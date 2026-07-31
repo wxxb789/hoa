@@ -27,8 +27,8 @@ targets:  runtime-agnostic | repo-only |
 
 | Artifact | Type | Areas | Targets | Path | Notes |
 |---|---|---|---|---|---|
-| ha-agent-retrieve | skill | self-management, software-development | runtime-agnostic | `skills/ha-agent-retrieve/` | 跨 agent 历史 → 带 coverage manifest、已去重的 Retrieval Bundle |
-| ha-introspect | skill | self-management, work-management | runtime-agnostic | `skills/ha-introspect/` | 分层自省报告:确定性使用 facets（L1）+ 带证据的盲点审计（L2） |
-| ha-introspect-distill | skill | self-management, software-development | runtime-agnostic | `skills/ha-introspect-distill/` | 把已批准的可复用工作提炼成 skill（或 opt-in 的 rule/config），经 runtime 原生 skill-creator 或内联产出 |
+| hoa-agent-retrieve | skill | self-management, software-development | runtime-agnostic | `skills/hoa-agent-retrieve/` | 跨 agent 历史 → 带 coverage manifest、已去重的 Retrieval Bundle |
+| hoa-introspect | skill | self-management, work-management | runtime-agnostic | `skills/hoa-introspect/` | 分层自省报告:确定性使用 facets（L1）+ 带证据的盲点审计（L2） |
+| hoa-introspect-distill | skill | self-management, software-development | runtime-agnostic | `skills/hoa-introspect-distill/` | 把已批准的可复用工作提炼成 skill（或 opt-in 的 rule/config），经 runtime 原生 skill-creator 或内联产出 |
 
 > 非 skill 类型（orchestration · agent · workflow · mcp · prompt · rule · eval · reflection）会在真实 artifact 落地时补充。

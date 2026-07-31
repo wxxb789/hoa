@@ -43,7 +43,7 @@ def load_object(path: Path) -> dict[str, object]:
 
 
 def read_bundle(path: Path) -> tuple[dict[str, object], list[dict[str, object]]]:
-    """Load an object bundle or a manifest-first JSONL bundle from ha-agent-retrieve."""
+    """Load an object bundle or a manifest-first JSONL bundle from hoa-agent-retrieve."""
     if path.stat().st_size > MAX_FILE_BYTES:
         raise ValueError("bundle exceeds maximum file size")
     try:

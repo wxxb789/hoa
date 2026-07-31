@@ -1,11 +1,11 @@
 ---
-name: ha-agent-retrieve
-description: "Search, gather, or inventory local AI-agent histories across runtimes and return a read-only, coverage-manifested Retrieval Bundle. Use for requests such as 'find every session where I touched X', 'pull my last month across agents', 'search my Claude Code, Codex, and OpenCode history', or when another workflow needs re-checkable cross-agent evidence. Do not use for one known file or session; use ha-introspect for analysis or conclusions, and ha-introspect-distill to create a skill."
+name: hoa-agent-retrieve
+description: "Search, gather, or inventory local AI-agent histories across runtimes and return a read-only, coverage-manifested Retrieval Bundle. Use for requests such as 'find every session where I touched X', 'pull my last month across agents', 'search my Claude Code, Codex, and OpenCode history', or when another workflow needs re-checkable cross-agent evidence. Do not use for one known file or session; use hoa-introspect for analysis or conclusions, and hoa-introspect-distill to create a skill."
 ---
 
 <!-- index: areas=self-management,software-development; targets=runtime-agnostic -->
 
-# ha-agent-retrieve
+# hoa-agent-retrieve
 
 Retrieve local, operator-authorized AI-agent history into a normalized evidence
 bundle. This is the retrieval primitive: it inventories coverage before it
@@ -36,8 +36,8 @@ and drift notes. `unsupported`, `not-found`, `inaccessible`, and
 
 ## Workflow
 
-1. Load an untracked config (`~/.config/ha/config.toml` or
-   `.ha/config.local.toml`) when available. It may enable agents and provide
+1. Load an untracked config (`~/.config/hoa/config.toml` or
+   `.hoa/config.local.toml`) when available. It may enable agents and provide
    explicit source roots; it must not be committed.
 2. Define the scope. Probe every requested core adapter and report one status
    per source. Probe optional adapters or MCP memory only when explicitly
@@ -75,12 +75,12 @@ inventory, not a claim that every runtime was searched.
 - **No secret scavenging:** search only selected sources; do not scan arbitrary
   disks, cloud accounts, credentials, or unrelated private folders. Excerpts
   should be minimal and only for the requested retrieval.
-- **No hard sibling dependency:** `ha-introspect` may consume this bundle when
+- **No hard sibling dependency:** `hoa-introspect` may consume this bundle when
   installed. If it is absent, the bundle remains independently useful;
   conversely, this skill does not require its files.
 - **No conclusions here:** report records, coverage, and deterministic counts.
   Send interpretation, work-pattern claims, and recommendations to
-  `ha-introspect`; send reusable-skill authoring to `ha-introspect-distill`.
+  `hoa-introspect`; send reusable-skill authoring to `hoa-introspect-distill`.
 
 ## Verification and stop condition
 

@@ -1,4 +1,4 @@
-# ha — Project Agent Instructions
+# hoa — Project Agent Instructions
 
 ## Generated Artifacts Output
 

@@ -1,11 +1,11 @@
 ---
-name: ha-introspect
-description: Produce an evidence-cited, cross-agent self-report with deterministic usage facets and a rigorously bounded blind-spot audit. Use only when explicitly asked for "my usage insights", "audit my work patterns", "where am I wasting effort", "blind spots", or a periodic "self-retro". Do not use for raw records or cross-agent search (use ha-agent-retrieve), a single-session summary, or creating a skill/rule from a finding (use ha-introspect-distill). Heavyweight and explicit-invocation-only; never run it ambiently.
+name: hoa-introspect
+description: Produce an evidence-cited, cross-agent self-report with deterministic usage facets and a rigorously bounded blind-spot audit. Use only when explicitly asked for "my usage insights", "audit my work patterns", "where am I wasting effort", "blind spots", or a periodic "self-retro". Do not use for raw records or cross-agent search (use hoa-agent-retrieve), a single-session summary, or creating a skill/rule from a finding (use hoa-introspect-distill). Heavyweight and explicit-invocation-only; never run it ambiently.
 ---
 
 <!-- index: areas=self-management,work-management; targets=runtime-agnostic -->
 
-# ha-introspect
+# hoa-introspect
 
 Turn a bounded set of agent-history records into a layered self-report:
 
@@ -19,7 +19,7 @@ observable work patterns within the supplied coverage only.
 
 ## Contract
 
-**Input.** Prefer a Retrieval Bundle from **ha-agent-retrieve** if that sibling
+**Input.** Prefer a Retrieval Bundle from **hoa-agent-retrieve** if that sibling
 is installed. Do not require it: in bounded mode, accept only a user-provided
 bundle, user-provided paths, or records directly accessible in this runtime.
 Say exactly what that restriction excludes. Read
@@ -84,7 +84,7 @@ measurement suggestion. When the records have no usable signal, write
 6. **Close honestly.** Summarize coverage, L1 facts, verified L2 findings (or
    `0 qualifying blind spots`), recommendations, candidate rules/configs, and
    On the Horizon. Refer a stable repeatable-work candidate to
-   **ha-introspect-distill** only when the user asks to create an asset.
+   **hoa-introspect-distill** only when the user asks to create an asset.
 
 ## Guardrails
 

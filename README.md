@@ -1,4 +1,4 @@
-# ha — Hall of Armor
+# hoa — Hall of Armor
 
 > **English** · [简体中文](./README.zh-CN.md)
 
@@ -20,7 +20,7 @@ This repo is a practice ground for two crafts:
 
 - **Harness engineering** — *capability = model × harness.* A harness is
   everything wrapped around the model: context, tools, control loop, memory,
-  permissions, output handling. `ha` doesn't store whole harnesses — a harness
+  permissions, output handling. `hoa` doesn't store whole harnesses — a harness
   is an *assembly*: the runtime's own **settings** (managed by chezmoi) plus
   **portable parts** from here (`skills/` installed via `npx skills`, with
   `agents/` `prompts/` `rules/` `mcps/` as the library they draw on).
@@ -32,7 +32,7 @@ This repo is a practice ground for two crafts:
 ## Personal aim, public repo
 
 Built for my **personal** use, but the repository is **public** — clone it,
-fork it, `npx skills add wxxb789/ha`, take any part you like. Because it is
+fork it, `npx skills add wxxb789/hoa`, take any part you like. Because it is
 public, **no secrets and no personal information are ever tracked by git** (see
 [`.gitignore`](./.gitignore)): commit templates and sanitized assets only; real
 credentials and private content stay untracked (`.env`, `*.key`, `*.token`,
@@ -43,7 +43,7 @@ credentials and private content stay untracked (`.env`, `*.key`, `*.token`,
 1. **Manage** — one versioned home for the portable agent parts, instead of
    copies scattered across `~/.claude`, `~/.codex`, `~/.config/opencode`, …
 2. **Deploy** — `skills/` installs into every runtime with `npx skills`;
-   runtime **settings** are deployed by chezmoi. `ha` reinvents neither.
+   runtime **settings** are deployed by chezmoi. `hoa` reinvents neither.
 3. **Reflect** — analyze / review / retro how I use AI agents: which setup wins
    which task, what worked, what broke, why I chose X.
 
@@ -52,23 +52,23 @@ credentials and private content stay untracked (`.env`, `*.key`, `*.token`,
 Hermes · Claude Code · Codex · pi · OpenCode · Kimi Code · *(any of the 70+
 agents `npx skills` supports)*
 
-## `ha` ↔ chezmoi (who owns what)
+## `hoa` ↔ chezmoi (who owns what)
 
 | Concern | Owner | Mechanism |
 |---|---|---|
-| Skills (`SKILL.md` packages) | **ha** | `npx skills add wxxb789/ha` → `~/<agent>/skills/` |
-| Agent roles, orchestration, prompts, rules, mcps, workflows, evals | **ha** | version-controlled library / knowledge (composed into skills or used by hand) |
-| Reflections & external refs | **ha** | knowledge, never deployed |
+| Skills (`SKILL.md` packages) | **hoa** | `npx skills add wxxb789/hoa` → `~/<agent>/skills/` |
+| Agent roles, orchestration, prompts, rules, mcps, workflows, evals | **hoa** | version-controlled library / knowledge (composed into skills or used by hand) |
+| Reflections & external refs | **hoa** | knowledge, never deployed |
 | Runtime **settings** — LLM provider, models, plugins, `settings.json` / `config.toml` / `opencode.json` | **chezmoi** | `chezmoi apply` |
 
 The split is deliberate: chezmoi already handles machine-specific settings and
-secret templating; `ha` handles the portable, shareable parts. No overlap, no
+secret templating; `hoa` handles the portable, shareable parts. No overlap, no
 custom deploy tooling.
 
 ## Structure
 
 ```text
-ha/
+hoa/
 ├── index.md · index.zh-CN.md   # every artifact, labeled by area + target
 ├── skills/        # THE deploy surface — SKILL.md packages installed via `npx skills`
 ├── agents/        # portable, runtime-agnostic role / persona / authority / I-O contracts
@@ -103,7 +103,7 @@ internally.
 | `workflows/` | outcome-centered finite steps | anything owning retry / continuation / agent scheduling (→ `orchestration/`) |
 | `evals/` | machine-runnable / repeatably-scored inputs + rubrics | prose analysis of results (→ `reflections/`) |
 | `reflections/` | observations, conclusions, decisions, retros | fixtures / configs / datasets used at run time |
-| `scripts/` | maintains the `ha` repo itself | runtime settings or hooks (→ chezmoi) |
+| `scripts/` | maintains the `hoa` repo itself | runtime settings or hooks (→ chezmoi) |
 
 > Edge cases: a stop-hook that tweaks a runtime is **settings** → chezmoi; a
 > generic continuation / termination pattern → `orchestration/`. A multi-agent
@@ -116,14 +116,14 @@ internally.
 [`skills`](https://github.com/vercel-labs/skills) CLI:
 
 ```bash
-# install all ha skills into every detected runtime (global)
-npx skills add wxxb789/ha -g
+# install all hoa skills into every detected runtime (global)
+npx skills add wxxb789/hoa -g
 
 # just some skills, into specific runtimes
-npx skills add wxxb789/ha -g -s <skill> -a claude-code -a opencode
+npx skills add wxxb789/hoa -g -s <skill> -a claude-code -a opencode
 
 # list before installing / update / remove
-npx skills add wxxb789/ha --list
+npx skills add wxxb789/hoa --list
 npx skills update
 npx skills remove <skill>
 ```
@@ -133,7 +133,7 @@ npx skills remove <skill>
   the current project.
 - **Symlink** by default (one canonical copy, easy updates) or `--copy` (Windows
   / no-symlink environments).
-- Everything else in `ha` is **library / knowledge** — not auto-deployed. Fold
+- Everything else in `hoa` is **library / knowledge** — not auto-deployed. Fold
   it into a skill, or reference it by hand.
 - Runtime **settings** deploy separately via `chezmoi apply`.
 
@@ -160,7 +160,7 @@ Type is derived from the folder. Both axes are multi-valued.
 
 ## Using this repo
 
-- **Anyone:** `npx skills add wxxb789/ha` to install the skills, or fork and
+- **Anyone:** `npx skills add wxxb789/hoa` to install the skills, or fork and
   take whichever parts help.
-- **Me:** author skills here → `npx skills add wxxb789/ha -g` → they land in
+- **Me:** author skills here → `npx skills add wxxb789/hoa -g` → they land in
   every runtime; settings ride along via chezmoi.

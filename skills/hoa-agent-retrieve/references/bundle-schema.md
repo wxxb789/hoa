@@ -1,6 +1,6 @@
 # Retrieval Bundle schema
 
-`ha-agent-retrieve` owns this contract. Consumers may add fields, but they must
+`hoa-agent-retrieve` owns this contract. Consumers may add fields, but they must
 preserve the manifest-first ordering and may not infer absence from an
 unavailable source.
 

@@ -1,4 +1,4 @@
-"""Fail-closed output-location safety for ha skills.
+"""Fail-closed output-location safety for hoa skills.
 
 The AGENT supplies the target path; this module only VALIDATES it - it never
 auto-discovers, auto-redirects, or writes. A path is safe only when it is

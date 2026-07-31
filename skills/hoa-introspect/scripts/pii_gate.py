@@ -33,11 +33,11 @@ def redirect(kind: str) -> Path:
     """Choose the platform state-directory redirect without creating it."""
     timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     if sys.platform == "win32":
-        base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / "ha"
+        base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / "hoa"
     elif sys.platform == "darwin":
-        base = Path.home() / "Library" / "Application Support" / "ha"
+        base = Path.home() / "Library" / "Application Support" / "hoa"
     else:
-        base = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state")) / "ha"
+        base = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state")) / "hoa"
     return base / kind / timestamp
 
 

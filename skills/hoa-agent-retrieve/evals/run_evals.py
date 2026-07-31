@@ -235,7 +235,7 @@ def main() -> int:
     cases = (("manifest-statuses", lambda temp: test_manifest_statuses(fixture_dir, temp)), ("usage-fields-and-cross-agent-dedup", test_usage_fields_and_cross_agent_dedup), ("inaccessible-enumeration", test_inaccessible_enumeration_does_not_abort), ("cross-worktree-refusal", test_cross_worktree_refusal), ("sqlite-and-limit", test_sqlite_and_limit), ("locator-shapes", test_locator_shapes), ("partial-jsonl-and-source-budgets", test_partial_jsonl_and_source_budgets), ("symlinks-and-safety-fail-closed", test_symlinks_and_safety_fail_closed), ("project-and-time-filters", test_project_and_time_filters))
     outcomes: list[dict[str, str]] = []
     for name, case in cases:
-        with tempfile.TemporaryDirectory(prefix="ha-agent-retrieve-eval-") as directory:
+        with tempfile.TemporaryDirectory(prefix="hoa-agent-retrieve-eval-") as directory:
             case(Path(directory))
         outcomes.append({"fixture": name, "expected": "pass", "actual": "pass"})
     for outcome in outcomes:

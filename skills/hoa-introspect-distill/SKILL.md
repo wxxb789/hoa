@@ -1,17 +1,17 @@
 ---
-name: ha-introspect-distill
+name: hoa-introspect-distill
 description: >-
   Distill approved repeatable work into a reusable skill, or an explicitly opted-in
   rule/config change. Use when asked to "distill this", "turn this workflow into a
   skill", "turn this workflow into a rule", or when handing off repeatable-work
-  findings from an ha-introspect report. Do not use for the work-pattern audit itself
-  (use ha-introspect), raw cross-agent history retrieval (use ha-agent-retrieve), or
+  findings from an hoa-introspect report. Do not use for the work-pattern audit itself
+  (use hoa-introspect), raw cross-agent history retrieval (use hoa-agent-retrieve), or
   a one-off task that is not worth reusing.
 ---
 
 <!-- index: areas=self-management,software-development; targets=runtime-agnostic -->
 
-# ha-introspect-distill
+# hoa-introspect-distill
 
 Turn repeatable work into a small reusable asset, but only after the operator approves
 that exact asset. This skill proposes; it never converts an interesting pattern into a
@@ -19,7 +19,7 @@ tracked capability by itself.
 
 ## Contract
 
-**Input.** Take an `ha-introspect` repeatable-work finding or a direct user description.
+**Input.** Take an `hoa-introspect` repeatable-work finding or a direct user description.
 When no history evidence exists, label its basis `user-provided`; do not imply an audit
 occurred. Consume only the minimal report shape in [intake schema](references/intake-schema.md).
 
@@ -34,7 +34,7 @@ spec-versus-created diff.
 
 ## Workflow
 
-1. **Intake and qualify.** Reuse evidence supplied by `ha-introspect`; do not re-audit.
+1. **Intake and qualify.** Reuse evidence supplied by `hoa-introspect`; do not re-audit.
    With evidence, prefer stable multi-step work observed at least three times across two
    projects. Reject work already covered, narrowly project-specific work, and one-offs.
    Direct requests may still qualify, but retain the `user-provided` label.
@@ -71,8 +71,8 @@ spec-versus-created diff.
   approved, and proved untracked or outside every Git worktree before writing.
 - Keep personal paths, secrets, session ids, and raw history out of tracked assets and
   chat echoes. Use an untracked artifact location for sensitive reports.
-- Sibling composition is soft: if `ha-introspect` is unavailable, accept a direct basis;
-  if `ha-agent-retrieve` is unavailable, do not attempt raw retrieval here.
+- Sibling composition is soft: if `hoa-introspect` is unavailable, accept a direct basis;
+  if `hoa-agent-retrieve` is unavailable, do not attempt raw retrieval here.
 
 ## References
 

@@ -122,7 +122,7 @@ def output_path(explicit: Path | None) -> Path:
     if explicit is not None:
         return explicit.expanduser().resolve()
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    state = Path(os.environ.get("LOCALAPPDATA", Path.home() / ".local" / "state")) / "ha" / "retrieval"
+    state = Path(os.environ.get("LOCALAPPDATA", Path.home() / ".local" / "state")) / "hoa" / "retrieval"
     return (state / stamp / "retrieval-bundle.jsonl").resolve()
 
 

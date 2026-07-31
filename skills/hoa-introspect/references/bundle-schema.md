@@ -1,8 +1,8 @@
-# Minimal Retrieval Bundle consumed by ha-introspect
+# Minimal Retrieval Bundle consumed by hoa-introspect
 
-`ha-introspect` consumes the public contract below. It intentionally does not
+`hoa-introspect` consumes the public contract below. It intentionally does not
 define discovery paths, agent adapters, or source catalogs; those belong to
-**ha-agent-retrieve** when it is available.
+**hoa-agent-retrieve** when it is available.
 
 Narrative report language is configured separately through untracked
 `report_language` (default `en-US`); this machine-readable schema, including
@@ -66,7 +66,7 @@ The aggregator uses optional explicit fields only; it never guesses from prose:
 
 ```json
 {
-  "skills": ["ha-introspect", "plugin:review"],
+  "skills": ["hoa-introspect", "plugin:review"],
   "mcp": ["memory.search"],
   "agent_types": ["explore"],
   "friction_events": ["retry"]

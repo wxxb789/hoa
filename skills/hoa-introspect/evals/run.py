@@ -5,7 +5,7 @@
 # ///
 # ─── How to run ───
 # python evals/run.py
-"""Run self-contained behavior checks for ha-introspect safety contracts."""
+"""Run self-contained behavior checks for hoa-introspect safety contracts."""
 
 from __future__ import annotations
 
@@ -93,7 +93,7 @@ def assert_pii_gate() -> None:
 
 
 def assert_jsonl_bundle_accepted() -> None:
-    """Given a manifest-first JSONL bundle (ha-agent-retrieve's real output), then parse it."""
+    """Given a manifest-first JSONL bundle (hoa-agent-retrieve's real output), then parse it."""
     manifest = {"kind": "coverage_manifest", "sources": [{"agent": "demo", "status": "available"}]}
     record = {"kind": "record", "agent": "demo", "origin_fingerprint": "o1", "locator": {"file": "x", "line": 1}, "skills": ["demo"]}
     with tempfile.TemporaryDirectory() as directory:

@@ -1,7 +1,7 @@
 # Minimal intake schema
 
-`ha-introspect-distill` consumes a repeatable-work finding, not a complete audit bundle.
-Keeping the boundary small lets `ha-introspect` remain optional while preserving evidence
+`hoa-introspect-distill` consumes a repeatable-work finding, not a complete audit bundle.
+Keeping the boundary small lets `hoa-introspect` remain optional while preserving evidence
 honesty.
 
 ```json
