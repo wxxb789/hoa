@@ -28,8 +28,10 @@ Hand-curated for now; Phase 3 may generate it from per-artifact metadata.
 | Artifact | Type | Areas | Targets | Path | Notes |
 |---|---|---|---|---|---|
 | define-goal | skill | self-management, software-development, work-management | codex | `skills/define-goal/` | turn fuzzy intent into a measurable objective and create it with Codex goal tools |
+| ghc-search | skill | software-development | runtime-agnostic | `skills/ghc-search/` | web and X/Twitter search through the local `ghc-proxy` Responses API; answer plus deduped sources |
 | hoa-agent-retrieve | skill | self-management, software-development | runtime-agnostic | `skills/hoa-agent-retrieve/` | cross-agent history → coverage-manifested, deduped Retrieval Bundle |
 | hoa-introspect | skill | self-management, work-management | runtime-agnostic | `skills/hoa-introspect/` | layered self-report: deterministic usage facets (L1) + evidence-cited blind-spot audit (L2) |
 | hoa-introspect-distill | skill | self-management, software-development | runtime-agnostic | `skills/hoa-introspect-distill/` | distill approved repeatable work into a skill (or opt-in rule/config) via the runtime-native skill-creator or inline |
+| my-ado-cppr | skill | software-development | runtime-agnostic | `skills/my-ado-cppr/` | commit → push → create/update PR on Azure DevOps or GitHub; probe/plan/apply with resumable state |
 
 > Non-skill types (orchestration · agent · workflow · mcp · prompt · rule · eval · reflection) populate as real artifacts land.
