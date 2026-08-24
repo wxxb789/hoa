@@ -64,12 +64,18 @@ directory. Running the script directly still creates the worktree and prints its
 path; it just leaves you where you were, and says so.
 
 ## Layout & why
-Worktrees live at `<repo-parent>/.wt/<repo>/<branch>`:
+Worktrees live at `<repo-parent>/.wt/<repo>/<branch-slug>`, where the slug is the
+branch name reduced to `[A-Za-z0-9._-]` plus a short `git hash-object` digest of the
+full name:
 - **same drive** as the repo → avoids the Windows cross-drive cwd-drift trap (subagent writes
   landing in the wrong physical dir).
 - **outside** the repo dir → main `git status` stays clean; no double-load of `CLAUDE.md`
   / `AGENTS.md` by tools that walk parent dirs.
   (Alt: some put worktrees under `.git/wt/` so tools ignore them entirely — also valid.)
+- **digest suffix** → the readable half is lossy (`/` and space become `-`, non-ASCII
+  drops out), so `feature/one` and `feature-one` would otherwise share a directory and
+  the second `gitwt new` would hand back the first branch's checkout. `gitwt new` also
+  refuses to reuse a directory git does not have checked out on the requested branch.
 
 ## Per-tool worktree support (verified 2026-06-15)
 | Tool | Native worktree | Use with `gitwt` |
@@ -87,10 +93,13 @@ that only Claude Code had built in.
 ## The 3 pain points and how `gitwt` solves them (community-validated)
 1. **Env/ports collide** when every worktree runs a dev server → `gitwt env` writes a
    `direnv` `.envrc` that inherits the main `.env`/venv and assigns a deterministic
-   per-worktree `PORT` (3000–3999 from a path hash). (Pattern from waldencui's "direnv
-   is all you need".) Requires `direnv`.
+   per-worktree `PORT` (3000–3999 from a path hash). Worktrees are siblings of the main
+   checkout, not children, so direnv would never find a `.envrc` left only in the repo —
+   `gitwt` copies it into each worktree (`direnv allow` each one once). (Pattern from
+   waldencui's "direnv is all you need".) Requires `direnv`.
 2. **Gitignored files don't follow** (`.env`) → copy-on-create via `.worktreeinclude`
-   (Claude-compatible) and `git config gitwt.copy`.
+   (Claude-compatible) and `git config gitwt.copy`. Both accept globs (`**/.env.example`),
+   expanded before copying.
 3. **Deps need reinstalling** per worktree → `git config gitwt.hook "npm install"` runs
    automatically after `gitwt new`.
 
@@ -136,5 +145,9 @@ GNU-only constructs so it runs on Windows git-bash, macOS, and Linux:
 
 ## References
 - `references/gitwt` — the helper (put it on PATH, `chmod +x`).
+- `scripts/test_gitwt.sh` — regression tests (`bash skills/git-worktree-workflow/scripts/test_gitwt.sh`).
+  Builds a throwaway repo whose path contains a space and asserts the four behaviours
+  that broke before: space-safe root parsing, collision-free branch slugs, `.envrc`
+  reaching each worktree, and glob copy patterns expanding.
 - Git worktree docs: https://git-scm.com/docs/git-worktree
 - direnv pattern: waldencui "direnv is all you need to parallelize … with git worktrees".
