@@ -29,6 +29,7 @@ Hand-curated for now; Phase 3 may generate it from per-artifact metadata.
 |---|---|---|---|---|---|
 | define-goal | skill | self-management, software-development, work-management | codex | `skills/define-goal/` | turn fuzzy intent into a measurable objective and create it with Codex goal tools |
 | ghc-search | skill | software-development | runtime-agnostic | `skills/ghc-search/` | web and X/Twitter search through the local `ghc-proxy` Responses API; answer plus deduped sources |
+| git-worktree-workflow | skill | software-development, work-management | runtime-agnostic | `skills/git-worktree-workflow/` | run several agent CLIs in parallel on one repo via isolated worktrees; ships the `gitwt` helper |
 | hoa-agent-retrieve | skill | self-management, software-development | runtime-agnostic | `skills/hoa-agent-retrieve/` | cross-agent history → coverage-manifested, deduped Retrieval Bundle |
 | hoa-introspect | skill | self-management, work-management | runtime-agnostic | `skills/hoa-introspect/` | layered self-report: deterministic usage facets (L1) + evidence-cited blind-spot audit (L2) |
 | hoa-introspect-distill | skill | self-management, software-development | runtime-agnostic | `skills/hoa-introspect-distill/` | distill approved repeatable work into a skill (or opt-in rule/config) via the runtime-native skill-creator or inline |

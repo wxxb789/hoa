@@ -1,0 +1,484 @@
+#!/usr/bin/env bash
+# gitwt — tool-agnostic git worktree workflow (v2)
+# Works with ANY agent CLI: Claude Code · Codex · PI · OpenCode · Hermes · aider · gemini …
+# Philosophy: a thin shell over `git worktree`. Agents are pluggable — they just `cd` in and run.
+#   No tool's private --worktree flag is used, so you can switch tools freely.
+#
+# Named `gitwt` -- deliberately neither `wt` nor `git-wt`:
+#   * `wt` is Windows Terminal's App Execution Alias on Windows
+#     (%LOCALAPPDATA%\Microsoft\WindowsApps\wt.exe). A helper named `wt` only wins
+#     by PATH order, and loses the moment its own dir drops out of PATH -- at which
+#     point `wt --shell` reaches Windows Terminal, whose CLI11 parser rejects the
+#     flag with a modal error dialog on every shell start.
+#   * `git-wt` is the binary name of k1LoW/git-wt, a widely installed Go worktree
+#     tool. Same name on PATH, and its CLI has NO subcommands -- `git wt list`
+#     there creates a worktree called "list". Sharing the name would make a future
+#     `brew install k1LoW/tap/git-wt` silently shadow this script with one whose
+#     verbs mean something else.
+# `gitwt` collides with neither, at the cost of not being a `git <verb>` subcommand.
+#
+# Design:
+#   - worktrees live at  <repo-parent>/.wt/<repo>/<branch>
+#       * same drive as the repo  -> avoids the Windows cross-drive cwd-drift trap
+#       * outside the repo dir     -> keeps main `git status` clean, no CLAUDE.md double-load
+#   - copy-on-create for gitignored files (.env etc.) via .worktreeinclude / gitwt.copy
+#   - postCreate hooks (gitwt.hook) -> auto `npm install` / `uv sync` per worktree
+#   - `gitwt env` drops a direnv .envrc that auto-isolates env + per-worktree PORT
+#   - `gitwt clean` removes worktrees whose branches are already merged
+# English by convention. Idempotent where possible.
+set -euo pipefail
+
+# ---- locate repo + worktree root -------------------------------------------
+_gitwt_main_root() {  # MAIN worktree (works even when called from inside a linked worktree)
+  # Take everything after the "worktree " prefix, not the second whitespace field:
+  # a repo path containing spaces ("/tmp/repo with space") is one value, and $2
+  # would truncate it to "/tmp/repo" -- every command would then derive a
+  # nonexistent path. "worktree " is 9 chars, so the value starts at offset 10.
+  git worktree list --porcelain 2>/dev/null | awk '/^worktree /{print substr($0, 10); exit}'
+}
+_gitwt_base_dir() {
+  local main; main="$(_gitwt_main_root)" || return 1
+  echo "$(dirname "$main")/.wt/$(basename "$main")"
+}
+_gitwt_slug() {
+  # Slugify a branch name into a directory name, then append a short digest of the
+  # ORIGINAL name. The readable half is lossy on purpose -- `/` and space collapse to
+  # `-` and non-ASCII drops out -- so `feature/one`, `feature-one` and a CJK-only
+  # branch would otherwise land on one directory, and `gitwt new` for the second
+  # branch would hand back the first one's checkout. The digest restores injectivity:
+  # distinct branch names always get distinct directories, and one name always maps
+  # to the same directory.
+  #
+  # Written with explicit ranges rather than `tr -cd '[:alnum:]._-'`: GNU tr reads the
+  # bracket expression as a character class, but BSD/macOS tr also treats the literal
+  # `[` and `]` as members of the set, so a branch containing brackets would slug
+  # differently per platform and resolve to a different worktree directory on each.
+  #
+  # `git hash-object` rather than sha1sum/shasum/md5: git is already a hard dependency
+  # and works outside a repo with --stdin, whereas the digest utilities differ in name
+  # and flags across Linux, macOS, and git-bash.
+  local readable digest
+  readable="$(printf '%s' "$1" | tr '/ ' '--' | tr -cd 'a-zA-Z0-9._-')"
+  digest="$(printf '%s' "$1" | git hash-object --stdin)"
+  digest="${digest:0:8}"
+  if [ -n "$readable" ]; then echo "${readable}-${digest}"; else echo "wt-${digest}"; fi
+}
+_gitwt_is_worktree_of() {  # dir, branch — true when git has dir checked out on branch
+  local dir="$1" branch="$2" head
+  head="$(git -C "$dir" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+  [ "$head" = "$branch" ]
+}
+_gitwt_default_branch() {
+  local main; main="$(_gitwt_main_root)"
+  git -C "$main" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##' \
+    || { git -C "$main" show-ref --verify --quiet refs/heads/main && echo main || echo master; }
+}
+
+# ---- config lookup: gitwt.* with legacy wt.* fallback -----------------------
+# The helper was called `wt` before the Windows Terminal collision forced a rename;
+# repos configured then still carry wt.copy / wt.hook. Read both, new name first.
+_gitwt_config_all() {
+  local key="$1" repo="$2"
+  git -C "$repo" config --get-all "gitwt.$key" 2>/dev/null || true
+  git -C "$repo" config --get-all "wt.$key" 2>/dev/null || true
+}
+
+# ---- copy-on-create: .worktreeinclude (Claude-compatible) + gitwt.copy ------
+# Patterns are globs, not filenames: the documented `**/.env.example` and any glob in
+# .worktreeinclude must be EXPANDED before existence is tested. A quoted `[ -e "$src/$pat" ]`
+# tests the literal string, so every wildcard pattern silently copied nothing.
+# `find` rather than shell globbing: bash's `**` only spans directories under `shopt -s
+# globstar` (off by default, and absent in the bash 3.2 that ships on macOS), and an
+# unmatched glob would otherwise pass through as a literal.
+_gitwt_expand_pattern() {  # src, pattern -> matching paths relative to src, one per line
+  local src="$1" pat="$2"
+  case "$pat" in
+    '**/'*)  # leading `**/` means "at any depth, INCLUDING the top level"
+      local rest="${pat#**/}"
+      ( cd "$src" && find . -name .git -prune -o \( -path "./*/$rest" -o -path "./$rest" \) -print 2>/dev/null ) ;;
+    *[*?[]*) # any other glob
+      ( cd "$src" && find . -name .git -prune -o -path "./$pat" -print 2>/dev/null ) ;;
+    *)       # plain path: no expansion needed
+      [ -e "$src/$pat" ] && echo "./$pat" ;;
+  esac | sed 's#^\./##'
+  return 0
+}
+_gitwt_copy_one() {  # src, dst, relative-path, label
+  local src="$1" dst="$2" rel="$3" label="$4"
+  [ -e "$src/$rel" ] || return 0
+  mkdir -p "$dst/$(dirname "$rel")" || return 0
+  cp -r "$src/$rel" "$dst/$rel" 2>/dev/null || return 0
+  echo "  + copied$label $rel"
+}
+_gitwt_copy_includes() {
+  local src="$1" dst="$2"
+  local pat rel
+  # 1) .worktreeinclude — identical semantics to Claude Code (gitignored matches only)
+  local inc="$src/.worktreeinclude"
+  if [ -f "$inc" ]; then
+    while IFS= read -r pat; do
+      [ -z "$pat" ] && continue; case "$pat" in \#*) continue;; esac
+      while IFS= read -r rel; do
+        [ -n "$rel" ] || continue
+        # check-ignore on the MATCHED path, not the pattern: only gitignored files
+        # are copied, which is what makes this Claude-compatible.
+        ( cd "$src" && git check-ignore -q "$rel" 2>/dev/null ) || continue
+        _gitwt_copy_one "$src" "$dst" "$rel" ""
+      done < <(_gitwt_expand_pattern "$src" "$pat")
+    done < "$inc"
+  fi
+  # 2) gitwt.copy (multi-valued) — explicit patterns, even if NOT gitignored
+  local cps=()
+  while IFS= read -r pat; do [ -n "$pat" ] && cps+=("$pat"); done \
+    < <(_gitwt_config_all copy "$src")
+  for pat in "${cps[@]:-}"; do
+    [ -z "$pat" ] && continue
+    while IFS= read -r rel; do
+      [ -n "$rel" ] || continue
+      _gitwt_copy_one "$src" "$dst" "$rel" " (gitwt.copy)"
+    done < <(_gitwt_expand_pattern "$src" "$pat")
+  done
+  return 0
+}
+
+# ---- direnv .envrc: seed into every managed worktree ------------------------
+# direnv searches UPWARD from the cwd for a .envrc. Worktrees live at
+# <repo-parent>/.wt/<repo>/<slug>, which is NOT below the main checkout, so a
+# .envrc written only into the main repo is never discovered from a worktree --
+# and the recommended `.gitignore` entry keeps the checkout from carrying one
+# either. Copy it in, so each worktree evaluates the file with its own cwd and
+# therefore gets its own PORT.
+_gitwt_seed_envrc() {
+  local main="$1" dst="$2"
+  [ -f "$main/.envrc" ] || return 0
+  [ "$main" = "$dst" ] && return 0
+  [ -e "$dst/.envrc" ] && return 0
+  cp "$main/.envrc" "$dst/.envrc" || return 0
+  # Not auto-allowed: direnv's trust gate exists because a .envrc can arrive from
+  # a clone rather than from the user, and gitwt copies whatever the main repo has.
+  echo "  + copied .envrc — run: direnv allow \"$dst\""
+}
+_gitwt_seed_envrc_all() {  # backfill worktrees created before `gitwt env` ran
+  local main="$1" base d
+  base="$(_gitwt_base_dir 2>/dev/null || true)"
+  [ -n "$base" ] && [ -d "$base" ] || return 0
+  for d in "$base"/*/; do
+    [ -d "$d" ] || continue
+    _gitwt_seed_envrc "$main" "${d%/}"
+  done
+  return 0
+}
+
+# ---- postCreate hooks: gitwt.hook (multi-valued) ---------------------------
+# Read into an array first (avoids the while|pipe subshell swallowing execution).
+_gitwt_run_hooks() {
+  local dst="$1" cmd
+  local hooks=()
+  while IFS= read -r cmd; do [ -n "$cmd" ] && hooks+=("$cmd"); done \
+    < <(_gitwt_config_all hook "$dst")
+  for cmd in "${hooks[@]:-}"; do
+    [ -z "$cmd" ] && continue
+    echo "  > hook: $cmd"
+    ( cd "$dst" && eval "$cmd" ) || { echo "  ! hook failed: $cmd" >&2; return 1; }
+  done
+  return 0
+}
+
+# ---- commands --------------------------------------------------------------
+cmd_new() {   # gitwt new <branch> [base-ref]   (prints path on last line)
+  local branch="${1:?usage: gitwt new <branch> [base-ref]}"; local base="${2:-}"
+  local main; main="$(_gitwt_main_root)"
+  local dir; dir="$(_gitwt_base_dir)/$(_gitwt_slug "$branch")"
+  if [ -d "$dir" ]; then
+    # Reuse only what git actually has checked out on THIS branch. The slug digest
+    # already makes two branch names collide impossible, but a directory can survive
+    # its worktree (an interrupted `worktree remove`, a manual mkdir), and returning
+    # that silently would hand the caller a tree that is not on the requested branch.
+    if _gitwt_is_worktree_of "$dir" "$branch"; then
+      echo "gitwt: reuse $dir" >&2; echo "$dir"; return 0
+    fi
+    echo "gitwt: $dir exists but is not a worktree on '$branch'" >&2
+    echo "       remove it (gitwt rm '$branch' --force, or rm -rf) and retry" >&2
+    return 1
+  fi
+  mkdir -p "$(dirname "$dir")"
+  if git -C "$main" show-ref --verify --quiet "refs/heads/$branch"; then
+    git -C "$main" worktree add "$dir" "$branch" >&2
+  elif [ -n "$base" ]; then
+    git -C "$main" worktree add "$dir" -b "$branch" "$base" >&2
+  else
+    git -C "$main" worktree add "$dir" -b "$branch" >&2
+  fi
+  _gitwt_copy_includes "$main" "$dir" >&2
+  _gitwt_seed_envrc "$main" "$dir" >&2
+  _gitwt_run_hooks "$dir" >&2 || true
+  echo "$dir"
+}
+
+cmd_switch() {  # gitwt <branch>  — create/reuse and print path; with shell fn, cd's in
+  local branch="${1:?usage: gitwt <branch>}"
+  # Always route through cmd_new: a bare `-d` test would accept a directory that is
+  # not a worktree on this branch, and cmd_new is the one place that verifies it.
+  local dir; dir="$(cmd_new "$branch")"
+  echo "$dir"
+  # Reached when the script runs as a plain executable rather than through the
+  # `gitwt` shell function -- e.g. before common.bash has sourced the function,
+  # or from another script. A child process cannot change its caller's cwd, so
+  # the worktree is ready but the caller has not moved. Say so instead of
+  # leaving a bare path that reads like a successful switch.
+  if [ -z "${_GITWT_SHELL_FN:-}" ] && [ -t 2 ]; then
+    echo "gitwt: worktree ready, but this invocation cannot cd for you." >&2
+    echo "       start a new shell (so common.bash loads the gitwt function)," >&2
+    echo "       or: cd \"\$(gitwt path $branch)\"" >&2
+  fi
+}
+
+cmd_list() { git worktree list; }
+cmd_path() { echo "$(_gitwt_base_dir)/$(_gitwt_slug "${1:?usage: gitwt path <branch>}")"; }
+
+cmd_rm() {    # gitwt rm <branch> [--force]
+  local branch="${1:?usage: gitwt rm <branch> [--force]}"; shift || true
+  local main; main="$(_gitwt_main_root)"
+  local dir; dir="$(_gitwt_base_dir)/$(_gitwt_slug "$branch")"
+  git -C "$main" worktree remove "$dir" "$@"
+  git -C "$main" branch -d "$branch" 2>/dev/null || true
+  echo "gitwt: removed $dir"
+}
+
+cmd_prune() {
+  local main; main="$(_gitwt_main_root)"
+  git -C "$main" worktree prune -v
+  # Only ever hand `find -delete` a real, non-empty base dir. If _gitwt_base_dir
+  # came back empty (not in a repo), `find "" ...` is implementation-defined and
+  # some versions fall back to the current directory -- not something to risk with
+  # -delete. -maxdepth/-empty keep it to leftover empty slug dirs directly under
+  # the base; the worktrees themselves are removed by git, never by this.
+  local base; base="$(_gitwt_base_dir 2>/dev/null || true)"
+  [ -n "$base" ] && [ -d "$base" ] || return 0
+  find "$base" -maxdepth 1 -type d -empty -delete 2>/dev/null || true
+}
+
+cmd_clean() { # gitwt clean [--merged] [--force]  — drop worktrees whose branch is merged into default
+  local main; main="$(_gitwt_main_root)"; local def; def="$(_gitwt_default_branch)"
+  local force=""; for a in "$@"; do [ "$a" = "--force" ] && force="--force"; done
+  # Use git's own notion of "merged into default" (branches fully contained in $def).
+  # Protect against data loss: a worktree with uncommitted/untracked changes is
+  # skipped unless --force is given (git worktree remove already refuses dirty ones).
+  local br dir branches=()
+  while IFS= read -r br; do
+    # Strip a leading "* " marker and surrounding whitespace using shell builtins.
+    # `xargs` would also do it, but BSD/macOS xargs interprets quotes in its input,
+    # so a branch name containing one would be mangled or make xargs fail outright.
+    br="${br#\*}"
+    br="${br#"${br%%[![:space:]]*}"}"   # ltrim
+    br="${br%"${br##*[![:space:]]}"}"   # rtrim
+    [ -n "$br" ] && [ "$br" != "$def" ] && branches+=("$br")
+  done < <(git -C "$main" branch --merged "$def" --format='%(refname:short)' 2>/dev/null || true)
+  if [ "${#branches[@]}" -eq 0 ]; then echo "gitwt: no merged branches with worktrees to clean"; cmd_prune; return 0; fi
+  for br in "${branches[@]:-}"; do
+    [ -z "$br" ] && continue
+    dir="$(_gitwt_base_dir)/$(_gitwt_slug "$br")"
+    [ -d "$dir" ] || continue            # only touch branches that HAVE a managed worktree
+    echo "gitwt: clean merged '$br'  ($dir)"
+    if git -C "$main" worktree remove $force "$dir" 2>/dev/null; then
+      git -C "$main" branch -d "$br" 2>/dev/null || true
+    else
+      echo "  ! skipped — worktree has local changes; use: gitwt clean --merged --force"
+    fi
+  done
+  cmd_prune
+}
+
+cmd_env() {   # gitwt env  — write a direnv .envrc into the MAIN repo and seed it into worktrees
+  local main; main="$(_gitwt_main_root)"; local f="$main/.envrc"
+  if [ -e "$f" ]; then
+    echo "gitwt: $f already exists — not overwriting" >&2
+    # Still useful: push the existing file into worktrees that lack it.
+    _gitwt_seed_envrc_all "$main"
+    return 1
+  fi
+  cat > "$f" <<'ENVRC'
+# Managed by `gitwt env`. Auto-isolates env across git worktrees (direnv).
+# Each worktree inherits the MAIN worktree's .env + venv, and gets a stable unique PORT.
+# substr($0, 10) drops the "worktree " prefix and keeps the rest verbatim, so a repo
+# path containing spaces survives; $2 would truncate it at the first space.
+_main="$(git worktree list --porcelain | awk '/^worktree /{print substr($0, 10); exit}')"
+
+# 1) share the main worktree's .env (then let a local .env override)
+dotenv_if_exists "$_main/.env"
+dotenv_if_exists ".env"
+
+# 2) share a Python venv if the main worktree has one.
+#    Windows venvs put executables in Scripts/, POSIX ones in bin/ -- probe both so
+#    this .envrc works unchanged on Windows (git-bash), macOS, and Linux.
+if [ -d "$_main/.venv" ]; then
+  export VIRTUAL_ENV="$_main/.venv"
+  if [ -d "$_main/.venv/bin" ]; then
+    PATH_add "$_main/.venv/bin"
+  elif [ -d "$_main/.venv/Scripts" ]; then
+    PATH_add "$_main/.venv/Scripts"
+  fi
+fi
+
+# 3) deterministic per-worktree port (3000–3999), derived from the worktree path hash
+_h=$(pwd | cksum | cut -d' ' -f1)
+export PORT=$(( 3000 + (_h % 1000) ))
+export DEV_PORT="$PORT"
+ENVRC
+  echo "gitwt: wrote $f"
+  _gitwt_seed_envrc_all "$main"
+  echo "    -> add '.envrc' to .gitignore (or commit it for the team)"
+  echo "    -> run: direnv allow $main"
+  echo "    -> new worktrees get a copy automatically; allow each one once"
+  command -v direnv >/dev/null || echo "    !! direnv not installed — see: https://direnv.net"
+}
+
+cmd_doctor() {
+  echo "git:     $(git --version 2>/dev/null || echo MISSING)"
+  echo "direnv:  $(direnv --version 2>/dev/null || echo 'NOT installed (needed for gitwt env)')"
+  printf "agents:  "; for t in claude codex pi opencode hermes aider gemini; do
+    command -v "$t" >/dev/null 2>&1 && printf "%s " "$t"; done; echo
+  local b; b="$(_gitwt_base_dir 2>/dev/null)" && echo "wt base: $b" || echo "wt base: (not in a git repo)"
+  # The rename exists to keep this helper off Windows Terminal's `wt` alias; say so
+  # when a bare `wt` on PATH is in fact Windows Terminal, so it is never mistaken
+  # for a stale copy of this script.
+  local w; w="$(command -v wt 2>/dev/null || true)"
+  case "$w" in
+    '') ;;
+    *WindowsApps*|*WindowsTerminal*) echo "note:    'wt' on PATH is Windows Terminal ($w), not this helper — expected" ;;
+    *) echo "note:    a separate 'wt' exists at $w" ;;
+  esac
+}
+
+usage() {
+cat <<'EOF'
+gitwt — tool-agnostic git worktree helper (any agent CLI: claude/codex/pi/opencode/hermes/…)
+
+  gitwt <branch>                  create/reuse worktree + cd into it (needs shell fn; see `gitwt --shell`)
+  gitwt new <branch> [base]       create/reuse a worktree, print its path
+  gitwt ls                        list all worktrees
+  gitwt path <branch>             print the worktree path
+  gitwt run <tool> <branch> [-- …]  isolate + launch any agent CLI in the worktree
+  gitwt rm <branch> [--force]     remove worktree + delete merged branch
+  gitwt clean [--merged] [--force]  remove worktrees whose branch is already merged
+  gitwt prune                     clean stale metadata + empty dirs
+  gitwt env                       drop a direnv .envrc (auto env + unique PORT per worktree)
+  gitwt doctor                    check git/direnv/agents + show layout
+  gitwt --shell                   print a shell function so `gitwt <branch>` can cd for you
+
+Not a `git <verb>` subcommand by design: that would require the name `git-wt`,
+which is the binary of k1LoW/git-wt -- a different tool whose CLI has no
+subcommands, so `git wt list` there creates a worktree named "list".
+Also not to be confused with `wt`, which on Windows is Windows Terminal.
+
+Config (per-repo, via `git config`):
+  git config --add gitwt.copy "**/.env.example"   # extra files to copy into new worktrees
+  git config --add gitwt.hook "npm install"        # run after creating a worktree
+  git config --add gitwt.hook "uv sync"
+  (legacy wt.copy / wt.hook are still honoured)
+
+Worktrees: <repo-parent>/.wt/<repo>/<branch>   (same drive, outside repo).
+Also honours .worktreeinclude (Claude Code-compatible) for gitignored copies.
+EOF
+}
+
+emit_shell_fn() {
+# Resolve this script's own absolute path and bake it into the emitted function.
+# common.bash may source us via an absolute path when ~/.local/bin is not on PATH
+# (macOS in particular -- this dotfiles repo never adds that dir), in which case a
+# bare `command gitwt` inside the function would not resolve. $0 is what the caller
+# invoked us as; make it absolute without readlink -f, which BSD/macOS lacks.
+local _self
+case "$0" in
+  /*) _self="$0" ;;
+  *)  _self="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")" ;;
+esac
+
+cat <<EOF
+# gitwt shell integration — sourced from ~/.config/shell/common.bash so that
+# \`gitwt <branch>\` cds into the worktree. Completion covers local branch names.
+#
+# A child process cannot change its caller's cwd, so only this function can cd;
+# the script alone just prints the path. _GITWT_SHELL_FN tells it which path it
+# is on, so it can advise rather than print a bare path that looks like a switch.
+_GITWT_BIN=\${_GITWT_BIN:-$_self}
+EOF
+cat <<'EOF'
+gitwt() {
+  case "${1:-}" in
+    ""|-h|--help|help|new|ls|list|path|rm|remove|prune|clean|env|doctor|run|--shell)
+      _GITWT_SHELL_FN=1 "$_GITWT_BIN" "$@" ;;
+    *)  # bare `gitwt <branch>` -> create/reuse and cd in
+      # `new` both reuses and verifies: it only returns a directory git has checked
+      # out on this branch. A `path` + `-d` shortcut would cd into a leftover
+      # directory that is not that branch's worktree.
+      local _d; _d="$(_GITWT_SHELL_FN=1 "$_GITWT_BIN" new "$1" | tail -1)"
+      [ -d "$_d" ] && cd "$_d" || echo "gitwt: could not enter worktree for '$1'" >&2 ;;
+  esac
+}
+
+# Completion: subcommands at position 1, branch names after a branch-taking verb.
+# bash and zsh only; both shells source this via common.bash.
+if [ -n "${BASH_VERSION:-}" ]; then
+  _gitwt_complete() {
+    local cur prev subs
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+    subs="new ls list path rm remove prune clean env doctor run --shell --help"
+    if [ "$COMP_CWORD" -eq 1 ]; then
+      COMPREPLY=( $(compgen -W "$subs $(git branch --format='%(refname:short)' 2>/dev/null)" -- "$cur") )
+      return
+    fi
+    case "$prev" in
+      new|path|rm|remove) COMPREPLY=( $(compgen -W "$(git branch --format='%(refname:short)' 2>/dev/null)" -- "$cur") ) ;;
+      clean)              COMPREPLY=( $(compgen -W "--merged --force" -- "$cur") ) ;;
+      run)                COMPREPLY=( $(compgen -W "claude codex pi opencode hermes aider gemini" -- "$cur") ) ;;
+      *)                  COMPREPLY=() ;;
+    esac
+  }
+  complete -F _gitwt_complete gitwt
+elif [ -n "${ZSH_VERSION:-}" ]; then
+  _gitwt_complete_zsh() {
+    local -a subs branches
+    subs=(new ls list path rm remove prune clean env doctor run --shell --help)
+    branches=(${(f)"$(git branch --format='%(refname:short)' 2>/dev/null)"})
+    if (( CURRENT == 2 )); then
+      compadd -- $subs $branches
+    else
+      case "${words[CURRENT-1]}" in
+        new|path|rm|remove) compadd -- $branches ;;
+        clean)              compadd -- --merged --force ;;
+        run)                compadd -- claude codex pi opencode hermes aider gemini ;;
+      esac
+    fi
+  }
+  compdef _gitwt_complete_zsh gitwt
+fi
+EOF
+}
+
+cmd_run() {
+  local tool="${1:?usage: gitwt run <tool> <branch> [-- args]}"
+  local branch="${2:?usage: gitwt run <tool> <branch> [-- args]}"; shift 2
+  [ "${1:-}" = "--" ] && shift || true
+  local dir; dir="$(cmd_new "$branch")"
+  echo "gitwt: launching '$tool' in $dir" >&2
+  ( cd "$dir" && command -v "$tool" >/dev/null 2>&1 \
+      && exec "$tool" "$@" \
+      || { echo "gitwt: '$tool' not found in PATH" >&2; exit 127; } )
+}
+
+case "${1:-}" in
+  new)     shift; cmd_new "$@" ;;
+  ls|list) shift; cmd_list "$@" ;;
+  path)    shift; cmd_path "$@" ;;
+  rm|remove) shift; cmd_rm "$@" ;;
+  prune)   shift; cmd_prune "$@" ;;
+  clean)   shift; cmd_clean "$@" ;;
+  env)     shift; cmd_env "$@" ;;
+  doctor)  shift; cmd_doctor "$@" ;;
+  run)     shift; cmd_run "$@" ;;
+  --shell) emit_shell_fn ;;
+  ""|-h|--help|help) usage ;;
+  *)       cmd_switch "$1" ;;   # bare `gitwt <branch>` prints path (cd via shell fn)
+esac
