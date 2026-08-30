@@ -48,9 +48,9 @@ When the goal is feasible only under material assumptions, expose those assumpti
 
 When the goal is not feasible as stated, do not polish it into false precision. Explain the decisive mismatch and offer the closest meaningful reframing that preserves the underlying intent. Do not turn the reframe into an action plan.
 
-## Compile The `/goal` Prompt
+## Compile The Goal Prompt
 
-Begin the final invocation with `/goal ` followed by one cohesive plain-language prompt. Include:
+Compile one cohesive, plain-language goal payload. On a runtime that accepts `/goal`, begin the final invocation with `/goal ` followed by that payload. When the runtime does not accept `/goal`, return the payload for its native goal intake without claiming it was submitted or executed. Include:
 
 - the desired end state
 - the evidence that will distinguish completion from non-completion
@@ -58,4 +58,4 @@ Begin the final invocation with `/goal ` followed by one cohesive plain-language
 
 Keep implementation choices open. Include a deadline, threshold, validator, command, or named artifact only when it is supplied by the user or verified as authoritative; never invent one to make the goal look concrete.
 
-Once the goal is ready, return the invocation as the final substantive content without analysis, alternatives, a plan, or runtime-specific flags.
+Once the goal is ready, return the invocation or portable payload as the final substantive content without analysis, alternatives, a plan, or runtime-specific flags.
