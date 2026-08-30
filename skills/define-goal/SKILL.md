@@ -1,102 +1,61 @@
 ---
 name: define-goal
-description: Help the user define a concrete, measurable goal before starting work, especially when they ask to use the goal tool, create a goal, set an objective, clarify success criteria, or turn a fuzzy intention into a quantitative outcome. Use this skill for goal creation and goal refinement only; it does not manage durable snapshots, decision logs, or long-running execution artifacts.
+description: Clarify and stress-test an intention into a meaningful, feasible, and verifiable `/goal` prompt without planning how to achieve it. Use when the user wants to turn a vague idea into a goal, refine or challenge a proposed goal, or narrow an ambition that may be too broad or infeasible. Do not use for implementation planning, task breakdown, execution, or progress management.
 ---
 
-<!-- Ported from openai/skills@b0401f07213a66414d84a65cb50c1d226f99485a; modified to add HOA catalog metadata. See LICENSE.txt. -->
-<!-- index: areas=self-management,software-development,work-management; targets=codex -->
+<!-- Originally ported from openai/skills@b0401f07213a66414d84a65cb50c1d226f99485a; redesigned for runtime-agnostic /goal output and modified to add HOA catalog metadata. See LICENSE.txt. -->
+<!-- index: areas=self-management,software-development,work-management; targets=runtime-agnostic -->
 
 # Define Goal
 
-## Overview
+**Outcome:** Turn the user's intention into one ready-to-run `/goal` invocation whose prompt defines a meaningful end state, credible completion evidence, and material bounds without prescribing implementation.
 
-Shape the user's intent into an objective an agent can pursue honestly. Prefer measurable outcomes, explicit evidence, and bounded scope over activity descriptions.
+**Done:** The response either contains one ready-to-run `/goal` invocation with no unresolved issue that could materially change its outcome, evidence, bounds, or feasibility, or withholds the invocation and identifies the smallest current frontier of decisions, facts, or reframes needed to make an honest goal possible.
 
-This skill covers goal definition and goal-tool creation only. Do not create intermediate planning artifacts, durable snapshots, ledgers, decision logs, or resume files from this skill.
+**Safe failure:** Do not manufacture precision or emit `/goal` when no honest completion contract can yet be stated. Name the decisive ambiguity, contradiction, or feasibility problem and help the user resolve it first.
 
-## Workflow
+## Boundary
 
-1. Confirm that goal definition is actually needed.
-   - Use this skill when the user asks for `$define-goal`, asks to create or set a goal, asks for the goal tool, or wants help turning an intention into a clear objective.
-   - If the user only asks for ordinary implementation work, do the work directly instead of forcing goal creation.
+This skill owns the goal space: the desired change, why it matters when that affects the target, credible evidence of success, material constraints, and whether the result is plausibly achievable.
 
-2. Restate the likely goal in concrete terms.
-   A usable goal names:
-   - the specific outcome that will be true
-   - the main artifact, system, repo, environment, or user-facing behavior involved
-   - how completion will be verified
-   - what is in scope
-   - what is out of scope when ambiguity would matter
-   - the stop condition for asking the user instead of grinding
+It does not own the solution space: methods, architecture, tools, steps, task breakdown, sequencing, milestones, execution, or progress tracking. Discuss a means only when it materially changes feasibility or the acceptable bounds, and record the resulting constraint rather than an implementation choice.
 
-3. Make it quantitative when the domain supports it.
-   Prefer numbers that represent real success, not decorative precision:
-   - pass/fail validators: exact tests, checks, CI jobs, evals, commands, or acceptance criteria
-   - quality thresholds: latency, error rate, cost, accuracy, recall, precision, coverage, flake rate, bundle size, memory, uptime, completion rate, or manual review criteria
-   - artifact constraints: file paths, affected modules, allowed commands, output formats, target environments, deadlines, or maximum blast radius
-   - evidence counts: number of reproduced failures, successful reruns, reviewed examples, migrated records, addressed comments, or verified cases
+This skill produces the `/goal` invocation. The `/goal` command owns persistence, planning, execution, and lifecycle. Do not call, emulate, or prescribe runtime-specific goal tools.
 
-4. Repair weak goals before setting them.
-   - Rewrite vague goals into measurable objectives when local context makes the rewrite safe.
-   - Ask one concise clarification question when the missing detail changes the intended outcome or validation.
-   - Reject pure activity goals such as "make progress," "keep investigating," "improve things," or "work on X" unless they are sharpened into a verifiable outcome.
+## Clarify The Goal
 
-5. Check active goal state before creating a goal.
-   - Call `get_goal`.
-   - If there is no active goal and the objective meets the quality bar, call `create_goal`.
-   - If there is an active goal that still matches the user's intent, continue using it instead of creating a duplicate.
-   - If there is an active goal that conflicts with the new request, ask whether to finish the current goal, mark it complete if done, or start a separate goal-backed thread.
+Express the state of the world or knowledge that should hold at completion, not merely an activity. A research, diagnostic, or decision goal may end in justified knowledge or a resolved decision rather than a changed external system.
 
-6. Create the goal only after it passes the quality bar.
-   - Use a single concise objective string.
-   - Include the verification evidence in the objective itself.
-   - Include scope bounds when they constrain the work.
-   - Include a token budget only when the user explicitly requested one.
-   - Do not call `create_goal` for an ordinary multi-step task unless the user explicitly asked for goal-backed work.
+Distinguish a goal from a vision. A goal has a finishable state; a vision is directional and open-ended. When the input is a vision, say so and help the user choose a bounded goal that serves it without inventing an implementation plan.
 
-## Goal Quality Bar
+Surface assumptions whose failure would make the goal stop serving the user's intent, become misleading, remain unverifiable, or prove infeasible. Challenge proxy outcomes, unsupported confidence, contradictory constraints, and ambitions outside the user's plausible control. Preserve the user's underlying intent while correcting the proposed target.
 
-Before `create_goal`, the objective should answer:
+Use quantitative thresholds only when the metric, target, and measurement method are grounded in the user's context or reliable evidence. Otherwise use an observable binary or qualitative acceptance condition. A metric is evidence of the desired outcome, not a substitute for it.
 
-- What concrete thing will be true when this is done?
-- What evidence will prove it?
-- What quantitative or binary threshold defines success?
-- What scope boundaries matter?
-- What should cause the agent to stop and ask?
+## Resolve Material Uncertainty
 
-Good:
+Resolve externally knowable facts from available context and tools when they materially affect the goal. Ask the user for preferences, priorities, commitments, and tradeoffs that only they can decide; do not make them supply facts the agent can reasonably obtain.
 
-> Reduce checkout API p95 latency below 250 ms for the documented slow path by making the smallest safe server-side change, then verify with `npm run test:checkout` and the existing local latency benchmark showing p95 under 250 ms across 3 consecutive runs.
+Present together the user decisions whose prerequisites are already settled. Frame each as concrete choices or candidate goal formulations, recommend an answer, and state what the choice changes in the goal; do not substitute a generic questionnaire or fill-in-the-blank intake form for that judgment. Do not ask downstream questions before the decisions they depend on, and stop questioning once the remaining uncertainty cannot materially change the goal contract.
 
-Good:
+When the ambiguity represents genuinely different desired outcomes, offer a small set of materially distinct candidate goals, explain the tradeoff at the goal level, and recommend one. Do not brainstorm competing implementations.
 
-> Resolve the open review comments on PR 123 that request code changes, update only the affected auth files and tests, and verify with the targeted auth test command plus `gh pr view 123` showing no unresolved change-request threads.
+## Check Feasibility
 
-Weak:
+Judge feasibility against the stated horizon, constraints, available control, and critical dependencies. Treat an unsupported claim of impossibility as another uncertainty to resolve, not as a verdict.
 
-> Make checkout faster.
+When the goal is feasible only under material assumptions, expose those assumptions and include them as bounds or conditions. When feasibility remains unknown, either resolve the missing fact or ask whether the user wants an epistemic goal that determines feasibility.
 
-Weak:
+When the goal is not feasible as stated, do not polish it into false precision. Explain the decisive mismatch and offer the closest meaningful reframing that preserves the underlying intent. Do not turn the reframe into an action plan.
 
-> Keep investigating the PR comments.
+## Compile The `/goal` Prompt
 
-## Quantification Heuristics
+Begin the final invocation with `/goal ` followed by one cohesive plain-language prompt. Include:
 
-- For bugs, define success as reproduction first, fix second, and a failing-then-passing validator when possible.
-- For tests, name the exact command and required pass condition.
-- For performance, name the metric, target threshold, measurement method, and number of runs.
-- For quality work, define an observable acceptance bar such as reviewed examples, lint/typecheck/test pass, or user-approved artifact.
-- For research, define the decision the research must enable, the sources or systems in scope, and the evidence standard.
-- For operations, define healthy state, monitoring window, failure threshold, and rollback or escalation trigger.
+- the desired end state
+- the evidence that will distinguish completion from non-completion
+- only the scope, constraints, exclusions, or critical assumptions that materially limit acceptable outcomes
 
-## Clarifying Questions
+Keep implementation choices open. Include a deadline, threshold, validator, command, or named artifact only when it is supplied by the user or verified as authoritative; never invent one to make the goal look concrete.
 
-Ask only when a reasonable rewrite would risk pursuing the wrong outcome. Keep the question short and oriented around the missing validator or scope boundary.
-
-Useful question shapes:
-
-- "What metric should define success here: latency, cost, accuracy, or user-visible behavior?"
-- "Which environment should I verify against: local, staging, or production?"
-- "What is the minimum evidence you want before I mark this goal complete?"
-
-If the user cannot provide a metric, propose the most honest binary validator available and ask for confirmation.
+Once the goal is ready, return the invocation as the final substantive content without analysis, alternatives, a plan, or runtime-specific flags.
