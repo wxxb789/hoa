@@ -3,9 +3,6 @@ name: define-goal
 description: Clarify and stress-test an intention into a meaningful, feasible, and verifiable `/goal` prompt without planning how to achieve it. Use when the user wants to turn a vague idea into a goal, refine or challenge a proposed goal, or narrow an ambition that may be too broad or infeasible. Do not use for implementation planning, task breakdown, execution, or progress management.
 ---
 
-<!-- Originally ported from openai/skills@b0401f07213a66414d84a65cb50c1d226f99485a; redesigned for runtime-agnostic /goal output and modified to add HOA catalog metadata. See LICENSE.txt. -->
-<!-- index: areas=self-management,software-development,work-management; targets=runtime-agnostic -->
-
 # Define Goal
 
 **Outcome:** Turn the user's intention into one ready-to-run `/goal` invocation whose prompt defines a meaningful end state, credible completion evidence, and material bounds without prescribing implementation.
