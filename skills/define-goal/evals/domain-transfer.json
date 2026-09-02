@@ -1,0 +1,104 @@
+{
+  "purpose": "Fresh-context scenarios for transferring the goal contract beyond software development. Grade semantic decisions rather than exact wording.",
+  "procedure": [
+    "Run each case in a fresh model context with the current define-goal skill loaded.",
+    "Grade the final response against expected_mode, must_hold, and must_not_hold.",
+    "Do not tell the model the expected mode, rubric, or suspected failure.",
+    "Run these cases alongside cardinality.json so domain transfer cannot weaken software behavior."
+  ],
+  "cases": [
+    {
+      "id": "qualitative-essay-quality",
+      "prompt": "Use define-goal to shape this intention: write a high-quality 2,000-word essay for experienced product leaders explaining why constraints create strategy. It must avoid AI slop, read smoothly and feel human, offer original thinking, reveal non-obvious connections, and leave the reader with a genuine aha moment.",
+      "expected_mode": "single-goal",
+      "must_hold": [
+        "Treat the finished essay as one completion judgment.",
+        "Preserve the intended audience and qualitative qualities as acceptance conditions.",
+        "Use credible editorial or target-reader judgment rather than the model's own confidence as completion evidence.",
+        "Treat the aha effect as an intended reader response to assess, not a guaranteed reaction from every reader."
+      ],
+      "must_not_hold": [
+        "Invent AI-detector scores, arbitrary counts of insights, or unsupported reader-response metrics.",
+        "Replace the requested qualities with word count alone.",
+        "Prescribe a writing process, outline, or editing workflow."
+      ]
+    },
+    {
+      "id": "commercial-product-name",
+      "prompt": "Use define-goal to turn this into a goal: name a new B2B cash-flow forecasting product for small-business owners. I want the name to create a real commercial advantage.",
+      "expected_mode": "decision-goal-or-frontier",
+      "must_hold": [
+        "Define success as a defensible naming decision for the intended audience and positioning.",
+        "Distinguish comparative evidence for a promising name from guaranteed commercial impact.",
+        "Treat legal, trademark, linguistic, or market acceptance as authoritative checks or external conditions when material."
+      ],
+      "must_not_hold": [
+        "Promise revenue, adoption, or commercial advantage from the name alone.",
+        "Claim legal or trademark clearance from an informal search.",
+        "Brainstorm names or prescribe a naming process."
+      ]
+    },
+    {
+      "id": "business-model-advantage",
+      "prompt": "Use define-goal to turn this into a goal: help a business owner clarify and optimize the business model so the company gains more competitive advantage and earns more revenue.",
+      "expected_mode": "decision-goal-or-frontier",
+      "must_hold": [
+        "Preserve competitive advantage and revenue as the intended business impact.",
+        "Define an honest diagnostic or decision completion state when the impact target lacks a baseline, horizon, attribution boundary, or sufficient business evidence.",
+        "Expose the smallest missing business decisions or facts that materially change the goal contract."
+      ],
+      "must_not_hold": [
+        "Invent a revenue target, deadline, market fact, or causal claim.",
+        "Silently replace the business impact with the activity of producing an analysis.",
+        "Produce pricing, channel, experimentation, or execution plans."
+      ]
+    },
+    {
+      "id": "career-plateau-boundary",
+      "prompt": "Use define-goal to help me analyze my career development, break through my current plateau, expand into new opportunities, and formulate a plan.",
+      "expected_mode": "frontier-or-bounded-goal-structure",
+      "must_hold": [
+        "Recognize the request as an underspecified career vision or initiative.",
+        "Preserve the desired external career outcomes while identifying the decisions, evidence, constraints, or acceptance conditions needed to make them honest goals.",
+        "Apply the cardinality rule instead of assuming one goal or splitting every activity into a goal.",
+        "Keep plan creation outside this skill's output contract."
+      ],
+      "must_not_hold": [
+        "Guarantee promotion, offers, recognition, or new opportunities that depend on other people.",
+        "Silently reduce the goal to applications, networking, courses, or other controllable activities.",
+        "Produce a career roadmap, milestones, or action plan."
+      ]
+    },
+    {
+      "id": "software-authoritative-validator",
+      "prompt": "Use define-goal to shape this goal: reduce checkout API p95 latency below 250 ms on the documented slow path without increasing its current error rate. Verify with `npm run test:checkout` and the existing local benchmark, which reports both p95 and error rate, showing p95 below 250 ms and error rate no higher than the recorded pre-change baseline across three consecutive runs.",
+      "expected_mode": "single-goal",
+      "must_hold": [
+        "Preserve the supplied latency threshold, recorded error-rate baseline, test command, benchmark measurement method, and consecutive-run requirement.",
+        "Treat the supplied software validators as authoritative completion evidence.",
+        "Keep implementation choices open."
+      ],
+      "must_not_hold": [
+        "Generalize away or replace the supplied command, threshold, or measurement method.",
+        "Invent an architecture, optimization technique, or additional quality gate.",
+        "Split testing, benchmarking, and latency into separate goals."
+      ]
+    },
+    {
+      "id": "legitimate-external-acceptance",
+      "prompt": "Use define-goal to shape this intention: secure formal board approval of the FY2027 expansion strategy by November 30, 2026. Completion evidence is the board vote and signed meeting minutes; management controls the proposal, but the board makes the approval decision.",
+      "expected_mode": "single-goal",
+      "must_hold": [
+        "Keep formal board approval as the legitimate desired end state.",
+        "Preserve the November 30, 2026 deadline as a material bound.",
+        "Use the supplied vote and signed minutes as authoritative completion evidence.",
+        "Represent the board's decision authority as an external dependency without treating approval as guaranteed."
+      ],
+      "must_not_hold": [
+        "Silently replace approval with preparing or presenting the proposal.",
+        "Declare the goal invalid merely because management does not control the vote.",
+        "Produce a lobbying, presentation, or governance plan."
+      ]
+    }
+  ]
+}

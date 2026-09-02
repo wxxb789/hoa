@@ -1,0 +1,91 @@
+{
+  "purpose": "Fresh-context behavioral scenarios for goal cardinality. Grade semantics rather than exact wording.",
+  "procedure": [
+    "Run each case in a fresh model context with the current define-goal skill loaded.",
+    "Grade the final response against expected_mode, must_hold, and must_not_hold.",
+    "Do not tell the model the expected mode or suspected failure."
+  ],
+  "cases": [
+    {
+      "id": "cohesive-launch-goal",
+      "prompt": "Use define-goal to turn this intention into a goal: launch the French checkout experience. Completion requires French localization, EUR payments and refunds, and legal approval, all together.",
+      "expected_mode": "single-goal",
+      "must_hold": [
+        "Treat launch as one user-meaningful completion judgment.",
+        "Keep localization, payments, refunds, and legal approval as necessary completion evidence or bounds."
+      ],
+      "must_not_hold": [
+        "Split the necessary conditions into separate goals.",
+        "Invent implementation steps or unsupported thresholds."
+      ]
+    },
+    {
+      "id": "independent-enterprise-outcomes",
+      "prompt": "Use define-goal to shape this initiative: make the product enterprise-ready by providing SSO and SCIM provisioning, auditable admin activity, EU data residency, and a published enterprise SLA. Each capability may be accepted, deferred, or released independently.",
+      "expected_mode": "goal-set",
+      "must_hold": [
+        "Return the smallest sufficient set of separately addressable goals.",
+        "Give every goal its own end state and credible completion evidence.",
+        "Preserve the unifying enterprise-readiness intent without creating an unfinishable umbrella goal."
+      ],
+      "must_not_hold": [
+        "Collapse all outcomes into one vague completion contract.",
+        "Replace the independent outcomes with one meta-goal to decide, track, or report their statuses.",
+        "Turn technical workstreams or phases into goals."
+      ]
+    },
+    {
+      "id": "mutually-exclusive-priority",
+      "prompt": "Use define-goal to help with this: should we spend Q4 improving API latency or building bulk data export? Turn the intention into a goal.",
+      "expected_mode": "decision-goal-or-candidates",
+      "must_hold": [
+        "Treat the two outcomes as alternatives rather than simultaneous commitments.",
+        "Return a decision goal or candidate goal formulations with the material tradeoff exposed."
+      ],
+      "must_not_hold": [
+        "Return both alternatives as an executable goal set.",
+        "Choose a priority without evidence or user authority."
+      ]
+    },
+    {
+      "id": "unbounded-vision",
+      "prompt": "Use define-goal to turn this into a goal: become the world's most trusted developer platform.",
+      "expected_mode": "frontier-or-bounded-goal",
+      "must_hold": [
+        "Identify the statement as a vision rather than a finishable goal.",
+        "Expose the smallest decision frontier or propose a bounded formulation for confirmation."
+      ],
+      "must_not_hold": [
+        "Invent a trust metric, deadline, market scope, or authoritative validator.",
+        "Emit a polished but unverifiable goal payload."
+      ]
+    },
+    {
+      "id": "vision-with-independent-bounded-outcomes",
+      "prompt": "Use define-goal to serve this vision: make open-source maintainers sustainably successful. Over the next 12 months, at least 100 maintainers should receive recurring funding for six months, and 20 critical projects should complete independent security audits with remediation decisions recorded. Either outcome remains valuable if the other is delayed.",
+      "expected_mode": "goal-set",
+      "must_hold": [
+        "Keep the vision as directional context rather than an executable umbrella goal.",
+        "Return separate funding and security-audit goals because their completion judgments are independently meaningful.",
+        "Preserve the supplied horizon, thresholds, and evidence in the relevant goal payloads."
+      ],
+      "must_not_hold": [
+        "Force both outcomes into one completion contract.",
+        "Turn funding or audit delivery into implementation plans."
+      ]
+    },
+    {
+      "id": "implementation-steps-are-not-goals",
+      "prompt": "Use define-goal to turn this into goals: create the database schema, add API endpoints, build the UI, and deploy so customers can delete their own accounts.",
+      "expected_mode": "single-goal",
+      "must_hold": [
+        "Define customer self-service account deletion as the completion state.",
+        "Use user-visible behavior and credible verification rather than the proposed implementation sequence."
+      ],
+      "must_not_hold": [
+        "Create separate database, API, UI, or deployment goals.",
+        "Prescribe an implementation plan."
+      ]
+    }
+  ]
+}

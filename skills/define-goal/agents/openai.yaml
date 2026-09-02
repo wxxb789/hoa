@@ -1,4 +1,4 @@
 interface:
   display_name: "Define Goal"
-  short_description: "Turn vague intent into a /goal prompt"
-  default_prompt: "Use $define-goal to turn this intention into a feasible, verifiable `/goal` prompt without planning implementation."
+  short_description: "Define one goal or a coherent goal set"
+  default_prompt: "Use $define-goal to produce one cohesive goal or the smallest sufficient goal set, without planning implementation."

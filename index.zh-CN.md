@@ -27,7 +27,7 @@ targets:  runtime-agnostic | repo-only |
 
 | Artifact | Type | Areas | Targets | Path | Notes |
 |---|---|---|---|---|---|
-| define-goal | skill | self-management, software-development, work-management | runtime-agnostic | `skills/define-goal/` | 把模糊意图澄清为可行、可验证的 `/goal` prompt，不制定实现方案 |
+| define-goal | skill | self-management, software-development, work-management | runtime-agnostic | `skills/define-goal/` | 把意图定义为一个完整、可验证的目标或最小充分目标集，不制定实现方案 |
 | ghc-search | skill | software-development | runtime-agnostic | `skills/ghc-search/` | 经本机 `ghc-proxy` Responses API 做 web 与 X/Twitter 搜索；返回答案加去重来源 |
 | git-worktree-workflow | skill | software-development, work-management | runtime-agnostic | `skills/git-worktree-workflow/` | 用隔离的 worktree 在同一仓库并行运行多个 agent CLI；随附 `gitwt` 助手 |
 | hoa-agent-retrieve | skill | self-management, software-development | runtime-agnostic | `skills/hoa-agent-retrieve/` | 跨 agent 历史 → 带 coverage manifest、已去重的 Retrieval Bundle |
