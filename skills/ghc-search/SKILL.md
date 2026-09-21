@@ -31,8 +31,8 @@ python $S x --handle dotnet --from-date 2026-08-01 "what shipped this month"
 
 | Flag | Engine | |
 |---|---|---|
-| `--model` | both | defaults `gpt-5.6-terra` (gpt), `grok-4.5` (x) |
-| `--effort low\|medium\|high` | both | default `medium` |
+| `--model` | both | defaults `gpt-5.6-luna` (gpt), `grok-4.5` (x) |
+| `--effort low\|medium\|high` | both | defaults `high` (gpt), `medium` (x) |
 | `--handle NAME` | x | restrict to a handle; repeatable |
 | `--exclude-handle NAME` | x | repeatable |
 | `--from-date` / `--to-date` | x | `YYYY-MM-DD` |
@@ -84,5 +84,5 @@ MCP) over general search when looking up a named library or API.
 ## Check
 
 ```bash
-python "$(dirname $S)/test_ghc_search.py"   # 9 tests, offline
+python "$(dirname $S)/test_ghc_search.py"   # 11 tests, offline
 ```

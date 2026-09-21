@@ -19,8 +19,8 @@ from urllib.parse import urlsplit
 DEFAULT_ENDPOINT = "http://127.0.0.1:4141/v1/responses"
 # Per-engine defaults. There is deliberately no default engine: gpt and x search
 # different corpora, and picking one for the caller guesses at intent.
-ENGINE_MODEL = {"gpt": "gpt-5.6-terra", "x": "grok-4.5"}
-DEFAULT_EFFORT = "medium"
+ENGINE_MODEL = {"gpt": "gpt-5.6-luna", "x": "grok-4.5"}
+ENGINE_EFFORT = {"gpt": "high", "x": "medium"}
 
 # Inline citation markup, eating any space in front of it so removal leaves no
 # double space. grok-4.5 emits "[[1]](url)", gpt-5.4 emits "([label](url))".
@@ -209,8 +209,8 @@ def main(argv=None) -> int:
                          "different corpora, so the caller has to say which.")
     ap.add_argument("query")
     ap.add_argument("--model", help=f"default per engine: {ENGINE_MODEL['gpt']} (gpt), {ENGINE_MODEL['x']} (x)")
-    ap.add_argument("--effort", choices=("low", "medium", "high"), default=DEFAULT_EFFORT,
-                    help=f"reasoning effort (default {DEFAULT_EFFORT})")
+    ap.add_argument("--effort", choices=("low", "medium", "high"),
+                    help=f"reasoning effort (default: gpt={ENGINE_EFFORT['gpt']}, x={ENGINE_EFFORT['x']})")
 
     x = ap.add_argument_group("x only")
     x.add_argument("--handle", action="append", default=[], metavar="NAME",
@@ -243,12 +243,13 @@ def main(argv=None) -> int:
         ap.error(f"{', '.join(wrong)} not valid for engine '{args.engine}'")
 
     model = args.model or ENGINE_MODEL[args.engine]
+    effort = args.effort or ENGINE_EFFORT[args.engine]
     mode = "x_search" if args.engine == "x" else "web_search"
 
     started = time.monotonic()
     try:
         body = build_body(
-            args.query, args.engine, model=model, effort=args.effort,
+            args.query, args.engine, model=model, effort=effort,
             max_tokens=args.max_tokens,
             handles=args.handle, excluded_handles=args.exclude_handle,
             from_date=args.from_date, to_date=args.to_date,
@@ -263,7 +264,7 @@ def main(argv=None) -> int:
     sources = sources[: args.limit] if args.limit > 0 else sources
 
     if args.as_json:
-        json.dump({"model": model, "mode": mode, "effort": args.effort,
+        json.dump({"model": model, "mode": mode, "effort": effort,
                    "elapsed_s": round(elapsed, 2), "answer": answer,
                    "sources": [dict(n=i, **s) for i, s in enumerate(sources, 1)]},
                   sys.stdout, ensure_ascii=False, indent=2)
@@ -274,7 +275,7 @@ def main(argv=None) -> int:
             print("\nSources:")
             for i, s in enumerate(sources, 1):
                 print(f"  [{i}] {s['title']} — {s['url']}")
-        print(f"\n({model}, {mode}, effort={args.effort}, {elapsed:.1f}s)")
+        print(f"\n({model}, {mode}, effort={effort}, {elapsed:.1f}s)")
     return 0
 
 

@@ -4,6 +4,9 @@ import json
 import pathlib
 import sys
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
+from unittest.mock import patch
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from ghc_search import SearchError, build_body, main, parse, strip_citations  # noqa: E402
@@ -12,6 +15,36 @@ FIXTURE = json.loads((pathlib.Path(__file__).parent / "fixture_web_response.json
 
 
 class T(unittest.TestCase):
+    def capture_request(self, argv):
+        requests = []
+
+        with patch(
+            "ghc_search.post",
+            side_effect=lambda endpoint, body, timeout: requests.append(body) or FIXTURE,
+        ), redirect_stdout(StringIO()):
+            self.assertEqual(main([*argv, "--json"]), 0)
+
+        self.assertEqual(len(requests), 1)
+        return requests[0]
+
+    def test_cli_uses_per_engine_defaults(self):
+        gpt = self.capture_request(["gpt", "q"])
+        self.assertEqual(gpt["model"], "gpt-5.6-luna")
+        self.assertEqual(gpt["reasoning"], {"effort": "high"})
+
+        x = self.capture_request(["x", "q"])
+        self.assertEqual(x["model"], "grok-4.5")
+        self.assertEqual(x["reasoning"], {"effort": "medium"})
+
+    def test_cli_preserves_explicit_model_and_effort_overrides(self):
+        gpt = self.capture_request(["gpt", "q", "--model", "custom-gpt", "--effort", "low"])
+        self.assertEqual(gpt["model"], "custom-gpt")
+        self.assertEqual(gpt["reasoning"], {"effort": "low"})
+
+        x = self.capture_request(["x", "q", "--model", "custom-x", "--effort", "high"])
+        self.assertEqual(x["model"], "custom-x")
+        self.assertEqual(x["reasoning"], {"effort": "high"})
+
     def test_real_response(self):
         answer, sources = parse(FIXTURE)
         # Citation markup stripped out of the answer.
@@ -74,7 +107,7 @@ class T(unittest.TestCase):
                           max_tokens=512, handles=["SpaceXAI"])
         self.assertEqual(body["input"][0]["content"].count("SpaceXAI"), 1)
         # Web search leaves the query untouched.
-        body = build_body("q", "gpt", model="gpt-5.6-terra", effort="medium", max_tokens=512)
+        body = build_body("q", "gpt", model="gpt-5.6-luna", effort="medium", max_tokens=512)
         self.assertEqual(body["input"][0]["content"], "q")
 
     def test_effort_and_engine_shape(self):
@@ -85,7 +118,7 @@ class T(unittest.TestCase):
         self.assertEqual(x["tools"][0]["excluded_x_handles"], ["spam"])
         self.assertEqual(x["tools"][0]["from_date"], "2026-08-01")
 
-        g = build_body("q", "gpt", model="gpt-5.6-terra", effort="low", max_tokens=512,
+        g = build_body("q", "gpt", model="gpt-5.6-luna", effort="low", max_tokens=512,
                        domains=["a.test"], blocked_domains=["b.test"],
                        context_size="low", country="US")
         self.assertEqual(g["tools"][0]["type"], "web_search")
