@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 import time
@@ -16,10 +17,11 @@ import urllib.error
 import urllib.request
 from urllib.parse import urlsplit
 
-DEFAULT_ENDPOINT = "http://127.0.0.1:4141/v1/responses"
+DEFAULT_ENDPOINT = os.environ.get("GHC_SEARCH_ENDPOINT", "http://127.0.0.1:4141/v1/responses")
 # Per-engine defaults. There is deliberately no default engine: gpt and x search
 # different corpora, and picking one for the caller guesses at intent.
-ENGINE_MODEL = {"gpt": "gpt-5.6-luna", "x": "grok-4.5"}
+ENGINE_MODEL = {"gpt": os.environ.get("GHC_SEARCH_MODEL_GPT", "gpt-5.6-luna"),
+                "x": os.environ.get("GHC_SEARCH_MODEL_X", "grok-4.5")}
 ENGINE_EFFORT = {"gpt": "high", "x": "medium"}
 
 # Inline citation markup, eating any space in front of it so removal leaves no

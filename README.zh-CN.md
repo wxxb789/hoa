@@ -2,6 +2,9 @@
 
 > [English](./README.md) · **简体中文**
 
+[![CI](https://github.com/wxxb789/hoa/actions/workflows/ci.yml/badge.svg)](https://github.com/wxxb789/hoa/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+
 我运行 AI agent 的**可移植部件**的个人家目录，覆盖我的整体运作——软件开发、
 公司 / 项目管理、个人内省 / 自我管理。skill、agent 角色、orchestration 模式、
 prompt、rule、MCP 配置、workflow、eval 都在这里纳入版本控制。其中可下发的那部分
@@ -62,7 +65,8 @@ Hermes · Claude Code · Codex · pi · OpenCode · Kimi Code · *(`npx skills` 
 
 ```text
 hoa/
-├── index.md · index.zh-CN.md   # 全部 artifact，按 area + target 打标签
+├── index.md · index.zh-CN.md   # 全部 artifact，按 area + target 打标签（自动生成——见 scripts/）
+├── CHANGELOG.md   # 重要变更记录；每个 skill 带 `version=` 元数据
 ├── skills/        # 唯一部署面 —— 用 `npx skills` 安装的 SKILL.md 包
 ├── agents/        # 可移植、runtime 无关的 role / persona / authority / I-O 契约
 ├── orchestration/ # 调度、handoff、retry、continuation、termination、聚合(循环、crew、fan-out/in、best-of-N)
@@ -73,12 +77,31 @@ hoa/
 ├── evals/         # 可重复的 benchmark、cases、fixtures、rubrics、脱敏 datasets
 ├── reflections/   # 人写的比较、决策、retro、post-mortem
 ├── ref/           # 外部参考
-└── scripts/       # 仓库自身的 validation / index 工具
+└── scripts/       # 仓库工具：generate_index.py（索引）、vendor_shared.py（共享 skill 脚本分发）
 ```
 
 `skills/` 遵循 `npx skills` 的布局：`skills/<name>/SKILL.md`（扁平）或
 `skills/<category>/<name>/SKILL.md`（catalog）；`skills/.curated/`、
 `skills/.experimental/`、`skills/.system/` 也会被识别。
+
+`index.md` / `index.zh-CN.md` 是**生成文件**——改完 skill 的
+`<!-- index: ... -->` 元数据注释后运行 `python scripts/generate_index.py`
+（CI 会对漂移报错）。
+
+## 双语政策
+
+文档同时维护英文与简体中文。**英文是权威来源**；中文镜像随同一次提交跟进。
+生成文件（索引）从单一来源产出双语，只有手写文档付翻译成本。
+
+## 克隆
+
+```bash
+git clone https://github.com/wxxb789/hoa   # 用 skill / 跑测试都不需要子模块
+```
+
+`ref/` 下的 40 个参考仓库是子模块——很重，只在研究上游时才需要。普通克隆
+（不加 `--recursive`）使用和测试其余一切完全够用。需要时刷新参考：
+`git submodule update --init --remote --merge`。
 
 ## 该放哪儿？（分类）
 
@@ -127,8 +150,8 @@ npx skills remove <skill>
 
 ## 标签
 
-area 与 target 作为标签记录在 [`index.md`](./index.md) 里，而不是建目录（一个
-artifact 常同时服务多个）：
+area 与 target 作为标签记录在 [`index.md`](./index.md) 里（由每个 skill 的
+`<!-- index: ... -->` 注释生成），而不是建目录（一个 artifact 常同时服务多个）：
 
 - `areas`：`software-development` · `work-management` · `self-management`
 - `targets`：`runtime-agnostic` · `repo-only` · `claude-code` · `codex` ·
@@ -137,6 +160,12 @@ artifact 常同时服务多个）：
 
 type 从目录推导。两个轴都可多值。
 
+## 参考地图
+
+[`ref/README.md`](./ref/README.md) 把 **40 个外部 agent/skill/harness 仓库**逐一
+映射到"它是什么 + 值得偷什么具体模式"——如果你想设计自己的 agent 体系，这是
+本仓库信息密度最高的一页。
+
 ## 路线图
 
 - **Phase 1：** 骨架 + 定义 + 按 area/target 打标签的 index（taxonomy 已经 Oracle
@@ -144,7 +173,8 @@ type 从目录推导。两个轴都可多值。
 - **Phase 2：** skills-first 下发——`skills/` 走 `npx skills`，设置走 chezmoi；
   去掉 `runtimes/`。✓
 - **Phase 3：** 在 `skills/` 里长出真实 skill；从 per-artifact metadata 生成
-  `index.md`；建 `evals/` + `reflections/`。
+  `index.md`（✓ `scripts/generate_index.py`）；建 `evals/` + `reflections/`
+  （第一篇复盘：`reflections/2026-09-23-skills-first-split.md`）。
 
 ## 如何使用
 

@@ -2,6 +2,9 @@
 
 > **English** · [简体中文](./README.zh-CN.md)
 
+[![CI](https://github.com/wxxb789/hoa/actions/workflows/ci.yml/badge.svg)](https://github.com/wxxb789/hoa/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+
 A personal home for the **portable parts** of how I run AI agents across my whole
 operation — software development, company / project management, and personal
 self-management. Skills, agent roles, orchestration patterns, prompts, rules,
@@ -69,7 +72,8 @@ custom deploy tooling.
 
 ```text
 hoa/
-├── index.md · index.zh-CN.md   # every artifact, labeled by area + target
+├── index.md · index.zh-CN.md   # every artifact, labeled by area + target (GENERATED — see scripts/)
+├── CHANGELOG.md   # notable changes; skills carry per-skill `version=` metadata
 ├── skills/        # THE deploy surface — SKILL.md packages installed via `npx skills`
 ├── agents/        # portable, runtime-agnostic role / persona / authority / I-O contracts
 ├── orchestration/ # scheduling, handoff, retry, continuation, termination, aggregation (loops, crews, fan-out/in, best-of-N)
@@ -80,12 +84,34 @@ hoa/
 ├── evals/         # repeatable benchmarks, cases, fixtures, rubrics, sanitized datasets
 ├── reflections/   # human write-ups: comparisons, decisions, retros, post-mortems
 ├── ref/           # external references
-└── scripts/       # this repo's own validation / index tooling
+└── scripts/       # repo tooling: generate_index.py (index), vendor_shared.py (shared skill scripts)
 ```
 
 `skills/` follows the `npx skills` layout: `skills/<name>/SKILL.md` (flat) or
 `skills/<category>/<name>/SKILL.md` (catalog); `skills/.curated/`,
 `skills/.experimental/`, `skills/.system/` are recognized too.
+
+`index.md` / `index.zh-CN.md` are **generated** — run
+`python scripts/generate_index.py` after editing a skill's
+`<!-- index: ... -->` metadata comment (CI fails on drift).
+
+## Bilingual policy
+
+Docs are maintained in English and 简体中文. **English is the source of
+truth**; the Chinese mirror follows in the same commit. Generated files
+(indexes) come from a single source and are emitted in both languages, so
+only hand-written docs pay the translation tax.
+
+## Cloning
+
+```bash
+git clone https://github.com/wxxb789/hoa   # submodules NOT needed for skills/tests
+```
+
+`ref/` holds 40 reference repos as submodules — heavy, and only needed when
+studying an upstream. A plain clone (no `--recursive`) is fully sufficient to
+use and test everything else. Refresh the references when needed:
+`git submodule update --init --remote --merge`.
 
 ## Where does it go? (classification)
 
@@ -139,8 +165,9 @@ npx skills remove <skill>
 
 ## Labels
 
-Areas and targets are tracked as labels in [`index.md`](./index.md), not as
-folders (one artifact often serves several):
+Areas and targets are tracked as labels in [`index.md`](./index.md) (generated
+from each skill's `<!-- index: ... -->` comment), not as folders (one artifact
+often serves several):
 
 - `areas`: `software-development` · `work-management` · `self-management`
 - `targets`: `runtime-agnostic` · `repo-only` · `claude-code` · `codex` ·
@@ -149,6 +176,12 @@ folders (one artifact often serves several):
 
 Type is derived from the folder. Both axes are multi-valued.
 
+## Reference map
+
+[`ref/README.md`](./ref/README.md) maps **40 external agent/skill/harness
+repos** to what each is and the specific pattern worth stealing from it — the
+densest page in this repo if you are designing your own agent setup.
+
 ## Roadmap
 
 - **Phase 1:** skeleton + definition + area/target-labeled index (taxonomy
@@ -156,7 +189,9 @@ Type is derived from the folder. Both axes are multi-valued.
 - **Phase 2:** skills-first deploy — `skills/` via `npx skills`, settings via
   chezmoi; `runtimes/` dropped. ✓
 - **Phase 3:** grow real skills in `skills/`; generate `index.md` from
-  per-artifact metadata; build out `evals/` + `reflections/`.
+  per-artifact metadata (✓ `scripts/generate_index.py`); build out `evals/` +
+  `reflections/` (first retro:
+  `reflections/2026-09-23-skills-first-split.md`).
 
 ## Using this repo
 

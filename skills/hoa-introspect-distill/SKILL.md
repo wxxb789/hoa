@@ -9,7 +9,7 @@ description: >-
   a one-off task that is not worth reusing.
 ---
 
-<!-- index: areas=self-management,software-development; targets=runtime-agnostic -->
+<!-- index: areas=self-management,software-development; targets=runtime-agnostic; version=1.0.0 -->
 
 # hoa-introspect-distill
 

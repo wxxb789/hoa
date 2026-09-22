@@ -3,7 +3,7 @@ name: git-worktree-workflow
 description: Run multiple AI coding agents (Claude Code, Codex, PI, OpenCode, Hermes, aider, gemini, …) in parallel on the same repo using isolated git worktrees. Tool-agnostic by design — agents are pluggable, so you can switch between them freely. Use when the user wants parallel agent sessions, worktree isolation, "work on two features at once", per-worktree env/port isolation, or to avoid agents stepping on each other's edits.
 ---
 
-<!-- index: areas=software-development,work-management; targets=runtime-agnostic -->
+<!-- index: areas=software-development,work-management; targets=runtime-agnostic; version=1.0.0 -->
 
 # Git Worktree Workflow (tool-agnostic)
 
@@ -32,24 +32,8 @@ gitwt --shell                  # print shell fn so bare `gitwt <branch>` can cd 
 
 The helper ships at `references/gitwt`. Install it on PATH and `chmod +x`.
 
-### Why the name is `gitwt`
-
-Not `wt`, and not `git-wt` — both collide, and both failures are quiet:
-
-- **`wt`** is Windows Terminal's App Execution Alias
-  (`%LOCALAPPDATA%\Microsoft\WindowsApps\wt.exe`), registered system-wide. A helper
-  named `wt` only wins by PATH order and loses the moment its directory drops out,
-  at which point a `command -v wt` guard passes on Windows Terminal and
-  `wt --shell` pops a **modal error dialog** on every shell start. Because git-bash
-  starts as a login shell, that is one dialog per shell — unbounded.
-- **`git-wt`** would be reachable as `git wt …` (git dispatches `git <verb>` to
-  `git-<verb>` on PATH), but it is the binary name of
-  [k1LoW/git-wt](https://github.com/k1LoW/git-wt), whose CLI has **no subcommands** —
-  `git wt list` there creates a worktree named `list`. Sharing the name means a
-  later `brew install k1LoW/tap/git-wt` silently shadows this script with one whose
-  verbs mean something else.
-
-`gitwt` collides with neither, at the cost of not being a `git <verb>` subcommand.
+The name deliberately avoids `wt` and `git-wt` — both collide with existing
+tools, quietly. See [naming](references/naming.md) for the full rationale.
 
 ### One-time setup
 ```bash
@@ -141,7 +125,8 @@ GNU-only constructs so it runs on Windows git-bash, macOS, and Linux:
 - shell-builtin trimming instead of `xargs` — BSD `xargs` interprets quotes in input
 - `find -delete` is never handed an empty path
 - `.envrc` probes both `.venv/bin` and `.venv/Scripts`
-- no `readlink -f` (absent on macOS)
+- Windows: verify bare `bash` is Git Bash, not the WSL `bash.exe` —
+  see [naming](references/naming.md#windows-bash-trap)
 
 ## References
 - `references/gitwt` — the helper (put it on PATH, `chmod +x`).
@@ -150,4 +135,3 @@ GNU-only constructs so it runs on Windows git-bash, macOS, and Linux:
   that broke before: space-safe root parsing, collision-free branch slugs, `.envrc`
   reaching each worktree, and glob copy patterns expanding.
 - Git worktree docs: https://git-scm.com/docs/git-worktree
-- direnv pattern: waldencui "direnv is all you need to parallelize … with git worktrees".

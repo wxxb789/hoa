@@ -3,7 +3,7 @@ name: hoa-introspect
 description: Produce an evidence-cited, cross-agent self-report with deterministic usage facets and a rigorously bounded blind-spot audit. Use only when explicitly asked for "my usage insights", "audit my work patterns", "where am I wasting effort", "blind spots", or a periodic "self-retro". Do not use for raw records or cross-agent search (use hoa-agent-retrieve), a single-session summary, or creating a skill/rule from a finding (use hoa-introspect-distill). Heavyweight and explicit-invocation-only; never run it ambiently.
 ---
 
-<!-- index: areas=self-management,work-management; targets=runtime-agnostic -->
+<!-- index: areas=self-management,work-management; targets=runtime-agnostic; version=1.0.0 -->
 
 # hoa-introspect
 

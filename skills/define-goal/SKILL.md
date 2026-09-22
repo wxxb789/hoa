@@ -3,6 +3,8 @@ name: define-goal
 description: Define and stress-test an intention as one cohesive, feasible, verifiable goal or the smallest sufficient set of independently meaningful goals, without planning implementation. Use when the user wants to create or refine a goal, turn a vision into bounded outcomes, or separate independently finishable outcomes within an initiative. Do not use for task breakdown, implementation planning, execution, or progress management.
 ---
 
+<!-- index: areas=self-management,software-development,work-management; targets=runtime-agnostic; version=1.1.0 -->
+
 # Define Goal
 
 **Outcome:** Turn the user's intention into either one cohesive goal payload or the smallest sufficient set of separately addressable goal payloads, each defining a meaningful end state, credible completion evidence, and material bounds without prescribing implementation.

@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Shared script drift check
+        run: python scripts/vendor_shared.py --check
+
+      - name: Skill catalog drift check
+        run: python scripts/generate_index.py --check
+
+      - name: ghc-search tests
+        run: python skills/ghc-search/scripts/test_ghc_search.py
+
+      - name: my-ado-cppr tests
+        working-directory: skills/my-ado-cppr
+        run: python -m unittest lib.test_run
+
+      - name: hoa-introspect evals
+        run: python skills/hoa-introspect/evals/run.py
+
+      - name: hoa-introspect-distill evals
+        run: python skills/hoa-introspect-distill/evals/run_evals.py
+
+      - name: hoa-agent-retrieve evals
+        run: python skills/hoa-agent-retrieve/evals/run_evals.py
+
+      - name: git-worktree-workflow tests
+        run: bash skills/git-worktree-workflow/scripts/test_gitwt.sh
+
+      - name: SKILL.md frontmatter sanity
+        run: |
+          for f in skills/*/SKILL.md; do
+            head -1 "$f" | grep -q '^---$' || { echo "missing frontmatter: $f"; exit 1; }
+            grep -q '^name:' "$f" || { echo "missing name: $f"; exit 1; }
+            grep -q '^description:' "$f" || { echo "missing description: $f"; exit 1; }
+          done

@@ -1,13 +1,13 @@
 ---
 name: ghc-search
-description: Open-ended web search and X/Twitter search via the local ghc-proxy. Use when you need to find something on the web and do not already have a URL, or when you need posts from X/Twitter. Built-in WebSearch is denied on this machine, so this is the web-search path. Use WebFetch instead when you already have the URL; use context7 MCP for library/API documentation; use agent-browser when you need raw Bing SERP links or to interact with a page.
+description: Open-ended web search and X/Twitter search through a local ghc-proxy (OpenAI-compatible Responses API). Use when you need to find something on the web and do not already have a URL, or when you need posts from X/Twitter. Fetch pages directly when you already have the URL; prefer a documentation MCP (e.g. context7) for library/API docs.
 ---
 
-<!-- index: areas=software-development; targets=runtime-agnostic -->
+<!-- index: areas=software-development; targets=runtime-agnostic; version=1.0.0 -->
 
 # ghc-search
 
-Web and X search through the local `ghc-proxy` Responses API. The script owns request
+Web and X search through a local `ghc-proxy` Responses API. The script owns request
 building, parsing, inline-citation stripping, and URL dedup — you get an answer plus a
 clean source list.
 
@@ -31,7 +31,7 @@ python $S x --handle dotnet --from-date 2026-08-01 "what shipped this month"
 
 | Flag | Engine | |
 |---|---|---|
-| `--model` | both | defaults `gpt-5.6-luna` (gpt), `grok-4.5` (x) |
+| `--model` | both | defaults below (env-overridable) |
 | `--effort low\|medium\|high` | both | defaults `high` (gpt), `medium` (x) |
 | `--handle NAME` | x | restrict to a handle; repeatable |
 | `--exclude-handle NAME` | x | repeatable |
@@ -43,6 +43,19 @@ python $S x --handle dotnet --from-date 2026-08-01 "what shipped this month"
 | `--json`, `--max-tokens`, `--timeout`, `--endpoint` | both | |
 
 A flag from the wrong engine is rejected before any network call.
+
+## Configuration
+
+Defaults assume a ghc-proxy on `127.0.0.1:4141`. Override without flags via
+environment variables (a different proxy host, or different default models):
+
+| Env var | Overrides | Default |
+|---|---|---|
+| `GHC_SEARCH_ENDPOINT` | proxy endpoint | `http://127.0.0.1:4141/v1/responses` |
+| `GHC_SEARCH_MODEL_GPT` | gpt-engine default model | `gpt-5.6-luna` |
+| `GHC_SEARCH_MODEL_X` | x-engine default model | `grok-4.5` |
+
+`--model` and `--endpoint` flags win over env vars.
 
 ## What you need to know
 
@@ -69,13 +82,14 @@ curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:4141/v1/models \
 ```
 
 `200` = up, and that endpoint also lists the models you can pass to `--model`. The
-script prints `ghc-proxy not reachable at 127.0.0.1:4141` when it is not.
+script prints `ghc-proxy not reachable at ...` (with the configured endpoint) when it
+is not.
 
 ## When this is not the right tool
 
-`ghc-proxy` is machine-local. On a host without it this skill cannot run at all,
-and the fallback is `agent-browser` — drive **Bing** with `&setlang=en`; Google
-serves it a block page.
+Without a reachable ghc-proxy this skill cannot run; fall back to whatever browser
+automation your runtime offers (e.g. drive **Bing** with `&setlang=en`; Google may
+serve a block page).
 
 Reach for something else when you already have what you need: fetch the page
 directly when you have the URL, and prefer a documentation source (`context7`
