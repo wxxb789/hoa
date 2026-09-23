@@ -170,7 +170,7 @@ def render(rows: list[dict], lang: str) -> str:
     header, footer = (HEADER_EN, FOOTER_EN) if lang == "en" else (HEADER_ZH, FOOTER_ZH)
     note_i = 0 if lang == "en" else 1
     out = [header]
-    for r in sorted(rows, key=lambda x: x["name"]):
+    for r in rows:  # collect() already sorted by name
         note = NOTES[r["name"]][note_i]
         out.append(
             f"| {r['name']} | skill | {r['areas']} | {r['targets']} | "

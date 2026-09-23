@@ -42,7 +42,10 @@ jobs:
 
       - name: SKILL.md frontmatter sanity
         run: |
-          for f in skills/*/SKILL.md; do
+          shopt -s nullglob
+          files=(skills/*/SKILL.md)
+          [ ${#files[@]} -gt 0 ] || { echo "no SKILL.md files found"; exit 1; }
+          for f in "${files[@]}"; do
             head -1 "$f" | grep -q '^---$' || { echo "missing frontmatter: $f"; exit 1; }
             grep -q '^name:' "$f" || { echo "missing name: $f"; exit 1; }
             grep -q '^description:' "$f" || { echo "missing description: $f"; exit 1; }

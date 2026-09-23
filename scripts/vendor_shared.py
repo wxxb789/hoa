@@ -47,7 +47,8 @@ def main(argv=None) -> int:
         if not source.is_file():
             print(f"vendor_shared: missing shared source {source}", file=sys.stderr)
             return 1
-        src_hash = digest(source)
+        src_bytes = source.read_bytes()
+        src_hash = hashlib.sha256(src_bytes).hexdigest()
         for consumer in consumers:
             dest = ROOT / consumer / name
             if args.check:
@@ -57,7 +58,7 @@ def main(argv=None) -> int:
                     status = 1
             else:
                 dest.parent.mkdir(parents=True, exist_ok=True)
-                dest.write_bytes(source.read_bytes())
+                dest.write_bytes(src_bytes)
                 print(f"vendored {name} → {consumer}/")
     if not args.check and status == 0:
         print("all consumers up to date")
