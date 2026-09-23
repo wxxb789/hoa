@@ -45,6 +45,37 @@ class T(unittest.TestCase):
         self.assertEqual(x["model"], "custom-x")
         self.assertEqual(x["reasoning"], {"effort": "high"})
 
+    def test_env_overrides_set_default_model(self):
+        # Env vars replace the built-in default when no --model flag is passed.
+        for env, engine, expected in (
+            ({"GHC_SEARCH_MODEL_GPT": "env-gpt"}, "gpt", "env-gpt"),
+            ({"GHC_SEARCH_MODEL_X": "env-x"}, "x", "env-x"),
+        ):
+            with self.subTest(engine=engine):
+                with patch.dict("os.environ", env):
+                    body = self.capture_request([engine, "q"])
+                self.assertEqual(body["model"], expected)
+
+    def test_cli_flag_beats_env_override(self):
+        # An explicit --model wins over the environment default.
+        with patch.dict("os.environ", {"GHC_SEARCH_MODEL_GPT": "env-gpt"}):
+            body = self.capture_request(["gpt", "q", "--model", "flag-gpt"])
+        self.assertEqual(body["model"], "flag-gpt")
+
+    def test_env_endpoint_changes_default(self):
+        captured = {}
+        with patch.dict(
+            "os.environ",
+            {"GHC_SEARCH_ENDPOINT": "http://env-proxy:9999/v1/responses"},
+        ), patch(
+            "ghc_search.post",
+            side_effect=lambda endpoint, body, timeout:
+                captured.update(endpoint=endpoint) or FIXTURE,
+        ), redirect_stdout(StringIO()):
+            self.assertEqual(main(["gpt", "q", "--json"]), 0)
+        self.assertEqual(captured["endpoint"], "http://env-proxy:9999/v1/responses")
+
+
     def test_real_response(self):
         answer, sources = parse(FIXTURE)
         # Citation markup stripped out of the answer.

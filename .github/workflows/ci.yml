@@ -21,6 +21,9 @@ jobs:
       - name: Skill catalog drift check
         run: python scripts/generate_index.py --check
 
+      - name: Index generator tests
+        run: python scripts/test_generate_index.py
+
       - name: ghc-search tests
         run: python skills/ghc-search/scripts/test_ghc_search.py
 
@@ -47,6 +50,8 @@ jobs:
           [ ${#files[@]} -gt 0 ] || { echo "no SKILL.md files found"; exit 1; }
           for f in "${files[@]}"; do
             head -1 "$f" | grep -q '^---$' || { echo "missing frontmatter: $f"; exit 1; }
-            grep -q '^name:' "$f" || { echo "missing name: $f"; exit 1; }
-            grep -q '^description:' "$f" || { echo "missing description: $f"; exit 1; }
+            name_val=$(grep -m1 '^name:' "$f" | sed 's/^name:[[:space:]]*//')
+            [ -n "$name_val" ] || { echo "empty name: $f"; exit 1; }
+            desc_val=$(grep -m1 '^description:' "$f" | sed 's/^description:[[:space:]]*//')
+            [ -n "$desc_val" ] || { echo "empty description: $f"; exit 1; }
           done

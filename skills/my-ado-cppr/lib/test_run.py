@@ -108,11 +108,18 @@ class ReviewerFlowTests(unittest.TestCase):
 
 
 class ValidatePlanTests(unittest.TestCase):
-    def test_both_pr_and_alias_rejected(self):
+    def test_both_pr_and_ado_alias_rejected(self):
         err = commit_push_pr._validate_plan(
             {"pr": {"action": "create"}, "ado_pr": {"action": "create"}}, "ado"
         )
         self.assertIn("use only one", err)
+
+    def test_both_pr_and_github_alias_rejected(self):
+        err = commit_push_pr._validate_plan(
+            {"pr": {"action": "create"}, "github_pr": {"action": "create"}}, "github"
+        )
+        self.assertIn("use only one", err)
+
 
     def test_pr_alias_alone_ok(self):
         self.assertIsNone(

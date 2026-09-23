@@ -3,10 +3,33 @@
 Notable changes to this repo. Skills carry per-skill `version=` metadata in
 their `<!-- index: ... -->` comment; this file records the notable deltas.
 
+## 2026-09-23 — code-review fixes (round 2)
+
+From the ce-code-review pass (validator-confirmed finding plus
+adversarial-codex residual risks):
+
+- **generate_index.py:** quoted metadata values (`areas="..."`) now parse
+  equal to unquoted; a skill directory missing `SKILL.md` is a hard error
+  (was silently skipped by the glob); catalog notes fall back to the first
+  sentence of the SKILL.md frontmatter description — `NOTES` is now an
+  optional bilingual override, so a new skill generates without editing the
+  generator.
+- **vendor_shared.py:** destination symlinks are rejected in both check and
+  write modes (a symlink passed content comparison but is not a
+  self-contained copy); up-to-date consumers are no longer rewritten.
+- **CI:** the SKILL.md frontmatter check now requires non-empty `name:`
+  and `description:` values, not just the key prefix; the index-generator
+  test suite runs in CI.
+- **ghc-search:** env overrides (`GHC_SEARCH_*`) are read per call instead
+  of at import (fixes a latent reload trap); env-vs-flag precedence and
+  env endpoint are now covered by tests (11 → 14 tests).
+- **my-ado-cppr:** the `github_pr` + `pr` plan-conflict case is tested
+  (21 → 22 tests).
+- **New suite:** `scripts/test_generate_index.py` — 12 round-trip tests
+  covering parse, validation, fallback notes, and `--check` drift.
+
 ## 2026-09-23 — hardening pass
 
-- **License:** root MIT `LICENSE` added; per-skill Apache copy removed
-  (the root license covers everything).
 - **CI:** `.github/workflows/ci.yml` added — runs every skill's offline
   test/eval suite, the index drift check, the shared-script drift check,
   and a SKILL.md frontmatter sanity pass on every push/PR.

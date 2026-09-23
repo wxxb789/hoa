@@ -24,7 +24,10 @@ AREAS = ("software-development", "work-management", "self-management")
 TARGETS = ("runtime-agnostic", "repo-only", "claude-code", "codex", "opencode",
            "hermes", "pi", "kimi-code")
 
-# One-line notes per skill. Keep in sync with the SKILL.md description.
+# Optional bilingual note overrides per skill: (en, zh). A skill absent here
+# falls back to the first sentence of its SKILL.md frontmatter description,
+# so a new skill generates without touching this file. Overrides exist to
+# keep the Chinese note from rendering the English description verbatim.
 NOTES = {
     "ghc-search": (
         "web and X/Twitter search via a local ghc-proxy Responses API; answer plus deduped sources",
@@ -56,10 +59,33 @@ NOTES = {
     ),
 }
 
+KV = re.compile(r"(\w+)\s*=\s*([^;]+)")
+
 INDEX_COMMENT = re.compile(
     r"^<!--\s*index:\s*(?P<kv>.*)\s*-->\s*$", re.MULTILINE
 )
-KV = re.compile(r"(\w+)\s*=\s*([^;]+)")
+
+FRONTMATTER_DESC = re.compile(
+    r"^---\s*\n.*?^description:\s*(?P<desc>.*?)(?=\n\w|\n---)", re.MULTILINE | re.DOTALL
+)
+
+
+def _fallback_note(skill_md: Path) -> str:
+    """First sentence of the SKILL.md frontmatter description."""
+    text = skill_md.read_text(encoding="utf-8")
+    m = FRONTMATTER_DESC.search(text)
+    if not m:
+        return ""
+    desc = " ".join(m.group("desc").split())
+    first_sentence = re.split(r"(?<=[.!?])\s", desc, maxsplit=1)[0]
+    return first_sentence
+
+
+def _unquote(value: str) -> str:
+    """Strip one pair of matching surrounding quotes from a metadata value."""
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+        return value[1:-1]
+    return value
 
 
 def parse_metadata(skill_md: Path) -> dict[str, str]:
@@ -67,7 +93,7 @@ def parse_metadata(skill_md: Path) -> dict[str, str]:
     m = INDEX_COMMENT.search(text)
     if not m:
         raise ValueError(f"no `<!-- index: ... -->` comment in {skill_md}")
-    meta = {k: v.strip() for k, v in KV.findall(m.group("kv"))}
+    meta = {k: _unquote(v.strip()) for k, v in KV.findall(m.group("kv"))}
     for key in ("areas", "targets"):
         if key not in meta:
             raise ValueError(f"missing `{key}=` in {skill_md}")
@@ -82,12 +108,24 @@ def parse_metadata(skill_md: Path) -> dict[str, str]:
 
 def collect() -> list[dict]:
     rows = []
-    for skill_md in sorted(SKILLS.glob("*/SKILL.md")):
-        name = skill_md.parent.name
+    skill_dirs = sorted(p for p in SKILLS.iterdir() if p.is_dir())
+    for skill_dir in skill_dirs:
+        skill_md = skill_dir / "SKILL.md"
+        if not skill_md.is_file():
+            raise ValueError(f"skill directory without SKILL.md: {skill_dir}")
+        name = skill_dir.name
         meta = parse_metadata(skill_md)
-        if name not in NOTES:
-            raise ValueError(f"no catalog note for skill {name!r} in NOTES")
-        rows.append({"name": name, **meta})
+        fallback = _fallback_note(skill_md)
+        if name in NOTES:
+            notes = NOTES[name]
+            note_en = notes[0] or fallback
+            note_zh = notes[1] or fallback
+        else:
+            note_en = note_zh = fallback
+        if not note_en:
+            raise ValueError(f"no note for skill {name!r}: no NOTES override "
+                             f"and no usable frontmatter description")
+        rows.append({"name": name, "note_en": note_en, "note_zh": note_zh, **meta})
     if not rows:
         raise ValueError("no skills found")
     return rows
@@ -165,13 +203,11 @@ FOOTER_ZH = """
 > 非 skill 类型（orchestration · agent · workflow · mcp · prompt · rule · eval · reflection）会在真实 artifact 落地时补充。
 """
 
-
 def render(rows: list[dict], lang: str) -> str:
     header, footer = (HEADER_EN, FOOTER_EN) if lang == "en" else (HEADER_ZH, FOOTER_ZH)
-    note_i = 0 if lang == "en" else 1
     out = [header]
     for r in rows:  # collect() already sorted by name
-        note = NOTES[r["name"]][note_i]
+        note = r["note_en"] if lang == "en" else r["note_zh"]
         out.append(
             f"| {r['name']} | skill | {r['areas']} | {r['targets']} | "
             f"`skills/{r['name']}/` | {note} |\n"

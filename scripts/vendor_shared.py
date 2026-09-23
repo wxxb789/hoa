@@ -51,12 +51,22 @@ def main(argv=None) -> int:
         src_hash = hashlib.sha256(src_bytes).hexdigest()
         for consumer in consumers:
             dest = ROOT / consumer / name
+            if dest.is_symlink():
+                # A symlink passes content comparison (reads follow the link)
+                # but is not a self-contained copy: an installed skill package
+                # would carry a dangling link. Fail in both modes.
+                print(f"vendor_shared: {dest} is a symlink; remove it and run "
+                      f"python scripts/vendor_shared.py", file=sys.stderr)
+                status = 1
+                continue
             if args.check:
                 if not dest.is_file() or digest(dest) != src_hash:
                     print(f"vendor_shared: {dest} is stale; run "
                           f"python scripts/vendor_shared.py", file=sys.stderr)
                     status = 1
             else:
+                if dest.is_file() and digest(dest) == src_hash:
+                    continue
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 dest.write_bytes(src_bytes)
                 print(f"vendored {name} → {consumer}/")

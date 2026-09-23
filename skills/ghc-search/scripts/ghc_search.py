@@ -17,11 +17,19 @@ import urllib.error
 import urllib.request
 from urllib.parse import urlsplit
 
-DEFAULT_ENDPOINT = os.environ.get("GHC_SEARCH_ENDPOINT", "http://127.0.0.1:4141/v1/responses")
+# Env overrides are read per-call, not at import, so tests and embedding
+# callers can set them without reloading the module.
+def default_endpoint() -> str:
+    return os.environ.get("GHC_SEARCH_ENDPOINT", "http://127.0.0.1:4141/v1/responses")
+
+
 # Per-engine defaults. There is deliberately no default engine: gpt and x search
 # different corpora, and picking one for the caller guesses at intent.
-ENGINE_MODEL = {"gpt": os.environ.get("GHC_SEARCH_MODEL_GPT", "gpt-5.6-luna"),
-                "x": os.environ.get("GHC_SEARCH_MODEL_X", "grok-4.5")}
+def engine_model(engine: str) -> str:
+    env_key = "GHC_SEARCH_MODEL_GPT" if engine == "gpt" else "GHC_SEARCH_MODEL_X"
+    return os.environ.get(env_key, {"gpt": "gpt-5.6-luna", "x": "grok-4.5"}[engine])
+
+
 ENGINE_EFFORT = {"gpt": "high", "x": "medium"}
 
 # Inline citation markup, eating any space in front of it so removal leaves no
@@ -210,7 +218,7 @@ def main(argv=None) -> int:
                     help="gpt = web search, x = X/Twitter search. No default: they search "
                          "different corpora, so the caller has to say which.")
     ap.add_argument("query")
-    ap.add_argument("--model", help=f"default per engine: {ENGINE_MODEL['gpt']} (gpt), {ENGINE_MODEL['x']} (x)")
+    ap.add_argument("--model", help=f"default per engine: {engine_model('gpt')} (gpt), {engine_model('x')} (x)")
     ap.add_argument("--effort", choices=("low", "medium", "high"),
                     help=f"reasoning effort (default: gpt={ENGINE_EFFORT['gpt']}, x={ENGINE_EFFORT['x']})")
 
@@ -232,7 +240,7 @@ def main(argv=None) -> int:
     ap.add_argument("--limit", type=int, default=10, help="max sources listed (default 10)")
     ap.add_argument("--max-tokens", type=int, default=2048)
     ap.add_argument("--timeout", type=float, default=90.0)
-    ap.add_argument("--endpoint", default=DEFAULT_ENDPOINT)
+    ap.add_argument("--endpoint", default=default_endpoint())
     ap.add_argument("--json", action="store_true", dest="as_json", help="structured output")
     args = ap.parse_args(argv)
 
@@ -244,7 +252,7 @@ def main(argv=None) -> int:
     if wrong:
         ap.error(f"{', '.join(wrong)} not valid for engine '{args.engine}'")
 
-    model = args.model or ENGINE_MODEL[args.engine]
+    model = args.model or engine_model(args.engine)
     effort = args.effort or ENGINE_EFFORT[args.engine]
     mode = "x_search" if args.engine == "x" else "web_search"
 
