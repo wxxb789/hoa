@@ -11,14 +11,15 @@ Run: python evals/run_trigger_evals.py
 """
 from __future__ import annotations
 
-import importlib.util
 import json
 import sys
 from pathlib import Path
 
 EVALS = Path(__file__).resolve().parent
 ROOT = EVALS.parent
-GENERATOR = ROOT / "scripts" / "generate_index.py"
+sys.path.insert(0, str(ROOT / "scripts"))
+
+import generate_index as gi  # noqa: E402
 
 REQUIRED_TOP = {"purpose", "procedure", "cases"}
 REQUIRED_CASE = {"id", "request", "must_pick", "distractors"}
@@ -26,9 +27,6 @@ REQUIRED_CASE = {"id", "request", "must_pick", "distractors"}
 
 def _catalog_names() -> set[str]:
     """Artifact names from the real catalog (skills + library folders)."""
-    spec = importlib.util.spec_from_file_location("generate_index", GENERATOR)
-    gi = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(gi)
     return {row["name"] for row in gi.collect()}
 
 

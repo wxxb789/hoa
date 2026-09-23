@@ -142,6 +142,18 @@ def parse_metadata(skill_md: Path) -> dict[str, str]:
     return meta
 
 
+def _resolve_notes(name: str, doc: Path, kind: str) -> tuple[str, str]:
+    """Bilingual note for an artifact: NOTES override, else the doc's
+    frontmatter description. Raises when neither yields a note."""
+    fallback = _fallback_note(doc)
+    en, zh = NOTES.get(name, (fallback, fallback))
+    note_en, note_zh = en or fallback, zh or fallback
+    if not note_en:
+        raise ValueError(f"no note for {kind} {name!r}: no NOTES override "
+                         f"and no usable description")
+    return note_en, note_zh
+
+
 def collect() -> list[dict]:
     rows = []
     skill_dirs = sorted(p for p in SKILLS.iterdir() if p.is_dir())
@@ -151,25 +163,16 @@ def collect() -> list[dict]:
             raise ValueError(f"skill directory without SKILL.md: {skill_dir}")
         name = skill_dir.name
         meta = parse_metadata(skill_md)
-        fallback = _fallback_note(skill_md)
-        if name in NOTES:
-            notes = NOTES[name]
-            note_en = notes[0] or fallback
-            note_zh = notes[1] or fallback
-        else:
-            note_en = note_zh = fallback
-        if not note_en:
-            raise ValueError(f"no note for skill {name!r}: no NOTES override "
-                             f"and no usable frontmatter description")
-        rows.append({"name": name, "type": "skill", "note_en": note_en,
-                     "note_zh": note_zh, **meta})
+        note_en, note_zh = _resolve_notes(name, skill_md, "skill")
+        rows.append({"name": name, "type": "skill", "path": f"skills/{name}/",
+                     "note_en": note_en, "note_zh": note_zh, **meta})
     rows.extend(_collect_library())
     if not rows:
         raise ValueError("no skills found")
     return rows
 
 
-def _library_doc(folder: Path, entry: Path) -> Path | None:
+def _library_doc(entry: Path) -> Path | None:
     """Main markdown file of a library artifact: <name>.md or <name>/README.md."""
     if entry.is_file() and entry.suffix == ".md":
         return entry
@@ -188,23 +191,18 @@ def _collect_library() -> list[dict]:
         for entry in sorted(folder.iterdir()):
             if entry.name.startswith("."):
                 continue
-            doc = _library_doc(folder, entry)
+            doc = _library_doc(entry)
             if doc is None:
                 raise ValueError(
                     f"library artifact without a main .md: {entry} "
                     f"(expected {entry.name}.md or {entry.name}/README.md)")
-            name = entry.stem if entry.is_file() else entry.name
+            is_file = entry.is_file()
+            name = entry.stem if is_file else entry.name
+            path = f"{folder_name}/{name}.md" if is_file else f"{folder_name}/{name}/"
             meta = parse_metadata(doc)
-            fallback = _fallback_note(doc)
-            note_en = note_zh = fallback
-            if name in NOTES:
-                note_en = NOTES[name][0] or fallback
-                note_zh = NOTES[name][1] or fallback
-            if not note_en:
-                raise ValueError(f"no note for {artifact_type} {name!r}: no "
-                                 f"NOTES override and no usable description")
+            note_en, note_zh = _resolve_notes(name, doc, artifact_type)
             rows.append({"name": name, "type": artifact_type, "folder": folder_name,
-                         "note_en": note_en, "note_zh": note_zh, **meta})
+                         "path": path, "note_en": note_en, "note_zh": note_zh, **meta})
     return rows
 
 
@@ -283,21 +281,12 @@ def render(rows: list[dict], lang: str) -> str:
     out = [header]
     for r in rows:  # collect() already sorted by name
         note = r["note_en"] if lang == "en" else r["note_zh"]
-        folder = r.get("folder", "skills")
-        path = f"{folder}/{r['name']}/" if r["type"] == "skill" else _library_path(r)
         out.append(
             f"| {r['name']} | {r['type']} | {r['areas']} | {r['targets']} | "
-            f"`{path}` | {note} |\n"
+            f"`{r['path']}` | {note} |\n"
         )
     out.append(footer)
     return "".join(out)
-
-
-def _library_path(r: dict) -> str:
-    """Rendered path column for a library artifact."""
-    folder, name = r["folder"], r["name"]
-    doc = ROOT / folder / f"{name}.md"
-    return f"{folder}/{name}.md" if doc.is_file() else f"{folder}/{name}/"
 
 
 def main(argv=None) -> int:

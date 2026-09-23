@@ -10,31 +10,30 @@ Usage: python evals/judge_trigger_evals.py [--limit N] [--json]
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import json
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 EVALS = Path(__file__).resolve().parent
 ROOT = EVALS.parent
-GHC_SEARCH = ROOT / "skills" / "ghc-search" / "scripts" / "ghc_search.py"
+sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT / "skills" / "ghc-search" / "scripts"))
 
-spec = importlib.util.spec_from_file_location("generate_index", ROOT / "scripts" / "generate_index.py")
-gi = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(gi)
+import generate_index as gi  # noqa: E402
+import ghc_search  # noqa: E402
 
 JUDGE_MODEL = "gpt-5.6-luna"
+MAX_WORKERS = 5
 
 
 def catalog_text() -> str:
-    rows = gi.collect()
-    lines = []
-    for r in rows:
-        lines.append(f"- {r['name']} ({r['type']}): {r['note_en']}")
-    return "\n".join(lines)
+    return "\n".join(
+        f"- {r['name']} ({r['type']}): {r['note_en']}" for r in gi.collect()
+    )
 
 
-def judge_one(ghc_search, catalog: str, request: str) -> str:
+def judge_one(catalog: str, request: str) -> str:
     prompt = (
         "You are routing a user request to exactly one artifact from this catalog.\n\n"
         f"Catalog:\n{catalog}\n\n"
@@ -54,26 +53,27 @@ def main() -> int:
     ap.add_argument("--json", action="store_true", help="emit machine-readable results")
     args = ap.parse_args()
 
-    sys.path.insert(0, str(GHC_SEARCH.parent))
-    import ghc_search
-
     cases = json.loads((EVALS / "trigger-cases.json").read_text(encoding="utf-8"))["cases"]
     if args.limit:
         cases = cases[: args.limit]
     catalog = catalog_text()
 
-    results = []
-    for case in cases:
+    def run_case(case: dict) -> dict:
         try:
-            pick = judge_one(ghc_search, catalog, case["request"])
+            pick = judge_one(catalog, case["request"])
             passed = pick in case["must_pick"]
         except ghc_search.SearchError as exc:
             pick, passed = f"error: {exc}", False
-        results.append({"id": case["id"], "pick": pick,
-                        "must_pick": case["must_pick"], "passed": passed})
+        result = {"id": case["id"], "pick": pick,
+                  "must_pick": case["must_pick"], "passed": passed}
         if not args.json:
             mark = "PASS" if passed else "FAIL"
-            print(f"{mark} {case['id']}: picked {pick!r} (want {case['must_pick']})")
+            print(f"{mark} {case['id']}: picked {pick!r} (want {case['must_pick']})",
+                  flush=True)
+        return result
+
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        results = list(executor.map(run_case, cases))
 
     passed = sum(r["passed"] for r in results)
     if args.json:
