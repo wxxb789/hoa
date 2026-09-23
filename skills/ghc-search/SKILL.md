@@ -98,5 +98,5 @@ MCP) over general search when looking up a named library or API.
 ## Check
 
 ```bash
-python "$(dirname $S)/test_ghc_search.py"   # 11 tests, offline
+python "$(dirname $S)/test_ghc_search.py"   # offline, no network required
 ```

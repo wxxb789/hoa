@@ -99,7 +99,7 @@ hoa/
 git clone https://github.com/wxxb789/hoa   # 用 skill / 跑测试都不需要子模块
 ```
 
-`ref/` 下的 40 个参考仓库是子模块——很重，只在研究上游时才需要。普通克隆
+`ref/` 下的 35 个参考仓库是子模块——很重，只在研究上游时才需要。普通克隆
 （不加 `--recursive`）使用和测试其余一切完全够用。需要时刷新参考：
 `git submodule update --init --remote --merge`。
 
@@ -162,7 +162,7 @@ type 从目录推导。两个轴都可多值。
 
 ## 参考地图
 
-[`ref/README.md`](./ref/README.md) 把 **40 个外部 agent/skill/harness 仓库**逐一
+[`ref/README.md`](./ref/README.md) 把 **35 个外部 agent/skill/harness 仓库**逐一
 映射到"它是什么 + 值得偷什么具体模式"——如果你想设计自己的 agent 体系，这是
 本仓库信息密度最高的一页。
 
@@ -173,8 +173,25 @@ type 从目录推导。两个轴都可多值。
 - **Phase 2：** skills-first 下发——`skills/` 走 `npx skills`，设置走 chezmoi；
   去掉 `runtimes/`。✓
 - **Phase 3：** 在 `skills/` 里长出真实 skill；从 per-artifact metadata 生成
-  `index.md`（✓ `scripts/generate_index.py`）；建 `evals/` + `reflections/`
-  （第一篇复盘：`reflections/2026-09-23-skills-first-split.md`）。
+  `index.md`（✓ `scripts/generate_index.py`，现已覆盖库目录）；建 `evals/` +
+  `reflections/`（第一篇复盘：`reflections/2026-09-23-skills-first-split.md`；
+  trigger evals：`evals/trigger-cases.json`）。✓
+- **Phase 4（当前）：** 让库真正活起来——每个库目录现在至少有一个改编自
+  `ref/` 的样例（第一批偷师：ECC 的 skill-scout → `agents/`、looper 的
+  typed gates → `orchestration/`）；下一步：distill 循环产出的第一个
+  自产 skill，第一个外部消费者 issue。
+
+## 复盘节奏
+
+复盘是排期的，不是随缘的：每月跑一次 **hoa-introspect** 自我复盘，产出写入
+`reflections/`。distill 循环（introspect → retrieve → distill）应在下一个
+phase 收尾前产出第一个自产 skill。
+
+## 请求一个 skill
+
+公开仓库，开放接收：如果这里缺某个能力、或某个 skill 只覆盖了你场景的一半，
+请开 issue（bug 或 skill request）——issue 模板两种都有。外部请求也是决定
+下一步建什么的最好信号。
 
 ## 如何使用
 

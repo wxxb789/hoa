@@ -20,6 +20,18 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SKILLS = ROOT / "skills"
 
+# Library folders indexed beside skills. Each artifact is a directory (or a
+# single file) whose metadata comment lives in its main markdown file:
+# <folder>/<name>.md or <folder>/<name>/README.md.
+LIBRARY_FOLDERS = {
+    "agents": "agent",
+    "orchestration": "orchestration",
+    "rules": "rule",
+    "prompts": "prompt",
+    "workflows": "workflow",
+    "mcps": "mcp",
+}
+
 AREAS = ("software-development", "work-management", "self-management")
 TARGETS = ("runtime-agnostic", "repo-only", "claude-code", "codex", "opencode",
            "hermes", "pi", "kimi-code")
@@ -56,6 +68,30 @@ NOTES = {
     "my-ado-cppr": (
         "commit → push → create/update PR on Azure DevOps or GitHub; probe/plan/apply with resumable state",
         "commit → push → 在 Azure DevOps 或 GitHub 创建/更新 PR；probe/plan/apply 三段式，状态可 resume",
+    ),
+    "skill-scout": (
+        "search local/marketplace/upstream for an existing skill before authoring a new one; report, never author",
+        "写新 skill 前先在本地/marketplace/上游搜索已有实现；只报告，不代写",
+    ),
+    "typed-verification-gates": (
+        "every loop iteration ends at a gate typed programmatic / judge / human, declared before the work",
+        "循环每次迭代止于一道事先定型的验证门：programmatic / judge / human",
+    ),
+    "generated-means-generated": (
+        "generated files are never hand-edited; regeneration rides the same commit and drift fails CI",
+        "生成文件绝不手改；再生成随同一提交，漂移即 CI 失败",
+    ),
+    "fresh-context-grader": (
+        "one-shot judge prompt: grade a response against a rubric written before it existed",
+        "一次性评审 prompt：用先于回答写好的 rubric 在全新上下文里评分",
+    ),
+    "adopt-a-pattern": (
+        "finite recipe turning a ref-map what-to-steal note into a landed, classified, attributed artifact",
+        "把 ref 地图里的 what-to-steal 笔记变成落地、归类、带署名 artifact 的有限步骤",
+    ),
+    "ghc-proxy": (
+        "portable definition of the local ghc-proxy search service; registration stays in chezmoi",
+        "本地 ghc-proxy 搜索服务的可移植定义；注册留在 chezmoi",
     ),
 }
 
@@ -125,9 +161,50 @@ def collect() -> list[dict]:
         if not note_en:
             raise ValueError(f"no note for skill {name!r}: no NOTES override "
                              f"and no usable frontmatter description")
-        rows.append({"name": name, "note_en": note_en, "note_zh": note_zh, **meta})
+        rows.append({"name": name, "type": "skill", "note_en": note_en,
+                     "note_zh": note_zh, **meta})
+    rows.extend(_collect_library())
     if not rows:
         raise ValueError("no skills found")
+    return rows
+
+
+def _library_doc(folder: Path, entry: Path) -> Path | None:
+    """Main markdown file of a library artifact: <name>.md or <name>/README.md."""
+    if entry.is_file() and entry.suffix == ".md":
+        return entry
+    readme = entry / "README.md"
+    if entry.is_dir() and readme.is_file():
+        return readme
+    return None
+
+
+def _collect_library() -> list[dict]:
+    rows = []
+    for folder_name, artifact_type in sorted(LIBRARY_FOLDERS.items()):
+        folder = ROOT / folder_name
+        if not folder.is_dir():
+            continue
+        for entry in sorted(folder.iterdir()):
+            if entry.name.startswith("."):
+                continue
+            doc = _library_doc(folder, entry)
+            if doc is None:
+                raise ValueError(
+                    f"library artifact without a main .md: {entry} "
+                    f"(expected {entry.name}.md or {entry.name}/README.md)")
+            name = entry.stem if entry.is_file() else entry.name
+            meta = parse_metadata(doc)
+            fallback = _fallback_note(doc)
+            note_en = note_zh = fallback
+            if name in NOTES:
+                note_en = NOTES[name][0] or fallback
+                note_zh = NOTES[name][1] or fallback
+            if not note_en:
+                raise ValueError(f"no note for {artifact_type} {name!r}: no "
+                                 f"NOTES override and no usable description")
+            rows.append({"name": name, "type": artifact_type, "folder": folder_name,
+                         "note_en": note_en, "note_zh": note_zh, **meta})
     return rows
 
 
@@ -164,7 +241,7 @@ targets:  runtime-agnostic | repo-only |
 """
 
 FOOTER_EN = """
-> Non-skill types (orchestration · agent · workflow · mcp · prompt · rule · eval · reflection) populate as real artifacts land.
+> Reflections and eval results are prose/knowledge, not indexed here.
 """
 
 HEADER_ZH = """# Index — 按 area 与 target 索引
@@ -188,8 +265,6 @@ targets:  runtime-agnostic | repo-only |
 
 - 两个轴都**可多值**（逗号分隔）。
 - **type** 从顶层目录推导——不要重复打标。
-- `targets` = 这个 skill 用 `npx skills --agent` 装到哪些 runtime
-  （`runtime-agnostic` = 任意；`repo-only` = 永不下发，如库 / 知识类）。
 - 一行对应一个**逻辑** artifact（不为双语文件分别建行）。
 - 暂不设 `status` 轴，等实验 / 废弃状态真的出现再加。
 
@@ -200,7 +275,7 @@ targets:  runtime-agnostic | repo-only |
 """
 
 FOOTER_ZH = """
-> 非 skill 类型（orchestration · agent · workflow · mcp · prompt · rule · eval · reflection）会在真实 artifact 落地时补充。
+> reflections 与 eval 结果属于文章 / 知识类，不在此索引。
 """
 
 def render(rows: list[dict], lang: str) -> str:
@@ -208,12 +283,21 @@ def render(rows: list[dict], lang: str) -> str:
     out = [header]
     for r in rows:  # collect() already sorted by name
         note = r["note_en"] if lang == "en" else r["note_zh"]
+        folder = r.get("folder", "skills")
+        path = f"{folder}/{r['name']}/" if r["type"] == "skill" else _library_path(r)
         out.append(
-            f"| {r['name']} | skill | {r['areas']} | {r['targets']} | "
-            f"`skills/{r['name']}/` | {note} |\n"
+            f"| {r['name']} | {r['type']} | {r['areas']} | {r['targets']} | "
+            f"`{path}` | {note} |\n"
         )
     out.append(footer)
     return "".join(out)
+
+
+def _library_path(r: dict) -> str:
+    """Rendered path column for a library artifact."""
+    folder, name = r["folder"], r["name"]
+    doc = ROOT / folder / f"{name}.md"
+    return f"{folder}/{name}.md" if doc.is_file() else f"{folder}/{name}/"
 
 
 def main(argv=None) -> int:

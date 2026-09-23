@@ -1,0 +1,72 @@
+{
+  "purpose": "Trigger (routing) evals for hoa artifacts: given a user request, which artifact should a runtime pick? Graded by an LLM judge against the artifact descriptions; must_pick lists exactly one acceptable choice, distractors name artifacts that must NOT be picked.",
+  "procedure": [
+    "Build the catalog: each artifact's name, type, and description from its SKILL.md frontmatter (skills) or NOTES override (library artifacts).",
+    "For each case, present ONLY the catalog to a fresh-context judge along with the user request; ask for one artifact name.",
+    "Grade: pass iff the judge's pick is in must_pick.",
+    "Do not reveal must_pick or distractors to the judge.",
+    "This file is data, not a runner; evals/run_trigger_evals.py validates it offline and CI checks that validation."
+  ],
+  "cases": [
+    {
+      "id": "route-to-search",
+      "request": "Find out what the current stable version of the .NET SDK is; I don't have a URL.",
+      "must_pick": ["ghc-search"],
+      "distractors": ["define-goal", "git-worktree-workflow", "my-ado-cppr"]
+    },
+    {
+      "id": "route-to-goal-definition",
+      "request": "Help me turn 'make our product enterprise-ready' into a verifiable goal or set of goals.",
+      "must_pick": ["define-goal"],
+      "distractors": ["ghc-search", "git-worktree-workflow"]
+    },
+    {
+      "id": "route-to-worktree",
+      "request": "I want to run Claude Code and Codex at the same time on this repo without them stepping on each other.",
+      "must_pick": ["git-worktree-workflow"],
+      "distractors": ["ghc-search", "my-ado-cppr", "define-goal"]
+    },
+    {
+      "id": "route-to-commit-push-pr",
+      "request": "Commit my staged changes, push the branch, and open a PR on Azure DevOps.",
+      "must_pick": ["my-ado-cppr"],
+      "distractors": ["git-worktree-workflow", "ghc-search"]
+    },
+    {
+      "id": "route-to-retrieve-not-introspect",
+      "request": "Find every session across my Claude Code and Codex history where I touched the auth module.",
+      "must_pick": ["hoa-agent-retrieve"],
+      "distractors": ["hoa-introspect", "hoa-introspect-distill"]
+    },
+    {
+      "id": "route-to-introspect-not-retrieve",
+      "request": "Audit my work patterns for blind spots and wasted effort over the last month.",
+      "must_pick": ["hoa-introspect"],
+      "distractors": ["hoa-agent-retrieve", "hoa-introspect-distill"]
+    },
+    {
+      "id": "route-to-distill",
+      "request": "This recurring deployment checklist keeps coming up — turn it into a reusable skill.",
+      "must_pick": ["hoa-introspect-distill"],
+      "distractors": ["hoa-introspect", "hoa-agent-retrieve", "define-goal"]
+    },
+    {
+      "id": "route-to-skill-scout",
+      "request": "Before I write a new skill for slide generation, check whether a good one already exists somewhere public.",
+      "must_pick": ["skill-scout"],
+      "distractors": ["ghc-search", "hoa-introspect-distill"]
+    },
+    {
+      "id": "route-to-typed-gates",
+      "request": "I'm designing an overnight agent loop — how should I decide what counts as 'done' for each iteration?",
+      "must_pick": ["typed-verification-gates"],
+      "distractors": ["define-goal", "adopt-a-pattern"]
+    },
+    {
+      "id": "route-to-adopt-a-pattern",
+      "request": "There's a pattern in our reference repos I want to turn into a first-class artifact here — what's the process?",
+      "must_pick": ["adopt-a-pattern"],
+      "distractors": ["typed-verification-gates", "skill-scout"]
+    }
+  ]
+}

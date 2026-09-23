@@ -35,5 +35,11 @@ targets:  runtime-agnostic | repo-only |
 | hoa-introspect | skill | self-management,work-management | runtime-agnostic | `skills/hoa-introspect/` | layered self-report: deterministic usage facets (L1) + evidence-cited blind-spot audit (L2) |
 | hoa-introspect-distill | skill | self-management,software-development | runtime-agnostic | `skills/hoa-introspect-distill/` | distill approved repeatable work into a skill (or opt-in rule/config) via the runtime-native skill-creator or inline |
 | my-ado-cppr | skill | software-development | runtime-agnostic | `skills/my-ado-cppr/` | commit → push → create/update PR on Azure DevOps or GitHub; probe/plan/apply with resumable state |
+| skill-scout | agent | software-development,work-management | repo-only | `agents/skill-scout.md` | search local/marketplace/upstream for an existing skill before authoring a new one; report, never author |
+| ghc-proxy | mcp | software-development | repo-only | `mcps/ghc-proxy.md` | portable definition of the local ghc-proxy search service; registration stays in chezmoi |
+| typed-verification-gates | orchestration | software-development | repo-only | `orchestration/typed-verification-gates.md` | every loop iteration ends at a gate typed programmatic / judge / human, declared before the work |
+| fresh-context-grader | prompt | software-development,work-management | repo-only | `prompts/fresh-context-grader.md` | one-shot judge prompt: grade a response against a rubric written before it existed |
+| generated-means-generated | rule | software-development,work-management,self-management | repo-only | `rules/generated-means-generated.md` | generated files are never hand-edited; regeneration rides the same commit and drift fails CI |
+| adopt-a-pattern | workflow | software-development | repo-only | `workflows/adopt-a-pattern.md` | finite recipe turning a ref-map what-to-steal note into a landed, classified, attributed artifact |
 
-> Non-skill types (orchestration · agent · workflow · mcp · prompt · rule · eval · reflection) populate as real artifacts land.
+> Reflections and eval results are prose/knowledge, not indexed here.
