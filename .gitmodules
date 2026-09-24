@@ -3,11 +3,6 @@
 	url = https://github.com/EveryInc/compound-engineering-plugin
 	branch = main
 	ignore = dirty
-[submodule "ref/compound-knowledge-plugin"]
-	path = ref/compound-knowledge-plugin
-	url = https://github.com/EveryInc/compound-knowledge-plugin
-	branch = main
-	ignore = dirty
 [submodule "ref/superpowers"]
 	path = ref/superpowers
 	url = https://github.com/obra/superpowers
@@ -41,11 +36,6 @@
 [submodule "ref/zhijian-skills"]
 	path = ref/zhijian-skills
 	url = https://github.com/zjp1997720/zhijian-skills
-	branch = main
-	ignore = dirty
-[submodule "ref/god-skill"]
-	path = ref/god-skill
-	url = https://github.com/fattly/god-skill
 	branch = main
 	ignore = dirty
 [submodule "ref/dbskill"]
@@ -108,16 +98,6 @@
 	url = https://github.com/alchaincyf/nuwa-skill
 	branch = main
 	ignore = dirty
-[submodule "ref/yourself-skill"]
-	path = ref/yourself-skill
-	url = https://github.com/notdog1998/yourself-skill
-	branch = master
-	ignore = dirty
-[submodule "ref/forge-skill"]
-	path = ref/forge-skill
-	url = https://github.com/YIKUAIBANZI/forge-skill
-	branch = main
-	ignore = dirty
 [submodule "ref/huashu-design"]
 	path = ref/huashu-design
 	url = https://github.com/alchaincyf/huashu-design
@@ -171,11 +151,6 @@
 [submodule "ref/ECC"]
 	path = ref/ECC
 	url = https://github.com/affaan-m/ECC
-	branch = main
-	ignore = dirty
-[submodule "ref/andrej-karpathy-skills"]
-	path = ref/andrej-karpathy-skills
-	url = https://github.com/multica-ai/andrej-karpathy-skills
 	branch = main
 	ignore = dirty
 [submodule "ref/gstack"]

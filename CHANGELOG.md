@@ -3,6 +3,35 @@
 Notable changes to this repo. Skills carry per-skill `version=` metadata in
 their `<!-- index: ... -->` comment; this file records the notable deltas.
 
+## 2026-09-24 — library seeding, test consolidation, ref pruning
+
+- **Library folders are live:** every library folder (`agents/`,
+  `orchestration/`, `rules/`, `prompts/`, `workflows/`, `mcps/`) now holds
+  one exemplar with a provenance note — most adapted from a `ref/` row
+  (first steals: ECC's skill-scout, looper's typed verification gates);
+  `rules/generated-means-generated.md` and `mcps/ghc-proxy.md` document this
+  repo's own incidents and local service instead. Second retro:
+  `reflections/2026-09-23-first-steals.md`.
+- **generate_index.py covers library folders:** library artifacts (a
+  `<name>.md` or `<name>/README.md` with an `<!-- index: ... -->` comment)
+  are indexed beside skills; index regenerated (13 artifacts).
+- **Test consolidation:** same-branch parameter rows merged (my-ado-cppr
+  alias tests, generate_index axis tests; 22 → 21 and 12 → 10), one
+  downstream-duplicate drift test removed, one redundant distill fixture
+  dropped (ambiguous vs group approval hit the same branch); 2 new library
+  tests added. Suites: generate-index 12, ghc-search 14, my-ado-cppr 21,
+  gitwt 19.
+- **New evals:** `skills/define-goal/evals/validate_fixtures.py` (offline
+  schema check for the judge fixtures, in CI) and `evals/` trigger evals —
+  10 routing cases validated offline against the real catalog.
+- **ref/ pruned:** 5 dead submodules removed (40 → 35) after a 5+ month
+  staleness + redundancy audit; andrej-karpathy-skills kept as a link-only
+  row. All remaining submodules refreshed to upstream heads.
+- **Intake:** issue templates (bug report / skill request) and README
+  "Reflect cadence" + "Request a skill" sections; roadmap Phase 4.
+- **Fixes:** ghc-search SKILL.md no longer hard-codes its test count (it had
+  drifted to 11 of 14).
+
 ## 2026-09-23 — code-review fixes (round 2)
 
 From the ce-code-review pass (validator-confirmed finding plus

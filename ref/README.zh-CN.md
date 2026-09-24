@@ -18,7 +18,6 @@ git submodule update --remote --merge   # 把所有跟踪分支拉到各自最�
 | 仓库 | 类别 | 是什么 | 可借鉴什么 |
 |---|---|---|---|
 | [EveryInc/compound-engineering-plugin](https://github.com/EveryInc/compound-engineering-plugin)<br>`ref/compound-engineering-plugin` | 工程 skills | 一个跨 harness 的 AI 编码 agent 插件，包含 31 个串联的工作流 skills，覆盖 brainstorm、plan、work、review、debug 与复利式学习循环。 | 复利循环：ce-compound 写入 docs/solutions 的学习记录，之后 ce-brainstorm/ce-plan 会把它们作为基底读取。 |
-| [EveryInc/compound-knowledge-plugin](https://github.com/EveryInc/compound-knowledge-plugin)<br>`ref/compound-knowledge-plugin` | plugins | 一个 Claude Code 插件，包含 6 个 kw: 工作流 skills（brainstorm、plan、confidence、review、work、compound）外加 5 个 agent，用于复利式知识工作。 | /kw:compound skill 把学习记录连同 YAML frontmatter 保存到 docs/knowledge/，而 /kw:plan 会自动检索它们——一个自我强化的循环。 |
 | [obra/superpowers](https://github.com/obra/superpowers)<br>`ref/superpowers` | 工程 skills | 一个 Claude Code 插件，包含 14 个可组合、可自动触发的 skills，编码了 TDD 优先的 agent 开发工作流：brainstorm、plan、worktree、subagent 驱动的实现、review。 | “writing-skills 就是流程文档的 TDD”这一 meta-skill，加上以 RED-GREEN-REFACTOR 为门槛的 subagent 驱动开发，以及先规范后代码的两阶段 review。 |
 | [mattpocock/skills](https://github.com/mattpocock/skills)<br>`ref/mattpocock-skills` | 工程 skills | Matt Pocock 收集的约 41 个可组合 Claude Code agent skills，面向真实工程：grilling、spec/ticket 流程、TDD、代码 review 与领域建模。 | “grilling”模式：一场不留情面的构建前访谈，同时产出 CONTEXT.md 通用语言词汇表与 ADR（grill-with-docs）。 |
 | [juliusbrussee/caveman](https://github.com/juliusbrussee/caveman)<br>`ref/caveman` | prompts | 一个 Claude Code / 多 agent 插件，强制以简短的“穴居人腔”回复，在保留代码与技术准确性的同时削减约 65% 的输出 token。 | SessionStart + UserPromptSubmit hooks 持久化一个模式标志，并通过 decision:"block" 注入统计信息，而非靠模型计算。 |
@@ -26,7 +25,6 @@ git submodule update --remote --merge   # 把所有跟踪分支拉到各自最�
 | [JimLiu/baoyu-design](https://github.com/JimLiu/baoyu-design)<br>`ref/baoyu-design` | 设计 | 一个可移植的 Agent Skill，重新封装了 Anthropic 的 Claude Design 引擎，让本地 agent（Cursor、Claude Code、Codex）产出自包含的 HTML mockup、原型与幻灯片。 | 与 harness 无关的 SKILL.md：检测运行时并加载对应 harness 的 references/*.md 工具映射，让工艺规则保持可移植。 |
 | [lijigang/ljg-skills](https://github.com/lijigang/ljg-skills)<br>`ref/ljg-skills` | 思维工具 | 一个个人收藏的 21 个中文认知 skills，把概念、书籍、论文与领域拆解为结构化思维框架，以 org-mode/markdown 或 PNG 卡片输出。 | 可复用的“框架即 skill”模式：固定维度的拆解（8 轴概念解剖、书籍的 x→f→f(x) 归约）压缩成一句顿悟式的话。 |
 | [zjp1997720/zhijian-skills](https://github.com/zjp1997720/zhijian-skills)<br>`ref/zhijian-skills` | agent skills | 一个单仓库作品集，包含 11 个聚焦、独立版本化的 Agent Skills，涵盖 Codex 运维、工作流编排、模型路由、知识系统、研究与 WeChat 发布。 | registry/skills.json 清单，加上 `skills/<name>/` 载荷与 `docs/skills/<name>/` 双语文档的拆分，让每个 skill 拥有自己的版本。 |
-| [fattly/god-skill](https://github.com/fattly/god-skill)<br>`ref/god-skill` | prompts | 一个中文 AI-agent skill，通过多 agent 研究流水线把任意指定人物提炼为可运行的 persona SKILL.md。 | 带置信度标注的“灵魂层”：每条存在性推断都标注置信度+证据，并把“深刻但不可证伪”明确列为需拒绝的失败模式。 |
 | [dontbesilent2025/dbskill](https://github.com/dontbesilent2025/dbskill)<br>`ref/dbskill` | skills | 一个中文 Claude Code 插件/marketplace，包含 28 个商业与内容创作诊断 Skills，外加一个从推文挖掘出的 4,176 条原子知识库。 | `/dbs` 路由 skill：单一入口读取对话上下文并自动派发到合适的专用 skill。 |
 | [tw93/Waza](https://github.com/tw93/Waza)<br>`ref/Waza` | 工程 skills | Waza 是一个跨 agent（Claude Code/Codex/Cursor）插件，包含八个工程工作流 skills：think、ui、check、hunt、write、learn、read、health。 | 双语的 `when_to_use`/`dispatch_intent` frontmatter，加上 RESOLVER.md 路由表，让一个 skill 能跨 agent/语言触发。 |
 | [tw93/Kami](https://github.com/tw93/Kami)<br>`ref/Kami` | 设计 | 一个 Claude Code skill 与基于约束的设计系统，通过 WeasyPrint 把专业文档与落地页排版成带品牌的 PDF/PPTX/PNG 交付物。 | 确定性交付门：发布前的按类型内容 schema + 事实覆盖检查 + 页面图像视觉 QA 清单。 |
@@ -39,8 +37,6 @@ git submodule update --remote --merge   # 把所有跟踪分支拉到各自最�
 | [mvanhorn/last30days-skill](https://github.com/mvanhorn/last30days-skill)<br>`ref/last30days-skill` | 研究 | 一个多主机 Agent Skills 插件（/last30days），并行搜索约 20 个社交平台，按互动量给结果打分，再由一个 AI judge 综合出一份带引用的简报。 | `doctor` 健康检查命令：探测每个来源并开出精确修复方案：缺失的 key、不在 PATH 的 CLI、过期的 cookie。 |
 | [titanwings/colleague-skill](https://github.com/titanwings/colleague-skill)<br>`ref/colleague-skill` | meta-skill | 一个双语 meta-skill 引擎（dot-skill），从素材中把同事、关系或名人提炼为可复用的 persona+work Agent Skill。 | 分阶段的 prompt 链流水线：intake 到 persona_analyzer 到 persona_builder 到 work_builder 到 merger 到 correction_handler。 |
 | [alchaincyf/nuwa-skill](https://github.com/alchaincyf/nuwa-skill)<br>`ref/nuwa-skill` | meta-skill | 一个 meta-skill（女娲/Nuwa），自动研究一个指定人物或模糊需求，并把其思维提炼为可运行的 Agent-Skill 视角。 | 5 部分的“认知 OS”模板：心智模型 + 决策启发法 + 表达 DNA + 反模式 + 每个 skill 一份 FIDELITY.md 诚实边界文件。 |
-| [notdog1998/yourself-skill](https://github.com/notdog1998/yourself-skill)<br>`ref/yourself-skill` | agent | 一个双语 Claude Code skill，把你自己的聊天记录、日记与照片提炼为可运行的数字自我（Self Memory + Persona）。 | 两层身份构建：Part A Self Memory + Part B 5 层 Persona（从硬规则到人际），并带一个实时的 Correction 层。 |
-| [YIKUAIBANZI/forge-skill](https://github.com/YIKUAIBANZI/forge-skill)<br>`ref/forge-skill` | persona | 本地优先的 Claude Code skill 集，从聊天记录与对话中把某人（或你自己）的 persona 提炼为结构化画像，再回放用于决策镜像或角色扮演。 | forge/use 拆分，加上多变体“自我辩论”（几份参数微调过的你就一个决策争辩，为的是厘清而非答案）。 |
 | [alchaincyf/huashu-design](https://github.com/alchaincyf/huashu-design)<br>`ref/huashu-design` | 设计 | 一个与 agent 无关的 Claude skill，把一句 prompt 变成可交付的 HTML 原型、幻灯片、MP4/GIF 动画、可编辑 PPTX、信息图与专家设计评审。 | Brand Asset Protocol：询问、搜索官方品牌页、下载、从真实素材 grep 出 hex 颜色（绝不猜测），并冻结进 brand-spec.md。 |
 | [yaojingang/yao-open-skills](https://github.com/yaojingang/yao-open-skills)<br>`ref/yao-open-skills` | 研究 | 一个精选的公开中文 Claude Skills 合集，把决策、商业、安全与学习问题转化为结构化的多格式分析报告。 | registry/skills.json 作为单一事实来源，通过一个 render 脚本自动生成 README 目录 + HTML 导航。 |
 | [yaojingang/yao-open-prompts](https://github.com/yaojingang/yao-open-prompts)<br>`ref/yao-open-prompts` | prompts | 一个开源库，含 118 个按场景分类的中文 AI prompts（工作、学习、内容、营销），配有完整的英文镜像与目录生成脚本。 | 严格的每 prompt YAML frontmatter + 三段式正文（title/intro/Prompt），喂给一个自动生成的 CATALOG.md 索引。 |
@@ -52,7 +48,6 @@ git submodule update --remote --merge   # 把所有跟踪分支拉到各自最�
 | [MrGeDiao/shuorenhua](https://github.com/MrGeDiao/shuorenhua)<br>`ref/shuorenhua` | 文风 | 一个中文优先的 AI 写作去痕 skill/插件，运行固定的六步流水线（场景、保护片段、Tier、改写级别、编辑范围、两遍复读），并由一个 82 例假阳性基准把关。 | `bounded` 编辑范围：整句填充词进入一份用户确认的删除列表而非自动删除，让长度控制保持人性化。 |
 | [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill)<br>`ref/taste-skill` | 设计 | 一个可移植的 Agent Skills 库（也是 Claude 插件），包含反 slop 的前端设计与图像生成 skills，把 AI 搭出的 UI 推向高级的布局、排版与动效。 | “反 slop”模式：每个 SKILL.md 把要打破的具体 AI 默认（6 行标题、卡中卡、左右重复）作为硬性负向约束点名。 |
 | [affaan-m/ECC](https://github.com/affaan-m/ECC)<br>`ref/ECC` | agent harness | ECC 是一个 harness 原生的 agentic 操作者插件（v2.0.0），在 Claude Code、Codex、Cursor 及其他 harness 上交付 278 个 skills、67 个 agents、hooks、rules 与 MCP 约定。 | skill-scout：在编写新 skill 前先在本地/marketplace/GitHub/web 搜索已有 skill，以避免重复。 |
-| [multica-ai/andrej-karpathy-skills](https://github.com/multica-ai/andrej-karpathy-skills)<br>`ref/andrej-karpathy-skills` | prompts | 一个 Claude Code 插件（一份 CLAUDE.md / SKILL.md），编码了来自 Karpathy 的四条反 slop 编码原则：先思考后编码、简洁、外科手术式改动、目标驱动循环。 | “把命令式任务转化为可验证目标”的表（“Fix the bug” → “先写一个失败的测试”），用于目标驱动的执行。 |
 | [garrytan/gstack](https://github.com/garrytan/gstack)<br>`ref/gstack` | 工程 skills | 一套 59 个 Claude Code 斜杠命令 skills 加一个 headless 浏览器 CLI，运行一场从 plan 到 review、QA 与 ship 的 AI 工程冲刺。 | 通过一个配置驱动的 gen-skill-docs 生成器从 .tmpl 模板生成 SKILL.md，并共享 resolver 模块（preamble/jargon），让众多 skills 共用一条 prompt 脊梁。 |
 | [anthropics/skills](https://github.com/anthropics/skills)<br>`ref/anthropics-skills` | skills | Anthropic 官方的示例 Agent Skills 仓库：17 个自包含的 SKILL.md skills（docs、design、MCP、web testing），外加一个模板与 Claude Code 插件 marketplace。 | SKILL.md 模式：两字段 YAML frontmatter（name + when-to-use description）领衔一个自包含的指令文件夹。 |
 | [victorchen96/victorchen96.github.io](https://victorchen96.github.io/auto_research/framework.html) (`auto_research/`)<br>`ref/auto_research-site` | 编排 | HTML 展示页加综述 PDF，记录 Deli_AutoResearch：一个长时程自主 agent 协议，以及一条产出 ICLR 风格综述的 5 子 skill 论文写作流水线。 | 三层心跳看门狗（常驻 shell 守卫 / 持久 cron / 会话内 last_seen），加上由 stale_count 驱动的强制结构性转向。 |
@@ -60,6 +55,15 @@ git submodule update --remote --merge   # 把所有跟踪分支拉到各自最�
 
 > 仓库单元格显示上游仓库（带链接），下方是其本地 submodule 路径。有两行是某个
 > 更大 vendor 仓库的子目录——见括号里的路径（`auto_research/`、`finance/`）。
+
+## 仅链接的参考
+
+| 仓库 | 是什么 | 可借鉴什么 |
+|---|---|---|
+| [multica-ai/andrej-karpathy-skills](https://github.com/multica-ai/andrej-karpathy-skills) | 一份 SKILL.md 提炼 Karpathy 的四条反 slop 编码原则：先思考后编码、简洁优先、外科手术式改动、目标驱动执行。 | "把命令式任务转化为可验证目标"的表（"Fix the bug" → "先写一个失败的测试"）——一页纸，无需 vendor。 |
+
+> 单薄的单一 skill 仓库：在这里留链接，不用付 submodule 的成本。只有真的要研究
+> 上游时才值得加 submodule。
 
 ## 如何添加更多
 

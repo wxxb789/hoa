@@ -42,6 +42,11 @@ jobs:
 
       - name: git-worktree-workflow tests
         run: bash skills/git-worktree-workflow/scripts/test_gitwt.sh
+      - name: define-goal fixture validation
+        run: python skills/define-goal/evals/validate_fixtures.py
+
+      - name: Trigger-eval case validation
+        run: python evals/run_trigger_evals.py
 
       - name: SKILL.md frontmatter sanity
         run: |

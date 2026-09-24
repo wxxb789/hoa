@@ -6,8 +6,8 @@
 `areas` 和 `targets` 打标签——因为一个 artifact 常同时服务多个 area 或 runtime，
 而目录表达不了这一点。
 
-> 由 `python scripts/generate_index.py` 生成——目录表不要手改；改每个 skill 里的
-> `<!-- index: ... -->` 注释即可。
+> 由 `python scripts/generate_index.py` 生成——目录表不要手改；改每个 artifact 里的
+> `<!-- index: ... -->` 注释即可（skill 与库文件一视同仁）。
 
 ## 标签词表
 
@@ -19,8 +19,6 @@ targets:  runtime-agnostic | repo-only |
 
 - 两个轴都**可多值**（逗号分隔）。
 - **type** 从顶层目录推导——不要重复打标。
-- `targets` = 这个 skill 用 `npx skills --agent` 装到哪些 runtime
-  （`runtime-agnostic` = 任意；`repo-only` = 永不下发，如库 / 知识类）。
 - 一行对应一个**逻辑** artifact（不为双语文件分别建行）。
 - 暂不设 `status` 轴，等实验 / 废弃状态真的出现再加。
 
@@ -35,5 +33,11 @@ targets:  runtime-agnostic | repo-only |
 | hoa-introspect | skill | self-management,work-management | runtime-agnostic | `skills/hoa-introspect/` | 分层自省报告：确定性使用 facets（L1）+ 带证据的盲点审计（L2） |
 | hoa-introspect-distill | skill | self-management,software-development | runtime-agnostic | `skills/hoa-introspect-distill/` | 把已批准的可复用工作提炼成 skill（或 opt-in 的 rule/config），经 runtime 原生 skill-creator 或内联产出 |
 | my-ado-cppr | skill | software-development | runtime-agnostic | `skills/my-ado-cppr/` | commit → push → 在 Azure DevOps 或 GitHub 创建/更新 PR；probe/plan/apply 三段式，状态可 resume |
+| skill-scout | agent | software-development,work-management | repo-only | `agents/skill-scout.md` | 写新 skill 前先在本地/marketplace/上游搜索已有实现；只报告，不代写 |
+| ghc-proxy | mcp | software-development | repo-only | `mcps/ghc-proxy.md` | 本地 ghc-proxy 搜索服务的可移植定义；注册留在 chezmoi |
+| typed-verification-gates | orchestration | software-development | repo-only | `orchestration/typed-verification-gates.md` | 循环每次迭代止于一道事先定型的验证门：programmatic / judge / human |
+| fresh-context-grader | prompt | software-development,work-management | repo-only | `prompts/fresh-context-grader.md` | 一次性评审 prompt：用先于回答写好的 rubric 在全新上下文里评分 |
+| generated-means-generated | rule | software-development,work-management,self-management | repo-only | `rules/generated-means-generated.md` | 生成文件绝不手改；再生成随同一提交，漂移即 CI 失败 |
+| adopt-a-pattern | workflow | software-development | repo-only | `workflows/adopt-a-pattern.md` | 把 ref 地图里的 what-to-steal 笔记变成落地、归类、带署名 artifact 的有限步骤 |
 
-> 非 skill 类型（orchestration · agent · workflow · mcp · prompt · rule · eval · reflection）会在真实 artifact 落地时补充。
+> reflections 与 eval 结果属于文章 / 知识类，不在此索引。

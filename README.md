@@ -92,8 +92,14 @@ hoa/
 `skills/.experimental/`, `skills/.system/` are recognized too.
 
 `index.md` / `index.zh-CN.md` are **generated** — run
-`python scripts/generate_index.py` after editing a skill's
-`<!-- index: ... -->` metadata comment (CI fails on drift).
+`python scripts/generate_index.py` after editing any artifact's
+`<!-- index: ... -->` metadata comment (CI fails on drift). Artifacts are
+skills (`skills/<name>/SKILL.md`) and library files (`<folder>/<name>.md` or
+`<folder>/<name>/README.md` under `agents/`, `mcps/`, `orchestration/`,
+`prompts/`, `rules/`, `workflows/`). Each catalog name must be unique, every
+configured library folder must hold at least one artifact, and each artifact's
+index note comes from a `NOTES` override in the generator or the first line of
+its frontmatter description (plain-Markdown body as last resort).
 
 ## Bilingual policy
 
@@ -108,7 +114,7 @@ only hand-written docs pay the translation tax.
 git clone https://github.com/wxxb789/hoa   # submodules NOT needed for skills/tests
 ```
 
-`ref/` holds 40 reference repos as submodules — heavy, and only needed when
+`ref/` holds 35 reference repos as submodules — heavy, and only needed when
 studying an upstream. A plain clone (no `--recursive`) is fully sufficient to
 use and test everything else. Refresh the references when needed:
 `git submodule update --init --remote --merge`.
@@ -178,7 +184,7 @@ Type is derived from the folder. Both axes are multi-valued.
 
 ## Reference map
 
-[`ref/README.md`](./ref/README.md) maps **40 external agent/skill/harness
+[`ref/README.md`](./ref/README.md) maps **35 external agent/skill/harness
 repos** to what each is and the specific pattern worth stealing from it — the
 densest page in this repo if you are designing your own agent setup.
 
@@ -189,9 +195,28 @@ densest page in this repo if you are designing your own agent setup.
 - **Phase 2:** skills-first deploy — `skills/` via `npx skills`, settings via
   chezmoi; `runtimes/` dropped. ✓
 - **Phase 3:** grow real skills in `skills/`; generate `index.md` from
-  per-artifact metadata (✓ `scripts/generate_index.py`); build out `evals/` +
-  `reflections/` (first retro:
-  `reflections/2026-09-23-skills-first-split.md`).
+  per-artifact metadata (✓ `scripts/generate_index.py`, now covering library
+  folders too); build out `evals/` + `reflections/` (first retro:
+  `reflections/2026-09-23-skills-first-split.md`; trigger evals:
+  `evals/trigger-cases.json`). ✓
+- **Phase 4 (current):** make the library real — every library folder now
+  carries at least one exemplar adapted from `ref/` (first steals: ECC's
+  skill-scout → `agents/`, looper's typed gates → `orchestration/`); next:
+  the first skill authored *by* the distill loop, and the first external
+  consumer issue.
+
+## Reflect cadence
+
+Reflection is scheduled, not aspirational: run **hoa-introspect** monthly as a
+self-retro and land the write-up in `reflections/`. The distill loop
+(introspect → retrieve → distill) should produce its first self-authored skill
+before the next phase closes.
+
+## Request a skill
+
+Public repo, open intake: if a capability here is missing or half-covers your
+case, open an issue (bug or skill request) — the issue templates cover both.
+External requests are also the best signal for what to build next.
 
 ## Using this repo
 
