@@ -7,8 +7,10 @@ their `<!-- index: ... -->` comment; this file records the notable deltas.
 
 - **Library folders are live:** every library folder (`agents/`,
   `orchestration/`, `rules/`, `prompts/`, `workflows/`, `mcps/`) now holds
-  one exemplar adapted from a `ref/` row with provenance — first steals:
-  ECC's skill-scout, looper's typed verification gates. Second retro:
+  one exemplar with a provenance note — most adapted from a `ref/` row
+  (first steals: ECC's skill-scout, looper's typed verification gates);
+  `rules/generated-means-generated.md` and `mcps/ghc-proxy.md` document this
+  repo's own incidents and local service instead. Second retro:
   `reflections/2026-09-23-first-steals.md`.
 - **generate_index.py covers library folders:** library artifacts (a
   `<name>.md` or `<name>/README.md` with an `<!-- index: ... -->` comment)

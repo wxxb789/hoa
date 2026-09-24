@@ -84,9 +84,13 @@ hoa/
 `skills/<category>/<name>/SKILL.md`（catalog）；`skills/.curated/`、
 `skills/.experimental/`、`skills/.system/` 也会被识别。
 
-`index.md` / `index.zh-CN.md` 是**生成文件**——改完 skill 的
+`index.md` / `index.zh-CN.md` 是**生成文件**——改完任何 artifact 的
 `<!-- index: ... -->` 元数据注释后运行 `python scripts/generate_index.py`
-（CI 会对漂移报错）。
+（CI 会对漂移报错）。Artifact 包括 skill（`skills/<name>/SKILL.md`）与库文件
+（`agents/`、`mcps/`、`orchestration/`、`prompts/`、`rules/`、`workflows/`
+下的 `<folder>/<name>.md` 或 `<folder>/<name>/README.md`）。目录名全局唯一，
+每个配置的库目录至少要有一个 artifact,索引备注取 generator 里的 `NOTES`
+覆盖、frontmatter description 首句,最后回退到正文首个非空行。
 
 ## 双语政策
 

@@ -60,18 +60,22 @@ def main() -> int:
         seen_ids.add(cid)
         if not isinstance(case["request"], str) or not case["request"].strip():
             errors.append(f"{where} ({cid}): request must be a non-empty string")
-        for field in ("must_pick", "distractors"):
-            value = case[field]
-            if (not isinstance(value, list) or not value
-                    or not all(isinstance(v, str) and v.strip() for v in value)):
-                errors.append(f"{where} ({cid}): {field} must be a non-empty list of names")
-                continue
-            unknown = [v for v in value if v not in catalog]
+        must_pick = case["must_pick"]
+        if not (isinstance(must_pick, list) and len(must_pick) == 1
+                and isinstance(must_pick[0], str) and must_pick[0].strip()):
+            errors.append(f"{where} ({cid}): must_pick must be a list of exactly one artifact name")
+        distractors = case["distractors"]
+        if (not isinstance(distractors, list) or not distractors
+                or not all(isinstance(v, str) and v.strip() for v in distractors)):
+            errors.append(f"{where} ({cid}): distractors must be a non-empty list of names")
+        else:
+            unknown = [v for v in distractors if v not in catalog]
             if unknown:
-                errors.append(f"{where} ({cid}): {field} names unknown artifacts: {unknown}")
-        overlap = set(case.get("must_pick", [])) & set(case.get("distractors", []))
-        if overlap:
-            errors.append(f"{where} ({cid}): same artifact in must_pick and distractors: {sorted(overlap)}")
+                errors.append(f"{where} ({cid}): distractors name unknown artifacts: {unknown}")
+        if isinstance(must_pick, list) and len(must_pick) == 1 and must_pick[0] in catalog \
+                and isinstance(distractors, list):
+            if must_pick[0] in distractors:
+                errors.append(f"{where} ({cid}): must_pick {must_pick[0]!r} is also a distractor")
 
     if errors:
         for error in errors:

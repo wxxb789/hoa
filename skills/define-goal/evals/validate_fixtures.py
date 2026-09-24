@@ -48,11 +48,17 @@ def validate(name: str) -> list[str]:
         for field in ("prompt", "expected_mode"):
             if not isinstance(case[field], str) or not case[field].strip():
                 errors.append(f"{where}: {field} must be a non-empty string")
-        for field in ("must_hold", "must_not_hold"):
-            value = case[field]
+        must_hold = case["must_hold"]
+        must_not = case["must_not_hold"]
+        for field, value in (("must_hold", must_hold), ("must_not_hold", must_not)):
             if (not isinstance(value, list) or not value
                     or not all(isinstance(item, str) and item.strip() for item in value)):
                 errors.append(f"{where}: {field} must be a non-empty list of non-empty strings")
+        if isinstance(must_hold, list) and isinstance(must_not, list):
+            contradiction = [i for i in must_hold if i in must_not]
+            if contradiction:
+                errors.append(f"{where}: same rubric item in both must_hold and "
+                              f"must_not_hold: {contradiction}")
     return errors
 
 

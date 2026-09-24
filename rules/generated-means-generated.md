@@ -27,6 +27,14 @@ grew to 14. The fix is always the same shape: make the generator the only
 writer, and make CI the enforcer.
 
 ## Applies to
-
 `index.md` / `index.zh-CN.md` (`generate_index.py`), vendored shared scripts
 (`vendor_shared.py`), and any future generated catalog or count.
+
+## Provenance
+
+Distilled from this repo's own drift scars: the hand-maintained index tables
+before `scripts/generate_index.py` existed, and the hard-coded "11 tests"
+comment in `skills/ghc-search/SKILL.md` after the suite grew to 14 (recorded
+in [`reflections/2026-09-23-first-steals.md`](../reflections/2026-09-23-first-steals.md)).
+Not adapted from any `ref/` row — the rule generalizes the repo's own
+incidents, in the shape of `workflows/adopt-a-pattern.md` step 5.

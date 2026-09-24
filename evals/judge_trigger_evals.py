@@ -49,28 +49,29 @@ def judge_one(catalog: str, request: str) -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--limit", type=int, default=0, help="judge only the first N cases")
+    ap.add_argument("--limit", type=int, default=0,
+                    help="judge only the first N cases (0 = all cases)")
     ap.add_argument("--json", action="store_true", help="emit machine-readable results")
     args = ap.parse_args()
+    if args.limit < 0:
+        ap.error("--limit must be >= 0")
 
     cases = json.loads((EVALS / "trigger-cases.json").read_text(encoding="utf-8"))["cases"]
     if args.limit:
         cases = cases[: args.limit]
+    if not cases:
+        print("judge_trigger_evals: no cases to judge", file=sys.stderr)
+        return 1
     catalog = catalog_text()
 
     def run_case(case: dict) -> dict:
         try:
             pick = judge_one(catalog, case["request"])
             passed = pick in case["must_pick"]
-        except ghc_search.SearchError as exc:
+        except Exception as exc:  # per-case failure, never aborts the batch
             pick, passed = f"error: {exc}", False
-        result = {"id": case["id"], "pick": pick,
-                  "must_pick": case["must_pick"], "passed": passed}
-        if not args.json:
-            mark = "PASS" if passed else "FAIL"
-            print(f"{mark} {case['id']}: picked {pick!r} (want {case['must_pick']})",
-                  flush=True)
-        return result
+        return {"id": case["id"], "pick": pick,
+                "must_pick": case["must_pick"], "passed": passed}
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         results = list(executor.map(run_case, cases))
@@ -80,6 +81,9 @@ def main() -> int:
         print(json.dumps({"passed": passed, "total": len(results), "results": results},
                          indent=2, ensure_ascii=False))
     else:
+        for r in results:  # input order, not completion order
+            mark = "PASS" if r["passed"] else "FAIL"
+            print(f"{mark} {r['id']}: picked {r['pick']!r} (want {r['must_pick']})")
         print(f"\n{passed}/{len(results)} passed")
     return 0 if passed == len(results) else 1
 

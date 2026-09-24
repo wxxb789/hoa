@@ -19,7 +19,10 @@ sequence.
      orchestration pattern → the matching library folder.
 4. **Adapt, don't port.** Rewrite in this repo's voice and constraints; keep
    attribution with a `Provenance` section linking the upstream.
-5. **Add the `<!-- index: ... -->` metadata** comment, regenerate the index
+5. **Add the `<!-- index: ... -->` metadata** comment and make sure the
+   artifact has an index note: a frontmatter `description:` (preferred) or a
+   readable first body line, unless a curated bilingual note belongs in the
+   generator's `NOTES`. Regenerate the index
    (`python scripts/generate_index.py`), and run the repo's checks.
 6. **Mark the steal in the map**: change the row's *what-to-steal* cell to
    note where it landed (e.g. "→ landed as `rules/generated-means-generated`").

@@ -34,3 +34,11 @@ Registering this as an actual MCP server in a specific runtime (Claude Code's
 `settings.json`, OpenCode's `config.json`, …) is machine-specific settings
 work: keep the registration in chezmoi, not in this repo. This file is the
 portable definition both sides can point at.
+
+## Provenance
+
+Written for this repo when `skills/ghc-search/` needed its local proxy
+documented as a portable artifact; the definition mirrors the reference client
+in `skills/ghc-search/scripts/ghc_search.py` (endpoint, engines, default
+models), which is the executable source of truth. Not adapted from a `ref/`
+row — it describes this machine's own local service.

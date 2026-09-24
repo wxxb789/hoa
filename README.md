@@ -92,8 +92,14 @@ hoa/
 `skills/.experimental/`, `skills/.system/` are recognized too.
 
 `index.md` / `index.zh-CN.md` are **generated** — run
-`python scripts/generate_index.py` after editing a skill's
-`<!-- index: ... -->` metadata comment (CI fails on drift).
+`python scripts/generate_index.py` after editing any artifact's
+`<!-- index: ... -->` metadata comment (CI fails on drift). Artifacts are
+skills (`skills/<name>/SKILL.md`) and library files (`<folder>/<name>.md` or
+`<folder>/<name>/README.md` under `agents/`, `mcps/`, `orchestration/`,
+`prompts/`, `rules/`, `workflows/`). Each catalog name must be unique, every
+configured library folder must hold at least one artifact, and each artifact's
+index note comes from a `NOTES` override in the generator or the first line of
+its frontmatter description (plain-Markdown body as last resort).
 
 ## Bilingual policy
 

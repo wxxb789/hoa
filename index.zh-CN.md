@@ -6,8 +6,8 @@
 `areas` 和 `targets` 打标签——因为一个 artifact 常同时服务多个 area 或 runtime，
 而目录表达不了这一点。
 
-> 由 `python scripts/generate_index.py` 生成——目录表不要手改；改每个 skill 里的
-> `<!-- index: ... -->` 注释即可。
+> 由 `python scripts/generate_index.py` 生成——目录表不要手改；改每个 artifact 里的
+> `<!-- index: ... -->` 注释即可（skill 与库文件一视同仁）。
 
 ## 标签词表
 
