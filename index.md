@@ -34,9 +34,11 @@ targets:  runtime-agnostic | repo-only |
 | git-worktree-workflow | skill | software-development,work-management | runtime-agnostic | `skills/git-worktree-workflow/` | run several agent CLIs in parallel on one repo via isolated worktrees; ships the `gitwt` helper |
 | hoa-agent-retrieve | skill | self-management,software-development | runtime-agnostic | `skills/hoa-agent-retrieve/` | cross-agent history → coverage-manifested, deduped Retrieval Bundle |
 | hoa-introspect | skill | self-management,work-management | runtime-agnostic | `skills/hoa-introspect/` | layered self-report: deterministic usage facets (L1) + evidence-cited blind-spot audit (L2) |
-| hoa-introspect-distill | skill | self-management,software-development | runtime-agnostic | `skills/hoa-introspect-distill/` | distill approved repeatable work into a skill (or opt-in rule/config) via the runtime-native skill-creator or inline |
+| hoa-introspect-distill | skill | self-management,software-development | runtime-agnostic | `skills/hoa-introspect-distill/` | qualify supplied recurring-work findings as candidates; create only after individual approval |
+| hoa-skill-review | skill | software-development,work-management,self-management | runtime-agnostic | `skills/hoa-skill-review/` | review skill behavior and changes against consumer evidence without editing the target |
+| hoa-skill-work | skill | software-development,work-management,self-management | runtime-agnostic | `skills/hoa-skill-work/` | directly create or evolve a defined skill with focused, risk-scaled validation |
 | my-ado-cppr | skill | software-development | runtime-agnostic | `skills/my-ado-cppr/` | commit → push → create/update PR on Azure DevOps or GitHub; probe/plan/apply with resumable state |
-| skill-scout | agent | software-development,work-management | repo-only | `agents/skill-scout.md` | search local/marketplace/upstream for an existing skill before authoring a new one; report, never author |
+| skill-scout | agent | software-development,work-management | repo-only | `agents/skill-scout.md` | read-only search for an existing skill when asked to check before authoring; never create one |
 | ghc-proxy | mcp | software-development | repo-only | `mcps/ghc-proxy.md` | portable definition of the local ghc-proxy search service; registration stays in chezmoi |
 | typed-verification-gates | orchestration | software-development | repo-only | `orchestration/typed-verification-gates.md` | every loop iteration ends at a gate typed programmatic / judge / human, declared before the work |
 | fresh-context-grader | prompt | software-development,work-management | repo-only | `prompts/fresh-context-grader.md` | one-shot judge prompt: grade a response against a rubric written before it existed |

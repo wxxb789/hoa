@@ -31,9 +31,11 @@ targets:  runtime-agnostic | repo-only |
 | git-worktree-workflow | skill | software-development,work-management | runtime-agnostic | `skills/git-worktree-workflow/` | 用隔离的 worktree 在同一仓库并行运行多个 agent CLI；随附 `gitwt` 助手 |
 | hoa-agent-retrieve | skill | self-management,software-development | runtime-agnostic | `skills/hoa-agent-retrieve/` | 跨 agent 历史 → 带 coverage manifest、已去重的 Retrieval Bundle |
 | hoa-introspect | skill | self-management,work-management | runtime-agnostic | `skills/hoa-introspect/` | 分层自省报告：确定性使用 facets（L1）+ 带证据的盲点审计（L2） |
-| hoa-introspect-distill | skill | self-management,software-development | runtime-agnostic | `skills/hoa-introspect-distill/` | 把已批准的可复用工作提炼成 skill（或 opt-in 的 rule/config），经 runtime 原生 skill-creator 或内联产出 |
+| hoa-introspect-distill | skill | self-management,software-development | runtime-agnostic | `skills/hoa-introspect-distill/` | 评估给定的重复工作发现为候选；逐项批准后才创建资产 |
+| hoa-skill-review | skill | software-development,work-management,self-management | runtime-agnostic | `skills/hoa-skill-review/` | 依据消费者证据审计 skill 行为与修改，不改动被审查对象 |
+| hoa-skill-work | skill | software-development,work-management,self-management | runtime-agnostic | `skills/hoa-skill-work/` | 直接创建或演进已定义的 skill，并按风险聚焦验证 |
 | my-ado-cppr | skill | software-development | runtime-agnostic | `skills/my-ado-cppr/` | commit → push → 在 Azure DevOps 或 GitHub 创建/更新 PR；probe/plan/apply 三段式，状态可 resume |
-| skill-scout | agent | software-development,work-management | repo-only | `agents/skill-scout.md` | 写新 skill 前先在本地/marketplace/上游搜索已有实现；只报告，不代写 |
+| skill-scout | agent | software-development,work-management | repo-only | `agents/skill-scout.md` | 按请求先搜索已有 skill，再决定是否编写；只报告，不代写 |
 | ghc-proxy | mcp | software-development | repo-only | `mcps/ghc-proxy.md` | 本地 ghc-proxy 搜索服务的可移植定义；注册留在 chezmoi |
 | typed-verification-gates | orchestration | software-development | repo-only | `orchestration/typed-verification-gates.md` | 循环每次迭代止于一道事先定型的验证门：programmatic / judge / human |
 | fresh-context-grader | prompt | software-development,work-management | repo-only | `prompts/fresh-context-grader.md` | 一次性评审 prompt：用先于回答写好的 rubric 在全新上下文里评分 |

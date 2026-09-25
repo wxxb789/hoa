@@ -41,6 +41,14 @@ TARGETS = ("runtime-agnostic", "repo-only", "claude-code", "codex", "opencode",
 # so a new skill generates without touching this file. Overrides exist to
 # keep the Chinese note from rendering the English description verbatim.
 NOTES = {
+    "hoa-skill-review": (
+        "review skill behavior and changes against consumer evidence without editing the target",
+        "依据消费者证据审计 skill 行为与修改，不改动被审查对象",
+    ),
+    "hoa-skill-work": (
+        "directly create or evolve a defined skill with focused, risk-scaled validation",
+        "直接创建或演进已定义的 skill，并按风险聚焦验证",
+    ),
     "ghc-search": (
         "web and X/Twitter search via a local ghc-proxy Responses API; answer plus deduped sources",
         "经本机 `ghc-proxy` Responses API 做 web 与 X/Twitter 搜索；返回答案加去重来源",
@@ -62,16 +70,16 @@ NOTES = {
         "分层自省报告：确定性使用 facets（L1）+ 带证据的盲点审计（L2）",
     ),
     "hoa-introspect-distill": (
-        "distill approved repeatable work into a skill (or opt-in rule/config) via the runtime-native skill-creator or inline",
-        "把已批准的可复用工作提炼成 skill（或 opt-in 的 rule/config），经 runtime 原生 skill-creator 或内联产出",
+        "qualify supplied recurring-work findings as candidates; create only after individual approval",
+        "评估给定的重复工作发现为候选；逐项批准后才创建资产",
     ),
     "my-ado-cppr": (
         "commit → push → create/update PR on Azure DevOps or GitHub; probe/plan/apply with resumable state",
         "commit → push → 在 Azure DevOps 或 GitHub 创建/更新 PR；probe/plan/apply 三段式，状态可 resume",
     ),
     "skill-scout": (
-        "search local/marketplace/upstream for an existing skill before authoring a new one; report, never author",
-        "写新 skill 前先在本地/marketplace/上游搜索已有实现；只报告，不代写",
+        "read-only search for an existing skill when asked to check before authoring; never create one",
+        "按请求先搜索已有 skill，再决定是否编写；只报告，不代写",
     ),
     "typed-verification-gates": (
         "every loop iteration ends at a gate typed programmatic / judge / human, declared before the work",

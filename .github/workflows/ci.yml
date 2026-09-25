@@ -48,6 +48,12 @@ jobs:
       - name: Trigger-eval case validation
         run: python evals/run_trigger_evals.py
 
+      - name: Skill-method case validation
+        run: python evals/validate_skill_method_cases.py
+
+      - name: Skill-method setup isolation tests
+        run: python -m unittest evals.test_validate_skill_method_cases
+
       - name: SKILL.md frontmatter sanity
         run: |
           shopt -s nullglob

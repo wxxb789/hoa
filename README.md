@@ -169,6 +169,31 @@ npx skills remove <skill>
   it into a skill, or reference it by hand.
 - Runtime **settings** deploy separately via `chezmoi apply`.
 
+## Work on skills
+
+Choose the capability by the work you want done, not by the model running it:
+
+| Need | Skill | Result |
+|---|---|---|
+| Audit an existing skill, review a proposed change, or judge its behavior | `hoa-skill-review` | Evidence-backed findings; no changes to the reviewed skill |
+| Create a skill from a defined capability or improve an existing skill | `hoa-skill-work` | A complete skill change with validation results and any unverified paths |
+| Discover recurring work in agent history | `hoa-introspect` | Evidence-cited work-pattern findings; no automatic creation |
+| Qualify a supplied recurring-work finding before choosing an asset | `hoa-introspect-distill` | Individually approved candidate and, when approved, its created asset |
+
+For behavior changes, `hoa-skill-work` starts with focused checks and expands to multiple
+variants, models, or runtimes when reach, risk, or conflicting evidence warrants
+it. `hoa-introspect-distill` retains its per-candidate approval gate; a direct
+request to create or improve a defined skill does not need that intake flow.
+`evals/skill-method-cases.json` holds the focused behavior scenarios; CI checks
+their structure and isolation paths, while model/host behavior is judged in
+fresh runs rather than claimed from the CI fixture check.
+Claude Code's native `plugin eval` tests plugin-shaped packages; Anthropic's
+`skill-creator` is a separate first-party plugin, and the earlier
+`define-goal` review used CE guidance plus a session-written runner. None is
+a required dependency of these runtime-agnostic hoa skills. The
+[source-level ownership study](./reflections/2026-09-25-claude-code-skill-source.md)
+distinguishes the implementations and their evidence limits.
+
 ## Labels
 
 Areas and targets are tracked as labels in [`index.md`](./index.md) (generated
