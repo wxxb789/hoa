@@ -1,13 +1,13 @@
 ---
 name: git-worktree-workflow
-description: Run multiple AI coding agents (Claude Code, Codex, PI, OpenCode, Hermes, aider, gemini, …) in parallel on the same repo using isolated git worktrees. Tool-agnostic by design — agents are pluggable, so you can switch between them freely. Use when the user wants parallel agent sessions, worktree isolation, "work on two features at once", per-worktree env/port isolation, or to avoid agents stepping on each other's edits.
+description: Run multiple AI coding agents (Claude Code, Codex, PI, OpenCode, Hermes, aider, gemini, …) in parallel on the same repo using isolated git worktrees. Tool-agnostic by design — agents are pluggable, so you can switch between them freely. Use when the user wants parallel agent sessions, worktree isolation, "work on two features at once", per-worktree environment setup and deterministic port defaults, or to avoid agents stepping on each other's edits.
 ---
 
-<!-- index: areas=software-development,work-management; targets=runtime-agnostic; version=1.0.0 -->
+<!-- index: areas=software-development,work-management; targets=runtime-agnostic; version=1.1.0 -->
 
 # Git Worktree Workflow (tool-agnostic)
 
-One repo, many agents, zero collisions. Each agent runs in its own `git worktree`
+One repo, many agents, isolated working trees. Each agent runs in its own `git worktree`
 (separate working dir + branch, shared `.git`). **Core principle: build a thin shell
 over `git worktree` and treat the agent CLI as pluggable.** Do NOT rely on any tool's
 private `--worktree` flag (Claude Code, Hermes have one) — that locks you in. The
@@ -25,7 +25,7 @@ gitwt run <tool> <branch> [-- …]  # isolate + launch ANY agent CLI in the work
 gitwt rm <branch> [--force]    # remove worktree + delete branch
 gitwt clean [--merged] [--force]  # remove worktrees whose branch is merged into default
 gitwt prune                    # clean stale metadata + empty dirs
-gitwt env                      # drop a direnv .envrc: auto env + unique PORT per worktree
+gitwt env                      # drop a direnv .envrc: auto env + deterministic hashed PORT
 gitwt doctor                   # check git/direnv/agents + show layout
 gitwt --shell                  # print shell fn so bare `gitwt <branch>` can cd for you
 ```
@@ -39,13 +39,50 @@ tools, quietly. See [naming](references/naming.md) for the full rationale.
 ```bash
 echo 'command -v gitwt >/dev/null 2>&1 && eval "$(command gitwt --shell)"' >> ~/.bashrc
 # per repo, optional:
-git config --add gitwt.hook "npm install"      # or: uv sync / pnpm i — runs after `gitwt new`
+git config --add gitwt.hook "npm install"      # or: uv sync / pnpm i — required postCreate setup
 git config --add gitwt.copy "**/.env.example"  # extra files to seed into new worktrees
 ```
 
 Only the shell **function** can `cd` — a child process cannot change its caller's
 directory. Running the script directly still creates the worktree and prints its
 path; it just leaves you where you were, and says so.
+
+### Hook readiness and recovery
+
+Configured `gitwt.hook` (or legacy `wt.hook`) commands are required before a
+worktree is ready. If a hook fails, `gitwt new`, bare `gitwt <branch>`, and
+`gitwt run` return nonzero; no path is printed, no directory change is made, and
+`gitwt run` does not launch the tool. The worktree and all partial copy/hook writes
+are kept. A failed or interrupted setup is never automatically retried: an existing
+worktree is reused only with a valid `ready` marker, so `new`, the bare shell function,
+and `run` refuse an `in-progress`, missing, malformed, or legacy marker without
+rerunning copies or hooks. This applies even when no hooks are currently configured.
+
+The marker is stored as `.gitwt-instance-id` in the linked worktree's private Git
+admin directory (`git rev-parse --absolute-git-dir`), never in tracked checkout files.
+It contains `gitwt-instance-v2`, a fresh 128-bit lowercase-hex ID from `/dev/urandom`
+via `od`, and `in-progress` or `ready`; same-directory rename publishes each marker
+atomically. Gitwt verifies the branch, expected repository, and ID before marking
+ready and before reporting a path. A raw Git removal/re-add loses the private marker
+and is refused; old external v1/v2 state files are ignored.
+
+Per-branch atomic `mkdir` locks live under `<repo-parent>/.wt/<repo>/.gitwt-locks/`.
+`new`, `rm`, and each `clean` removal share the lock. If a process is interrupted,
+the lock directory named in the error may remain; after confirming no gitwt operation
+for that branch is active, remove the empty lock with `rmdir <lock-dir>`. This only
+unblocks coordination; it does not make an `in-progress` worktree ready.
+
+To recover, inspect and manually finish/verify setup at the preserved path, then use
+tools there directly; or preserve/migrate its changes, remove it with `gitwt rm
+[--force] <branch>`, and create a fresh worktree with `gitwt new <branch> [base]`.
+Use `--force` only after backing up files Git would otherwise refuse to remove. An
+uncoordinated raw Git removal can race after the final readiness check; the marker
+checks detect normal replacement during setup but cannot serialize raw Git commands.
+
+Copy-on-create does not overwrite existing files or nest directories: it skips an
+existing regular file only when bytes match, or a directory only when its tree
+matches; a differing destination fails closed and leaves the worktree for manual
+recovery. Once ready, later hook-config changes apply only to future worktrees.
 
 ## Layout & why
 Worktrees live at `<repo-parent>/.wt/<repo>/<branch-slug>`, where the slug is the
@@ -77,15 +114,17 @@ that only Claude Code had built in.
 ## The 3 pain points and how `gitwt` solves them (community-validated)
 1. **Env/ports collide** when every worktree runs a dev server → `gitwt env` writes a
    `direnv` `.envrc` that inherits the main `.env`/venv and assigns a deterministic
-   per-worktree `PORT` (3000–3999 from a path hash). Worktrees are siblings of the main
-   checkout, not children, so direnv would never find a `.envrc` left only in the repo —
-   `gitwt` copies it into each worktree (`direnv allow` each one once). (Pattern from
-   waldencui's "direnv is all you need".) Requires `direnv`.
+   `PORT` (3000–3999 from a path hash). This is not a uniqueness guarantee: the range
+   has only 1,000 values, so different worktrees can collide; edit the generated
+   `.envrc` to override `PORT`/`DEV_PORT` for a colliding worktree. Worktrees are
+   siblings of the main checkout, not children, so direnv would never find a `.envrc`
+   left only in the repo — `gitwt` copies it into each worktree (`direnv allow` each
+   one once), following waldencui's "direnv is all you need" pattern. Requires `direnv`.
 2. **Gitignored files don't follow** (`.env`) → copy-on-create via `.worktreeinclude`
    (Claude-compatible) and `git config gitwt.copy`. Both accept globs (`**/.env.example`),
    expanded before copying.
 3. **Deps need reinstalling** per worktree → `git config gitwt.hook "npm install"` runs
-   automatically after `gitwt new`.
+   after `gitwt new`; hook failures block readiness and require manual recovery.
 
 ## Two mental models (pick per task)
 - **By concurrent activity** (matklad): a few long-lived worktrees mapped to *activities*,
@@ -131,7 +170,7 @@ GNU-only constructs so it runs on Windows git-bash, macOS, and Linux:
 ## References
 - `references/gitwt` — the helper (put it on PATH, `chmod +x`).
 - `scripts/test_gitwt.sh` — regression tests (`bash skills/git-worktree-workflow/scripts/test_gitwt.sh`).
-  Builds a throwaway repo whose path contains a space and asserts the four behaviours
-  that broke before: space-safe root parsing, collision-free branch slugs, `.envrc`
-  reaching each worktree, and glob copy patterns expanding.
+  Builds a throwaway repo whose path contains a space and checks space-safe root
+  parsing, collision-resistant slugs with branch-verified reuse, `.envrc`
+  propagation, glob copying, and fail-closed hook readiness.
 - Git worktree docs: https://git-scm.com/docs/git-worktree

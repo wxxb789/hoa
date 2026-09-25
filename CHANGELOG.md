@@ -3,6 +3,41 @@
 Notable changes to this repo. Skills carry per-skill `version=` metadata in
 their `<!-- index: ... -->` comment; this file records the notable deltas.
 
+## 2026-09-25 — safer skill execution and goal activation
+
+- **define-goal v1.2.0:** keep independently finishable `/goal` payloads
+  separately activatable on one-active-goal runtimes. The usage note sits
+  outside copyable goals; broader sampling and readiness rules were rejected
+  after they regressed independently meaningful outcomes in weak-model trials.
+- **my-ado-cppr v1.1.0:** default to committing staged changes only. Explicit
+  file selections use literal Git pathspecs and cannot consume unrelated
+  staged changes; reject empty, conflicting, and non-boolean staging plans
+  before writes. Real-Git regression cases cover amend and deletions.
+- **git-worktree-workflow v1.1.0:** configured post-create hooks must succeed
+  before `gitwt` returns a ready worktree or launches an agent. Failed setup
+  preserves partial files for manual recovery; a private Git-admin marker
+  prevents unknown checkouts from inheriting readiness. Managed creation and
+  removal share a lock. Copy conflicts fail closed, and hashed PORT values
+  are documented as potentially colliding rather than guaranteed unique.
+- **ghc-search v1.0.1:** quote installed script paths so searches and offline
+  checks work when an installation directory contains spaces.
+
+## 2026-09-25 — portable skill review and authoring
+
+- Added `hoa-skill-review` for read-only skill audits, change reviews, and
+  evidence-backed judgments, with targeted evaluation before expanding to
+  multi-model or multi-variant comparisons.
+- Added `hoa-skill-work` for directly requested skill creation and evolution.
+  It keeps the existing `hoa-introspect-distill` approval flow limited to
+  candidate qualification from repeatable work; direct-creation routing in the
+  introspection/retrieval skills and trigger fixtures follows that boundary.
+- Added routing fixtures and bilingual catalog notes for both skills.
+- Inspected the installed Claude Code v2.1.282 Bun executable and first-party
+  plugin scripts to separate native eval/skill/goal machinery from plugin and
+  session-authored methods; recorded the source boundaries in `reflections/`.
+  Added behavior fixtures for harness errors, comparable baselines, and
+  held-out activation checks without making large eval matrices the default.
+
 ## 2026-09-24 — library seeding, test consolidation, ref pruning
 
 - **Library folders are live:** every library folder (`agents/`,

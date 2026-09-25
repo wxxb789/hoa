@@ -3,7 +3,7 @@ name: ghc-search
 description: Open-ended web search and X/Twitter search through a local ghc-proxy (OpenAI-compatible Responses API). Use when you need to find something on the web and do not already have a URL, or when you need posts from X/Twitter. Fetch pages directly when you already have the URL; prefer a documentation MCP (e.g. context7) for library/API docs.
 ---
 
-<!-- index: areas=software-development; targets=runtime-agnostic; version=1.0.0 -->
+<!-- index: areas=software-development; targets=runtime-agnostic; version=1.0.1 -->
 
 # ghc-search
 
@@ -23,10 +23,10 @@ equivalent `skills/` dir for any other runtime `npx skills` installed it into.
 ```bash
 S=~/.claude/skills/ghc-search/scripts/ghc_search.py   # adjust per runtime
 
-python $S gpt "what is the current stable .NET SDK version"
-python $S x --handle SpaceXAI "newest post"
-python $S gpt --domain dotnet.microsoft.com --json "latest .NET SDK version"
-python $S x --handle dotnet --from-date 2026-08-01 "what shipped this month"
+python "$S" gpt "what is the current stable .NET SDK version"
+python "$S" x --handle SpaceXAI "newest post"
+python "$S" gpt --domain dotnet.microsoft.com --json "latest .NET SDK version"
+python "$S" x --handle dotnet --from-date 2026-08-01 "what shipped this month"
 ```
 
 | Flag | Engine | |
@@ -98,5 +98,5 @@ MCP) over general search when looking up a named library or API.
 ## Check
 
 ```bash
-python "$(dirname $S)/test_ghc_search.py"   # offline, no network required
+python "$(dirname "$S")/test_ghc_search.py"   # offline, no network required
 ```

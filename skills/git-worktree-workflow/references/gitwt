@@ -105,9 +105,22 @@ _gitwt_expand_pattern() {  # src, pattern -> matching paths relative to src, one
 }
 _gitwt_copy_one() {  # src, dst, relative-path, label
   local src="$1" dst="$2" rel="$3" label="$4"
-  [ -e "$src/$rel" ] || return 0
-  mkdir -p "$dst/$(dirname "$rel")" || return 0
-  cp -r "$src/$rel" "$dst/$rel" 2>/dev/null || return 0
+  local source="$src/$rel" target="$dst/$rel"
+  [ -e "$source" ] || [ -L "$source" ] || return 0
+  if [ -e "$target" ] || [ -L "$target" ]; then
+    if [ ! -L "$source" ] && [ -f "$source" ] && [ ! -L "$target" ] && \
+       [ -f "$target" ] && cmp -s "$source" "$target"; then
+      return 0
+    fi
+    if [ ! -L "$source" ] && [ -d "$source" ] && [ ! -L "$target" ] && \
+       [ -d "$target" ] && diff -r "$source" "$target" >/dev/null 2>&1; then
+      return 0
+    fi
+    echo "gitwt: refusing to overwrite or nest differing copy destination $target" >&2
+    return 1
+  fi
+  mkdir -p "$dst/$(dirname "$rel")" || { echo "gitwt: could not create directory for copied file $rel" >&2; return 1; }
+  cp -r "$source" "$target" 2>/dev/null || { echo "gitwt: could not copy $rel into $dst" >&2; return 1; }
   echo "  + copied$label $rel"
 }
 _gitwt_copy_includes() {
@@ -123,7 +136,7 @@ _gitwt_copy_includes() {
         # check-ignore on the MATCHED path, not the pattern: only gitignored files
         # are copied, which is what makes this Claude-compatible.
         ( cd "$src" && git check-ignore -q "$rel" 2>/dev/null ) || continue
-        _gitwt_copy_one "$src" "$dst" "$rel" ""
+        _gitwt_copy_one "$src" "$dst" "$rel" "" || return 1
       done < <(_gitwt_expand_pattern "$src" "$pat")
     done < "$inc"
   fi
@@ -135,7 +148,7 @@ _gitwt_copy_includes() {
     [ -z "$pat" ] && continue
     while IFS= read -r rel; do
       [ -n "$rel" ] || continue
-      _gitwt_copy_one "$src" "$dst" "$rel" " (gitwt.copy)"
+      _gitwt_copy_one "$src" "$dst" "$rel" " (gitwt.copy)" || return 1
     done < <(_gitwt_expand_pattern "$src" "$pat")
   done
   return 0
@@ -152,11 +165,13 @@ _gitwt_seed_envrc() {
   local main="$1" dst="$2"
   [ -f "$main/.envrc" ] || return 0
   [ "$main" = "$dst" ] && return 0
-  [ -e "$dst/.envrc" ] && return 0
-  cp "$main/.envrc" "$dst/.envrc" || return 0
+  local existed=0
+  if [ -e "$dst/.envrc" ] || [ -L "$dst/.envrc" ]; then existed=1; fi
+  _gitwt_copy_one "$main" "$dst" .envrc "" || return 1
   # Not auto-allowed: direnv's trust gate exists because a .envrc can arrive from
   # a clone rather than from the user, and gitwt copies whatever the main repo has.
-  echo "  + copied .envrc — run: direnv allow \"$dst\""
+  if [ "$existed" -eq 0 ]; then echo "    -> run: direnv allow \"$dst\""; fi
+  return 0
 }
 _gitwt_seed_envrc_all() {  # backfill worktrees created before `gitwt env` ran
   local main="$1" base d
@@ -170,17 +185,249 @@ _gitwt_seed_envrc_all() {  # backfill worktrees created before `gitwt env` ran
 }
 
 # ---- postCreate hooks: gitwt.hook (multi-valued) ---------------------------
-# Read into an array first (avoids the while|pipe subshell swallowing execution).
-_gitwt_run_hooks() {
-  local dst="$1" cmd
-  local hooks=()
-  while IFS= read -r cmd; do [ -n "$cmd" ] && hooks+=("$cmd"); done \
-    < <(_gitwt_config_all hook "$dst")
-  for cmd in "${hooks[@]:-}"; do
-    [ -z "$cmd" ] && continue
+# Readiness is a marker in the private Git admin directory. Failed setup is kept
+# in-progress and deliberately requires manual recovery instead of replaying hooks.
+_GITWT_HOOKS=()
+
+_gitwt_load_hooks() {
+  local src="$1" cmd
+  _GITWT_HOOKS=()
+  while IFS= read -r cmd; do [ -n "$cmd" ] && _GITWT_HOOKS+=("$cmd"); done \
+    < <(_gitwt_config_all hook "$src")
+  return 0
+}
+
+_gitwt_new_instance_id() {
+  local id
+  id="$(od -An -v -N 16 -tx1 /dev/urandom 2>/dev/null | tr -d ' \012')" || {
+    echo "gitwt: cannot generate a worktree instance ID from /dev/urandom" >&2
+    return 1
+  }
+  if [ "${#id}" -ne 32 ]; then
+    echo "gitwt: generated an invalid worktree instance ID" >&2
+    return 1
+  fi
+  case "$id" in
+    *[!0-9a-f]*) echo "gitwt: generated an invalid worktree instance ID" >&2; return 1 ;;
+  esac
+  printf '%s\n' "$id"
+}
+
+_gitwt_atomic_write_lines() {  # file, line...
+  local file="$1"; shift
+  local tmp="${file}.tmp.$$.$RANDOM"
+  if ! ( set -C; printf '%s\n' "$@" > "$tmp" ); then
+    echo "gitwt: could not create temporary marker file $tmp" >&2
+    return 1
+  fi
+  if ! mv -f "$tmp" "$file"; then
+    rm -f "$tmp"
+    echo "gitwt: could not atomically save readiness marker at $file" >&2
+    return 1
+  fi
+  return 0
+}
+
+_gitwt_absolute_git_common_dir() {  # repo -> canonical common git directory
+  local repo="$1" common
+  common="$(git -C "$repo" rev-parse --git-common-dir 2>/dev/null)" || return 1
+  case "$common" in
+    /*|[A-Za-z]:*) ;;
+    *) common="$repo/$common" ;;
+  esac
+  ( cd "$common" 2>/dev/null && pwd -P )
+}
+
+_gitwt_worktree_admin_dir() {  # main repo, linked worktree -> private admin directory
+  local main="$1" dir="$2" main_common dir_common admin main_admin
+  main_common="$(_gitwt_absolute_git_common_dir "$main")" || {
+    echo "gitwt: cannot resolve the main repository's Git common directory" >&2
+    return 1
+  }
+  dir_common="$(_gitwt_absolute_git_common_dir "$dir")" || {
+    echo "gitwt: cannot resolve $dir's Git common directory" >&2
+    return 1
+  }
+  if [ "$main_common" != "$dir_common" ]; then
+    echo "gitwt: $dir is not a linked worktree of the expected main repository" >&2
+    return 1
+  fi
+  admin="$(git -C "$dir" rev-parse --absolute-git-dir 2>/dev/null)" || {
+    echo "gitwt: cannot resolve $dir's private Git admin directory" >&2
+    return 1
+  }
+  admin="$(cd "$admin" 2>/dev/null && pwd -P)" || {
+    echo "gitwt: cannot access $dir's private Git admin directory" >&2
+    return 1
+  }
+  main_admin="$(git -C "$main" rev-parse --absolute-git-dir 2>/dev/null)" || return 1
+  main_admin="$(cd "$main_admin" 2>/dev/null && pwd -P)" || return 1
+  if [ "$admin" = "$main_admin" ] || [ ! -f "$admin/commondir" ]; then
+    echo "gitwt: $dir is not a linked worktree of the expected main repository" >&2
+    return 1
+  fi
+  printf '%s\n' "$admin"
+}
+
+_GITWT_MARKER_ID=""
+_GITWT_MARKER_PHASE=""
+
+_gitwt_read_instance_marker() {  # private admin directory -> marker ID/phase globals
+  local marker="$1/.gitwt-instance-id"
+  local version="" id="" phase="" extra=""
+  if [ -L "$marker" ] || [ ! -f "$marker" ]; then
+    echo "gitwt: missing or invalid readiness marker at $marker; preserving checkout" >&2
+    echo "       verify setup manually; back up changes before recreating it through gitwt" >&2
+    return 1
+  fi
+  if ! {
+    IFS= read -r version &&
+      IFS= read -r id &&
+      IFS= read -r phase &&
+      { ! IFS= read -r extra && [ -z "$extra" ]; }
+  } < "$marker"; then
+    echo "gitwt: malformed readiness marker at $marker; preserving checkout" >&2
+    return 1
+  fi
+  if [ "$version" != gitwt-instance-v2 ] || [ "${#id}" -ne 32 ]; then
+    echo "gitwt: unsupported or legacy readiness marker at $marker; refusing to trust checkout" >&2
+    return 1
+  fi
+  case "$id" in
+    *[!0-9a-f]*) echo "gitwt: malformed worktree instance ID at $marker" >&2; return 1 ;;
+  esac
+  case "$phase" in
+    in-progress|ready) ;;
+    *) echo "gitwt: invalid readiness phase '$phase' at $marker; preserving checkout" >&2; return 1 ;;
+  esac
+  _GITWT_MARKER_ID="$id"
+  _GITWT_MARKER_PHASE="$phase"
+}
+
+_gitwt_write_instance_marker() {  # private admin directory, instance ID, phase
+  local admin="$1" id="$2" phase="$3" marker="$1/.gitwt-instance-id"
+  case "$phase" in
+    in-progress)
+      if [ -e "$marker" ] || [ -L "$marker" ]; then
+        echo "gitwt: unexpected readiness marker already exists at $marker" >&2
+        return 1
+      fi
+      ;;
+    ready)
+      _gitwt_read_instance_marker "$admin" || return 1
+      if [ "$_GITWT_MARKER_ID" != "$id" ] || [ "$_GITWT_MARKER_PHASE" != in-progress ]; then
+        echo "gitwt: readiness marker changed before setup completed at $marker" >&2
+        return 1
+      fi
+      ;;
+    *) echo "gitwt: invalid readiness phase '$phase'" >&2; return 1 ;;
+  esac
+  _gitwt_atomic_write_lines "$marker" gitwt-instance-v2 "$id" "$phase"
+}
+
+_gitwt_verify_worktree_instance() {  # main repo, dir, branch, expected ID, expected phase
+  local main="$1" dir="$2" branch="$3" expected_id="$4" expected_phase="$5"
+  local admin
+  if ! _gitwt_is_worktree_of "$dir" "$branch"; then
+    echo "gitwt: worktree changed or is no longer on '$branch'; preserving it" >&2
+    return 1
+  fi
+  admin="$(_gitwt_worktree_admin_dir "$main" "$dir")" || return 1
+  _gitwt_read_instance_marker "$admin" || return 1
+  if [ "$_GITWT_MARKER_ID" != "$expected_id" ] || [ "$_GITWT_MARKER_PHASE" != "$expected_phase" ]; then
+    echo "gitwt: worktree readiness changed at $dir; preserving it" >&2
+    return 1
+  fi
+}
+
+_gitwt_run_hooks() {  # main, dst, branch, instance ID
+  local main="$1" dst="$2" branch="$3" instance_id="$4"
+  local cmd admin
+  for cmd in "${_GITWT_HOOKS[@]:-}"; do
+    [ -n "$cmd" ] || continue
+    _gitwt_verify_worktree_instance "$main" "$dst" "$branch" "$instance_id" in-progress || return 1
     echo "  > hook: $cmd"
     ( cd "$dst" && eval "$cmd" ) || { echo "  ! hook failed: $cmd" >&2; return 1; }
+    _gitwt_verify_worktree_instance "$main" "$dst" "$branch" "$instance_id" in-progress || return 1
   done
+  _gitwt_verify_worktree_instance "$main" "$dst" "$branch" "$instance_id" in-progress || return 1
+  admin="$(_gitwt_worktree_admin_dir "$main" "$dst")" || return 1
+  _gitwt_write_instance_marker "$admin" "$instance_id" ready || return 1
+  _gitwt_verify_worktree_instance "$main" "$dst" "$branch" "$instance_id" ready
+}
+
+_gitwt_acquire_worktree_lock() {  # lock directory, branch
+  local lock_dir="$1" branch="$2" lock_root
+  lock_root="$(dirname "$lock_dir")"
+  if ! mkdir -p "$lock_root"; then
+    echo "gitwt: could not create worktree lock directory $lock_root" >&2
+    return 1
+  fi
+  if ! mkdir "$lock_dir" 2>/dev/null; then
+    if [ -d "$lock_dir" ]; then
+      echo "gitwt: another worktree operation or a stale lock blocks '$branch' ($lock_dir)" >&2
+      echo "       if no gitwt process is active, remove the empty lock with: rmdir \"$lock_dir\"" >&2
+    else
+      echo "gitwt: cannot create worktree lock at $lock_dir" >&2
+    fi
+    return 1
+  fi
+  return 0
+}
+
+_gitwt_release_worktree_lock() {
+  rmdir "$1" 2>/dev/null || true
+}
+
+_gitwt_prepare_new() {  # main, branch, dir, base ref
+  local main="$1" branch="$2" dir="$3" base="$4"
+  local admin_dir instance_id
+  if [ -d "$dir" ]; then
+    if ! _gitwt_is_worktree_of "$dir" "$branch"; then
+      echo "gitwt: $dir exists but is not a worktree on '$branch'" >&2
+      echo "       preserving it; inspect or move it before retrying" >&2
+      return 1
+    fi
+    admin_dir="$(_gitwt_worktree_admin_dir "$main" "$dir")" || return 1
+    _gitwt_read_instance_marker "$admin_dir" || return 1
+    if [ "$_GITWT_MARKER_PHASE" != ready ]; then
+      echo "gitwt: setup for '$branch' is not ready; refusing to rerun hooks" >&2
+      echo "       preserve the checkout, verify it manually, then back it up before recreation" >&2
+      return 1
+    fi
+    instance_id="$_GITWT_MARKER_ID"
+    _gitwt_verify_worktree_instance "$main" "$dir" "$branch" "$instance_id" ready || return 1
+    echo "gitwt: reuse $dir" >&2
+    return 0
+  elif [ -e "$dir" ] || [ -L "$dir" ]; then
+    echo "gitwt: $dir exists but is not a worktree directory on '$branch'" >&2
+    echo "       preserving it; inspect or move it before retrying" >&2
+    return 1
+  fi
+
+  instance_id="$(_gitwt_new_instance_id)" || return 1
+  if ! mkdir -p "$(dirname "$dir")"; then
+    echo "gitwt: could not create worktree parent for $dir" >&2
+    return 1
+  fi
+  if git -C "$main" show-ref --verify --quiet "refs/heads/$branch"; then
+    if ! git -C "$main" worktree add "$dir" "$branch" >&2; then return 1; fi
+  elif [ -n "$base" ]; then
+    if ! git -C "$main" worktree add "$dir" -b "$branch" "$base" >&2; then return 1; fi
+  else
+    if ! git -C "$main" worktree add "$dir" -b "$branch" >&2; then return 1; fi
+  fi
+  if ! _gitwt_is_worktree_of "$dir" "$branch"; then
+    echo "gitwt: created $dir but it is not on '$branch'; preserving it" >&2
+    return 1
+  fi
+  admin_dir="$(_gitwt_worktree_admin_dir "$main" "$dir")" || return 1
+  _gitwt_write_instance_marker "$admin_dir" "$instance_id" in-progress || return 1
+  _gitwt_verify_worktree_instance "$main" "$dir" "$branch" "$instance_id" in-progress || return 1
+  _gitwt_load_hooks "$dir" || return 1
+  _gitwt_copy_includes "$main" "$dir" >&2 || return 1
+  _gitwt_seed_envrc "$main" "$dir" >&2 || return 1
+  _gitwt_run_hooks "$main" "$dir" "$branch" "$instance_id" >&2 || return 1
   return 0
 }
 
@@ -188,38 +435,25 @@ _gitwt_run_hooks() {
 cmd_new() {   # gitwt new <branch> [base-ref]   (prints path on last line)
   local branch="${1:?usage: gitwt new <branch> [base-ref]}"; local base="${2:-}"
   local main; main="$(_gitwt_main_root)"
-  local dir; dir="$(_gitwt_base_dir)/$(_gitwt_slug "$branch")"
-  if [ -d "$dir" ]; then
-    # Reuse only what git actually has checked out on THIS branch. The slug digest
-    # already makes two branch names collide impossible, but a directory can survive
-    # its worktree (an interrupted `worktree remove`, a manual mkdir), and returning
-    # that silently would hand the caller a tree that is not on the requested branch.
-    if _gitwt_is_worktree_of "$dir" "$branch"; then
-      echo "gitwt: reuse $dir" >&2; echo "$dir"; return 0
-    fi
-    echo "gitwt: $dir exists but is not a worktree on '$branch'" >&2
-    echo "       remove it (gitwt rm '$branch' --force, or rm -rf) and retry" >&2
-    return 1
+  local base_dir; base_dir="$(_gitwt_base_dir)"
+  local slug; slug="$(_gitwt_slug "$branch")"
+  local dir="$base_dir/$slug"
+  local lock_dir="$base_dir/.gitwt-locks/$slug.lock"
+  _gitwt_acquire_worktree_lock "$lock_dir" "$branch" || return 1
+  local result=0
+  _gitwt_prepare_new "$main" "$branch" "$dir" "$base" || result=$?
+  if [ "$result" -eq 0 ]; then
+    if ! printf '%s\n' "$dir"; then result=1; fi
   fi
-  mkdir -p "$(dirname "$dir")"
-  if git -C "$main" show-ref --verify --quiet "refs/heads/$branch"; then
-    git -C "$main" worktree add "$dir" "$branch" >&2
-  elif [ -n "$base" ]; then
-    git -C "$main" worktree add "$dir" -b "$branch" "$base" >&2
-  else
-    git -C "$main" worktree add "$dir" -b "$branch" >&2
-  fi
-  _gitwt_copy_includes "$main" "$dir" >&2
-  _gitwt_seed_envrc "$main" "$dir" >&2
-  _gitwt_run_hooks "$dir" >&2 || true
-  echo "$dir"
+  _gitwt_release_worktree_lock "$lock_dir"
+  [ "$result" -eq 0 ] || return "$result"
 }
 
 cmd_switch() {  # gitwt <branch>  — create/reuse and print path; with shell fn, cd's in
   local branch="${1:?usage: gitwt <branch>}"
   # Always route through cmd_new: a bare `-d` test would accept a directory that is
   # not a worktree on this branch, and cmd_new is the one place that verifies it.
-  local dir; dir="$(cmd_new "$branch")"
+  local dir; dir="$(cmd_new "$branch")" || return $?
   echo "$dir"
   # Reached when the script runs as a plain executable rather than through the
   # `gitwt` shell function -- e.g. before common.bash has sourced the function,
@@ -239,10 +473,29 @@ cmd_path() { echo "$(_gitwt_base_dir)/$(_gitwt_slug "${1:?usage: gitwt path <bra
 cmd_rm() {    # gitwt rm <branch> [--force]
   local branch="${1:?usage: gitwt rm <branch> [--force]}"; shift || true
   local main; main="$(_gitwt_main_root)"
-  local dir; dir="$(_gitwt_base_dir)/$(_gitwt_slug "$branch")"
-  git -C "$main" worktree remove "$dir" "$@"
-  git -C "$main" branch -d "$branch" 2>/dev/null || true
-  echo "gitwt: removed $dir"
+  local base_dir; base_dir="$(_gitwt_base_dir)"
+  local slug; slug="$(_gitwt_slug "$branch")"
+  local dir="$base_dir/$slug"
+  local lock_dir="$base_dir/.gitwt-locks/$slug.lock"
+  _gitwt_acquire_worktree_lock "$lock_dir" "$branch" || return 1
+  local result=0 refused=0 removed=0
+  if ! _gitwt_is_worktree_of "$dir" "$branch" || \
+     ! _gitwt_worktree_admin_dir "$main" "$dir" >/dev/null; then
+    refused=1; result=1
+  elif git -C "$main" worktree remove "$dir" "$@"; then
+    git -C "$main" branch -d "$branch" 2>/dev/null || true
+    removed=1
+  else
+    result=$?
+  fi
+  _gitwt_release_worktree_lock "$lock_dir"
+  if [ "$refused" -eq 1 ]; then
+    echo "gitwt: refusing to remove $dir; it is not this repository's worktree on '$branch'" >&2 || true
+  fi
+  if [ "$removed" -eq 1 ]; then
+    if ! echo "gitwt: removed $dir"; then result=1; fi
+  fi
+  return "$result"
 }
 
 cmd_prune() {
@@ -260,11 +513,13 @@ cmd_prune() {
 
 cmd_clean() { # gitwt clean [--merged] [--force]  — drop worktrees whose branch is merged into default
   local main; main="$(_gitwt_main_root)"; local def; def="$(_gitwt_default_branch)"
+  local base_dir; base_dir="$(_gitwt_base_dir)"
+  local lock_root="$base_dir/.gitwt-locks"
   local force=""; for a in "$@"; do [ "$a" = "--force" ] && force="--force"; done
   # Use git's own notion of "merged into default" (branches fully contained in $def).
   # Protect against data loss: a worktree with uncommitted/untracked changes is
   # skipped unless --force is given (git worktree remove already refuses dirty ones).
-  local br dir branches=()
+  local br dir slug lock_dir branches=()
   while IFS= read -r br; do
     # Strip a leading "* " marker and surrounding whitespace using shell builtins.
     # `xargs` would also do it, but BSD/macOS xargs interprets quotes in its input,
@@ -277,12 +532,26 @@ cmd_clean() { # gitwt clean [--merged] [--force]  — drop worktrees whose branc
   if [ "${#branches[@]}" -eq 0 ]; then echo "gitwt: no merged branches with worktrees to clean"; cmd_prune; return 0; fi
   for br in "${branches[@]:-}"; do
     [ -z "$br" ] && continue
-    dir="$(_gitwt_base_dir)/$(_gitwt_slug "$br")"
+    slug="$(_gitwt_slug "$br")"
+    dir="$base_dir/$slug"
     [ -d "$dir" ] || continue            # only touch branches that HAVE a managed worktree
-    echo "gitwt: clean merged '$br'  ($dir)"
+    lock_dir="$lock_root/$slug.lock"
+    if ! _gitwt_acquire_worktree_lock "$lock_dir" "$br"; then
+      echo "  ! skipped — setup/removal is busy for '$br'"
+      continue
+    fi
+    if ! _gitwt_is_worktree_of "$dir" "$br" || \
+       ! _gitwt_worktree_admin_dir "$main" "$dir" >/dev/null; then
+      _gitwt_release_worktree_lock "$lock_dir"
+      echo "  ! skipped — worktree changed before cleanup for '$br'"
+      continue
+    fi
     if git -C "$main" worktree remove $force "$dir" 2>/dev/null; then
       git -C "$main" branch -d "$br" 2>/dev/null || true
+      _gitwt_release_worktree_lock "$lock_dir"
+      echo "gitwt: clean merged '$br'  ($dir)"
     else
+      _gitwt_release_worktree_lock "$lock_dir"
       echo "  ! skipped — worktree has local changes; use: gitwt clean --merged --force"
     fi
   done
@@ -299,7 +568,7 @@ cmd_env() {   # gitwt env  — write a direnv .envrc into the MAIN repo and seed
   fi
   cat > "$f" <<'ENVRC'
 # Managed by `gitwt env`. Auto-isolates env across git worktrees (direnv).
-# Each worktree inherits the MAIN worktree's .env + venv, and gets a stable unique PORT.
+# Each worktree inherits the MAIN worktree's .env + venv, and gets a deterministic PORT.
 # substr($0, 10) drops the "worktree " prefix and keeps the rest verbatim, so a repo
 # path containing spaces survives; $2 would truncate it at the first space.
 _main="$(git worktree list --porcelain | awk '/^worktree /{print substr($0, 10); exit}')"
@@ -320,7 +589,8 @@ if [ -d "$_main/.venv" ]; then
   fi
 fi
 
-# 3) deterministic per-worktree port (3000–3999), derived from the worktree path hash
+# 3) deterministic PORT (3000–3999) from path hash; collisions are possible.
+#    Override PORT and DEV_PORT here for a colliding worktree.
 _h=$(pwd | cksum | cut -d' ' -f1)
 export PORT=$(( 3000 + (_h % 1000) ))
 export DEV_PORT="$PORT"
@@ -362,7 +632,7 @@ gitwt — tool-agnostic git worktree helper (any agent CLI: claude/codex/pi/open
   gitwt rm <branch> [--force]     remove worktree + delete merged branch
   gitwt clean [--merged] [--force]  remove worktrees whose branch is already merged
   gitwt prune                     clean stale metadata + empty dirs
-  gitwt env                       drop a direnv .envrc (auto env + unique PORT per worktree)
+  gitwt env                       drop a direnv .envrc (deterministic PORT; collisions possible, override manually)
   gitwt doctor                    check git/direnv/agents + show layout
   gitwt --shell                   print a shell function so `gitwt <branch>` can cd for you
 
@@ -373,9 +643,17 @@ Also not to be confused with `wt`, which on Windows is Windows Terminal.
 
 Config (per-repo, via `git config`):
   git config --add gitwt.copy "**/.env.example"   # extra files to copy into new worktrees
-  git config --add gitwt.hook "npm install"        # run after creating a worktree
+  git config --add gitwt.hook "npm install"        # required postCreate setup
   git config --add gitwt.hook "uv sync"
   (legacy wt.copy / wt.hook are still honoured)
+
+Configured hooks must succeed before new, bare branch switch, or run reports a ready
+worktree. Failure returns nonzero: new prints no path, switch does not cd, and run does
+not launch. A failed setup leaves the checkout and its private `in-progress` marker in
+place; gitwt never reruns hooks automatically. Existing worktrees are reused only with
+a matching `ready` marker; markerless, in-progress, legacy, or mismatched checkouts are
+preserved and refused. Manually verify setup or back up changes before removing and
+recreating the worktree.
 
 Worktrees: <repo-parent>/.wt/<repo>/<branch>   (same drive, outside repo).
 Also honours .worktreeinclude (Claude Code-compatible) for gitignored copies.
@@ -412,8 +690,11 @@ gitwt() {
       # `new` both reuses and verifies: it only returns a directory git has checked
       # out on this branch. A `path` + `-d` shortcut would cd into a leftover
       # directory that is not that branch's worktree.
-      local _d; _d="$(_GITWT_SHELL_FN=1 "$_GITWT_BIN" new "$1" | tail -1)"
-      [ -d "$_d" ] && cd "$_d" || echo "gitwt: could not enter worktree for '$1'" >&2 ;;
+      local _d; _d="$(_GITWT_SHELL_FN=1 "$_GITWT_BIN" new "$1")" || return $?
+      if [ -d "$_d" ]; then cd "$_d"; else
+        echo "gitwt: could not enter worktree for '$1'" >&2
+        return 1
+      fi ;;
   esac
 }
 
@@ -461,11 +742,16 @@ cmd_run() {
   local tool="${1:?usage: gitwt run <tool> <branch> [-- args]}"
   local branch="${2:?usage: gitwt run <tool> <branch> [-- args]}"; shift 2
   [ "${1:-}" = "--" ] && shift || true
-  local dir; dir="$(cmd_new "$branch")"
+  local dir; dir="$(cmd_new "$branch")" || return $?
   echo "gitwt: launching '$tool' in $dir" >&2
-  ( cd "$dir" && command -v "$tool" >/dev/null 2>&1 \
-      && exec "$tool" "$@" \
-      || { echo "gitwt: '$tool' not found in PATH" >&2; exit 127; } )
+  (
+    cd "$dir" || exit 1
+    if ! command -v "$tool" >/dev/null 2>&1; then
+      echo "gitwt: '$tool' not found in PATH" >&2
+      exit 127
+    fi
+    exec "$tool" "$@"
+  )
 }
 
 case "${1:-}" in

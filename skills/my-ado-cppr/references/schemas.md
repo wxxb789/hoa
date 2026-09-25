@@ -116,7 +116,6 @@ All suggestions are advisory — the skill never runs them.
   },
   "commit": {
     "do": true,
-    "stage_all": true,
     "amend": false,
     "paths": null,
     "message": "[feat] description\n\n- details"
@@ -158,9 +157,9 @@ All suggestions are advisory — the skill never runs them.
 
 **`commit`**
 - `do: true` requires `message` unless `amend: true`.
-- `stage_all: true` runs `git add -A` before commit.
+- `stage_all: true` runs `git add -A` before commit and includes every working-tree change; set it only when the user authorized that scope. If omitted or false, only already-staged changes are committed. When present it must be a JSON boolean, not a string such as `"false"`.
 - `amend: true` → uses `--amend`. With empty `message` it adds `--no-edit`.
-- `paths: ["a/b", "c/d"]` — stage only these via `git add -- <paths>` instead of `-A`. Mutually exclusive with `stage_all`.
+- `paths: ["a/b", "c/d"]` — when provided, must be a non-empty list of non-empty literal filenames. Stage and commit only these working-tree paths via literal pathspecs for `git add` and `git commit --only`, leaving unrelated staged entries untouched. Cannot be combined with `stage_all: true`; omit it or set it to `null` for staged-only commits.
 
 **`push`**
 - `set_upstream: true` (default) runs `git push -u <remote> <branch>`.

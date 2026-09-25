@@ -3,7 +3,7 @@ name: my-ado-cppr
 description: Commit local changes, push branches, and create or update PRs in Azure DevOps or GitHub repositories. Use when asked to commit/push and open PRs, automate ADO work item linking/auto-complete, or create GitHub PRs (ignore work items for GitHub).
 ---
 
-<!-- index: areas=software-development; targets=runtime-agnostic; version=1.0.0 -->
+<!-- index: areas=software-development; targets=runtime-agnostic; version=1.1.0 -->
 
 # Commit Push PR
 
@@ -52,7 +52,7 @@ Build a plan JSON from the probe output (full shape:
 {
   "provider": "ado",
   "branch": {"create": true, "name": "feature/my-branch"},
-  "commit": {"do": true, "stage_all": true, "message": "[feat] description\n\n- details"},
+  "commit": {"do": true, "message": "[feat] description\n\n- details"},
   "push":   {"do": true, "set_upstream": true},
   "pr": {
     "action": "create", "source_branch": "feature/x", "target_branch": "main",
@@ -66,6 +66,8 @@ Key decision rules (full field notes in [schemas](references/schemas.md)):
 
 - `existing_prs` non-empty → BEFORE you build a plan, summarize each PR (`id`, `title`, `source_branch → target_branch`, `draft`) and ask the user: **update** that PR, **abandon and create new**, or **abort**.
 - `identity.git_email == reviewer` → drop self from `pr.reviewers` before sending.
+- `commit.stage_all: true` stages every working-tree change; include it only when the user has authorized committing all changes. When omitted, only already-staged changes are committed.
+- `commit.paths` must be a non-empty list of literal filenames; it cannot be combined with `commit.stage_all: true` and leaves unrelated staged entries untouched.
 - `commit.amend: true` re-pushing a pushed branch → `push.force_with_lease: true`.
 - `provider` optional; auto-detected from `git remote get-url origin` (`dev.azure.com` / `*.visualstudio.com` / `ssh.dev.azure.com` = ADO; `github.com` = GitHub). To pin in an apply run, put it in the plan — `--provider` exists on `probe` only.
 

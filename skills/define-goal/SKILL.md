@@ -3,7 +3,7 @@ name: define-goal
 description: Define and stress-test an intention as one cohesive, feasible, verifiable goal or the smallest sufficient set of independently meaningful goals, without planning implementation. Use when the user wants to create or refine a goal, turn a vision into bounded outcomes, or separate independently finishable outcomes within an initiative. Do not use for task breakdown, implementation planning, execution, or progress management.
 ---
 
-<!-- index: areas=self-management,software-development,work-management; targets=runtime-agnostic; version=1.1.0 -->
+<!-- index: areas=self-management,software-development,work-management; targets=runtime-agnostic; version=1.2.0 -->
 
 # Define Goal
 
@@ -73,6 +73,8 @@ Compile each ready goal as a cohesive, plain-language payload. On a runtime that
 - the evidence that will distinguish completion from non-completion
 - only the scope, constraints, exclusions, or critical assumptions that materially limit acceptable outcomes
 
+Claude Code keeps only one active `/goal` per session; setting another replaces an unfinished goal. When rendering multiple `/goal` invocations there or in another single-active-goal runtime, add one concise usage instruction outside the copyable payloads: use distinct sessions, or activate the next goal only after the prior one resolves.
+
 Keep implementation choices open. Use only evaluation details and concrete bounds supplied by the user or grounded in authoritative evidence; never invent specificity merely to make the goal look concrete. A deliverable directly implied by the user's intent may be stated without prescribing how to produce it.
 
-Once the goal structure is ready, return the payloads plus only the labels needed to distinguish a goal set from alternatives or state a material prerequisite. Do not append analysis, an implementation plan, or runtime-specific flags.
+Once the goal structure is ready, return the copyable payloads, any required runtime-usage note outside them, and only the labels needed to distinguish a goal set from alternatives or state a material prerequisite. Do not append analysis, an implementation plan, or runtime-specific flags.

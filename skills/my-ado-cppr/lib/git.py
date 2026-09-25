@@ -158,12 +158,20 @@ def commit(
     *,
     stage_all_first: bool = False,
     amend: bool = False,
+    only_paths: list[str] | None = None,
     cwd: str | None = None,
 ) -> str:
     """Create a commit. Returns the commit SHA.
 
     If `amend` is True, uses --amend; if `message` is empty, also uses --no-edit.
+    If `only_paths` is provided, commit only their working-tree contents and
+    leave unrelated staged entries in the index.
     """
+    if only_paths is not None and not only_paths:
+        raise GitError("commit: only_paths must not be empty")
+    if stage_all_first and only_paths is not None:
+        raise GitError("commit: stage_all_first and only_paths cannot be combined")
+
     if stage_all_first:
         _run(["add", "-A"], cwd=cwd)
 
@@ -178,6 +186,8 @@ def commit(
         if not message.strip():
             raise GitError("commit message is empty")
         args += ["-m", message.rstrip("\n") + "\n"]
+    if only_paths is not None:
+        args += ["--only", "--", *only_paths]
 
     cp = _run(args, cwd=cwd, check=False)
     if cp.returncode != 0:
@@ -205,11 +215,12 @@ def commit_with_paths(
     amend: bool = False,
     cwd: str | None = None,
 ) -> str:
-    """Stage specific paths then commit. Returns SHA."""
+    """Stage and commit specific paths without consuming unrelated index entries."""
     if not paths:
         raise GitError("commit_with_paths: paths must not be empty")
-    _run(["add", "--", *paths], cwd=cwd)
-    return commit(message, stage_all_first=False, amend=amend, cwd=cwd)
+    literal_pathspecs = [f":(literal){path}" for path in paths]
+    _run(["add", "--", *literal_pathspecs], cwd=cwd)
+    return commit(message, stage_all_first=False, amend=amend, only_paths=literal_pathspecs, cwd=cwd)
 
 
 def push(
