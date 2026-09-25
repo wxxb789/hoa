@@ -14,11 +14,12 @@ their `<!-- index: ... -->` comment; this file records the notable deltas.
   staged changes; reject empty, conflicting, and non-boolean staging plans
   before writes. Real-Git regression cases cover amend and deletions.
 - **git-worktree-workflow v1.1.0:** configured post-create hooks must succeed
-  before `gitwt` returns a ready worktree or launches an agent. Failed setup
-  preserves partial files for manual recovery; a private Git-admin marker
-  prevents unknown checkouts from inheriting readiness. Managed creation and
-  removal share a lock. Copy conflicts fail closed, and hashed PORT values
-  are documented as potentially colliding rather than guaranteed unique.
+  before `gitwt` returns a ready worktree or launches an agent; each hook runs
+  in an errexit-enabled Bash process so earlier command failures are not masked.
+  Failed setup preserves partial files for manual recovery; `gitwt clean` also
+  requires a valid ready private Git-admin marker, even with `--force`. Managed
+  creation and removal share a lock. Copy conflicts fail closed, and hashed PORT
+  values are documented as potentially colliding rather than guaranteed unique.
 - **ghc-search v1.0.1:** quote installed script paths so searches and offline
   checks work when an installation directory contains spaces.
 

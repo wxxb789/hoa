@@ -215,6 +215,22 @@ else
   bad "stale pending fingerprint blocked a fresh checkout"
 fi
 
+echo "== thread 6b: a later command cannot mask a failed hook =="
+git -C "$REPO" config --unset-all gitwt.hook
+git -C "$REPO" config --add gitwt.hook 'false; printf "late\n" >> "$GITWT_TEST_ROOT/masked-hook.log"'
+MASKED_DIR="$(run path masked-hook)"
+if run new masked-hook >"$ROOT/masked-hook-out" 2>"$ROOT/masked-hook-err"; then
+  bad "a later successful command masked hook failure"
+else
+  ok "nonterminal hook failure blocks readiness"
+fi
+check "failed compound hook kept its checkout" "failed compound hook deleted its checkout" \
+      [ -d "$MASKED_DIR" ]
+check "failed compound hook emitted no path" "failed compound hook emitted a ready path" \
+      [ ! -s "$ROOT/masked-hook-out" ]
+check "commands after an unhandled failure were not run" "hook continued after failure" \
+      [ ! -e "$ROOT/masked-hook.log" ]
+
 echo "== thread 7: setup excludes concurrent removal =="
 git -C "$REPO" config --unset-all gitwt.hook
 git -C "$REPO" config --add gitwt.hook 'touch "$GITWT_TEST_ROOT/concurrent-started"; while [ ! -e "$GITWT_TEST_ROOT/concurrent-release" ]; do sleep 0.1; done'
@@ -265,6 +281,30 @@ else
   check "manual checkout emitted no ready path" "manual checkout emitted a path" \
         [ ! -s "$ROOT/unmanaged-out" ]
 fi
+
+echo "== thread 8b: automatic cleanup preserves unverified checkouts =="
+git -C "$REPO" config --add gitwt.hook '[ -e "$GITWT_TEST_ROOT/clean-ready" ]'
+CLEAN_PENDING_DIR="$(run path clean-pending)"
+if run new clean-pending >"$ROOT/clean-pending-out" 2>"$ROOT/clean-pending-err"; then
+  bad "cleanup fixture unexpectedly completed setup"
+else
+  ok "cleanup fixture retains incomplete setup"
+fi
+run clean --merged --force >"$ROOT/clean-out" 2>&1
+check "cleanup removes a ready merged worktree" "cleanup kept a ready merged worktree" \
+      [ ! -d "$COPY_DIR" ]
+if git -C "$REPO" show-ref --verify --quiet refs/heads/copy-present; then
+  bad "cleanup kept the merged ready branch"
+else
+  ok "cleanup deletes the merged ready branch"
+fi
+check "cleanup preserves failed setup" "cleanup removed failed setup" \
+      [ -d "$CLEAN_PENDING_DIR" ]
+check "cleanup preserves failed branch" "cleanup deleted failed branch" \
+      git -C "$REPO" show-ref --verify --quiet refs/heads/clean-pending
+check "cleanup preserves markerless checkout" "cleanup removed markerless checkout" \
+      [ -d "$LEGACY_DIR" ]
+git -C "$REPO" config --unset-all gitwt.hook
 
 echo "== thread 9: output failure cannot strand a removal lock =="
 if [ -e /dev/full ]; then

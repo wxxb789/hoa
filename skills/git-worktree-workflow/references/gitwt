@@ -347,7 +347,12 @@ _gitwt_run_hooks() {  # main, dst, branch, instance ID
     [ -n "$cmd" ] || continue
     _gitwt_verify_worktree_instance "$main" "$dst" "$branch" "$instance_id" in-progress || return 1
     echo "  > hook: $cmd"
-    ( cd "$dst" && eval "$cmd" ) || { echo "  ! hook failed: $cmd" >&2; return 1; }
+    # Run independently: the parent invokes this in a failure condition, which
+    # disables errexit for its subshell and could mask an earlier hook command.
+    ( cd "$dst" && "$BASH" -e -u -o pipefail -c "$cmd" ) || {
+      echo "  ! hook failed: $cmd" >&2
+      return 1
+    }
     _gitwt_verify_worktree_instance "$main" "$dst" "$branch" "$instance_id" in-progress || return 1
   done
   _gitwt_verify_worktree_instance "$main" "$dst" "$branch" "$instance_id" in-progress || return 1
@@ -518,8 +523,9 @@ cmd_clean() { # gitwt clean [--merged] [--force]  — drop worktrees whose branc
   local force=""; for a in "$@"; do [ "$a" = "--force" ] && force="--force"; done
   # Use git's own notion of "merged into default" (branches fully contained in $def).
   # Protect against data loss: a worktree with uncommitted/untracked changes is
-  # skipped unless --force is given (git worktree remove already refuses dirty ones).
-  local br dir slug lock_dir branches=()
+  # skipped unless --force is given. Readiness is always required; --force does not
+  # bypass a missing, invalid, or in-progress private marker.
+  local br dir slug lock_dir admin_dir branches=()
   while IFS= read -r br; do
     # Strip a leading "* " marker and surrounding whitespace using shell builtins.
     # `xargs` would also do it, but BSD/macOS xargs interprets quotes in its input,
@@ -541,9 +547,11 @@ cmd_clean() { # gitwt clean [--merged] [--force]  — drop worktrees whose branc
       continue
     fi
     if ! _gitwt_is_worktree_of "$dir" "$br" || \
-       ! _gitwt_worktree_admin_dir "$main" "$dir" >/dev/null; then
+       ! admin_dir="$(_gitwt_worktree_admin_dir "$main" "$dir" 2>/dev/null)" || \
+       ! _gitwt_read_instance_marker "$admin_dir" >/dev/null 2>&1 || \
+       [ "$_GITWT_MARKER_PHASE" != ready ]; then
       _gitwt_release_worktree_lock "$lock_dir"
-      echo "  ! skipped — worktree changed before cleanup for '$br'"
+      echo "  ! skipped — worktree is changed or lacks a valid ready marker for '$br'"
       continue
     fi
     if git -C "$main" worktree remove $force "$dir" 2>/dev/null; then

@@ -53,7 +53,10 @@ Configured `gitwt.hook` (or legacy `wt.hook`) commands are required before a
 worktree is ready. If a hook fails, `gitwt new`, bare `gitwt <branch>`, and
 `gitwt run` return nonzero; no path is printed, no directory change is made, and
 `gitwt run` does not launch the tool. The worktree and all partial copy/hook writes
-are kept. A failed or interrupted setup is never automatically retried: an existing
+are kept. Each configured hook runs in its own Bash process with `errexit` enabled,
+so an unhandled failure before a later successful command still fails setup; shell
+conditionals such as `if` and `||` retain their normal behavior. A failed or interrupted
+setup is never automatically retried: an existing
 worktree is reused only with a valid `ready` marker, so `new`, the bare shell function,
 and `run` refuse an `in-progress`, missing, malformed, or legacy marker without
 rerunning copies or hooks. This applies even when no hooks are currently configured.
@@ -78,6 +81,10 @@ tools there directly; or preserve/migrate its changes, remove it with `gitwt rm
 Use `--force` only after backing up files Git would otherwise refuse to remove. An
 uncoordinated raw Git removal can race after the final readiness check; the marker
 checks detect normal replacement during setup but cannot serialize raw Git commands.
+`gitwt clean --merged --force` still skips in-progress, markerless, malformed, and
+legacy checkouts: automatic cleanup requires an actual worktree on the expected branch
+and repository with a valid `ready` private marker. Use `gitwt rm` deliberately when
+recovering one of those preserved checkouts.
 
 Copy-on-create does not overwrite existing files or nest directories: it skips an
 existing regular file only when bytes match, or a directory only when its tree
@@ -138,7 +145,8 @@ that only Claude Code had built in.
 1. One branch = one worktree (git enforces it). `gitwt` names the worktree after the branch.
 2. Never nest a worktree inside the repo. `gitwt` uses a sibling `.wt/`.
 3. Clean up: `gitwt clean --merged` after merging; `gitwt prune` periodically. Dirty
-   worktrees are protected — `gitwt clean` skips them unless `--force`.
+   worktrees are protected — `gitwt clean` skips them unless `--force`. Cleanup also
+   requires a valid `ready` marker, which `--force` does not bypass.
 4. Each worktree is a fresh checkout: `node_modules`/venv/`.env` are NOT shared. Use
    `gitwt.hook` for deps, `gitwt env`/`.worktreeinclude` for env.
 5. Windows: keep worktrees on the repo's drive; pin absolute paths in fan-out prompts.
