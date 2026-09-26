@@ -1,6 +1,6 @@
 ---
 name: hoa-introspect
-description: Produce an evidence-cited, cross-agent self-report with deterministic usage facets and a rigorously bounded blind-spot audit. Use only when explicitly asked for "my usage insights", "audit my work patterns", "where am I wasting effort", "blind spots", or a periodic "self-retro". Do not use for raw records or cross-agent search (use hoa-agent-retrieve), a single-session summary, or creating a skill/rule from a finding (use hoa-introspect-distill). Heavyweight and explicit-invocation-only; never run it ambiently.
+description: Produce an evidence-cited, cross-agent self-report with deterministic usage facets and a rigorously bounded blind-spot audit. Use only when explicitly asked for "my usage insights", "audit my work patterns", "where am I wasting effort", "blind spots", or a periodic "self-retro". Do not use for raw records or cross-agent search (use hoa-agent-retrieve), a single-session summary, qualifying findings into approved assets (use hoa-introspect-distill), or direct skill creation (use hoa-skill-work). Heavyweight and explicit-invocation-only; never invoke as a side effect of another skill.
 ---
 
 <!-- index: areas=self-management,work-management; targets=runtime-agnostic; version=1.0.0 -->
@@ -83,8 +83,10 @@ measurement suggestion. When the records have no usable signal, write
    paths, secrets, session IDs, and private text out of chat echoes.
 6. **Close honestly.** Summarize coverage, L1 facts, verified L2 findings (or
    `0 qualifying blind spots`), recommendations, candidate rules/configs, and
-   On the Horizon. Refer a stable repeatable-work candidate to
-   **hoa-introspect-distill** only when the user asks to create an asset.
+   On the Horizon. Route a finding offered for candidate qualification to
+   **hoa-introspect-distill**; route a direct request to create a defined skill
+   from that finding to **hoa-skill-work**. Do not treat the audit as creation
+   authorization or imply that distillation approval already occurred.
 
 ## Guardrails
 

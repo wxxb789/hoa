@@ -549,6 +549,17 @@ def _validate_plan(plan: dict, prov_name: str) -> str | None:
 
     # commit.do requires message (unless amend)
     commit_block = plan.get("commit") or {}
+    if "stage_all" in commit_block and not isinstance(commit_block["stage_all"], bool):
+        return "commit.stage_all must be a boolean when provided"
+    paths = commit_block.get("paths")
+    if paths is not None:
+        if not isinstance(paths, list) or not paths or any(
+            not isinstance(path, str) or not path for path in paths
+        ):
+            return "commit.paths must be a non-empty list of non-empty strings when provided"
+        if commit_block.get("stage_all"):
+            return "commit.paths cannot be combined with commit.stage_all=true"
+
     if commit_block.get("do") and not commit_block.get("amend"):
         if not (commit_block.get("message") or "").strip():
             return "commit.do=true requires commit.message (or commit.amend=true)"
@@ -762,19 +773,19 @@ def apply(
             try:
                 msg = str(commit_plan.get("message") or "").strip()
                 amend = bool(commit_plan.get("amend"))
-                paths = commit_plan.get("paths") or []
+                paths = commit_plan.get("paths")
 
                 if amend and not msg:
                     # --amend --no-edit
                     msg = ""
 
                 cli_exec.breadcrumb("committing...")
-                if paths:
-                    sha = git.commit_with_paths(msg, [str(p) for p in paths], amend=amend)
+                if paths is not None:
+                    sha = git.commit_with_paths(msg, paths, amend=amend)
                 else:
                     sha = git.commit(
                         msg,
-                        stage_all_first=bool(commit_plan.get("stage_all", True)),
+                        stage_all_first=bool(commit_plan.get("stage_all", False)),
                         amend=amend,
                     )
 

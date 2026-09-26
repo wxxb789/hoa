@@ -1,12 +1,11 @@
 ---
 name: hoa-introspect-distill
 description: >-
-  Distill approved repeatable work into a reusable skill, or an explicitly opted-in
-  rule/config change. Use when asked to "distill this", "turn this workflow into a
-  skill", "turn this workflow into a rule", or when handing off repeatable-work
-  findings from an hoa-introspect report. Do not use for the work-pattern audit itself
-  (use hoa-introspect), raw cross-agent history retrieval (use hoa-agent-retrieve), or
-  a one-off task that is not worth reusing.
+  Qualify supplied repeatable-work findings into individually approved skill or
+  opted-in rule/config candidates. Use when the user wants candidates assessed
+  before choosing an asset, or approves one candidate from an hoa-introspect
+  report. Use hoa-skill-work for direct creation or evolution of a defined skill;
+  use hoa-introspect to discover work patterns in history.
 ---
 
 <!-- index: areas=self-management,software-development; targets=runtime-agnostic; version=1.0.0 -->
@@ -19,7 +18,8 @@ tracked capability by itself.
 
 ## Contract
 
-**Input.** Take an `hoa-introspect` repeatable-work finding or a direct user description.
+**Input.** Take an `hoa-introspect` repeatable-work finding or a user description
+offered for qualification, not a direct authorization to create a defined skill.
 When no history evidence exists, label its basis `user-provided`; do not imply an audit
 occurred. Consume only the minimal report shape in [intake schema](references/intake-schema.md).
 
@@ -37,7 +37,7 @@ spec-versus-created diff.
 1. **Intake and qualify.** Reuse evidence supplied by `hoa-introspect`; do not re-audit.
    With evidence, prefer stable multi-step work observed at least three times across two
    projects. Reject work already covered, narrowly project-specific work, and one-offs.
-   Direct requests may still qualify, but retain the `user-provided` label.
+   A user-provided pattern may still qualify, but retain the `user-provided` label.
 2. **Draft, do not create.** Draft identity, contract, workflow, and basis for each
    qualifying candidate. Rank by expected gain. Five is a ceiling, not a quota: zero
    qualifying candidates is a correct outcome.

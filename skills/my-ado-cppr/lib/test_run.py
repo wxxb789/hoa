@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import os
+import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -238,6 +241,144 @@ class SplitPorcelainTests(unittest.TestCase):
     def test_short_lines_skipped(self):
         staged, unstaged, untracked = commit_push_pr.git._split_porcelain(["", "M "])
         self.assertEqual((staged, unstaged, untracked), ([], [], []))
+
+
+class CommitScopeTests(unittest.TestCase):
+    def _git(self, root: Path, *args: str) -> str:
+        result = subprocess.run(
+            ["git", *args], cwd=root, text=True, capture_output=True, check=False
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return result.stdout.strip()
+
+    def _repo(self) -> Path:
+        directory = tempfile.TemporaryDirectory(prefix="cppr-scope-")
+        self.addCleanup(directory.cleanup)
+        root = Path(directory.name)
+        self._git(root, "init", "-q")
+        self._git(root, "config", "user.name", "Fixture")
+        self._git(root, "config", "user.email", "fixture@example.invalid")
+        (root / "selected.txt").write_text("base\n", encoding="utf-8")
+        (root / "unrelated.txt").write_text("base\n", encoding="utf-8")
+        self._git(root, "add", "selected.txt", "unrelated.txt")
+        self._git(root, "commit", "-qm", "baseline")
+        self._git(root, "checkout", "-qb", "feature/scope")
+        return root
+
+    def _committed_paths(self, root: Path) -> set[str]:
+        return set(self._git(root, "show", "--pretty=format:", "--name-only", "HEAD").splitlines())
+
+    def test_paths_commit_excludes_other_staged_files(self):
+        root = self._repo()
+        (root / "selected.txt").write_text("selected update\n", encoding="utf-8")
+        (root / "unrelated.txt").write_text("unrelated update\n", encoding="utf-8")
+        self._git(root, "add", "unrelated.txt")
+
+        commit_push_pr.git.commit_with_paths("selected only", ["selected.txt"], cwd=str(root))
+
+        self.assertEqual(self._committed_paths(root), {"selected.txt"})
+        self.assertEqual(self._git(root, "diff", "--cached", "--name-only"), "unrelated.txt")
+
+    def test_paths_commit_treats_metacharacters_as_literal_filenames(self):
+        root = self._repo()
+        (root / "src").mkdir()
+        for name in ("[id].tsx", "i.tsx"):
+            (root / "src" / name).write_text("base\n", encoding="utf-8")
+        self._git(root, "add", "src")
+        self._git(root, "commit", "-qm", "fixture files")
+        (root / "src" / "[id].tsx").write_text("selected update\n", encoding="utf-8")
+        (root / "src" / "i.tsx").write_text("unrelated update\n", encoding="utf-8")
+        self._git(root, "add", "src/i.tsx")
+
+        commit_push_pr.git.commit_with_paths("literal path", ["src/[id].tsx"], cwd=str(root))
+
+        self.assertEqual(self._committed_paths(root), {"src/[id].tsx"})
+        self.assertEqual(self._git(root, "diff", "--cached", "--name-only"), "src/i.tsx")
+
+    def test_paths_commit_includes_selected_deletion_only(self):
+        root = self._repo()
+        (root / "selected.txt").unlink()
+        (root / "unrelated.txt").write_text("unrelated update\n", encoding="utf-8")
+        self._git(root, "add", "unrelated.txt")
+
+        commit_push_pr.git.commit_with_paths("delete selected", ["selected.txt"], cwd=str(root))
+
+        self.assertEqual(self._committed_paths(root), {"selected.txt"})
+        self.assertEqual(self._git(root, "diff", "--cached", "--name-only"), "unrelated.txt")
+
+    def test_amend_paths_keeps_other_staged_files(self):
+        root = self._repo()
+        (root / "selected.txt").write_text("first update\n", encoding="utf-8")
+        commit_push_pr.git.commit_with_paths("selected only", ["selected.txt"], cwd=str(root))
+        (root / "selected.txt").write_text("amended update\n", encoding="utf-8")
+        (root / "unrelated.txt").write_text("unrelated update\n", encoding="utf-8")
+        self._git(root, "add", "unrelated.txt")
+
+        commit_push_pr.git.commit_with_paths("", ["selected.txt"], amend=True, cwd=str(root))
+
+        self.assertEqual(self._committed_paths(root), {"selected.txt"})
+        self.assertEqual(self._git(root, "diff", "--cached", "--name-only"), "unrelated.txt")
+
+    def test_apply_stages_only_explicitly_authorized_changes(self):
+        for stage_all, expected in ((None, {"selected.txt"}),
+                                    (True, {"selected.txt", "extra.txt"})):
+            with self.subTest(stage_all=stage_all):
+                root = self._repo()
+                self._git(root, "remote", "add", "origin", "https://dev.azure.com/org/project/_git/repo")
+                (root / "selected.txt").write_text("selected update\n", encoding="utf-8")
+                self._git(root, "add", "selected.txt")
+                (root / "extra.txt").write_text("untracked extra\n", encoding="utf-8")
+                provider = SimpleNamespace(
+                    NAME="ado", AUTH_REMEDY="az login",
+                    parse_remote=lambda url: {"repository": url},
+                    check_auth=lambda **_kwargs: (True, {}),
+                )
+                plan = {"provider": "ado", "commit": {"do": True, "message": "scoped"}}
+                if stage_all is not None:
+                    plan["commit"]["stage_all"] = stage_all
+                previous = Path.cwd()
+                try:
+                    os.chdir(root)
+                    with patch.object(commit_push_pr, "_get_provider_by_name", return_value=provider):
+                        result = commit_push_pr.apply(plan, repo_root=str(root))
+                finally:
+                    os.chdir(previous)
+
+                self.assertTrue(result["ok"], result)
+                self.assertEqual(self._committed_paths(root), expected)
+
+    def test_apply_rejects_empty_or_conflicting_path_scopes_before_writes(self):
+        invalid = (
+            {"paths": []},
+            {"paths": [], "stage_all": True},
+            {"paths": ["selected.txt"], "stage_all": True},
+            {"stage_all": "false"},
+        )
+        for selection in invalid:
+            with self.subTest(selection=selection):
+                root = self._repo()
+                self._git(root, "remote", "add", "origin", "https://dev.azure.com/org/project/_git/repo")
+                (root / "unrelated.txt").write_text("staged unrelated update\n", encoding="utf-8")
+                self._git(root, "add", "unrelated.txt")
+                (root / "extra.txt").write_text("untracked extra\n", encoding="utf-8")
+                original_head = self._git(root, "rev-parse", "HEAD")
+                provider = SimpleNamespace(
+                    NAME="ado", AUTH_REMEDY="az login",
+                    parse_remote=lambda url: {"repository": url},
+                    check_auth=lambda **_kwargs: (True, {}),
+                )
+                plan = {"provider": "ado", "commit": {"do": True, "message": "scoped", **selection}}
+                previous = Path.cwd()
+                try:
+                    os.chdir(root)
+                    with patch.object(commit_push_pr, "_get_provider_by_name", return_value=provider):
+                        result = commit_push_pr.apply(plan, repo_root=str(root))
+                finally:
+                    os.chdir(previous)
+                self.assertFalse(result["ok"], result)
+                self.assertEqual(self._git(root, "rev-parse", "HEAD"), original_head)
+                self.assertEqual(self._git(root, "diff", "--cached", "--name-only"), "unrelated.txt")
+                self.assertTrue((root / "extra.txt").exists())
 
 if __name__ == "__main__":
     unittest.main()

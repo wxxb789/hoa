@@ -21,17 +21,19 @@
     },
     {
       "id": "independent-enterprise-outcomes",
-      "prompt": "Use define-goal to shape this initiative: make the product enterprise-ready by providing SSO and SCIM provisioning, auditable admin activity, EU data residency, and a published enterprise SLA. Each capability may be accepted, deferred, or released independently.",
+      "prompt": "Use define-goal in Claude Code to shape this initiative: make the product enterprise-ready by providing SSO and SCIM provisioning, auditable admin activity, EU data residency, and a published enterprise SLA. Each capability may be accepted, deferred, or released independently.",
       "expected_mode": "goal-set",
       "must_hold": [
         "Return the smallest sufficient set of separately addressable goals.",
         "Give every goal its own end state and credible completion evidence.",
-        "Preserve the unifying enterprise-readiness intent without creating an unfinishable umbrella goal."
+        "Preserve the unifying enterprise-readiness intent without creating an unfinishable umbrella goal.",
+        "Explain that these separate /goal invocations need separate sessions or sequential activation after the preceding goal completes in this single-active-goal runtime."
       ],
       "must_not_hold": [
         "Collapse all outcomes into one vague completion contract.",
         "Replace the independent outcomes with one meta-goal to decide, track, or report their statuses.",
-        "Turn technical workstreams or phases into goals."
+        "Turn technical workstreams or phases into goals.",
+        "Imply that pasting several /goal invocations into one session keeps them all active."
       ]
     },
     {

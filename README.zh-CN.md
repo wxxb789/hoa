@@ -152,6 +152,28 @@ npx skills remove <skill>
 - `hoa` 里其它东西都是**库 / 知识**——不自动下发。拼进某个 skill，或手动取用。
 - runtime **设置**由 `chezmoi apply` 另行下发。
 
+## 处理 skill
+
+按要完成的工作选择能力，而不是按当前运行的模型选择：
+
+| 需求 | Skill | 结果 |
+|---|---|---|
+| 审计已有 skill、评审拟议修改，或判断其行为 | `hoa-skill-review` | 带证据的发现项；不修改被审查的 skill |
+| 根据明确能力创建 skill，或改进已有 skill | `hoa-skill-work` | 完整的 skill 修改，以及验证结果与未验证路径 |
+| 从 agent 历史中发现重复工作 | `hoa-introspect` | 带证据的工作模式发现；不会自动创建资产 |
+| 在选择资产前评估给定的重复工作发现 | `hoa-introspect-distill` | 逐项批准的候选，以及获批后创建的资产 |
+
+对行为变更，`hoa-skill-work` 默认使用聚焦检查；只有覆盖面、风险或相互矛盾的证据需要时，
+才扩大到多版本、多模型或多 runtime。`hoa-introspect-distill` 保留逐候选批准门槛；
+直接请求创建或改进一个明确的 skill，不需要走该提名流程。
+`evals/skill-method-cases.json` 保存聚焦行为场景；CI 只校验结构与隔离路径，
+模型和 runtime 行为须在全新运行中判断，不能把 fixture 检查当成行为证明。
+Claude Code 内置的 `plugin eval` 测试 plugin 形态的包；Anthropic 的
+`skill-creator` 是另外安装的官方 plugin，先前的 `define-goal` 审查则使用 CE
+指导和会话自写 runner。它们都不是这些可移植 hoa skill 的必需依赖。
+[源码归属研究](./reflections/2026-09-25-claude-code-skill-source.md)
+区分了实现及各自的证据边界。
+
 ## 标签
 
 area 与 target 作为标签记录在 [`index.md`](./index.md) 里（由每个 skill 的

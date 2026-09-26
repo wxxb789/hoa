@@ -1,6 +1,6 @@
 ---
 name: hoa-agent-retrieve
-description: "Search, gather, or inventory local AI-agent histories across runtimes and return a read-only, coverage-manifested Retrieval Bundle. Use for requests such as 'find every session where I touched X', 'pull my last month across agents', 'search my Claude Code, Codex, and OpenCode history', or when another workflow needs re-checkable cross-agent evidence. Do not use for one known file or session; use hoa-introspect for analysis or conclusions, and hoa-introspect-distill to create a skill."
+description: "Search, gather, or inventory local AI-agent histories across runtimes and return a read-only, coverage-manifested Retrieval Bundle. Use for requests such as 'find every session where I touched X', 'pull my last month across agents', 'search my Claude Code, Codex, and OpenCode history', or when another workflow needs re-checkable cross-agent evidence. Do not use for one known file or session; use hoa-introspect for work-pattern analysis, hoa-introspect-distill to qualify a repeatable-work candidate, or hoa-skill-work for direct skill creation."
 ---
 
 <!-- index: areas=self-management,software-development; targets=runtime-agnostic; version=1.0.0 -->
@@ -80,7 +80,8 @@ inventory, not a claim that every runtime was searched.
   conversely, this skill does not require its files.
 - **No conclusions here:** report records, coverage, and deterministic counts.
   Send interpretation, work-pattern claims, and recommendations to
-  `hoa-introspect`; send reusable-skill authoring to `hoa-introspect-distill`.
+  `hoa-introspect`; send candidate qualification to `hoa-introspect-distill`
+  and direct skill creation to `hoa-skill-work`.
 
 ## Verification and stop condition
 
