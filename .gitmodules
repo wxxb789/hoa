@@ -173,3 +173,8 @@
 	url = https://github.com/anthropics/knowledge-work-plugins
 	branch = main
 	ignore = dirty
+[submodule "ref/i-have-adhd"]
+	path = ref/i-have-adhd
+	url = https://github.com/ayghri/i-have-adhd
+	branch = main
+	ignore = dirty
