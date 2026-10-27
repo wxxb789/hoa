@@ -16,9 +16,15 @@
     },
     {
       "id": "route-to-goal-definition",
-      "request": "Help me turn 'make our product enterprise-ready' into a verifiable goal or set of goals.",
+      "request": "Help me turn 'make our product enterprise-ready' into goal prompts I can run one at a time, getting an inspectable result roughly every half day without dictating implementation.",
       "must_pick": ["define-goal"],
       "distractors": ["ghc-search", "git-worktree-workflow"]
+    },
+    {
+      "id": "route-to-goal-refinement",
+      "request": "Goal 001 is complete. Help me refine the provisional 002 goal file from its results, keeping our ambitious direction and leaving later numbered goals open to learning. Do not implement it.",
+      "must_pick": ["define-goal"],
+      "distractors": ["hoa-skill-work", "typed-verification-gates"]
     },
     {
       "id": "route-to-worktree",

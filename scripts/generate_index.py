@@ -54,8 +54,8 @@ NOTES = {
         "经本机 `ghc-proxy` Responses API 做 web 与 X/Twitter 搜索；返回答案加去重来源",
     ),
     "define-goal": (
-        "define one cohesive, verifiable goal or the smallest sufficient goal set without planning implementation",
-        "把意图定义为一个完整、可验证的目标或最小充分目标集，不制定实现方案",
+        "preserve ambitious intent in numbered goal files, with clear near-term and provisional later outcomes, not implementation plans",
+        "把雄心转化为编号 goal 文件，近期清晰、远期可细化，不制定实现步骤",
     ),
     "git-worktree-workflow": (
         "run several agent CLIs in parallel on one repo via isolated worktrees; ships the `gitwt` helper",

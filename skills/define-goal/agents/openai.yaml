@@ -1,4 +1,4 @@
 interface:
   display_name: "Define Goal"
-  short_description: "Define one goal or a coherent goal set"
-  default_prompt: "Use $define-goal to produce one cohesive goal or the smallest sufficient goal set, without planning implementation."
+  short_description: "Define ordered, progressive goal files"
+  default_prompt: "Use $define-goal to preserve my ambition in numbered goal-prompt files, with a clear next outcome and provisional later outcomes, without planning implementation."

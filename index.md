@@ -29,7 +29,7 @@ targets:  runtime-agnostic | repo-only |
 
 | Artifact | Type | Areas | Targets | Path | Notes |
 |---|---|---|---|---|---|
-| define-goal | skill | self-management,software-development,work-management | runtime-agnostic | `skills/define-goal/` | define one cohesive, verifiable goal or the smallest sufficient goal set without planning implementation |
+| define-goal | skill | self-management,software-development,work-management | runtime-agnostic | `skills/define-goal/` | preserve ambitious intent in numbered goal files, with clear near-term and provisional later outcomes, not implementation plans |
 | ghc-search | skill | software-development | runtime-agnostic | `skills/ghc-search/` | web and X/Twitter search via a local ghc-proxy Responses API; answer plus deduped sources |
 | git-worktree-workflow | skill | software-development,work-management | runtime-agnostic | `skills/git-worktree-workflow/` | run several agent CLIs in parallel on one repo via isolated worktrees; ships the `gitwt` helper |
 | hoa-agent-retrieve | skill | self-management,software-development | runtime-agnostic | `skills/hoa-agent-retrieve/` | cross-agent history → coverage-manifested, deduped Retrieval Bundle |

@@ -1,80 +1,71 @@
 ---
 name: define-goal
-description: Define and stress-test an intention as one cohesive, feasible, verifiable goal or the smallest sufficient set of independently meaningful goals, without planning implementation. Use when the user wants to create or refine a goal, turn a vision into bounded outcomes, or separate independently finishable outcomes within an initiative. Do not use for task breakdown, implementation planning, execution, or progress management.
+description: Define ambitious intentions as numbered goal-prompt files, progressing from clear near-term outcomes to provisional longer-term outcomes without planning implementation. Use when the user wants to create or refine goals, turn a large vision into inspectable increments, or refine the next goal from earlier results. Not for task breakdown, implementation planning, execution, or progress tracking.
 ---
 
-<!-- index: areas=self-management,software-development,work-management; targets=runtime-agnostic; version=1.2.0 -->
+<!-- index: areas=self-management,software-development,work-management; targets=runtime-agnostic; version=2.0.0 -->
 
 # Define Goal
 
-**Outcome:** Turn the user's intention into either one cohesive goal payload or the smallest sufficient set of separately addressable goal payloads, each defining a meaningful end state, credible completion evidence, and material bounds without prescribing implementation.
+**Outcome:** Preserve the user's ambition in one or more ordered goal-prompt files that let a downstream agent pursue meaningful outcomes with freedom over implementation and regular opportunities for feedback.
 
-**Done:** The response contains one ready goal payload, contains the smallest sufficient goal set whose members each have an independently meaningful and verifiable completion judgment, or withholds the output and identifies the smallest current frontier of decisions, facts, or reframes needed to state an honest goal structure. Material uncertainty is resolved, represented as an explicit assumption or condition when that preserves the user's intent, or returned as part of the blocking frontier.
+**Done:** Each selected goal has a numbered file or, when writes are unavailable, named file contents. The next goal is bounded and verifiable; later goals may be explicitly provisional. Together they preserve the ambition. If even an honest next goal cannot be stated, identify the decisive missing fact, user choice, or reframing needed rather than emitting a misleading queue.
 
-**Safe failure:** Do not manufacture precision, force independently meaningful outcomes into one completion contract, or turn solution structure into goals. When no honest goal structure can yet be stated, name the decisive ambiguity, contradiction, or feasibility problem and help the user resolve it first.
+**Safe failure:** When a commitment is too large, narrow the next outcome without shrinking the long-term ambition. Expose uncertainty rather than inventing precision, substituting an easier target, or claiming that elapsed time establishes success.
 
 ## Boundary
 
-This skill owns the goal space: the desired change, why it matters when that affects the target, credible evidence of success, material constraints, and whether the result is plausibly achievable.
+This skill defines purpose, desired outcomes, credible completion evidence, material bounds, and the order in which outcomes build toward the ambition. An outcome sequence is not an implementation plan: describe what becomes possible, not the steps, architecture, or tools used to make it possible.
 
-It does not own the solution space: methods, architecture, tools, steps, task breakdown, sequencing, milestones, execution, or progress tracking. Discuss a means only when it materially changes feasibility or the acceptable bounds, and record the resulting constraint rather than an implementation choice.
+This skill writes goal documents. The receiving agent and harness own implementation planning, execution, timing, goal activation, and progress tracking. Do not execute the goals or build a scheduler or lifecycle mechanism.
 
-This skill produces goal payloads. The receiving runtime or goal mechanism owns persistence, planning, execution, and lifecycle. Do not call, emulate, or prescribe runtime-specific goal tools.
+## Preserve The Ambition
 
-## Clarify The Goal
+Understand what the user wants to become possible and why it matters. Their current knowledge, feature ideas, and proposed methods are context, not a ceiling on what the agent may achieve. Offer better outcome formulations when useful, distinguishing proposals from commitments the user has made.
 
-Express the state of the world or knowledge that should hold at completion, not merely an activity. A research, diagnostic, or decision goal may end in justified knowledge or a resolved decision rather than a changed external system.
+Keep an open-ended vision as directional context rather than forcing it into one enormous completion contract. Preserve that direction across the goal files instead of replacing it with only a small first delivery. A goal can end in a changed system, justified knowledge, or a resolved decision, according to the user's purpose.
 
-Distinguish a goal from a vision. A goal has a finishable state; a vision is directional and open-ended. When the input is a vision, say so and help the user choose a bounded goal structure that serves it, applying the cardinality rule below without inventing an implementation plan.
+Ask only about uncertainties that materially change the intended outcome, acceptance, authority, or next commitment. Establish externally knowable facts proportionately from available evidence rather than making the user supply them. Recommend a formulation or a choice instead of issuing a generic questionnaire. Explicit assumptions can carry non-blocking uncertainty; unknown details of distant goals need not block a useful next goal. When the outcome and acceptance are already clear, ordinary discovery belongs to the receiving agent; missing execution context alone does not justify a preliminary readiness goal.
 
-Surface assumptions whose failure would make the goal stop serving the user's intent, become misleading, remain unverifiable, or prove infeasible. Challenge proxy outcomes, unsupported confidence, contradictory constraints, and any claim that in-scope work guarantees an outcome materially outside the user's control. Preserve the user's underlying intent while correcting the proposed target.
+## Size Goals For Feedback
 
-Use quantitative thresholds only when the metric, target, and measurement method are grounded in the user's context or reliable evidence. Otherwise use an observable binary or qualitative acceptance condition. A metric is evidence of the desired outcome, not a substitute for it.
+Use about **12 hours** as the default target time to an inspectable result, unless the user supplies another feedback window. This is a goal-sizing guide, not an exact estimate, guaranteed deadline, minimum duration, or automatic stop. Completion still depends on the outcome and its evidence.
 
-When completion depends on qualitative judgment or relative improvement, identify the relevant audience, reviewer, or decision authority and the context, observable qualities, or comparison basis that makes the judgment credible. Do not use the model's own confidence, arbitrary counts, or an unrelated proxy as completion evidence.
+Use one goal for a bounded, cohesive outcome. Split larger ambitions when the available context indicates a long gap without useful feedback, even when the goals are successive advances toward the same ultimate outcome. Do not invent scope or impose a standard release workflow to justify more goals. Keep separately desired outcomes identifiable rather than replacing them with a status-tracking meta-goal. Mutually exclusive outcomes are candidates for a choice, not successive commitments.
 
-## Choose Goal Cardinality
+Choose boundaries around meaningful, inspectable advances. Favor early real product use that can grow toward the vision over a large invisible foundation. Later goals may depend on and extend earlier ones; independent cancellation is not required. Preserve user-relevant value while leaving replacement of interim features and implementations open. Database, API, UI, and testing tasks are not separate goals merely because they are different implementation work.
 
-Prefer one goal when the user's intended success has one completion judgment, even when that judgment requires several necessary conditions or pieces of evidence.
+Inspection does not require a UI. Use evidence appropriate to the outcome: working behavior for a service, a usable experience for a product, or findings that resolve real uncertainty for research. A progress report, activity count, or cosmetic demonstration is not a substitute for the promised result.
 
-Use the smallest sufficient goal set when the intention contains outcomes whose completion, deferral, or cancellation can be judged independently. Each member must have its own end state, completion evidence, and material bounds, and the set must preserve the user's intended outcomes without overlap or silent omission.
+Judge sizing against the available context, control, and dependencies. When a meaningful result cannot plausibly fit the window, expose the mismatch and propose a smaller useful outcome or an explicit exception. Separate agent work from external waiting or observation: waiting alone does not justify extra goals, and splitting cannot shorten it. Preserve the user's final acceptance conditions rather than silently weakening them to fit the window. A lack of evidence about feasibility is not proof of impossibility.
 
-Do not collapse independently desired outcomes into one meta-goal to decide, track, or report their statuses. Each outcome remains its own goal unless the user's intended end state is the portfolio decision itself.
+## Let Detail Follow Evidence
 
-Size, number of workstreams, architecture layers, phases, milestones, or execution order do not by themselves justify multiple goals. Do not turn implementation structure into goal structure.
+Number the goals in their proposed realization order, from near to far. Explain material prerequisites at the outcome level. This order guides sequential use; it does not freeze the whole series against later learning or changed priorities.
 
-Do not present mutually exclusive outcomes as a goal set. When only one outcome should be chosen, offer candidate goal formulations or define an epistemic goal whose end state is the justified decision.
+Make the next goal clear enough for a fresh agent to pursue and for completion to be judged. Let more distant goals be broader: retain their purpose, intended advance, and the kind of evidence that would establish success, while marking unresolved outcome choices and assumptions as provisional. Do not invent detailed acceptance thresholds or implementation decisions to make every future file look equally ready.
 
-Record a cross-goal prerequisite only when it materially changes whether a goal can honestly be completed; leave execution ordering to planning.
+Before activation, refine a provisional goal against earlier results and current priorities, and resize it to the feedback window if needed. When revising files, preserve completed goals and unrelated content. If splitting or reordering changes future filenames, report the revised order. Resolve only material user choices; there is no mandatory human approval ceremony between goals. Do not silently change the ultimate purpose to make a later goal easier to satisfy.
 
-## Resolve Material Uncertainty
+## Make Success Credible
 
-Resolve externally knowable facts from available context and tools only when they materially affect the goal contract and can be established proportionately from authoritative evidence. Otherwise expose the uncertainty as an assumption, condition, or feasibility question. Ask the user for preferences, priorities, commitments, and tradeoffs that only they can decide; do not make them supply facts the agent can reasonably obtain.
+Describe the state that distinguishes completion from non-completion, not merely an activity. Preserve user-supplied validators and bounds, including what each bound applies to. Ground concrete acceptance requirements in context or reliable evidence, and distinguish proposed additions from established requirements. Use quantitative thresholds only with a grounded metric, target, and measurement method; otherwise use observable qualitative or binary conditions.
 
-Present together the user decisions whose prerequisites are already settled. Frame each as concrete choices or candidate goal formulations, recommend an answer, and state what the choice changes in the goal; do not substitute a generic questionnaire or fill-in-the-blank intake form for that judgment. Do not ask downstream questions before the decisions they depend on, and stop questioning once the remaining uncertainty cannot materially change the goal contract.
+For qualitative judgment or relative improvement, name the relevant audience or acceptance authority and the observable qualities or comparison basis that make its judgment credible. The model's own confidence, arbitrary counts, and unrelated proxy scores are not completion evidence.
 
-When the ambiguity prevents choosing between materially different goal structures, offer a small set of candidate formulations, explain the tradeoff at the goal level, and recommend one. Do not brainstorm competing implementations.
+Preserve legitimate desired outcomes that depend on other people or external conditions, but do not imply that the agent's work guarantees them. Name the dependency and what would establish acceptance. Offer a more controllable reframe as a choice, not a silent replacement for the user's goal.
 
-## Check Feasibility
+## Write Goal Files
 
-Judge feasibility against the stated horizon, constraints, available control, and critical dependencies. Treat an unsupported claim of impossibility as another uncertainty to resolve, not as a verdict.
+Use the user's destination or an existing project convention; otherwise use `goals/<initiative>/`. Write one Markdown file per selected goal, with sortable numeric prefixes such as `001-<short-name>.md`, `002-<short-name>.md`. Candidates awaiting a user choice are not numbered as a committed series. Read existing files when revising a series and preserve content outside the requested revision.
 
-A desired end state may depend on decisions or responses outside the user's control. Preserve that intended outcome, but do not imply that in-scope work guarantees it. State the acceptance authority or external condition that makes completion observable, and offer a more controllable reframe only as a choice when the original commitment cannot be made honestly.
+Each file is a plain-language goal prompt with:
 
-When the goal is feasible only under material assumptions, expose those assumptions and include them as bounds or conditions. When feasibility remains unknown, either resolve the missing fact or ask whether the user wants an epistemic goal that determines feasibility.
+- the intended advance and enough of the larger purpose to orient a fresh agent;
+- completion evidence, or a provisional basis for acceptance when the goal is distant;
+- only material scope, constraints, prerequisites, and assumptions;
+- a clear indication when refinement is needed before activation, with the unresolved outcome choices identified.
 
-When the goal is not feasible as stated, do not polish it into false precision. Explain the decisive mismatch and offer the closest meaningful reframing that preserves the underlying intent. Do not turn the reframe into an action plan.
+Keep the files free of task checklists, implementation plans, and runtime-specific flags. Supply enough relevant context in each file that the next agent does not need the original conversation. A ready file's contents can be supplied to the receiving harness's native goal intake, including `/goal` where supported; do not assume the command accepts a file path or multiple active goals.
 
-## Compile Goal Payloads
-
-Compile each ready goal as a cohesive, plain-language payload. On a runtime that accepts `/goal`, render each payload as a separate `/goal ` invocation. When the runtime does not accept `/goal`, return separately addressable payloads for its native goal intake. Do not claim that a payload was submitted, executed, or activated, and do not imply that a goal set can be activated atomically. Each payload includes:
-
-- the desired end state
-- the evidence that will distinguish completion from non-completion
-- only the scope, constraints, exclusions, or critical assumptions that materially limit acceptable outcomes
-
-Claude Code keeps only one active `/goal` per session; setting another replaces an unfinished goal. When rendering multiple `/goal` invocations there or in another single-active-goal runtime, add one concise usage instruction outside the copyable payloads: use distinct sessions, or activate the next goal only after the prior one resolves.
-
-Keep implementation choices open. Use only evaluation details and concrete bounds supplied by the user or grounded in authoritative evidence; never invent specificity merely to make the goal look concrete. A deliverable directly implied by the user's intent may be stated without prescribing how to produce it.
-
-Once the goal structure is ready, return the copyable payloads, any required runtime-usage note outside them, and only the labels needed to distinguish a goal set from alternatives or state a material prerequisite. Do not append analysis, an implementation plan, or runtime-specific flags.
+Return the actual file paths in numeric order and explain that the user should use them one at a time, refining provisional goals before use and moving on after the preceding goal completes or the user revises the sequence. Summarize what each goal makes possible without duplicating every file in chat. If writes are unavailable or declined, return separately named complete file contents instead. Do not claim files were saved or goals activated unless that actually happened; writing the files does not activate them.

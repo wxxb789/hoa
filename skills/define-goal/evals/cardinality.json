@@ -1,14 +1,15 @@
 {
-  "purpose": "Fresh-context behavioral scenarios for goal cardinality. Grade semantics rather than exact wording.",
+  "purpose": "Fresh-context scenarios for goal sizing, progressive outcomes, and numbered goal files. Grade semantics and saved artifacts rather than exact wording.",
   "procedure": [
     "Run each case in a fresh model context with the current define-goal skill loaded.",
-    "Grade the final response against expected_mode, must_hold, and must_not_hold.",
+    "Use a fresh writable workspace per case unless the case supplies a different capability boundary. Inspect saved files as well as the final response against expected_mode, must_hold, and must_not_hold.",
+    "Each selected goal belongs in its own numbered Markdown file. Alternatives and unresolved choices are not an execution queue.",
     "Do not tell the model the expected mode or suspected failure."
   ],
   "cases": [
     {
       "id": "cohesive-launch-goal",
-      "prompt": "Use define-goal to turn this intention into a goal: launch the French checkout experience. Completion requires French localization, EUR payments and refunds, and legal approval, all together.",
+      "prompt": "Use define-goal to turn this intention into a goal: launch the French checkout experience. Localization, EUR payments and refunds, and legal approval are already complete; only the final launch acceptance remains, comfortably within one feedback window. Completion requires those conditions all together.",
       "expected_mode": "single-goal",
       "must_hold": [
         "Treat launch as one user-meaningful completion judgment.",
@@ -24,15 +25,15 @@
       "prompt": "Use define-goal in Claude Code to shape this initiative: make the product enterprise-ready by providing SSO and SCIM provisioning, auditable admin activity, EU data residency, and a published enterprise SLA. Each capability may be accepted, deferred, or released independently.",
       "expected_mode": "goal-set",
       "must_hold": [
-        "Return the smallest sufficient set of separately addressable goals.",
+        "Return separate numbered goal files for the independently valuable outcomes in a proposed realization order.",
         "Give every goal its own end state and credible completion evidence.",
         "Preserve the unifying enterprise-readiness intent without creating an unfinishable umbrella goal.",
-        "Explain that these separate /goal invocations need separate sessions or sequential activation after the preceding goal completes in this single-active-goal runtime."
+        "Explain that the files are used in numeric order, one goal at a time, with provisional goals refined before activation."
       ],
       "must_not_hold": [
         "Collapse all outcomes into one vague completion contract.",
         "Replace the independent outcomes with one meta-goal to decide, track, or report their statuses.",
-        "Turn technical workstreams or phases into goals.",
+        "Turn implementation tasks or architecture layers into goals.",
         "Imply that pasting several /goal invocations into one session keeps them all active."
       ]
     },
@@ -55,7 +56,7 @@
       "expected_mode": "frontier-or-bounded-goal",
       "must_hold": [
         "Identify the statement as a vision rather than a finishable goal.",
-        "Expose the smallest decision frontier or propose a bounded formulation for confirmation."
+        "Preserve the ambition while exposing the smallest material choice or proposing an initial observable outcome for confirmation; allow later outcomes to remain provisional."
       ],
       "must_not_hold": [
         "Invent a trust metric, deadline, market scope, or authoritative validator.",
@@ -68,7 +69,8 @@
       "expected_mode": "goal-set",
       "must_hold": [
         "Keep the vision as directional context rather than an executable umbrella goal.",
-        "Return separate funding and security-audit goals because their completion judgments are independently meaningful.",
+        "Keep funding and security-audit outcomes separately identifiable, with progressive outcomes where useful and honest.",
+        "Distinguish the supplied long-term observation horizon from the agent feedback window; do not pretend six months of funding can be verified in twelve hours.",
         "Preserve the supplied horizon, thresholds, and evidence in the relevant goal payloads."
       ],
       "must_not_hold": [
@@ -86,7 +88,75 @@
       ],
       "must_not_hold": [
         "Create separate database, API, UI, or deployment goals.",
+        "Invent a preliminary readiness goal or a standard staged-release sequence without a demonstrated feedback need.",
         "Prescribe an implementation plan."
+      ]
+    },
+    {
+      "id": "ambitious-progressive-product",
+      "prompt": "Use define-goal to shape an ambitious research companion that eventually helps independent researchers synthesize their own papers, discover unexpected connections, and develop defensible new research directions. I only know basic search tools, so do not let my current feature ideas cap the ambition. The existing local app can import and display papers, and I have a small representative collection available. I want a real inspectable result about every 12 hours rather than waiting weeks for a large foundation. The final experience is one evolving product, not unrelated projects. Keep it local for now, and leave the later experience open to what we learn.",
+      "expected_mode": "ordered-goal-files",
+      "must_hold": [
+        "Save multiple separate Markdown goal files with sortable numeric prefixes and explain their realization order.",
+        "Preserve the ambitious research-companion intent in the goals without committing invented capabilities as user requirements.",
+        "Make the earliest goal a meaningful observable use of real papers, not infrastructure or a progress report.",
+        "Make the next goal bounded and verifiable while letting later goals be broader, explicitly provisional, and refinable before use.",
+        "Allow later goals to build on and preserve earlier capabilities; independent cancellation is not required.",
+        "Use roughly twelve hours as a sizing and feedback target, not a guaranteed deadline or automatic stop.",
+        "Give each file enough purpose and prerequisite context to be useful to a fresh downstream agent."
+      ],
+      "must_not_hold": [
+        "Return only one multi-week goal or only a first goal with the rest of the ambition omitted.",
+        "Return only chat payloads when file writing is available.",
+        "Prescribe architecture, implementation steps, task checklists, or a foundation-first sequence.",
+        "Require every future detail or acceptance threshold before defining a useful first goal.",
+        "Treat a screenshot, fake demo, arbitrary task count, or elapsed time as sufficient completion evidence.",
+        "Create a scheduler, runtime state machine, goal hashes, or an automatic activation mechanism."
+      ]
+    },
+    {
+      "id": "backend-feedback-window-override",
+      "prompt": "Use define-goal to shape an ambitious improvement of our existing local event service: teams should eventually be able to recover from bad imports, understand failures, and safely reprocess work. Today one small sample import can be run locally and its resulting records inspected. I want an inspectable result every two hours, not twelve. I do not need a UI, and I have no preferred implementation. The later capabilities can evolve from what we learn.",
+      "expected_mode": "ordered-goal-files",
+      "must_hold": [
+        "Use the user's two-hour feedback window for sizing instead of the default twelve hours.",
+        "Define progressive behavior-level outcomes in numbered files, with the first assessable through real service behavior and records.",
+        "Preserve recovery and safe reprocessing as intended outcomes while leaving later detail provisional."
+      ],
+      "must_not_hold": [
+        "Invent a UI, a screenshot requirement, or a specific architecture.",
+        "Guarantee completion within two hours or declare work complete when the window expires.",
+        "Split by database, queue, API, testing, or deployment tasks."
+      ]
+    },
+    {
+      "id": "refine-provisional-next-goal",
+      "prompt": "Use define-goal to refine the next goal in our numbered series. Goal 001 is complete: users can ask a question of local papers and inspect supporting passages. Goal 002 is provisional: help users explore meaningful connections between papers; completion should involve useful, traceable connections, but the exact experience was left open. Goal 003 provisionally extends this toward defensible research directions. Early feedback is that conflicting findings are much more useful than similarity lists. Keep the long-term intent and numbering. Refine 002 around this evidence and leave 003 provisional; do not implement anything.",
+      "expected_mode": "refined-next-goal",
+      "must_hold": [
+        "Produce the revised 002 goal file with an observable outcome and credible evidence focused on conflicting findings and supporting sources.",
+        "Preserve the existing question-answering capability and the long-term research intent.",
+        "Keep numbering and identify 003 as provisional without inventing its detailed solution.",
+        "Do not claim to have modified existing files unless they were actually available and written."
+      ],
+      "must_not_hold": [
+        "Rebuild a fixed roadmap or prescribe implementation steps.",
+        "Activate a runtime goal, start implementation, or require a human review gate after every goal.",
+        "Silently renumber, rewrite completed goals, or treat all future goals as equally ready."
+      ]
+    },
+    {
+      "id": "chat-only-goal-files",
+      "prompt": "Use define-goal to shape an ambitious personal research companion, starting with useful answers grounded in local papers and later growing toward new research directions. I want gradual inspectable outcomes. This conversation cannot create files; give me the content to save myself.",
+      "expected_mode": "named-file-contents",
+      "must_hold": [
+        "Return separate numbered filenames and complete proposed contents instead of claiming files were saved.",
+        "Keep the same near-to-far progression, completion evidence, and provisional later goals as on a writable host.",
+        "Explain numeric-order use and refinement before activating provisional goals."
+      ],
+      "must_not_hold": [
+        "Claim file creation, goal submission, execution, or activation.",
+        "Require a particular runtime command or emit an implementation plan."
       ]
     }
   ]

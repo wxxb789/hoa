@@ -2,7 +2,7 @@
   "purpose": "Fresh-context scenarios for transferring the goal contract beyond software development. Grade semantic decisions rather than exact wording.",
   "procedure": [
     "Run each case in a fresh model context with the current define-goal skill loaded.",
-    "Grade the final response against expected_mode, must_hold, and must_not_hold.",
+    "Use a fresh writable workspace and inspect numbered goal files as well as the final response against expected_mode, must_hold, and must_not_hold. If tools are unavailable, grade explicitly unsaved filenames and contents instead.",
     "Do not tell the model the expected mode, rubric, or suspected failure.",
     "Run these cases alongside cardinality.json so domain transfer cannot weaken software behavior."
   ],
@@ -60,13 +60,13 @@
       "must_hold": [
         "Recognize the request as an underspecified career vision or initiative.",
         "Preserve the desired external career outcomes while identifying the decisions, evidence, constraints, or acceptance conditions needed to make them honest goals.",
-        "Apply the cardinality rule instead of assuming one goal or splitting every activity into a goal.",
+        "Size the next commitment for useful feedback, allowing progressive outcome goals without splitting every activity into a goal.",
         "Keep plan creation outside this skill's output contract."
       ],
       "must_not_hold": [
         "Guarantee promotion, offers, recognition, or new opportunities that depend on other people.",
         "Silently reduce the goal to applications, networking, courses, or other controllable activities.",
-        "Produce a career roadmap, milestones, or action plan."
+        "Produce an implementation roadmap, task milestones, or action plan instead of outcome goals."
       ]
     },
     {
@@ -97,6 +97,7 @@
       "must_not_hold": [
         "Silently replace approval with preparing or presenting the proposal.",
         "Declare the goal invalid merely because management does not control the vote.",
+        "Split proposal drafting or board scheduling into goals solely because approval depends on an external decision.",
         "Produce a lobbying, presentation, or governance plan."
       ]
     }
