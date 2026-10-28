@@ -73,11 +73,11 @@ describe('Teams exact recipient selection', () => {
 describe('Teams concrete-composer dispatch and receipt safety', () => {
   const group: GroupTarget = { kind: 'group', id: '19:0123456789abcdef0123456789abcdef@thread.v2', name: 'Planning' };
 
-  function sendFixture(mode: 'valid' | 'switched' | 'detached' | 'text-changed' | 'dialog-open' | 'new-draft' | 'historical' | 'below-highwater' | 'wrapped', text = 'Hello', renderedText = text) {
+  function sendFixture(mode: 'valid' | 'switched' | 'detached' | 'text-changed' | 'dialog-open' | 'new-draft' | 'historical' | 'below-highwater' | 'wrapped' | 'stale-group' | 'wrong-group-title', text = 'Hello', renderedText = text) {
     let clicks = 0;
     const editorId = 'new-message-fixture';
     const identity = `compose-editor:${JSON.stringify([editorId, group.id])}`;
-    let metadata = JSON.stringify({ observed: { names: ['chat-input', identity] } });
+    let metadata = JSON.stringify({ observed: { names: [`compose-editor:${JSON.stringify([editorId, '19:previous@thread.v2'])}`] } });
     const editor = {
       id: editorId, isConnected: true, children: [{ tagName: 'P', innerText: '' }], innerText: '',
       textContent: '', focus: () => undefined,
@@ -115,6 +115,7 @@ describe('Teams concrete-composer dispatch and receipt safety', () => {
         document: {
           querySelectorAll: (selector: string) => selector.includes('ckeditor') ? [editor]
             : selector.includes('chat-pane-message') ? [row]
+            : selector.includes('chat-title') ? [{ innerText: mode === 'wrong-group-title' ? 'Other group' : group.name, getBoundingClientRect: () => ({ width: 100, height: 20 }) }]
             : mode === 'dialog-open' ? [{ getClientRects: () => [{}] }] : [],
           getElementById: (id: string) => nodes[id] ?? null,
         },
@@ -170,7 +171,9 @@ describe('Teams concrete-composer dispatch and receipt safety', () => {
     const locator = (selector: string): FixtureLocator => ({
       count: async () => 1,
       all: async () => [],
-      click: async () => {}, fill: async () => {}, press: async () => {}, waitFor: async () => {},
+      click: async () => {
+        if (selector.includes('groupChatCard') && mode !== 'stale-group') metadata = JSON.stringify({ observed: { names: ['chat-input', identity] } });
+      }, fill: async () => {}, press: async () => {}, waitFor: async () => {},
       getAttribute: async (name: string) => name === 'aria-selected' ? 'true' : editor.getAttribute(name),
       nth: () => locator(selector), first: () => locator(selector),
       evaluate: async () => group.name,
@@ -192,11 +195,18 @@ describe('Teams concrete-composer dispatch and receipt safety', () => {
       waitForFunction: async (fn: (...args: unknown[]) => unknown, args: unknown) => {
         const result = inDocument(() => fn(args));
         if (!result) throw new Error('receipt not established');
-        return { jsonValue: async () => result };
+        return { jsonValue: async () => result, dispose: async () => undefined };
       },
     } as unknown as Frame;
     return { page: { frames: () => [frame] } as unknown as Page, clicks: () => clicks, draft: () => editor.textContent, candidateId };
   }
+
+  test.each(['stale-group', 'wrong-group-title'] as const)('group discovery rejects the %s destination instead of fabricating an ID/name pair', async mode => {
+    const fixture = sendFixture(mode);
+    await expect(execute(fixture.page, { operation: 'find', kind: 'group', query: group.name })).rejects.toThrow();
+    expect(fixture.clicks()).toBe(0);
+    expect(fixture.draft()).toBe('');
+  });
 
   test.each(['switched', 'detached', 'text-changed', 'dialog-open'] as const)('does not click when the concrete %s composer proof changes', async mode => {
     const fixture = sendFixture(mode);

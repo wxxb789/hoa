@@ -19,6 +19,9 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
 - Added **teams-cdp** for exact person/group discovery and authorized plain-text
   sending through the existing Teams profile. Native popouts, trusted multiline
   input, draft preservation, and fresh Sent receipts keep dispatch scoped.
+- Group search waits for a changed conversation ID and the exact rendered title
+  in one snapshot before returning a destination. An unchanged prior composer
+  cannot certify the clicked result, even when its group name matches.
 - Added **m365-copilot-cdp** for actual Chat and Code model selection, sending,
   and completed reply reading. It reuses one consent-approved connection,
   preserves profile settings with a durable rollback receipt, and rejects stale

@@ -303,11 +303,30 @@ async function groupCards(frame: Frame): Promise<GroupCard[]> {
 }
 
 async function openGroup(frame: Frame, card: GroupCard): Promise<Group> {
+  const previousId = await frame.locator(EDITOR).count() ? (await composer(frame)).id : null;
   await frame.locator(`${GROUP_CARD}:visible`).nth(card.index).click();
-  await frame.locator(EDITOR).waitFor({ timeout: TIMEOUT });
-  const current = await composer(frame);
-  if (!/^19:[a-zA-Z0-9-]+@thread\.v2$/.test(current.id)) throw new Error('Search result is not a supported existing group chat');
-  return { kind: 'group', id: current.id, name: card.name };
+  const selected = await frame.waitForFunction(({ previousId, name }) => {
+    const visible = (element: Element) => {
+      const bounds = element.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0 && getComputedStyle(element).visibility === 'visible';
+    };
+    const editors = [...document.querySelectorAll<HTMLElement>('[data-tid="ckeditor"][role="textbox"][contenteditable="true"]')].filter(visible);
+    const titles = [...document.querySelectorAll<HTMLElement>('h2[data-tid="chat-title"] #custom-chat-topic-renderer')].filter(visible);
+    if (editors.length !== 1 || titles.length !== 1 || titles[0]!.innerText !== name) return false;
+    const editor = editors[0]!;
+    try {
+      const names: unknown = JSON.parse(editor.getAttribute('data-tabster') ?? 'null')?.observed?.names;
+      if (!Array.isArray(names)) return false;
+      const identities = names.filter((value): value is string => typeof value === 'string' && value.startsWith('compose-editor:'));
+      if (identities.length !== 1) return false;
+      const identity: unknown = JSON.parse(identities[0]!.slice('compose-editor:'.length));
+      if (!Array.isArray(identity) || identity.length !== 2 || !editor.id || identity[0] !== editor.id
+          || typeof identity[1] !== 'string' || !/^19:[a-zA-Z0-9-]+@thread\.v2$/.test(identity[1]) || identity[1] === previousId) return false;
+      return { kind: 'group' as const, id: identity[1], name };
+    } catch { return false; }
+  }, { previousId, name: card.name }, { timeout: TIMEOUT, polling: 100 });
+  try { return await selected.jsonValue() as Group; }
+  finally { await selected.dispose(); }
 }
 
 async function groups(frame: Frame, query: string): Promise<Group[]> {
