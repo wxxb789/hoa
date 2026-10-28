@@ -1,7 +1,35 @@
 # Changelog
 
-Notable changes to this repo. Skills carry per-skill `version=` metadata in
-their `<!-- index: ... -->` comment; this file records the notable deltas.
+Notable changes to this repo. `VERSION` is authoritative for all custom skills;
+their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
+
+## 0.1.0 — unified custom-skill versioning
+
+- Start one release version for every custom skill under `skills/`; reference
+  repositories and non-skill library artifacts retain their own versions. Custom
+  skills use standard frontmatter `metadata.version`, without a duplicate HTML version.
+- Move custom-skill catalog labels to `metadata.areas` / `metadata.targets`
+  string fields. Reject legacy skill HTML index comments while preserving
+  library metadata and ordinary report-template comments.
+- Add version consistency/sync/bump tooling. Patch is the default increment;
+  minor and major are explicit choices. Generated catalogs stay synchronized.
+- Publish the initial `v0.1.0` and subsequent CI-approved main releases through
+  serialized, stale-head-checked, atomic branch/tag updates. Local commands do
+  not publish; existing repository protection and token permissions still apply.
+
+## 2026-10-28 — desktop Teams and M365 Copilot automation
+
+- Added **teams-cdp** for exact person/group discovery and authorized plain-text
+  sending through the existing Teams profile. Native popouts, trusted multiline
+  input, draft preservation, and fresh Sent receipts keep dispatch scoped.
+- Group search waits for a changed conversation ID and the exact rendered title
+  in one snapshot before returning a destination. An unchanged prior composer
+  cannot certify the clicked result, even when its group name matches.
+- Added **m365-copilot-cdp** for actual Chat and Code model selection, sending,
+  and completed reply reading. It reuses one consent-approved connection,
+  preserves profile settings with a durable rollback receipt, and rejects stale
+  or cross-conversation completion evidence. Native dual-window parallelism is
+  not established; the session runner remains sequential.
 
 ## 2026-09-25 — safer skill execution and goal activation
 

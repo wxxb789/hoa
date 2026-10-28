@@ -6,9 +6,11 @@ description: >-
   to create or change a skill. Use hoa-skill-review for read-only audits and
   candidate-output judgments; use hoa-introspect-distill for recurring-work
   findings that need qualification and item approval, when available.
+metadata:
+  version: "0.1.0"
+  areas: "software-development,work-management,self-management"
+  targets: "runtime-agnostic"
 ---
-
-<!-- index: areas=software-development,work-management,self-management; targets=runtime-agnostic; version=1.0.0 -->
 
 # hoa-skill-work
 

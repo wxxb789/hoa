@@ -42,3 +42,6 @@ private/
 # Python build artifacts (generated when running skill scripts / evals)
 __pycache__/
 *.pyc
+
+# Local dependencies for bundled TypeScript skill scripts
+node_modules/

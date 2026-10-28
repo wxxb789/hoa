@@ -6,8 +6,9 @@
 `areas` 和 `targets` 打标签——因为一个 artifact 常同时服务多个 area 或 runtime，
 而目录表达不了这一点。
 
-> 由 `python scripts/generate_index.py` 生成——目录表不要手改；改每个 artifact 里的
-> `<!-- index: ... -->` 注释即可（skill 与库文件一视同仁）。
+> 由 `python scripts/generate_index.py` 生成——目录表不要手改。skill 请修改 YAML
+> frontmatter 中的 `metadata.areas`、`metadata.targets`；库文件仍修改
+> `<!-- index: ... -->` 注释。
 
 ## 标签词表
 
@@ -17,7 +18,7 @@ targets:  runtime-agnostic | repo-only |
           claude-code | codex | opencode | hermes | pi | kimi-code
 ```
 
-- 两个轴都**可多值**（逗号分隔）。
+- 两个轴都**可多值**（逗号分隔）；skill 中的值是 YAML 字符串，不是列表。
 - **type** 从顶层目录推导——不要重复打标。
 - 一行对应一个**逻辑** artifact（不为双语文件分别建行）。
 - 暂不设 `status` 轴，等实验 / 废弃状态真的出现再加。
@@ -34,7 +35,9 @@ targets:  runtime-agnostic | repo-only |
 | hoa-introspect-distill | skill | self-management,software-development | runtime-agnostic | `skills/hoa-introspect-distill/` | 评估给定的重复工作发现为候选；逐项批准后才创建资产 |
 | hoa-skill-review | skill | software-development,work-management,self-management | runtime-agnostic | `skills/hoa-skill-review/` | 依据消费者证据审计 skill 行为与修改，不改动被审查对象 |
 | hoa-skill-work | skill | software-development,work-management,self-management | runtime-agnostic | `skills/hoa-skill-work/` | 直接创建或演进已定义的 skill，并按风险聚焦验证 |
+| m365-copilot-cdp | skill | software-development,work-management | runtime-agnostic | `skills/m365-copilot-cdp/` | 通过 CDP 操作桌面 Copilot Chat 与 Code，选择模型并读取回复 |
 | my-ado-cppr | skill | software-development | runtime-agnostic | `skills/my-ado-cppr/` | commit → push → 在 Azure DevOps 或 GitHub 创建/更新 PR；probe/plan/apply 三段式，状态可 resume |
+| teams-cdp | skill | work-management | runtime-agnostic | `skills/teams-cdp/` | 通过本机桌面 CDP 向明确的 Teams 联系人或现有群组发送消息 |
 | skill-scout | agent | software-development,work-management | repo-only | `agents/skill-scout.md` | 按请求先搜索已有 skill，再决定是否编写；只报告，不代写 |
 | ghc-proxy | mcp | software-development | repo-only | `mcps/ghc-proxy.md` | 本地 ghc-proxy 搜索服务的可移植定义；注册留在 chezmoi |
 | typed-verification-gates | orchestration | software-development | repo-only | `orchestration/typed-verification-gates.md` | 循环每次迭代止于一道事先定型的验证门：programmatic / judge / human |
