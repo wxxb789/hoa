@@ -4,6 +4,20 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version increment after the first release
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -15,6 +29,19 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install repository script dependencies
+        run: python -m pip install -r scripts/requirements.txt
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: Desktop CDP types and behavioral tests
+        run: |
+          for dir in scripts/shared skills/teams-cdp/scripts skills/m365-copilot-cdp/scripts; do
+            (cd "$dir" && bun install --frozen-lockfile && bun run check && bun test)
+          done
+
       - name: Shared script drift check
         run: python scripts/vendor_shared.py --check
 
@@ -23,6 +50,15 @@ jobs:
 
       - name: Index generator tests
         run: python scripts/test_generate_index.py
+
+      - name: Unified version and catalog check
+        run: python scripts/version.py check
+
+      - name: Unified version tests
+        run: python scripts/test_version.py
+
+      - name: Automatic release tests (isolated local Git remotes)
+        run: python scripts/test_release.py
 
       - name: ghc-search tests
         run: python skills/ghc-search/scripts/test_ghc_search.py
@@ -66,3 +102,32 @@ jobs:
             desc_val=$(grep -m1 '^description:' "$f" | sed 's/^description:[[:space:]]*//')
             [ -n "$desc_val" ] || { echo "empty description: $f"; exit 1; }
           done
+
+  release:
+    needs: test
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: release-main
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install repository script dependencies
+        run: python -m pip install -r scripts/requirements.txt
+
+      - name: Publish tested main version
+        env:
+          RELEASE_PART: ${{ github.event_name == 'workflow_dispatch' && inputs.bump || 'patch' }}
+        run: python scripts/release.py --part "$RELEASE_PART"

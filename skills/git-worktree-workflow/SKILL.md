@@ -1,9 +1,11 @@
 ---
 name: git-worktree-workflow
 description: Run multiple AI coding agents (Claude Code, Codex, PI, OpenCode, Hermes, aider, gemini, …) in parallel on the same repo using isolated git worktrees. Tool-agnostic by design — agents are pluggable, so you can switch between them freely. Use when the user wants parallel agent sessions, worktree isolation, "work on two features at once", per-worktree environment setup and deterministic port defaults, or to avoid agents stepping on each other's edits.
+metadata:
+  version: "0.1.0"
 ---
 
-<!-- index: areas=software-development,work-management; targets=runtime-agnostic; version=1.1.0 -->
+<!-- index: areas=software-development,work-management; targets=runtime-agnostic -->
 
 # Git Worktree Workflow (tool-agnostic)
 

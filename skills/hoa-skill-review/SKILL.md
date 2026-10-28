@@ -6,9 +6,11 @@ description: >-
   skill block. Use when candidate skill replies need judgment against task requirements.
   Use hoa-skill-work for requested skill creation or evolution; use
   hoa-introspect-distill for recurring-work candidates considered for distillation.
+metadata:
+  version: "0.1.0"
 ---
 
-<!-- index: areas=software-development,work-management,self-management; targets=runtime-agnostic; version=1.0.0 -->
+<!-- index: areas=software-development,work-management,self-management; targets=runtime-agnostic -->
 
 # hoa-skill-review
 

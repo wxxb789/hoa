@@ -17,10 +17,21 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+sys.dont_write_bytecode = True
 SCRIPT = Path(__file__).resolve().parent / "generate_index.py"
+ARTIFACTS = SCRIPT.parent.parent / ".tmp-artifacts" / "index-tests"
+spec = importlib.util.spec_from_file_location("skill_metadata", SCRIPT.parent / "skill_metadata.py")
+sm = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(sm)
 spec = importlib.util.spec_from_file_location("generate_index", SCRIPT)
 gi = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(gi)
+with patch.dict(sys.modules, {"skill_metadata": sm}):
+    spec.loader.exec_module(gi)
+
+def make_temp_root() -> Path:
+    ARTIFACTS.mkdir(parents=True, exist_ok=True)
+    return Path(tempfile.mkdtemp(dir=ARTIFACTS))
+
 
 
 def make_skill(root: Path, name: str, *, index=None, frontmatter=True, quoted=False):
@@ -34,15 +45,15 @@ def make_skill(root: Path, name: str, *, index=None, frontmatter=True, quoted=Fa
     if frontmatter:
         parts += ["---", "name: " + name,
                   "description: " + name + " does one thing. And another.",
-                  "---", ""]
+                  "metadata:", '  version: "0.1.0"', "---", ""]
     parts += [f"<!-- index: {index} -->", "", f"# {name}", ""]
-    (d / "SKILL.md").write_text("\n".join(parts), encoding="utf-8")
+    (d / "SKILL.md").write_bytes("\n".join(parts).encode("utf-8"))
     return d
 
 
 class ParseMetadataTests(unittest.TestCase):
     def setUp(self):
-        self.tmp = Path(tempfile.mkdtemp())
+        self.tmp = make_temp_root()
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
 
     def test_plain_and_quoted_values_parse_equal(self):
@@ -73,10 +84,36 @@ class ParseMetadataTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             gi.parse_metadata(bad / "SKILL.md")
 
+    def test_custom_skill_version_comes_only_from_yaml_metadata(self):
+        skill = make_skill(self.tmp, "standard") / "SKILL.md"
+        metadata = gi.parse_skill_metadata(skill)
+        self.assertEqual(metadata["version"], "0.1.0")
+        self.assertNotIn("version", gi.parse_metadata(skill))
+
+    def test_legacy_html_version_is_rejected_only_for_custom_skills(self):
+        skill = make_skill(self.tmp, "legacy", index=
+                           "areas=software-development; targets=runtime-agnostic; version=9.8.7")
+        self.assertEqual(gi.parse_metadata(skill / "SKILL.md")["version"], "9.8.7")
+        with self.assertRaisesRegex(ValueError, "legacy index version="):
+            gi.parse_skill_metadata(skill / "SKILL.md")
+
+    def test_custom_skill_missing_yaml_version_cannot_hide_behind_index_metadata(self):
+        skill = make_skill(self.tmp, "missing") / "SKILL.md"
+        skill.write_bytes(skill.read_bytes().replace(b'  version: "0.1.0"\n', b""))
+        with self.assertRaises(ValueError):
+            gi.parse_skill_metadata(skill)
+
+    def test_duplicate_yaml_version_is_not_silently_overwritten(self):
+        skill = make_skill(self.tmp, "duplicate") / "SKILL.md"
+        skill.write_bytes(skill.read_bytes().replace(
+            b'  version: "0.1.0"\n', b'  version: "0.1.0"\n  version: "0.2.0"\n'))
+        with self.assertRaisesRegex(ValueError, "duplicate metadata.version"):
+            gi.parse_skill_metadata(skill)
+
 
 class CollectTests(unittest.TestCase):
     def setUp(self):
-        self.tmp = Path(tempfile.mkdtemp())
+        self.tmp = make_temp_root()
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
 
     def test_dir_without_skill_md_rejected(self):
@@ -96,6 +133,7 @@ class CollectTests(unittest.TestCase):
             rows = gi.collect()
         self.assertEqual(rows[0]["note_en"], "unlisted-skill does one thing.")
         self.assertEqual(rows[0]["note_zh"], "unlisted-skill does one thing.")
+        self.assertEqual(rows[0]["version"], "0.1.0")
 
     def test_notes_override_beats_fallback(self):
         make_skill(self.tmp, "listed-skill")
@@ -117,7 +155,7 @@ class CollectTests(unittest.TestCase):
 
 class CheckDriftTests(unittest.TestCase):
     def setUp(self):
-        self.tmp = Path(tempfile.mkdtemp())
+        self.tmp = make_temp_root()
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
 
     def _run(self, check):
@@ -141,7 +179,7 @@ class LibraryCollectTests(unittest.TestCase):
     FOLDERS = {"agents": "agent", "mcps": "mcp"}
 
     def setUp(self):
-        self.tmp = Path(tempfile.mkdtemp())
+        self.tmp = make_temp_root()
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
 
     def _collect(self):
@@ -168,12 +206,13 @@ class LibraryCollectTests(unittest.TestCase):
     def test_library_file_artifact_collected_and_indexed(self):
         self._write_library_doc(
             "---\nname: reviewer\ndescription: A reviewer role does things.\n---\n"
-            "<!-- index: areas=software-development; targets=repo-only -->\n")
+            "<!-- index: areas=software-development; targets=repo-only; version=9.8.7 -->\n")
         with patch.object(gi, "NOTES", {}):
             rows = self._collect()
             content = gi.render(rows, "en")
         lib = next(r for r in rows if r["name"] == "reviewer")
         self.assertEqual(lib["type"], "agent")
+        self.assertEqual(lib["version"], "9.8.7")
         self.assertIn("| reviewer | agent | software-development | repo-only | "
                       "`agents/reviewer.md` |", content)
 

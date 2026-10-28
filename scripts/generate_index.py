@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Generate index.md / index.zh-CN.md from per-skill metadata.
 
-Single source of truth: the `<!-- index: ... -->` HTML comment in each
-skills/<name>/SKILL.md, plus a short description from a table in this script
-(bilingual). Skills without an index comment are a hard error — an unindexed
-skill is invisible to the catalog.
+Catalog areas/targets live in each `<!-- index: ... -->` HTML comment;
+custom-skill versions live only in YAML frontmatter `metadata.version`.
+Descriptions come from a bilingual table or frontmatter. Skills without
+an index comment are a hard error — an unindexed skill is invisible.
 
 Usage:
     python scripts/generate_index.py          # write both files
@@ -16,6 +16,10 @@ import argparse
 import re
 import sys
 from pathlib import Path
+
+# Keep --check read-only, including helper/dependency import caches.
+sys.dont_write_bytecode = True
+import skill_metadata as sm
 
 ROOT = Path(__file__).resolve().parent.parent
 SKILLS = ROOT / "skills"
@@ -41,6 +45,14 @@ TARGETS = ("runtime-agnostic", "repo-only", "claude-code", "codex", "opencode",
 # so a new skill generates without touching this file. Overrides exist to
 # keep the Chinese note from rendering the English description verbatim.
 NOTES = {
+    "teams-cdp": (
+        "send Teams messages to exact people or existing groups through local desktop CDP",
+        "通过本机桌面 CDP 向明确的 Teams 联系人或现有群组发送消息",
+    ),
+    "m365-copilot-cdp": (
+        "operate desktop Copilot Chat and Code through CDP with model selection and reply reads",
+        "通过 CDP 操作桌面 Copilot Chat 与 Code，选择模型并读取回复",
+    ),
     "hoa-skill-review": (
         "review skill behavior and changes against consumer evidence without editing the target",
         "依据消费者证据审计 skill 行为与修改，不改动被审查对象",
@@ -155,6 +167,32 @@ def parse_metadata(skill_md: Path) -> dict[str, str]:
     return meta
 
 
+def parse_skill_metadata(skill_md: Path) -> dict[str, str]:
+    """Validate custom-skill catalog fields and the standard YAML version field."""
+    text = skill_md.read_bytes().decode("utf-8")
+    comments = list(INDEX_COMMENT.finditer(text))
+    if len(comments) != 1 or len(re.findall(r"<!--\s*index:", text)) != 1:
+        raise ValueError(f"expected exactly one index metadata comment in {skill_md}")
+    seen = set()
+    parts = comments[0].group("kv").split(";")
+    for number, part in enumerate(parts):
+        if not part.strip() and number == len(parts) - 1:
+            continue
+        field = KV.fullmatch(part.strip())
+        if field is None:
+            raise ValueError(f"malformed index metadata in {skill_md}: {part!r}")
+        key = field.group(1)
+        if key in seen:
+            raise ValueError(f"duplicate {key}= metadata in {skill_md}")
+        if key == "version":
+            raise ValueError(f"legacy index version= is not allowed in {skill_md}; "
+                             "use frontmatter metadata.version")
+        seen.add(key)
+    metadata = parse_metadata(skill_md)
+    metadata["version"] = sm.version_scalar(text, skill_md)[0]
+    return metadata
+
+
 def _resolve_notes(name: str, doc: Path, kind: str) -> tuple[str, str]:
     """Bilingual note for an artifact: NOTES override, else the doc's
     frontmatter description. Raises when neither yields a note."""
@@ -175,7 +213,7 @@ def collect() -> list[dict]:
         if not skill_md.is_file():
             raise ValueError(f"skill directory without SKILL.md: {skill_dir}")
         name = skill_dir.name
-        meta = parse_metadata(skill_md)
+        meta = parse_skill_metadata(skill_md)
         note_en, note_zh = _resolve_notes(name, skill_md, "skill")
         rows.append({"name": name, "type": "skill", "path": f"skills/{name}/",
                      "note_en": note_en, "note_zh": note_zh, **meta})

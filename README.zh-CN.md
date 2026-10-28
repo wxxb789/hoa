@@ -66,7 +66,8 @@ Hermes · Claude Code · Codex · pi · OpenCode · Kimi Code · *(`npx skills` 
 ```text
 hoa/
 ├── index.md · index.zh-CN.md   # 全部 artifact，按 area + target 打标签（自动生成——见 scripts/）
-├── CHANGELOG.md   # 重要变更记录；每个 skill 带 `version=` 元数据
+├── VERSION        # 全部自定义 skill 共用的权威版本
+├── CHANGELOG.md   # 重要变更；旧条目保留历史上的各 skill 版本
 ├── skills/        # 唯一部署面 —— 用 `npx skills` 安装的 SKILL.md 包
 ├── agents/        # 可移植、runtime 无关的 role / persona / authority / I-O 契约
 ├── orchestration/ # 调度、handoff、retry、continuation、termination、聚合(循环、crew、fan-out/in、best-of-N)
@@ -91,6 +92,30 @@ hoa/
 下的 `<folder>/<name>.md` 或 `<folder>/<name>/README.md`）。目录名全局唯一，
 每个配置的库目录至少要有一个 artifact,索引备注取 generator 里的 `NOTES`
 覆盖、frontmatter description 首句,最后回退到正文首个非空行。
+
+## 统一 skill 版本
+
+`VERSION` 是 `skills/` 下所有自定义包共用的发布版本，从 `0.1.0` 开始。
+每个 SKILL.md 通过标准 YAML `metadata.version` 同步版本，独立安装后也保留该信息。
+HTML index 注释只保存 areas/targets 等目录字段；自定义 skill 中旧的 `version=`
+注释会报错，不作为兼容回退。第三方/参考目录及非 skill 的库 artifact 保持原有元数据。
+
+```bash
+python -m pip install -r scripts/requirements.txt  # 仓库工具依赖；建议使用 venv
+python scripts/version.py check       # 只读检查版本一致性和索引
+python scripts/version.py sync        # 同步 VERSION 并重新生成索引
+python scripts/version.py bump        # 默认 patch：0.1.0 -> 0.1.1
+python scripts/version.py bump minor  # 显式 minor；也支持 major
+```
+
+`main` 的 CI 成功后，发布 job 为尚未打 tag 的当前版本发布 tag（首次为 `v0.1.0`）；
+之后的普通更新默认递增 patch。手动触发 CI 可选择 patch、minor 或 major。
+发布保留 desktop CDP 测试及现有仓库检查，串行执行，拒绝过期 CI 对应的提交，
+并以原子 push 同时提交版本更新和 tag，不使用 force。
+
+本地版本命令不会 commit 或 push。仅供 CI 的发布 helper 需要 `contents: write`，
+分支保护也必须允许正常 push；它不会绕过仓库策略。重跑已发布的 push 不会再次升版。
+
 
 ## 双语政策
 
@@ -173,6 +198,18 @@ Claude Code 内置的 `plugin eval` 测试 plugin 形态的包；Anthropic 的
 指导和会话自写 runner。它们都不是这些可移植 hoa skill 的必需依赖。
 [源码归属研究](./reflections/2026-09-25-claude-code-skill-source.md)
 区分了实现及各自的证据边界。
+
+## 桌面消息自动化
+
+- [`teams-cdp`](./skills/teams-cdp/SKILL.md) 查找准确的联系人和现有群聊，
+  发送已授权的纯文本消息，并检查新消息的 **Sent** 回执。
+- [`m365-copilot-cdp`](./skills/m365-copilot-cdp/SKILL.md) 通过本机 CDP 操作
+  桌面 Copilot 的 Chat 与 Code，包括模型选择和回复读取。
+
+两个包使用 strict TypeScript、Bun 和 `playwright-core`，连接已登录的应用，
+不额外下载浏览器。每个 skill 均包含独立的依赖清单和 lockfile。
+必须为实际工作界面启用本机 CDP；Code 还依赖已就绪的 native host。
+使用真实账号前，先阅读各 skill 的启动方式和授权边界。
 
 ## 标签
 

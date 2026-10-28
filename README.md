@@ -73,7 +73,8 @@ custom deploy tooling.
 ```text
 hoa/
 ├── index.md · index.zh-CN.md   # every artifact, labeled by area + target (GENERATED — see scripts/)
-├── CHANGELOG.md   # notable changes; skills carry per-skill `version=` metadata
+├── VERSION        # canonical version shared by every custom skill
+├── CHANGELOG.md   # notable changes; older entries retain historical per-skill versions
 ├── skills/        # THE deploy surface — SKILL.md packages installed via `npx skills`
 ├── agents/        # portable, runtime-agnostic role / persona / authority / I-O contracts
 ├── orchestration/ # scheduling, handoff, retry, continuation, termination, aggregation (loops, crews, fan-out/in, best-of-N)
@@ -100,6 +101,33 @@ skills (`skills/<name>/SKILL.md`) and library files (`<folder>/<name>.md` or
 configured library folder must hold at least one artifact, and each artifact's
 index note comes from a `NOTES` override in the generator or the first line of
 its frontmatter description (plain-Markdown body as last resort).
+
+## Unified skill versions
+
+`VERSION` is the release version for every custom package under `skills/`, starting
+at `0.1.0`. Each SKILL.md mirrors it in standard YAML `metadata.version` so installed
+packages retain the version. HTML index comments contain only catalog fields such
+as areas/targets; custom-skill `version=` comments are rejected, not read as a fallback.
+Third-party/reference trees and non-skill library artifacts keep their own metadata.
+
+```bash
+python -m pip install -r scripts/requirements.txt  # repository tooling; prefer a venv
+python scripts/version.py check       # read-only consistency and index check
+python scripts/version.py sync        # mirror VERSION and regenerate indexes
+python scripts/version.py bump        # patch by default: 0.1.0 -> 0.1.1
+python scripts/version.py bump minor  # explicit minor; major is also supported
+```
+
+After CI succeeds on `main`, the release job publishes the current untagged version
+(initially `v0.1.0`). Later normal updates bump patch automatically. Manual CI
+dispatch can choose patch, minor, or major. Publication retains the browser/CDP
+tests and all existing repository gates, serializes releases, rejects stale tested
+heads, and pushes the version commit and tag atomically without force.
+
+Local version commands never commit or push. The CI-only release helper requires
+`contents: write`; branch protection must permit its normal push. It does not
+bypass repository policy. Re-running an already published push is a no-op.
+
 
 ## Bilingual policy
 
@@ -193,6 +221,19 @@ Claude Code's native `plugin eval` tests plugin-shaped packages; Anthropic's
 a required dependency of these runtime-agnostic hoa skills. The
 [source-level ownership study](./reflections/2026-09-25-claude-code-skill-source.md)
 distinguishes the implementations and their evidence limits.
+
+## Desktop messaging automation
+
+- [`teams-cdp`](./skills/teams-cdp/SKILL.md) discovers exact people and existing
+  group chats, sends authorized plain text, and checks a new **Sent** receipt.
+- [`m365-copilot-cdp`](./skills/m365-copilot-cdp/SKILL.md) operates desktop Copilot
+  Chat and Code through local CDP, including model selection and reply reads.
+
+Both packages use strict TypeScript, Bun, and `playwright-core`; they attach to
+already signed-in applications without downloading another browser. Each skill
+contains its own dependency manifest and lockfile. Local CDP must be enabled for
+the actual working application surface; Code also requires a ready native host.
+Read each skill's startup and authority instructions before using a real account.
 
 ## Labels
 
