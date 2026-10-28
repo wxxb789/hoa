@@ -8,9 +8,9 @@ description: >-
   findings that need qualification and item approval, when available.
 metadata:
   version: "0.1.0"
+  areas: "software-development,work-management,self-management"
+  targets: "runtime-agnostic"
 ---
-
-<!-- index: areas=software-development,work-management,self-management; targets=runtime-agnostic -->
 
 # hoa-skill-work
 

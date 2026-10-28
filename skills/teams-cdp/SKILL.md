@@ -7,9 +7,9 @@ description: >-
   discovery and sending, not channels, meetings, browser login, or Microsoft Graph.
 metadata:
   version: "0.1.0"
+  areas: "work-management"
+  targets: "runtime-agnostic"
 ---
-
-<!-- index: areas=work-management; targets=runtime-agnostic -->
 
 # Teams CDP
 

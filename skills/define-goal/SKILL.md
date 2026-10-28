@@ -3,9 +3,9 @@ name: define-goal
 description: Define ambitious intentions as numbered goal-prompt files, progressing from clear near-term outcomes to provisional longer-term outcomes without planning implementation. Use when the user wants to create or refine goals, turn a large vision into inspectable increments, or refine the next goal from earlier results. Not for task breakdown, implementation planning, execution, or progress tracking.
 metadata:
   version: "0.1.0"
+  areas: "self-management,software-development,work-management"
+  targets: "runtime-agnostic"
 ---
-
-<!-- index: areas=self-management,software-development,work-management; targets=runtime-agnostic -->
 
 # Define Goal
 

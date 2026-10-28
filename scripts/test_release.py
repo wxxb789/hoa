@@ -62,12 +62,15 @@ class ReleaseTests(unittest.TestCase):
 
     @staticmethod
     def skill(name, version, *, custom=False):
-        metadata = f'metadata:\n  version: "{version}"\n' if custom else ""
-        index_version = "" if custom else f"; version={version}"
+        metadata = (f'metadata:\n  version: "{version}"\n'
+                    '  areas: software-development\n  targets: runtime-agnostic\n'
+                    '  owner: unchanged\n') if custom else ""
+        index = ("" if custom else
+                 f"<!-- index: areas=software-development; targets=runtime-agnostic; version={version} -->\n\n")
         return (
             f"---\nname: {name}\ndescription: {name} fixture behavior.\n{metadata}---\n\n"
-            f"<!-- index: areas=software-development; targets=runtime-agnostic{index_version} -->\n\n"
-            f"# {name}\n\nKeep this body unchanged.\n"
+            f"{index}# {name}\n\n<!-- Template: preserve this body comment. -->\n"
+            "Keep this body unchanged.\n"
         )
 
     @staticmethod

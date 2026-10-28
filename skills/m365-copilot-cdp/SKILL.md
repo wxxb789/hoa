@@ -8,9 +8,9 @@ description: >-
   a chat request that merely asks for code.
 metadata:
   version: "0.1.0"
+  areas: "software-development,work-management"
+  targets: "runtime-agnostic"
 ---
-
-<!-- index: areas=software-development,work-management; targets=runtime-agnostic -->
 
 # Microsoft 365 Copilot desktop CDP
 

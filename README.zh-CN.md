@@ -85,9 +85,10 @@ hoa/
 `skills/<category>/<name>/SKILL.md`（catalog）；`skills/.curated/`、
 `skills/.experimental/`、`skills/.system/` 也会被识别。
 
-`index.md` / `index.zh-CN.md` 是**生成文件**——改完任何 artifact 的
-`<!-- index: ... -->` 元数据注释后运行 `python scripts/generate_index.py`
-（CI 会对漂移报错）。Artifact 包括 skill（`skills/<name>/SKILL.md`）与库文件
+`index.md` / `index.zh-CN.md` 是**生成文件**——修改目录元数据后运行
+`python scripts/generate_index.py`：自定义 skill 使用 YAML 的 `metadata.areas` /
+`metadata.targets`，库 artifact 使用 `<!-- index: ... -->` 注释（CI 会对漂移报错）。
+Artifact 包括 skill（`skills/<name>/SKILL.md`）与库文件
 （`agents/`、`mcps/`、`orchestration/`、`prompts/`、`rules/`、`workflows/`
 下的 `<folder>/<name>.md` 或 `<folder>/<name>/README.md`）。目录名全局唯一，
 每个配置的库目录至少要有一个 artifact,索引备注取 generator 里的 `NOTES`
@@ -97,8 +98,8 @@ hoa/
 
 `VERSION` 是 `skills/` 下所有自定义包共用的发布版本，从 `0.1.0` 开始。
 每个 SKILL.md 通过标准 YAML `metadata.version` 同步版本，独立安装后也保留该信息。
-HTML index 注释只保存 areas/targets 等目录字段；自定义 skill 中旧的 `version=`
-注释会报错，不作为兼容回退。第三方/参考目录及非 skill 的库 artifact 保持原有元数据。
+目录标签也放在同一个 metadata mapping 中；自定义 skill 的旧 HTML index 注释
+会报错，不作为兼容回退。第三方/参考目录及非 skill 的库 artifact 保持原有元数据。
 
 ```bash
 python -m pip install -r scripts/requirements.txt  # 仓库工具依赖；建议使用 venv
@@ -213,8 +214,18 @@ Claude Code 内置的 `plugin eval` 测试 plugin 形态的包；Anthropic 的
 
 ## 标签
 
-area 与 target 作为标签记录在 [`index.md`](./index.md) 里（由每个 skill 的
-`<!-- index: ... -->` 注释生成），而不是建目录（一个 artifact 常同时服务多个）：
+area 与 target 作为标签记录在 [`index.md`](./index.md) 里，而不是建目录
+（一个 artifact 常同时服务多个）。自定义 skill 将标签保存为标准 YAML
+`metadata` 下的逗号分隔字符串，与版本放在一起：
+
+```yaml
+metadata:
+  version: "0.1.0"
+  areas: "software-development,work-management"
+  targets: "runtime-agnostic"
+```
+
+库 artifact 保留 HTML index 注释。允许的标签值：
 
 - `areas`：`software-development` · `work-management` · `self-management`
 - `targets`：`runtime-agnostic` · `repo-only` · `claude-code` · `codex` ·

@@ -8,9 +8,9 @@ description: >-
   use hoa-introspect to discover work patterns in history.
 metadata:
   version: "0.1.0"
+  areas: "self-management,software-development"
+  targets: "runtime-agnostic"
 ---
-
-<!-- index: areas=self-management,software-development; targets=runtime-agnostic -->
 
 # hoa-introspect-distill
 

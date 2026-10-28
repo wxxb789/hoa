@@ -93,8 +93,9 @@ hoa/
 `skills/.experimental/`, `skills/.system/` are recognized too.
 
 `index.md` / `index.zh-CN.md` are **generated** — run
-`python scripts/generate_index.py` after editing any artifact's
-`<!-- index: ... -->` metadata comment (CI fails on drift). Artifacts are
+`python scripts/generate_index.py` after editing catalog metadata: YAML
+`metadata.areas` / `metadata.targets` for custom skills, or `<!-- index: ... -->`
+comments for library artifacts (CI fails on drift). Artifacts are
 skills (`skills/<name>/SKILL.md`) and library files (`<folder>/<name>.md` or
 `<folder>/<name>/README.md` under `agents/`, `mcps/`, `orchestration/`,
 `prompts/`, `rules/`, `workflows/`). Each catalog name must be unique, every
@@ -106,8 +107,8 @@ its frontmatter description (plain-Markdown body as last resort).
 
 `VERSION` is the release version for every custom package under `skills/`, starting
 at `0.1.0`. Each SKILL.md mirrors it in standard YAML `metadata.version` so installed
-packages retain the version. HTML index comments contain only catalog fields such
-as areas/targets; custom-skill `version=` comments are rejected, not read as a fallback.
+packages retain the version. Catalog labels share the same metadata mapping;
+custom-skill HTML index comments are rejected, not read as a fallback.
 Third-party/reference trees and non-skill library artifacts keep their own metadata.
 
 ```bash
@@ -237,9 +238,18 @@ Read each skill's startup and authority instructions before using a real account
 
 ## Labels
 
-Areas and targets are tracked as labels in [`index.md`](./index.md) (generated
-from each skill's `<!-- index: ... -->` comment), not as folders (one artifact
-often serves several):
+Areas and targets are tracked as labels in [`index.md`](./index.md), not as folders
+(one artifact often serves several). Custom skills store them as comma-separated
+strings under standard YAML `metadata`, alongside their version:
+
+```yaml
+metadata:
+  version: "0.1.0"
+  areas: "software-development,work-management"
+  targets: "runtime-agnostic"
+```
+
+Library artifacts retain their HTML index comments. Allowed label values:
 
 - `areas`: `software-development` · `work-management` · `self-management`
 - `targets`: `runtime-agnostic` · `repo-only` · `claude-code` · `codex` ·

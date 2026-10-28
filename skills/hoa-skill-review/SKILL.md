@@ -8,9 +8,9 @@ description: >-
   hoa-introspect-distill for recurring-work candidates considered for distillation.
 metadata:
   version: "0.1.0"
+  areas: "software-development,work-management,self-management"
+  targets: "runtime-agnostic"
 ---
-
-<!-- index: areas=software-development,work-management,self-management; targets=runtime-agnostic -->
 
 # hoa-skill-review
 

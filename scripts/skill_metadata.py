@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read and losslessly update custom-skill frontmatter metadata.version.
+"""Read custom-skill catalog metadata and losslessly update metadata.version.
 
 PyYAML supplies the parsed nodes and scalar token source spans. Only the
 selected scalar is replaced; the rest of the frontmatter and document is
@@ -68,8 +68,8 @@ def _value(mapping, fields: dict, key: str, location: str, source: Path):
     return key_node, value
 
 
-def version_scalar(text: str, source: Path) -> tuple[str, int, int, str | None]:
-    """Return the version string and its exact scalar-token span/style in text."""
+def _version_metadata(text: str, source: Path):
+    """Return the editable version span together with its parsed metadata nodes."""
     frontmatter, offset = _frontmatter(text, source)
     try:
         root = yaml.compose(frontmatter, Loader=yaml.SafeLoader)
@@ -106,8 +106,26 @@ def version_scalar(text: str, source: Path) -> tuple[str, int, int, str | None]:
     scalar = scalars[0]
     if "\n" in frontmatter[scalar.start_mark.index:scalar.end_mark.index]:
         raise ValueError(f"multiline metadata.version is not editable in {source}")
-    return (version.value, offset + scalar.start_mark.index,
-            offset + scalar.end_mark.index, scalar.style)
+    return ((version.value, offset + scalar.start_mark.index,
+             offset + scalar.end_mark.index, scalar.style), metadata, metadata_fields)
+
+
+def version_scalar(text: str, source: Path) -> tuple[str, int, int, str | None]:
+    """Return the version string and its exact scalar-token span/style in text."""
+    return _version_metadata(text, source)[0]
+
+
+def catalog_metadata(text: str, source: Path) -> dict[str, str]:
+    """Read only the custom catalog fields, preserving CSV scalar values verbatim."""
+    version, metadata, fields = _version_metadata(text, source)
+    values = {}
+    for key in ("areas", "targets"):
+        _, value = _value(metadata, fields, key, "metadata", source)
+        if not isinstance(value, ScalarNode) or value.tag != STRING:
+            raise ValueError(f"metadata.{key} must be a YAML string in {source}")
+        values[key] = value.value
+    values["version"] = version[0]
+    return values
 
 
 def replace_version(text: str, release: str, source: Path) -> str:

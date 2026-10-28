@@ -3,9 +3,9 @@ name: hoa-agent-retrieve
 description: "Search, gather, or inventory local AI-agent histories across runtimes and return a read-only, coverage-manifested Retrieval Bundle. Use for requests such as 'find every session where I touched X', 'pull my last month across agents', 'search my Claude Code, Codex, and OpenCode history', or when another workflow needs re-checkable cross-agent evidence. Do not use for one known file or session; use hoa-introspect for work-pattern analysis, hoa-introspect-distill to qualify a repeatable-work candidate, or hoa-skill-work for direct skill creation."
 metadata:
   version: "0.1.0"
+  areas: "self-management,software-development"
+  targets: "runtime-agnostic"
 ---
-
-<!-- index: areas=self-management,software-development; targets=runtime-agnostic -->
 
 # hoa-agent-retrieve
 

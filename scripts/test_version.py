@@ -36,14 +36,14 @@ with patch.dict(sys.modules, {"generate_index": gi, "skill_metadata": sm}):
 
 def make_skill(root: Path, name: str, *, release="0.1.0", index=None,
                newline="\n", quote="", frontmatter=None) -> Path:
-    if index is None:
-        index = "areas=software-development; targets=runtime-agnostic; owner=unchanged"
     if frontmatter is None:
         frontmatter = (f"name: {name}\ndescription: {name} does one thing.\n"
                        f"metadata:\n  version: {quote}{release}{quote}\n"
-                       "  owner: unchanged\n")
-    text = (f"---\n{frontmatter}---\n\n"
-            f"<!-- index: {index} -->\n\n# {name}\n\n"
+                       "  areas: software-development\n"
+                       "  targets: runtime-agnostic\n  owner: unchanged\n")
+    comment = f"<!-- index: {index} -->\n\n" if index is not None else ""
+    text = (f"---\n{frontmatter}---\n\n{comment}# {name}\n\n"
+            "<!-- Template: preserve this ordinary body comment. -->\n"
             "Keep version=77.88.99 in prose, and non-ASCII text: 中文.\n"
             "```text\nversion: 42.0.0\n```\n")
     target = root / "skills" / name / "SKILL.md"
@@ -91,11 +91,13 @@ class VersionTests(unittest.TestCase):
             self.assertEqual((self.root / filename).read_bytes(),
                              gi.render(rows, lang).encode("utf-8"))
 
-    def assert_rejected_without_writes(self, *args):
+    def assert_rejected_without_writes(self, *args, error=None):
         before = self.snapshot()
-        status, _, error = self.run_cli(*args)
-        self.assertEqual(status, 1, error)
-        self.assertTrue(error)
+        status, _, error_output = self.run_cli(*args)
+        self.assertEqual(status, 1, error_output)
+        self.assertTrue(error_output)
+        if error is not None:
+            self.assertIn(error, error_output)
         self.assertEqual(self.snapshot(), before)
 
     def test_patch_is_default_and_explicit_patch_matches(self):
@@ -140,6 +142,18 @@ class VersionTests(unittest.TestCase):
             else:
                 self.assertEqual(after[relative], content)
         self.assert_indexes_current()
+
+    def test_sync_preserves_bom_and_csv_axes_exactly(self):
+        target = make_skill(self.root, "bom", release="7.6.5", newline="\r\n", quote="'")
+        before = b"\xef\xbb\xbf" + target.read_bytes().replace(
+            b"areas: software-development", b'areas: "work-management, software-development"').replace(
+            b"targets: runtime-agnostic", b"targets: 'codex,claude-code,runtime-agnostic'")
+        target.write_bytes(before)
+        self.assertEqual(self.run_cli("sync")[0], 0)
+        self.assertEqual(target.read_bytes(), before.replace(b"version: '7.6.5'", b"version: '0.1.0'"))
+        self.assertEqual(gi.parse_skill_metadata(target), {
+            "areas": "work-management, software-development",
+            "targets": "codex,claude-code,runtime-agnostic", "version": "0.1.0"})
 
     def test_check_is_read_only_and_detects_both_kinds_of_drift(self):
         self.assertEqual(self.run_cli("sync")[0], 0)
@@ -194,35 +208,38 @@ class VersionTests(unittest.TestCase):
         self.assertEqual((self.root / "VERSION").read_bytes(), b"0.1.1")
 
     def test_yaml_version_errors_are_rejected_before_any_mutation(self):
+        axes = "areas: software-development, targets: runtime-agnostic"
+        block_axes = "  areas: software-development\n  targets: runtime-agnostic\n"
         cases = (
-            "owner: unchanged\n",
-            "metadata: {}\n",
-            "metadata: {owner: unchanged}\n",
-            "metadata: {version: 0.1.0}\nmetadata: {version: 0.1.0}\n",
-            "metadata: {version: 0.1.0, version: 0.1.0}\n",
-            "metadata: {version: 1.0}\n",
-            "metadata: {version: true}\n",
-            "metadata: {version: [0.1.0]}\n",
-            "metadata: {version: 01.1.0}\n",
-            "metadata: {version: '1.2.3-beta'}\n",
-            "metadata: {version: '0.1.0\"}\n",
-            "metadata:\n\tversion: 0.1.0\n",
-            "version: 0.1.0\nmetadata: {version: 0.1.0}\n",
-            "metadata:\n  version: |-\n    0.1.0\n",
-            "defaults: &v 0.1.0\nmetadata: {version: *v}\n",
-            "defaults: &m {version: 0.1.0}\nmetadata: *m\n",
-            "metadata: &m {version: 0.1.0}\ncopy: *m\n",
-            "metadata: {version: &v 0.1.0}\ncopy: *v\n",
-            "defaults: &m {version: 0.1.0}\nmetadata: {<<: *m}\n",
-            "defaults: &m {metadata: {version: 0.1.0}}\n<<: *m\n",
+            ("owner: unchanged\n", "missing frontmatter.metadata"),
+            (f"metadata: {{{axes}}}\n", "missing metadata.version"),
+            (f"metadata: {{owner: unchanged, {axes}}}\n", "missing metadata.version"),
+            (f"metadata: {{version: 0.1.0, {axes}}}\nmetadata: {{version: 0.1.0, {axes}}}\n",
+             "duplicate frontmatter.metadata"),
+            (f"metadata: {{version: 0.1.0, version: 0.1.0, {axes}}}\n", "duplicate metadata.version"),
+            (f"metadata: {{version: 1.0, {axes}}}\n", "metadata.version must be a YAML string"),
+            (f"metadata: {{version: true, {axes}}}\n", "metadata.version must be a YAML string"),
+            (f"metadata: {{version: [0.1.0], {axes}}}\n", "metadata.version must be a YAML string"),
+            (f"metadata: {{version: 01.1.0, {axes}}}\n", "invalid stable numeric version"),
+            (f"metadata: {{version: '1.2.3-beta', {axes}}}\n", "invalid stable numeric version"),
+            (f"metadata: {{version: '0.1.0\", {axes}}}\n", "invalid YAML frontmatter"),
+            ("metadata:\n\tversion: 0.1.0\n" + block_axes, "invalid YAML frontmatter"),
+            (f"version: 0.1.0\nmetadata: {{version: 0.1.0, {axes}}}\n", "top-level version"),
+            ("metadata:\n  version: |-\n    0.1.0\n" + block_axes,
+             "metadata.version requires a plain or quoted scalar"),
+            (f"defaults: &v 0.1.0\nmetadata: {{version: *v, {axes}}}\n", "aliased metadata.version"),
+            (f"defaults: &m {{version: 0.1.0, {axes}}}\nmetadata: *m\n", "aliased frontmatter.metadata"),
+            (f"metadata: &m {{version: 0.1.0, {axes}}}\ncopy: *m\n", "anchored/aliased metadata.version"),
+            (f"metadata: {{version: &v 0.1.0, {axes}}}\ncopy: *v\n", "anchored/aliased metadata.version"),
+            (f"defaults: &m {{version: 0.1.0}}\nmetadata: {{<<: *m, {axes}}}\n", "ambiguous/merge key"),
+            (f"defaults: &m {{metadata: {{version: 0.1.0, {axes}}}}}\n<<: *m\n", "ambiguous/merge key"),
         )
-        for content in cases:
+        for content, error in cases:
             with self.subTest(frontmatter=content):
                 make_skill(self.root, "z-bad", frontmatter=
                            "name: invalid\ndescription: Invalid fixture.\n" + content)
-                self.assert_rejected_without_writes("sync")
-                self.assert_rejected_without_writes("bump")
-                self.assert_rejected_without_writes("check")
+                for command in ("sync", "bump", "check"):
+                    self.assert_rejected_without_writes(command, error=error)
 
     def test_flow_yaml_scalar_spans_preserve_tags_comments_and_other_values(self):
         target = make_skill(self.root, "complex", newline="\r\n", frontmatter=
@@ -232,6 +249,8 @@ class VersionTests(unittest.TestCase):
                             "notes: &notes {owner: unchanged}\n"
                             "copy: *notes\n"
                             'metadata: {owner: unchanged, version: !!str "7.6.5", '
+                            'areas: "work-management,software-development", '
+                            'targets: "codex,claude-code", '
                             'other-version: "7.6.5"} # retain this comment\n')
         before = target.read_bytes()
         self.assertEqual(self.run_cli("sync")[0], 0)
@@ -243,7 +262,8 @@ class VersionTests(unittest.TestCase):
     def test_equivalent_escaped_string_is_not_rewritten_until_version_changes(self):
         target = make_skill(self.root, "escaped", frontmatter=
                             "name: escaped\ndescription: An escaped scalar.\n"
-                            'metadata: {version: "0.1.\\x30"}\n')
+                            'metadata: {version: "0.1.\\x30", areas: software-development, '
+                            'targets: runtime-agnostic}\n')
         before = target.read_bytes()
         self.assertEqual(self.run_cli("sync")[0], 0)
         self.assertEqual(target.read_bytes(), before)
@@ -251,7 +271,7 @@ class VersionTests(unittest.TestCase):
         self.assertEqual(self.run_cli("bump")[0], 0)
         self.assertEqual(target.read_bytes(), before.replace(b'"0.1.\\x30"', b'"0.1.1"'))
 
-    def test_legacy_duplicate_and_malformed_index_metadata_fail_preflight(self):
+    def test_legacy_html_index_metadata_fails_preflight_even_with_valid_yaml(self):
         cases = (
             "areas=software-development",
             "areas=software-development; targets=runtime-agnostic; version=0.1.0",
@@ -263,19 +283,35 @@ class VersionTests(unittest.TestCase):
         for index in cases:
             with self.subTest(index=index):
                 make_skill(self.root, "z-bad", index=index)
-                self.assert_rejected_without_writes("sync")
-                self.assert_rejected_without_writes("bump")
-                self.assert_rejected_without_writes("check")
+                for command in ("sync", "bump", "check"):
+                    self.assert_rejected_without_writes(command, error="legacy HTML index")
 
-    def test_missing_and_multiple_index_comments_fail_before_mutation(self):
+    def test_missing_invalid_non_string_and_duplicate_yaml_axes_fail_before_mutation(self):
         target = make_skill(self.root, "z-bad")
         valid = target.read_bytes()
-        for content in (b"---\ndescription: No index metadata.\n---\n",
-                        valid + b"\n<!-- index: areas=software-development; "
-                        b"targets=runtime-agnostic -->\n"):
+        cases = (
+            (valid.replace(b"  areas: software-development\n", b""), "missing metadata.areas"),
+            (valid.replace(b"  targets: runtime-agnostic\n", b""), "missing metadata.targets"),
+            (valid.replace(b"  areas: software-development\n", b"  areas: nonsense\n"), "unknown area"),
+            (valid.replace(b"  targets: runtime-agnostic\n", b"  targets: nonsense\n"), "unknown target"),
+            (valid.replace(b"  areas: software-development\n", b"  areas: [software-development]\n"),
+             "metadata.areas must be a YAML string"),
+            (valid.replace(b"  targets: runtime-agnostic\n", b"  targets: true\n"),
+             "metadata.targets must be a YAML string"),
+            (valid.replace(b"  areas: software-development\n",
+                           b"  areas: software-development\n  areas: work-management\n"),
+             "duplicate metadata.areas"),
+            (valid.replace(b"  targets: runtime-agnostic\n",
+                           b"  targets: runtime-agnostic\n  targets: codex\n"),
+             "duplicate metadata.targets"),
+            (valid + b"\n<!-- index: areas=software-development; targets=runtime-agnostic -->\n"
+             b"<!-- index: areas=work-management; targets=codex -->\n", "legacy HTML index"),
+        )
+        for content, error in cases:
             with self.subTest(content=content):
                 target.write_bytes(content)
-                self.assert_rejected_without_writes("bump")
+                for command in ("sync", "bump", "check"):
+                    self.assert_rejected_without_writes(command, error=error)
 
     def test_all_generator_inputs_are_validated_before_writes(self):
         make_skill(self.root, "z-valid", release="9.9.9")

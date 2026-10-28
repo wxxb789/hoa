@@ -6,8 +6,9 @@
 `areas` 和 `targets` 打标签——因为一个 artifact 常同时服务多个 area 或 runtime，
 而目录表达不了这一点。
 
-> 由 `python scripts/generate_index.py` 生成——目录表不要手改；改每个 artifact 里的
-> `<!-- index: ... -->` 注释即可（skill 与库文件一视同仁）。
+> 由 `python scripts/generate_index.py` 生成——目录表不要手改。skill 请修改 YAML
+> frontmatter 中的 `metadata.areas`、`metadata.targets`；库文件仍修改
+> `<!-- index: ... -->` 注释。
 
 ## 标签词表
 
@@ -17,7 +18,7 @@ targets:  runtime-agnostic | repo-only |
           claude-code | codex | opencode | hermes | pi | kimi-code
 ```
 
-- 两个轴都**可多值**（逗号分隔）。
+- 两个轴都**可多值**（逗号分隔）；skill 中的值是 YAML 字符串，不是列表。
 - **type** 从顶层目录推导——不要重复打标。
 - 一行对应一个**逻辑** artifact（不为双语文件分别建行）。
 - 暂不设 `status` 轴，等实验 / 废弃状态真的出现再加。

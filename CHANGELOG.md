@@ -8,6 +8,9 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
 - Start one release version for every custom skill under `skills/`; reference
   repositories and non-skill library artifacts retain their own versions. Custom
   skills use standard frontmatter `metadata.version`, without a duplicate HTML version.
+- Move custom-skill catalog labels to `metadata.areas` / `metadata.targets`
+  string fields. Reject legacy skill HTML index comments while preserving
+  library metadata and ordinary report-template comments.
 - Add version consistency/sync/bump tooling. Patch is the default increment;
   minor and major are explicit choices. Generated catalogs stay synchronized.
 - Publish the initial `v0.1.0` and subsequent CI-approved main releases through
