@@ -178,3 +178,8 @@
 	url = https://github.com/ayghri/i-have-adhd
 	branch = main
 	ignore = dirty
+[submodule "ref/pstack"]
+	path = ref/pstack
+	url = https://github.com/backnotprop/pstack
+	branch = main
+	ignore = dirty
