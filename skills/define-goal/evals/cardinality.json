@@ -2,9 +2,10 @@
   "purpose": "Fresh-context scenarios for goal sizing, progressive outcomes, and numbered goal files. Grade semantics and saved artifacts rather than exact wording.",
   "procedure": [
     "Run each case in a fresh model context with the current define-goal skill loaded.",
-    "Use a fresh writable workspace per case unless the case supplies a different capability boundary. Inspect saved files as well as the final response against expected_mode, must_hold, and must_not_hold.",
+    "Use a fresh writable workspace per case unless the case supplies a different capability boundary. Inspect saved files as well as the final response against expected_mode, must_hold, and must_not_hold. When a case supplies setup files, create them in its workspace before the run and compare them afterwards.",
     "Each selected goal belongs in its own numbered Markdown file. Alternatives and unresolved choices are not an execution queue.",
-    "Do not tell the model the expected mode or suspected failure."
+    "Do not tell the model the expected mode or suspected failure.",
+    "expected_mode names the intended structure for the judge; pass or fail comes from must_hold and must_not_hold."
   ],
   "cases": [
     {
@@ -28,7 +29,7 @@
         "Return separate numbered goal files for the independently valuable outcomes in a proposed realization order.",
         "Give every goal its own end state and credible completion evidence.",
         "Preserve the unifying enterprise-readiness intent without creating an unfinishable umbrella goal.",
-        "Explain that the files are used in numeric order, one goal at a time, with provisional goals refined before activation."
+        "Explain the recommended order and each goal's prerequisite, with provisional goals refined before activation."
       ],
       "must_not_hold": [
         "Collapse all outcomes into one vague completion contract.",
@@ -71,7 +72,8 @@
         "Keep the vision as directional context rather than an executable umbrella goal.",
         "Keep funding and security-audit outcomes separately identifiable, with progressive outcomes where useful and honest.",
         "Distinguish the supplied long-term observation horizon from the agent feedback window; do not pretend six months of funding can be verified in twelve hours.",
-        "Preserve the supplied horizon, thresholds, and evidence in the relevant goal payloads."
+        "Preserve the supplied horizon, thresholds, and evidence in the relevant goal files.",
+        "State each goal's prerequisite so the funding and security-audit outcomes do not wait on each other."
       ],
       "must_not_hold": [
         "Force both outcomes into one completion contract.",
@@ -97,13 +99,14 @@
       "prompt": "Use define-goal to shape an ambitious research companion that eventually helps independent researchers synthesize their own papers, discover unexpected connections, and develop defensible new research directions. I only know basic search tools, so do not let my current feature ideas cap the ambition. The existing local app can import and display papers, and I have a small representative collection available. I want a real inspectable result about every 12 hours rather than waiting weeks for a large foundation. The final experience is one evolving product, not unrelated projects. Keep it local for now, and leave the later experience open to what we learn.",
       "expected_mode": "ordered-goal-files",
       "must_hold": [
-        "Save multiple separate Markdown goal files with sortable numeric prefixes and explain their realization order.",
+        "Save multiple separate Markdown goal files with sortable numeric prefixes and explain their recommended order and each goal's prerequisite.",
         "Preserve the ambitious research-companion intent in the goals without committing invented capabilities as user requirements.",
         "Make the earliest goal a meaningful observable use of real papers, not infrastructure or a progress report.",
         "Make the next goal bounded and verifiable while letting later goals be broader, explicitly provisional, and refinable before use.",
         "Allow later goals to build on and preserve earlier capabilities; independent cancellation is not required.",
         "Use roughly twelve hours as a sizing and feedback target, not a guaranteed deadline or automatic stop.",
-        "Give each file enough purpose and prerequisite context to be useful to a fresh downstream agent."
+        "Give each file enough purpose and prerequisite context to be useful to a fresh downstream agent.",
+        "Give the next goal a self-contained completion check whose evidence the executing agent can show within its own run."
       ],
       "must_not_hold": [
         "Return only one multi-week goal or only a first goal with the rest of the ambition omitted.",
@@ -152,11 +155,51 @@
       "must_hold": [
         "Return separate numbered filenames and complete proposed contents instead of claiming files were saved.",
         "Keep the same near-to-far progression, completion evidence, and provisional later goals as on a writable host.",
-        "Explain numeric-order use and refinement before activating provisional goals."
+        "Explain the recommended order, each goal's prerequisite, and refinement before activating provisional goals."
       ],
       "must_not_hold": [
         "Claim file creation, goal submission, execution, or activation.",
         "Require a particular runtime command or emit an implementation plan."
+      ]
+    },
+    {
+      "id": "refine-existing-series-on-disk",
+      "prompt": "Use define-goal on our existing series in goals/research-companion/. 001 is complete: you can ask questions over local papers and inspect the supporting passages. Feedback from actually using it: the most valuable moments were seeing where papers disagree with each other; similarity lists felt like noise. We also suspect 002 as written is too big for one feedback window; the disagreement view alone is a substantial piece. Refine the series accordingly, keep the long-term intent, and don't implement anything.",
+      "expected_mode": "refined-series",
+      "must_hold": [
+        "Revise the series inside goals/research-companion/ so the next goal focuses on where papers disagree, with traceable supporting passages as completion evidence.",
+        "Leave goal 001 unchanged as completed.",
+        "Keep the research-directions goal provisional and preserve its intent.",
+        "If any file is split, renamed, or renumbered, report the resulting files in order.",
+        "Leave NOTES.md unchanged."
+      ],
+      "must_not_hold": [
+        "Rewrite, delete, or renumber completed goal 001.",
+        "Leave two different goal files sharing the same numeric prefix, or leave a superseded file in place without marking it, so the sequence is ambiguous.",
+        "Implement anything, or add task checklists or implementation plans.",
+        "Discard the long-term research-companion intent."
+      ],
+      "setup": {
+        "goals/research-companion/001-grounded-answers.md": "# Goal 001: Grounded answers from my own papers\n\n## Purpose\nToward a local research companion that helps an independent researcher synthesize their own papers, discover unexpected connections, and develop defensible new research directions.\n\n## Intended advance\nA researcher can ask a natural-language question about the papers already imported into the existing local app and receive an answer that cites the specific supporting passages, which they can open and inspect.\n\n## Completion evidence\n- Realistic questions over the representative collection are answered with citations to passages that actually exist in the cited papers.\n- Each cited passage can be opened from the answer and visibly supports the claim.\n- When the collection does not support an answer, the app says so instead of fabricating one.\n\n## Bounds\n- Local only; no paper content leaves the machine.\n- Preserve existing import and display behavior.\n",
+        "goals/research-companion/002-paper-connections.md": "# Goal 002 (provisional): Explore meaningful connections between papers\n\nStatus: provisional; refine before activation.\n\n## Purpose\nBuilds on goal 001 (grounded answers) toward a companion that helps researchers discover unexpected connections and, later, defensible research directions.\n\n## Intended advance\nA researcher can explore meaningful connections between papers in their collection, with each connection traceable to the passages that justify it.\n\n## Provisional basis for acceptance\nConnections the researcher judges useful and non-obvious, each traceable to supporting passages. The exact experience (views, interaction, what counts as a connection) is intentionally left open.\n\n## Unresolved choices\n- What kinds of connections matter most to the researcher.\n- How connections should be presented and explored.\n",
+        "goals/research-companion/003-research-directions.md": "# Goal 003 (provisional): Toward defensible research directions\n\nStatus: provisional; refine after goal 002 results.\n\n## Purpose\nExtends the companion from understanding existing work toward proposing new, defensible research directions grounded in the researcher's own collection.\n\n## Intended advance\nThe researcher can develop candidate research directions justified by evidence from their papers, including gaps, tensions, and open questions.\n\n## Provisional basis for acceptance\nThe researcher can trace each proposed direction to its supporting and challenging evidence and judge whether it is defensible. Details depend on what goal 002 reveals.\n",
+        "goals/research-companion/NOTES.md": "# Research companion notes\n\n- Representative collection: about 40 PDFs kept outside this repo.\n- Acceptance reviewer: Dr. Lin (primary user).\n- Keep everything local; no cloud APIs.\n"
+      }
+    },
+    {
+      "id": "front-load-questions",
+      "prompt": "Use define-goal: move our public product documentation from the self-hosted wiki to a static docs site the team can maintain in our repository. I haven't decided whether every existing wiki URL must keep working or whether we can reorganize the docs freely, and I'm not sure yet whether to keep the old wiki online read-only afterwards or shut it down. I want goals I can hand to an agent and leave running unattended.",
+      "expected_mode": "questions-first, with provisional or independent goals",
+      "must_hold": [
+        "Ask the user both open decisions (keep every existing URL working versus reorganize freely; keep the old wiki read-only versus shut it down) together in this reply.",
+        "Keep every goal whose completion depends on an unanswered decision provisional, naming the open question, or withhold it until answered.",
+        "Make any goal presented as ready completable without asking the user anything further."
+      ],
+      "must_not_hold": [
+        "Create a goal whose work is to ask, interview, or confirm decisions with the user.",
+        "Silently pick an answer to either open decision and present it as the user's requirement.",
+        "Defer either decision into the executing agent's run (for example 'confirm with the user during the migration' or 'decide when you get there').",
+        "Prescribe an implementation plan, tool choice, or migration checklist."
       ]
     }
   ]

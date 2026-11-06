@@ -4,15 +4,16 @@
     "Run each case in a fresh model context with the current define-goal skill loaded.",
     "Use a fresh writable workspace and inspect numbered goal files as well as the final response against expected_mode, must_hold, and must_not_hold. If tools are unavailable, grade explicitly unsaved filenames and contents instead.",
     "Do not tell the model the expected mode, rubric, or suspected failure.",
-    "Run these cases alongside cardinality.json so domain transfer cannot weaken software behavior."
+    "Run these cases alongside cardinality.json so domain transfer cannot weaken software behavior.",
+    "expected_mode names the intended structure for the judge; pass or fail comes from must_hold and must_not_hold."
   ],
   "cases": [
     {
       "id": "qualitative-essay-quality",
       "prompt": "Use define-goal to shape this intention: write a high-quality 2,000-word essay for experienced product leaders explaining why constraints create strategy. It must avoid AI slop, read smoothly and feel human, offer original thinking, reveal non-obvious connections, and leave the reader with a genuine aha moment.",
-      "expected_mode": "single-goal",
+      "expected_mode": "single-goal or agent-goal-plus-external-acceptance",
       "must_hold": [
-        "Treat the finished essay as one completion judgment.",
+        "Treat the finished essay as one deliverable, without separate outline, drafting, or editing goals; if reader acceptance is a separate external-acceptance goal, it judges that same essay.",
         "Preserve the intended audience and qualitative qualities as acceptance conditions.",
         "Use credible editorial or target-reader judgment rather than the model's own confidence as completion evidence.",
         "Treat the aha effect as an intended reader response to assess, not a guaranteed reaction from every reader."
@@ -86,18 +87,18 @@
     },
     {
       "id": "legitimate-external-acceptance",
-      "prompt": "Use define-goal to shape this intention: secure formal board approval of the FY2027 expansion strategy by November 30, 2026. Completion evidence is the board vote and signed meeting minutes; management controls the proposal, but the board makes the approval decision.",
-      "expected_mode": "single-goal",
+      "prompt": "Use define-goal to shape this intention: secure formal board approval of next fiscal year's expansion strategy within the next 12 weeks. Completion evidence is the board vote and signed meeting minutes; management controls the proposal, but the board makes the approval decision.",
+      "expected_mode": "agent-goal-plus-external-acceptance",
       "must_hold": [
-        "Keep formal board approval as the legitimate desired end state.",
-        "Preserve the November 30, 2026 deadline as a material bound.",
-        "Use the supplied vote and signed minutes as authoritative completion evidence.",
-        "Represent the board's decision authority as an external dependency without treating approval as guaranteed."
+        "Keep formal board approval as the legitimate desired end state, evidenced by the supplied board vote and signed meeting minutes.",
+        "Preserve the 12-week deadline as a material bound.",
+        "Represent the board's decision authority as an external dependency without treating approval as guaranteed.",
+        "End the agent's own goal at a handoff that its work can establish and show within the feedback window, and keep the approval itself as a separate numbered external-acceptance goal that is recorded when the decision arrives rather than run by an agent."
       ],
       "must_not_hold": [
         "Silently replace approval with preparing or presenting the proposal.",
         "Declare the goal invalid merely because management does not control the vote.",
-        "Split proposal drafting or board scheduling into goals solely because approval depends on an external decision.",
+        "Split the agent's own preparation work (for example drafting and scheduling) into several agent goals, or make waiting itself a goal.",
         "Produce a lobbying, presentation, or governance plan."
       ]
     }

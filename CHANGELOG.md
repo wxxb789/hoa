@@ -3,6 +3,22 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## 2026-11-05 — define-goal verifiable goal files
+
+- **define-goal:** numbered goal files (which replaced the v1.2.0 `/goal` payloads before
+  0.1.0) now give each ready goal a standalone **Done when** section. It lists only what
+  the receiving agent can show during its run, keeps user-supplied validators without added
+  gates, and asks for a closing evidence report. Each file states its prerequisite, so one
+  numbered series can mark goals that run earlier or in parallel. When the request assigns
+  acceptance to someone else or to an event outside the feedback window, the agent goal ends
+  at a verifiable handoff and the acceptance becomes an external-acceptance goal that is
+  recorded, not run. Questions only the user can answer are asked together up front, and a
+  goal stays provisional while one would change it. Users write their own goal commands;
+  files carry no command text or size cap.
+- The define-goal judge fixtures follow this contract: the board case uses a relative deadline
+  and expects an agent goal plus external acceptance, and new cases cover revising a series
+  already on disk (`setup` files, checked by `validate_fixtures.py`) and front-loaded questions.
+
 ## 0.1.0 — unified custom-skill versioning
 
 - Start one release version for every custom skill under `skills/`; reference

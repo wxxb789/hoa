@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 FIXTURES = Path(__file__).resolve().parent
 
@@ -59,6 +59,14 @@ def validate(name: str) -> list[str]:
             if contradiction:
                 errors.append(f"{where}: same rubric item in both must_hold and "
                               f"must_not_hold: {contradiction}")
+        setup = case.get("setup")
+        if setup is not None and not (
+                isinstance(setup, dict) and setup
+                and all(isinstance(path, str) and path and isinstance(text, str)
+                        and not PurePosixPath(path).is_absolute()
+                        and ".." not in PurePosixPath(path).parts
+                        for path, text in setup.items())):
+            errors.append(f"{where}: setup must map relative file paths to file contents")
     return errors
 
 
