@@ -1,6 +1,6 @@
 ---
 name: hoa-introspect
-description: Produce an evidence-cited, cross-agent self-report with deterministic usage facets and a rigorously bounded blind-spot audit. Use only when explicitly asked for "my usage insights", "audit my work patterns", "where am I wasting effort", "blind spots", or a periodic "self-retro". Do not use for raw records or cross-agent search (use hoa-agent-retrieve), a single-session summary, qualifying findings into approved assets (use hoa-introspect-distill), or direct skill creation (use hoa-skill-work). Heavyweight and explicit-invocation-only; never invoke as a side effect of another skill.
+description: Produce an evidence-cited, cross-agent self-report with deterministic usage facets and a rigorously bounded blind-spot audit. Use only when explicitly asked for "my usage insights", "audit my work patterns", "where am I wasting effort", "blind spots", or a periodic "self-retro". Do not use for raw records or cross-agent search, a single-session summary, qualifying findings into approved assets (use hoa-introspect-distill), or direct skill creation (use hoa-skill-work). Heavyweight and explicit-invocation-only; never invoke as a side effect of another skill.
 metadata:
   version: "0.1.2"
   areas: "self-management,work-management"
@@ -21,9 +21,10 @@ observable work patterns within the supplied coverage only.
 
 ## Contract
 
-**Input.** Prefer a Retrieval Bundle from **hoa-agent-retrieve** if that sibling
-is installed. Do not require it: in bounded mode, accept only a user-provided
-bundle, user-provided paths, or records directly accessible in this runtime.
+**Input.** Prefer a manifest-first Retrieval Bundle in the consumed schema
+(hoa's `prompts/cross-agent-history-retrieval.md` can produce one). Without one,
+work in bounded mode: accept only user-provided paths or records directly
+accessible in this runtime.
 Say exactly what that restriction excludes. Read
 [the minimal consumed schema](references/bundle-schema.md) before parsing.
 

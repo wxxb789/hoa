@@ -74,7 +74,7 @@ spec-versus-created diff.
 - Keep personal paths, secrets, session ids, and raw history out of tracked assets and
   chat echoes. Use an untracked artifact location for sensitive reports.
 - Sibling composition is soft: if `hoa-introspect` is unavailable, accept a direct basis;
-  if `hoa-agent-retrieve` is unavailable, do not attempt raw retrieval here.
+  do not attempt raw history retrieval here.
 
 ## References
 

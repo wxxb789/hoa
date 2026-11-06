@@ -48,13 +48,13 @@
       "id": "route-to-search",
       "request": "Find out what the current stable version of the .NET SDK is; I don't have a URL.",
       "must_pick": ["ghc-search"],
-      "distractors": ["define-goal", "git-worktree-workflow", "my-ado-cppr"]
+      "distractors": ["define-goal", "parallel-agent-worktrees", "ado-commit-push-pr"]
     },
     {
       "id": "route-to-goal-definition",
       "request": "Help me turn 'make our product enterprise-ready' into goal prompts I can run one at a time, getting an inspectable result roughly every half day without dictating implementation.",
       "must_pick": ["define-goal"],
-      "distractors": ["ghc-search", "git-worktree-workflow"]
+      "distractors": ["ghc-search", "parallel-agent-worktrees"]
     },
     {
       "id": "route-to-goal-refinement",
@@ -65,32 +65,32 @@
     {
       "id": "route-to-worktree",
       "request": "I want to run Claude Code and Codex at the same time on this repo without them stepping on each other.",
-      "must_pick": ["git-worktree-workflow"],
-      "distractors": ["ghc-search", "my-ado-cppr", "define-goal"]
+      "must_pick": ["parallel-agent-worktrees"],
+      "distractors": ["ghc-search", "ado-commit-push-pr", "define-goal"]
     },
     {
       "id": "route-to-commit-push-pr",
       "request": "Commit my staged changes, push the branch, and open a PR on Azure DevOps.",
-      "must_pick": ["my-ado-cppr"],
-      "distractors": ["git-worktree-workflow", "ghc-search"]
+      "must_pick": ["ado-commit-push-pr"],
+      "distractors": ["parallel-agent-worktrees", "ghc-search"]
     },
     {
       "id": "route-to-retrieve-not-introspect",
       "request": "Find every session across my Claude Code and Codex history where I touched the auth module.",
-      "must_pick": ["hoa-agent-retrieve"],
+      "must_pick": ["cross-agent-history-retrieval"],
       "distractors": ["hoa-introspect", "hoa-introspect-distill"]
     },
     {
       "id": "route-to-introspect-not-retrieve",
       "request": "Audit my work patterns for blind spots and wasted effort over the last month.",
       "must_pick": ["hoa-introspect"],
-      "distractors": ["hoa-agent-retrieve", "hoa-introspect-distill", "hoa-skill-review"]
+      "distractors": ["cross-agent-history-retrieval", "hoa-introspect-distill", "hoa-skill-review"]
     },
     {
       "id": "route-to-distill",
       "request": "From this work-pattern report, qualify recurring deployment-checklist findings as candidates for a skill; ask me to approve a candidate before creating anything.",
       "must_pick": ["hoa-introspect-distill"],
-      "distractors": ["hoa-introspect", "hoa-agent-retrieve", "hoa-skill-work"]
+      "distractors": ["hoa-introspect", "cross-agent-history-retrieval", "hoa-skill-work"]
     },
     {
       "id": "route-recurring-pattern-direct-create",

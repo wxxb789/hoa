@@ -31,19 +31,19 @@ targets:  runtime-agnostic | repo-only |
 |---|---|---|---|---|---|
 | define-goal | skill | self-management,software-development,work-management | runtime-agnostic | `skills/define-goal/` | preserve ambitious intent in numbered goal files, with clear near-term and provisional later outcomes, not implementation plans |
 | ghc-search | skill | software-development | runtime-agnostic | `skills/ghc-search/` | web and X/Twitter search via a local ghc-proxy Responses API; answer plus deduped sources |
-| git-worktree-workflow | skill | software-development,work-management | runtime-agnostic | `skills/git-worktree-workflow/` | run several agent CLIs in parallel on one repo via isolated worktrees; ships the `gitwt` helper |
-| hoa-agent-retrieve | skill | self-management,software-development | runtime-agnostic | `skills/hoa-agent-retrieve/` | cross-agent history → coverage-manifested, deduped Retrieval Bundle |
 | hoa-introspect | skill | self-management,work-management | runtime-agnostic | `skills/hoa-introspect/` | layered self-report: deterministic usage facets (L1) + evidence-cited blind-spot audit (L2) |
 | hoa-introspect-distill | skill | self-management,software-development | runtime-agnostic | `skills/hoa-introspect-distill/` | qualify supplied recurring-work findings as candidates; create only after individual approval |
 | hoa-skill-review | skill | software-development,work-management,self-management | runtime-agnostic | `skills/hoa-skill-review/` | review skill behavior and changes against consumer evidence without editing the target |
 | hoa-skill-work | skill | software-development,work-management,self-management | runtime-agnostic | `skills/hoa-skill-work/` | directly create or evolve a defined skill with focused, risk-scaled validation |
 | m365-copilot-cdp | skill | software-development,work-management | runtime-agnostic | `skills/m365-copilot-cdp/` | operate desktop Copilot Chat and Code through CDP with model selection and reply reads |
-| my-ado-cppr | skill | software-development | runtime-agnostic | `skills/my-ado-cppr/` | commit → push → create/update PR on Azure DevOps or GitHub; probe/plan/apply with resumable state |
 | teams-cdp | skill | work-management | runtime-agnostic | `skills/teams-cdp/` | send Teams messages to exact people or existing groups through local desktop CDP |
 | skill-scout | agent | software-development,work-management | repo-only | `agents/skill-scout.md` | read-only search for an existing skill when asked to check before authoring; never create one |
 | ghc-proxy | mcp | software-development | repo-only | `mcps/ghc-proxy.md` | portable definition of the local ghc-proxy search service; registration stays in chezmoi |
 | typed-verification-gates | orchestration | software-development | repo-only | `orchestration/typed-verification-gates.md` | every loop iteration ends at a gate typed programmatic / judge / human, declared before the work |
+| ado-commit-push-pr | prompt | software-development | repo-only | `prompts/ado-commit-push-pr.md` | one-shot commit → push → PR request for Azure DevOps or GitHub, with house conventions and az/gh pitfalls |
+| cross-agent-history-retrieval | prompt | self-management,software-development | repo-only | `prompts/cross-agent-history-retrieval.md` | one-shot search/export of local agent histories with per-source coverage, dedup, and redaction |
 | fresh-context-grader | prompt | software-development,work-management | repo-only | `prompts/fresh-context-grader.md` | one-shot judge prompt: grade a response against a rubric written before it existed |
+| parallel-agent-worktrees | prompt | software-development,work-management | repo-only | `prompts/parallel-agent-worktrees.md` | one-shot setup of one git worktree per agent CLI: layout, env/port isolation, fail-closed setup, safe cleanup |
 | generated-means-generated | rule | software-development,work-management,self-management | repo-only | `rules/generated-means-generated.md` | generated files are never hand-edited; regeneration rides the same commit and drift fails CI |
 | adopt-a-pattern | workflow | software-development | repo-only | `workflows/adopt-a-pattern.md` | finite recipe turning a ref-map what-to-steal note into a landed, classified, attributed artifact |
 
