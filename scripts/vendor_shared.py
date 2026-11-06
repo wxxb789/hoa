@@ -26,7 +26,6 @@ CONSUMERS: dict[str, list[str]] = {
     "safety.py": [
         "skills/hoa-introspect/scripts",
         "skills/hoa-introspect-distill/scripts",
-        "skills/hoa-agent-retrieve/scripts",
     ],
     **{
         name: ["skills/teams-cdp/scripts", "skills/m365-copilot-cdp/scripts"]

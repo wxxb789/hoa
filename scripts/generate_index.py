@@ -70,14 +70,6 @@ NOTES = {
         "preserve ambitious intent in numbered goal files, with clear near-term and provisional later outcomes, not implementation plans",
         "把雄心转化为编号 goal 文件，近期清晰、远期可细化，不制定实现步骤",
     ),
-    "git-worktree-workflow": (
-        "run several agent CLIs in parallel on one repo via isolated worktrees; ships the `gitwt` helper",
-        "用隔离的 worktree 在同一仓库并行运行多个 agent CLI；随附 `gitwt` 助手",
-    ),
-    "hoa-agent-retrieve": (
-        "cross-agent history → coverage-manifested, deduped Retrieval Bundle",
-        "跨 agent 历史 → 带 coverage manifest、已去重的 Retrieval Bundle",
-    ),
     "hoa-introspect": (
         "layered self-report: deterministic usage facets (L1) + evidence-cited blind-spot audit (L2)",
         "分层自省报告：确定性使用 facets（L1）+ 带证据的盲点审计（L2）",
@@ -85,10 +77,6 @@ NOTES = {
     "hoa-introspect-distill": (
         "qualify supplied recurring-work findings as candidates; create only after individual approval",
         "评估给定的重复工作发现为候选；逐项批准后才创建资产",
-    ),
-    "my-ado-cppr": (
-        "commit → push → create/update PR on Azure DevOps or GitHub; probe/plan/apply with resumable state",
-        "commit → push → 在 Azure DevOps 或 GitHub 创建/更新 PR；probe/plan/apply 三段式，状态可 resume",
     ),
     "skill-scout": (
         "read-only search for an existing skill when asked to check before authoring; never create one",
@@ -105,6 +93,18 @@ NOTES = {
     "fresh-context-grader": (
         "one-shot judge prompt: grade a response against a rubric written before it existed",
         "一次性评审 prompt：用先于回答写好的 rubric 在全新上下文里评分",
+    ),
+    "ado-commit-push-pr": (
+        "one-shot commit → push → PR request for Azure DevOps or GitHub, with house conventions and az/gh pitfalls",
+        "一次性 commit → push → PR 请求模板（Azure DevOps 或 GitHub），附提交约定与 az/gh 易错点",
+    ),
+    "cross-agent-history-retrieval": (
+        "one-shot search/export of local agent histories with per-source coverage, dedup, and redaction",
+        "一次性检索/导出本机各 agent 历史，按来源报告覆盖、去重并打码",
+    ),
+    "parallel-agent-worktrees": (
+        "one-shot setup of one git worktree per agent CLI: layout, env/port isolation, fail-closed setup, safe cleanup",
+        "一次性为每个 agent CLI 建独立 git worktree：布局、env/端口隔离、fail-closed 初始化、安全清理",
     ),
     "adopt-a-pattern": (
         "finite recipe turning a ref-map what-to-steal note into a landed, classified, attributed artifact",

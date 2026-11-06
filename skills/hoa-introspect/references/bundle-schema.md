@@ -2,7 +2,8 @@
 
 `hoa-introspect` consumes the public contract below. It intentionally does not
 define discovery paths, agent adapters, or source catalogs; those belong to
-**hoa-agent-retrieve** when it is available.
+whatever produced the bundle (for example hoa's
+`prompts/cross-agent-history-retrieval.md`).
 
 Narrative report language is configured separately through untracked
 `report_language` (default `en-US`); this machine-readable schema, including

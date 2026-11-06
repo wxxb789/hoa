@@ -1,2 +1,0 @@
-{"session_id":"demo-root","timestamp":"2026-07-01T10:00:00Z","role":"user","project":"fake-project","text":"Investigate synthetic auth failure."}
-{"session_id":"demo-branch","parent_id":"demo-root","timestamp":"2026-07-01T10:01:00Z","role":"assistant","project":"fake-project","text":"Synthetic branch reply."}
