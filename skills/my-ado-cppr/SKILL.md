@@ -2,7 +2,7 @@
 name: my-ado-cppr
 description: Commit local changes, push branches, and create or update PRs in Azure DevOps or GitHub repositories. Use when asked to commit/push and open PRs, automate ADO work item linking/auto-complete, or create GitHub PRs (ignore work items for GitHub).
 metadata:
-  version: "0.1.1"
+  version: "0.1.2"
   areas: "software-development"
   targets: "runtime-agnostic"
 ---
