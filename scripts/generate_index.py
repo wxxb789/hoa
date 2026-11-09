@@ -150,6 +150,22 @@ NOTES = {
         "per-channel prose contracts behind one content-first layer: blog, academic, X, Reddit, 小红书, 公众号, tutorial, changelog; plus a measurable AI-smell audit",
         "一套内容优先的共同层加分渠道契约：博客、论文、X、Reddit、小红书、公众号、教程、changelog；附可量化的 AI 味自查",
     ),
+    "skill-library-curation": (
+        "review a skill library by evidence: inventory, overlap groups, installer provenance, upstream freshness; recommendations never change state",
+        "按证据审查技能库：清点、重叠分组、安装来源、上游新鲜度；建议不改动状态",
+    ),
+    "ops-claim-verification": (
+        "turn a scheduled-job, repair or deployment claim into evidence: find the recording surface, separate manual from scheduled runs, audit the auditor",
+        "把定时任务、修复或部署的说法变成证据：找准记录面、区分手动与调度运行、审查审计者",
+    ),
+    "harness-engineering": (
+        "audit and restructure harness scripts: self-containment, obligations bound to owner decisions, pure checks plus one thin runner, net-negative line budget",
+        "审计与重构 harness 脚本：自包含、检查绑定 owner 决策、纯函数检查加薄 runner、净减行数",
+    ),
+    "agent-operating-contract-evolution": (
+        "evolve an agent's identity file and operating protocol by layer, with coverage markers, behavioral evals, and load-scope probes",
+        "按分层演进 agent 身份文件与操作协议：覆盖标记、行为评测、加载范围探测",
+    ),
 }
 
 KV = re.compile(r"(\w+)\s*=\s*([^;]+)")

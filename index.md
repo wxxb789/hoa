@@ -29,6 +29,7 @@ targets:  runtime-agnostic | repo-only |
 
 | Artifact | Type | Areas | Targets | Path | Notes |
 |---|---|---|---|---|---|
+| agent-operating-contract-evolution | skill | software-development,work-management,self-management | runtime-agnostic | `skills/agent-operating-contract-evolution/` | evolve an agent's identity file and operating protocol by layer, with coverage markers, behavioral evals, and load-scope probes |
 | define-goal | skill | self-management,software-development,work-management | runtime-agnostic | `skills/define-goal/` | preserve ambitious intent in numbered goal files, with clear near-term and provisional later outcomes, not implementation plans |
 | delegated-work-acceptance | skill | work-management,software-development | runtime-agnostic | `skills/delegated-work-acceptance/` | verify a delegated "done" against the artifact, the re-derived numbers and the write boundary |
 | dotnet-repo-workflow | skill | software-development | runtime-agnostic | `skills/dotnet-repo-workflow/` | run the repo's own .NET gate harness instead of a hand-rolled `dotnet test`; lock files, Roslyn harness traps, merge-ready checklist |
@@ -36,6 +37,7 @@ targets:  runtime-agnostic | repo-only |
 | ghc-search | skill | software-development | runtime-agnostic | `skills/ghc-search/` | web and X/Twitter search via a local ghc-proxy Responses API; answer plus deduped sources |
 | goal-driven-delivery | skill | software-development,work-management | runtime-agnostic | `skills/goal-driven-delivery/` | goal contract → agent-authored stages → operator-run gates → scripted merge gate → resumable ledger; ships `gdd.py`, `delivery-state.py`, `pr-merge-check.py` |
 | grounded-citations | skill | work-management,software-development | runtime-agnostic | `skills/grounded-citations/` | numbered citation ledger owned by a script: register at retrieval, cite per sentence, render and verify; ships `sources.py` |
+| harness-engineering | skill | software-development | runtime-agnostic | `skills/harness-engineering/` | audit and restructure harness scripts: self-containment, obligations bound to owner decisions, pure checks plus one thin runner, net-negative line budget |
 | hoa-introspect | skill | self-management,work-management | runtime-agnostic | `skills/hoa-introspect/` | layered self-report: deterministic usage facets (L1) + evidence-cited blind-spot audit (L2) |
 | hoa-introspect-distill | skill | self-management,software-development | runtime-agnostic | `skills/hoa-introspect-distill/` | qualify supplied recurring-work findings as candidates; create only after individual approval |
 | hoa-skill-review | skill | software-development,work-management,self-management | runtime-agnostic | `skills/hoa-skill-review/` | review skill behavior and changes against consumer evidence without editing the target |
@@ -43,7 +45,9 @@ targets:  runtime-agnostic | repo-only |
 | html-artifact | skill | software-development,work-management | runtime-agnostic | `skills/html-artifact/` | single-file, dependency-free HTML explainers, plans, reports, diagrams and throwaway editors on one house style |
 | m365-copilot-cdp | skill | software-development,work-management | runtime-agnostic | `skills/m365-copilot-cdp/` | operate desktop Copilot Chat and Code through CDP with model selection and reply reads |
 | omp-headless-orchestration | skill | software-development,work-management | pi | `skills/omp-headless-orchestration/` | detached tmux launcher for long `omp -p` runs; polled completion, session-id recovery |
+| ops-claim-verification | skill | software-development,work-management | runtime-agnostic | `skills/ops-claim-verification/` | turn a scheduled-job, repair or deployment claim into evidence: find the recording surface, separate manual from scheduled runs, audit the auditor |
 | report-claim-audit | skill | work-management,software-development | runtime-agnostic | `skills/report-claim-audit/` | recount every report claim from the artifact that owns it, diff the deliverable set, and price the open decisions |
+| skill-library-curation | skill | software-development,self-management | runtime-agnostic | `skills/skill-library-curation/` | review a skill library by evidence: inventory, overlap groups, installer provenance, upstream freshness; recommendations never change state |
 | teams-cdp | skill | work-management | runtime-agnostic | `skills/teams-cdp/` | send Teams messages to exact people or existing groups through local desktop CDP |
 | writing | skill | work-management,self-management | runtime-agnostic | `skills/writing/` | per-channel prose contracts behind one content-first layer: blog, academic, X, Reddit, 小红书, 公众号, tutorial, changelog; plus a measurable AI-smell audit |
 | skill-scout | agent | software-development,work-management | repo-only | `agents/skill-scout.md` | read-only search for an existing skill when asked to check before authoring; never create one |
