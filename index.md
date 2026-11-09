@@ -30,12 +30,16 @@ targets:  runtime-agnostic | repo-only |
 | Artifact | Type | Areas | Targets | Path | Notes |
 |---|---|---|---|---|---|
 | define-goal | skill | self-management,software-development,work-management | runtime-agnostic | `skills/define-goal/` | preserve ambitious intent in numbered goal files, with clear near-term and provisional later outcomes, not implementation plans |
+| delegated-work-acceptance | skill | work-management,software-development | runtime-agnostic | `skills/delegated-work-acceptance/` | verify a delegated "done" against the artifact, the re-derived numbers and the write boundary |
+| dotnet-repo-workflow | skill | software-development | runtime-agnostic | `skills/dotnet-repo-workflow/` | .NET gate harness over hand-rolled `dotnet test`, lock files, Roslyn harness traps, PR merge-ready checklist |
 | ghc-search | skill | software-development | runtime-agnostic | `skills/ghc-search/` | web and X/Twitter search via a local ghc-proxy Responses API; answer plus deduped sources |
+| goal-driven-delivery | skill | software-development,work-management | runtime-agnostic | `skills/goal-driven-delivery/` | goal contract → agent-authored stages → operator verification → scripted merge gate → resumable ledger; ships `gdd.py`, `delivery-state.py`, `pr-merge-check.py` |
 | hoa-introspect | skill | self-management,work-management | runtime-agnostic | `skills/hoa-introspect/` | layered self-report: deterministic usage facets (L1) + evidence-cited blind-spot audit (L2) |
 | hoa-introspect-distill | skill | self-management,software-development | runtime-agnostic | `skills/hoa-introspect-distill/` | qualify supplied recurring-work findings as candidates; create only after individual approval |
 | hoa-skill-review | skill | software-development,work-management,self-management | runtime-agnostic | `skills/hoa-skill-review/` | review skill behavior and changes against consumer evidence without editing the target |
 | hoa-skill-work | skill | software-development,work-management,self-management | runtime-agnostic | `skills/hoa-skill-work/` | directly create or evolve a defined skill with focused, risk-scaled validation |
 | m365-copilot-cdp | skill | software-development,work-management | runtime-agnostic | `skills/m365-copilot-cdp/` | operate desktop Copilot Chat and Code through CDP with model selection and reply reads |
+| omp-headless-orchestration | skill | software-development,work-management | pi | `skills/omp-headless-orchestration/` | detached tmux + NDJSON launcher for `omp -p` runs; polled completion, session-id recovery |
 | teams-cdp | skill | work-management | runtime-agnostic | `skills/teams-cdp/` | send Teams messages to exact people or existing groups through local desktop CDP |
 | skill-scout | agent | software-development,work-management | repo-only | `agents/skill-scout.md` | read-only search for an existing skill when asked to check before authoring; never create one |
 | ghc-proxy | mcp | software-development | repo-only | `mcps/ghc-proxy.md` | portable definition of the local ghc-proxy search service; registration stays in chezmoi |
