@@ -7,7 +7,7 @@ description: >-
   identity, routing, delegation, or persistence. Not for ordinary repo coding rules, and not for
   one-off task notes.
 metadata:
-  version: "0.1.16"
+  version: "0.1.17"
   areas: "software-development,work-management,self-management"
   targets: "runtime-agnostic"
 ---
