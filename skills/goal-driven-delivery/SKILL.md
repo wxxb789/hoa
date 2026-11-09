@@ -311,6 +311,10 @@ into it.
   and the next session cannot tell "not started" from "implemented, awaiting review".
 - **A commit message written through a shell heredoc containing `&` is treated as backgrounding.**
   Write the message to a file with the file tool and `git commit -F <path>`.
+- **A post-merge version bump invalidates every open branch.** When the repo's release job mirrors
+  a new version into every artifact after each merge, a branch cut before that bump fails the version
+  check on the pull-request *merge ref* while passing on its own head. Rebase onto `origin/main`, run
+  the repo's version sync, and re-verify before merging — not after CI goes red.
 - **Never run the full gate chain twice on one commit.** If CI runs the whole chain, let CI print it on
   the pushed commit; if CI is only a light cross-OS check and the real gates live in the build harness,
   your local run is the only full-chain evidence and you run it on the final tree. One of them is the
