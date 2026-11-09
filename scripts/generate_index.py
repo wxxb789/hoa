@@ -130,6 +130,26 @@ NOTES = {
         "portable definition of the local ghc-proxy search service; registration stays in chezmoi",
         "本地 ghc-proxy 搜索服务的可移植定义；注册留在 chezmoi",
     ),
+    "report-claim-audit": (
+        "recount every report claim from the artifact that owns it, diff the deliverable set, and price the open decisions",
+        "从各自的权威 artifact 重算每条报告声明、对账交付集合，并给待决事项定价",
+    ),
+    "evidence-backed-analytical-writing": (
+        "evidence map plus a claim → evidence → mechanism → limitation spine for Chinese analytical reports; recency window, status ladder, negative findings",
+        "中文分析报告：证据地图与「主张 → 证据 → 机制 → 局限」骨架；时效边界、状态阶梯、否定性结论",
+    ),
+    "grounded-citations": (
+        "numbered citation ledger owned by a script: register at retrieval, cite per sentence, render and verify; ships `sources.py`",
+        "脚本持有编号引用账本：检索即登记、逐句引用、机械渲染并可校验；随附 `sources.py`",
+    ),
+    "html-artifact": (
+        "single-file, dependency-free HTML explainers, plans, reports, diagrams and throwaway editors on one house style",
+        "零依赖单文件 HTML：解释文、计划、报告、图表与一次性编辑器，统一 house style",
+    ),
+    "writing": (
+        "per-channel prose contracts behind one content-first layer: blog, academic, X, Reddit, 小红书, 公众号, tutorial, changelog; plus a measurable AI-smell audit",
+        "一套内容优先的共同层加分渠道契约：博客、论文、X、Reddit、小红书、公众号、教程、changelog；附可量化的 AI 味自查",
+    ),
 }
 
 KV = re.compile(r"(\w+)\s*=\s*([^;]+)")
