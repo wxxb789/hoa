@@ -69,6 +69,10 @@ If the contract fails any clause, fix the contract — do not dispatch and hope.
 
 ## Phase 1 — branch and dispatch
 
+0. Read the contract before anything else: every "Done when" clause and negative control in the goal
+   file is binding, the accepted design doc owns the mechanism (do not reopen a decided dependency),
+   and the shipped predecessor's completion record tells you what already exists, its residual limits,
+   and which behaviours are deliberate non-goals.
 1. `git fetch origin --prune`, fast-forward `main`, branch `feat/<kebab-outcome>` **from
    `origin/main`**, never from a stale local main. Report the base SHA every time.
 2. Dispatch one implementation run carrying the goal file, the repo's contract docs, the most recent
@@ -126,6 +130,22 @@ The agent's report is a claim, never evidence:
    mirror an internal shape are not.
 3. Dispatch `fix` with a per-finding table requirement and an explicit reason for anything judged
    invalid. A silent skip reopens next round — that is why the table is mandatory.
+4. **Reproduce every finding yourself before dispatching it**, inside the repo, and give the fixer the
+   measured before/after rather than a description. A finding that is merely consistent with documented
+   semantics is still unverified, and a plausible false positive costs a 20–40 minute agent round.
+5. **Classify before dispatching: regression or pre-existing.** If this goal added one of two paths that
+   now disagree about the same input (producer vs renderer, writer vs reader, resolver vs sanitiser), it
+   is in scope. If the divergence is decided in the predecessor's completion record, it is not a defect —
+   say why in the reply instead of dispatching it.
+6. **When two rounds hit the same class, the third dispatch changes the mechanism** — collapse to one
+   function, one uniform rule, or drop the path that re-derives the value. Demand a property test over a
+   generated matrix instead of hand-picked rows, and require the prompt to prove no second copy of the
+   rule remains (`grep` plus `file:line`). Cover every field and every authored shape the new function
+   touches in that same dispatch, not just the one the finding named.
+7. **A residual limit already recorded does not discharge a finding.** When the reviewer names exactly
+   the case the goal record lists as a known limit, that limit is unpaid debt: implement the resolution
+   or make the omission explicit in code, then rewrite the limit. "Documented, therefore out of scope"
+   keeps a known-wrong value shipping.
 
 ## Phase 5 — gates, commit, PR
 
@@ -136,8 +156,11 @@ The agent's report is a claim, never evidence:
    `test "$(git merge-base HEAD origin/main)" = "$(git rev-parse origin/main)"`; when it fails, a sibling
    PR merged mid-increment and you must rebase onto `origin/main` first, or the review range is not
    exactly one increment.
-3. The PR body is a contract artifact: what landed, decisions with explicit non-adoptions, one
-   evidence table with its tier and counter, a **Known limits** section, and the real test plan.
+3. The PR body is a contract artifact — shape in [`references/pr-body.md`](references/pr-body.md):
+   what landed by subsystem, decisions with explicit non-adoptions naming the goal that owns them, one
+   evidence table measured on the **final** tree, every "Done when" clause mapped to the command that
+   observes it, and a **Known limits** section. Copy the previous goal's merged PR body as the starting
+   shape rather than inventing one per goal.
 4. Treat PR checks as a floor, not a gate — Phase 6 decides.
 
 ## Phase 6 — merge gate (mechanical, not remembered)
@@ -160,10 +183,29 @@ on any other basis:
 
 Then `gh pr merge <N> --squash --delete-branch`, `git fetch --prune`, `git checkout main`,
 `git pull --ff-only`, prove `gh pr view <N> --json headRefOid` equals the head you verified, report.
+Land and re-branch in one sequence so the next goal starts from the merged head:
+
+```bash
+gh pr merge <N> --squash --delete-branch
+gh pr view <N> --json state,mergeCommit --jq '"\(.state) \(.mergeCommit.oid)"'
+git checkout -q main && git pull -q --ff-only && git checkout -q -b feat/<next-goal-slug>
+```
+
+A PR that reads `MERGED` while `origin/main` still shows the old head means main had not been fetched,
+not that the merge failed. **Done** is merged *and* the next goal branched off the merged head — an
+open PR is not done.
+
+Bounded CI watching: `scripts/watch-pr-checks.sh <PR> [max_reruns] [max_polls] [logfile]` waits for a
+settled verdict, reruns only jobs that died on an infra step (<60 s fail), and logs every poll. A
+download step failing in under a minute is infra — `gh run rerun <run-id> --failed` first, then look
+at the code.
 
 A review bot typically posts minutes AFTER CI turns green; a merge fired at "checks pass" skips it
 every time. A push does not trigger a re-review — request one and match the marker's `commit_sha` to
-the NEW head; the old review keeps the old sha and looks finished.
+the NEW head; the old review keeps the old sha and looks finished. The bot writes its marker when the
+review *starts* (`status: running`) with the new sha already in it, so a poll that matches the sha alone
+returns a fake verdict on the first iteration — test `completed` and the sha together. Request/read/
+resolve commands, thread ids and infra-flake handling: [`references/bot-review-loop.md`](references/bot-review-loop.md).
 
 ## Phase 7 — durable state (what makes the next session possible)
 
@@ -220,6 +262,16 @@ outputs, so run the repo's build before any gate that reads compiled assemblies;
 builds at once on a host sized for one — that is an OOM kill of whichever run loses, not a code
 failure. Launcher contract, artifacts, recovery and liveness: [`references/transport.md`](references/transport.md).
 
+## Reporting mid-flight
+
+One status line first (state + head SHA + what is running), then evidence bullets with paths, then the
+next step — never a narrative of tool calls. Keep the task dir's `state.md` current per phase via
+`delivery-state.py` and name the watcher job and log path so the operator can re-check without you.
+Derive the answer from evidence (`show`, `git log --oneline -2`, `git status --short`,
+`gh pr list --state all`), never from the run you remember: hours pass between turns while other runs
+advance the repo, so a remembered status is stale by construction. When a round contradicts what you
+said earlier, say what changed and why.
+
 ## Stop conditions — when to stop and ask
 
 - Red line touched: destructive/irreversible action, production, credentials, public release, or
@@ -257,13 +309,31 @@ into it.
   meaning anything.
 - **A stalled increment with no ledger row is the expensive failure.** Work sits in a dirty worktree
   and the next session cannot tell "not started" from "implemented, awaiting review".
+- **A commit message written through a shell heredoc containing `&` is treated as backgrounding.**
+  Write the message to a file with the file tool and `git commit -F <path>`.
+- **Never run the full gate chain twice on one commit.** If CI runs the whole chain, let CI print it on
+  the pushed commit; if CI is only a light cross-OS check and the real gates live in the build harness,
+  your local run is the only full-chain evidence and you run it on the final tree. One of them is the
+  authority.
+- **Re-measure the goal record's numbers on the final tree.** Fix rounds applied after the record was
+  written leave it certifying an earlier tree — pass counts, bytes and digests all drift — so refresh
+  them as the last step before landing.
+- **Put the project's own toolchain first on `PATH` before running its gates.** An ambient interpreter
+  below the project's floor fails in a way that reads like a code defect.
+- **A late completion notification is not news.** Read `state.json`, the ledger and the repo first; it
+  usually describes work you already landed.
 
 ## Support files
 
 - `references/stage-templates/` — stage prompts rendered by `gdd.py`; the only copy of prompt text.
 - `references/phase-prompts.md` — the variable table for those templates (no prompt bodies).
 - `references/transport.md` — launcher contract, artifacts, recovery, liveness.
+- `references/bot-review-loop.md` — request/read/resolve cycle for an external review bot, marker
+  shape, thread ids, infra vs real CI failure.
+- `references/pr-body.md` — the PR body shape for a goal increment (evidence table, non-adoptions,
+  clause→evidence mapping).
 - `references/evidence-fairness.md` — making a "cheaper/faster" claim survive review.
 - `references/profiles/_template.md` — per-repo profile template.
 - `scripts/` — `gdd.py` (dispatch), `delivery-state.py` (ledger/resume), `pr-merge-check.py`
-  (merge gate), `adapters/omp-run.sh` (reference tmux launcher), `tests/run-gdd-selftest.sh`.
+  (merge gate), `watch-pr-checks.sh` (bounded CI poller with infra-only rerun),
+  `adapters/omp-run.sh` (reference tmux launcher), `tests/run-gdd-selftest.sh`.
