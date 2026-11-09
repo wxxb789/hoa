@@ -402,7 +402,13 @@ def main(argv=None) -> int:
                       f"python scripts/generate_index.py", file=sys.stderr)
                 status = 1
         else:
-            target.write_text(content, encoding="utf-8")
+            # Preserve the file's existing line-ending style: this repo stores the
+            # catalog with CRLF, and writing LF here would leave every local generate
+            # run looking like a whole-file edit (the --check comparison reads with
+            # universal newlines, so both styles pass it).
+            if target.exists() and b"\r\n" in target.read_bytes()[:2048]:
+                content = content.replace("\n", "\r\n")
+            target.write_bytes(content.encode("utf-8"))
             print(f"wrote {filename} ({len(rows)} artifacts)")
     return status
 
