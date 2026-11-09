@@ -7,7 +7,7 @@ description: >-
   end, including the merge. Do not use for one-line fixes, exploration with no acceptance criteria, or
   work no machine can check (that is a conversation, not a delivery).
 metadata:
-  version: "0.1.10"
+  version: "0.1.11"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
 ---
@@ -311,10 +311,11 @@ into it.
   and the next session cannot tell "not started" from "implemented, awaiting review".
 - **A commit message written through a shell heredoc containing `&` is treated as backgrounding.**
   Write the message to a file with the file tool and `git commit -F <path>`.
-- **A post-merge version bump invalidates every open branch.** When the repo's release job mirrors
-  a new version into every artifact after each merge, a branch cut before that bump fails the version
-  check on the pull-request *merge ref* while passing on its own head. Rebase onto `origin/main`, run
-  the repo's version sync, and re-verify before merging — not after CI goes red.
+- **A release job that bumps after the merge invalidates every other open branch.** If the repo mirrors
+  a new version into artifacts on each main push, a branch cut before that bump passes the version check
+  on its own head and fails it on the pull-request *merge ref*. Either the repo has each pull request
+  bump its own patch (then a rebase onto a newer main means bumping again) or you rebase and re-sync
+  before merging — never after CI goes red.
 - **Never run the full gate chain twice on one commit.** If CI runs the whole chain, let CI print it on
   the pushed commit; if CI is only a light cross-OS check and the real gates live in the build harness,
   your local run is the only full-chain evidence and you run it on the final tree. One of them is the

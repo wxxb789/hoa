@@ -119,11 +119,14 @@ python scripts/version.py bump        # patch by default: 0.1.0 -> 0.1.1
 python scripts/version.py bump minor  # explicit minor; major is also supported
 ```
 
-After CI succeeds on `main`, the release job publishes the current untagged version
-(initially `v0.1.0`). Later normal updates bump patch automatically. Manual CI
-dispatch can choose patch, minor, or major. Publication retains the browser/CDP
-tests and all existing repository gates, serializes releases, rejects stale tested
-heads, and pushes the version commit and tag atomically without force.
+Every pull request bumps the patch itself: CI requires `VERSION` to be exactly
+`origin/main`'s version with the patch component +1, so a branch cut before another
+merge must rebase and run `python scripts/version.py bump` again. After CI succeeds
+on `main`, the release job only tags the version already committed by the merged
+pull request (initially `v0.1.0` is published as-is); it never bumps or creates a
+version commit. Publication retains the browser/CDP tests and all existing
+repository gates, serializes releases, rejects stale tested heads, and pushes the
+tag atomically without force.
 
 Local version commands never commit or push. The CI-only release helper requires
 `contents: write`; branch protection must permit its normal push. It does not

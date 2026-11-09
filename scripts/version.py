@@ -6,6 +6,7 @@ Usage:
     python scripts/version.py sync        # mirror VERSION and regenerate indexes
     python scripts/version.py bump        # patch by default; prints new version
     python scripts/version.py bump minor  # or major; resets lower components
+    python scripts/version.py check-bump  # PR guard: exactly one patch above origin/main
 
 Only skills/<name>/SKILL.md metadata.version scalars, the two generated indexes,
 and VERSION are writable. Library versions and ref/ are independent. Every input
@@ -13,13 +14,15 @@ is validated before staging writes; each replacement is atomic and VERSION
 is replaced last. Handled write failures roll back completed replacements.
 Temporary write staging stays under .tmp-artifacts/version-write/. A process
 kill or concurrent writer is not a multi-file transaction: run check before
-using or publishing an interrupted tree. No Git commands are run by this script.
+using or publishing an interrupted tree. No Git commands are run by this script
+except check-bump, which reads origin/main:VERSION from the local repository.
 """
 from __future__ import annotations
 
 import argparse
 import os
 import stat
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -78,7 +81,7 @@ def _custom_skills() -> list[Path]:
 
 
 
-def _prepare(part: str | None) -> tuple[str, list[tuple[Path, bytes | None, bytes]]]:
+def _marker() -> tuple[Path, bytes, str, str]:
     marker = ROOT / "VERSION"
     _safe_path(marker)
     original = marker.read_bytes()
@@ -86,6 +89,11 @@ def _prepare(part: str | None) -> tuple[str, list[tuple[Path, bytes | None, byte
     newline = "\r\n" if text.endswith("\r\n") else "\n" if text.endswith("\n") else ""
     current = text[:-len(newline)] if newline else text
     sm.validate_version(current, marker)
+    return marker, original, current, newline
+
+
+def _prepare(part: str | None) -> tuple[str, list[tuple[Path, bytes | None, bytes]]]:
+    marker, original, current, newline = _marker()
     release = current
     if part is not None:
         components = [int(value) for value in current.split(".")]
@@ -119,6 +127,51 @@ def _prepare(part: str | None) -> tuple[str, list[tuple[Path, bytes | None, byte
         plans.append((target, before, rendered.encode("utf-8")))
     plans.append((marker, original, (release + newline).encode("utf-8")))
     return release, plans
+
+
+def _git_main_version() -> str:
+    result = subprocess.run(
+        ["git", "-C", str(ROOT), "show", "origin/main:VERSION"],
+        text=True, encoding="utf-8",
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+    )
+    if result.returncode:
+        detail = result.stderr.strip() or result.stdout.strip() or "git show failed"
+        raise ValueError(f"cannot read origin/main:VERSION from git ({detail}); "
+                         "fetch origin main before checking the bump")
+    base = result.stdout.strip()
+    sm.validate_version(base, Path("origin/main:VERSION"))
+    return base
+
+
+def _next_patch(version: str) -> str:
+    components = [int(value) for value in version.split(".")]
+    components[2] += 1
+    return ".".join(str(value) for value in components)
+
+
+def check_bump() -> None:
+    """Require VERSION to be exactly origin/main's patch plus one."""
+    base = _git_main_version()
+    current = _marker()[2]
+    expected = _next_patch(base)
+    fix = "run python scripts/version.py bump"
+    if current == expected:
+        print(current)
+        return
+    current_parts = tuple(int(value) for value in current.split("."))
+    base_parts = tuple(int(value) for value in base.split("."))
+    if current_parts < base_parts:
+        raise ValueError(f"VERSION {current} is older than origin/main's {base}; "
+                         f"rebase onto origin/main and {fix} (expected {expected})")
+    if current_parts[:2] != base_parts[:2]:
+        raise ValueError(f"VERSION {current} is not a patch over origin/main's {base}: "
+                         f"patch only; {fix} (expected {expected})")
+    if current == base:
+        raise ValueError(f"VERSION {current} is unchanged from origin/main; every pull "
+                         f"request must bump the patch: {fix}")
+    raise ValueError(f"VERSION {current} is not exactly one patch above origin/main's "
+                     f"{base}; {fix} (expected {expected})")
 
 
 def _stage(target: Path, content: bytes, staging: Path) -> Path:
@@ -196,11 +249,16 @@ def main(argv=None) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("check", help="read-only version mirror and index check")
     commands.add_parser("sync", help="mirror VERSION and regenerate indexes")
+    commands.add_parser("check-bump",
+                        help="fail unless VERSION is exactly origin/main's patch + 1")
     bump = commands.add_parser("bump", help="increment VERSION and sync mirrors/indexes")
     bump.add_argument("part", choices=("patch", "minor", "major"), nargs="?",
                       default="patch")
     args = parser.parse_args(argv)
     try:
+        if args.command == "check-bump":
+            check_bump()
+            return 0
         release, plans = _prepare(args.part if args.command == "bump" else None)
         if args.command == "check":
             drift = [str(target.relative_to(ROOT)) for target, before, after in plans

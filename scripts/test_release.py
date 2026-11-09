@@ -121,9 +121,11 @@ class ReleaseTests(unittest.TestCase):
         self.git(self.seed, "tag", "v0.1.0")
         self.git(self.seed, "push", "--quiet", "origin", "refs/tags/v0.1.0")
 
-    def advance_main(self):
+    def advance_main(self, *, bump=True):
         self.write(self.seed, "notes.txt", "A normal tested main update.\n")
-        self.git(self.seed, "add", "notes.txt")
+        if bump:
+            self.command(self.seed, sys.executable, "scripts/version.py", "bump")
+        self.git(self.seed, "add", ".")
         self.git(self.seed, "commit", "--quiet", "-m", "Normal main update")
         self.git(self.seed, "push", "--quiet", "origin", "main")
         return self.remote_head()
@@ -148,25 +150,26 @@ class ReleaseTests(unittest.TestCase):
         self.assert_published("0.1.0")
         self.assertEqual(self.remote_head(), self.initial)
 
-    def test_subsequent_push_defaults_patch_and_preserves_unrelated_changes(self):
+    def test_subsequent_push_publishes_bumped_version_without_commit(self):
         self.tag_initial()
         tested = self.advance_main()
         runner = self.runner()
         original_skill = (runner / "skills/custom/SKILL.md").read_text(encoding="utf-8")
+        self.assertIn('version: "0.1.1"', original_skill)
         self.write(runner, "notes.txt", "Keep this unrelated working-tree edit.\n")
         vendor = "Keep this staged third-party edit.\n"
         self.write(runner, "ref/vendor/SKILL.md", vendor)
         self.git(runner, "add", "ref/vendor/SKILL.md")
         self.write(runner, "untracked.txt", "Keep this untracked file.\n")
-        self.release(runner)
+        result = self.release(runner)
+        self.assertIn("Published v0.1.1", result.stdout)
         self.assert_published("0.1.1")
-        changed = set(self.git(self.remote, "diff-tree", "--no-commit-id", "--name-only", "-r", "main").stdout.splitlines())
-        self.assertTrue({"VERSION", "skills/custom/SKILL.md"} <= changed)
-        self.assertTrue(changed <= {"VERSION", "skills/custom/SKILL.md", "index.md", "index.zh-CN.md"})
-        self.assertEqual(self.git(self.remote, "rev-parse", "main^").stdout.strip(), tested)
+        self.assertEqual(self.remote_head(), tested)
+        self.assertEqual(self.git(self.remote, "rev-parse", "main^").stdout.strip(), self.initial)
+        self.assertEqual((runner / "VERSION").read_text(encoding="utf-8"), "0.1.1\n")
         self.assertEqual(
             (runner / "skills/custom/SKILL.md").read_text(encoding="utf-8"),
-            original_skill.replace('version: "0.1.0"', 'version: "0.1.1"'),
+            original_skill,
         )
         self.assertEqual((runner / "notes.txt").read_text(encoding="utf-8"), "Keep this unrelated working-tree edit.\n")
         self.assertEqual((runner / "ref/vendor/SKILL.md").read_text(encoding="utf-8"), vendor)
@@ -175,6 +178,17 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn("version=9.8.7", self.git(self.remote, "show", "main:ref/vendor/SKILL.md").stdout)
         self.assertIn("version=7.0.0", self.git(self.remote, "show", "main:agents/agents-fixture.md").stdout)
         self.command(runner, sys.executable, "scripts/version.py", "check")
+
+    def test_push_without_a_version_bump_is_refused(self):
+        self.tag_initial()
+        tested = self.advance_main(bump=False)
+        before = self.refs()
+        result = self.release(self.runner(), check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("tag collision", result.stderr)
+        self.assertIn("run python scripts/version.py bump", result.stderr)
+        self.assertEqual(self.refs(), before)
+        self.assertEqual(self.remote_head(), tested)
 
     def check_dispatch(self, part, expected):
         self.tag_initial()
@@ -237,7 +251,6 @@ class ReleaseTests(unittest.TestCase):
 
     def test_rejected_branch_update_does_not_publish_tag(self):
         self.tag_initial()
-        self.advance_main()
         hook = self.remote / "hooks/update"
         hook.write_text(
             "#!/bin/sh\n"
@@ -250,7 +263,9 @@ class ReleaseTests(unittest.TestCase):
         )
         hook.chmod(0o755)
         before = self.refs()
-        result = self.release(self.runner(), check=False)
+        # A main push never updates the branch, so the atomic push invariant is
+        # exercised where a release commit still exists: a manual dispatch bump.
+        result = self.release(self.runner(), event="workflow_dispatch", part="patch", check=False)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("fixture branch protection", result.stderr)
         self.assertEqual(self.refs(), before)
