@@ -166,6 +166,34 @@ NOTES = {
         "evolve an agent's identity file and operating protocol by layer, with coverage markers, behavioral evals, and load-scope probes",
         "按分层演进 agent 身份文件与操作协议：覆盖标记、行为评测、加载范围探测",
     ),
+    "kanban-workflows": (
+        "multi-card board work: decomposition, parallel dispatch, review gates, stuck-card recovery",
+        "多卡片看板工作：拆解、并行派发、评审门禁、卡住任务恢复",
+    ),
+    "tmux-agent-control": (
+        "drive a live TUI agent in tmux: find the pane, prove idle, send one complete instruction",
+        "在 tmux 中驱动运行中的 TUI agent：定位 pane、证明空闲、一次发出完整指令",
+    ),
+    "microsoft-office": (
+        "create, read, edit and template Word, PowerPoint and Excel files offline with Python CLIs",
+        "用 Python CLI 离线创建、读取、编辑与套用 Word、PowerPoint、Excel 文件模板",
+    ),
+    "agent-harness-settings-parity": (
+        "hold one policy across every coding harness despite different config files, knob names and units",
+        "让同一条策略在每个 coding harness 上生效，尽管配置文件、键名与单位各不相同",
+    ),
+    "generated-runtime-repairs": (
+        "repair the template/generator, prove the staged artifact, then deploy and read back the live runtime",
+        "修模板/生成器、验证暂存产物，再部署并回读线上运行时",
+    ),
+    "discord-rich-message": (
+        "structured Discord messages within platform limits: Components V2, aligned code-block tables, attachment fallback",
+        "在平台限制内发送结构化 Discord 消息：Components V2、等宽对齐表格、附件兜底",
+    ),
+    "cross-agent-repair-routing": (
+        "route a defect found in another agent's write surface: authority map, reproduction, one scoped landing decision",
+        "把他人写入面内的缺陷送修：权限地图、复现、一次定界的落地决策",
+    ),
 }
 
 KV = re.compile(r"(\w+)\s*=\s*([^;]+)")

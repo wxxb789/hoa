@@ -27,11 +27,15 @@ targets:  runtime-agnostic | repo-only |
 
 | Artifact | Type | Areas | Targets | Path | Notes |
 |---|---|---|---|---|---|
+| agent-harness-settings-parity | skill | software-development | runtime-agnostic | `skills/agent-harness-settings-parity/` | 让同一条策略在每个 coding harness 上生效，尽管配置文件、键名与单位各不相同 |
 | agent-operating-contract-evolution | skill | software-development,work-management,self-management | runtime-agnostic | `skills/agent-operating-contract-evolution/` | 按分层演进 agent 身份文件与操作协议：覆盖标记、行为评测、加载范围探测 |
+| cross-agent-repair-routing | skill | software-development,work-management | runtime-agnostic | `skills/cross-agent-repair-routing/` | 把他人写入面内的缺陷送修：权限地图、复现、一次定界的落地决策 |
 | define-goal | skill | self-management,software-development,work-management | runtime-agnostic | `skills/define-goal/` | 把雄心转化为编号 goal 文件，近期清晰、远期可细化，不制定实现步骤 |
 | delegated-work-acceptance | skill | work-management,software-development | runtime-agnostic | `skills/delegated-work-acceptance/` | 验收被委派的交付：核对 artifact、重算关键数字、检查写入边界 |
+| discord-rich-message | skill | software-development,work-management | runtime-agnostic | `skills/discord-rich-message/` | 在平台限制内发送结构化 Discord 消息：Components V2、等宽对齐表格、附件兜底 |
 | dotnet-repo-workflow | skill | software-development | runtime-agnostic | `skills/dotnet-repo-workflow/` | 走仓库自带 .NET gate 而非手搓 `dotnet test`；lock 文件、Roslyn 编译陷阱、merge-ready 清单 |
 | evidence-backed-analytical-writing | skill | work-management | runtime-agnostic | `skills/evidence-backed-analytical-writing/` | 中文分析报告：证据地图与「主张 → 证据 → 机制 → 局限」骨架；时效边界、状态阶梯、否定性结论 |
+| generated-runtime-repairs | skill | software-development,work-management | runtime-agnostic | `skills/generated-runtime-repairs/` | 修模板/生成器、验证暂存产物，再部署并回读线上运行时 |
 | ghc-search | skill | software-development | runtime-agnostic | `skills/ghc-search/` | 经本机 `ghc-proxy` Responses API 做 web 与 X/Twitter 搜索；返回答案加去重来源 |
 | goal-driven-delivery | skill | software-development,work-management | runtime-agnostic | `skills/goal-driven-delivery/` | 目标契约 → agent 分阶段产出 → operator 验收 → 脚本化合并门禁 → 可续跑账本；随附 `gdd.py`、`delivery-state.py`、`pr-merge-check.py` |
 | grounded-citations | skill | work-management,software-development | runtime-agnostic | `skills/grounded-citations/` | 脚本持有编号引用账本：检索即登记、逐句引用、机械渲染并可校验；随附 `sources.py` |
@@ -41,12 +45,15 @@ targets:  runtime-agnostic | repo-only |
 | hoa-skill-review | skill | software-development,work-management,self-management | runtime-agnostic | `skills/hoa-skill-review/` | 依据消费者证据审计 skill 行为与修改，不改动被审查对象 |
 | hoa-skill-work | skill | software-development,work-management,self-management | runtime-agnostic | `skills/hoa-skill-work/` | 直接创建或演进已定义的 skill，并按风险聚焦验证 |
 | html-artifact | skill | software-development,work-management | runtime-agnostic | `skills/html-artifact/` | 零依赖单文件 HTML：解释文、计划、报告、图表与一次性编辑器，统一 house style |
+| kanban-workflows | skill | work-management,software-development | runtime-agnostic | `skills/kanban-workflows/` | 多卡片看板工作：拆解、并行派发、评审门禁、卡住任务恢复 |
 | m365-copilot-cdp | skill | software-development,work-management | runtime-agnostic | `skills/m365-copilot-cdp/` | 通过 CDP 操作桌面 Copilot Chat 与 Code，选择模型并读取回复 |
+| microsoft-office | skill | work-management,software-development | runtime-agnostic | `skills/microsoft-office/` | 用 Python CLI 离线创建、读取、编辑与套用 Word、PowerPoint、Excel 文件模板 |
 | omp-headless-orchestration | skill | software-development,work-management | pi | `skills/omp-headless-orchestration/` | 脱离会话的 tmux 启动器跑 `omp -p` 长任务；轮询完成、按 session id 恢复 |
 | ops-claim-verification | skill | software-development,work-management | runtime-agnostic | `skills/ops-claim-verification/` | 把定时任务、修复或部署的说法变成证据：找准记录面、区分手动与调度运行、审查审计者 |
 | report-claim-audit | skill | work-management,software-development | runtime-agnostic | `skills/report-claim-audit/` | 从各自的权威 artifact 重算每条报告声明、对账交付集合，并给待决事项定价 |
 | skill-library-curation | skill | software-development,self-management | runtime-agnostic | `skills/skill-library-curation/` | 按证据审查技能库：清点、重叠分组、安装来源、上游新鲜度；建议不改动状态 |
 | teams-cdp | skill | work-management | runtime-agnostic | `skills/teams-cdp/` | 通过本机桌面 CDP 向明确的 Teams 联系人或现有群组发送消息 |
+| tmux-agent-control | skill | software-development,work-management | runtime-agnostic | `skills/tmux-agent-control/` | 在 tmux 中驱动运行中的 TUI agent：定位 pane、证明空闲、一次发出完整指令 |
 | writing | skill | work-management,self-management | runtime-agnostic | `skills/writing/` | 一套内容优先的共同层加分渠道契约：博客、论文、X、Reddit、小红书、公众号、教程、changelog；附可量化的 AI 味自查 |
 | skill-scout | agent | software-development,work-management | repo-only | `agents/skill-scout.md` | 按请求先搜索已有 skill，再决定是否编写；只报告，不代写 |
 | ghc-proxy | mcp | software-development | repo-only | `mcps/ghc-proxy.md` | 本地 ghc-proxy 搜索服务的可移植定义；注册留在 chezmoi |
