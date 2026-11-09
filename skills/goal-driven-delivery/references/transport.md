@@ -37,7 +37,13 @@ A missing `state.json` means **unknown**, never success.
 1. **One run per stage.** A stage run is a fresh session with clean context; that is the point. Never
    resume a previous increment's session — stale context is what makes a later compaction look like a
    false idle, and it carries a finished goal's decisions into a new one.
-2. **Resume only inside the same stage.** If an implement run dies mid-edit, resume its session with a
+2. **Waiting is free time, and still one writer per repo.** While a stage runs, write the *next*
+   goal's prompt and read its contract so the branch-off is a dispatch rather than a fresh start —
+   but do not dispatch it until the current goal is merged. A different repo may run concurrently
+   (different tree, no write conflict); the same repo never has two writers. To sequence the second
+   repo without babysitting it, arm a small poller that waits for the first run's `state.json` to leave
+   `running`, starts the follow-up, and appends each step to a chain log.
+3. **Resume only inside the same stage.** If an implement run dies mid-edit, resume its session with a
    continuation prompt that restates: what was interrupted, that the tree is mid-edit, that the work
    continues (not restarts), the unchanged rules (no commit / no push), and the ordered remaining
    steps. Resuming an increment that already has a report is a new stage, not a resume.

@@ -28,4 +28,15 @@ would have caught it). Then a short list of what is already sound and should NOT
 Everything else is fair game: duplicated fixtures, expectations derived by running the code under
 test, misleading names, dead helpers, comment noise in new files.
 
+## Group findings by what applying them touches
+
+- **evidence-neutral** — code shape, access modifiers, build files: safe to apply wholesale.
+- **count-refreshing** — removals or additions that move source/test line counts: every recorded
+  number in the goal record is invalidated by these.
+- **test pruning** — anything that deletes or merges a test.
+- **coverage** — anything that changes what a gate observes.
+
+Keep a separate **possible defect** section: a note that the record's rule and the code disagree is
+a correctness finding, not a tidy-up, and must not be filed as style.
+
 End by stating how the findings could be applied: all, specific numbers, or a described subset.
