@@ -62,6 +62,22 @@ NOTES = {
         "directly create or evolve a defined skill with focused, risk-scaled validation",
         "直接创建或演进已定义的 skill，并按风险聚焦验证",
     ),
+    "goal-driven-delivery": (
+        "goal contract → agent-authored stages → operator-run gates → scripted merge gate → resumable ledger; ships `gdd.py`, `delivery-state.py`, `pr-merge-check.py`",
+        "目标契约 → agent 分阶段产出 → operator 验收 → 脚本化合并门禁 → 可续跑账本；随附 `gdd.py`、`delivery-state.py`、`pr-merge-check.py`",
+    ),
+    "omp-headless-orchestration": (
+        "detached tmux launcher for long `omp -p` runs; polled completion, session-id recovery",
+        "脱离会话的 tmux 启动器跑 `omp -p` 长任务；轮询完成、按 session id 恢复",
+    ),
+    "delegated-work-acceptance": (
+        "verify a delegated \"done\" against the artifact, the re-derived numbers and the write boundary",
+        "验收被委派的交付：核对 artifact、重算关键数字、检查写入边界",
+    ),
+    "dotnet-repo-workflow": (
+        "run the repo's own .NET gate harness instead of a hand-rolled `dotnet test`; lock files, Roslyn harness traps, merge-ready checklist",
+        "走仓库自带 .NET gate 而非手搓 `dotnet test`；lock 文件、Roslyn 编译陷阱、merge-ready 清单",
+    ),
     "ghc-search": (
         "web and X/Twitter search via a local ghc-proxy Responses API; answer plus deduped sources",
         "经本机 `ghc-proxy` Responses API 做 web 与 X/Twitter 搜索；返回答案加去重来源",
