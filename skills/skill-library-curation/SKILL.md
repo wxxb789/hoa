@@ -7,7 +7,7 @@ description: >-
   editing a skill, and not for porting one into a shared repo — review and execution are separate
   modes, and execution needs its own confirmed scope.
 metadata:
-  version: "0.1.8"
+  version: "0.1.9"
   areas: "software-development,self-management"
   targets: "runtime-agnostic"
 ---

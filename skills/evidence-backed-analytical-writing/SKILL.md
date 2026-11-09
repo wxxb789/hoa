@@ -8,7 +8,7 @@ description: >-
   Not for citation mechanics (that is grounded-citations), social posts, changelogs, or any piece
   where the claims are already verified and only the wording needs work.
 metadata:
-  version: "0.1.8"
+  version: "0.1.9"
   areas: "work-management"
   targets: "runtime-agnostic"
 ---
