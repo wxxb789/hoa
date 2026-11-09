@@ -21,6 +21,13 @@ from unittest.mock import patch
 sys.dont_write_bytecode = True
 SCRIPTS = Path(__file__).resolve().parent
 ARTIFACTS = SCRIPTS.parent / ".tmp-artifacts" / "version-tests"
+GIT_ENV = {key: value for key, value in os.environ.items()
+           if not key.startswith(("GIT_", "GITHUB_"))}
+GIT_ENV.update({
+    "GIT_CONFIG_GLOBAL": os.devnull,
+    "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_TERMINAL_PROMPT": "0",
+})
 spec = importlib.util.spec_from_file_location("skill_metadata", SCRIPTS / "skill_metadata.py")
 sm = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(sm)
@@ -81,6 +88,25 @@ class VersionTests(unittest.TestCase):
             status = version.main(list(args))
         return status, stdout.getvalue(), stderr.getvalue()
 
+    def guard_fixture(self, base: str, current: str):
+        """Commit base VERSION as origin/main, then run check-bump on a candidate tree."""
+        with tempfile.TemporaryDirectory(dir=ARTIFACTS) as name:
+            root = Path(name)
+            (root / "VERSION").write_text(base + "\n", encoding="utf-8")
+            for args in (
+                ("init", "--quiet", "--initial-branch=main"),
+                ("config", "user.name", "Bump guard fixture"),
+                ("config", "user.email", "fixture@example.invalid"),
+                ("add", "VERSION"),
+                ("commit", "--quiet", "-m", "main base"),
+                ("update-ref", "refs/remotes/origin/main", "HEAD"),
+            ):
+                subprocess.run(["git", "-C", str(root), *args], env=GIT_ENV,
+                               text=True, capture_output=True, check=True)
+            (root / "VERSION").write_text(current + "\n", encoding="utf-8")
+            with patch.object(version, "ROOT", root):
+                return self.run_cli("check-bump")
+
     def snapshot(self):
         return {str(p.relative_to(self.root)): p.read_bytes()
                 for p in self.root.rglob("*") if p.is_file()}
@@ -120,6 +146,42 @@ class VersionTests(unittest.TestCase):
         self.assertEqual(self.run_cli("bump", "major")[1], "4.0.0\n")
         self.assertEqual(gi.parse_skill_metadata(self.skill)["version"], "4.0.0")
         self.assert_indexes_current()
+
+    def test_check_bump_accepts_exactly_one_patch_above_origin_main(self):
+        status, output, error = self.guard_fixture("1.2.3", "1.2.4")
+        self.assertEqual(status, 0, error)
+        self.assertEqual(output, "1.2.4\n")
+
+    def test_check_bump_accepts_a_rebased_and_rebumped_branch(self):
+        status, output, error = self.guard_fixture("1.2.4", "1.2.5")
+        self.assertEqual(status, 0, error)
+        self.assertEqual(output, "1.2.5\n")
+
+    def test_check_bump_rejects_an_unbumped_branch(self):
+        status, _, error = self.guard_fixture("1.2.3", "1.2.3")
+        self.assertEqual(status, 1)
+        self.assertIn("unchanged from origin/main", error)
+        self.assertIn("run python scripts/version.py bump", error)
+
+    def test_check_bump_rejects_a_version_older_than_origin_main(self):
+        status, _, error = self.guard_fixture("1.2.4", "1.2.3")
+        self.assertEqual(status, 1)
+        self.assertIn("older than origin/main", error)
+        self.assertIn("run python scripts/version.py bump", error)
+
+    def test_check_bump_requires_patch_only(self):
+        for current in ("1.3.0", "2.0.0"):
+            with self.subTest(current=current):
+                status, _, error = self.guard_fixture("1.2.3", current)
+                self.assertEqual(status, 1)
+                self.assertIn("patch only", error)
+                self.assertIn("run python scripts/version.py bump", error)
+
+    def test_check_bump_rejects_more_than_one_patch(self):
+        status, _, error = self.guard_fixture("1.2.3", "1.2.5")
+        self.assertEqual(status, 1)
+        self.assertIn("expected 1.2.4", error)
+        self.assertIn("run python scripts/version.py bump", error)
 
     def test_sync_preserves_bytes_quotes_and_unrelated_versions(self):
         quoted = make_skill(self.root, "quoted", release="7.6.5", newline="\r\n",

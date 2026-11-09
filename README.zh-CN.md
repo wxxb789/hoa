@@ -109,10 +109,12 @@ python scripts/version.py bump        # 默认 patch：0.1.0 -> 0.1.1
 python scripts/version.py bump minor  # 显式 minor；也支持 major
 ```
 
-`main` 的 CI 成功后，发布 job 为尚未打 tag 的当前版本发布 tag（首次为 `v0.1.0`）；
-之后的普通更新默认递增 patch。手动触发 CI 可选择 patch、minor 或 major。
+每个 PR 自行递增 patch：CI 要求 `VERSION` 恰好等于 `origin/main` 的版本且 patch 加 1，
+因此在他人的合并之后才建立或落后的分支必须 rebase 并再次运行
+`python scripts/version.py bump`。`main` 的 CI 成功后，发布 job 只为已合并 PR 提交的
+版本打 tag（首次的 `v0.1.0` 原样发布）；它从不递增版本，也不创建版本提交。
 发布保留 desktop CDP 测试及现有仓库检查，串行执行，拒绝过期 CI 对应的提交，
-并以原子 push 同时提交版本更新和 tag，不使用 force。
+并以原子 push 发布 tag，不使用 force。
 
 本地版本命令不会 commit 或 push。仅供 CI 的发布 helper 需要 `contents: write`，
 分支保护也必须允许正常 push；它不会绕过仓库策略。重跑已发布的 push 不会再次升版。

@@ -2,9 +2,12 @@
 """Publish the tested main revision and its unified version tag from GitHub CI.
 
 Usage: python scripts/release.py [--part patch|minor|major]
-An untagged VERSION is published as-is. Subsequent main pushes bump patch;
-workflow_dispatch may select a different increment. This entry point writes
-Git refs and is deliberately unavailable outside a trusted main CI event.
+Every pull request bumps the patch itself (checked by
+`python scripts/version.py check-bump`). A main push therefore tags the VERSION
+already committed by the merged pull request and never changes it or creates a
+version commit. An untagged VERSION is published as-is. `--part` is an explicit
+workflow_dispatch escape hatch and is rejected on main pushes. This entry point
+writes Git refs and is deliberately unavailable outside a trusted main CI event.
 """
 from __future__ import annotations
 
@@ -51,7 +54,7 @@ def version_command(*args: str) -> None:
     run(sys.executable, str(ROOT / "scripts" / "version.py"), *args)
 
 
-def publish(part: str) -> None:
+def publish(part: str | None) -> None:
     event = os.environ.get("GITHUB_EVENT_NAME")
     tested = os.environ.get("GITHUB_SHA", "")
     if (
@@ -61,8 +64,8 @@ def publish(part: str) -> None:
         or re.fullmatch(r"[0-9a-f]{40}", tested) is None
     ):
         raise ReleaseError("requires a GitHub Actions main push/workflow_dispatch event and its full tested SHA")
-    if event == "push" and part != "patch":
-        raise ReleaseError("main pushes must use patch; minor/major require workflow_dispatch")
+    if event == "push" and part is not None:
+        raise ReleaseError("main pushes publish the VERSION already on main; --part requires workflow_dispatch")
     head = git("rev-parse", "HEAD").stdout.strip()
     if head != tested:
         raise ReleaseError(f"checkout HEAD {head} does not match tested GITHUB_SHA {tested}")
@@ -92,9 +95,13 @@ def publish(part: str) -> None:
             raise ReleaseError(f"tag collision: {tag} is outside the tested main history")
         if ancestor.returncode:
             raise ReleaseError(f"cannot establish history for {tag}: {ancestor.stderr.strip()}")
-        if previous == head and event == "push":
+        if previous == head and part is None:
             print(f"No release needed: {tag} already published at tested HEAD {head}")
             return
+        if part is None:
+            raise ReleaseError(
+                f"tag collision: {tag} already exists at {previous} but VERSION is unchanged; "
+                "every pull request must bump the patch (run python scripts/version.py bump)")
         version_command("bump", part)
         version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
         tag = f"v{version}"
@@ -102,17 +109,18 @@ def publish(part: str) -> None:
             raise ReleaseError(f"tag collision: {tag} already exists; refusing to overwrite it")
         version_command("check")
 
-    git("add", "--", *paths)
-    changed = git("diff", "--cached", "--quiet", "--", *paths, check=False)
-    if changed.returncode == 1:
-        # --only leaves any unrelated staged work out of the release commit.
-        git(
-            "-c", "user.name=github-actions[bot]",
-            "-c", "user.email=41898282+github-actions[bot]@users.noreply.github.com",
-            "commit", "--only", "-m", f"chore: release {tag}", "--", *paths,
-        )
-    elif changed.returncode:
-        raise ReleaseError(f"cannot inspect release changes: {changed.stderr.strip()}")
+    if part is not None:
+        git("add", "--", *paths)
+        changed = git("diff", "--cached", "--quiet", "--", *paths, check=False)
+        if changed.returncode == 1:
+            # --only leaves any unrelated staged work out of the release commit.
+            git(
+                "-c", "user.name=github-actions[bot]",
+                "-c", "user.email=41898282+github-actions[bot]@users.noreply.github.com",
+                "commit", "--only", "-m", f"chore: release {tag}", "--", *paths,
+            )
+        elif changed.returncode:
+            raise ReleaseError(f"cannot inspect release changes: {changed.stderr.strip()}")
     git("tag", tag)
     # Normal atomic push honors branch protection and rejects branch/tag races.
     # Never split this into two pushes: a rejected branch must not publish a tag.
@@ -122,7 +130,7 @@ def publish(part: str) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--part", choices=("patch", "minor", "major"), default="patch")
+    parser.add_argument("--part", choices=("patch", "minor", "major"), default=None)
     args = parser.parse_args(argv)
     try:
         publish(args.part)
