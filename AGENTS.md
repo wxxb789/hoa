@@ -1,5 +1,26 @@
 # hoa — Project Agent Instructions
 
+## Portability — configuration, not hard-coding
+
+Every skill here runs on someone else's machine. A change born in one working environment is portable
+only when each environment-specific value can be supplied from outside it.
+
+- **No literals for environment.** No home paths, personal or assistant names, repository/bot/channel
+  ids, model ids, hostnames or host sizing in a skill's behaviour. Resolution order: CLI flag → env
+  var → config file → documented default.
+- **Skills may read the operator's configuration, and should.** That is the preferred mechanism, not a
+  workaround. Look for `$XDG_CONFIG_HOME/<skill>/config.yaml`, falling back to
+  `~/.config/<skill>/config.yaml`, and let an env var override a single key (the goal-driven-delivery
+  scripts do exactly this with `GDD_STATE_FILE`, `GDD_TASK_ROOT`, `GDD_RUN_ROOT`, `GDD_LAUNCHER`,
+  `GDD_TEMPLATES`, `GDD_GOAL_GLOB`). Document every key and its default inside the skill.
+- **Prefer the capability to the tool.** When a step needs a launcher, a review bot or a scheduler,
+  state the contract it must satisfy and ship one reference adapter; another install substitutes its
+  own.
+- **Per-project or per-install detail goes in a profile or overlay file**, never in the protocol body.
+- **Merging a self-evolved skill is a review gate, not a copy.** Take the method, then walk every new
+  literal path, id and model: demote each to configuration, keep the defaults honest, and re-run the
+  skill's own acceptance commands before opening the PR. A skill that only works here is not ready.
+
 ## Generated Artifacts Output
 
 All HTML artifacts and their related assets **MUST** be written to `./.tmp-artifacts/`.

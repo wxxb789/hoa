@@ -7,7 +7,7 @@ description: >-
   end, including the merge. Do not use for one-line fixes, exploration with no acceptance criteria, or
   work no machine can check (that is a conversation, not a delivery).
 metadata:
-  version: "0.1.15"
+  version: "0.1.16"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
 ---
@@ -90,6 +90,10 @@ The agent's report is a claim, never evidence:
 - **A non-zero gate that names a missing build output is a prerequisite failure, not a regression.**
   Read the message before calling it a delta; produce the artifacts and re-run.
 - Map every contract clause to a test name or evidence row; a clause with no test is unfinished work.
+- **A proof test is only proof if it fails when the feature is deleted.** A loop over a collection
+  that is empty without the feature, an input that already declares the value the assertion demands,
+  and an assertion that reads the same source the code reads all stay green with the change reverted.
+  Vacuous coverage is the one defect that hides every other defect in the same file.
 - **An assertion that only checks a count is not verification.** A clause "proven" by
   `assert(checks > 0)` stays green after the entire section it guards is deleted — read the
   assertion's substance, not its existence. Raise a weak proof test as its own increment and tell the
@@ -115,7 +119,17 @@ The agent's report is a claim, never evidence:
    unevidenced deletion of a defensive guard is how a contract check disappears. Conversely, an
    unreachable branch that cannot run is dead code and keeping it "just in case" is the failure —
    decide, and record which way.
-5. If the accepted set touches measured consumers, re-run the measurement harness — not just tests.
+5. **A finding that says the record's rule and the code disagree is a correctness defect, not
+   style.** The goal file is the contract: fix the code and leave the measured rows alone. A comment
+   or test name claiming a rule the code no longer implements is the same defect wearing a comment.
+6. **A `Delete` finding that removes an inert allowlist grant is worth taking** — a class or
+   attribute the policy already drops is how the next change re-opens a channel by accident.
+   Conversely, suspicious of consolidating duplicated styling across conditional asset graphs: those
+   copies are usually deliberate.
+7. **Name the rejected numbers in the apply prompt**, so the agent cannot "improve" them back in.
+   When an accepted finding changes line or test counts, every recorded count must be re-derived from
+   the tree or a real suite run — never adjusted arithmetically.
+8. If the accepted set touches measured consumers, re-run the measurement harness — not just tests.
 
 ## Phase 4 — review, then fix
 
@@ -282,6 +296,15 @@ said earlier, say what changed and why.
   commit and disclose it — decide, don't silently absorb.
 - The contract itself is wrong (contradiction discovered mid-flight): stop, amend it, then continue.
   Never ask an agent to satisfy an impossible clause.
+
+## Configuration
+
+Nothing about one install lives in the protocol. Every value that differs between machines is an env
+var with a documented default — `GDD_STATE_FILE`, `GDD_TASK_ROOT`, `GDD_RUN_ROOT`, `GDD_LAUNCHER`,
+`GDD_TEMPLATES`, `GDD_GOAL_GLOB`, `GDD_MODEL`/`GDD_THINKING` if your adapter accepts them — and a
+profile may point at its own files. When adding behaviour, resolve it the same way rather than
+inlining a path: a skill that reads the operator's configuration customises itself, one that hard-codes
+a path only works where it was written.
 
 ## Project profiles
 
