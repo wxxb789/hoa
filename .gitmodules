@@ -183,3 +183,8 @@
 	url = https://github.com/backnotprop/pstack
 	branch = main
 	ignore = dirty
+[submodule "ref/academic-research-skills"]
+	path = ref/academic-research-skills
+	url = https://github.com/Imbad0202/academic-research-skills
+	branch = main
+	ignore = dirty
