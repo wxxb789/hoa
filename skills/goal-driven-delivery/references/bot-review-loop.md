@@ -51,6 +51,17 @@ gh api repos/<owner>/<repo>/pulls/<PR>/comments \
 Each carries a severity badge in the body (`P1`/`P2`) and a `<!-- codex-code-review-finding:v1 -->`
 trailer. Reproduce the claim before dispatching it.
 
+`commit_id` on a review comment is **not** "the review that raised it" — GitHub re-anchors old
+threads onto the newest head, so a fresh `commit_id` can still carry a finding you already fixed.
+Anchor by `created_at` relative to your review request instead, and confirm each finding against
+the current tree before dispatching a fix.
+
+A push does not close a thread. After landing the fix, reply on every thread
+(`gh api repos/<o>/<r>/pulls/<PR>/comments/<comment_id>/replies -f body="Fixed in <sha>: …"`) and
+check `isResolved`. A clean verdict on the new head (`has_any_findings: false`) with an empty reply
+trail means the findings were never **answered**, not that they were addressed — the reviewer's next
+pass may repeat them, and the merge gate counts open threads.
+
 ## Threads
 
 ```bash
