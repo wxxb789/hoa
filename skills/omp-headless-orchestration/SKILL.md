@@ -7,7 +7,7 @@ description: >-
   recovering a run that was killed mid-turn. Do not use for a two-minute command (run it inline) or for
   work that needs live steering (that is a TUI session).
 metadata:
-  version: "0.1.17"
+  version: "0.1.18"
   areas: "software-development,work-management"
   targets: "pi"
 ---
@@ -99,6 +99,10 @@ The implementation is maintained once, with skill `goal-driven-delivery`
     byte counts, pid) are dropped when the run finalizes, so a reader that indexes them crashes on a
     finished run. Read `state`, `exit`, `duration_s`, `cwd` and `run_dir` defensively; treat everything
     else as optional.
+14. **`--max-time` takes one unit only.** `omp --max-time 1h30m` exits 2 before any work with
+    `Invalid --max-time value`, leaving a 0-byte `answer.md` and an empty event log — which reads like
+    an instant crash, not a rejected flag. Use `90m`, `2h` or plain seconds. The wrapper does not
+    validate this, so read `stderr.log` before blaming the prompt or the repo.
 
 ## Recovery after a session restart
 
