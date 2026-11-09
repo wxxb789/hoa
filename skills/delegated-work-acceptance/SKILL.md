@@ -6,9 +6,11 @@ description: >-
   scan or handoff comes back "complete", when a sub-agent's summary must be turned into a ruling, or
   when deciding what to authorize and what to send back. Do not use for grading your own work, or when
   no artifact exists to inspect.
+metadata:
+  version: "0.1.3"
+  areas: "work-management,software-development"
+  targets: "runtime-agnostic"
 ---
-
-<!-- index: areas=work-management,software-development; targets=runtime-agnostic -->
 
 # Delegated work acceptance
 

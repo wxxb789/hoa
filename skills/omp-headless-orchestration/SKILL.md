@@ -6,9 +6,11 @@ description: >-
   will run more than a couple of minutes, when the orchestrating chat/session may restart, or when
   recovering a run that was killed mid-turn. Do not use for a two-minute command (run it inline) or for
   work that needs live steering (that is a TUI session).
+metadata:
+  version: "0.1.3"
+  areas: "software-development,work-management"
+  targets: "pi"
 ---
-
-<!-- index: areas=software-development,work-management; targets=pi -->
 
 # OMP headless orchestration
 
