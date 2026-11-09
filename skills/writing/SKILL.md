@@ -7,7 +7,7 @@ description: >-
   destination and a reader whose decision it must move. Not for chat replies, commit messages, or
   any piece where the content is still missing and only the packaging is being polished.
 metadata:
-  version: "0.1.11"
+  version: "0.1.12"
   areas: "work-management,self-management"
   targets: "runtime-agnostic"
 ---
