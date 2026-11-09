@@ -24,7 +24,8 @@ lives in its own skill. One fact, one home.
 
 ## When to Use
 
-- "Start the next goal", "run the goal-driven flow", "finish this the usual way" — in any language.
+- "Start the next goal", "run the goal-driven flow", "finish this the usual way".
+- 中文同义说法同样触发：`开始下一个 goal`、`推进 goal driven 流程`、`按老流程把这个做完`。
 - Any multi-hour repo increment: a feature, a research-feasibility study, a migration, a docs
   rewrite — anything with a written completion contract and machine-checkable gates.
 - A repo where the operator delegates end to end, including the merge.
