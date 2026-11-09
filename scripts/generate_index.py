@@ -194,6 +194,18 @@ NOTES = {
         "route a defect found in another agent's write surface: authority map, reproduction, one scoped landing decision",
         "把他人写入面内的缺陷送修：权限地图、复现、一次定界的落地决策",
     ),
+    "hermes-models": (
+        "configure Hermes providers, transports and routing; prove every route with live signals, not `config get`",
+        "配置 Hermes provider、传输与路由；用实时信号证明路由，而非 `config get`",
+    ),
+    "hermes-updates": (
+        "upgrade a live Hermes install and diagnose drift: snapshot, official updater, post-check, failure index",
+        "升级运行中的 Hermes 并诊断漂移：快照、官方更新器、更新后检查、故障索引",
+    ),
+    "hermes-context-file-loading": (
+        "which Hermes instruction file loads from where, which project file wins, and which prompt tier a rule belongs to",
+        "Hermes 指令文件各自从何处加载、哪个项目文件生效，以及规则该放进哪个 prompt 层",
+    ),
 }
 
 KV = re.compile(r"(\w+)\s*=\s*([^;]+)")

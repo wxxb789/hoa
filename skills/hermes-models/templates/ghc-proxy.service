@@ -1,0 +1,17 @@
+[Unit]
+Description=GHC Proxy - GitHub Copilot API Proxy
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# PATH assumes bun under ~/.bun/bin; adjust for how this install provides bun.
+Environment=PATH=%h/.bun/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=%h/.bun/bin/bunx ghc-proxy@latest start --wait --upstream-timeout 1800
+Restart=on-failure
+RestartSec=10
+KillSignal=SIGTERM
+TimeoutStopSec=15
+
+[Install]
+WantedBy=default.target

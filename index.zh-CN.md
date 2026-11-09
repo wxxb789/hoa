@@ -40,6 +40,9 @@ targets:  runtime-agnostic | repo-only |
 | goal-driven-delivery | skill | software-development,work-management | runtime-agnostic | `skills/goal-driven-delivery/` | 目标契约 → agent 分阶段产出 → operator 验收 → 脚本化合并门禁 → 可续跑账本；随附 `gdd.py`、`delivery-state.py`、`pr-merge-check.py` |
 | grounded-citations | skill | work-management,software-development | runtime-agnostic | `skills/grounded-citations/` | 脚本持有编号引用账本：检索即登记、逐句引用、机械渲染并可校验；随附 `sources.py` |
 | harness-engineering | skill | software-development | runtime-agnostic | `skills/harness-engineering/` | 审计与重构 harness 脚本：自包含、检查绑定 owner 决策、纯函数检查加薄 runner、净减行数 |
+| hermes-context-file-loading | skill | software-development | hermes | `skills/hermes-context-file-loading/` | Hermes 指令文件各自从何处加载、哪个项目文件生效，以及规则该放进哪个 prompt 层 |
+| hermes-models | skill | software-development | hermes | `skills/hermes-models/` | 配置 Hermes provider、传输与路由；用实时信号证明路由，而非 `config get` |
+| hermes-updates | skill | software-development | hermes | `skills/hermes-updates/` | 升级运行中的 Hermes 并诊断漂移：快照、官方更新器、更新后检查、故障索引 |
 | hoa-introspect | skill | self-management,work-management | runtime-agnostic | `skills/hoa-introspect/` | 分层自省报告：确定性使用 facets（L1）+ 带证据的盲点审计（L2） |
 | hoa-introspect-distill | skill | self-management,software-development | runtime-agnostic | `skills/hoa-introspect-distill/` | 评估给定的重复工作发现为候选；逐项批准后才创建资产 |
 | hoa-skill-review | skill | software-development,work-management,self-management | runtime-agnostic | `skills/hoa-skill-review/` | 依据消费者证据审计 skill 行为与修改，不改动被审查对象 |
