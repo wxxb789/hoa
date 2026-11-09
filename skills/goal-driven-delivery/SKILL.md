@@ -7,7 +7,7 @@ description: >-
   end, including the merge. Do not use for one-line fixes, exploration with no acceptance criteria, or
   work no machine can check (that is a conversation, not a delivery).
 metadata:
-  version: "0.1.17"
+  version: "0.1.18"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
 ---

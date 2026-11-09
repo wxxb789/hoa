@@ -6,7 +6,7 @@ description: >-
   have grown past one screen, checkers are multiplying, or a harness subsystem needs a home.
   Not for one-off scripts, and not for application code that no scheduled check or gate runs.
 metadata:
-  version: "0.1.17"
+  version: "0.1.18"
   areas: "software-development"
   targets: "runtime-agnostic"
 ---

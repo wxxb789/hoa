@@ -8,7 +8,7 @@ description: >-
   legal text. Not for collecting or grading sources (that is claim auditing), and not for prose
   whose every claim is already primary-sourced.
 metadata:
-  version: "0.1.17"
+  version: "0.1.18"
   areas: "work-management"
   targets: "runtime-agnostic"
 ---
