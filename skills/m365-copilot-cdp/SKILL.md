@@ -7,7 +7,7 @@ description: >-
   desktop app's Chat or actual Code surface, not a browser PWA, Teams, Cowork, or
   a chat request that merely asks for code.
 metadata:
-  version: "0.1.7"
+  version: "0.1.8"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
 ---

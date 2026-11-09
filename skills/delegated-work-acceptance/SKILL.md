@@ -7,7 +7,7 @@ description: >-
   when deciding what to authorize and what to send back. Do not use for grading your own work, or when
   no artifact exists to inspect.
 metadata:
-  version: "0.1.7"
+  version: "0.1.8"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
 ---
