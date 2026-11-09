@@ -206,6 +206,38 @@ NOTES = {
         "which Hermes instruction file loads from where, which project file wins, and which prompt tier a rule belongs to",
         "Hermes 指令文件各自从何处加载、哪个项目文件生效，以及规则该放进哪个 prompt 层",
     ),
+    "skill-porting-and-publishing": (
+        "de-couple a private skill for publication: canonical side, five axes, config resolution, catalog/CI validation, branch-and-PR release",
+        "把私有 skill 解耦到可发布仓库：确定权威副本、五轴改造、配置解析、目录与 CI 校验、走分支与 PR 发布",
+    ),
+    "systematic-debugging": (
+        "root cause before fix: a tight red-capable loop, boundary evidence, ranked falsifiable hypotheses, then one fix at a time",
+        "先定位根因再修：紧致可复现的反馈环、边界证据、可证伪假设排序，然后一次只改一处",
+    ),
+    "subagent-driven-development": (
+        "execute a plan with a fresh subagent per task and two-stage review: spec compliance first, code quality second",
+        "按计划逐任务派发全新 subagent，并做两阶段评审：先规格符合，再代码质量",
+    ),
+    "writing-plans": (
+        "implementation plans an agent with zero context can execute: bite-sized tasks, exact paths, complete code, commands with expected output",
+        "写出零上下文 agent 也能执行的实现计划：小步任务、精确路径、完整代码、带预期输出的命令",
+    ),
+    "ai-coding-agent-delegation": (
+        "hand a bounded coding task to an external agent CLI in an isolated worktree, then verify the diff, tests and every acceptance claim yourself",
+        "把定界编码任务交给隔离 worktree 中的外部 agent CLI，再自行核验 diff、测试与全部验收声明",
+    ),
+    "contract-bound-deliverables": (
+        "meet a measurable brief: freeze the evidence packet, draft in parallel, assemble to the number, verify with the contract's own metric",
+        "满足可度量契约：冻结证据包、并行起草、按字数装配、用契约自身的度量脚本验收",
+    ),
+    "evidence-boundary-discipline": (
+        "state only what a dated source supports: tense to dateline, provenance-label parity, absence never escalates",
+        "只陈述有日期的来源所能支持的事实：时态对齐日期、来源标签全链路一致、缺失不升级为不存在",
+    ),
+    "git-auto-sync-pipelines": (
+        "scheduled commit/push for hand-edited repos: ordered gates, allowlist and size caps, staged secret scan, heartbeat and deduped alerts",
+        "手改仓库的定时提交推送：固定门序、白名单与体积上限、暂存区密钥扫描、心跳与去重告警",
+    ),
 }
 
 KV = re.compile(r"(\w+)\s*=\s*([^;]+)")
