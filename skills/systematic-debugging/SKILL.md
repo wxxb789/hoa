@@ -8,7 +8,7 @@ description: >-
   Not for exploratory "make it nicer" refactors, and not for a known mechanical change with an
   already-proven cause.
 metadata:
-  version: "0.1.21"
+  version: "0.1.22"
   areas: "software-development"
   targets: "runtime-agnostic"
 ---
