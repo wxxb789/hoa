@@ -15,8 +15,15 @@
 #   <run_root>/<YYYY-MM-DD>/<SLUG>/answer.md
 #
 # with state.json containing at least {"name","state","exit","cwd","started",
-# "ended","duration_s"} and state in running|done|killed|failed. gdd.py polls
-# that file; a missing state.json is unknown, never success.
+# "ended","duration_s","pid","tmux"} and state in running|done|killed|failed.
+# gdd.py polls that file; a missing state.json is unknown, never success.
+#
+# A run is finished only once `finalized` (holding the exit code) sits next to
+# state.json. When that marker is absent, state.json still says `running`, and
+# both the tmux session and the recorded pid are gone, the process died before
+# finalize.py could run: status/list/result/answer finalize it as failed with
+# exit -1, set `recovered_stale`, and print `stale_recovered: true`. A marker
+# is never mutated, so recovery is idempotent.
 #
 # This file is the reference adapter for an OMP-style CLI: it runs the agent in
 # a detached tmux session (so the run outlives the caller), streams the CLI's
@@ -82,6 +89,92 @@ find_run_dir() {
 }
 
 tmux_alive() { tmux has-session -t "$1" 2>/dev/null; }
+
+# recover_stale RUN_DIR — finalize a run whose tmux session and pid both died
+# without finalize.py running. Prints `stale_recovered: true` when it acted and
+# nothing otherwise. A run with a `finalized` marker is never touched.
+recover_stale() {
+  python3 - "$1" <<'PY'
+import json
+import os
+import subprocess
+import sys
+from datetime import datetime, timezone
+
+run = sys.argv[1]
+state_path = os.path.join(run, "state.json")
+marker_path = os.path.join(run, "finalized")
+try:
+    with open(state_path, encoding="utf-8") as handle:
+        state = json.load(handle)
+except (OSError, ValueError):
+    sys.exit(0)
+if state.get("state") != "running" or os.path.exists(marker_path):
+    sys.exit(0)
+
+sess = state.get("tmux") or ""
+if sess and subprocess.run(
+    ["tmux", "has-session", "-t", str(sess)], capture_output=True
+).returncode == 0:
+    sys.exit(0)
+
+try:
+    pid = int(state.get("pid"))
+except (TypeError, ValueError):
+    pid = None
+if pid and pid > 0:
+    try:
+        os.kill(pid, 0)
+    except PermissionError:
+        sys.exit(0)
+    except ProcessLookupError:
+        pass
+    else:
+        sys.exit(0)
+
+# Dead lane: the run's own finalizer keeps state/answer/ledger consistent.
+finalizer = os.path.join(run, "finalize.py")
+if os.path.exists(finalizer):
+    subprocess.run(
+        [sys.executable, finalizer, run, "-1"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+try:
+    with open(state_path, encoding="utf-8") as handle:
+        state = json.load(handle)
+except (OSError, ValueError):
+    state = {}
+now = datetime.now(timezone.utc)
+if state.get("state") == "running":
+    started = state.get("started") or ""
+    try:
+        duration = round((now - datetime.fromisoformat(started)).total_seconds(), 1)
+    except ValueError:
+        duration = None
+    state.update(
+        {"state": "failed", "exit": -1, "ended": now.isoformat(), "duration_s": duration}
+    )
+state["recovered_stale"] = True
+state["note"] = (
+    f"process disappeared without finalizing (tmux '{sess or '-'}' and "
+    f"pid {pid or '-'} are gone); finalized with exit -1"
+)
+with open(state_path, "w", encoding="utf-8") as handle:
+    json.dump(state, handle, indent=2, ensure_ascii=False)
+
+answer_path = os.path.join(run, "answer.md")
+if not os.path.exists(answer_path):
+    with open(answer_path, "w", encoding="utf-8"):
+        pass
+if not os.path.exists(marker_path):
+    with open(marker_path, "w", encoding="utf-8") as handle:
+        handle.write("-1")
+
+print("stale_recovered: true")
+PY
+}
 
 cmd_start() {
   local name="" prompt_file="" cwd="$PWD" resume="" model="" thinking=""
@@ -255,6 +348,9 @@ def main():
     if session_id and not os.path.exists(os.path.join(run_dir, "session.id")):
         with open(os.path.join(run_dir, "session.id"), "w", encoding="utf-8") as handle:
             handle.write(session_id + "\n")
+    # Finished, not to be mistaken for a live run: the marker holds the exit code.
+    with open(os.path.join(run_dir, "finalized"), "w", encoding="utf-8") as handle:
+        handle.write(str(exit_code))
 
     ledger = os.environ.get("OMP_LEDGER") or os.path.join(os.path.dirname(run_dir), "ledger.tsv")
     header = "ended\tname\tstate\texit\tduration_s\tcost_usd\tsession_id\trun_dir\n"
@@ -356,9 +452,20 @@ import os
 import sys
 
 run, pid, sess = sys.argv[1:4]
-lock = {"pid": int(pid) if pid.isdigit() else None, "tmux": sess}
+pid = int(pid) if pid.isdigit() else None
+lock = {"pid": pid, "tmux": sess}
 with open(os.path.join(run, "lock"), "w", encoding="utf-8") as handle:
     json.dump(lock, handle, indent=2)
+state_path = os.path.join(run, "state.json")
+try:
+    with open(state_path, encoding="utf-8") as handle:
+        state = json.load(handle)
+except (OSError, ValueError):
+    state = {}
+state["pid"] = pid
+state["tmux"] = sess
+with open(state_path, "w", encoding="utf-8") as handle:
+    json.dump(state, handle, indent=2)
 PY
 
   # Grab the session id early so an interrupted run is resumable.
@@ -395,13 +502,15 @@ PY
 }
 
 cmd_list() {
-  local d any=0
+  local d any=0 run
   for d in "$RUN_ROOT_BASE"/*/*/state.json \
            "$RUN_ROOT_BASE"/*/runs/*/state.json \
            "$RUN_ROOT_BASE"/*/omp-runs/*/state.json; do
     [[ -f "$d" ]] || continue
     any=1
-    python3 - "$(dirname "$d")" <<'PY'
+    run="$(dirname "$d")"
+    recover_stale "$run"
+    python3 - "$run" <<'PY'
 import json
 import os
 import subprocess
@@ -410,7 +519,7 @@ import sys
 run = sys.argv[1]
 with open(os.path.join(run, "state.json"), encoding="utf-8") as handle:
     state = json.load(handle)
-sess = state.get("tmux", "")
+sess = state.get("tmux") or ""
 alive = (
     subprocess.run(["tmux", "has-session", "-t", sess], capture_output=True).returncode == 0
     if sess
@@ -418,7 +527,9 @@ alive = (
 )
 started = (state.get("started") or "")[:19].replace("T", " ")
 state_name = state.get("state")
-if state_name == "running" and not alive:
+if state.get("recovered_stale"):
+    state_name = "failed(stale)"
+elif state_name == "running" and not alive:
     state_name = "GONE (crashed/killed — resume with -r %s)" % (state.get("session_id") or "?")
 print(
     f"{started}  {state.get('name', '?'):<28} {state_name:<10} exit={state.get('exit')} "
@@ -437,6 +548,7 @@ cmd_status() {
   local name="${1:-}"
   if [[ -z "$name" ]]; then cmd_list; return; fi
   local run; run="$(find_run_dir "$(sanitize "$name")")" || die "status: no run '$name'"
+  recover_stale "$run"
   python3 - "$run" <<'PY'
 import json
 import os
@@ -446,7 +558,7 @@ import sys
 run = sys.argv[1]
 with open(os.path.join(run, "state.json"), encoding="utf-8") as handle:
     state = json.load(handle)
-sess = state.get("tmux", "")
+sess = state.get("tmux") or ""
 alive = (
     subprocess.run(["tmux", "has-session", "-t", sess], capture_output=True).returncode == 0
     if sess
@@ -482,6 +594,7 @@ cmd_tail() {
 cmd_result() {
   local name; name="$(sanitize "${1:?result: slug required}")"
   local run; run="$(find_run_dir "$name")" || die "result: no run '$name'"
+  recover_stale "$run"
   python3 - "$run" <<'PY'
 import json
 import os
@@ -503,6 +616,7 @@ PY
 cmd_answer() {
   local name; name="$(sanitize "${1:?answer: slug required}")"
   local run; run="$(find_run_dir "$name")" || die "answer: no run '$name'"
+  recover_stale "$run"
   cat "$run/answer.md" 2>/dev/null || die "answer: not finished yet"
 }
 
