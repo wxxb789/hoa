@@ -7,7 +7,7 @@ description: >-
   auto-sync needs a safety review. Not for a repo with a review/PR workflow, and not for a one-off
   commit you can make yourself.
 metadata:
-  version: "0.1.23"
+  version: "0.1.24"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
 ---
