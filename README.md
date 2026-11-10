@@ -106,9 +106,12 @@ for library artifacts, falling back to the first sentence of the description
 (and, for Chinese, to the English note).
 
 Host install parity is separate from the catalog: `python
-scripts/install_host_skills.py --root <host-skills-dir> --check` names every
-skill that is absent, drifted or wrongly linked, and `--link` creates the
-missing symlinks. It never replaces a real directory.
+scripts/install_host_skills.py --root <host-skills-dir> --check` searches
+`<root>/<name>` and `<root>/<category>/<name>`, names every skill that is
+absent, drifted, wrongly linked or has two entries, and `--link` creates the
+missing symlinks at `<category>/<name>` — the skill's first `metadata.areas`
+value unless `--category` overrides it (`.` links flat). It never replaces a
+real directory and never adds a second entry for one skill.
 
 ## Unified skill versions
 

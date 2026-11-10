@@ -5,9 +5,11 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
 
 ## 2026-11-11 — host install parity and catalog truth
 
-- Added **`scripts/install_host_skills.py`**. `--root <host-skills-dir> --check` names every skill
-  that is absent, drifted or wrongly linked and exits 1; `--link` creates only missing symlinks,
-  is idempotent, and refuses to replace a real directory. The audit that motivated it found 8 of
+- Added **`scripts/install_host_skills.py`**. `--root <host-skills-dir> --check` searches flat and
+  one-level category layouts, names every skill that is absent, drifted, wrongly linked or present
+  twice, and exits 1; `--link` creates only missing symlinks at the skill's first
+  `metadata.areas` category (or `--category`), is idempotent, relinks a wrong link in place, and
+  refuses to replace a real directory or a duplicated skill. The audit that motivated it found 8 of
   40 skills installed in no runtime.
 - The generated catalog no longer has a second source of truth. The `NOTES` table is gone from
   `scripts/generate_index.py`; every one of its 49 notes moved unchanged into the artifact that

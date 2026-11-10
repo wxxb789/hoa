@@ -97,8 +97,10 @@ skill 用 `metadata.summary` / `metadata.summary_zh`，库 artifact 用索引注
 
 主机安装一致性独立于目录：
 `python scripts/install_host_skills.py --root <host-skills-dir> --check`
-会逐条列出缺失、内容漂移或链接错误的 skill；`--link` 只创建缺失的符号链接,
-不会替换真实目录。
+会搜索 `<root>/<name>` 与 `<root>/<category>/<name>`，逐条列出缺失、内容漂移、
+链接错误或存在两个条目的 skill；`--link` 在 `<category>/<name>` 创建缺失的符号链接，
+category 取该 skill 的第一个 `metadata.areas` 值，可用 `--category` 覆盖（`.` 表示平铺）。
+它不会替换真实目录，也不会为同一个 skill 添加第二个条目。
 
 ## 统一 skill 版本
 
