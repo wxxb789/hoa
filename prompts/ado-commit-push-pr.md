@@ -1,4 +1,4 @@
-<!-- index: areas=software-development; targets=repo-only -->
+<!-- index: areas=software-development; targets=repo-only; summary="one-shot commit → push → PR request for Azure DevOps or GitHub, with house conventions and az/gh pitfalls"; summary_zh="一次性 commit → push → PR 请求模板（Azure DevOps 或 GitHub），附提交约定与 az/gh 易错点" -->
 
 # ADO / GitHub commit, push, and PR
 

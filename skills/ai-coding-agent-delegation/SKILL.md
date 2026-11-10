@@ -7,9 +7,11 @@ description: >-
   compared across agents. Not for a quick bounded subtask in the current turn, and not for work with
   no written task spec or acceptance command.
 metadata:
-  version: "0.1.29"
+  version: "0.1.30"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
+  summary: "hand a bounded coding task to an external agent CLI in an isolated worktree, then verify the diff, tests and every acceptance claim yourself"
+  summary_zh: "把定界编码任务交给隔离 worktree 中的外部 agent CLI，再自行核验 diff、测试与全部验收声明"
   kind: "entry"
 ---
 

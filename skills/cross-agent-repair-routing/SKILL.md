@@ -5,9 +5,11 @@ description: >-
   rule on the claim, reproduce under the reporter's environment, and escalate one scoped landing
   decision. Use when you found a bug you may not fix in a shared tree. Not for fixing your own files.
 metadata:
-  version: "0.1.29"
+  version: "0.1.30"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
+  summary: "route a defect found in another agent's write surface: authority map, reproduction, one scoped landing decision"
+  summary_zh: "把他人写入面内的缺陷送修：权限地图、复现、一次定界的落地决策"
   kind: "entry"
 ---
 

@@ -8,9 +8,11 @@ description: >-
   Not for open-ended prose whose quality is the only gate, and not for auditing a report already
   delivered.
 metadata:
-  version: "0.1.29"
+  version: "0.1.30"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
+  summary: "meet a measurable brief: freeze the evidence packet, draft in parallel, assemble to the number, verify with the contract's own metric"
+  summary_zh: "满足可度量契约：冻结证据包、并行起草、按字数装配、用契约自身的度量脚本验收"
   kind: "entry"
 ---
 

@@ -1,4 +1,4 @@
-<!-- index: areas=software-development,work-management; targets=repo-only -->
+<!-- index: areas=software-development,work-management; targets=repo-only; summary="read-only search for an existing skill when asked to check before authoring; never create one"; summary_zh="按请求先搜索已有 skill，再决定是否编写；只报告，不代写" -->
 
 # skill-scout
 

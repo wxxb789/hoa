@@ -5,9 +5,11 @@ description: >-
   idle, then hand it one complete instruction without corrupting the session. Use when taking over
   or monitoring an interactive agent turn. Not for one-shot generation — run that headless.
 metadata:
-  version: "0.1.29"
+  version: "0.1.30"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
+  summary: "drive a live TUI agent in tmux: find the pane, prove idle, send one complete instruction"
+  summary_zh: "在 tmux 中驱动运行中的 TUI agent：定位 pane、证明空闲、一次发出完整指令"
   kind: "entry"
 ---
 

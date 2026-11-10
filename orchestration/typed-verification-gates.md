@@ -1,4 +1,4 @@
-<!-- index: areas=software-development; targets=repo-only -->
+<!-- index: areas=software-development; targets=repo-only; summary="every loop iteration ends at a gate typed programmatic / judge / human, declared before the work"; summary_zh="循环每次迭代止于一道事先定型的验证门：programmatic / judge / human" -->
 
 # Typed verification gates
 

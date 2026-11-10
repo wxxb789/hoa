@@ -7,9 +7,11 @@ description: >-
   candidate-output judgments; use hoa-introspect-distill for recurring-work
   findings that need qualification and item approval, when available.
 metadata:
-  version: "0.1.29"
+  version: "0.1.30"
   areas: "software-development,work-management,self-management"
   targets: "runtime-agnostic"
+  summary: "directly create or evolve a defined skill with focused, risk-scaled validation"
+  summary_zh: "直接创建或演进已定义的 skill，并按风险聚焦验证"
   kind: "entry"
 ---
 

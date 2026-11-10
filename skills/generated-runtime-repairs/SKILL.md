@@ -6,9 +6,11 @@ description: >-
   or when a reviewed patch must be landed and then materialized into a live runtime. Not for editing
   generated output by hand.
 metadata:
-  version: "0.1.29"
+  version: "0.1.30"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
+  summary: "repair the template/generator, prove the staged artifact, then deploy and read back the live runtime"
+  summary_zh: "修模板/生成器、验证暂存产物，再部署并回读线上运行时"
   kind: "entry"
 ---
 

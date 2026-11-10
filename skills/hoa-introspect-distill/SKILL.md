@@ -7,9 +7,11 @@ description: >-
   report. Use hoa-skill-work for direct creation or evolution of a defined skill;
   use hoa-introspect to discover work patterns in history.
 metadata:
-  version: "0.1.29"
+  version: "0.1.30"
   areas: "self-management,software-development"
   targets: "runtime-agnostic"
+  summary: "qualify supplied recurring-work findings as candidates; create only after individual approval"
+  summary_zh: "评估给定的重复工作发现为候选；逐项批准后才创建资产"
   kind: "entry"
 ---
 

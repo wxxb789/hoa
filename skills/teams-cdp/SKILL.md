@@ -6,9 +6,11 @@ description: >-
   through an already signed-in desktop Teams CDP session. Use for Teams UI
   discovery and sending, not channels, meetings, browser login, or Microsoft Graph.
 metadata:
-  version: "0.1.29"
+  version: "0.1.30"
   areas: "work-management"
   targets: "runtime-agnostic"
+  summary: "send Teams messages to exact people or existing groups through local desktop CDP"
+  summary_zh: "通过本机桌面 CDP 向明确的 Teams 联系人或现有群组发送消息"
   kind: "entry"
 ---
 

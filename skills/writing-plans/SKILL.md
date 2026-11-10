@@ -7,9 +7,11 @@ description: >-
   hand-off to a task-per-subagent executor. Not for setting outcomes and ambition (that is goal
   definition) and not for exploring whether the work should happen at all.
 metadata:
-  version: "0.1.29"
+  version: "0.1.30"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
+  summary: "implementation plans an agent with zero context can execute: bite-sized tasks, exact paths, complete code, commands with expected output"
+  summary_zh: "写出零上下文 agent 也能执行的实现计划：小步任务、精确路径、完整代码、带预期输出的命令"
   kind: "entry"
   consumes: "spec"
   produces: "plan"

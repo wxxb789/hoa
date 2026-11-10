@@ -7,9 +7,11 @@ description: >-
   editing a skill, and not for porting one into a shared repo — review and execution are separate
   modes, and execution needs its own confirmed scope.
 metadata:
-  version: "0.1.29"
+  version: "0.1.30"
   areas: "software-development,self-management"
   targets: "runtime-agnostic"
+  summary: "review a skill library by evidence: inventory, overlap groups, installer provenance, upstream freshness; recommendations never change state"
+  summary_zh: "按证据审查技能库：清点、重叠分组、安装来源、上游新鲜度；建议不改动状态"
   kind: "entry"
 ---
 

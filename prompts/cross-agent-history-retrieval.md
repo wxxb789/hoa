@@ -1,4 +1,4 @@
-<!-- index: areas=self-management,software-development; targets=repo-only -->
+<!-- index: areas=self-management,software-development; targets=repo-only; summary="one-shot search/export of local agent histories with per-source coverage, dedup, and redaction"; summary_zh="一次性检索/导出本机各 agent 历史，按来源报告覆盖、去重并打码" -->
 
 # Cross-agent history retrieval
 

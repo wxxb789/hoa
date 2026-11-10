@@ -1,4 +1,4 @@
-<!-- index: areas=software-development,work-management; targets=repo-only -->
+<!-- index: areas=software-development,work-management; targets=repo-only; summary="one-shot judge prompt: grade a response against a rubric written before it existed"; summary_zh="一次性评审 prompt：用先于回答写好的 rubric 在全新上下文里评分" -->
 
 # Fresh-context grader
 

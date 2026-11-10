@@ -7,9 +7,11 @@ description: >-
   NuGet package, or when a .NET change is ready to commit and open as a PR. Do not use for the repo's
   code style (its own AGENTS.md) or for orchestrator install maintenance.
 metadata:
-  version: "0.1.29"
+  version: "0.1.30"
   areas: "software-development"
   targets: "runtime-agnostic"
+  summary: "run the repo's own .NET gate harness instead of a hand-rolled `dotnet test`; lock files, Roslyn harness traps, merge-ready checklist"
+  summary_zh: "走仓库自带 .NET gate 而非手搓 `dotnet test`；lock 文件、Roslyn 编译陷阱、merge-ready 清单"
   kind: "entry"
 ---
 

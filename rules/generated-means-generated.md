@@ -1,4 +1,4 @@
-<!-- index: areas=software-development,work-management,self-management; targets=repo-only -->
+<!-- index: areas=software-development,work-management,self-management; targets=repo-only; summary="generated files are never hand-edited; regeneration rides the same commit and drift fails CI"; summary_zh="生成文件绝不手改；再生成随同一提交，漂移即 CI 失败" -->
 
 # Generated means generated
 

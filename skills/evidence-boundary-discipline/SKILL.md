@@ -8,9 +8,11 @@ description: >-
   legal text. Not for collecting or grading sources (that is claim auditing), and not for prose
   whose every claim is already primary-sourced.
 metadata:
-  version: "0.1.29"
+  version: "0.1.30"
   areas: "work-management"
   targets: "runtime-agnostic"
+  summary: "state only what a dated source supports: tense to dateline, provenance-label parity, absence never escalates"
+  summary_zh: "只陈述有日期的来源所能支持的事实：时态对齐日期、来源标签全链路一致、缺失不升级为不存在"
   kind: "entry"
 ---
 

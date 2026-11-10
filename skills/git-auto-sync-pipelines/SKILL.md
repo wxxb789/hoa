@@ -7,9 +7,11 @@ description: >-
   auto-sync needs a safety review. Not for a repo with a review/PR workflow, and not for a one-off
   commit you can make yourself.
 metadata:
-  version: "0.1.29"
+  version: "0.1.30"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
+  summary: "scheduled commit/push for hand-edited repos: ordered gates, allowlist and size caps, staged secret scan, heartbeat and deduped alerts"
+  summary_zh: "手改仓库的定时提交推送：固定门序、白名单与体积上限、暂存区密钥扫描、心跳与去重告警"
   kind: "entry"
 ---
 

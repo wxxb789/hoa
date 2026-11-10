@@ -5,9 +5,11 @@ description: >-
   monospace aligned tables, and the attachment fallback. Use when a plain Discord message would show
   raw pipes or truncate. Discord only — other platforms have their own rich-message systems.
 metadata:
-  version: "0.1.29"
+  version: "0.1.30"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
+  summary: "structured Discord messages within platform limits: Components V2, aligned code-block tables, attachment fallback"
+  summary_zh: "在平台限制内发送结构化 Discord 消息：Components V2、等宽对齐表格、附件兜底"
   kind: "entry"
 ---
 

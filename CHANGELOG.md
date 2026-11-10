@@ -3,6 +3,24 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## 2026-11-11 — host install parity and catalog truth
+
+- Added **`scripts/install_host_skills.py`**. `--root <host-skills-dir> --check` names every skill
+  that is absent, drifted or wrongly linked and exits 1; `--link` creates only missing symlinks,
+  is idempotent, and refuses to replace a real directory. The audit that motivated it found 8 of
+  40 skills installed in no runtime.
+- The generated catalog no longer has a second source of truth. The `NOTES` table is gone from
+  `scripts/generate_index.py`; every one of its 49 notes moved unchanged into the artifact that
+  owns it — `metadata.summary` / `metadata.summary_zh` for skills, `summary` / `summary_zh` in the
+  `<!-- index: ... -->` comment for library artifacts. Missing summaries fall back to the first
+  sentence of `description`, and a missing Chinese summary falls back to the English one. The
+  `spec-convergence` row now describes the current one-root-per-round protocol.
+- Added **`scripts/check_changelog.py --base <ref>`**: a changed `VERSION` without a changed
+  `CHANGELOG.md` exits 1, and CI runs it in the pull-request job.
+- Added **`scripts/check_frontmatter.py`**, which replaces the inline shell loop in CI and rejects a
+  missing frontmatter, a name that does not match its directory, an empty description, or invalid
+  catalog scalars.
+
 ## 2026-11-10 — cross-platform increments in goal-driven-delivery
 
 - Added **goal-driven-delivery** [`references/cross-platform-increments.md`](skills/goal-driven-delivery/references/cross-platform-increments.md)

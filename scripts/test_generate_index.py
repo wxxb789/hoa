@@ -35,7 +35,8 @@ def make_temp_root() -> Path:
 
 
 def make_skill(root: Path, name: str, *, index=None, frontmatter=True, quoted=False,
-               areas="software-development", targets="runtime-agnostic"):
+               areas="software-development", targets="runtime-agnostic",
+               summary=None, summary_zh=None):
     d = root / "skills" / name
     d.mkdir(parents=True)
     quote = '"' if quoted else ""
@@ -45,7 +46,12 @@ def make_skill(root: Path, name: str, *, index=None, frontmatter=True, quoted=Fa
                   "description: " + name + " does one thing. And another.",
                   "metadata:", '  version: "0.1.0"',
                   f"  areas: {quote}{areas}{quote}",
-                  f"  targets: {quote}{targets}{quote}", "---", ""]
+                  f"  targets: {quote}{targets}{quote}"]
+        if summary is not None:
+            parts.append(f"  summary: \"{summary}\"")
+        if summary_zh is not None:
+            parts.append(f"  summary_zh: \"{summary_zh}\"")
+        parts += ["---", ""]
     if index is not None:
         parts += [f"<!-- index: {index} -->", ""]
     parts += [f"# {name}", ""]
@@ -73,6 +79,26 @@ class ParseMetadataTests(unittest.TestCase):
         self.assertEqual(gi.parse_skill_metadata(skill), {
             "areas": "work-management, software-development",
             "targets": "codex,claude-code,runtime-agnostic", "version": "0.1.0"})
+
+    def test_summary_scalars_are_optional_strings(self):
+        skill = make_skill(self.tmp, "with-summary", summary="en note",
+                           summary_zh="zh note") / "SKILL.md"
+        self.assertEqual(gi.parse_skill_metadata(skill), {
+            "areas": "software-development", "targets": "runtime-agnostic",
+            "version": "0.1.0", "summary": "en note", "summary_zh": "zh note"})
+        for number, key in enumerate(("summary", "summary_zh")):
+            bad = make_skill(self.tmp, f"typed-{key}") / "SKILL.md"
+            bad.write_bytes(bad.read_bytes().replace(
+                f"  targets: runtime-agnostic\n".encode(),
+                f"  targets: runtime-agnostic\n  {key}: [not, a, string]\n".encode()))
+            with self.assertRaisesRegex(ValueError, rf"metadata\.{key} must be a YAML string"):
+                gi.parse_skill_metadata(bad)
+
+    def test_library_comment_rejects_unterminated_quote(self):
+        skill = make_skill(self.tmp, "broken-comment", frontmatter=False,
+                           index='areas=software-development; summary="unterminated') / "SKILL.md"
+        with self.assertRaisesRegex(ValueError, "unterminated quote"):
+            gi.parse_metadata(skill)
 
     def test_unknown_or_empty_yaml_area_or_target_rejected(self):
         for axis in ("areas", "targets"):
@@ -190,7 +216,6 @@ class CollectTests(unittest.TestCase):
     def test_note_falls_back_to_frontmatter(self):
         make_skill(self.tmp, "unlisted-skill")
         with patch.object(gi, "SKILLS", self.tmp / "skills"), \
-             patch.object(gi, "NOTES", {}), \
              patch.object(gi, "LIBRARY_FOLDERS", {}):
             rows = gi.collect()
         self.assertEqual(rows, [{
@@ -199,19 +224,36 @@ class CollectTests(unittest.TestCase):
             "note_zh": "unlisted-skill does one thing.",
             "areas": "software-development", "targets": "runtime-agnostic", "version": "0.1.0"}])
 
-    def test_notes_override_beats_fallback(self):
-        make_skill(self.tmp, "listed-skill")
-        with patch.object(gi, "SKILLS", self.tmp / "skills"), patch.object(
-            gi, "NOTES", {"listed-skill": ("override-en", "override-zh")}
-        ), patch.object(gi, "LIBRARY_FOLDERS", {}):
+    def test_frontmatter_summary_beats_description_for_both_languages(self):
+        make_skill(self.tmp, "listed-skill", summary="summary-en", summary_zh="summary-zh")
+        with patch.object(gi, "SKILLS", self.tmp / "skills"), \
+             patch.object(gi, "LIBRARY_FOLDERS", {}):
             rows = gi.collect()
-        self.assertEqual(rows[0]["note_en"], "override-en")
-        self.assertEqual(rows[0]["note_zh"], "override-zh")
+        self.assertEqual(rows[0]["note_en"], "summary-en")
+        self.assertEqual(rows[0]["note_zh"], "summary-zh")
 
-    def test_no_frontmatter_and_no_override_rejected(self):
+    def test_folded_description_fallback_uses_first_sentence_only(self):
+        skill = make_skill(self.tmp, "folded") / "SKILL.md"
+        skill.write_bytes(skill.read_bytes().replace(
+            b"description: folded does one thing. And another.",
+            b"description: >-\n  Folded first sentence. Second sentence."))
+        with patch.object(gi, "SKILLS", self.tmp / "skills"), \
+             patch.object(gi, "LIBRARY_FOLDERS", {}):
+            rows = gi.collect()
+        self.assertEqual(rows[0]["note_en"], "Folded first sentence.")
+        self.assertEqual(rows[0]["note_zh"], "Folded first sentence.")
+
+    def test_missing_chinese_summary_falls_back_to_english_summary(self):
+        make_skill(self.tmp, "english-only", summary="summary-en")
+        with patch.object(gi, "SKILLS", self.tmp / "skills"), \
+             patch.object(gi, "LIBRARY_FOLDERS", {}):
+            rows = gi.collect()
+        self.assertEqual(rows[0]["note_en"], "summary-en")
+        self.assertEqual(rows[0]["note_zh"], "summary-en")
+
+    def test_no_frontmatter_and_no_summary_rejected(self):
         make_skill(self.tmp, "bare", frontmatter=False)
         with patch.object(gi, "SKILLS", self.tmp / "skills"), \
-             patch.object(gi, "NOTES", {}), \
              patch.object(gi, "LIBRARY_FOLDERS", {}):
             with self.assertRaises(ValueError):
                 gi.collect()
@@ -271,23 +313,32 @@ class LibraryCollectTests(unittest.TestCase):
         self._write_library_doc(
             "---\nname: reviewer\ndescription: A reviewer role does things.\n---\n"
             "<!-- index: areas=software-development; targets=repo-only; version=9.8.7 -->\n")
-        with patch.object(gi, "NOTES", {}):
-            rows = self._collect()
-            content = gi.render(rows, "en")
+        rows = self._collect()
+        content = gi.render(rows, "en")
         lib = next(r for r in rows if r["name"] == "reviewer")
         self.assertEqual(lib["type"], "agent")
         self.assertEqual(lib["version"], "9.8.7")
+        self.assertEqual(lib["note_en"], "A reviewer role does things.")
         self.assertIn("| reviewer | agent | software-development | repo-only | "
                       "`agents/reviewer.md` |", content)
+
+    def test_library_comment_summary_keeps_semicolons_and_falls_back_in_chinese(self):
+        self._write_library_doc(
+            "---\nname: reviewer\ndescription: A reviewer role does things.\n---\n"
+            '<!-- index: areas=software-development; targets=repo-only; '
+            'summary="one fact; another fact" -->\n')
+        rows = self._collect()
+        lib = next(r for r in rows if r["name"] == "reviewer")
+        self.assertEqual(lib["note_en"], "one fact; another fact")
+        self.assertEqual(lib["note_zh"], "one fact; another fact")
 
     def test_library_readme_directory_artifact_uses_directory_path(self):
         self._write_library_doc(
             "---\nname: proxy\ndescription: A local proxy definition.\n---\n"
             "<!-- index: areas=software-development; targets=repo-only -->\n",
             folder="mcps", name="ghc-proxy", readme=True)
-        with patch.object(gi, "NOTES", {}):
-            rows = self._collect()
-            content = gi.render(rows, "en")
+        rows = self._collect()
+        content = gi.render(rows, "en")
         lib = next(r for r in rows if r["name"] == "ghc-proxy")
         self.assertEqual(lib["path"], "mcps/ghc-proxy/")
         self.assertIn("`mcps/ghc-proxy/`", content)

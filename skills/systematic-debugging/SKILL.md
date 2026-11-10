@@ -8,9 +8,11 @@ description: >-
   Not for exploratory "make it nicer" refactors, and not for a known mechanical change with an
   already-proven cause.
 metadata:
-  version: "0.1.29"
+  version: "0.1.30"
   areas: "software-development"
   targets: "runtime-agnostic"
+  summary: "root cause before fix: a tight red-capable loop, boundary evidence, ranked falsifiable hypotheses, then one fix at a time"
+  summary_zh: "先定位根因再修：紧致可复现的反馈环、边界证据、可证伪假设排序，然后一次只改一处"
   kind: "entry"
 ---
 
