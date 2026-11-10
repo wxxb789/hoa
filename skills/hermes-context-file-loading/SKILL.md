@@ -7,9 +7,10 @@ description: >-
   an instruction file that did or did not take effect, or reasoning about subagent context and prompt
   cache stability. Not for editing the runtime source, and not for other harnesses' context files.
 metadata:
-  version: "0.1.26"
+  version: "0.1.27"
   areas: "software-development"
   targets: "hermes"
+  kind: "entry"
 ---
 
 # Hermes Context File Loading

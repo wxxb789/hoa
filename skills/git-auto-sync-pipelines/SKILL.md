@@ -7,9 +7,10 @@ description: >-
   auto-sync needs a safety review. Not for a repo with a review/PR workflow, and not for a one-off
   commit you can make yourself.
 metadata:
-  version: "0.1.26"
+  version: "0.1.27"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
+  kind: "entry"
 ---
 
 # Git auto-sync pipelines

@@ -6,9 +6,10 @@ description: >-
   or when a reviewed patch must be landed and then materialized into a live runtime. Not for editing
   generated output by hand.
 metadata:
-  version: "0.1.26"
+  version: "0.1.27"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
+  kind: "entry"
 ---
 
 # Generated runtime repairs

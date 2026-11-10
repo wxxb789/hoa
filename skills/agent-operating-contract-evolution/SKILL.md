@@ -7,9 +7,10 @@ description: >-
   identity, routing, delegation, or persistence. Not for ordinary repo coding rules, and not for
   one-off task notes.
 metadata:
-  version: "0.1.26"
+  version: "0.1.27"
   areas: "software-development,work-management,self-management"
   targets: "runtime-agnostic"
+  kind: "entry"
 ---
 
 # Agent Operating Contract Evolution Skill

@@ -25,7 +25,10 @@ only when each environment-specific value can be supplied from outside it.
 
 Skills declare their role and artifacts in `metadata` as comma-separated strings:
 
-- `kind`: `controller`, `stage`, `mechanism`, or `entry` (optional).
+- `kind`: one of four roles. `controller` routes a chain and produces only `chain-plan`; `stage` is
+  one phase of a chain and is invoked by its controller; `mechanism` is invoked only by another skill
+  and is never a routing target; `entry` is directly routable from a user request. Every skill
+  declares a kind, and CI rejects a skill that does not.
 - `consumes` / `produces`: artifact names; declaring either requires `kind`.
 
 A mechanism is never a routing target, so it must not appear in `must_pick` in

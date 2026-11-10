@@ -7,9 +7,10 @@ description: >-
   between root and profiles, vision or image generation errors, or a relay's effort/cost looks
   wrong. Not for another harness's own model configuration.
 metadata:
-  version: "0.1.26"
+  version: "0.1.27"
   areas: "software-development"
   targets: "hermes"
+  kind: "entry"
 ---
 
 # Hermes Models & Providers

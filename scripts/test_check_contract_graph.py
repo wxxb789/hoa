@@ -51,12 +51,11 @@ def make_skill(root: Path, name: str, *, kind=None, consumes=None, produces=None
     return d
 
 
-def write_registry(root: Path, *, external=(), shared=(), required_kind=()):
+def write_registry(root: Path, *, external=(), shared=()):
     path = root / "scripts" / "contract_graph_registry.yaml"
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = []
-    for key, values in (("external", external), ("shared", shared),
-                        ("required_kind", required_kind)):
+    for key, values in (("external", external), ("shared", shared)):
         if values:
             lines.append(f"{key}:")
             lines.extend(f"  - {value}" for value in values)
@@ -164,17 +163,15 @@ class ContractGraphTests(unittest.TestCase):
         write_registry(self.tmp, shared=["shared-artifact"])
         self.assertEqual(self.violations(), [])
 
-    def test_r7_required_skill_missing_kind(self):
+    def test_r7_skill_missing_kind(self):
         make_skill(self.tmp, "bare")
-        write_registry(self.tmp, required_kind=["bare"])
         line = self.assert_rule("R7")
         self.assertIn("skills/bare/SKILL.md", line)
         self.assertIn("does not declare kind", line)
 
-    def test_r7_unknown_required_name(self):
-        write_registry(self.tmp, required_kind=["ghost"])
-        line = self.assert_rule("R7")
-        self.assertIn("required_kind names unknown skill 'ghost'", line)
+    def test_r7_entry_without_artifacts_passes(self):
+        make_skill(self.tmp, "plain", kind="entry")
+        self.assertEqual(self.violations(), [])
 
     def test_r8_controller_over_cap(self):
         skill_md = make_skill(self.tmp, "router", kind="controller",
@@ -193,7 +190,7 @@ class ContractGraphTests(unittest.TestCase):
     def test_main_summary_and_list(self):
         make_skill(self.tmp, "runner", kind="mechanism",
                    consumes="gate-spec", produces="gate-result")
-        make_skill(self.tmp, "plain")
+        make_skill(self.tmp, "plain", kind="entry")
         write_registry(self.tmp, external=["gate-spec"])
         with patch.object(cg, "ROOT", self.tmp), \
              contextlib.redirect_stdout(io.StringIO()) as out:
@@ -204,6 +201,7 @@ class ContractGraphTests(unittest.TestCase):
              contextlib.redirect_stdout(io.StringIO()) as out:
             self.assertEqual(cg.main(["--list"]), 0)
         self.assertEqual(out.getvalue(),
+                         "plain → entry → - → -\n"
                          "runner → mechanism → gate-spec → gate-result\n")
 
 

@@ -7,9 +7,10 @@ description: >-
   recovering a run that was killed mid-turn. Do not use for a two-minute command (run it inline) or for
   work that needs live steering (that is a TUI session).
 metadata:
-  version: "0.1.26"
+  version: "0.1.27"
   areas: "software-development,work-management"
   targets: "pi"
+  kind: "entry"
 ---
 
 # OMP headless orchestration

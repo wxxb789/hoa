@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Check the composition contract declared by custom skills.
 
-Every skill may declare `metadata.kind` (controller, stage, mechanism, entry)
-plus comma-separated `metadata.consumes` / `metadata.produces` artifact names.
-The graph is valid only when every consumed artifact has exactly one producer
-(or is registered external) and every producer is unambiguous.
+Every skill must declare `metadata.kind` (controller, stage, mechanism, entry)
+plus optional comma-separated `metadata.consumes` / `metadata.produces` artifact
+names. The graph is valid only when every consumed artifact has exactly one
+producer (or is registered external) and every producer is unambiguous.
 
 Usage:
     python scripts/check_contract_graph.py          # exit 1 on violations
@@ -97,10 +97,10 @@ def _load_skills(root: Path) -> tuple[Skill, ...]:
     return tuple(skills)
 
 
-def _registry(root: Path) -> tuple[frozenset[str], frozenset[str], tuple[str, ...]]:
+def _registry(root: Path) -> tuple[frozenset[str], frozenset[str]]:
     path = root / REGISTRY
     if not path.is_file():
-        return frozenset(), frozenset(), ()
+        return frozenset(), frozenset()
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     if not isinstance(data, dict):
         raise ValueError(f"{path}: expected a YAML mapping")
@@ -111,8 +111,7 @@ def _registry(root: Path) -> tuple[frozenset[str], frozenset[str], tuple[str, ..
             raise ValueError(f"{path}: {key} must be a list of names")
         return tuple(dict.fromkeys(item.strip() for item in value if item.strip()))
 
-    return (frozenset(names("external")), frozenset(names("shared")),
-            names("required_kind"))
+    return frozenset(names("external")), frozenset(names("shared"))
 
 
 def _trigger_cases(root: Path) -> tuple[tuple[str, tuple[str, ...]], ...]:
@@ -138,18 +137,10 @@ def _trigger_cases(root: Path) -> tuple[tuple[str, tuple[str, ...]], ...]:
 def analyze(root: Path | None = None) -> Result:
     root = ROOT if root is None else Path(root)
     skills = _load_skills(root)
-    external, shared, required_kind = _registry(root)
+    external, shared = _registry(root)
     cases = _trigger_cases(root)
     by_name = {skill.name: skill for skill in skills}
     violations: list[str] = []
-
-    for name in required_kind:
-        skill = by_name.get(name)
-        if skill is None:
-            violations.append(f"{REGISTRY.as_posix()}: R7: required_kind names "
-                              f"unknown skill {name!r}")
-        elif skill.kind is None:
-            violations.append(f"{skill.path}: R7: required skill does not declare kind")
 
     produced: dict[str, list[str]] = {}
     for skill in skills:
@@ -157,6 +148,8 @@ def analyze(root: Path | None = None) -> Result:
             produced.setdefault(artifact, []).append(skill.name)
 
     for skill in skills:
+        if skill.kind is None:
+            violations.append(f"{skill.path}: R7: skill does not declare kind")
         if skill.kind is not None and skill.kind not in KINDS:
             violations.append(f"{skill.path}: R1: invalid kind {skill.kind!r}; "
                               f"expected one of {', '.join(KINDS)}")

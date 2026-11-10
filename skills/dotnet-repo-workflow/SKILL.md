@@ -7,9 +7,10 @@ description: >-
   NuGet package, or when a .NET change is ready to commit and open as a PR. Do not use for the repo's
   code style (its own AGENTS.md) or for orchestrator install maintenance.
 metadata:
-  version: "0.1.26"
+  version: "0.1.27"
   areas: "software-development"
   targets: "runtime-agnostic"
+  kind: "entry"
 ---
 
 # .NET repo workflow
