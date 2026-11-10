@@ -40,6 +40,12 @@ jobs:
       - name: Skill catalog drift check
         run: python scripts/generate_index.py --check
 
+      - name: Composition contract graph
+        run: python scripts/check_contract_graph.py
+
+      - name: Contract graph checker tests
+        run: python scripts/test_check_contract_graph.py
+
       - name: Index generator tests
         run: python scripts/test_generate_index.py
 

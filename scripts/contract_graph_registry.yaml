@@ -1,0 +1,7 @@
+external:
+  - request
+  - work-report
+  - git-commit
+  - ci-result
+
+shared: []

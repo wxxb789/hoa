@@ -7,9 +7,12 @@ description: >-
   when deciding what to authorize and what to send back. Do not use for grading your own work, or when
   no artifact exists to inspect.
 metadata:
-  version: "0.1.18"
+  version: "0.1.19"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
+  kind: "mechanism"
+  consumes: "work-report"
+  produces: "acceptance-verdict"
 ---
 
 # Delegated work acceptance
