@@ -7,10 +7,12 @@ description: >-
   hand-off to a task-per-subagent executor. Not for setting outcomes and ambition (that is goal
   definition) and not for exploring whether the work should happen at all.
 metadata:
-  version: "0.1.28"
+  version: "0.1.29"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   kind: "entry"
+  consumes: "spec"
+  produces: "plan"
 ---
 
 # Writing Implementation Plans
@@ -37,6 +39,11 @@ hand-off are this port's.
 - Implementing multi-step features
 - Breaking down complex requirements
 - Delegating to subagents via `subagent-driven-development`
+
+**Start from the spec, not from scratch.** When `spec-convergence` produced a spec, the plan consumes
+it: implement its Scope, Acceptance and Testing seam; do not re-decide a settled boundary. If a task
+would need a decision the spec never made, stop and return to `spec-convergence` — widening the plan is
+how an unagreed boundary becomes code.
 
 **Don't skip when:**
 

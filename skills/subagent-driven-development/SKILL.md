@@ -7,11 +7,11 @@ description: >-
   hold between tasks. Not for discovering what to build, and not for one task you can finish in the
   current context.
 metadata:
-  version: "0.1.28"
+  version: "0.1.29"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   kind: "stage"
-  consumes: "spec"
+  consumes: "plan"
   produces: "implementation"
 ---
 
@@ -74,6 +74,10 @@ whatever tracker the work is recorded in, in plan order:
 
 **Key:** Read the plan ONCE. Extract everything. Don't make subagents read the plan file — provide the
 full task text directly in each dispatch.
+
+If the plan names a spec file, read it too: the plan says **how**, the spec says **what**, and the
+spec-compliance review in Step 2 measures against the spec's Acceptance list and Testing seam. A plan
+that contradicts the spec is a defect in the plan, not a licence to widen scope.
 
 ### 2. Per-Task Workflow
 

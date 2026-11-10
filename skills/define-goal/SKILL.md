@@ -2,7 +2,7 @@
 name: define-goal
 description: Define ambitious intentions as numbered goal-prompt files, progressing from clear near-term outcomes to provisional longer-term outcomes without planning implementation. Use when the user wants to create or refine goals, turn a large vision into inspectable increments, or refine the next goal from earlier results. Not for task breakdown, implementation planning, execution, or progress tracking.
 metadata:
-  version: "0.1.28"
+  version: "0.1.29"
   areas: "self-management,software-development,work-management"
   targets: "runtime-agnostic"
   kind: "entry"
@@ -19,6 +19,10 @@ metadata:
 ## Boundary
 
 This skill defines purpose, desired outcomes, credible completion evidence, material bounds, and the order in which outcomes build toward the ambition. An outcome sequence is not an implementation plan: describe what becomes possible, not the steps, architecture, or tools used to make it possible.
+
+If the next outcome's boundaries, acceptance or test seam are still undecided, settle them with
+`spec-convergence` first and consume its spec. Ambition and boundaries are two decisions; this skill
+owns the first.
 
 This skill writes goal documents. The receiving agent and harness own implementation planning, execution, timing, goal activation, and progress tracking. Do not execute the goals or build a scheduler or lifecycle mechanism.
 

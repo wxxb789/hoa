@@ -8,7 +8,7 @@ description: >-
   Not for open-ended prose whose quality is the only gate, and not for auditing a report already
   delivered.
 metadata:
-  version: "0.1.28"
+  version: "0.1.29"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
   kind: "entry"

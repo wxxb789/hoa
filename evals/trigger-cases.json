@@ -151,6 +151,12 @@
       "request": "The boundaries, acceptance criteria and testing seam for the export fix are already decided and written down. Turn them into a step-by-step execution plan with exact files, complete code and test commands.",
       "must_pick": ["writing-plans"],
       "distractors": ["spec-convergence", "define-goal"]
+    },
+    {
+      "id": "route-boundaryless-goal-to-spec-first",
+      "request": "我想把团队的发布流程改成全自动，目标定大一点，顺便把这季度的计划排出来。但现在连这件事该包含什么、什么算做完了都还没想清楚。",
+      "must_pick": ["spec-convergence"],
+      "distractors": ["define-goal", "writing-plans"]
     }
   ]
 }
