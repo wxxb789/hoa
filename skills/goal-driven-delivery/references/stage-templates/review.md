@@ -31,6 +31,15 @@ severity, `file:line`, and **the input that breaks** — not just the concern.
 - Unfair comparisons (baseline doing different work, setup charged to one side only, mixed tiers or
   counters in one table) are findings about the deliverable, not about style.
 
+## Test code is not production code
+
+Triage the diff into production and test paths before grading; test files are reviewed, not skipped.
+In test code, a wrong or missing assertion, a mock that passes regardless of the behaviour, an
+assertion on private internals, or a skipped test counted as coverage changes the verdict — never
+demote it to style. Never recommend sharing an expectation with the implementation or an input
+fixture with its assertion: an oracle that moves with the code cannot fail. Repeated literals and
+short setup duplication inside one test class are not findings.
+
 ## Report format
 
 Per finding: id, severity, `file:line`, what is wrong, why it matters, suggested fix. Then an
