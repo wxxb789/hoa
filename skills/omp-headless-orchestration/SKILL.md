@@ -7,7 +7,7 @@ description: >-
   recovering a run that was killed mid-turn. Do not use for a two-minute command (run it inline) or for
   work that needs live steering (that is a TUI session).
 metadata:
-  version: "0.1.25"
+  version: "0.1.26"
   areas: "software-development,work-management"
   targets: "pi"
 ---
@@ -85,7 +85,10 @@ The implementation is maintained once, with skill `goal-driven-delivery`
    grepping the shim path reports a healthy run as dead — use the pid in `state.json`.
 10. **A tmux-hosted run has no completion notification.** Nothing pings you when it ends: poll
     `omp-run.sh status <slug>` at turn boundaries, and treat `state` leaving `running` (not the tmux
-    session vanishing) as the done signal.
+    session vanishing) as the done signal. A run whose pane died with its process is finalized as
+    failed (`recovered_stale: true`, exit `-1`) the next time `status`/`list`/`result`/`answer` reads
+    it; a state file stuck at `running` is not evidence that the work is alive — read `finalized` or
+    the `stale_recovered` flag.
 11. **`exit=0` means the process ended, not that the task finished.** A run can end its turn while a
     long command is still in flight and report "waiting for the test gate" as its last text. Read
     `answer.md` for trailing wait language before treating the phase as done; the fix is a continuation

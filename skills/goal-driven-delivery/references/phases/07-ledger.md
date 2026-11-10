@@ -14,6 +14,10 @@ scripts/delivery-state.py show --repo <path> --goal <id>     # resume here
 `<task_root>/<date>/<repo>-<goal>/state.md`. A new session resumes with `show` + `git status` +
 `git log origin/main..HEAD` — three commands, no archaeology through prompt files.
 
+A run whose pane died is finalized as failed (`recovered_stale`) by the next `status`/`list`/`result`;
+a `state.json` stuck at `running` is not evidence of a live run — read the `finalized` marker or the
+`stale_recovered` flag.
+
 ## Phase 8 — reset before the next increment
 
 Fresh run (never resume a previous increment's session); verify the agent build is current;

@@ -5,7 +5,7 @@ description: >-
   idle, then hand it one complete instruction without corrupting the session. Use when taking over
   or monitoring an interactive agent turn. Not for one-shot generation — run that headless.
 metadata:
-  version: "0.1.25"
+  version: "0.1.26"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
 ---
