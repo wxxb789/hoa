@@ -7,7 +7,7 @@ description: >-
   hold between tasks. Not for discovering what to build, and not for one task you can finish in the
   current context.
 metadata:
-  version: "0.1.23"
+  version: "0.1.24"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   kind: "entry"
@@ -196,6 +196,40 @@ All tasks from the plan are complete. Review the full implementation:
 - Ready for merge?
 ```
 
+#### Dual-axis mode (opt-in)
+
+Default stays the per-task serial review above. Select dual-axis only when the increment is reviewed
+as a whole — a goal-driven delivery, or a plan whose tasks are all complete.
+
+Freeze one artifact set for both reviewers: the range (`BASE..HEAD`), the changed paths, and the
+spec or plan the work implements. Both reviewers get exactly that set; neither gets the other's
+report.
+
+Dispatch the two reviewers in parallel, isolated from each other:
+
+- **Standards** — repo conventions, the project's own review rules, and the test-code triage from
+  Step 3.
+- **Spec** — every acceptance clause, one line per clause, marked met or not met.
+
+Do not merge their findings, reorder findings across axes, or produce a combined score. Each axis
+returns its own verdict line and stable finding IDs — `STD-A01…` for Standards, `SPEC-A01…` for Spec
+— and each finding carries `file:line`, the rule it breaks, the mechanism, what is false, and the
+input that breaks it. Verdict per axis:
+
+```
+APPROVE | MUST_FIX (<n>) | DECISION_NEEDED (<question>) | BLOCKED:no_progress
+```
+
+A finding ID the operator already retained, whose evidence has not changed, is not re-asked in the
+next round.
+
+**`APPROVE` expires the moment the code changes.** Any fix invalidates both axes' approvals:
+re-review the delta against the same frozen set, and never carry a previous approval forward.
+
+**No-progress breaker.** If the same `(axis, rule, file, mechanism)` quadruple appears in two
+consecutive rounds, stop with `BLOCKED:no_progress` and name that quadruple. Do not spend a third
+round on it, and do not cap the loop by round count alone.
+
 ### 4. Verify and Commit
 
 Run the acceptance yourself; a child's "tests passed" is a claim.
@@ -258,6 +292,9 @@ git add <explicit paths> && git commit -m "<the plan's final message>"
 - Reviewer reviews again
 - Repeat until approved
 - Don't skip the re-review
+- **Dual-axis mode** replaces the fixed round cap with the no-progress breaker: a repeated
+  `(axis, rule, file, mechanism)` ends the loop at `BLOCKED:no_progress`. The cap still applies to
+  per-task review.
 
 ### If Subagent Fails a Task
 

@@ -45,3 +45,12 @@ short setup duplication inside one test class are not findings.
 Per finding: id, severity, `file:line`, what is wrong, why it matters, suggested fix. Then an
 explicit verdict line: `nothing material` if there is nothing that would change behaviour or make a
 document untrue.
+
+## Dual-axis mode (whole-increment)
+
+When the operator selects dual-axis review, return one report per axis over the same frozen input —
+range, changed paths and contract — each with its own verdict line (`APPROVE | MUST_FIX (<n>) |
+DECISION_NEEDED (<question>) | BLOCKED:no_progress`) and stable IDs (`STD-A01…`, `SPEC-A01…`). Keep
+the test-code triage above in the Standards axis; the Spec axis answers one line per acceptance
+clause. If a `(axis, rule, file, mechanism)` quadruple repeats a prior round, stop at
+`BLOCKED:no_progress` instead of starting another round.
