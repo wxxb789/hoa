@@ -7,6 +7,8 @@ Usage:
     python scripts/version.py bump        # patch by default; prints new version
     python scripts/version.py bump minor  # or major; resets lower components
     python scripts/version.py check-bump  # PR guard: exactly one patch above origin/main
+    python scripts/version.py check-merge # merge guard: the remote's patch + 1, tag unused
+    python scripts/version.py check-merge --offline  # local check only; warns
 
 Only skills/<name>/SKILL.md metadata.version scalars, the two generated indexes,
 and VERSION are writable. Library versions and ref/ are independent. Every input
@@ -14,8 +16,9 @@ is validated before staging writes; each replacement is atomic and VERSION
 is replaced last. Handled write failures roll back completed replacements.
 Temporary write staging stays under .tmp-artifacts/version-write/. A process
 kill or concurrent writer is not a multi-file transaction: run check before
-using or publishing an interrupted tree. No Git commands are run by this script
-except check-bump, which reads origin/main:VERSION from the local repository.
+using or publishing an interrupted tree. Only the check commands run Git:
+check-bump reads origin/main:VERSION from the local repository, check-merge reads
+the remote's real main via git ls-remote and verifies the version claim there.
 """
 from __future__ import annotations
 
@@ -129,15 +132,22 @@ def _prepare(part: str | None) -> tuple[str, list[tuple[Path, bytes | None, byte
     return release, plans
 
 
-def _git_main_version() -> str:
-    result = subprocess.run(
-        ["git", "-C", str(ROOT), "show", "origin/main:VERSION"],
+def _git(*arguments: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        ["git", "-C", str(ROOT), *arguments],
         text=True, encoding="utf-8",
         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
     )
+
+
+def _git_detail(result: subprocess.CompletedProcess) -> str:
+    return result.stderr.strip() or result.stdout.strip() or f"git exited {result.returncode}"
+
+
+def _git_main_version() -> str:
+    result = _git("show", "origin/main:VERSION")
     if result.returncode:
-        detail = result.stderr.strip() or result.stdout.strip() or "git show failed"
-        raise ValueError(f"cannot read origin/main:VERSION from git ({detail}); "
+        raise ValueError(f"cannot read origin/main:VERSION from git ({_git_detail(result)}); "
                          "fetch origin main before checking the bump")
     base = result.stdout.strip()
     sm.validate_version(base, Path("origin/main:VERSION"))
@@ -150,14 +160,11 @@ def _next_patch(version: str) -> str:
     return ".".join(str(value) for value in components)
 
 
-def check_bump() -> None:
-    """Require VERSION to be exactly origin/main's patch plus one."""
-    base = _git_main_version()
-    current = _marker()[2]
+def _require_patch_claim(current: str, base: str) -> None:
+    """Require current to be exactly base's patch plus one."""
     expected = _next_patch(base)
     fix = "run python scripts/version.py bump"
     if current == expected:
-        print(current)
         return
     current_parts = tuple(int(value) for value in current.split("."))
     base_parts = tuple(int(value) for value in base.split("."))
@@ -172,6 +179,81 @@ def check_bump() -> None:
                          f"request must bump the patch: {fix}")
     raise ValueError(f"VERSION {current} is not exactly one patch above origin/main's "
                      f"{base}; {fix} (expected {expected})")
+
+
+def _remote_refs(*arguments: str) -> dict[str, str]:
+    result = _git("ls-remote", *arguments)
+    if result.returncode:
+        raise ValueError(f"cannot query origin ({_git_detail(result)}); "
+                         "check the origin remote and network access")
+    refs = {}
+    for line in result.stdout.splitlines():
+        sha, _, name = line.partition("\t")
+        if name:
+            refs[name] = sha
+    return refs
+
+
+def _remote_main() -> tuple[str, str]:
+    """Return remote main's commit and VERSION, refusing a stale local origin/main."""
+    remote = _remote_refs("--heads", "origin", "refs/heads/main").get("refs/heads/main")
+    if remote is None:
+        raise ValueError("origin has no refs/heads/main; cannot check the version claim")
+    local = _git("rev-parse", "--verify", "refs/remotes/origin/main")
+    local = local.stdout.strip() if local.returncode == 0 else "missing"
+    if local != remote:
+        raise ValueError(f"origin/main is stale locally ({local} != {remote}); "
+                         "run: git fetch origin main")
+    result = _git("show", f"{remote}:VERSION")
+    if result.returncode:
+        # The matching local ref usually has the object; fetch it when it does not.
+        for fetch in (("fetch", "--no-tags", "origin", remote),
+                      ("fetch", "--no-tags", "origin", "main")):
+            if _git(*fetch).returncode == 0:
+                result = _git("show", f"{remote}:VERSION")
+                if result.returncode == 0:
+                    break
+    if result.returncode:
+        raise ValueError(f"cannot read {remote}:VERSION from git ({_git_detail(result)}); "
+                         "fetch origin main and retry")
+    base = result.stdout.strip()
+    sm.validate_version(base, Path(f"{remote}:VERSION"))
+    return remote, base
+
+
+def _remote_tag(version: str) -> tuple[str, str] | None:
+    tag = f"v{version}"
+    full = f"refs/tags/{tag}"
+    refs = _remote_refs("--tags", "origin", f"{full}*")
+    if full not in refs:
+        return None
+    return tag, refs.get(f"{full}^{{}}", refs[full])
+
+
+def check_bump() -> None:
+    """Require VERSION to be exactly origin/main's patch plus one."""
+    base = _git_main_version()
+    current = _marker()[2]
+    _require_patch_claim(current, base)
+    print(current)
+
+
+def check_merge(offline: bool = False) -> None:
+    """Require VERSION to be the free patch above origin's real main."""
+    current = _marker()[2]
+    if offline:
+        print("check-merge: offline, stale-ref and tag collisions are not verified",
+              file=sys.stderr)
+        check_bump()
+        return
+    _, base = _remote_main()
+    _require_patch_claim(current, base)
+    released = _remote_tag(current)
+    if released is not None:
+        tag, commit = released
+        raise ValueError(f"tag {tag} already exists on origin at {commit}; VERSION {current} "
+                         "is already released: every pull request must bump the patch")
+    print(current)
 
 
 def _stage(target: Path, content: bytes, staging: Path) -> Path:
@@ -251,6 +333,11 @@ def main(argv=None) -> int:
     commands.add_parser("sync", help="mirror VERSION and regenerate indexes")
     commands.add_parser("check-bump",
                         help="fail unless VERSION is exactly origin/main's patch + 1")
+    merge = commands.add_parser(
+        "check-merge",
+        help="fail unless VERSION is the free patch above origin's real main")
+    merge.add_argument("--offline", action="store_true",
+                       help="skip the remote reads; stale refs and tags are not verified")
     bump = commands.add_parser("bump", help="increment VERSION and sync mirrors/indexes")
     bump.add_argument("part", choices=("patch", "minor", "major"), nargs="?",
                       default="patch")
@@ -258,6 +345,9 @@ def main(argv=None) -> int:
     try:
         if args.command == "check-bump":
             check_bump()
+            return 0
+        if args.command == "check-merge":
+            check_merge(args.offline)
             return 0
         release, plans = _prepare(args.part if args.command == "bump" else None)
         if args.command == "check":

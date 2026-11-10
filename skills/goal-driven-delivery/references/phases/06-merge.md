@@ -16,6 +16,20 @@ on any other basis:
 3. unresolved review threads = 0;
 4. local gate re-run recorded for this tree (no `--gates-rc` ⇒ `UNKNOWN` ⇒ blocked).
 
+## Version precondition — after the rebase, before the merge
+
+A version claim is only true for the main it was measured against. **After** any rebase onto
+`origin/main` — never before it — run:
+
+```bash
+python scripts/version.py check-merge
+```
+
+A non-zero exit blocks the merge. `check-merge` reads the remote's real main with `git ls-remote`, so a
+sibling PR that merged after your last fetch cannot hide behind a stale `origin/main`; it also fails
+when tag `v<VERSION>` already exists on the remote. The fix is always
+`git fetch origin main && python scripts/version.py bump` — never a hand-edited `VERSION`.
+
 Then `gh pr merge <N> --squash --delete-branch`, `git fetch --prune`, `git checkout main`,
 `git pull --ff-only`, prove `gh pr view <N> --json headRefOid` equals the head you verified, report.
 Land and re-branch in one sequence so the next goal starts from the merged head:

@@ -183,6 +183,96 @@ class VersionTests(unittest.TestCase):
         self.assertIn("expected 1.2.4", error)
         self.assertIn("run python scripts/version.py bump", error)
 
+    def git(self, cwd, *args):
+        result = subprocess.run(["git", "-C", str(cwd), *args], env=GIT_ENV,
+                                text=True, capture_output=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return result.stdout.strip()
+
+    def merge_fixture(self, remote, current, *, local=None, tag=None):
+        """Bare origin at `remote`, a clone that can lag at `local`, optional tag."""
+        base = local or remote
+        root = Path(tempfile.mkdtemp(dir=self.tmp, prefix="merge-"))
+        origin, seed, clone = root / "origin.git", root / "seed", root / "clone"
+        self.git(root, "init", "--quiet", "--bare", "--initial-branch=main", str(origin))
+        self.git(root, "init", "--quiet", "--initial-branch=main", str(seed))
+        self.git(seed, "config", "user.name", "Merge guard fixture")
+        self.git(seed, "config", "user.email", "fixture@example.invalid")
+        (seed / "VERSION").write_text(base + "\n", encoding="utf-8")
+        self.git(seed, "add", "VERSION")
+        self.git(seed, "commit", "--quiet", "-m", "main base")
+        self.git(seed, "remote", "add", "origin", str(origin))
+        self.git(seed, "push", "--quiet", "origin", "main")
+        self.git(root, "clone", "--quiet", str(origin), str(clone))
+        tag_commit = None
+        if remote != base:
+            (seed / "VERSION").write_text(remote + "\n", encoding="utf-8")
+            self.git(seed, "commit", "--quiet", "-am", "sibling release")
+            self.git(seed, "push", "--quiet", "origin", "main")
+        if tag is not None:
+            self.git(seed, "tag", "-a", "-m", "release", f"v{tag}")
+            self.git(seed, "push", "--quiet", "origin", f"refs/tags/v{tag}")
+            tag_commit = self.git(seed, "rev-parse", "HEAD")
+        (clone / "VERSION").write_text(current + "\n", encoding="utf-8")
+        return clone, tag_commit
+
+    def test_check_merge_accepts_the_free_patch_above_remote_main(self):
+        clone, _ = self.merge_fixture("1.2.3", "1.2.4")
+        with patch.object(version, "ROOT", clone):
+            status, output, error = self.run_cli("check-merge")
+        self.assertEqual(status, 0, error)
+        self.assertEqual(output, "1.2.4\n")
+        self.assertEqual(error, "")
+
+    def test_check_merge_rejects_an_unbumped_version(self):
+        clone, _ = self.merge_fixture("1.2.3", "1.2.3")
+        with patch.object(version, "ROOT", clone):
+            status, _, error = self.run_cli("check-merge")
+        self.assertEqual(status, 1)
+        self.assertIn("unchanged from origin/main", error)
+        self.assertIn("run python scripts/version.py bump", error)
+
+    def test_check_merge_requires_one_patch(self):
+        for current in ("1.2.5", "1.3.0", "2.0.0"):
+            with self.subTest(current=current):
+                clone, _ = self.merge_fixture("1.2.3", current)
+                with patch.object(version, "ROOT", clone):
+                    status, _, error = self.run_cli("check-merge")
+                self.assertEqual(status, 1)
+                self.assertIn("run python scripts/version.py bump", error)
+                if current == "1.2.5":
+                    self.assertIn("expected 1.2.4", error)
+                else:
+                    self.assertIn("patch only", error)
+
+    def test_check_merge_rejects_a_stale_local_origin_main(self):
+        clone, _ = self.merge_fixture("1.2.4", "1.2.4", local="1.2.3")
+        local_sha = self.git(clone, "rev-parse", "refs/remotes/origin/main")
+        remote_sha = self.git(clone, "ls-remote", "origin", "refs/heads/main").split()[0]
+        with patch.object(version, "ROOT", clone):
+            status, output, error = self.run_cli("check-merge")
+        self.assertEqual(status, 1)
+        self.assertEqual(output, "")
+        self.assertIn(f"origin/main is stale locally ({local_sha} != {remote_sha})", error)
+        self.assertIn("run: git fetch origin main", error)
+
+    def test_check_merge_rejects_a_tag_that_already_exists_on_origin(self):
+        clone, tag_commit = self.merge_fixture("1.2.3", "1.2.4", tag="1.2.4")
+        with patch.object(version, "ROOT", clone):
+            status, _, error = self.run_cli("check-merge")
+        self.assertEqual(status, 1)
+        self.assertIn(f"tag v1.2.4 already exists on origin at {tag_commit}", error)
+        self.assertIn("already released", error)
+
+    def test_check_merge_offline_warns_and_skips_remote_reads(self):
+        clone, _ = self.merge_fixture("1.2.4", "1.2.4", local="1.2.3")
+        with patch.object(version, "ROOT", clone):
+            status, output, error = self.run_cli("check-merge", "--offline")
+        self.assertEqual(status, 0, error)
+        self.assertEqual(output, "1.2.4\n")
+        self.assertIn("check-merge: offline, stale-ref and tag collisions are not verified",
+                      error)
+
     def test_sync_preserves_bytes_quotes_and_unrelated_versions(self):
         quoted = make_skill(self.root, "quoted", release="7.6.5", newline="\r\n",
                             quote='"')

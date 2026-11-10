@@ -7,7 +7,7 @@ description: >-
   hold between tasks. Not for discovering what to build, and not for one task you can finish in the
   current context.
 metadata:
-  version: "0.1.27"
+  version: "0.1.28"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   kind: "stage"

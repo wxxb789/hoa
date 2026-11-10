@@ -5,7 +5,7 @@ description: >-
   monospace aligned tables, and the attachment fallback. Use when a plain Discord message would show
   raw pipes or truncate. Discord only — other platforms have their own rich-message systems.
 metadata:
-  version: "0.1.27"
+  version: "0.1.28"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   kind: "entry"
