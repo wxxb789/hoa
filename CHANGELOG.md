@@ -3,6 +3,14 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## 2026-11-10 — cross-platform increments in goal-driven-delivery
+
+- Added **goal-driven-delivery** [`references/cross-platform-increments.md`](skills/goal-driven-delivery/references/cross-platform-increments.md)
+  and a pointer section in its controller. A Linux-only green is not evidence for a repo that ships on
+  more than one OS: fixtures with `/tmp/...` literals, path substitution into serialised JSON, POSIX
+  signals and mode bits each fail on Windows without failing locally, and a gate that reports a test
+  name without its message costs one CI round trip per failure.
+
 ## 2026-11-06 — three skills retired to prompts
 
 - Removed **my-ado-cppr**, **hoa-agent-retrieve**, and **git-worktree-workflow**. An A/B

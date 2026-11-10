@@ -7,7 +7,7 @@ description: >-
   end, including the merge. Do not use for one-line fixes, exploration with no acceptance criteria, or
   work no machine can check (that is a conversation, not a delivery).
 metadata:
-  version: "0.1.25"
+  version: "0.1.26"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   kind: "controller"
@@ -64,6 +64,13 @@ stop and report — do not burn budget in silence.
 | 6 merge | a merge verdict, then the next branch | `--verified-head` is the SHA the gates ran on; bot marker `status: completed` with `commit_sha` matching the SAME head; no merge without the script's verdict | [`references/phases/06-merge.md`](references/phases/06-merge.md) |
 | 7 ledger | one ledger row per stage | the operator writes it, never the agent; resume with `show` + `git status` + `git log origin/main..HEAD`; mid-flight status comes from live state | [`references/phases/07-ledger.md`](references/phases/07-ledger.md) |
 | 8 reset | a fresh base for the next goal | fresh run, never a resumed session; delete merged branches; fork from freshly fetched `origin/main`; report the base SHA | [`references/phases/07-ledger.md`](references/phases/07-ledger.md) |
+
+## Platform-significant increments
+
+When the repo ships on more than one OS, a green local run is not evidence. Fixtures, path literals,
+goldens, signals and mode bits each carry a platform assumption; read
+[`references/cross-platform-increments.md`](references/cross-platform-increments.md) before writing the
+verification plan, and require the matrix job to print the failing test's own output.
 
 ## Stop conditions — when to stop and ask
 

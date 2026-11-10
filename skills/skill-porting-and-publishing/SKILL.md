@@ -9,7 +9,7 @@ description: >-
   Not for auditing a skill library (that is curation) and not for a prose-only edit in a repo that
   already owns the file.
 metadata:
-  version: "0.1.25"
+  version: "0.1.26"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
 ---
