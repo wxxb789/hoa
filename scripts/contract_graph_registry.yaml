@@ -1,7 +1,6 @@
 external:
   - request
   - work-report
-  - gate-spec
   - git-commit
   - ci-result
 
