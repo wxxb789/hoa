@@ -5,9 +5,10 @@ description: >-
   rule on the claim, reproduce under the reporter's environment, and escalate one scoped landing
   decision. Use when you found a bug you may not fix in a shared tree. Not for fixing your own files.
 metadata:
-  version: "0.1.26"
+  version: "0.1.27"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
+  kind: "entry"
 ---
 
 # Cross-agent repair routing

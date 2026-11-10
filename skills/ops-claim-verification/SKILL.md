@@ -8,9 +8,10 @@ description: >-
   about an environment. Not for auditing the contents of a written report, and not for accepting a
   teammate's delivery — those are separate passes.
 metadata:
-  version: "0.1.26"
+  version: "0.1.27"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
+  kind: "entry"
 ---
 
 # Ops claim verification

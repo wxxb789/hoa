@@ -5,8 +5,3 @@ external:
   - ci-result
 
 shared: []
-
-required_kind:
-  - goal-driven-delivery
-  - subagent-driven-development
-  - delegated-work-acceptance

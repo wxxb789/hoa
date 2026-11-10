@@ -5,9 +5,10 @@ description: >-
   CLIs. Use for reports, letters, decks, workbooks, tracked changes, comments, and CSV conversion.
   Not for legacy binary formats (.doc/.ppt/.xls), ODF files, or WYSIWYG layout work.
 metadata:
-  version: "0.1.26"
+  version: "0.1.27"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
+  kind: "entry"
 ---
 
 # Microsoft Office Skill

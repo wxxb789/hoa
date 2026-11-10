@@ -7,9 +7,10 @@ description: >-
   report. Use hoa-skill-work for direct creation or evolution of a defined skill;
   use hoa-introspect to discover work patterns in history.
 metadata:
-  version: "0.1.26"
+  version: "0.1.27"
   areas: "self-management,software-development"
   targets: "runtime-agnostic"
+  kind: "entry"
 ---
 
 # hoa-introspect-distill
