@@ -7,7 +7,7 @@ description: >-
   candidate-output judgments; use hoa-introspect-distill for recurring-work
   findings that need qualification and item approval, when available.
 metadata:
-  version: "0.1.27"
+  version: "0.1.28"
   areas: "software-development,work-management,self-management"
   targets: "runtime-agnostic"
   kind: "entry"

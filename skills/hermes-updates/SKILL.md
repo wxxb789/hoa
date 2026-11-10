@@ -7,7 +7,7 @@ description: >-
   release checkouts, or post-update health checks. Not for model/provider configuration and not for
   editing the install's own source.
 metadata:
-  version: "0.1.27"
+  version: "0.1.28"
   areas: "software-development"
   targets: "hermes"
   kind: "entry"

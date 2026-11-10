@@ -56,6 +56,10 @@ jobs:
         if: github.event_name == 'pull_request'
         run: python scripts/version.py check-bump
 
+      - name: Version claim is still free
+        if: github.event_name == 'pull_request'
+        run: python scripts/version.py check-merge
+
       - name: Unified version tests
         run: python scripts/test_version.py
 

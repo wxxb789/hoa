@@ -17,7 +17,8 @@
    ahead of a main that has since moved — it cannot see behind-ness. Check
    `test "$(git merge-base HEAD origin/main)" = "$(git rev-parse origin/main)"`; when it fails, a sibling
    PR merged mid-increment and you must rebase onto `origin/main` first, or the review range is not
-   exactly one increment.
+   exactly one increment. Pushing a branch does not freeze its version claim: if a sibling PR merges,
+   re-run `python scripts/version.py check-merge` before asking for a merge.
 7. The PR body is a contract artifact — shape in [`references/pr-body.md`](../pr-body.md):
    what landed by subsystem, decisions with explicit non-adoptions naming the goal that owns them, one
    evidence table measured on the **final** tree, every "Done when" clause mapped to the command that
