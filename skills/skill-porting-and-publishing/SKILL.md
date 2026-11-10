@@ -9,9 +9,11 @@ description: >-
   Not for auditing a skill library (that is curation) and not for a prose-only edit in a repo that
   already owns the file.
 metadata:
-  version: "0.1.29"
+  version: "0.1.30"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
+  summary: "de-couple a private skill for publication: canonical side, five axes, config resolution, catalog/CI validation, branch-and-PR release"
+  summary_zh: "把私有 skill 解耦到可发布仓库：确定权威副本、五轴改造、配置解析、目录与 CI 校验、走分支与 PR 发布"
   kind: "entry"
 ---
 

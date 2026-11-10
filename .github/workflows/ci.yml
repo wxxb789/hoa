@@ -49,12 +49,28 @@ jobs:
       - name: Index generator tests
         run: python scripts/test_generate_index.py
 
+      - name: Host install parity tests
+        run: python -m unittest scripts.test_install_host_skills
+
+      - name: Changelog rule tests
+        run: python -m unittest scripts.test_check_changelog
+
+      - name: SKILL.md frontmatter and catalog fields
+        run: python scripts/check_frontmatter.py
+
+      - name: Frontmatter checker tests
+        run: python -m unittest scripts.test_check_frontmatter
+
       - name: Unified version and catalog check
         run: python scripts/version.py check
 
       - name: Pull request bumps the patch
         if: github.event_name == 'pull_request'
         run: python scripts/version.py check-bump
+
+      - name: Pull request adds a changelog entry
+        if: github.event_name == 'pull_request'
+        run: python scripts/check_changelog.py --base origin/main
 
       - name: Version claim is still free
         if: github.event_name == 'pull_request'
@@ -86,19 +102,6 @@ jobs:
 
       - name: Skill-method setup isolation tests
         run: python -m unittest evals.test_validate_skill_method_cases
-
-      - name: SKILL.md frontmatter sanity
-        run: |
-          shopt -s nullglob
-          files=(skills/*/SKILL.md)
-          [ ${#files[@]} -gt 0 ] || { echo "no SKILL.md files found"; exit 1; }
-          for f in "${files[@]}"; do
-            head -1 "$f" | grep -q '^---$' || { echo "missing frontmatter: $f"; exit 1; }
-            name_val=$(grep -m1 '^name:' "$f" | sed 's/^name:[[:space:]]*//')
-            [ -n "$name_val" ] || { echo "empty name: $f"; exit 1; }
-            desc_val=$(grep -m1 '^description:' "$f" | sed 's/^description:[[:space:]]*//')
-            [ -n "$desc_val" ] || { echo "empty description: $f"; exit 1; }
-          done
 
   release:
     needs: test

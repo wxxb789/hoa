@@ -7,9 +7,11 @@ description: >-
   release checkouts, or post-update health checks. Not for model/provider configuration and not for
   editing the install's own source.
 metadata:
-  version: "0.1.29"
+  version: "0.1.30"
   areas: "software-development"
   targets: "hermes"
+  summary: "upgrade a live Hermes install and diagnose drift: snapshot, official updater, post-check, failure index"
+  summary_zh: "升级运行中的 Hermes 并诊断漂移：快照、官方更新器、更新后检查、故障索引"
   kind: "entry"
 ---
 

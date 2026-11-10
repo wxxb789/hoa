@@ -85,7 +85,7 @@ hoa/
 ├── evals/         # repeatable benchmarks, cases, fixtures, rubrics, sanitized datasets
 ├── reflections/   # human write-ups: comparisons, decisions, retros, post-mortems
 ├── ref/           # external references
-└── scripts/       # repo tooling: generate_index.py (index), vendor_shared.py (shared skill scripts)
+└── scripts/       # repo tooling: generate_index.py (index), install_host_skills.py (host parity), vendor_shared.py (shared skill scripts)
 ```
 
 `skills/` follows the `npx skills` layout: `skills/<name>/SKILL.md` (flat) or
@@ -100,8 +100,18 @@ skills (`skills/<name>/SKILL.md`) and library files (`<folder>/<name>.md` or
 `<folder>/<name>/README.md` under `agents/`, `mcps/`, `orchestration/`,
 `prompts/`, `rules/`, `workflows/`). Each catalog name must be unique, every
 configured library folder must hold at least one artifact, and each artifact's
-index note comes from a `NOTES` override in the generator or the first line of
-its frontmatter description (plain-Markdown body as last resort).
+index note comes from its own metadata: `metadata.summary` /
+`metadata.summary_zh` for skills, `summary` / `summary_zh` in the index comment
+for library artifacts, falling back to the first sentence of the description
+(and, for Chinese, to the English note).
+
+Host install parity is separate from the catalog: `python
+scripts/install_host_skills.py --root <host-skills-dir> --check` searches
+`<root>/<name>` and `<root>/<category>/<name>`, names every skill that is
+absent, drifted, wrongly linked or has two entries, and `--link` creates the
+missing symlinks at `<category>/<name>` — the skill's first `metadata.areas`
+value unless `--category` overrides it (`.` links flat). It never replaces a
+real directory and never adds a second entry for one skill.
 
 ## Unified skill versions
 
@@ -250,6 +260,8 @@ metadata:
   version: "0.1.0"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
+  summary: "one line for the English catalog"
+  summary_zh: "中文目录用一行"
 ```
 
 Library artifacts retain their HTML index comments. Allowed label values:

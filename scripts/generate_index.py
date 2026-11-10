@@ -2,10 +2,14 @@
 """Generate index.md / index.zh-CN.md from per-skill metadata.
 
 Custom-skill catalog fields live only in YAML frontmatter string scalars:
-`metadata.areas`, `metadata.targets`, and `metadata.version`. Legacy HTML
+`metadata.areas`, `metadata.targets`, `metadata.version`, and the optional
+bilingual notes `metadata.summary` / `metadata.summary_zh`. Legacy HTML
 index annotations are rejected for skills; library files retain their
-`<!-- index: ... -->` comments. Descriptions come from a bilingual table
-or frontmatter. Missing or invalid catalog metadata is a hard error.
+`<!-- index: ... -->` comments, which also carry `summary` / `summary_zh`.
+There is no per-skill note table in this file: a missing English summary
+falls back to the first sentence of the frontmatter description, and a
+missing Chinese summary falls back to the English one. Missing or invalid
+catalog metadata is a hard error.
 
 Usage:
     python scripts/generate_index.py          # write both files
@@ -14,12 +18,14 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 from pathlib import Path
 
 # Keep --check read-only, including helper/dependency import caches.
 sys.dont_write_bytecode = True
+import yaml
 import skill_metadata as sm
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -41,217 +47,8 @@ AREAS = ("software-development", "work-management", "self-management")
 TARGETS = ("runtime-agnostic", "repo-only", "claude-code", "codex", "opencode",
            "hermes", "pi", "kimi-code")
 
-# Optional bilingual note overrides per skill: (en, zh). A skill absent here
-# falls back to the first sentence of its SKILL.md frontmatter description,
-# so a new skill generates without touching this file. Overrides exist to
-# keep the Chinese note from rendering the English description verbatim.
-NOTES = {
-    "teams-cdp": (
-        "send Teams messages to exact people or existing groups through local desktop CDP",
-        "通过本机桌面 CDP 向明确的 Teams 联系人或现有群组发送消息",
-    ),
-    "m365-copilot-cdp": (
-        "operate desktop Copilot Chat and Code through CDP with model selection and reply reads",
-        "通过 CDP 操作桌面 Copilot Chat 与 Code，选择模型并读取回复",
-    ),
-    "hoa-skill-review": (
-        "review skill behavior and changes against consumer evidence without editing the target",
-        "依据消费者证据审计 skill 行为与修改，不改动被审查对象",
-    ),
-    "hoa-skill-work": (
-        "directly create or evolve a defined skill with focused, risk-scaled validation",
-        "直接创建或演进已定义的 skill，并按风险聚焦验证",
-    ),
-    "goal-driven-delivery": (
-        "goal contract → agent-authored stages → operator-run gates → scripted merge gate → resumable ledger; ships `gdd.py`, `delivery-state.py`, `pr-merge-check.py`",
-        "目标契约 → agent 分阶段产出 → operator 验收 → 脚本化合并门禁 → 可续跑账本；随附 `gdd.py`、`delivery-state.py`、`pr-merge-check.py`",
-    ),
-    "omp-headless-orchestration": (
-        "detached tmux launcher for long `omp -p` runs; polled completion, session-id recovery",
-        "脱离会话的 tmux 启动器跑 `omp -p` 长任务；轮询完成、按 session id 恢复",
-    ),
-    "delegated-work-acceptance": (
-        "verify a delegated \"done\" against the artifact, the re-derived numbers and the write boundary",
-        "验收被委派的交付：核对 artifact、重算关键数字、检查写入边界",
-    ),
-    "dotnet-repo-workflow": (
-        "run the repo's own .NET gate harness instead of a hand-rolled `dotnet test`; lock files, Roslyn harness traps, merge-ready checklist",
-        "走仓库自带 .NET gate 而非手搓 `dotnet test`；lock 文件、Roslyn 编译陷阱、merge-ready 清单",
-    ),
-    "ghc-search": (
-        "web and X/Twitter search via a local ghc-proxy Responses API; answer plus deduped sources",
-        "经本机 `ghc-proxy` Responses API 做 web 与 X/Twitter 搜索；返回答案加去重来源",
-    ),
-    "define-goal": (
-        "preserve ambitious intent in numbered goal files, with clear near-term and provisional later outcomes, not implementation plans",
-        "把雄心转化为编号 goal 文件，近期清晰、远期可细化，不制定实现步骤",
-    ),
-    "hoa-introspect": (
-        "layered self-report: deterministic usage facets (L1) + evidence-cited blind-spot audit (L2)",
-        "分层自省报告：确定性使用 facets（L1）+ 带证据的盲点审计（L2）",
-    ),
-    "hoa-introspect-distill": (
-        "qualify supplied recurring-work findings as candidates; create only after individual approval",
-        "评估给定的重复工作发现为候选；逐项批准后才创建资产",
-    ),
-    "skill-scout": (
-        "read-only search for an existing skill when asked to check before authoring; never create one",
-        "按请求先搜索已有 skill，再决定是否编写；只报告，不代写",
-    ),
-    "typed-verification-gates": (
-        "every loop iteration ends at a gate typed programmatic / judge / human, declared before the work",
-        "循环每次迭代止于一道事先定型的验证门：programmatic / judge / human",
-    ),
-    "generated-means-generated": (
-        "generated files are never hand-edited; regeneration rides the same commit and drift fails CI",
-        "生成文件绝不手改；再生成随同一提交，漂移即 CI 失败",
-    ),
-    "fresh-context-grader": (
-        "one-shot judge prompt: grade a response against a rubric written before it existed",
-        "一次性评审 prompt：用先于回答写好的 rubric 在全新上下文里评分",
-    ),
-    "ado-commit-push-pr": (
-        "one-shot commit → push → PR request for Azure DevOps or GitHub, with house conventions and az/gh pitfalls",
-        "一次性 commit → push → PR 请求模板（Azure DevOps 或 GitHub），附提交约定与 az/gh 易错点",
-    ),
-    "cross-agent-history-retrieval": (
-        "one-shot search/export of local agent histories with per-source coverage, dedup, and redaction",
-        "一次性检索/导出本机各 agent 历史，按来源报告覆盖、去重并打码",
-    ),
-    "parallel-agent-worktrees": (
-        "one-shot setup of one git worktree per agent CLI: layout, env/port isolation, fail-closed setup, safe cleanup",
-        "一次性为每个 agent CLI 建独立 git worktree：布局、env/端口隔离、fail-closed 初始化、安全清理",
-    ),
-    "adopt-a-pattern": (
-        "finite recipe turning a ref-map what-to-steal note into a landed, classified, attributed artifact",
-        "把 ref 地图里的 what-to-steal 笔记变成落地、归类、带署名 artifact 的有限步骤",
-    ),
-    "ghc-proxy": (
-        "portable definition of the local ghc-proxy search service; registration stays in chezmoi",
-        "本地 ghc-proxy 搜索服务的可移植定义；注册留在 chezmoi",
-    ),
-    "report-claim-audit": (
-        "recount every report claim from the artifact that owns it, diff the deliverable set, and price the open decisions",
-        "从各自的权威 artifact 重算每条报告声明、对账交付集合，并给待决事项定价",
-    ),
-    "evidence-backed-analytical-writing": (
-        "evidence map plus a claim → evidence → mechanism → limitation spine for Chinese analytical reports; recency window, status ladder, negative findings",
-        "中文分析报告：证据地图与「主张 → 证据 → 机制 → 局限」骨架；时效边界、状态阶梯、否定性结论",
-    ),
-    "grounded-citations": (
-        "numbered citation ledger owned by a script: register at retrieval, cite per sentence, render and verify; ships `sources.py`",
-        "脚本持有编号引用账本：检索即登记、逐句引用、机械渲染并可校验；随附 `sources.py`",
-    ),
-    "html-artifact": (
-        "single-file, dependency-free HTML explainers, plans, reports, diagrams and throwaway editors on one house style",
-        "零依赖单文件 HTML：解释文、计划、报告、图表与一次性编辑器，统一 house style",
-    ),
-    "writing": (
-        "per-channel prose contracts behind one content-first layer: blog, academic, X, Reddit, 小红书, 公众号, tutorial, changelog; plus a measurable AI-smell audit",
-        "一套内容优先的共同层加分渠道契约：博客、论文、X、Reddit、小红书、公众号、教程、changelog；附可量化的 AI 味自查",
-    ),
-    "skill-library-curation": (
-        "review a skill library by evidence: inventory, overlap groups, installer provenance, upstream freshness; recommendations never change state",
-        "按证据审查技能库：清点、重叠分组、安装来源、上游新鲜度；建议不改动状态",
-    ),
-    "ops-claim-verification": (
-        "turn a scheduled-job, repair or deployment claim into evidence: find the recording surface, separate manual from scheduled runs, audit the auditor",
-        "把定时任务、修复或部署的说法变成证据：找准记录面、区分手动与调度运行、审查审计者",
-    ),
-    "harness-engineering": (
-        "audit and restructure harness scripts: self-containment, obligations bound to owner decisions, pure checks plus one thin runner, net-negative line budget",
-        "审计与重构 harness 脚本：自包含、检查绑定 owner 决策、纯函数检查加薄 runner、净减行数",
-    ),
-    "agent-operating-contract-evolution": (
-        "evolve an agent's identity file and operating protocol by layer, with coverage markers, behavioral evals, and load-scope probes",
-        "按分层演进 agent 身份文件与操作协议：覆盖标记、行为评测、加载范围探测",
-    ),
-    "kanban-workflows": (
-        "multi-card board work: decomposition, parallel dispatch, review gates, stuck-card recovery",
-        "多卡片看板工作：拆解、并行派发、评审门禁、卡住任务恢复",
-    ),
-    "tmux-agent-control": (
-        "drive a live TUI agent in tmux: find the pane, prove idle, send one complete instruction",
-        "在 tmux 中驱动运行中的 TUI agent：定位 pane、证明空闲、一次发出完整指令",
-    ),
-    "microsoft-office": (
-        "create, read, edit and template Word, PowerPoint and Excel files offline with Python CLIs",
-        "用 Python CLI 离线创建、读取、编辑与套用 Word、PowerPoint、Excel 文件模板",
-    ),
-    "agent-harness-settings-parity": (
-        "hold one policy across every coding harness despite different config files, knob names and units",
-        "让同一条策略在每个 coding harness 上生效，尽管配置文件、键名与单位各不相同",
-    ),
-    "generated-runtime-repairs": (
-        "repair the template/generator, prove the staged artifact, then deploy and read back the live runtime",
-        "修模板/生成器、验证暂存产物，再部署并回读线上运行时",
-    ),
-    "discord-rich-message": (
-        "structured Discord messages within platform limits: Components V2, aligned code-block tables, attachment fallback",
-        "在平台限制内发送结构化 Discord 消息：Components V2、等宽对齐表格、附件兜底",
-    ),
-    "cross-agent-repair-routing": (
-        "route a defect found in another agent's write surface: authority map, reproduction, one scoped landing decision",
-        "把他人写入面内的缺陷送修：权限地图、复现、一次定界的落地决策",
-    ),
-    "hermes-models": (
-        "configure Hermes providers, transports and routing; prove every route with live signals, not `config get`",
-        "配置 Hermes provider、传输与路由；用实时信号证明路由，而非 `config get`",
-    ),
-    "hermes-updates": (
-        "upgrade a live Hermes install and diagnose drift: snapshot, official updater, post-check, failure index",
-        "升级运行中的 Hermes 并诊断漂移：快照、官方更新器、更新后检查、故障索引",
-    ),
-    "hermes-context-file-loading": (
-        "which Hermes instruction file loads from where, which project file wins, and which prompt tier a rule belongs to",
-        "Hermes 指令文件各自从何处加载、哪个项目文件生效，以及规则该放进哪个 prompt 层",
-    ),
-    "skill-porting-and-publishing": (
-        "de-couple a private skill for publication: canonical side, five axes, config resolution, catalog/CI validation, branch-and-PR release",
-        "把私有 skill 解耦到可发布仓库：确定权威副本、五轴改造、配置解析、目录与 CI 校验、走分支与 PR 发布",
-    ),
-    "systematic-debugging": (
-        "root cause before fix: a tight red-capable loop, boundary evidence, ranked falsifiable hypotheses, then one fix at a time",
-        "先定位根因再修：紧致可复现的反馈环、边界证据、可证伪假设排序，然后一次只改一处",
-    ),
-    "subagent-driven-development": (
-        "execute a plan with a fresh subagent per task and two-stage review: spec compliance first, code quality second",
-        "按计划逐任务派发全新 subagent，并做两阶段评审：先规格符合，再代码质量",
-    ),
-    "writing-plans": (
-        "implementation plans an agent with zero context can execute: bite-sized tasks, exact paths, complete code, commands with expected output",
-        "写出零上下文 agent 也能执行的实现计划：小步任务、精确路径、完整代码、带预期输出的命令",
-    ),
-    "spec-convergence": (
-        "converge an unclear request into a confirmed spec: fact-backed decision tree, one numbered round per level, explicit confirmation before writing",
-        "把模糊需求收敛为已确认 spec：有事实支撑的决策树、每层一轮编号提问、写前显式确认",
-    ),
-    "ai-coding-agent-delegation": (
-        "hand a bounded coding task to an external agent CLI in an isolated worktree, then verify the diff, tests and every acceptance claim yourself",
-        "把定界编码任务交给隔离 worktree 中的外部 agent CLI，再自行核验 diff、测试与全部验收声明",
-    ),
-    "contract-bound-deliverables": (
-        "meet a measurable brief: freeze the evidence packet, draft in parallel, assemble to the number, verify with the contract's own metric",
-        "满足可度量契约：冻结证据包、并行起草、按字数装配、用契约自身的度量脚本验收",
-    ),
-    "evidence-boundary-discipline": (
-        "state only what a dated source supports: tense to dateline, provenance-label parity, absence never escalates",
-        "只陈述有日期的来源所能支持的事实：时态对齐日期、来源标签全链路一致、缺失不升级为不存在",
-    ),
-    "git-auto-sync-pipelines": (
-        "scheduled commit/push for hand-edited repos: ordered gates, allowlist and size caps, staged secret scan, heartbeat and deduped alerts",
-        "手改仓库的定时提交推送：固定门序、白名单与体积上限、暂存区密钥扫描、心跳与去重告警",
-    ),
-}
-
-KV = re.compile(r"(\w+)\s*=\s*([^;]+)")
-
 INDEX_COMMENT = re.compile(
     r"^<!--\s*index:\s*(?P<kv>.*)\s*-->\s*$", re.MULTILINE
-)
-
-FRONTMATTER_DESC = re.compile(
-    r"^---\s*\n.*?^description:\s*(?P<desc>.*?)(?=\n\w|\n---)", re.MULTILINE | re.DOTALL
 )
 
 
@@ -259,9 +56,21 @@ def _fallback_note(doc: Path) -> str:
     """First sentence of the frontmatter description; else the first
     non-empty Markdown line that is not a heading or comment."""
     text = doc.read_text(encoding="utf-8")
-    m = FRONTMATTER_DESC.search(text)
-    if m:
-        desc = " ".join(m.group("desc").split())
+    description = ""
+    if text.startswith("---"):
+        lines = text.splitlines(keepends=True)
+        for index in range(1, len(lines)):
+            if lines[index].rstrip("\r\n") != "---":
+                continue
+            try:
+                data = yaml.safe_load("".join(lines[1:index]))
+            except yaml.YAMLError:
+                data = None
+            if isinstance(data, dict) and isinstance(data.get("description"), str):
+                description = data["description"]
+            break
+    if description:
+        desc = " ".join(description.split())
         return re.split(r"(?<=[.!?])\s", desc, maxsplit=1)[0]
     for line in text.splitlines():
         stripped = line.strip()
@@ -278,12 +87,60 @@ def _unquote(value: str) -> str:
     return value
 
 
+def _comment_value(value: str, source: Path) -> str:
+    """Decode one comment value: a double-quoted JSON/YAML string or a bare word."""
+    if value.startswith('"'):
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError as error:
+            raise ValueError(f"malformed quoted index value in {source}: {error}") from error
+    return _unquote(value)
+
+
+def _comment_fields(kv: str, source: Path) -> dict[str, str]:
+    """Parse `key=value; ...`, keeping `;` inside a double-quoted value."""
+    pairs: list[str] = []
+    current: list[str] = []
+    quoted = escaped = False
+    for char in kv:
+        if escaped:
+            current.append(char)
+            escaped = False
+        elif quoted and char == "\\":
+            current.append(char)
+            escaped = True
+        elif char == '"':
+            quoted = not quoted
+            current.append(char)
+        elif char == ";" and not quoted:
+            pairs.append("".join(current))
+            current = []
+        else:
+            current.append(char)
+    pairs.append("".join(current))
+    if quoted:
+        raise ValueError(f"unterminated quote in index comment in {source}")
+
+    meta = {}
+    for pair in pairs:
+        if not pair.strip():
+            continue
+        key, separator, value = pair.partition("=")
+        key = key.strip()
+        if not separator or not re.fullmatch(r"\w+", key):
+            raise ValueError(f"malformed index metadata {pair.strip()!r} in {source}")
+        if key in meta:
+            raise ValueError(f"duplicate index metadata {key!r} in {source}")
+        meta[key] = _comment_value(value.strip(), source)
+    return meta
+
+
 def parse_metadata(skill_md: Path) -> dict[str, str]:
     text = skill_md.read_text(encoding="utf-8")
     m = INDEX_COMMENT.search(text)
     if not m:
         raise ValueError(f"no `<!-- index: ... -->` comment in {skill_md}")
-    meta = {k: _unquote(v.strip()) for k, v in KV.findall(m.group("kv"))}
+    meta = _comment_fields(m.group("kv"), skill_md)
     for key in ("areas", "targets"):
         if key not in meta:
             raise ValueError(f"missing `{key}=` in {skill_md}")
@@ -312,14 +169,15 @@ def parse_skill_metadata(skill_md: Path) -> dict[str, str]:
     return metadata
 
 
-def _resolve_notes(name: str, doc: Path, kind: str) -> tuple[str, str]:
-    """Bilingual note for an artifact: NOTES override, else the doc's
-    frontmatter description. Raises when neither yields a note."""
+def _resolve_notes(meta: dict[str, str], doc: Path, kind: str, name: str) -> tuple[str, str]:
+    """Bilingual note from the artifact's own metadata: summary / summary_zh,
+    else the first sentence of the description. The Chinese note falls back to
+    the English note, never to a translation of it."""
     fallback = _fallback_note(doc)
-    en, zh = NOTES.get(name, (fallback, fallback))
-    note_en, note_zh = en or fallback, zh or fallback
+    note_en = meta.get("summary") or fallback
+    note_zh = meta.get("summary_zh") or note_en
     if not note_en:
-        raise ValueError(f"no note for {kind} {name!r}: no NOTES override "
+        raise ValueError(f"no note for {kind} {name!r}: no summary metadata "
                          f"and no usable description")
     return note_en, note_zh
 
@@ -333,7 +191,9 @@ def collect() -> list[dict]:
             raise ValueError(f"skill directory without SKILL.md: {skill_dir}")
         name = skill_dir.name
         meta = parse_skill_metadata(skill_md)
-        note_en, note_zh = _resolve_notes(name, skill_md, "skill")
+        note_en, note_zh = _resolve_notes(meta, skill_md, "skill", name)
+        for key in ("summary", "summary_zh"):
+            meta.pop(key, None)
         rows.append({"name": name, "type": "skill", "path": f"skills/{name}/",
                      "note_en": note_en, "note_zh": note_zh, **meta})
     rows.extend(_collect_library())
@@ -377,7 +237,9 @@ def _collect_library() -> list[dict]:
             name = entry.stem if is_file else entry.name
             path = f"{folder_name}/{name}.md" if is_file else f"{folder_name}/{name}/"
             meta = parse_metadata(doc)
-            note_en, note_zh = _resolve_notes(name, doc, artifact_type)
+            note_en, note_zh = _resolve_notes(meta, doc, artifact_type, name)
+            for key in ("summary", "summary_zh"):
+                meta.pop(key, None)
             rows.append({"name": name, "type": artifact_type, "folder": folder_name,
                          "path": path, "note_en": note_en, "note_zh": note_zh, **meta})
             found += 1

@@ -78,7 +78,7 @@ hoa/
 ├── evals/         # 可重复的 benchmark、cases、fixtures、rubrics、脱敏 datasets
 ├── reflections/   # 人写的比较、决策、retro、post-mortem
 ├── ref/           # 外部参考
-└── scripts/       # 仓库工具：generate_index.py（索引）、vendor_shared.py（共享 skill 脚本分发）
+└── scripts/       # 仓库工具：generate_index.py（索引）、install_host_skills.py（主机一致性）、vendor_shared.py（共享 skill 脚本分发）
 ```
 
 `skills/` 遵循 `npx skills` 的布局：`skills/<name>/SKILL.md`（扁平）或
@@ -91,8 +91,16 @@ hoa/
 Artifact 包括 skill（`skills/<name>/SKILL.md`）与库文件
 （`agents/`、`mcps/`、`orchestration/`、`prompts/`、`rules/`、`workflows/`
 下的 `<folder>/<name>.md` 或 `<folder>/<name>/README.md`）。目录名全局唯一，
-每个配置的库目录至少要有一个 artifact,索引备注取 generator 里的 `NOTES`
-覆盖、frontmatter description 首句,最后回退到正文首个非空行。
+每个配置的库目录至少要有一个 artifact,索引备注取 artifact 自身的元数据：
+skill 用 `metadata.summary` / `metadata.summary_zh`，库 artifact 用索引注释里的
+`summary` / `summary_zh`；缺失时回退到 description 首句,中文缺失时回退到英文备注。
+
+主机安装一致性独立于目录：
+`python scripts/install_host_skills.py --root <host-skills-dir> --check`
+会搜索 `<root>/<name>` 与 `<root>/<category>/<name>`，逐条列出缺失、内容漂移、
+链接错误或存在两个条目的 skill；`--link` 在 `<category>/<name>` 创建缺失的符号链接，
+category 取该 skill 的第一个 `metadata.areas` 值，可用 `--category` 覆盖（`.` 表示平铺）。
+它不会替换真实目录，也不会为同一个 skill 添加第二个条目。
 
 ## 统一 skill 版本
 

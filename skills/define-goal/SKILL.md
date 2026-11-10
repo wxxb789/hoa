@@ -2,9 +2,11 @@
 name: define-goal
 description: Define ambitious intentions as numbered goal-prompt files, progressing from clear near-term outcomes to provisional longer-term outcomes without planning implementation. Use when the user wants to create or refine goals, turn a large vision into inspectable increments, or refine the next goal from earlier results. Not for task breakdown, implementation planning, execution, or progress tracking.
 metadata:
-  version: "0.1.29"
+  version: "0.1.30"
   areas: "self-management,software-development,work-management"
   targets: "runtime-agnostic"
+  summary: "preserve ambitious intent in numbered goal files, with clear near-term and provisional later outcomes, not implementation plans"
+  summary_zh: "把雄心转化为编号 goal 文件，近期清晰、远期可细化，不制定实现步骤"
   kind: "entry"
 ---
 

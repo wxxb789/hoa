@@ -8,9 +8,11 @@ description: >-
   Not for citation mechanics (that is grounded-citations), social posts, changelogs, or any piece
   where the claims are already verified and only the wording needs work.
 metadata:
-  version: "0.1.29"
+  version: "0.1.30"
   areas: "work-management"
   targets: "runtime-agnostic"
+  summary: "evidence map plus a claim → evidence → mechanism → limitation spine for Chinese analytical reports; recency window, status ladder, negative findings"
+  summary_zh: "中文分析报告：证据地图与「主张 → 证据 → 机制 → 局限」骨架；时效边界、状态阶梯、否定性结论"
   kind: "entry"
 ---
 

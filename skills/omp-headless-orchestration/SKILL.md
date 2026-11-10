@@ -7,9 +7,11 @@ description: >-
   recovering a run that was killed mid-turn. Do not use for a two-minute command (run it inline) or for
   work that needs live steering (that is a TUI session).
 metadata:
-  version: "0.1.29"
+  version: "0.1.30"
   areas: "software-development,work-management"
   targets: "pi"
+  summary: "detached tmux launcher for long `omp -p` runs; polled completion, session-id recovery"
+  summary_zh: "脱离会话的 tmux 启动器跑 `omp -p` 长任务；轮询完成、按 session id 恢复"
   kind: "entry"
 ---
 

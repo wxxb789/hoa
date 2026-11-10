@@ -7,9 +7,11 @@ description: >-
   acceptance or test seam are still undecided. Not for work whose contract is already written,
   one-line fixes, or exploring what the system does today.
 metadata:
-  version: "0.1.29"
+  version: "0.1.30"
   areas: "software-development"
   targets: "runtime-agnostic"
+  summary: "converge an unclear request into a confirmed spec: one root concern per round, a capped number of questions per round, every question backed by the fact that makes it real, explicit shared-understanding confirmation before writing"
+  summary_zh: "把模糊需求收敛为已确认 spec：每轮一个根问题、每轮问题数有上限、每问附事实、写前显式确认共同理解"
   kind: "entry"
   produces: "spec"
 ---

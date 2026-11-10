@@ -119,7 +119,9 @@ def catalog_metadata(text: str, source: Path) -> dict[str, str]:
     """Read only the custom catalog fields, preserving CSV scalar values verbatim."""
     version, metadata, fields = _version_metadata(text, source)
     values = {}
-    for key in ("areas", "targets"):
+    for key in ("areas", "targets", "summary", "summary_zh"):
+        if key in ("summary", "summary_zh") and key not in fields:
+            continue
         _, value = _value(metadata, fields, key, "metadata", source)
         if not isinstance(value, ScalarNode) or value.tag != STRING:
             raise ValueError(f"metadata.{key} must be a YAML string in {source}")

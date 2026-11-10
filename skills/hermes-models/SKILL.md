@@ -7,9 +7,11 @@ description: >-
   between root and profiles, vision or image generation errors, or a relay's effort/cost looks
   wrong. Not for another harness's own model configuration.
 metadata:
-  version: "0.1.29"
+  version: "0.1.30"
   areas: "software-development"
   targets: "hermes"
+  summary: "configure Hermes providers, transports and routing; prove every route with live signals, not `config get`"
+  summary_zh: "配置 Hermes provider、传输与路由；用实时信号证明路由，而非 `config get`"
   kind: "entry"
 ---
 

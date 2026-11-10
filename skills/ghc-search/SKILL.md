@@ -2,9 +2,11 @@
 name: ghc-search
 description: Open-ended web search and X/Twitter search through a local ghc-proxy (OpenAI-compatible Responses API). Use when you need to find something on the web and do not already have a URL, or when you need posts from X/Twitter. Fetch pages directly when you already have the URL; prefer a documentation MCP (e.g. context7) for library/API docs.
 metadata:
-  version: "0.1.29"
+  version: "0.1.30"
   areas: "software-development"
   targets: "runtime-agnostic"
+  summary: "web and X/Twitter search via a local ghc-proxy Responses API; answer plus deduped sources"
+  summary_zh: "经本机 `ghc-proxy` Responses API 做 web 与 X/Twitter 搜索；返回答案加去重来源"
   kind: "entry"
 ---
 

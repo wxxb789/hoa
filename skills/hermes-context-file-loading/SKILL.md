@@ -7,9 +7,11 @@ description: >-
   an instruction file that did or did not take effect, or reasoning about subagent context and prompt
   cache stability. Not for editing the runtime source, and not for other harnesses' context files.
 metadata:
-  version: "0.1.29"
+  version: "0.1.30"
   areas: "software-development"
   targets: "hermes"
+  summary: "which Hermes instruction file loads from where, which project file wins, and which prompt tier a rule belongs to"
+  summary_zh: "Hermes 指令文件各自从何处加载、哪个项目文件生效，以及规则该放进哪个 prompt 层"
   kind: "entry"
 ---
 

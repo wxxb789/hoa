@@ -8,9 +8,11 @@ description: >-
   about an environment. Not for auditing the contents of a written report, and not for accepting a
   teammate's delivery — those are separate passes.
 metadata:
-  version: "0.1.29"
+  version: "0.1.30"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
+  summary: "turn a scheduled-job, repair or deployment claim into evidence: find the recording surface, separate manual from scheduled runs, audit the auditor"
+  summary_zh: "把定时任务、修复或部署的说法变成证据：找准记录面、区分手动与调度运行、审查审计者"
   kind: "entry"
 ---
 

@@ -7,9 +7,11 @@ description: >-
   when deciding what to authorize and what to send back. Do not use for grading your own work, or when
   no artifact exists to inspect.
 metadata:
-  version: "0.1.29"
+  version: "0.1.30"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
+  summary: "verify a delegated \"done\" against the artifact, the re-derived numbers and the write boundary"
+  summary_zh: "验收被委派的交付：核对 artifact、重算关键数字、检查写入边界"
   kind: "mechanism"
   consumes: "work-report"
   produces: "acceptance-verdict, scope-seal"

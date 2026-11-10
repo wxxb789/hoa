@@ -5,9 +5,11 @@ description: >-
   every installed coding harness, each with its own config file, knob name, and unit. Use when a
   setting must hold everywhere or before claiming it is already set. Not for a single-harness edit.
 metadata:
-  version: "0.1.29"
+  version: "0.1.30"
   areas: "software-development"
   targets: "runtime-agnostic"
+  summary: "hold one policy across every coding harness despite different config files, knob names and units"
+  summary_zh: "让同一条策略在每个 coding harness 上生效，尽管配置文件、键名与单位各不相同"
   kind: "entry"
 ---
 

@@ -1,4 +1,4 @@
-<!-- index: areas=software-development; targets=repo-only -->
+<!-- index: areas=software-development; targets=repo-only; summary="portable definition of the local ghc-proxy search service; registration stays in chezmoi"; summary_zh="本地 ghc-proxy 搜索服务的可移植定义；注册留在 chezmoi" -->
 
 # ghc-proxy (local Responses API)
 

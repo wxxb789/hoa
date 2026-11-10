@@ -6,9 +6,11 @@ description: >-
   have grown past one screen, checkers are multiplying, or a harness subsystem needs a home.
   Not for one-off scripts, and not for application code that no scheduled check or gate runs.
 metadata:
-  version: "0.1.29"
+  version: "0.1.30"
   areas: "software-development"
   targets: "runtime-agnostic"
+  summary: "audit and restructure harness scripts: self-containment, obligations bound to owner decisions, pure checks plus one thin runner, net-negative line budget"
+  summary_zh: "审计与重构 harness 脚本：自包含、检查绑定 owner 决策、纯函数检查加薄 runner、净减行数"
   kind: "entry"
 ---
 

@@ -1,4 +1,4 @@
-<!-- index: areas=software-development,work-management; targets=repo-only -->
+<!-- index: areas=software-development,work-management; targets=repo-only; summary="one-shot setup of one git worktree per agent CLI: layout, env/port isolation, fail-closed setup, safe cleanup"; summary_zh="一次性为每个 agent CLI 建独立 git worktree：布局、env/端口隔离、fail-closed 初始化、安全清理" -->
 
 # Parallel agent worktrees
 
