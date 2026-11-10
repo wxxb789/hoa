@@ -7,7 +7,7 @@ description: >-
   hold between tasks. Not for discovering what to build, and not for one task you can finish in the
   current context.
 metadata:
-  version: "0.1.19"
+  version: "0.1.20"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
 ---
@@ -134,6 +134,32 @@ After spec compliance passes:
 ```
 FILES TO REVIEW:
 - <paths touched by the task>
+
+TRIAGE FIRST:
+- Split the touched paths into production code and test code, and say which is which.
+- Test files are reviewed, not skipped. They carry their own defects.
+
+TEST CODE — BLOCKING (report as blocking; never downgrade to style):
+- Wrong or missing assertions.
+- Mocks or fixtures that let the test pass regardless of the behaviour under test.
+- Assertions on private internals instead of the public contract.
+- Skipped or commented-out tests presented as coverage.
+- Tests that depend on execution order or share mutable state.
+- A test that would still pass if the behaviour were removed.
+
+FORBIDDEN RECOMMENDATION:
+- Never propose sharing a constant, fixture or helper between a test's expected value and the code
+  under test, or between a test's input and its expectation. The oracle must be independent or the
+  test cannot fail.
+
+DO NOT REPORT:
+- Repeated literals inside one test class.
+- Short Given/When/Then setup duplication.
+- "Primitive Obsession" applied to test data.
+
+Test maintainability is a finding only with a concrete risk: large fixtures duplicated across files
+and already drifting, tests bound to private internals that break on legitimate refactors, or data
+builders so complex they hide the behaviour being verified. Name that risk in the finding.
 
 CHECK:
 - [ ] Follows project conventions and style?

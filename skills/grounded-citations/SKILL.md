@@ -7,7 +7,7 @@ description: >-
   for claims no source can carry. Use when an answer rests on fetched information rather than
   knowledge. Not for academic BibTeX pipelines, incidental lookups mid-task, or creative writing.
 metadata:
-  version: "0.1.19"
+  version: "0.1.20"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
 ---

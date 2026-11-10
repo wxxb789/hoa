@@ -6,7 +6,7 @@ description: >-
   through an already signed-in desktop Teams CDP session. Use for Teams UI
   discovery and sending, not channels, meetings, browser login, or Microsoft Graph.
 metadata:
-  version: "0.1.19"
+  version: "0.1.20"
   areas: "work-management"
   targets: "runtime-agnostic"
 ---
