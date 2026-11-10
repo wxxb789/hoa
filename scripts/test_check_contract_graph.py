@@ -51,17 +51,29 @@ def make_skill(root: Path, name: str, *, kind=None, consumes=None, produces=None
     return d
 
 
-def write_registry(root: Path, *, external=(), shared=()):
+def write_registry(root: Path, *, external=(), shared=(), required_kind=()):
     path = root / "scripts" / "contract_graph_registry.yaml"
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = []
-    for key, values in (("external", external), ("shared", shared)):
+    for key, values in (("external", external), ("shared", shared),
+                        ("required_kind", required_kind)):
         if values:
             lines.append(f"{key}:")
             lines.extend(f"  - {value}" for value in values)
         else:
             lines.append(f"{key}: []")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def pad_skill_to(path: Path, lines: int) -> None:
+    text = path.read_text(encoding="utf-8")
+    missing = lines - len(text.splitlines())
+    if missing < 0:
+        raise ValueError(f"{path} already exceeds {lines} lines")
+    if missing:
+        text = text.rstrip("\n") + "\n" + "\n".join(
+            f"filler {index}" for index in range(missing)) + "\n"
+    path.write_text(text, encoding="utf-8")
 
 
 def write_trigger_cases(root: Path, cases):
@@ -150,6 +162,32 @@ class ContractGraphTests(unittest.TestCase):
         line = self.assert_rule("R6")
         self.assertIn("shared-artifact", line)
         write_registry(self.tmp, shared=["shared-artifact"])
+        self.assertEqual(self.violations(), [])
+
+    def test_r7_required_skill_missing_kind(self):
+        make_skill(self.tmp, "bare")
+        write_registry(self.tmp, required_kind=["bare"])
+        line = self.assert_rule("R7")
+        self.assertIn("skills/bare/SKILL.md", line)
+        self.assertIn("does not declare kind", line)
+
+    def test_r7_unknown_required_name(self):
+        write_registry(self.tmp, required_kind=["ghost"])
+        line = self.assert_rule("R7")
+        self.assertIn("required_kind names unknown skill 'ghost'", line)
+
+    def test_r8_controller_over_cap(self):
+        skill_md = make_skill(self.tmp, "router", kind="controller",
+                              produces="chain-plan") / "SKILL.md"
+        pad_skill_to(skill_md, cg.MAX_CONTROLLER_LINES + 1)
+        line = self.assert_rule("R8")
+        self.assertIn(f"{cg.MAX_CONTROLLER_LINES + 1} lines", line)
+        self.assertIn(f"cap is {cg.MAX_CONTROLLER_LINES}", line)
+
+    def test_r8_controller_at_cap_passes(self):
+        skill_md = make_skill(self.tmp, "router", kind="controller",
+                              produces="chain-plan") / "SKILL.md"
+        pad_skill_to(skill_md, cg.MAX_CONTROLLER_LINES)
         self.assertEqual(self.violations(), [])
 
     def test_main_summary_and_list(self):

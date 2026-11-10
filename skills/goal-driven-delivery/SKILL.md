@@ -7,9 +7,10 @@ description: >-
   end, including the merge. Do not use for one-line fixes, exploration with no acceptance criteria, or
   work no machine can check (that is a conversation, not a delivery).
 metadata:
-  version: "0.1.20"
+  version: "0.1.21"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
+  kind: "entry"
 ---
 
 # Goal-driven delivery
@@ -75,7 +76,10 @@ If the contract fails any clause, fix the contract — do not dispatch and hope.
    and which behaviours are deliberate non-goals.
 1. `git fetch origin --prune`, fast-forward `main`, branch `feat/<kebab-outcome>` **from
    `origin/main`**, never from a stale local main. Report the base SHA every time.
-2. Dispatch one implementation run carrying the goal file, the repo's contract docs, the most recent
+2. Record the baseline before dispatching: `worktree-scope.py snapshot --repo <path> --label <goal>`.
+   Report the count of pre-existing dirty paths in the dispatch line — they are not part of this
+   increment. Refuse to dispatch on a dirty submodule or nested repository; resolve it first.
+3. Dispatch one implementation run carrying the goal file, the repo's contract docs, the most recent
    comparable increment as the shape reference, the exact gate commands, and "do not commit/push".
    Use `scripts/gdd.py stage` so prompt, run name and ledger row come from one template.
 
@@ -163,19 +167,30 @@ The agent's report is a claim, never evidence:
 
 ## Phase 5 — gates, commit, PR
 
-1. Re-run gates on the exact tree you ship; commit with explicit paths; push; open the PR.
-2. **Before opening the PR, prove the branch is not behind main.** `git rev-list --count
+1. Re-run gates on the exact tree you ship.
+2. **Before committing, define the working increment.** `worktree-scope.py diff --repo <path>
+   --label <goal>`, then `seal`. If `overlapping_paths` is non-empty, stop and ask the operator which
+   writer owns each path — do not commit across it.
+3. Commit with explicit paths; push; open the PR.
+4. **After committing, verify the sealed scope.** `worktree-scope.py verify --repo <path> --label
+   <goal>`. Drift ⇒ stop, name the paths, and require either a re-review or an explicit operator
+   acceptance recorded in the PR body. Do not move this check into `pr-merge-check.py`: that gate
+   declares `Environment: none` and only judges the remote PR.
+5. **Check every number on the final tree:** every count, duration or table value in the PR body and
+   the evidence record is re-derived on the final tree — never carried over from an earlier stage.
+   Record the tree it was measured on (head SHA plus the sealed `scope_sha`).
+6. **Before opening the PR, prove the branch is not behind main.** `git rev-list --count
    origin/main..HEAD` reads `1` whether you are one commit ahead of the current main or one commit
    ahead of a main that has since moved — it cannot see behind-ness. Check
    `test "$(git merge-base HEAD origin/main)" = "$(git rev-parse origin/main)"`; when it fails, a sibling
    PR merged mid-increment and you must rebase onto `origin/main` first, or the review range is not
    exactly one increment.
-3. The PR body is a contract artifact — shape in [`references/pr-body.md`](references/pr-body.md):
+7. The PR body is a contract artifact — shape in [`references/pr-body.md`](references/pr-body.md):
    what landed by subsystem, decisions with explicit non-adoptions naming the goal that owns them, one
    evidence table measured on the **final** tree, every "Done when" clause mapped to the command that
    observes it, and a **Known limits** section. Copy the previous goal's merged PR body as the starting
    shape rather than inventing one per goal.
-4. Treat PR checks as a floor, not a gate — Phase 6 decides.
+8. Treat PR checks as a floor, not a gate — Phase 6 decides.
 
 ## Phase 6 — merge gate (mechanical, not remembered)
 

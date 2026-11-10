@@ -7,12 +7,12 @@ description: >-
   when deciding what to authorize and what to send back. Do not use for grading your own work, or when
   no artifact exists to inspect.
 metadata:
-  version: "0.1.20"
+  version: "0.1.21"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
   kind: "mechanism"
   consumes: "work-report"
-  produces: "acceptance-verdict"
+  produces: "acceptance-verdict, scope-seal"
 ---
 
 # Delegated work acceptance
@@ -45,6 +45,27 @@ sender works from a fixed scope and the acceptance criteria exist before the wor
 - A line like `open terminal failed: not a terminal` is the CLI failing to open an interactive terminal
   under a headless flag — not a run failure. Judge by exit code and produced artifacts.
 - A clean process exit is itself only a claim: acceptance still re-runs the gates itself (§1.5).
+
+## 0.6 The working increment is a path set, not a document hash
+
+Review dispatches at a commit range, so uncommitted work is invisible to it. Bind the tree to a
+recorded scope with `scripts/worktree-scope.py`:
+
+1. `snapshot` when you take the tree: HEAD plus every dirty path (mode and content digest). Those
+   paths are the baseline, not part of the increment.
+2. `diff` after the work: `changed_paths` are the increment, `excluded_preexisting_paths` were
+   already dirty and are untouched, `overlapping_paths` had two writers — stop and ask the operator
+   which one owns each path before going further.
+3. `seal` once the review passes. `--accept-overlap` is an explicit operator decision and is
+   recorded, so the fact survives into the record.
+4. `verify` after committing and before landing: exit 1 names every `added`, `modified` or `removed`
+   path, so a post-review edit cannot ship unexamined.
+
+The oracle is the path set, not a content hash of the report: a document can be rewritten without
+changing the increment, and a one-line edit can change everything. Put the same path set and
+`scope_sha` in the acceptance verdict and the PR body. State resolution: `--state-file`, then
+`$HOA_SCOPE_STATE`, then `$XDG_STATE_HOME/hoa/scope`, then `~/.local/state/hoa/scope`; one JSON file
+per repo+label.
 
 ## 1. Verify from the diff, not from the receipt
 

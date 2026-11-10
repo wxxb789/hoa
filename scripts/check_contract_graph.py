@@ -29,6 +29,7 @@ ROOT = Path(__file__).resolve().parent.parent
 KINDS = ("controller", "stage", "mechanism", "entry")
 REGISTRY = Path("scripts") / "contract_graph_registry.yaml"
 TRIGGER_CASES = Path("evals") / "trigger-cases.json"
+MAX_CONTROLLER_LINES = 120
 
 
 @dataclass(frozen=True)
@@ -96,21 +97,22 @@ def _load_skills(root: Path) -> tuple[Skill, ...]:
     return tuple(skills)
 
 
-def _registry(root: Path) -> tuple[frozenset[str], frozenset[str]]:
+def _registry(root: Path) -> tuple[frozenset[str], frozenset[str], tuple[str, ...]]:
     path = root / REGISTRY
     if not path.is_file():
-        return frozenset(), frozenset()
+        return frozenset(), frozenset(), ()
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     if not isinstance(data, dict):
         raise ValueError(f"{path}: expected a YAML mapping")
 
-    def names(key: str) -> frozenset[str]:
+    def names(key: str) -> tuple[str, ...]:
         value = data.get(key, [])
         if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
-            raise ValueError(f"{path}: {key} must be a list of artifact names")
-        return frozenset(item.strip() for item in value if item.strip())
+            raise ValueError(f"{path}: {key} must be a list of names")
+        return tuple(dict.fromkeys(item.strip() for item in value if item.strip()))
 
-    return names("external"), names("shared")
+    return (frozenset(names("external")), frozenset(names("shared")),
+            names("required_kind"))
 
 
 def _trigger_cases(root: Path) -> tuple[tuple[str, tuple[str, ...]], ...]:
@@ -136,10 +138,18 @@ def _trigger_cases(root: Path) -> tuple[tuple[str, tuple[str, ...]], ...]:
 def analyze(root: Path | None = None) -> Result:
     root = ROOT if root is None else Path(root)
     skills = _load_skills(root)
-    external, shared = _registry(root)
+    external, shared, required_kind = _registry(root)
     cases = _trigger_cases(root)
     by_name = {skill.name: skill for skill in skills}
     violations: list[str] = []
+
+    for name in required_kind:
+        skill = by_name.get(name)
+        if skill is None:
+            violations.append(f"{REGISTRY.as_posix()}: R7: required_kind names "
+                              f"unknown skill {name!r}")
+        elif skill.kind is None:
+            violations.append(f"{skill.path}: R7: required skill does not declare kind")
 
     produced: dict[str, list[str]] = {}
     for skill in skills:
@@ -172,6 +182,11 @@ def analyze(root: Path | None = None) -> Result:
                 if artifact != "chain-plan":
                     violations.append(f"{skill.path}: R5: controller produces {artifact!r} "
                                       f"in addition to 'chain-plan'")
+            line_count = len((root / skill.path).read_text(
+                encoding="utf-8").splitlines())
+            if line_count > MAX_CONTROLLER_LINES:
+                violations.append(f"{skill.path}: R8: controller SKILL.md is "
+                                  f"{line_count} lines; cap is {MAX_CONTROLLER_LINES}")
 
     for artifact, producers in produced.items():
         if len(producers) > 1 and artifact not in shared:
