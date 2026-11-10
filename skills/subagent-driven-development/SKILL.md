@@ -7,10 +7,11 @@ description: >-
   hold between tasks. Not for discovering what to build, and not for one task you can finish in the
   current context.
 metadata:
-  version: "0.1.22"
+  version: "0.1.23"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   kind: "entry"
+  consumes: "spec"
 ---
 
 # Subagent-Driven Development

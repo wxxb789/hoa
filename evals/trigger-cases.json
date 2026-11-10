@@ -139,6 +139,18 @@
       "request": "There's a pattern in our reference repos I want to turn into a first-class artifact here — what's the process?",
       "must_pick": ["adopt-a-pattern"],
       "distractors": ["typed-verification-gates", "skill-scout"]
+    },
+    {
+      "id": "route-to-spec-convergence",
+      "request": "这个需求边界还没想清楚，帮我把范围和验收理出来。",
+      "must_pick": ["spec-convergence"],
+      "distractors": ["define-goal", "writing-plans"]
+    },
+    {
+      "id": "route-decided-change-to-writing-plans",
+      "request": "The boundaries, acceptance criteria and testing seam for the export fix are already decided and written down. Turn them into a step-by-step execution plan with exact files, complete code and test commands.",
+      "must_pick": ["writing-plans"],
+      "distractors": ["spec-convergence", "define-goal"]
     }
   ]
 }

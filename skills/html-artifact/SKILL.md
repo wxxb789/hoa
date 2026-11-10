@@ -7,7 +7,7 @@ description: >-
   for an artifact, explainer, plan write-up, diagram, or design variants. Not for markdown-shaped
   notes, brand-matching a known site's look, or generative canvas art.
 metadata:
-  version: "0.1.22"
+  version: "0.1.23"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
 ---

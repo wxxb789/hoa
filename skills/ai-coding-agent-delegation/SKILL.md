@@ -7,7 +7,7 @@ description: >-
   compared across agents. Not for a quick bounded subtask in the current turn, and not for work with
   no written task spec or acceptance command.
 metadata:
-  version: "0.1.22"
+  version: "0.1.23"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
 ---

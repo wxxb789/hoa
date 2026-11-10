@@ -222,6 +222,10 @@ NOTES = {
         "implementation plans an agent with zero context can execute: bite-sized tasks, exact paths, complete code, commands with expected output",
         "写出零上下文 agent 也能执行的实现计划：小步任务、精确路径、完整代码、带预期输出的命令",
     ),
+    "spec-convergence": (
+        "converge an unclear request into a confirmed spec: fact-backed decision tree, one numbered round per level, explicit confirmation before writing",
+        "把模糊需求收敛为已确认 spec：有事实支撑的决策树、每层一轮编号提问、写前显式确认",
+    ),
     "ai-coding-agent-delegation": (
         "hand a bounded coding task to an external agent CLI in an isolated worktree, then verify the diff, tests and every acceptance claim yourself",
         "把定界编码任务交给隔离 worktree 中的外部 agent CLI，再自行核验 diff、测试与全部验收声明",
