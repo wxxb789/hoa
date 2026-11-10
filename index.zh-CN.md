@@ -60,6 +60,7 @@ targets:  runtime-agnostic | repo-only |
 | report-claim-audit | skill | work-management,software-development | runtime-agnostic | `skills/report-claim-audit/` | 从各自的权威 artifact 重算每条报告声明、对账交付集合，并给待决事项定价 |
 | skill-library-curation | skill | software-development,self-management | runtime-agnostic | `skills/skill-library-curation/` | 按证据审查技能库：清点、重叠分组、安装来源、上游新鲜度；建议不改动状态 |
 | skill-porting-and-publishing | skill | software-development,work-management | runtime-agnostic | `skills/skill-porting-and-publishing/` | 把私有 skill 解耦到可发布仓库：确定权威副本、五轴改造、配置解析、目录与 CI 校验、走分支与 PR 发布 |
+| spec-convergence | skill | software-development | runtime-agnostic | `skills/spec-convergence/` | 把模糊需求收敛为已确认 spec：有事实支撑的决策树、每层一轮编号提问、写前显式确认 |
 | subagent-driven-development | skill | software-development,work-management | runtime-agnostic | `skills/subagent-driven-development/` | 按计划逐任务派发全新 subagent，并做两阶段评审：先规格符合，再代码质量 |
 | systematic-debugging | skill | software-development | runtime-agnostic | `skills/systematic-debugging/` | 先定位根因再修：紧致可复现的反馈环、边界证据、可证伪假设排序，然后一次只改一处 |
 | teams-cdp | skill | work-management | runtime-agnostic | `skills/teams-cdp/` | 通过本机桌面 CDP 向明确的 Teams 联系人或现有群组发送消息 |

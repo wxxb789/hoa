@@ -5,7 +5,7 @@ description: >-
   CLIs. Use for reports, letters, decks, workbooks, tracked changes, comments, and CSV conversion.
   Not for legacy binary formats (.doc/.ppt/.xls), ODF files, or WYSIWYG layout work.
 metadata:
-  version: "0.1.22"
+  version: "0.1.23"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
 ---
