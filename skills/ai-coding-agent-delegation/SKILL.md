@@ -7,7 +7,7 @@ description: >-
   compared across agents. Not for a quick bounded subtask in the current turn, and not for work with
   no written task spec or acceptance command.
 metadata:
-  version: "0.1.21"
+  version: "0.1.22"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
 ---
@@ -176,6 +176,18 @@ One-shot live checks — a config read proves nothing:
    normal publish path.
 6. Clean up worktrees only after integration or explicit abandonment.
 
+### A malformed report is not a failed run
+
+When the run terminated successfully, its expected artifacts exist inside the declared write scope, and
+the report already contains the business facts, a parse error is an encoding defect, not a failed task.
+Ask once, in the **same session**, to restate those facts in the required shape — no tools, no file
+reads, no writes, no new investigation. Budget: **1** re-encode per dispatch; keep the original report,
+the re-encoded report and the real parse error side by side, because the error is the evidence.
+
+This repair does not apply to a non-zero or cancelled run, to missing or out-of-scope artifacts, or to
+a report that never contained the business facts. Those are real failures: stop and report. Re-running
+the task cannot conjure a missing fact, and a second re-encode never becomes valid.
+
 ## Common Pitfalls
 
 1. Launching agents in the same checkout and causing file conflicts.
@@ -198,6 +210,8 @@ One-shot live checks — a config read proves nothing:
 - [ ] Agent command, cwd, and logs are recorded.
 - [ ] Diff inspected by the operator/you, not only by the child agent.
 - [ ] Acceptance commands rerun and real output captured.
+- [ ] Whether a format-only re-encode was used is recorded; if one was, the budget of **1** per dispatch
+      was respected.
 - [ ] Each acceptance claim names its level: **provisioned** (files/config exist), **probed** (an
       identity echo answered), or **accepted** (the real path ran and its artifact met its gate).
       "reply with exactly: OK" is a probe, never acceptance.

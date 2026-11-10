@@ -6,7 +6,7 @@ description: >-
   or needs per-card ownership and routing. Not for a single edit, and not for uniform batch
   fan-out — that wants one resumable runner script.
 metadata:
-  version: "0.1.21"
+  version: "0.1.22"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
 ---
