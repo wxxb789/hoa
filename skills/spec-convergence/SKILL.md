@@ -7,7 +7,7 @@ description: >-
   still undecided. Not for work whose contract is already written, one-line fixes, or exploring what the
   system does today.
 metadata:
-  version: "0.1.25"
+  version: "0.1.26"
   areas: "software-development"
   targets: "runtime-agnostic"
   kind: "entry"
