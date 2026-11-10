@@ -35,6 +35,23 @@ for poll in $(seq 1 "$MAX_POLLS"); do
   out="$(gh pr checks "$PR" 2>&1)"
   log "poll $poll"; printf '%s\n' "$out" >>"$LOG"
 
+  # Immediately after a push GitHub lists no checks at all and `gh pr checks` exits 1 with
+  # "no checks reported", which contains none of the pending words — reading that as "nothing left
+  # to wait for" declares a false green before the matrix has even registered, and the merge gate
+  # then fails on a job that only just started. Require real rows, then require the merge state to
+  # agree with them.
+  if grep -qiE 'no checks reported|no check runs found' <<<"$out"; then
+    log "  poll $poll: no checks registered yet"
+    sleep 30
+    continue
+  fi
+  rows="$(grep -cE $'^[^\t]+\t(pass|fail|pending|skipping)' <<<"$out" || true)"
+  if (( ${rows:-0} == 0 )); then
+    log "  poll $poll: no parseable check rows yet"
+    sleep 30
+    continue
+  fi
+
   if ! grep -qE 'pending|queued|in_progress' <<<"$out"; then
     real=0
     while IFS=$'\t' read -r name state dur _rest; do
@@ -52,8 +69,18 @@ for poll in $(seq 1 "$MAX_POLLS"); do
       real=1
     done <<<"$out"
     if (( real == 0 )); then
-      gh pr view "$PR" --json mergeable,mergeStateStatus,headRefOid \
-        --jq '"\(.mergeable) \(.mergeStateStatus) \(.headRefOid)"' | tee -a "$LOG"
+      state_line="$(gh pr view "$PR" --json mergeable,mergeStateStatus,headRefOid \
+        --jq '"\(.mergeable) \(.mergeStateStatus) \(.headRefOid)"' | tee -a "$LOG")"
+      observed_head="$(awk '{print $3}' <<<"$state_line")"
+      if [[ -n "$observed_head" && "$observed_head" != "$HEAD7"* ]]; then
+        log "head moved: watching $HEAD7 but the PR is at $observed_head"
+        exit 2
+      fi
+      if ! grep -qE '^MERGEABLE CLEAN' <<<"$state_line"; then
+        log "  poll $poll: checks done, merge state not CLEAN yet"
+        sleep 30
+        continue
+      fi
       log "CI green"
       exit 0
     fi
