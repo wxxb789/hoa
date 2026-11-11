@@ -235,6 +235,8 @@ def effective_state(run_dir, state):
         return recorded
     lock, has_lock = read_lock(run_dir)
     if not has_lock:
+        lock, has_lock = recorded_lock(state)
+    if not has_lock:
         return recorded
     if not lock:
         return "stale lock"
@@ -242,6 +244,19 @@ def effective_state(run_dir, state):
     if alive is None:
         alive = tmux_alive(lock.get("tmux"))
     return "running" if alive else "stale lock"
+
+
+def recorded_lock(state):
+    """Launcher identity from state.json, for launchers that never write a lock file.
+
+    omp-run.sh records `pid` (null under tmux) and `tmux` in state.json but writes no lock, so
+    `read_lock` found nothing and a run that died kept reading as "running" until the 6h deadline.
+    """
+    text = state or {}
+    pid, tmux = text.get("pid"), text.get("tmux")
+    if not pid and not tmux:
+        return None, False
+    return {"pid": pid, "tmux": tmux}, True
 
 
 def run_state_paths(task_root_dir, run_root_dir):
@@ -521,8 +536,17 @@ def cmd_stage(args):
                 fail(f"wait: run still not finished after 6h: {run_name}", 1)
             time.sleep(30)
 
+        final_state = effective_state(run_dir, state)
         exit_code = state.get("exit")
         duration = state.get("duration_s")
+        if final_state != "done":
+            resume = state.get("session_id") or "?"
+            fail(
+                f"wait: run ended in {final_state} (exit={exit_code if exit_code is not None else '-'}) "
+                f"instead of done — resume with: {launcher} start --name {run_name}-r2 "
+                f"--prompt <same prompt> --resume {resume}",
+                1,
+            )
         note = f"exit={exit_code if exit_code is not None else '-'} dur={duration if duration is not None else '-'}"
         ledger_append(
             repo,
