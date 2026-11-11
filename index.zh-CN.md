@@ -56,6 +56,7 @@ targets:  runtime-agnostic | repo-only |
 | hoa-skill-review | skill | software-development,work-management,self-management | runtime-agnostic | `skills/hoa-skill-review/` | 依据消费者证据审计 skill 行为与修改，不改动被审查对象 |
 | hoa-skill-work | skill | software-development,work-management,self-management | runtime-agnostic | `skills/hoa-skill-work/` | 直接创建或演进已定义的 skill，并按风险聚焦验证 |
 | html-artifact | skill | software-development,work-management | runtime-agnostic | `skills/html-artifact/` | 零依赖单文件 HTML：解释文、计划、报告、图表与一次性编辑器，统一 house style |
+| jupyter-live-kernel | skill | software-development | runtime-agnostic | `skills/jupyter-live-kernel/` | 在活的 Jupyter kernel 里迭代 Python，而不是反复重启脚本 |
 | kanban-workflows | skill | work-management,software-development | runtime-agnostic | `skills/kanban-workflows/` | 多卡片看板工作：拆解、并行派发、评审门禁、卡住任务恢复 |
 | m365-copilot-cdp | skill | software-development,work-management | runtime-agnostic | `skills/m365-copilot-cdp/` | 通过 CDP 操作桌面 Copilot Chat 与 Code，选择模型并读取回复 |
 | microsoft-office | skill | work-management,software-development | runtime-agnostic | `skills/microsoft-office/` | 用 Python CLI 离线创建、读取、编辑与套用 Word、PowerPoint、Excel 文件模板 |
