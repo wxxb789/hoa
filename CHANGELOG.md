@@ -3,6 +3,12 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## 2026-11-11 — `design-an-interface` joins the catalog
+
+- **`skills/design-an-interface/`** (new): sketch a software interface or public API: signatures, OpenAPI snippet, usage examples. Ported from a private runtime: no machine path, no bot
+  name, no model id, and the capabilities it names are the general ones. Chinese note: 设计软件接口或公开 API：签名草稿、OpenAPI 片段、用法示例.
+  Targets `runtime-agnostic`; areas `software-development`; kind `entry`.
+
 ## 2026-11-11 — a run that never wrote a lock read as running forever
 
 - **`skills/goal-driven-delivery/scripts/gdd.py`, `scripts/delivery-state.py`**: `omp-run.sh` records
