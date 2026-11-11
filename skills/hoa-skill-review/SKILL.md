@@ -7,7 +7,7 @@ description: >-
   Use hoa-skill-work for requested skill creation or evolution; use
   hoa-introspect-distill for recurring-work candidates considered for distillation.
 metadata:
-  version: "0.1.33"
+  version: "0.1.34"
   areas: "software-development,work-management,self-management"
   targets: "runtime-agnostic"
   summary: "review skill behavior and changes against consumer evidence without editing the target"

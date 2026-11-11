@@ -7,7 +7,7 @@ description: >-
   hold between tasks. Not for discovering what to build, and not for one task you can finish in the
   current context.
 metadata:
-  version: "0.1.33"
+  version: "0.1.34"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "execute a plan with a fresh subagent per task and two-stage review: spec compliance first, code quality second"

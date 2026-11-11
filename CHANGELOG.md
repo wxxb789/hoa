@@ -3,6 +3,17 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## 2026-11-11 — the failure modes of a long stage run
+
+- **`skills/goal-driven-delivery/references/run-failure-modes.md`** (new) collects five rules, each from a
+  run that actually failed: a test must never be able to kill the process under test (`tmux kill-server`
+  killed the stage that ran it); a hermetic test can pass for the wrong reason when the developer's machine
+  has the binary it promised to stub; a crashed run silently blocks the next stage and deleting its `lock`
+  does not clear it — recover with `<adapter> result <run>`; catching a broken sink is not enough when the
+  interpreter still exits non-zero into a `pipefail` pipeline; and a recorded measurement whose producer and
+  validator disagree is not evidence.
+- `SKILL.md` links the new reference from the phase section.
+
 ## 2026-11-11 — a run log with a ceiling
 
 - **`skills/goal-driven-delivery/scripts/adapters/events-writer.py`** replaces `tee` in the
