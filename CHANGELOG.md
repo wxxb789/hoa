@@ -3,6 +3,32 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## 2026-11-11 — the eval judge runs on a configuration
+
+- **`evals/judge_trigger_evals.py`** no longer hard-codes a judge model or reaches another skill's
+  private gateway client. Endpoint, model, effort and the optional credential resolve through
+  `scripts/skill_config.py`: CLI flag → environment variable → `$XDG_CONFIG_HOME/evals/config.yaml`
+  (fallback `~/.config/evals/config.yaml`) → documented default. The wire protocol is a plain
+  OpenAI-compatible `POST <base_url>/chat/completions`; effort is sent as `reasoning_effort`.
+  With no endpoint/model configured the script exits 2, prints `base_url`, `model`, `effort` and
+  the config-file path, and never guesses. A malformed config exits 2 naming `path:line`.
+- **Baseline record.** `--record` writes `evals/baseline.json` (`case_count`, `model`, `effort`,
+  `passed`, `total`, `judge_endpoint_host`, `generated_at`, `per_case`) atomically, only for the
+  full case set; an existing record is replaced only with `--force`. `evals/run_trigger_evals.py`
+  stays offline and now rejects a record whose ids are unknown, whose `passed` is not the sum of
+  its rows, or whose `case_count`/`total` do not describe the current suite. A missing record is
+  reported and allowed until the first explicit `--record` run.
+- Added **`evals/test_judge_trigger_evals.py`** (25 tests): precedence flag > env > config >
+  default, the unconfigured exit-2 path, malformed config, an OpenAI-compatible
+  chat-completions stub on `127.0.0.1`, non-catalog replies and per-case network failures, the
+  baseline schema/overwrite rules, and every baseline inconsistency the CI gate rejects. CI runs
+  it as a new gate; no test uses the network or a credential.
+- **`README.md`** gains "How this repository is shaped": the four `kind` layers, the artifact
+  surfaces with their counts, contract-graph rules R1–R9 with what each rejects, every CI gate
+  command and what it protects, and how an eval case is graded — including the honest limit of a
+  single-model judge. `README.zh-CN.md` mirrors the section.
+- `VERSION` 0.1.32, mirrored into every `SKILL.md` by `python scripts/version.py bump`.
+
 ## 2026-11-11 — a mechanism, or no claim
 
 - Added **`scripts/skill_config.py`**, the one implementation of the documented chain

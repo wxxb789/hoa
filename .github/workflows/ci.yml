@@ -100,6 +100,9 @@ jobs:
       - name: Trigger-eval case validation
         run: python evals/run_trigger_evals.py
 
+      - name: Eval judge configuration and baseline tests
+        run: python -m unittest evals.test_judge_trigger_evals
+
       - name: Skill-method case validation
         run: python evals/validate_skill_method_cases.py
 

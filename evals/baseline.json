@@ -1,0 +1,136 @@
+{
+  "case_count": 25,
+  "model": "deepseek-v4.1-flash",
+  "effort": "low",
+  "passed": 24,
+  "total": 25,
+  "judge_endpoint_host": "litellm-proxy-hk.graydune-4a6be1e2.eastasia.azurecontainerapps.io",
+  "generated_at": "2026-11-11T01:59:02Z",
+  "per_case": [
+    {
+      "id": "route-to-teams-send",
+      "pick": "teams-cdp",
+      "passed": true
+    },
+    {
+      "id": "route-to-copilot-chat-code",
+      "pick": "m365-copilot-cdp",
+      "passed": true
+    },
+    {
+      "id": "route-explicit-teams-cdp",
+      "pick": "teams-cdp",
+      "passed": true
+    },
+    {
+      "id": "route-explicit-copilot-cdp",
+      "pick": "m365-copilot-cdp",
+      "passed": true
+    },
+    {
+      "id": "teams-api-search-not-ui-send",
+      "pick": "ghc-search",
+      "passed": true
+    },
+    {
+      "id": "copilot-cli-search-not-desktop",
+      "pick": "ghc-search",
+      "passed": true
+    },
+    {
+      "id": "route-to-search",
+      "pick": "ghc-search",
+      "passed": true
+    },
+    {
+      "id": "route-to-goal-definition",
+      "pick": "define-goal",
+      "passed": true
+    },
+    {
+      "id": "route-to-goal-refinement",
+      "pick": "define-goal",
+      "passed": true
+    },
+    {
+      "id": "route-to-worktree",
+      "pick": "parallel-agent-worktrees",
+      "passed": true
+    },
+    {
+      "id": "route-to-commit-push-pr",
+      "pick": "ado-commit-push-pr",
+      "passed": true
+    },
+    {
+      "id": "route-to-retrieve-not-introspect",
+      "pick": "cross-agent-history-retrieval",
+      "passed": true
+    },
+    {
+      "id": "route-to-introspect-not-retrieve",
+      "pick": "hoa-introspect",
+      "passed": true
+    },
+    {
+      "id": "route-to-distill",
+      "pick": "hoa-introspect-distill",
+      "passed": true
+    },
+    {
+      "id": "route-recurring-pattern-direct-create",
+      "pick": "hoa-skill-work",
+      "passed": true
+    },
+    {
+      "id": "route-to-skill-review",
+      "pick": "hoa-skill-review",
+      "passed": true
+    },
+    {
+      "id": "route-to-skill-judgment",
+      "pick": "hoa-skill-review",
+      "passed": true
+    },
+    {
+      "id": "route-to-skill-creation",
+      "pick": "hoa-skill-work",
+      "passed": true
+    },
+    {
+      "id": "route-to-skill-evolution",
+      "pick": "hoa-skill-work",
+      "passed": true
+    },
+    {
+      "id": "route-to-skill-scout",
+      "pick": "skill-scout",
+      "passed": true
+    },
+    {
+      "id": "route-to-typed-gates",
+      "pick": "typed-verification-gates",
+      "passed": true
+    },
+    {
+      "id": "route-to-adopt-a-pattern",
+      "pick": "adopt-a-pattern",
+      "passed": true
+    },
+    {
+      "id": "route-to-spec-convergence",
+      "pick": "spec-convergence",
+      "passed": true
+    },
+    {
+      "id": "route-decided-change-to-writing-plans",
+      "pick": "writing-plans",
+      "passed": true
+    },
+    {
+      "id": "route-boundaryless-goal-to-spec-first",
+      "pick": "define-goal",
+      "passed": false
+    }
+  ]
+}
