@@ -4,7 +4,9 @@
 Every skill must declare `metadata.kind` (controller, stage, mechanism, entry)
 plus optional comma-separated `metadata.consumes` / `metadata.produces` artifact
 names. The graph is valid only when every consumed artifact has exactly one
-producer (or is registered external) and every producer is unambiguous.
+producer (or is registered external), every producer is unambiguous, and every
+produced artifact is consumed by some skill or listed under `terminal:` in the
+registry with a one-line reason.
 
 Usage:
     python scripts/check_contract_graph.py          # exit 1 on violations
@@ -97,10 +99,10 @@ def _load_skills(root: Path) -> tuple[Skill, ...]:
     return tuple(skills)
 
 
-def _registry(root: Path) -> tuple[frozenset[str], frozenset[str]]:
+def _registry(root: Path) -> tuple[frozenset[str], frozenset[str], dict[str, str]]:
     path = root / REGISTRY
     if not path.is_file():
-        return frozenset(), frozenset()
+        return frozenset(), frozenset(), {}
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     if not isinstance(data, dict):
         raise ValueError(f"{path}: expected a YAML mapping")
@@ -111,7 +113,20 @@ def _registry(root: Path) -> tuple[frozenset[str], frozenset[str]]:
             raise ValueError(f"{path}: {key} must be a list of names")
         return tuple(dict.fromkeys(item.strip() for item in value if item.strip()))
 
-    return frozenset(names("external")), frozenset(names("shared"))
+    terminal_data = data.get("terminal", {})
+    if not isinstance(terminal_data, dict):
+        raise ValueError(f"{path}: terminal must be a mapping of artifact: reason")
+    terminal = {}
+    for artifact, reason in terminal_data.items():
+        if not isinstance(artifact, str) or not artifact.strip():
+            raise ValueError(f"{path}: terminal artifact names must be non-empty strings")
+        if not isinstance(reason, str) or not reason.strip():
+            raise ValueError(f"{path}: terminal.{artifact} needs a one-line reason")
+        if "\n" in reason or "\r" in reason:
+            raise ValueError(f"{path}: terminal.{artifact} reason must be one line")
+        terminal[artifact.strip()] = reason.strip()
+
+    return frozenset(names("external")), frozenset(names("shared")), terminal
 
 
 def _trigger_cases(root: Path) -> tuple[tuple[str, tuple[str, ...]], ...]:
@@ -137,7 +152,7 @@ def _trigger_cases(root: Path) -> tuple[tuple[str, tuple[str, ...]], ...]:
 def analyze(root: Path | None = None) -> Result:
     root = ROOT if root is None else Path(root)
     skills = _load_skills(root)
-    external, shared = _registry(root)
+    external, shared, terminal = _registry(root)
     cases = _trigger_cases(root)
     by_name = {skill.name: skill for skill in skills}
     violations: list[str] = []
@@ -185,6 +200,14 @@ def analyze(root: Path | None = None) -> Result:
         if len(producers) > 1 and artifact not in shared:
             violations.append(f"{by_name[producers[1]].path}: R6: artifact {artifact!r} "
                               f"produced by multiple skills: {', '.join(producers)}")
+
+    consumed = {artifact for skill in skills for artifact in skill.consumes}
+    for artifact, producers in produced.items():
+        if artifact in consumed or artifact in terminal or artifact in external:
+            continue
+        violations.append(f"{by_name[producers[0]].path}: R9: artifact {artifact!r} produced "
+                          f"by {', '.join(repr(name) for name in producers)} is neither "
+                          f"consumed by a skill nor registered under terminal:")
 
     artifacts = frozenset(produced) | external | {
         artifact for skill in skills for artifact in skill.consumes}

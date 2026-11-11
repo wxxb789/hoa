@@ -46,6 +46,9 @@ jobs:
       - name: Contract graph checker tests
         run: python scripts/test_check_contract_graph.py
 
+      - name: Skill configuration resolver tests
+        run: python -m unittest scripts.test_skill_config
+
       - name: Index generator tests
         run: python scripts/test_generate_index.py
 

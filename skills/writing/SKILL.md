@@ -7,7 +7,7 @@ description: >-
   destination and a reader whose decision it must move. Not for chat replies, commit messages, or
   any piece where the content is still missing and only the packaging is being polished.
 metadata:
-  version: "0.1.30"
+  version: "0.1.31"
   areas: "work-management,self-management"
   targets: "runtime-agnostic"
   summary: "per-channel prose contracts behind one content-first layer: blog, academic, X, Reddit, 小红书, 公众号, tutorial, changelog; plus a measurable AI-smell audit"

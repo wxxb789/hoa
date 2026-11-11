@@ -8,7 +8,7 @@ description: >-
   Not for exploratory "make it nicer" refactors, and not for a known mechanical change with an
   already-proven cause.
 metadata:
-  version: "0.1.30"
+  version: "0.1.31"
   areas: "software-development"
   targets: "runtime-agnostic"
   summary: "root cause before fix: a tight red-capable loop, boundary evidence, ranked falsifiable hypotheses, then one fix at a time"
@@ -421,8 +421,9 @@ Test command: <exact command>
 | `repro_floor` | `DEBUG_REPRO_FLOOR` | `0.5` — reproduction rate worth debugging |
 | `log_tag_prefix` | `DEBUG_LOG_TAG_PREFIX` | `[DEBUG-` — unique tag for temporary logs |
 
-Read `$XDG_CONFIG_HOME/systematic-debugging/config.yaml` (fallback `~/.config/...`) when present; a
-flag or env var overrides the file. Commands above show the env form with the default inline, so a
+Resolution order and the config-file path are defined once in
+[skill-porting-and-publishing § Configuration](../skill-porting-and-publishing/SKILL.md#configuration-is-a-gate-not-advice);
+this skill does not restate them. Commands above show the env form with the default inline, so a
 reader can run them without the config.
 
 **No shortcuts. No guessing. Systematic always wins.**

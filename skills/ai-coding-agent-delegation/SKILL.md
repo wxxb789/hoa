@@ -7,7 +7,7 @@ description: >-
   compared across agents. Not for a quick bounded subtask in the current turn, and not for work with
   no written task spec or acceptance command.
 metadata:
-  version: "0.1.30"
+  version: "0.1.31"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "hand a bounded coding task to an external agent CLI in an isolated worktree, then verify the diff, tests and every acceptance claim yourself"
@@ -233,6 +233,7 @@ the task cannot conjure a missing fact, and a second re-encode never becomes val
 | `sandbox_mode` | `DELEGATION_SANDBOX` | none — an explicit choice, never a silent fallback |
 | `max_time` | `DELEGATION_MAX_TIME` | none — the harness's own limit, when it has one |
 
-Read `$XDG_CONFIG_HOME/ai-coding-agent-delegation/config.yaml` (fallback `~/.config/...`) when
-present; a flag or env var overrides the file. This skill never chooses a harness, a model or a
+Resolution order and the config-file path are defined once in
+[skill-porting-and-publishing § Configuration](../skill-porting-and-publishing/SKILL.md#configuration-is-a-gate-not-advice);
+this skill does not restate them. This skill never chooses a harness, a model or a
 sandbox level on the operator's behalf.

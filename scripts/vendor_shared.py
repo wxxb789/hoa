@@ -3,9 +3,10 @@
 
 npx skills installs each skill folder as a self-contained package, so shared
 helpers must be physically copied into every skill that needs them. This
-script keeps that honest: the canonical copy lives in scripts/shared/, and
-this vendoring pass copies it (verbatim) to every consumer. Run it after
-editing a shared script, then commit all updated copies together.
+script keeps that honest: the canonical copy lives in scripts/shared/ (or a
+root-level source listed in SOURCES), and this vendoring pass copies it
+(verbatim) to every consumer. Run it after editing a shared script, then
+commit all updated copies together.
 
 Usage:
     python scripts/vendor_shared.py           # copy shared/ → each consumer
@@ -21,8 +22,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SHARED = ROOT / "scripts" / "shared"
 
+# A root-level script that must be vendored like a shared one.
+SOURCES: dict[str, Path] = {
+    "skill_config.py": ROOT / "scripts" / "skill_config.py",
+}
+
 # shared script name → destination skill script dirs
 CONSUMERS: dict[str, list[str]] = {
+    "skill_config.py": ["skills/goal-driven-delivery/scripts"],
     "safety.py": [
         "skills/hoa-introspect/scripts",
         "skills/hoa-introspect-distill/scripts",
@@ -46,7 +53,7 @@ def main(argv=None) -> int:
 
     status = 0
     for name, consumers in sorted(CONSUMERS.items()):
-        source = SHARED / name
+        source = SOURCES.get(name, SHARED / name)
         if not source.is_file():
             print(f"vendor_shared: missing shared source {source}", file=sys.stderr)
             return 1

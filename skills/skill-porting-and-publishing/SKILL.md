@@ -9,7 +9,7 @@ description: >-
   Not for auditing a skill library (that is curation) and not for a prose-only edit in a repo that
   already owns the file.
 metadata:
-  version: "0.1.30"
+  version: "0.1.31"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "de-couple a private skill for publication: canonical side, five axes, config resolution, catalog/CI validation, branch-and-PR release"
@@ -88,6 +88,15 @@ CLI flag → environment variable → operator config file → documented defaul
 The operator config file is `$XDG_CONFIG_HOME/<skill>/config.yaml`, falling back to
 `~/.config/<skill>/config.yaml`; one env var overrides one key. A skill may — and should — read that
 file to customise itself. What it may not do is encode one machine's answer as the only answer.
+
+The rule is implemented once, in [`scripts/skill_config.py`](../../scripts/skill_config.py):
+`resolve(skill, key, *, flag=None, env=None, default=None, root=None)` returns the value, and
+`explain(...)` also returns which step supplied it. The environment variable is
+`<SKILL_BIG_SNAKE>_<KEY_BIG_SNAKE>`, except that a key already shaped like an environment variable
+(`GDD_STATE_FILE`) is used verbatim. `python scripts/skill_config.py --skill <name> --key <KEY>`
+prints the value and its provenance. A skill whose scripts resolve values vendors the file with
+`python scripts/vendor_shared.py` so the installed package stays self-contained; a skill that only
+documents the rule points here instead of restating it.
 
 Review each ported package against this list and record the outcome in the report:
 
@@ -202,9 +211,8 @@ fighting its own line endings (see Pitfalls). Fix that first, or the probe train
 | `base_branch` | `PORTING_BASE_BRANCH` | the remote HEAD branch |
 | `dirty_age_hours` | `PORTING_DIRTY_AGE_HOURS` | `24` |
 
-No key in this table is a repo name. The skill reads the file at
-`$XDG_CONFIG_HOME/skill-porting-and-publishing/config.yaml` (fallback `~/.config/...`) when present;
-a flag beats an env var beats that file.
+No key in this table is a repo name. These keys resolve through the shared order above; the file is
+`$XDG_CONFIG_HOME/skill-porting-and-publishing/config.yaml` (fallback `~/.config/...`).
 
 ## Report shape
 

@@ -38,6 +38,9 @@ check() {
 export GDD_TASK_ROOT="$TASK_ROOT"
 export GDD_RUN_ROOT="$RUN_ROOT"
 export GDD_STATE_FILE="$TMP/ledger.tsv"
+export XDG_CONFIG_HOME="$TMP/config-home"
+mkdir -p "$XDG_CONFIG_HOME"
+unset GDD_GOAL_GLOB
 
 # --- fixtures ---------------------------------------------------------------
 
@@ -608,6 +611,57 @@ PR_HELP="$("$SCRIPTS/pr-merge-check.py" --help 2>&1)"
 printf '%s\n' "$PR_HELP" | grep -q -- '--marker' \
   && printf '%s\n' "$PR_HELP" | grep -q -- '--allow-no-machine-review'
 check $? "pr-merge-check --help documents marker and allow-no-machine-review"
+
+# --- 13. operator config file ----------------------------------------------
+
+CFG_HOME="$XDG_CONFIG_HOME"
+CFG_DIR="$CFG_HOME/goal-driven-delivery"
+CFG_FILE="$CFG_DIR/config.yaml"
+CFG_LEDGER="$TMP/config-ledger.tsv"
+mkdir -p "$CFG_DIR"
+printf 'GDD_STATE_FILE: %s\n' "$CFG_LEDGER" >"$CFG_FILE"
+
+CFG_RUN_OUT="$TMP/config-run.out"
+env -u GDD_STATE_FILE -u GDD_LAUNCHER XDG_CONFIG_HOME="$CFG_HOME" \
+  GDD_LAUNCHER="$FAKE_LAUNCHER" \
+  "$SCRIPTS/gdd.py" stage --repo "$REPO" --goal 0003 --stage simplify \
+  --base abc1234 --head def5678 >"$CFG_RUN_OUT" 2>&1
+CFG_RC=$?
+[ "$CFG_RC" -eq 0 ] && [ -f "$CFG_LEDGER" ] && grep -q '0003' "$CFG_LEDGER"
+check $? "config-file GDD_STATE_FILE is honoured (rc=$CFG_RC)" "$(cat "$CFG_RUN_OUT")"
+
+CFG_SHOW="$TMP/config-show.out"
+env -u GDD_STATE_FILE -u GDD_LAUNCHER XDG_CONFIG_HOME="$CFG_HOME" \
+  "$SCRIPTS/gdd.py" status --repo "$REPO" --goal 0003 >"$CFG_SHOW" 2>&1
+grep -qx 'stage: simplify' "$CFG_SHOW"
+check $? "gdd status reads the config-file ledger" "$(cat "$CFG_SHOW")"
+
+ENV_LEDGER="$TMP/env-ledger.tsv"
+env GDD_STATE_FILE="$ENV_LEDGER" GDD_LAUNCHER="$FAKE_LAUNCHER" \
+  XDG_CONFIG_HOME="$CFG_HOME" \
+  "$SCRIPTS/gdd.py" stage --repo "$REPO" --goal 0004 --stage simplify \
+  --base abc1234 --head def5678 >"$TMP/env-run.out" 2>&1
+[ $? -eq 0 ] && [ -f "$ENV_LEDGER" ] && grep -q '0004' "$ENV_LEDGER" \
+  && ! grep -q '0004' "$CFG_LEDGER"
+check $? "environment beats the config file" "$(cat "$TMP/env-run.out")"
+
+printf 'GDD_STATE_FILE: %s\nGDD_LAUNCHER: /nonexistent-launcher\n' "$CFG_LEDGER" >"$CFG_FILE"
+CLI_OUT="$TMP/cli-wins.out"
+env -u GDD_STATE_FILE -u GDD_LAUNCHER XDG_CONFIG_HOME="$CFG_HOME" \
+  "$SCRIPTS/gdd.py" stage --repo "$REPO" --goal 0005 --stage simplify \
+  --base abc1234 --head def5678 --launcher "$FAKE_LAUNCHER" >"$CLI_OUT" 2>&1
+CLI_RC=$?
+[ "$CLI_RC" -eq 0 ] && grep -q '0005' "$CFG_LEDGER"
+check $? "explicit --launcher beats the config file (rc=$CLI_RC)" "$(cat "$CLI_OUT")"
+
+printf 'nested:\n  child: value\n' >"$CFG_FILE"
+BAD_OUT="$TMP/bad-config.out"
+env -u GDD_STATE_FILE -u GDD_LAUNCHER XDG_CONFIG_HOME="$CFG_HOME" \
+  "$SCRIPTS/gdd.py" stage --repo "$REPO" --goal 0006 --stage simplify \
+  --base abc1234 --head def5678 --launcher "$FAKE_LAUNCHER" >"$BAD_OUT" 2>&1
+BAD_RC=$?
+[ "$BAD_RC" -eq 2 ] && grep -q "$CFG_FILE:1:" "$BAD_OUT"
+check $? "malformed config exits 2 naming path and line (rc=$BAD_RC)" "$(cat "$BAD_OUT")"
 
 echo "selftest: $PASS/$TOTAL ok"
 [ "$PASS" -eq "$TOTAL" ]
