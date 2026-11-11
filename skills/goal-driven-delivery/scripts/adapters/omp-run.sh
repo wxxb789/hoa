@@ -15,18 +15,19 @@
 #   <run_root>/<YYYY-MM-DD>/<SLUG>/answer.md
 #
 # with state.json containing at least {"name","state","exit","cwd","started",
-# "ended","duration_s","pid","tmux"} and state in running|done|killed|failed.
-# gdd.py polls that file; a missing state.json is unknown, never success.
+# "ended","duration_s","pid","tmux","backend"} and state in
+# running|done|killed|failed. gdd.py polls that file; a missing state.json is
+# unknown, never success.
 #
 # A run is finished only once `finalized` (holding the exit code) sits next to
 # state.json. When that marker is absent, state.json still says `running`, and
-# both the tmux session and the recorded pid are gone, the process died before
-# finalize.py could run: status/list/result/answer finalize it as failed with
-# exit -1, set `recovered_stale`, and print `stale_recovered: true`. A marker
-# is never mutated, so recovery is idempotent.
+# the lock's pid (and recorded tmux session, if any) are gone, the process died
+# before finalize.py could run: status/list/result/answer finalize it as failed
+# with exit -1, set `recovered_stale`, and print `stale_recovered: true`. A
+# marker is never mutated, so recovery is idempotent.
 #
 # This file is the reference adapter for an OMP-style CLI: it runs the agent in
-# a detached tmux session (so the run outlives the caller), streams the CLI's
+# a detached session (so the run outlives the caller), streams the CLI's
 # `--mode=json` NDJSON events to events.ndjson, and finalizes state.json +
 # answer.md when the process exits. To adapt it for another agent CLI:
 #   1. point OMP_BIN at that CLI (or edit the command in cmd_start);
@@ -36,13 +37,21 @@
 #      assistant text;
 #   4. keep start/status/result/answer/kill and the exit codes.
 #
-# Why tmux: a background job that is a child of the calling session dies with
-# it, and one-shot CLI mode only prints at exit — one kill loses the whole run.
-# A detached tmux session outlives the caller, and the NDJSON event log makes
-# progress observable while the run is still going.
+# Why a detached session: a background job that is a child of the calling
+# session dies with it, and one-shot CLI mode only prints at exit — one kill
+# loses the whole run. A detached backend outlives the caller, and the NDJSON
+# event log makes progress observable while the run is still going. Two
+# backends implement it:
+#   setsid (default)  the run gets its own session and process group with no
+#                     controlling terminal. Nothing a caller's terminal or a
+#                     tmux server does can SIGHUP it; `kill` signals the whole
+#                     group. Use this where a tmux server may die mid-run.
+#   tmux              a detached tmux session, which also lets a human attach
+#                     to watch the agent. Keep it where attaching matters.
 #
 # Usage:
 #   omp-run.sh start --name SLUG --prompt FILE [--cwd DIR] [--resume ID]
+#                    [--backend setsid|tmux]
 #                    [--model M] [--thinking L] [--max-time D] [--profile P]
 #                    [--extra "FLAG ..."] [--replace]
 #   omp-run.sh list                 # every recorded run + liveness
@@ -50,10 +59,11 @@
 #   omp-run.sh tail SLUG [N]        # last N event lines (default 20)
 #   omp-run.sh result SLUG          # state summary + answer head
 #   omp-run.sh answer SLUG          # only the final assistant text
-#   omp-run.sh kill SLUG            # Ctrl-C then kill-session
+#   omp-run.sh kill SLUG            # tmux: Ctrl-C then kill-session; setsid: TERM the group
 #
 # Environment:
 #   OMP_BIN       agent binary (default: omp)
+#   OMP_RUN_BACKEND  default for start --backend: setsid | tmux (default: setsid)
 #   OMP_RUN_ROOT  base run root (default: $GDD_RUN_ROOT or
 #                 ${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs)
 #   OMP_LEDGER    finished-run ledger (default: <run_root>/ledger.tsv)
@@ -67,10 +77,15 @@
 # Model / thinking / max-time have no default here: the flag is omitted when it
 # is not supplied. Run artifacts: <run_root>/<date>/<SLUG>/ = prompt.md, run.sh,
 # events-writer.py, finalize.py, events.ndjson, events.stats.json, stderr.log,
-# state.json, exit.code, session.id, lock, answer.md.
+# state.json, exit.code, session.id, lock, answer.md (setsid also writes
+# launcher.log, the backend wrapper's own stderr). `lock` holds
+# {"pid","tmux","backend","started_at"}; `tmux` is null under setsid and `pid`
+# is the run's own session leader, so liveness is decided by pid first and the
+# tmux session second.
 set -uo pipefail
 
 OMP_BIN="${OMP_BIN:-omp}"
+BACKEND_DEFAULT="${OMP_RUN_BACKEND:-setsid}"
 RUN_ROOT_BASE="${OMP_RUN_ROOT:-${GDD_RUN_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs}}"
 RUNDIR_ROOT="$RUN_ROOT_BASE/$(date +%F)"
 export OMP_LEDGER="${OMP_LEDGER:-$RUN_ROOT_BASE/ledger.tsv}"
@@ -98,6 +113,35 @@ find_run_dir() {
 
 tmux_alive() { tmux has-session -t "$1" 2>/dev/null; }
 
+pid_alive() {
+  local pid="${1:-}"
+  [[ "$pid" =~ ^[0-9]+$ ]] && [[ "$pid" -gt 0 ]] || return 1
+  kill -0 "$pid" 2>/dev/null
+}
+
+# lock_value RUN_DIR KEY — a top-level field of the JSON lock, empty if absent.
+lock_value() {
+  [[ -f "$1/lock" ]] || return 0
+  jq -r --arg k "$2" '.[$k] // empty' "$1/lock" 2>/dev/null
+}
+
+# kill_pid_group PID — TERM the run's process group, KILL it after a bounded
+# wait. The pid is the setsid session leader, so its process group is the run.
+kill_pid_group() {
+  local pid="$1" i
+  kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true
+  for i in $(seq 1 20); do
+    kill -0 -- "-$pid" 2>/dev/null || return 0
+    sleep 0.25
+  done
+  kill -KILL -- "-$pid" 2>/dev/null || true
+  for i in $(seq 1 20); do
+    kill -0 -- "-$pid" 2>/dev/null || return 0
+    sleep 0.25
+  done
+  return 1
+}
+
 # recover_stale RUN_DIR — finalize a run whose tmux session and pid both died
 # without finalize.py running. Prints `stale_recovered: true` when it acted and
 # nothing otherwise. A run with a `finalized` marker is never touched.
@@ -120,14 +164,18 @@ except (OSError, ValueError):
 if state.get("state") != "running" or os.path.exists(marker_path):
     sys.exit(0)
 
-sess = state.get("tmux") or ""
-if sess and subprocess.run(
-    ["tmux", "has-session", "-t", str(sess)], capture_output=True
-).returncode == 0:
-    sys.exit(0)
+try:
+    with open(os.path.join(run, "lock"), encoding="utf-8") as handle:
+        lock = json.load(handle)
+except (OSError, ValueError):
+    lock = {}
+if not isinstance(lock, dict):
+    lock = {}
+sess = (lock["tmux"] if "tmux" in lock else state.get("tmux")) or ""
+backend = lock.get("backend") or state.get("backend") or ("tmux" if sess else "setsid")
 
 try:
-    pid = int(state.get("pid"))
+    pid = int(lock.get("pid") or state.get("pid"))
 except (TypeError, ValueError):
     pid = None
 if pid and pid > 0:
@@ -137,7 +185,18 @@ if pid and pid > 0:
         sys.exit(0)
     except ProcessLookupError:
         pass
+    except OSError:
+        pass
     else:
+        sys.exit(0)
+if sess:
+    try:
+        alive = subprocess.run(
+            ["tmux", "has-session", "-t", str(sess)], capture_output=True
+        ).returncode == 0
+    except OSError:
+        alive = False
+    if alive:
         sys.exit(0)
 
 # Dead lane: the run's own finalizer keeps state/answer/ledger consistent.
@@ -166,8 +225,8 @@ if state.get("state") == "running":
     )
 state["recovered_stale"] = True
 state["note"] = (
-    f"process disappeared without finalizing (tmux '{sess or '-'}' and "
-    f"pid {pid or '-'} are gone); finalized with exit -1"
+    f"process disappeared without finalizing (backend {backend}; tmux "
+    f"'{sess or '-'}' and pid {pid or '-'} are gone); finalized with exit -1"
 )
 with open(state_path, "w", encoding="utf-8") as handle:
     json.dump(state, handle, indent=2, ensure_ascii=False)
@@ -186,7 +245,7 @@ PY
 
 cmd_start() {
   local name="" prompt_file="" cwd="$PWD" resume="" model="" thinking=""
-  local max_time="" profile="" extra="" replace=0
+  local max_time="" profile="" extra="" replace=0 backend="$BACKEND_DEFAULT"
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -194,6 +253,7 @@ cmd_start() {
       --prompt) prompt_file="${2:-}"; shift 2 ;;
       --cwd) cwd="${2:-}"; shift 2 ;;
       --resume) resume="${2:-}"; shift 2 ;;
+      --backend) backend="${2:-}"; shift 2 ;;
       --model) model="${2:-}"; shift 2 ;;
       --thinking) thinking="${2:-}"; shift 2 ;;
       --max-time) max_time="${2:-}"; shift 2 ;;
@@ -204,11 +264,18 @@ cmd_start() {
     esac
   done
 
+  case "$backend" in
+    setsid|tmux) ;;
+    *) die "start: --backend must be setsid or tmux (got '$backend')" ;;
+  esac
+
   [[ -n "$name" ]] || die "start: --name is required"
   [[ -n "$prompt_file" && -f "$prompt_file" ]] || die "start: --prompt FILE is required and must exist"
   [[ -d "$cwd" ]] || die "start: --cwd '$cwd' is not a directory"
   [[ -x "$OMP_BIN" ]] || die "start: agent binary not found at $OMP_BIN (set OMP_BIN)"
   [[ -f "$EVENTS_WRITER" ]] || die "start: bounded event writer not found at $EVENTS_WRITER"
+  [[ "$backend" == setsid ]] && ! command -v setsid >/dev/null 2>&1 \
+    && die "start: setsid not found (use --backend tmux)"
 
   name="$(sanitize "$name")"
   [[ -n "$name" ]] || die "start: name sanitized to empty"
@@ -216,11 +283,26 @@ cmd_start() {
   local sess="omp-$name"
   local run="$RUNDIR_ROOT/$name"
 
+  local lock_pid="" lock_backend=""
+  if [[ -f "$run/lock" ]]; then
+    lock_pid="$(lock_value "$run" pid)"
+    lock_backend="$(lock_value "$run" backend)"
+  fi
+
   if tmux_alive "$sess"; then
     if [[ $replace -eq 1 ]]; then
       tmux kill-session -t "$sess" 2>/dev/null
     else
       die "start: tmux session '$sess' is already running (use --replace to restart)"
+    fi
+  fi
+  # A setsid run has no session to name it: only its lock pid proves it lives.
+  if [[ "$lock_backend" == setsid || "$backend" == setsid ]] \
+     && pid_alive "$lock_pid"; then
+    if [[ $replace -eq 1 ]]; then
+      kill_pid_group "$lock_pid" || die "start: could not stop run '$name' (pid $lock_pid)"
+    else
+      die "start: run '$name' is still running (pid $lock_pid; use --replace to restart)"
     fi
   fi
   [[ -d "$run" ]] && mv "$run" "$run.prev-$(date +%H%M%S)" 2>/dev/null
@@ -468,12 +550,12 @@ PY
   } > "$run/run.sh"
   chmod +x "$run/run.sh"
 
-  python3 - "$run" "$name" "$cwd" "$model" "$thinking" "$max_time" "$resume" "$sess" <<'PY'
+  python3 - "$run" "$name" "$cwd" "$model" "$thinking" "$max_time" "$resume" "$sess" "$backend" <<'PY'
 import json
 import sys
 from datetime import datetime, timezone
 
-run, name, cwd, model, thinking, max_time, resume, sess = sys.argv[1:9]
+run, name, cwd, model, thinking, max_time, resume, sess, backend = sys.argv[1:10]
 state = {
     "name": name,
     "state": "running",
@@ -485,7 +567,8 @@ state = {
     "model": model or None,
     "thinking": thinking or None,
     "max_time": max_time or None,
-    "tmux": sess,
+    "tmux": sess if backend == "tmux" else None,
+    "backend": backend,
     "run_dir": run,
     "session_id": resume or "",
     "resumed_from": resume or None,
@@ -498,27 +581,52 @@ with open(run + "/state.json", "w", encoding="utf-8") as handle:
     json.dump(state, handle, indent=2, ensure_ascii=False)
 PY
 
-  local run_cmd
-  run_cmd="bash $(printf '%q' "$run/run.sh")"
-  tmux new-session -d -s "$sess" -c "$cwd" "$run_cmd" \
-    || die "start: tmux new-session failed"
+  local run_pid="" pane_pid="" i
+  if [[ "$backend" == tmux ]]; then
+    local run_cmd
+    run_cmd="bash $(printf '%q' "$run/run.sh")"
+    tmux new-session -d -s "$sess" -c "$cwd" "$run_cmd" \
+      || die "start: tmux new-session failed"
+    for i in $(seq 1 20); do
+      pane_pid="$(tmux list-panes -t "$sess" -F '#{pane_pid}' 2>/dev/null | head -n1)"
+      [[ -n "$pane_pid" ]] && break
+      sleep 0.2
+    done
+    run_pid="$pane_pid"
+  else
+    # setsid gives the run its own session and process group with no
+    # controlling terminal. The child records its own pid *after* setsid and
+    # then execs run.sh, so the lock names the shell that owns the agent — not
+    # the setsid wrapper, which may fork and exit.
+    local pidfile="$run/setsid.pid"
+    rm -f "$pidfile"
+    setsid bash -c 'printf "%s\n" "$$" > "$1"; exec bash "$2"' \
+      omp-run "$pidfile" "$run/run.sh" </dev/null >>"$run/launcher.log" 2>&1 &
+    for i in $(seq 1 50); do
+      [[ -s "$pidfile" ]] && break
+      sleep 0.1
+    done
+    run_pid="$(cat "$pidfile" 2>/dev/null || true)"
+    rm -f "$pidfile"
+    [[ -n "$run_pid" ]] || die "start: setsid run did not start (see $run/launcher.log)"
+  fi
 
   # The lock names the process behind the run: a state.json that still says
   # `running` while this pid is gone is reported as `stale lock`, not running.
-  local pane_pid="" i
-  for i in $(seq 1 20); do
-    pane_pid="$(tmux list-panes -t "$sess" -F '#{pane_pid}' 2>/dev/null | head -n1)"
-    [[ -n "$pane_pid" ]] && break
-    sleep 0.2
-  done
-  python3 - "$run" "$pane_pid" "$sess" <<'PY'
+  python3 - "$run" "$run_pid" "$sess" "$backend" <<'PY'
 import json
 import os
 import sys
+from datetime import datetime, timezone
 
-run, pid, sess = sys.argv[1:4]
+run, pid, sess, backend = sys.argv[1:5]
 pid = int(pid) if pid.isdigit() else None
-lock = {"pid": pid, "tmux": sess}
+lock = {
+    "pid": pid,
+    "tmux": sess if backend == "tmux" else None,
+    "backend": backend,
+    "started_at": datetime.now(timezone.utc).isoformat(),
+}
 with open(os.path.join(run, "lock"), "w", encoding="utf-8") as handle:
     json.dump(lock, handle, indent=2)
 state_path = os.path.join(run, "state.json")
@@ -528,7 +636,8 @@ try:
 except (OSError, ValueError):
     state = {}
 state["pid"] = pid
-state["tmux"] = sess
+state["tmux"] = lock["tmux"]
+state["backend"] = backend
 with open(state_path, "w", encoding="utf-8") as handle:
     json.dump(state, handle, indent=2)
 PY
@@ -564,7 +673,12 @@ PY
   done
 
   echo "started: $name"
-  echo "  tmux      : $sess"
+  echo "  backend   : $backend"
+  if [[ "$backend" == tmux ]]; then
+    echo "  tmux      : $sess"
+  else
+    echo "  pid       : $run_pid"
+  fi
   echo "  run dir   : $run"
   echo "  session id: $(cat "$run/session.id" 2>/dev/null || echo '(pending)')"
   echo "  events    : tail -F $run/events.ndjson"
@@ -579,30 +693,70 @@ cmd_list() {
     [[ -f "$d" ]] || continue
     any=1
     run="$(dirname "$d")"
-    recover_stale "$run"
-    python3 - "$run" <<'PY'
+    local recovered
+    recovered="$(recover_stale "$run")"
+    python3 - "$run" "$recovered" <<'PY'
 import json
 import os
 import subprocess
 import sys
 
-run = sys.argv[1]
+run, recovered = sys.argv[1], bool(sys.argv[2])
 with open(os.path.join(run, "state.json"), encoding="utf-8") as handle:
     state = json.load(handle)
-sess = state.get("tmux") or ""
-alive = (
-    subprocess.run(["tmux", "has-session", "-t", sess], capture_output=True).returncode == 0
-    if sess
-    else False
-)
+try:
+    with open(os.path.join(run, "lock"), encoding="utf-8") as handle:
+        lock = json.load(handle)
+except (OSError, ValueError):
+    lock = {}
+if not isinstance(lock, dict):
+    lock = {}
+sess = (lock["tmux"] if "tmux" in lock else state.get("tmux")) or ""
+pid = lock.get("pid") or state.get("pid")
+
+
+def pid_alive(value):
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        return False
+    if value <= 0:
+        return False
+    try:
+        os.kill(value, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
+def tmux_alive(name):
+    if not name:
+        return False
+    try:
+        return subprocess.run(
+            ["tmux", "has-session", "-t", str(name)], capture_output=True
+        ).returncode == 0
+    except OSError:
+        return False
+
+
+alive = pid_alive(pid) or tmux_alive(sess)
 started = (state.get("started") or "")[:19].replace("T", " ")
 state_name = state.get("state")
-if state.get("recovered_stale"):
+if recovered:
+    # Just finalized by recover_stale: report what was observed, not the
+    # bookkeeping that was written.
+    state_name = "GONE (resume with -r %s)" % (state.get("session_id") or "?")
+elif state.get("recovered_stale"):
     state_name = "failed(stale)"
 elif state_name == "running" and not alive:
-    state_name = "GONE (crashed/killed — resume with -r %s)" % (state.get("session_id") or "?")
+    state_name = "GONE (resume with -r %s)" % (state.get("session_id") or "?")
 print(
-    f"{started}  {state.get('name', '?'):<28} {state_name:<10} exit={state.get('exit')} "
+    f"{started}  {state.get('name', '?'):<28} {state_name} exit={state.get('exit')} "
     f"dur={state.get('duration_s')} cost=${state.get('cost_usd', 0)} "
     f"sess={state.get('session_id') or '-'}"
 )
@@ -628,12 +782,49 @@ import sys
 run = sys.argv[1]
 with open(os.path.join(run, "state.json"), encoding="utf-8") as handle:
     state = json.load(handle)
-sess = state.get("tmux") or ""
-alive = (
-    subprocess.run(["tmux", "has-session", "-t", sess], capture_output=True).returncode == 0
-    if sess
-    else False
-)
+try:
+    with open(os.path.join(run, "lock"), encoding="utf-8") as handle:
+        lock = json.load(handle)
+except (OSError, ValueError):
+    lock = {}
+if not isinstance(lock, dict):
+    lock = {}
+sess = (lock["tmux"] if "tmux" in lock else state.get("tmux")) or ""
+pid = lock.get("pid") or state.get("pid")
+backend = lock.get("backend") or state.get("backend") or ("tmux" if sess else "setsid")
+
+
+def pid_alive(value):
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        return False
+    if value <= 0:
+        return False
+    try:
+        os.kill(value, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
+def tmux_alive(name):
+    if not name:
+        return False
+    try:
+        return subprocess.run(
+            ["tmux", "has-session", "-t", str(name)], capture_output=True
+        ).returncode == 0
+    except OSError:
+        return False
+
+
+tmux_up = tmux_alive(sess)
+alive = pid_alive(pid) or tmux_up
 events = os.path.join(run, "events.ndjson")
 retained = os.path.getsize(events) if os.path.exists(events) else 0
 try:
@@ -658,7 +849,9 @@ print(
     json.dumps(
         {
             **state,
-            "tmux_alive": alive,
+            "backend": backend,
+            "alive": alive,
+            "tmux_alive": tmux_up,
             "events_bytes": retained,
             "events_bytes_total": total,
             "events_truncated": truncated,
@@ -715,13 +908,38 @@ cmd_answer() {
 cmd_kill() {
   local name; name="$(sanitize "${1:?kill: slug required}")"
   local run; run="$(find_run_dir "$name")" || die "kill: no run '$name'"
-  local sess; sess="$(jq -r '.tmux // empty' "$run/state.json")"
-  [[ -n "$sess" ]] || die "kill: no tmux session recorded"
-  tmux send-keys -t "$sess" C-c 2>/dev/null
-  local i
-  for i in $(seq 1 20); do tmux_alive "$sess" || break; sleep 1; done
-  tmux_alive "$sess" && tmux kill-session -t "$sess" 2>/dev/null
-  echo "killed: $name ($sess)"
+  local pid sess backend
+  pid="$(lock_value "$run" pid)"
+  sess="$(lock_value "$run" tmux)"
+  backend="$(lock_value "$run" backend)"
+  [[ -z "$pid" ]] && pid="$(jq -r '.pid // empty' "$run/state.json" 2>/dev/null)"
+  [[ -z "$sess" ]] && sess="$(jq -r '.tmux // empty' "$run/state.json" 2>/dev/null)"
+
+  # setsid: one signal to the process group reaches the run shell, the agent
+  # and the event writer. tmux: today's Ctrl-C then kill-session.
+  if [[ "$backend" == setsid || -z "$sess" ]]; then
+    pid_alive "$pid" || die "kill: no live process group recorded for '$name'"
+    kill_pid_group "$pid" || die "kill: process group $pid survived SIGKILL"
+    echo "killed: $name (pid $pid)"
+    return 0
+  fi
+
+  if tmux_alive "$sess"; then
+    tmux send-keys -t "$sess" C-c 2>/dev/null
+    local i
+    for i in $(seq 1 20); do tmux_alive "$sess" || break; sleep 1; done
+    tmux_alive "$sess" && tmux kill-session -t "$sess" 2>/dev/null
+    echo "killed: $name ($sess)"
+    return 0
+  fi
+
+  # The tmux server is gone but the pane process may still be alive.
+  if pid_alive "$pid"; then
+    kill_pid_group "$pid" || die "kill: process group $pid survived SIGKILL"
+    echo "killed: $name (pid $pid)"
+    return 0
+  fi
+  die "kill: run '$name' is already gone (no tmux session, pid $pid is dead)"
 }
 
 main() {
