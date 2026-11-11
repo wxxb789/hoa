@@ -3,6 +3,12 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## 2026-11-11 — `plan-to-issues` joins the catalog
+
+- **`skills/plan-to-issues/`** (new): break a PRD or plan into issue-level tasks with titles, bodies and labels. Ported from a private runtime: no machine path, no bot
+  name, no model id, and the capabilities it names are the general ones. Chinese note: 把 PRD 或计划拆成 issue 级任务：标题、正文、标签.
+  Targets `runtime-agnostic`; areas `work-management`; kind `entry`.
+
 ## 2026-11-11 — `ocr-and-documents` joins the catalog
 
 - **`skills/ocr-and-documents/`** (new): extract text from PDFs and scans with pymupdf or marker-pdf. Ported from a private runtime: no machine path, no bot
