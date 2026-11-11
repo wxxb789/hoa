@@ -33,9 +33,15 @@ Usage
     python evals/judge_trigger_evals.py --record [--force]
 
 `--record` writes evals/baseline.json only on an explicit request and only for
-the full case set; an existing record is replaced only with `--force`.
+the full case set; an existing record is replaced only with `--force`. Before
+writing, the proposed record is checked with the same rules the offline gate
+applies (run_trigger_evals.baseline_errors). A run whose picks include transport
+errors or non-catalog answers cannot be represented in the accepted schema, so
+the file is left untouched and the script exits 2; a wrong-but-catalog pick is
+an honest measurement and is recorded.
 
-Exit codes: 0 every case passed, 1 at least one failed, 2 configuration/usage.
+Exit codes: 0 every case passed, 1 at least one failed, 2 configuration/usage or
+a record the offline gate would reject.
 """
 from __future__ import annotations
 
@@ -58,6 +64,13 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 import generate_index as gi  # noqa: E402
 import skill_config as sc  # noqa: E402
+
+try:  # `python evals/judge_trigger_evals.py` puts evals/ on sys.path
+    import run_trigger_evals as gate  # noqa: E402
+except ModuleNotFoundError as error:  # imported as evals.judge_trigger_evals
+    if error.name != "run_trigger_evals":
+        raise
+    from evals import run_trigger_evals as gate  # noqa: E402
 
 SKILL = "evals"
 KEY_BASE_URL = "base_url"
@@ -321,10 +334,19 @@ def main(argv=None) -> int:
         print(f"\n{passed}/{len(results)} passed")
 
     if args.record:
+        record = baseline_record(cases, model, effort, base_url, results)
+        rejected = gate.baseline_errors(cases, record)
+        if rejected:
+            print("judge_trigger_evals: the run's failures cannot be represented in "
+                  "the accepted baseline schema (typically transport errors or "
+                  "non-catalog answers); re-run the judge instead of replacing an "
+                  "earlier measurement:", file=sys.stderr)
+            for error in rejected:
+                print(f"  {error}", file=sys.stderr)
+            print(f"judge_trigger_evals: {target} was not written", file=sys.stderr)
+            return 2
         try:
-            written = record_baseline(
-                baseline_record(cases, model, effort, base_url, results),
-                force=args.force)
+            written = record_baseline(record, force=args.force)
         except (OSError, RecordError) as error:
             print(f"judge_trigger_evals: cannot record baseline: {error}", file=sys.stderr)
             return 2

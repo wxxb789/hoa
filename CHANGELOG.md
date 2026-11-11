@@ -14,17 +14,22 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   the config-file path, and never guesses. A malformed config exits 2 naming `path:line`.
 - **Baseline record.** `--record` writes `evals/baseline.json` (`case_count`, `model`, `effort`,
   `passed`, `total`, `judge_endpoint_host`, `generated_at`, `per_case`) atomically, only for the
-  full case set; an existing record is replaced only with `--force`. `evals/run_trigger_evals.py`
+  full case set; an existing record is replaced only with `--force`. Before writing, the proposed
+  record is validated with the offline gate's own rules: a run whose picks include transport errors
+  or non-catalog answers cannot be represented in the accepted schema, so nothing is written, the
+  existing baseline is untouched, and the script exits 2 naming the offending cases. A
+  wrong-but-catalog pick is recorded as the failure it is. `evals/run_trigger_evals.py`
   stays offline and now rejects a record whose ids are unknown, whose pick names no catalog
   artifact, whose recorded flag disagrees with `pick ∈ must_pick` recomputed against the current
   case set, whose `passed` is not the sum of its rows, or whose `case_count`/`total` do not
   describe the current suite. A missing record is reported and allowed until the first explicit
   `--record` run.
-- Added **`evals/test_judge_trigger_evals.py`** (28 tests): precedence flag > env > config >
+- Added **`evals/test_judge_trigger_evals.py`** (31 tests): precedence flag > env > config >
   default, the unconfigured exit-2 path, malformed config, an OpenAI-compatible
   chat-completions stub on `127.0.0.1`, non-catalog replies and per-case network failures, the
-  baseline schema/overwrite rules, and every baseline inconsistency the CI gate rejects. CI runs
-  it as a new gate; no test uses the network or a credential.
+  baseline schema/overwrite rules, refusal to replace a baseline with an unrepresentable run, and
+  every baseline inconsistency the CI gate rejects. CI runs it as a new gate; no test uses the
+  network or a credential.
 - **`README.md`** gains "How this repository is shaped": the four `kind` layers, the artifact
   surfaces with their counts, contract-graph rules R1–R9 with what each rejects, every CI gate
   command and what it protects, and how an eval case is graded — including the honest limit of a

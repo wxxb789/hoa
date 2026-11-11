@@ -222,7 +222,10 @@ python evals/judge_trigger_evals.py --json \
 `POST <base_url>/chat/completions`；effort 通过 `reasoning_effort` 字段发送。全都没提供时脚本
 以 2 退出，打印所需键与配置文件路径，绝不猜一个模型。`--record` 写入 `evals/baseline.json`
 （`case_count`、`model`、`effort`、`passed`、`total`、`judge_endpoint_host`、`generated_at`、
-`per_case`），且只记录完整 case set；已有记录只有加 `--force` 才会被替换。CI 从不调用模型：
+`per_case`），且只记录完整 case set；已有记录只有加 `--force` 才会被替换。写入前会用离线
+gate 自身的规则校验待写入记录：包含传输错误或非目录回答的运行无法用接受的 schema 表示，因此
+文件保持原样、脚本以 2 退出并点名出错的 case（重跑而不是丢掉上一次测量）；答成目录内但错误的
+artifact 则如实记录为失败。CI 从不调用模型：
 `run_trigger_evals.py` 离线校验 baseline 的 id、目录内 pick、重算后的通过标志与 case 总数，
 在第一次记录之前报告 `no baseline recorded yet`。
 

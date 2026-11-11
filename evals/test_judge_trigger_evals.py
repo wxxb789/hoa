@@ -90,6 +90,10 @@ class Stub:
                     if f"User request: {case['request']}\n" in prompt)
         if self.mode == "garbage" and case["id"] == self.fail_case:
             return 200, {"choices": [{"message": {"content": "no-such-artifact"}}]}
+        if self.mode == "other_artifact" and case["id"] == self.fail_case:
+            other = next(candidate["must_pick"][0] for candidate in self.cases
+                         if candidate["must_pick"][0] not in case["must_pick"])
+            return 200, {"choices": [{"message": {"content": other}}]}
         if self.mode == "http500" and case["id"] == self.fail_case:
             return 500, {"error": "stub failure"}
         return 200, {"choices": [{"message": {"content": case["must_pick"][0]}}]}
@@ -281,12 +285,17 @@ class RecordTests(unittest.TestCase):
         }
         judge.BASELINE_PATH = self.baseline
 
-    def run_main(self, *args: str) -> tuple[int, str, str]:
+    def make_stub(self, **kwargs) -> Stub:
+        stub = Stub(**kwargs)
+        self.addCleanup(stub.close)
+        return stub
+
+    def run_main(self, *args: str, stub: Stub | None = None) -> tuple[int, str, str]:
         stdout, stderr = io.StringIO(), io.StringIO()
         with patch.dict(os.environ, self.environ, clear=True), \
                 contextlib.redirect_stdout(stdout), \
                 contextlib.redirect_stderr(stderr):
-            code = judge.main([*args, "--base-url", self.stub.base_url,
+            code = judge.main([*args, "--base-url", (stub or self.stub).base_url,
                                "--model", "stub-model"])
         return code, stdout.getvalue(), stderr.getvalue()
 
@@ -322,6 +331,48 @@ class RecordTests(unittest.TestCase):
         self.assertIn("wrote", err)
         replaced = json.loads(self.baseline.read_text(encoding="utf-8"))
         self.assertEqual(replaced["case_count"], record["case_count"])
+
+    def test_force_never_replaces_a_baseline_with_an_unrepresentable_run(self) -> None:
+        code, _out, err = self.run_main("--record")
+        self.assertEqual(code, 0, err)
+        before = self.baseline.read_bytes()
+        failing = _cases()[1]["id"]
+        stub = self.make_stub(mode="garbage", fail_case=failing)
+        code, _out, err = self.run_main("--record", "--force", stub=stub)
+        self.assertEqual(code, 2, err)
+        self.assertEqual(self.baseline.read_bytes(), before)
+        self.assertIn(f"({failing})", err)
+        self.assertIn("not a catalog artifact", err)
+        self.assertIn("cannot be represented", err)
+        self.assertIn("was not written", err)
+
+    def test_wrong_catalog_pick_is_recorded_and_validates(self) -> None:
+        code, _out, err = self.run_main("--record")
+        self.assertEqual(code, 0, err)
+        before = self.baseline.read_bytes()
+        cases = _cases()
+        stub = self.make_stub(mode="other_artifact", fail_case=cases[0]["id"])
+        code, _out, err = self.run_main("--record", "--force", stub=stub)
+        self.assertEqual(code, 1, err)
+        self.assertIn("wrote", err)
+        self.assertNotEqual(self.baseline.read_bytes(), before)
+        record = json.loads(self.baseline.read_text(encoding="utf-8"))
+        row = next(entry for entry in record["per_case"]
+                   if entry["id"] == cases[0]["id"])
+        self.assertFalse(row["passed"])
+        self.assertNotIn(row["pick"], cases[0]["must_pick"])
+        self.assertEqual(record["passed"], len(cases) - 1)
+        self.assertEqual(gate.baseline_errors(cases, record), [])
+
+    def test_record_without_a_baseline_creates_no_file_on_an_unrepresentable_run(self) -> None:
+        failing = _cases()[0]["id"]
+        for mode in ("garbage", "http500"):
+            with self.subTest(mode=mode):
+                stub = self.make_stub(mode=mode, fail_case=failing)
+                code, _out, err = self.run_main("--record", stub=stub)
+                self.assertEqual(code, 2, err)
+                self.assertFalse(self.baseline.exists())
+                self.assertIn(f"({failing})", err)
 
 
 class JudgeUnitTests(unittest.TestCase):

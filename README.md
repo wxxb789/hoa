@@ -239,7 +239,11 @@ The config keys are `base_url`, `model`, `effort` and optional `api_key`; the en
 them supplied the script exits 2, prints the keys and the config path, and never guesses a model.
 `--record` writes `evals/baseline.json` (`case_count`, `model`, `effort`, `passed`, `total`,
 `judge_endpoint_host`, `generated_at`, `per_case`) for the full case set only; an existing record is
-replaced only with `--force`. CI never calls the model: `run_trigger_evals.py` validates the
+replaced only with `--force`. The proposed record is checked with the gate's own rules before it is
+written: a run containing transport errors or non-catalog answers cannot be represented in the
+accepted schema, so the file is left untouched and the script exits 2 naming the offending cases
+(re-run instead of losing the previous measurement); a wrong-but-catalog pick is recorded as the
+failure it is. CI never calls the model: `run_trigger_evals.py` validates the
 baseline's ids, catalog picks, recomputed pass flags and case totals offline, and reports
 `no baseline recorded yet` before the first record.
 
