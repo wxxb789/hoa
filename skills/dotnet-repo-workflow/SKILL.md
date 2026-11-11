@@ -7,7 +7,7 @@ description: >-
   NuGet package, or when a .NET change is ready to commit and open as a PR. Do not use for the repo's
   code style (its own AGENTS.md) or for orchestrator install maintenance.
 metadata:
-  version: "0.1.42"
+  version: "0.1.43"
   areas: "software-development"
   targets: "runtime-agnostic"
   summary: "run the repo's own .NET gate harness instead of a hand-rolled `dotnet test`; lock files, Roslyn harness traps, merge-ready checklist"
