@@ -271,12 +271,27 @@ def tmux_alive(session):
     return proc.returncode == 0
 
 
+def recorded_lock(state):
+    """Launcher identity from state.json, for launchers that never write a lock file.
+
+    omp-run.sh records `pid` (null under tmux) and `tmux` in state.json but writes no lock, so
+    `read_lock` found nothing and a run that died kept reading as "running" until the 6h deadline.
+    """
+    text = state or {}
+    pid, tmux = text.get("pid"), text.get("tmux")
+    if not pid and not tmux:
+        return None, False
+    return {"pid": pid, "tmux": tmux}, True
+
+
 def effective_state(run_dir, state):
     """Recorded run state, with `stale lock` for a lock whose process is gone."""
     recorded = str((state or {}).get("state") or "?")
     if recorded != "running":
         return recorded
     lock, has_lock = read_lock(run_dir)
+    if not has_lock:
+        lock, has_lock = recorded_lock(state)
     if not has_lock:
         return recorded
     if not lock:

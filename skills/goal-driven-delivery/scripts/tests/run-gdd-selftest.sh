@@ -1067,5 +1067,39 @@ SPACE_POLL_RC=$?
   && grep -qx 'state: running' "$SPACE_POLL_OUT"
 check $? "poll command survives a run root containing a space (rc=$SPACE_RC/$SPACE_POLL_RC)" "$(cat "$SPACE_POLL_OUT")"
 
+
+# A launcher that records pid/tmux in state.json but never writes a lock file: the run must read as
+# stale, not running, or a dead run blocks the next stage until the 6h deadline.
+NOLOCK_DIR="$RUN_ROOT/$TODAY/workrepo-0001-simplify-nolock"
+mkdir -p "$NOLOCK_DIR"
+python3 - "$NOLOCK_DIR" "$REPO_REAL" "$DEAD_PID" <<'PYEOF'
+import json
+import sys
+
+run_dir, cwd, pid = sys.argv[1:4]
+with open(run_dir + "/state.json", "w", encoding="utf-8") as handle:
+    json.dump(
+        {
+            "name": "workrepo-0001-simplify-nolock",
+            "state": "running",
+            "exit": None,
+            "cwd": cwd,
+            "started": "2026-01-01T00:00:00+00:00",
+            "ended": None,
+            "duration_s": None,
+            "pid": int(pid),
+            "tmux": None,
+        },
+        handle,
+    )
+PYEOF
+touch "$NOLOCK_DIR/state.json"
+
+NOLOCK_SHOW="$TMP/nolock-show.out"
+"$SCRIPTS/delivery-state.py" show --repo "$REPO" --goal 0001 \
+  --state-file "$TMP/s3.tsv" --task-root "$TASK_ROOT" --run-root "$RUN_ROOT" >"$NOLOCK_SHOW" 2>&1
+grep -qx 'last_run: workrepo-0001-simplify-nolock stale lock exit=- dur=-' "$NOLOCK_SHOW"
+check $? "a run with a recorded pid but no lock file reports stale lock" "$(cat "$NOLOCK_SHOW")"
+
 echo "selftest: $PASS/$TOTAL ok"
 [ "$PASS" -eq "$TOTAL" ]
