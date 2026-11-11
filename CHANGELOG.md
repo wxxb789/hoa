@@ -3,6 +3,31 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## 2026-11-11 — the reference launcher can own its own session
+
+- **`skills/goal-driven-delivery/scripts/adapters/omp-run.sh`**: `start --backend setsid|tmux`, with
+  `OMP_RUN_BACKEND` as the default (`setsid`). The setsid backend puts the run in its own session and
+  process group with no controlling terminal, so a dying tmux server cannot SIGHUP it. `lock` now
+  holds `{"pid","tmux","backend","started_at"}` and `state.json` records `pid` + `backend`; the setsid
+  pid is the shell that owns the agent (setsid execs in place), not a wrapper that exits. `status`,
+  `list` and `recover_stale` decide liveness from the lock pid before the recorded tmux session, so a
+  run whose process is gone reads `stale lock` / `GONE (resume with -r ...)`, never `running`. `kill`
+  TERMs the process group and escalates to SIGKILL after a bounded wait; the tmux backend keeps its
+  Ctrl-C then kill-session path.
+- **`skills/goal-driven-delivery/scripts/tests/test-omp-run-setsid.sh`** (new): stub-CLI coverage for
+  the setsid lock/state contract, live status, group kill, external-kill recovery, the default
+  backend, and the tmux backend (skipped loudly when tmux is unavailable).
+- **`skills/goal-driven-delivery/scripts/tests/run-gdd-selftest.sh`**: the fake-tmux end-to-end run
+  selects `--backend tmux` explicitly and asserts the same lock contract for that backend.
+- **`skills/goal-driven-delivery/references/transport.md`,
+  `skills/omp-headless-orchestration/SKILL.md`**: document the two backends and how to keep an
+  attachable tmux session.
+
+The failure this removes: when a concurrent job killed the tmux server, the agent got SIGHUP,
+`run.sh` never reached its finalizer, `state.json` stayed `running`, and `gdd.py --wait` sat on it for
+six hours. A setsid run has no controlling terminal and its own process group; if its leader dies, the
+lock pid proves it and the run is reported gone within a poll.
+
 ## 2026-11-11 — `design-an-interface` joins the catalog
 
 - **`skills/design-an-interface/`** (new): sketch a software interface or public API: signatures, OpenAPI snippet, usage examples. Ported from a private runtime: no machine path, no bot

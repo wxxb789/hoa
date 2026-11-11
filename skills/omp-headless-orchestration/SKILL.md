@@ -32,16 +32,19 @@ terminal goes down.
 
 A background child of the orchestrating session receives SIGTERM when that session ends, and `omp -p`
 prints only at exit — a run killed at minute 37 leaves a 0-byte output file. Always launch through the
-tmux wrapper shipped with this skill:
+launcher forwarder shipped with this skill:
 
 ```bash
 scripts/omp-run.sh start --name <slug> --prompt <file> --cwd <repo> \
+  [--backend setsid|tmux] \
   [--resume <session-id>] [--model M] [--thinking L] [--max-time 3h] [--extra "--no-tools"]
 scripts/omp-run.sh list | status <slug> | tail <slug> 20 | result <slug> | answer <slug> | kill <slug>
 ```
 
-A detached tmux session hangs off the tmux server (init), not off your session, so it survives session
-and gateway restarts. Verify with the ancestor chain of the omp pid, not by assumption.
+A detached run is not a child of your session, so it survives session and gateway restarts. The
+default backend is `setsid` (own session and process group, no controlling terminal: a dying tmux
+server cannot SIGHUP it). `--backend tmux` or `OMP_RUN_BACKEND=tmux` keeps the attachable tmux
+session. Verify with the ancestor chain of the omp pid, not by assumption.
 
 The implementation is maintained once, with skill `goal-driven-delivery`
 (`scripts/adapters/omp-run.sh`), because that skill's `gdd.py` defaults to it; the copy here
