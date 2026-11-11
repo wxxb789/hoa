@@ -42,6 +42,7 @@ targets:  runtime-agnostic | repo-only |
 | generated-runtime-repairs | skill | software-development,work-management | runtime-agnostic | `skills/generated-runtime-repairs/` | 修模板/生成器、验证暂存产物，再部署并回读线上运行时 |
 | ghc-search | skill | software-development | runtime-agnostic | `skills/ghc-search/` | 经本机 `ghc-proxy` Responses API 做 web 与 X/Twitter 搜索；返回答案加去重来源 |
 | git-auto-sync-pipelines | skill | software-development,work-management | runtime-agnostic | `skills/git-auto-sync-pipelines/` | 手改仓库的定时提交推送：固定门序、白名单与体积上限、暂存区密钥扫描、心跳与去重告警 |
+| github-code-review | skill | software-development,work-management | runtime-agnostic | `skills/github-code-review/` | 评审 PR：读 diff，用 gh 或 REST 发行内评论 |
 | goal-driven-delivery | skill | software-development,work-management | runtime-agnostic | `skills/goal-driven-delivery/` | 目标契约 → agent 分阶段产出 → operator 验收 → 脚本化合并门禁 → 可续跑账本；随附 `gdd.py`、`delivery-state.py`、`pr-merge-check.py` |
 | grounded-citations | skill | work-management,software-development | runtime-agnostic | `skills/grounded-citations/` | 脚本持有编号引用账本：检索即登记、逐句引用、机械渲染并可校验；随附 `sources.py` |
 | harness-engineering | skill | software-development | runtime-agnostic | `skills/harness-engineering/` | 审计与重构 harness 脚本：自包含、检查绑定 owner 决策、纯函数检查加薄 runner、净减行数 |

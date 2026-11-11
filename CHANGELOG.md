@@ -3,6 +3,12 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## 2026-11-11 — `github-code-review` joins the catalog
+
+- **`skills/github-code-review/`** (new): review a pull request: read the diff, post inline comments through gh or the REST API. Ported from a private runtime: no machine path, no bot
+  name, no model id, and the capabilities it names are the general ones. Chinese note: 评审 PR：读 diff，用 gh 或 REST 发行内评论.
+  Targets `runtime-agnostic`; areas `software-development,work-management`; kind `mechanism`.
+
 ## 2026-11-11 — `design-an-interface` joins the catalog
 
 - **`skills/design-an-interface/`** (new): sketch a software interface or public API: signatures, OpenAPI snippet, usage examples. Ported from a private runtime: no machine path, no bot
