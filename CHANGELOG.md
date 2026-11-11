@@ -3,6 +3,12 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## 2026-11-11 — `arch-improvement-plan` joins the catalog
+
+- **`skills/arch-improvement-plan/`** (new): incremental architecture improvement: find boundaries, plan the migration, emit PRD plus tasks. Ported from a private runtime: no machine path, no bot
+  name, no model id, and the capabilities it names are the general ones. Chinese note: 增量架构改进：划边界、给迁移计划、产出 PRD 与任务.
+  Targets `runtime-agnostic`; areas `software-development`; kind `entry`.
+
 ## 2026-11-11 — `github-repo-management` joins the catalog
 
 - **`skills/github-repo-management/`** (new): clone, create and fork repositories; manage remotes and releases. Ported from a private runtime: no machine path, no bot

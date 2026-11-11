@@ -30,6 +30,7 @@ targets:  runtime-agnostic | repo-only |
 | agent-harness-settings-parity | skill | software-development | runtime-agnostic | `skills/agent-harness-settings-parity/` | 让同一条策略在每个 coding harness 上生效，尽管配置文件、键名与单位各不相同 |
 | agent-operating-contract-evolution | skill | software-development,work-management,self-management | runtime-agnostic | `skills/agent-operating-contract-evolution/` | 按分层演进 agent 身份文件与操作协议：覆盖标记、行为评测、加载范围探测 |
 | ai-coding-agent-delegation | skill | software-development,work-management | runtime-agnostic | `skills/ai-coding-agent-delegation/` | 把定界编码任务交给隔离 worktree 中的外部 agent CLI，再自行核验 diff、测试与全部验收声明 |
+| arch-improvement-plan | skill | software-development | runtime-agnostic | `skills/arch-improvement-plan/` | 增量架构改进：划边界、给迁移计划、产出 PRD 与任务 |
 | contract-bound-deliverables | skill | work-management,software-development | runtime-agnostic | `skills/contract-bound-deliverables/` | 满足可度量契约：冻结证据包、并行起草、按字数装配、用契约自身的度量脚本验收 |
 | cross-agent-repair-routing | skill | software-development,work-management | runtime-agnostic | `skills/cross-agent-repair-routing/` | 把他人写入面内的缺陷送修：权限地图、复现、一次定界的落地决策 |
 | define-goal | skill | self-management,software-development,work-management | runtime-agnostic | `skills/define-goal/` | 把雄心转化为编号 goal 文件，近期清晰、远期可细化，不制定实现步骤 |
