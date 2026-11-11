@@ -58,6 +58,7 @@ targets:  runtime-agnostic | repo-only |
 | hoa-skill-review | skill | software-development,work-management,self-management | runtime-agnostic | `skills/hoa-skill-review/` | review skill behavior and changes against consumer evidence without editing the target |
 | hoa-skill-work | skill | software-development,work-management,self-management | runtime-agnostic | `skills/hoa-skill-work/` | directly create or evolve a defined skill with focused, risk-scaled validation |
 | html-artifact | skill | software-development,work-management | runtime-agnostic | `skills/html-artifact/` | single-file, dependency-free HTML explainers, plans, reports, diagrams and throwaway editors on one house style |
+| jupyter-live-kernel | skill | software-development | runtime-agnostic | `skills/jupyter-live-kernel/` | iterate on Python inside a live Jupyter kernel instead of restarting scripts |
 | kanban-workflows | skill | work-management,software-development | runtime-agnostic | `skills/kanban-workflows/` | multi-card board work: decomposition, parallel dispatch, review gates, stuck-card recovery |
 | m365-copilot-cdp | skill | software-development,work-management | runtime-agnostic | `skills/m365-copilot-cdp/` | operate desktop Copilot Chat and Code through CDP with model selection and reply reads |
 | microsoft-office | skill | work-management,software-development | runtime-agnostic | `skills/microsoft-office/` | create, read, edit and template Word, PowerPoint and Excel files offline with Python CLIs |

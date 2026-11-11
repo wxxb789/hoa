@@ -3,7 +3,7 @@ name: github-code-review
 description: >-
   Review PRs: diffs, inline comments via gh or REST.
 metadata:
-  version: "0.1.41"
+  version: "0.1.42"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "review a pull request: read the diff, post inline comments through gh or the REST API"

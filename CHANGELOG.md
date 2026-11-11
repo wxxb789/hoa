@@ -3,6 +3,12 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## 2026-11-11 — `jupyter-live-kernel` joins the catalog
+
+- **`skills/jupyter-live-kernel/`** (new): iterate on Python inside a live Jupyter kernel instead of restarting scripts. Ported from a private runtime: no machine path, no bot
+  name, no model id, and the capabilities it names are the general ones. Chinese note: 在活的 Jupyter kernel 里迭代 Python，而不是反复重启脚本.
+  Targets `runtime-agnostic`; areas `software-development`; kind `mechanism`.
+
 ## 2026-11-11 — `arch-improvement-plan` joins the catalog
 
 - **`skills/arch-improvement-plan/`** (new): incremental architecture improvement: find boundaries, plan the migration, emit PRD plus tasks. Ported from a private runtime: no machine path, no bot
