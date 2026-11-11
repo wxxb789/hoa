@@ -3,6 +3,48 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## 2026-11-11 — a run log with a ceiling
+
+- **`skills/goal-driven-delivery/scripts/adapters/events-writer.py`** replaces `tee` in the
+  launcher's event pipeline: stdin lines are passed to stdout unchanged (the terminal keeps the
+  whole stream) and retained in `events.ndjson` under a bound. Under the cap the file is
+  byte-identical to the input; over it the file keeps the first lines (≤ 64 KiB, the session event)
+  plus the most recent lines, with exactly one
+  `{"type":"truncated","dropped_bytes":N,"dropped_lines":M}` line at the splice point. A sidecar
+  `events.stats.json` carries `total_bytes`, `dropped_bytes`, `dropped_lines`, `retained_bytes` and
+  `session_id`; the session id is also written atomically to `session.id` as soon as the event
+  arrives. `OMP_RUN_EVENTS_MAX_BYTES` sets the bound (default 8 MiB); unset, empty, non-integer or
+  non-positive values warn on the run's `stderr.log` and use the default, never unbounded. The
+  writer exits 0 on truncation, file failure or a broken terminal pipe, truncates its log on start
+  like `tee` (a replay in the same run directory replaces the stream instead of mixing two), and
+  the `start` hint uses `tail -F` because compaction replaces the inode.
+- **`adapters/omp-run.sh`** copies the writer into each run directory, pipes the agent through it
+  under `pipefail`, seeds `session.id` for `--resume`, and recovers the session id from that sidecar
+  first (scanning the first 64 KiB of the log only when it is absent). `state.json` and `status`
+  report `events_bytes` (retained), `events_bytes_total`, `events_truncated` and
+  `events_dropped_bytes`; `events_bytes` is no longer mistaken for the stream length.
+- **Generated `finalize.py`** skips the marker rather than counting it, takes the session id from
+  `state.json` → `session.id` → the retained stream, and labels stream-derived counters
+  (`tool_calls`, `turns`, `cost_usd`) partial via `tool_calls_partial`, `turns_partial`,
+  `cost_partial` whenever the stream was truncated. Run directories without a sidecar finalize as
+  before, with zero truncation and totals equal to the retained file.
+- **`references/transport.md`** states the four `events_*` fields the launcher contract now
+  requires and adds the adapter-testing rule: a stage run is itself hosted in tmux, so tests use a
+  stub `tmux` or an isolated socket and never `kill-server` / kill a session they did not create.
+- **`tests/run-gdd-selftest.sh`** adds 18 checks: under-cap byte-identity, a replay replacing the
+  log, over-cap head + one marker + tail arithmetic, invalid-cap fallback, and an end-to-end
+  stub-agent/stub-tmux run covering `tail`, `status`, `finalize`, terminal completeness and session
+  recovery when the session event lies beyond the 64 KiB log head. Selftest 80/80.
+- **Measured.** A stub agent emitted 33,249,020 bytes (240,003 lines) into the default 8 MiB cap:
+  the run retained 8,453,877 bytes, dropped 24,795,212 bytes in 179,171 lines, kept a 65,405-byte
+  head whose first line is the session event, and wrote one marker
+  `{"type":"truncated","dropped_bytes":24795212,"dropped_lines":179171}`; the run directory is
+  8,475,959 bytes against 33,249,020 for today's `tee` log, and the first 33,249,020 bytes of the
+  pane were byte-identical to the input (sha256 `6e924715…`). A direct writer run at cap 262,144 on
+  2,749,019 input bytes retained 327,426 bytes (≤ cap + 65,405 head), dropped 2,421,660 bytes, and
+  its `state.json` four `events_*` fields matched the sidecar.
+- `VERSION` 0.1.33, mirrored into every `SKILL.md` by `python scripts/version.py bump`.
+
 ## 2026-11-11 — the eval judge runs on a configuration
 
 - **`evals/judge_trigger_evals.py`** no longer hard-codes a judge model or reaches another skill's

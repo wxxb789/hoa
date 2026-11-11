@@ -612,6 +612,232 @@ printf '%s\n' "$PR_HELP" | grep -q -- '--marker' \
   && printf '%s\n' "$PR_HELP" | grep -q -- '--allow-no-machine-review'
 check $? "pr-merge-check --help documents marker and allow-no-machine-review"
 
+# --- 12b. bounded event writer ---------------------------------------------
+
+WRITER="$SCRIPTS/adapters/events-writer.py"
+STREAM="$TMP/bounded-input.ndjson"
+python3 - "$STREAM" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], "w", encoding="utf-8") as handle:
+    handle.write(json.dumps({"type": "session", "id": "selftest-session"}) + "\n")
+    for index in range(3000):
+        handle.write(
+            json.dumps({"type": "message_update", "seq": index, "text": "x" * 90})
+            + "\n"
+        )
+    handle.write(json.dumps({"type": "turn_end", "n": 3000}) + "\n")
+PY
+STREAM_BYTES="$(wc -c <"$STREAM")"
+
+mkdir -p "$TMP/writer-under"
+OMP_RUN_EVENTS_MAX_BYTES=8388608 python3 "$WRITER" "$TMP/writer-under" \
+  <"$STREAM" >"$TMP/writer-under/terminal" 2>"$TMP/writer-under/stderr"
+check $? "bounded writer exits 0 under the cap"
+
+cmp -s "$STREAM" "$TMP/writer-under/events.ndjson" \
+  && cmp -s "$STREAM" "$TMP/writer-under/terminal"
+check $? "under the cap the file and the terminal stream are byte-identical"
+
+python3 - "$TMP/writer-under" "$STREAM_BYTES" <<'PY'
+import json
+import os
+import sys
+
+run, expected = sys.argv[1], int(sys.argv[2])
+stats = json.load(open(os.path.join(run, "events.stats.json"), encoding="utf-8"))
+assert stats["truncated"] is False, stats
+assert stats["dropped_bytes"] == 0 and stats["dropped_lines"] == 0, stats
+assert stats["total_bytes"] == expected, stats
+assert stats["retained_bytes"] == expected, stats
+session = open(os.path.join(run, "session.id"), encoding="utf-8").read().strip()
+assert session == "selftest-session", session
+PY
+check $? "under the cap the sidecar reports the full stream and session.id exists"
+
+# A replay of run.sh in the same run directory replaces the log, like tee.
+OMP_RUN_EVENTS_MAX_BYTES=8388608 python3 "$WRITER" "$TMP/writer-under" \
+  <"$STREAM" >"$TMP/writer-under/terminal-replay" 2>"$TMP/writer-under/stderr-replay"
+python3 - "$TMP/writer-under" "$STREAM_BYTES" <<'PY'
+import json
+import os
+import sys
+
+run, expected = sys.argv[1], int(sys.argv[2])
+stats = json.load(open(os.path.join(run, "events.stats.json"), encoding="utf-8"))
+data = open(os.path.join(run, "events.ndjson"), "rb").read()
+assert len(data) == stats["retained_bytes"] == stats["total_bytes"] == expected, (len(data), stats)
+PY
+check $? "a writer replay in the same run directory replaces the log, like tee"
+
+mkdir -p "$TMP/writer-over"
+OMP_RUN_EVENTS_MAX_BYTES=65536 python3 "$WRITER" "$TMP/writer-over" \
+  <"$STREAM" >"$TMP/writer-over/terminal" 2>"$TMP/writer-over/stderr"
+check $? "bounded writer exits 0 over the cap"
+
+python3 - "$TMP/writer-over" "$STREAM" 65536 <<'PY'
+import json
+import os
+import sys
+
+run, stream_path, cap = sys.argv[1], sys.argv[2], int(sys.argv[3])
+events_path = os.path.join(run, "events.ndjson")
+stats = json.load(open(os.path.join(run, "events.stats.json"), encoding="utf-8"))
+data = open(events_path, "rb").read()
+blocks = data.splitlines(keepends=True)
+markers = [i for i, line in enumerate(blocks) if json.loads(line).get("type") == "truncated"]
+assert len(markers) == 1, markers
+index = markers[0]
+head, marker, tail = blocks[:index], blocks[index], blocks[index + 1 :]
+assert json.loads(marker)["type"] == "truncated", marker
+assert set(json.loads(marker)) == {"type", "dropped_bytes", "dropped_lines"}, marker
+assert sum(map(len, head)) == stats["head_bytes"], (head, stats)
+assert stats["truncated"] is True, stats
+assert stats["dropped_bytes"] > 0 and stats["dropped_lines"] > 0, stats
+assert len(data) == stats["retained_bytes"] == os.path.getsize(events_path), (len(data), stats)
+assert len(data) <= cap + stats["head_bytes"], (len(data), cap, stats)
+assert stats["total_bytes"] == sum(map(len, head)) + stats["dropped_bytes"] + sum(map(len, tail)), stats
+assert json.loads(head[0]) == {"type": "session", "id": "selftest-session"}, head[0]
+last_input = open(stream_path, "rb").read().splitlines(keepends=True)[-1]
+assert tail and tail[-1] == last_input, (tail[-1:], last_input)
+session = open(os.path.join(run, "session.id"), encoding="utf-8").read().strip()
+assert session == "selftest-session", session
+print("over-cap: retained=%d total=%d dropped=%d marker=%s"
+      % (len(data), stats["total_bytes"], stats["dropped_bytes"], marker.decode().strip()))
+PY
+check $? "over the cap: head + one marker + tail, session kept, sidecar arithmetic holds"
+
+mkdir -p "$TMP/writer-default"
+OMP_RUN_EVENTS_MAX_BYTES=0 python3 "$WRITER" "$TMP/writer-default" \
+  <"$STREAM" >"$TMP/writer-default/terminal" 2>"$TMP/writer-default/stderr"
+check $? "an invalid cap still exits 0"
+
+cmp -s "$STREAM" "$TMP/writer-default/events.ndjson" \
+  && grep -q 'is not positive' "$TMP/writer-default/stderr" \
+  && grep -q '"max_bytes":8388608' "$TMP/writer-default/events.stats.json"
+check $? "an invalid cap warns and falls back to the 8 MiB default"
+
+# --- 12c. bounded run end to end (stub agent, stub tmux) -------------------
+
+E2E_ROOT="$TMP/e2e-runs"
+E2E_STREAM="$TMP/e2e-input.ndjson"
+# A 70 KiB non-session line first pushes the session event past the 64 KiB
+# log-head fallback, so only the writer's session.id sidecar can recover it.
+python3 - "$STREAM" "$E2E_STREAM" <<'PY'
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as source:
+    stream = source.read()
+pad = '{"type":"message_update","seq":-1,"text":"' + "p" * 70000 + '"}\n'
+with open(sys.argv[2], "w", encoding="utf-8") as handle:
+    handle.write(pad)
+    handle.write(stream)
+PY
+python3 - "$E2E_STREAM" <<'PY'
+import sys
+
+data = open(sys.argv[1], "rb").read()
+assert b'"type":"session"' not in data[:65536]
+PY
+check $? "the test stream puts the session event beyond the 64 KiB log head"
+E2E_BYTES="$(wc -c <"$E2E_STREAM")"
+STUB_OMP="$TMP/stub-omp.sh"
+printf '#!/usr/bin/env bash\ncat "$STUB_STREAM"\n' >"$STUB_OMP"
+chmod +x "$STUB_OMP"
+FAKEBIN="$TMP/fakebin"
+mkdir -p "$FAKEBIN"
+cat >"$FAKEBIN/tmux" <<'FAKETMUX'
+#!/usr/bin/env bash
+set -uo pipefail
+cmd="${1:-}"
+shift || true
+case "$cmd" in
+  has-session) exit 1 ;;
+  new-session)
+    last=""
+    for arg in "$@"; do last="$arg"; done
+    printf '%s\n' "$last" >"${FAKE_TMUX_CMD:-/dev/null}"
+    ( bash -c "$last" ) >"${FAKE_TMUX_LOG:-/dev/null}" 2>&1 &
+    exit 0 ;;
+  list-panes) printf '%s\n' "$$" ;;
+  kill-session) exit 0 ;;
+  *) exit 0 ;;
+esac
+FAKETMUX
+chmod +x "$FAKEBIN/tmux"
+
+E2E_START="$TMP/e2e-start.out"
+env PATH="$FAKEBIN:$PATH" OMP_BIN="$STUB_OMP" OMP_RUN_ROOT="$E2E_ROOT" \
+  OMP_RUN_EVENTS_MAX_BYTES=65536 OMP_LEDGER="$TMP/e2e-ledger.tsv" \
+  STUB_STREAM="$E2E_STREAM" FAKE_TMUX_LOG="$TMP/e2e-terminal.log" \
+  "$ADAPTER" start --name e2e-bounded --prompt "$IMPL_PROMPT" --cwd "$TMP" \
+  >"$E2E_START" 2>&1
+check $? "launcher start with the stub agent exits 0"
+
+grep -qx 'started: e2e-bounded' "$E2E_START" \
+  && grep -q 'session id: selftest-session' "$E2E_START"
+check $? "start reports the session id persisted by the writer"
+
+E2E_DIR="$E2E_ROOT/$TODAY/e2e-bounded"
+for _ in $(seq 1 200); do
+  [ -f "$E2E_DIR/finalized" ] && break
+  sleep 0.1
+done
+[ -f "$E2E_DIR/finalized" ]
+check $? "the bounded run finalized"
+
+head -c "$E2E_BYTES" "$TMP/e2e-terminal.log" | cmp -s - "$E2E_STREAM"
+check $? "the terminal stream stayed complete through the writer"
+
+python3 - "$E2E_DIR" "$E2E_BYTES" <<'PY'
+import json
+import os
+import sys
+
+run, expected = sys.argv[1], int(sys.argv[2])
+events_path = os.path.join(run, "events.ndjson")
+stats = json.load(open(os.path.join(run, "events.stats.json"), encoding="utf-8"))
+state = json.load(open(os.path.join(run, "state.json"), encoding="utf-8"))
+assert state["state"] == "done" and state["exit"] == 0, state
+assert state["events_bytes"] == os.path.getsize(events_path), (state, os.path.getsize(events_path))
+assert state["events_bytes_total"] == stats["total_bytes"] == expected, (state, stats)
+assert state["events_truncated"] is True, state
+assert state["events_dropped_bytes"] == stats["dropped_bytes"], (state, stats)
+assert state["tool_calls_partial"] is True, state
+assert state["turns_partial"] is True and state["cost_partial"] is True, state
+assert state["session_id"] == "selftest-session", state
+assert open(os.path.join(run, "exit.code"), encoding="utf-8").read().strip() == "0"
+PY
+check $? "finalize wrote state.json consistent with the writer sidecar"
+
+E2E_STATUS="$TMP/e2e-status.out"
+env OMP_RUN_ROOT="$E2E_ROOT" "$ADAPTER" status e2e-bounded >"$E2E_STATUS" 2>&1
+check $? "status on the bounded run exits 0"
+
+python3 - "$E2E_STATUS" "$E2E_DIR" <<'PY'
+import json
+import os
+import sys
+
+status = json.load(open(sys.argv[1], encoding="utf-8"))
+stats = json.load(open(os.path.join(sys.argv[2], "events.stats.json"), encoding="utf-8"))
+assert status["events_bytes"] == stats["retained_bytes"], (status, stats)
+assert status["events_bytes_total"] == stats["total_bytes"], (status, stats)
+assert status["events_truncated"] is True, status
+assert status["events_dropped_bytes"] == stats["dropped_bytes"], (status, stats)
+PY
+check $? "status prints the four events fields consistent with the sidecar"
+
+E2E_TAIL="$TMP/e2e-tail.out"
+env OMP_RUN_ROOT="$E2E_ROOT" "$ADAPTER" tail e2e-bounded 20 >"$E2E_TAIL" 2>&1
+grep -q 'turn_end' "$E2E_TAIL"
+check $? "tail still renders the most recent events"
+
+env OMP_RUN_ROOT="$E2E_ROOT" "$ADAPTER" tail e2e-bounded 200000 >"$E2E_TAIL" 2>&1
+grep -qx 'truncated' "$E2E_TAIL"
+check $? "tail renders the truncation marker as a JSON event line"
+
 # --- 13. operator config file ----------------------------------------------
 
 CFG_HOME="$XDG_CONFIG_HOME"
