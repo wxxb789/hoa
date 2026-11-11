@@ -7,7 +7,7 @@ description: >-
   end, including the merge. Do not use for one-line fixes, exploration with no acceptance criteria, or
   work no machine can check (that is a conversation, not a delivery).
 metadata:
-  version: "0.1.33"
+  version: "0.1.34"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "goal contract → agent-authored stages → operator-run gates → scripted merge gate → resumable ledger; ships `gdd.py`, `delivery-state.py`, `pr-merge-check.py`"
@@ -73,6 +73,13 @@ When the repo ships on more than one OS, a green local run is not evidence. Fixt
 goldens, signals and mode bits each carry a platform assumption; read
 [`references/cross-platform-increments.md`](references/cross-platform-increments.md) before writing the
 verification plan, and require the matrix job to print the failing test's own output.
+
+## When a run dies or lies
+
+Read [`references/run-failure-modes.md`](references/run-failure-modes.md) before adding a selftest case,
+writing a verification plan, or believing a run's report of itself — a test can kill the process under
+test, a stubbed test can pass for the wrong reason, a crashed run blocks the next stage, and an exit code
+can disagree with the artifact it produced.
 
 ## Stop conditions — when to stop and ask
 

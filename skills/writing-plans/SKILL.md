@@ -7,7 +7,7 @@ description: >-
   hand-off to a task-per-subagent executor. Not for setting outcomes and ambition (that is goal
   definition) and not for exploring whether the work should happen at all.
 metadata:
-  version: "0.1.33"
+  version: "0.1.34"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "implementation plans an agent with zero context can execute: bite-sized tasks, exact paths, complete code, commands with expected output"
