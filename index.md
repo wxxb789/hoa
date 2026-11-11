@@ -62,6 +62,7 @@ targets:  runtime-agnostic | repo-only |
 | kanban-workflows | skill | work-management,software-development | runtime-agnostic | `skills/kanban-workflows/` | multi-card board work: decomposition, parallel dispatch, review gates, stuck-card recovery |
 | m365-copilot-cdp | skill | software-development,work-management | runtime-agnostic | `skills/m365-copilot-cdp/` | operate desktop Copilot Chat and Code through CDP with model selection and reply reads |
 | microsoft-office | skill | work-management,software-development | runtime-agnostic | `skills/microsoft-office/` | create, read, edit and template Word, PowerPoint and Excel files offline with Python CLIs |
+| notes-to-prd | skill | work-management | runtime-agnostic | `skills/notes-to-prd/` | turn notes or an idea into a structured PRD draft |
 | ocr-and-documents | skill | work-management | runtime-agnostic | `skills/ocr-and-documents/` | extract text from PDFs and scans with pymupdf or marker-pdf |
 | omp-headless-orchestration | skill | software-development,work-management | pi | `skills/omp-headless-orchestration/` | detached tmux launcher for long `omp -p` runs; polled completion, session-id recovery |
 | ops-claim-verification | skill | software-development,work-management | runtime-agnostic | `skills/ops-claim-verification/` | turn a scheduled-job, repair or deployment claim into evidence: find the recording surface, separate manual from scheduled runs, audit the auditor |
