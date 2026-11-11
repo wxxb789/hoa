@@ -3,6 +3,12 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## 2026-11-11 — `notes-to-prd` joins the catalog
+
+- **`skills/notes-to-prd/`** (new): turn notes or an idea into a structured PRD draft. Ported from a private runtime: no machine path, no bot
+  name, no model id, and the capabilities it names are the general ones. Chinese note: 把笔记或想法转成结构化 PRD 草稿.
+  Targets `runtime-agnostic`; areas `work-management`; kind `entry`.
+
 ## 2026-11-11 — `plan-to-issues` joins the catalog
 
 - **`skills/plan-to-issues/`** (new): break a PRD or plan into issue-level tasks with titles, bodies and labels. Ported from a private runtime: no machine path, no bot
