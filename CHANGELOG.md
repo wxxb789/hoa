@@ -3,6 +3,17 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## 2026-11-11 — a run that never wrote a lock read as running forever
+
+- **`skills/goal-driven-delivery/scripts/gdd.py`, `scripts/delivery-state.py`**: `omp-run.sh` records
+  `pid` and `tmux` in `state.json` but writes no `lock` file, so `read_lock()` found nothing, the
+  recorded `state: running` was trusted as-is, and a run that had already died kept reporting
+  `running` until the 6h deadline — blocking the next stage. `effective_state()` now falls back to the
+  launcher identity in `state.json` (`recorded_lock()`), in both the CLI and the state reporter.
+- **`scripts/tests/run-gdd-selftest.sh`**: new case for a run with a recorded pid and no lock file;
+  it must read `stale lock`, not `running`. Both scripts carried the same gap, and the new test caught
+  the second copy.
+
 ## 2026-11-11 — the same shell expansion, one file further
 
 - **`skills/skill-library-curation/references/skills-cli-installs.md`**: the provenance snippet passed
