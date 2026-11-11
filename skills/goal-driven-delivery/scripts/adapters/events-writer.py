@@ -193,6 +193,7 @@ class Writer:
                         % exc)
                 self.warned_terminal = True
             self.stdout_ok = False
+            _neutralize_stdout()
 
     def _write_session(self):
         if not self.session_id:
@@ -317,9 +318,40 @@ def _only_passthrough():
             try:
                 out.write(line)
                 out.flush()
-            except (OSError, ValueError):
+            except (OSError, ValueError) as exc:
+                _stderr("terminal write failed: %s; passing the stream through only"
+                        % exc)
                 out = None
+                _neutralize_stdout()
     return 0
+
+
+def _neutralize_stdout():
+    """Point fd 1, and sys.stdout, at /dev/null after a terminal write failure.
+
+    A failed write can leave bytes pending in the buffered stdout; the
+    interpreter's shutdown flush would raise again and change the exit status
+    to 120 even though main() returned 0, failing a pipefail pipeline whose
+    agent actually succeeded. Retargeting fd 1 lets that flush succeed, and the
+    replacement sink keeps any later write harmless. sys.stdout may be None
+    when fd 1 was closed before startup, so neither object is assumed present.
+    """
+    null_fd = None
+    try:
+        null_fd = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(null_fd, 1)
+    except OSError:
+        pass
+    finally:
+        if null_fd is not None and null_fd != 1:
+            try:
+                os.close(null_fd)
+            except OSError:
+                pass
+    try:
+        sys.stdout = open(os.devnull, "w", encoding="utf-8", errors="replace")
+    except OSError:
+        sys.stdout = None
 
 
 def main(argv):

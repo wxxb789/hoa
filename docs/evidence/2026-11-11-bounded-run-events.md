@@ -12,12 +12,12 @@ Exit codes are process exit codes. The generated run directories and the judging
 | Contract clause | Result | Where |
 |---|---|---|
 | stream written through a bounded writer the run directory carries; `OMP_RUN_EVENTS_MAX_BYTES`, default 8 MiB, precedence `OMP_*` → default; no absolute host path | met | `scripts/adapters/events-writer.py:41,57-76`; copied per run at `scripts/adapters/omp-run.sh:230`; cap captured for replay at `:457-459` |
-| under the cap the file is byte-for-byte the stream | met | `events-writer.py:262-273` (append path before the first eviction); selftest 54 |
-| over the cap: head lines ≤ 64 KiB (first line whole), rolling tail, exactly one marker line | met | `events-writer.py:42,149-156,274-294,298-305`; selftest 57-58 |
-| total length knowable: sidecar plus `events_bytes`, `events_bytes_total`, `events_truncated`, `events_dropped_bytes`; `status` prints them | met | `events-writer.py:229-260`; `omp-run.sh:388-397,660-667`; selftest 55, 68 |
-| session recovery independent of the log head: `session.id` written on first sight, resume path reads it, log head only as fallback | met | `events-writer.py:197-227`; `omp-run.sh:231-232,536-546`; selftest 61-63 |
+| under the cap the file is byte-for-byte the stream | met | `events-writer.py:263-274` (append path before the first eviction); selftest 54 |
+| over the cap: head lines ≤ 64 KiB (first line whole), rolling tail, exactly one marker line | met | `events-writer.py:42,149-156,275-295,299-306`; selftest 57-58 |
+| total length knowable: sidecar plus `events_bytes`, `events_bytes_total`, `events_truncated`, `events_dropped_bytes`; `status` prints them | met | `events-writer.py:230-261`; `omp-run.sh:388-397,660-667`; selftest 55, 68 |
+| session recovery independent of the log head: `session.id` written on first sight, resume path reads it, log head only as fallback | met | `events-writer.py:198-228`; `omp-run.sh:231-232,536-546`; selftest 61-63 |
 | `finalize.py` reads through the marker, still writes `state.json`/`exit.code`, counters marked partial | met | `omp-run.sh:322-397`; selftest 64-66 |
-| writer never exits non-zero on truncation / file / terminal failure; terminal stream complete | met | `events-writer.py:118-144,184-195,298-321`; selftest 53, 57, 59, 65 |
+| writer never exits non-zero on truncation / file / terminal failure; terminal stream complete | met | `events-writer.py:118-144,184-196,299-308,311-326,329-354`; selftest 53, 57, 59, 65, 71-73 |
 | crash mid-write leaves a valid file (complete-line appends, atomic compaction) | met | `events-writer.py:125-144,157-182`; unchanged complete lines before the last append |
 | unset/non-positive cap warns on the run's `stderr.log`, never unbounded | met | `events-writer.py:57-76`; opt-in run's `stderr.log`, §5 |
 | existing oversized run dirs untouched | met | no deletion path anywhere in the diff; `omp-run.sh` only moves a run dir aside on `start` as before |
@@ -32,8 +32,8 @@ selftest 61).
 
 ## 2. Bounded writer behaviour
 
-`bash skills/goal-driven-delivery/scripts/tests/run-gdd-selftest.sh` → `selftest: 80/80 ok`, exit 0.
-The base commit's suite reports `62/62`; this increment adds 18 checks (53-70).
+`bash skills/goal-driven-delivery/scripts/tests/run-gdd-selftest.sh` → `selftest: 83/83 ok`, exit 0.
+The base commit's suite reports `62/62`; this increment adds 21 checks (53-70, 71-73).
 
 Direct writer, under the cap (input 424,968 bytes, default cap):
 
@@ -57,6 +57,14 @@ Invalid cap (selftest 59-60): `OMP_RUN_EVENTS_MAX_BYTES=0` exits 0, warns
 `events-writer: OMP_RUN_EVENTS_MAX_BYTES=0 is not positive; using default 8388608 bytes` on stderr,
 keeps the stream byte-identical and records `"max_bytes":8388608` in the sidecar. The non-integer
 warning takes the same path (`=nope` was probed and produced the documented `not an integer` line).
+
+Terminal loss (selftest 71-73): with `PYTHONUNBUFFERED` unset and the reader closing after 200
+bytes, the writer exits 0. Before the fix it exited 120: the buffered stdout still held pending
+bytes, and the interpreter's shutdown flush re-raised the broken pipe. The run warns exactly once
+(`events-writer: terminal write failed: [Errno 32] Broken pipe; continuing to bound the file`, no
+`Exception ignored` line), and bounding continues: 424,968 input bytes, 130,918 retained at cap
+65,536 plus a 65,501-byte head, 294,115 bytes dropped in 2,075 lines, one marker, the last retained
+line equal to the last input line, and `session.id` intact.
 
 ## 3. Session recovery beyond the log head
 
@@ -138,11 +146,14 @@ carries the wrapper's own 95-byte `[finalize] …` summary line — wrapper outp
 
 ## 6. Gates
 
-Run on the final tree, sequentially.
+Run on the final tree, sequentially. The selftest was run twice: once with the host `PATH`, and once
+with `PATH` pointing at a symlink farm of the same executables minus `tmux`, so a hidden tmux
+dependency fails instead of being masked by an installed tmux.
 
 | Command | Output | Exit |
 |---|---|---|
-| `bash skills/goal-driven-delivery/scripts/tests/run-gdd-selftest.sh` | `selftest: 80/80 ok` | 0 |
+| `bash skills/goal-driven-delivery/scripts/tests/run-gdd-selftest.sh` | `selftest: 83/83 ok` | 0 |
+| `PATH=<same executables, no tmux> bash …/run-gdd-selftest.sh` | `selftest: 83/83 ok` | 0 |
 | `bash skills/goal-driven-delivery/scripts/tests/test-omp-run-stale.sh` | `stale-test: 7/7 ok` | 0 |
 | `python scripts/vendor_shared.py --check` | no output | 0 |
 | `python scripts/generate_index.py --check` | no output | 0 |

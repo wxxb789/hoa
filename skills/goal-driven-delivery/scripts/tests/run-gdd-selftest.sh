@@ -812,7 +812,7 @@ PY
 check $? "finalize wrote state.json consistent with the writer sidecar"
 
 E2E_STATUS="$TMP/e2e-status.out"
-env OMP_RUN_ROOT="$E2E_ROOT" "$ADAPTER" status e2e-bounded >"$E2E_STATUS" 2>&1
+env PATH="$FAKEBIN:$PATH" OMP_RUN_ROOT="$E2E_ROOT" "$ADAPTER" status e2e-bounded >"$E2E_STATUS" 2>&1
 check $? "status on the bounded run exits 0"
 
 python3 - "$E2E_STATUS" "$E2E_DIR" <<'PY'
@@ -837,6 +837,48 @@ check $? "tail still renders the most recent events"
 env OMP_RUN_ROOT="$E2E_ROOT" "$ADAPTER" tail e2e-bounded 200000 >"$E2E_TAIL" 2>&1
 grep -qx 'truncated' "$E2E_TAIL"
 check $? "tail renders the truncation marker as a JSON event line"
+
+# --- 12d. terminal failure ---------------------------------------------------
+
+# The buffered stdout holds bytes when the reader goes away; the interpreter's
+# shutdown flush used to re-raise and turn a completed run into exit 120 under
+# `set -o pipefail`. Unset PYTHONUNBUFFERED so this exercises that buffer even
+# on a host that exports it.
+mkdir -p "$TMP/writer-broken"
+env -u PYTHONUNBUFFERED OMP_RUN_EVENTS_MAX_BYTES=65536 python3 "$WRITER" \
+  "$TMP/writer-broken" <"$STREAM" 2>"$TMP/writer-broken/stderr" \
+  | head -c 200 >/dev/null
+BROKEN_RC="${PIPESTATUS[0]}"
+[ "$BROKEN_RC" -eq 0 ]
+check $? "a terminal that goes away mid-stream does not change the writer exit (rc=$BROKEN_RC)"
+
+[ "$(grep -c 'terminal write failed' "$TMP/writer-broken/stderr")" -eq 1 ] \
+  && ! grep -q 'Exception ignored' "$TMP/writer-broken/stderr"
+check $? "the dead terminal is warned once, not re-raised at shutdown"
+
+python3 - "$TMP/writer-broken" "$STREAM_BYTES" "$STREAM" 65536 <<'PY'
+import json
+import os
+import sys
+
+run, expected_bytes, stream_path, cap = sys.argv[1], int(sys.argv[2]), sys.argv[3], int(sys.argv[4])
+events_path = os.path.join(run, "events.ndjson")
+input_blocks = open(stream_path, "rb").read().splitlines(keepends=True)
+data = open(events_path, "rb").read()
+blocks = data.splitlines(keepends=True)
+assert blocks and all(json.loads(line) for line in blocks), "invalid json line"
+markers = [i for i, line in enumerate(blocks) if json.loads(line).get("type") == "truncated"]
+assert len(markers) == 1, markers
+stats = json.load(open(os.path.join(run, "events.stats.json"), encoding="utf-8"))
+assert stats["truncated"] is True, stats
+assert stats["total_bytes"] == expected_bytes, stats
+assert stats["total_lines"] == len(input_blocks), (stats, len(input_blocks))
+assert len(data) == stats["retained_bytes"] <= cap + stats["head_bytes"], (len(data), stats)
+assert blocks[-1] == input_blocks[-1], (blocks[-1:], input_blocks[-1])
+session = open(os.path.join(run, "session.id"), encoding="utf-8").read().strip()
+assert session == "selftest-session", session
+PY
+check $? "the file is still bounded and valid after the terminal went away"
 
 # --- 13. operator config file ----------------------------------------------
 

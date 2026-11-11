@@ -31,10 +31,12 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
 - **`references/transport.md`** states the four `events_*` fields the launcher contract now
   requires and adds the adapter-testing rule: a stage run is itself hosted in tmux, so tests use a
   stub `tmux` or an isolated socket and never `kill-server` / kill a session they did not create.
-- **`tests/run-gdd-selftest.sh`** adds 18 checks: under-cap byte-identity, a replay replacing the
-  log, over-cap head + one marker + tail arithmetic, invalid-cap fallback, and an end-to-end
-  stub-agent/stub-tmux run covering `tail`, `status`, `finalize`, terminal completeness and session
-  recovery when the session event lies beyond the 64 KiB log head. Selftest 80/80.
+- **`tests/run-gdd-selftest.sh`** adds 21 checks: under-cap byte-identity, a replay replacing the
+  log, over-cap head + one marker + tail arithmetic, invalid-cap fallback, a closed-terminal case
+  (the writer exits 0 with a bounded, valid file and no shutdown re-raise when the reader goes
+  away mid-stream), and an end-to-end stub-agent/stub-tmux run covering `tail`, `status`, `finalize`,
+  terminal completeness and session recovery when the session event lies beyond the 64 KiB log
+  head. Every adapter invocation that can reach tmux carries the stub `PATH`. Selftest 83/83.
 - **Measured.** A stub agent emitted 33,249,020 bytes (240,003 lines) into the default 8 MiB cap:
   the run retained 8,453,877 bytes, dropped 24,795,212 bytes in 179,171 lines, kept a 65,405-byte
   head whose first line is the session event, and wrote one marker
