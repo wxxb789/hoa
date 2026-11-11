@@ -419,6 +419,30 @@ class BaselineGateTests(unittest.TestCase):
         errors = self.errors(per_case=per_case)
         self.assertTrue(any("passed must be a boolean" in error for error in errors), errors)
 
+    def test_retargeted_case_invalidates_the_recorded_flag(self) -> None:
+        record = self.record()
+        cases = _cases()
+        cases[0] = {**cases[0], "must_pick": ["ghc-search"]}
+        errors = gate.baseline_errors(cases, record, gate._catalog_names())
+        self.assertTrue(errors, "a case retargeted after recording must invalidate the baseline")
+        message = next(error for error in errors if cases[0]["id"] in error)
+        self.assertIn(repr(record["per_case"][0]["pick"]), message)
+        self.assertIn("recomputes to passed=False", message)
+        self.assertIn("passed=True", message)
+        self.assertIn("ghc-search", message)
+
+    def test_pick_must_name_a_catalog_artifact(self) -> None:
+        per_case = self.record()["per_case"]
+        per_case[0] = {**per_case[0], "pick": "no-such-artifact", "passed": False}
+        record = self.record(per_case=per_case, passed=len(self.cases) - 1)
+        errors = gate.baseline_errors(self.cases, record, gate._catalog_names())
+        self.assertTrue(any("not a catalog artifact" in error for error in errors), errors)
+
+    def test_committed_baseline_matches_the_current_cases(self) -> None:
+        record = gate.load_baseline(ROOT / "evals" / "baseline.json")
+        self.assertIsNotNone(record)
+        self.assertEqual(gate.baseline_errors(_cases(), record, gate._catalog_names()), [])
+
     def test_missing_field(self) -> None:
         record = self.record()
         del record["model"]

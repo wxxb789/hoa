@@ -239,8 +239,9 @@ The config keys are `base_url`, `model`, `effort` and optional `api_key`; the en
 them supplied the script exits 2, prints the keys and the config path, and never guesses a model.
 `--record` writes `evals/baseline.json` (`case_count`, `model`, `effort`, `passed`, `total`,
 `judge_endpoint_host`, `generated_at`, `per_case`) for the full case set only; an existing record is
-replaced only with `--force`. CI never calls the model: `run_trigger_evals.py` validates the baseline's ids, pass count
-and case count offline, and reports `no baseline recorded yet` before the first record.
+replaced only with `--force`. CI never calls the model: `run_trigger_evals.py` validates the
+baseline's ids, catalog picks, recomputed pass flags and case totals offline, and reports
+`no baseline recorded yet` before the first record.
 
 The honest limit: one model, one prompt, one effort level, one curated case set. A pass rate says
 that this judge on this date read these descriptions as intended; it is not evidence that users

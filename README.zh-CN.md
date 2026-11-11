@@ -223,8 +223,8 @@ python evals/judge_trigger_evals.py --json \
 以 2 退出，打印所需键与配置文件路径，绝不猜一个模型。`--record` 写入 `evals/baseline.json`
 （`case_count`、`model`、`effort`、`passed`、`total`、`judge_endpoint_host`、`generated_at`、
 `per_case`），且只记录完整 case set；已有记录只有加 `--force` 才会被替换。CI 从不调用模型：
-`run_trigger_evals.py` 离线校验 baseline 的 id、通过数与 case 数，在第一次记录之前报告
-`no baseline recorded yet`。
+`run_trigger_evals.py` 离线校验 baseline 的 id、目录内 pick、重算后的通过标志与 case 总数，
+在第一次记录之前报告 `no baseline recorded yet`。
 
 诚实边界：一个模型、一个 prompt、一个 effort 级别、一套人工挑选的 case。通过率说明的是这个
 judge 在这一天这样理解了这些描述；它不证明用户会同样路由、不证明描述本身好、也不证明另一个

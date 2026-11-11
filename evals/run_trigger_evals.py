@@ -8,9 +8,11 @@ scripts/generate_index.py — a case routing to a nonexistent artifact fails
 here, in CI, instead of silently in a judge run.
 
 It also validates a recorded evals/baseline.json when one exists: every case id
-exists, the pass count equals the sum of per-case passes, and the record
-describes the full current case set. No baseline is allowed before the first
-explicit `judge_trigger_evals.py --record` run. Nothing here uses the network.
+exists, every pick names a catalog artifact, each recorded pass flag is
+recomputed from that pick against the current case's must_pick, the pass count
+equals the sum of per-case passes, and the record describes the full current case
+set. No baseline is allowed before the first explicit
+`judge_trigger_evals.py --record` run. Nothing here uses the network.
 
 Run: python evals/run_trigger_evals.py
 """
@@ -56,12 +58,22 @@ def load_baseline(path=None) -> dict | None:
     return record
 
 
-def baseline_errors(cases: list[dict], record: dict) -> list[str]:
-    """Every way a recorded baseline disagrees with the current case set."""
+def baseline_errors(cases: list[dict], record: dict,
+                    catalog: set[str] | None = None) -> list[str]:
+    """Every way a recorded baseline disagrees with the current case set.
+
+    Recorded flags are not trusted: each row's outcome is recomputed from its
+    pick against the current case's must_pick, and every pick must name a
+    catalog artifact. A baseline recorded before a case was retargeted is stale
+    even when all of its internal totals still add up.
+    """
     errors: list[str] = []
     missing = [field for field in BASELINE_FIELDS if field not in record]
     if missing:
         return [f"baseline.json: missing keys: {missing}"]
+    if catalog is None:
+        catalog = _catalog_names()
+    cases_by_id = {case["id"]: case for case in cases}
 
     for key in ("model", "effort", "judge_endpoint_host", "generated_at"):
         value = record[key]
@@ -94,6 +106,19 @@ def baseline_errors(cases: list[dict], record: dict) -> list[str]:
             seen.add(entry["id"])
         if not isinstance(entry["pick"], str):
             errors.append(f"{where} pick must be a string")
+        elif entry["pick"] not in catalog:
+            errors.append(f"{where} ({entry['id']}) pick {entry['pick']!r} is not a "
+                          f"catalog artifact")
+        if isinstance(entry["id"], str) and isinstance(entry["pick"], str):
+            case = cases_by_id.get(entry["id"])
+            must_pick = case.get("must_pick") if case else None
+            if isinstance(must_pick, list):
+                recomputed = entry["pick"] in must_pick
+                if isinstance(entry["passed"], bool) and entry["passed"] != recomputed:
+                    errors.append(
+                        f"{where} ({entry['id']}) passed={entry['passed']} but its "
+                        f"pick {entry['pick']!r} recomputes to passed={recomputed} "
+                        f"against must_pick {must_pick!r}; re-record the baseline")
         if not isinstance(entry["passed"], bool):
             errors.append(f"{where} passed must be a boolean")
         elif entry["passed"]:
@@ -179,7 +204,7 @@ def main() -> int:
         print(f"run_trigger_evals: {error}", file=sys.stderr)
         return 1
     if record is not None:
-        errors = baseline_errors(data["cases"], record)
+        errors = baseline_errors(data["cases"], record, catalog)
         if errors:
             for error in errors:
                 print(f"run_trigger_evals: {error}", file=sys.stderr)
