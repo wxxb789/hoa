@@ -771,15 +771,33 @@ E2E_START="$TMP/e2e-start.out"
 env PATH="$FAKEBIN:$PATH" OMP_BIN="$STUB_OMP" OMP_RUN_ROOT="$E2E_ROOT" \
   OMP_RUN_EVENTS_MAX_BYTES=65536 OMP_LEDGER="$TMP/e2e-ledger.tsv" \
   STUB_STREAM="$E2E_STREAM" FAKE_TMUX_LOG="$TMP/e2e-terminal.log" \
-  "$ADAPTER" start --name e2e-bounded --prompt "$IMPL_PROMPT" --cwd "$TMP" \
+  "$ADAPTER" start --backend tmux --name e2e-bounded --prompt "$IMPL_PROMPT" --cwd "$TMP" \
   >"$E2E_START" 2>&1
 check $? "launcher start with the stub agent exits 0"
 
 grep -qx 'started: e2e-bounded' "$E2E_START" \
-  && grep -q 'session id: selftest-session' "$E2E_START"
+  && grep -q 'session id: selftest-session' "$E2E_START" \
+  && grep -qx '  backend   : tmux' "$E2E_START"
 check $? "start reports the session id persisted by the writer"
 
 E2E_DIR="$E2E_ROOT/$TODAY/e2e-bounded"
+python3 - "$E2E_DIR" <<'PY'
+import json
+import os
+import sys
+
+run = sys.argv[1]
+lock = json.load(open(os.path.join(run, "lock"), encoding="utf-8"))
+assert isinstance(lock.get("pid"), int) and lock["pid"] > 0, lock
+assert lock.get("tmux") == "omp-e2e-bounded", lock
+assert lock.get("backend") == "tmux", lock
+assert lock.get("started_at"), lock
+state = json.load(open(os.path.join(run, "state.json"), encoding="utf-8"))
+assert state.get("pid") == lock["pid"], state
+assert state.get("backend") == "tmux", state
+assert state.get("tmux") == "omp-e2e-bounded", state
+PY
+check $? "tmux start writes the lock contract (pid, tmux, backend, started_at)"
 for _ in $(seq 1 200); do
   [ -f "$E2E_DIR/finalized" ] && break
   sleep 0.1
