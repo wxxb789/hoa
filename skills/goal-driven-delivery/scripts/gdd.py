@@ -48,6 +48,7 @@ import glob
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import time
@@ -363,7 +364,7 @@ def launch(launcher, prompt_path, repo, goal, stage, model, thinking, max_time):
         run_dir = os.path.join(
             resolved_run_root, datetime.now().strftime("%Y-%m-%d"), run_name
         )
-    return run_name, run_dir
+    return run_name, run_dir, resolved_run_root
 
 
 def read_state(run_dir):
@@ -479,7 +480,7 @@ def cmd_stage(args):
         )
 
     try:
-        run_name, run_dir = launch(
+        run_name, run_dir, launch_run_root = launch(
             launcher,
             prompt_path,
             repo,
@@ -507,7 +508,7 @@ def cmd_stage(args):
     ledger_append(repo, args.goal, args.stage, base, head, gates, next_stage=args.stage)
     print(f"run: {run_name}")
     print(f"run_dir: {run_dir}")
-    print(f"poll: {launcher} status {run_name}")
+    print(f"poll: GDD_RUN_ROOT={shlex.quote(launch_run_root)} {launcher} status {run_name}")
 
     if args.wait:
         deadline = time.time() + 6 * 3600

@@ -51,7 +51,7 @@ added.
 
 ## 2. goal-driven-delivery resolves all six keys
 
-`bash skills/goal-driven-delivery/scripts/tests/run-gdd-selftest.sh` → `selftest: 60/60 ok`, exit 0.
+`bash skills/goal-driven-delivery/scripts/tests/run-gdd-selftest.sh` → `selftest: 62/62 ok`, exit 0.
 Checks 1–52 are the pre-existing suite and pass unchanged, including the environment-only defaults
 (42–44), archive contract resolution (27), and the launcher/env pass-through checks (23–24). Five
 checks for the config file were added:
@@ -73,6 +73,16 @@ the pre-fix `gdd.py` the same run is `57/60`.
 ok 58 - config-file GDD_RUN_ROOT is exported to the launcher (rc=0)
 ok 59 - gdd status discovers the run under the config-file run root
 ok 60 - concurrency guard sees the run under the config-file run root (rc=3)
+```
+
+Round-2 review fix (P2): the printed poll command now carries the resolved root as a shell-quoted
+`GDD_RUN_ROOT=` prefix taken from the value `launch()` already returned, so copy-pasting it polls the
+run when the root came from the config file; two checks pin it (61–62: config-file root, and a root
+containing a space), and on the pre-fix `gdd.py` the same tree is `60/62`.
+
+```text
+ok 61 - printed poll command reports the config-file-root run (rc=0)
+ok 62 - poll command survives a run root containing a space (rc=0/0)
 ```
 
 The six keys are resolved through the vendored copy of `scripts/skill_config.py`:
@@ -145,7 +155,7 @@ Those files are `ai-coding-agent-delegation`, `contract-bound-deliverables`,
 | `python -m unittest scripts.test_skill_config -v` | `Ran 14 tests ... OK` | 0 |
 | `python -m unittest scripts.test_check_contract_graph -v` | `Ran 18 tests ... OK` | 0 |
 | `python -m unittest scripts.test_skill_config scripts.test_check_contract_graph scripts.test_generate_index` | `Ran 61 tests ... OK` | 0 |
-| `bash skills/goal-driven-delivery/scripts/tests/run-gdd-selftest.sh` | `selftest: 60/60 ok` | 0 |
+| `bash skills/goal-driven-delivery/scripts/tests/run-gdd-selftest.sh` | `selftest: 62/62 ok` | 0 |
 | `python scripts/check_contract_graph.py` | `contract graph: 40 skills, 10 artifacts, ok` | 0 |
 | `python scripts/generate_index.py --check` | no output | 0 |
 | `python scripts/check_changelog.py --base origin/main` | `check_changelog: VERSION and CHANGELOG.md both changed` | 0 |
@@ -201,7 +211,7 @@ nor registered under terminal:
 |---|---|---|
 | `python -m unittest scripts.test_skill_config scripts.test_check_contract_graph scripts.test_generate_index` | `Ran 61 tests ... OK` | 0 |
 | `python -m unittest scripts.test_install_host_skills scripts.test_check_changelog scripts.test_version scripts.test_check_frontmatter scripts.test_release` | `Ran 88 tests ... OK` | 0 |
-| `bash skills/goal-driven-delivery/scripts/tests/run-gdd-selftest.sh` | `selftest: 57/57 ok` (pre-fix tree; 60/60 after the round-1 fix, §2) | 0 |
+| `bash skills/goal-driven-delivery/scripts/tests/run-gdd-selftest.sh` | `selftest: 57/57 ok` (pre-fix tree; 60/60 after the round-1 fix, 62/62 after the round-2 fix, §2) | 0 |
 | `python scripts/check_contract_graph.py` | `contract graph: 40 skills, 10 artifacts, ok` | 0 |
 | `python scripts/generate_index.py --check` | no output | 0 |
 | `python scripts/check_frontmatter.py` | `check_frontmatter: 40 skills OK` | 0 |
