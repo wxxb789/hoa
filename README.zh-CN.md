@@ -102,6 +102,138 @@ skill 用 `metadata.summary` / `metadata.summary_zh`，库 artifact 用索引注
 category 取该 skill 的第一个 `metadata.areas` 值，可用 `--category` 覆盖（`.` 表示平铺）。
 它不会替换真实目录，也不会为同一个 skill 添加第二个条目。
 
+## 这个仓库的形状
+
+两条轴描述这里的一切：**artifact 是什么**（surface）与 **skill 如何与其他 skill 组合**（layer）。
+`index.md` 是清单；本节是地图。
+
+### 四个组合层
+
+每个 `skills/<name>/SKILL.md` 都声明 `metadata.kind`。CI 拒绝缺失或未知的值，因此层是树上的
+事实，而不是靠人记得添加的标签。
+
+| `kind` | 用途 | 当前树上 |
+|---|---|---|
+| `entry` | 可由用户请求直接路由。它可以消费/生产 artifact，但不需要 controller 来调用。 | 37 个 skill，例如 `ghc-search`、`hoa-skill-work`、`spec-convergence` |
+| `controller` | 路由一条链：决定哪个 stage 运行，且只生产 `chain-plan`。 | `goal-driven-delivery` |
+| `stage` | 链中的一个阶段，由它的 controller 调用。声明它消费和生产什么。 | `subagent-driven-development`（`plan` → `implementation`） |
+| `mechanism` | 只由另一个 skill 调用，永远不是路由目标。CI 拒绝把它列为 trigger case 的 `must_pick`。 | `delegated-work-acceptance` |
+
+### 面（Surfaces）
+
+| 目录 | 内容 | 是否下发 |
+|---|---|---|
+| `skills/` | 40 个 `SKILL.md` 包：唯一自动下发的 artifact。`npx skills add wxxb789/hoa` 安装它们。 | 是 |
+| `agents/` | 1 个 role / authority / I-O 契约（`skill-scout`）。 | 否——库 |
+| `mcps/` | 1 个可移植 MCP 定义（`ghc-proxy`）。 | 否——库 |
+| `orchestration/` | 1 个调度/handoff/termination 模式（`typed-verification-gates`）。 | 否——库 |
+| `prompts/` | 4 个按任务调用的 prompt 模板。 | 否——库 |
+| `rules/` | 1 条常驻约束（`generated-means-generated`）。 | 否——库 |
+| `workflows/` | 1 个面向结果的有限 recipe（`adopt-a-pattern`）。 | 否——库 |
+| `evals/` | 两个 case suite（`trigger-cases.json`、`skill-method-cases.json`）及其离线校验器。 | 否——仅仓库 |
+| `reflections/`、`ref/` | 人写的复盘与外部参考子模块；研究材料，从不下发。 | 否 |
+| `scripts/` | 仓库维护：目录、主机一致性、版本/发布、契约图、配置解析器。 | 否 |
+
+skill 的 frontmatter 同时携带目录字段与组合字段：`version`、`kind`、可选的逗号分隔
+`consumes` / `produces`、`areas`、`targets`、`summary`、`summary_zh`。库 artifact 把元数据
+放在 `<!-- index: ... -->` 注释里。`index.md` 与 `index.zh-CN.md` 从这两个来源生成，覆盖 49 个
+artifact；CI 对漂移报错。runtime **设置**（provider、模型、插件）归 chezmoi，不归本仓库。
+
+### 契约图
+
+`scripts/check_contract_graph.py` 读取每个 skill 的 `kind` / `consumes` / `produces`，构建
+artifact 图并离线检查（`--list` 打印图）。`scripts/contract_graph_registry.yaml` 登记三个
+豁免口：`external:` 是 skill 图之外生产的 artifact（request、work-report、git-commit、
+ci-result）；`shared:` 是两个 skill 都可以生产的 artifact（当前为空）；`terminal:` 是没有任何
+skill 消费的 artifact，每个都带一行理由（chain-plan、implementation、acceptance-verdict、
+scope-seal）。每条规则都由该命令执行：
+
+| 规则 | 拒绝什么 |
+|---|---|
+| R1 | `kind` 不在 `entry`、`controller`、`stage`、`mechanism` 之内。 |
+| R2 | 没有 `kind` 却声明了 `consumes` / `produces`。 |
+| R3 | 消费的 artifact 没有 skill 生产，也未登记为 `external:`。 |
+| R4 | `mechanism` 出现在任何 trigger case 的 `must_pick` 中——mechanism 永远不是路由目标。 |
+| R5 | controller 不生产 `chain-plan`，或生产了任何别的 artifact。 |
+| R6 | 同一个 artifact 由多个 skill 生产，且未登记为 `shared:`。 |
+| R7 | skill 完全没有声明 `kind`。 |
+| R8 | controller 的 `SKILL.md` 超过 120 行。 |
+| R9 | 生产的 artifact 没有 skill 消费，也未登记为 `terminal:` 并带一行理由；`external:` artifact 豁免。 |
+
+### CI 跑什么
+
+`test` job 在每次 push 到 `main`、每个 pull request 与 `workflow_dispatch` 时运行；`release`
+job 只在 `main` 上、`test` 成功之后运行，并为 CI 验证过的提交打 tag。
+
+| 检查命令（CI step） | 保护什么 |
+|---|---|
+| 在 `scripts/shared`、`skills/teams-cdp/scripts`、`skills/m365-copilot-cdp/scripts` 中运行 `bun install --frozen-lockfile && bun run check && bun test` | 共享代码与两个桌面 skill 的 CDP 类型和行为。 |
+| `python scripts/vendor_shared.py --check` | 分发到 skill 内的共享脚本副本与权威文件一致。 |
+| `python scripts/generate_index.py --check` | `index.md` / `index.zh-CN.md` 与 artifact 元数据一致。 |
+| `python scripts/check_contract_graph.py` | 上面的 R1–R9。 |
+| `python scripts/test_check_contract_graph.py` | 契约图检查器自身的规则测试。 |
+| `python -m unittest scripts.test_skill_config` | 配置解析顺序与畸形配置行为。 |
+| `python scripts/test_generate_index.py` | 目录收集、summary、中文回退、漂移。 |
+| `python -m unittest scripts.test_install_host_skills` | 主机安装一致性（`--check` / `--link`）。 |
+| `python -m unittest scripts.test_check_changelog` | changelog 规则自身的测试。 |
+| `python scripts/check_frontmatter.py` | 每个 `SKILL.md` 的 frontmatter 与目录字段。 |
+| `python -m unittest scripts.test_check_frontmatter` | frontmatter 检查器自身的测试。 |
+| `python scripts/version.py check` | `VERSION` 被每个 skill 与两个索引镜像。 |
+| `python scripts/version.py check-bump`（pull request） | `VERSION` 恰好是 `origin/main` 的 patch + 1。 |
+| `python scripts/check_changelog.py --base origin/main`（pull request） | `VERSION` 变化时 `CHANGELOG.md` 也变化。 |
+| `python scripts/version.py check-merge`（pull request） | 合并前版本声明在远端仍然可用。 |
+| `python scripts/test_version.py` | 版本、同步与发布守卫行为。 |
+| `python scripts/test_release.py` | 针对隔离本地 Git remote 的自动发布。 |
+| `python skills/ghc-search/scripts/test_ghc_search.py` | 搜索客户端的请求/解析/错误行为。 |
+| `python skills/hoa-introspect/evals/run.py` | `hoa-introspect` eval fixtures。 |
+| `python skills/hoa-introspect-distill/evals/run_evals.py` | `hoa-introspect-distill` eval fixtures。 |
+| `python skills/define-goal/evals/validate_fixtures.py` | `define-goal` eval fixtures。 |
+| `python evals/run_trigger_evals.py` | trigger case 结构、目录交叉引用与 baseline 算术（离线）。 |
+| `python -m unittest evals.test_judge_trigger_evals` | judge 配置优先级、退出码、逐 case 失败、baseline 写入；对本地 stub 运行。 |
+| `python evals/validate_skill_method_cases.py` | `skill-method-cases.json` 结构与隔离路径。 |
+| `python -m unittest evals.test_validate_skill_method_cases` | skill-method case 的 setup 文件隔离。 |
+| `python scripts/release.py`（release job，`main` 上 `test` 之后） | 发布 CI 刚验证过的版本；从不升版。 |
+
+依赖安装（`python -m pip install -r scripts/requirements.txt`）先于这些检查。judge 的 HTTP
+客户端只用标准库；它导入的目录生成器使用仓库的 PyYAML 工具。
+
+### eval case 如何评分——以及它能证明什么
+
+`evals/trigger-cases.json` 有 25 个路由 case：`id`、用户 `request`、恰好一个 `must_pick`
+artifact，以及不得被选中的 `distractors`。评分者是 fresh context 中的 LLM，它只看到一个新贡献者
+会看到的东西：
+
+1. 从 `scripts/generate_index.py collect()` 构建目录：49 个 artifact 的 name、type 与英文 summary。
+2. 对一个 case，发送目录与请求，要求只回复一个 artifact 名。
+3. 只有去掉首尾空白后的回复恰好等于该 case 的 `must_pick` 才算通过。回复没有命中任何目录条目
+   即该 case 失败，pick 原样保留。网络或 endpoint 错误只让该 case 失败，批次其余 case 继续完成。
+4. `must_pick` 与 `distractors` 从不展示给 judge。
+
+judge 靠配置运行，绝不写死。endpoint、model、effort 按 CLI flag → 环境变量 →
+`$XDG_CONFIG_HOME/evals/config.yaml`（回退 `~/.config/evals/config.yaml`）→ 文档化默认值解析：
+
+```bash
+python evals/judge_trigger_evals.py --json \
+  --base-url <openai-compatible-base> --model <judge-model> --effort low
+```
+
+配置键是 `base_url`、`model`、`effort` 与可选的 `api_key`；环境变量名是
+`EVALS_BASE_URL`、`EVALS_MODEL`、`EVALS_EFFORT` 与 `EVALS_API_KEY`。请求是普通的
+`POST <base_url>/chat/completions`；effort 通过 `reasoning_effort` 字段发送。全都没提供时脚本
+以 2 退出，打印所需键与配置文件路径，绝不猜一个模型。`--record` 写入 `evals/baseline.json`
+（`case_count`、`model`、`effort`、`passed`、`total`、`judge_endpoint_host`、`generated_at`、
+`per_case`），且只记录完整 case set；已有记录只有加 `--force` 才会被替换。写入前会用离线
+gate 自身的规则校验待写入记录：包含传输错误或非目录回答的运行无法用接受的 schema 表示，因此
+文件保持原样、脚本以 2 退出并点名出错的 case（重跑而不是丢掉上一次测量）；答成目录内但错误的
+artifact 则如实记录为失败。CI 从不调用模型：
+`run_trigger_evals.py` 离线校验 baseline 的 id、目录内 pick、重算后的通过标志与 case 总数，
+在第一次记录之前报告 `no baseline recorded yet`。
+
+诚实边界：一个模型、一个 prompt、一个 effort 级别、一套人工挑选的 case。通过率说明的是这个
+judge 在这一天这样理解了这些描述；它不证明用户会同样路由、不证明描述本身好、也不证明另一个
+模型会同意。baseline 固定 model、effort、endpoint host 与日期，正是因为改动其中任何一项都会
+破坏可比性。这个 suite 证明的是在人工挑选的近义 case 上有区分度，而不是真实世界的路由质量。
+
 ## 统一 skill 版本
 
 `VERSION` 是 `skills/` 下所有自定义包共用的发布版本，从 `0.1.0` 开始。

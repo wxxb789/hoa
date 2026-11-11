@@ -113,6 +113,147 @@ missing symlinks at `<category>/<name>` — the skill's first `metadata.areas`
 value unless `--category` overrides it (`.` links flat). It never replaces a
 real directory and never adds a second entry for one skill.
 
+## How this repository is shaped
+
+Two axes describe everything here: **what an artifact is** (its surface) and **how a skill composes
+with other skills** (its layer). `index.md` is the inventory; this section is the map.
+
+### Four composition layers
+
+Every `skills/<name>/SKILL.md` declares `metadata.kind`. CI rejects a missing or unknown value, so
+the layer is a fact about the tree, not a label someone remembers to add.
+
+| `kind` | What it is for | At this tree |
+|---|---|---|
+| `entry` | Directly routable from a user request. It may consume/produce artifacts, but it needs no controller to be invoked. | 37 skills, e.g. `ghc-search`, `hoa-skill-work`, `spec-convergence` |
+| `controller` | Routes a chain: decides which stage runs, and produces only `chain-plan`. | `goal-driven-delivery` |
+| `stage` | One phase of a chain, invoked by its controller. Declares what it consumes and produces. | `subagent-driven-development` (`plan` → `implementation`) |
+| `mechanism` | Invoked only by another skill; never a routing target. CI rejects it as a trigger-case `must_pick`. | `delegated-work-acceptance` |
+
+### Surfaces
+
+| Folder | What lives there | Deployed? |
+|---|---|---|
+| `skills/` | 40 `SKILL.md` packages: the only auto-deployed artifact. `npx skills add wxxb789/hoa` installs them. | yes |
+| `agents/` | 1 role / authority / I-O contract (`skill-scout`). | no — library |
+| `mcps/` | 1 portable MCP definition (`ghc-proxy`). | no — library |
+| `orchestration/` | 1 scheduling/handoff/termination pattern (`typed-verification-gates`). | no — library |
+| `prompts/` | 4 per-task request templates. | no — library |
+| `rules/` | 1 standing constraint (`generated-means-generated`). | no — library |
+| `workflows/` | 1 finite outcome-oriented recipe (`adopt-a-pattern`). | no — library |
+| `evals/` | Two case suites (`trigger-cases.json`, `skill-method-cases.json`) and their offline validators. | no — repo only |
+| `reflections/`, `ref/` | Write-ups and external reference submodules; study material, never deployed. | no |
+| `scripts/` | Repo maintenance: catalog, host parity, version/release, contract graph, config resolver. | no |
+
+A skill's frontmatter carries the catalog and composition fields together: `version`, `kind`,
+optional comma-separated `consumes` / `produces`, `areas`, `targets`, `summary`, `summary_zh`.
+Library artifacts keep their metadata in an `<!-- index: ... -->` comment. `index.md` and
+`index.zh-CN.md` are generated from those two sources and cover 49 artifacts; CI fails on drift.
+Runtime **settings** (provider, models, plugins) are chezmoi's job, not this repo's.
+
+### The contract graph
+
+`scripts/check_contract_graph.py` reads every skill's `kind` / `consumes` / `produces`, builds the
+artifact graph, and checks it offline (`--list` prints the graph). `scripts/contract_graph_registry.yaml`
+registers three escape hatches: `external:` artifacts produced outside the skill graph (request,
+work-report, git-commit, ci-result), `shared:` artifacts two skills may both produce (currently
+none), and `terminal:` artifacts no skill consumes, each with a one-line reason (chain-plan,
+implementation, acceptance-verdict, scope-seal). Every rule is enforced by that command:
+
+| Rule | Rejects |
+|---|---|
+| R1 | A `kind` outside `entry`, `controller`, `stage`, `mechanism`. |
+| R2 | `consumes` / `produces` declared without a `kind`. |
+| R3 | A consumed artifact that no skill produces and that is not registered `external:`. |
+| R4 | A `mechanism` listed in any trigger case's `must_pick` — mechanisms are never routing targets. |
+| R5 | A controller that does not produce `chain-plan`, or that produces anything else. |
+| R6 | One artifact produced by more than one skill unless it is registered `shared:`. |
+| R7 | A skill that does not declare `kind` at all. |
+| R8 | A controller `SKILL.md` longer than 120 lines. |
+| R9 | A produced artifact that no skill consumes and that is not registered `terminal:` with a one-line reason; `external:` artifacts are exempt. |
+
+### What CI runs
+
+The `test` job runs on every push to `main`, every pull request, and `workflow_dispatch`; the
+`release` job runs only after it on `main` and tags the commit CI tested.
+
+| Gate command (CI step) | Protects |
+|---|---|
+| `bun install --frozen-lockfile && bun run check && bun test` in `scripts/shared`, `skills/teams-cdp/scripts`, `skills/m365-copilot-cdp/scripts` | Desktop CDP types and behavior in the shared code and both desktop skills. |
+| `python scripts/vendor_shared.py --check` | Vendored copies of shared scripts match their canonical file. |
+| `python scripts/generate_index.py --check` | `index.md` / `index.zh-CN.md` match artifact metadata. |
+| `python scripts/check_contract_graph.py` | Rules R1–R9 above. |
+| `python scripts/test_check_contract_graph.py` | The graph checker's own rule tests. |
+| `python -m unittest scripts.test_skill_config` | Config resolution order and malformed-config behavior. |
+| `python scripts/test_generate_index.py` | Catalog collection, summaries, bilingual fallback, drift. |
+| `python -m unittest scripts.test_install_host_skills` | Host install parity (`--check` / `--link`). |
+| `python -m unittest scripts.test_check_changelog` | The changelog rule's own tests. |
+| `python scripts/check_frontmatter.py` | Every `SKILL.md` frontmatter and catalog field. |
+| `python -m unittest scripts.test_check_frontmatter` | The frontmatter checker's own tests. |
+| `python scripts/version.py check` | `VERSION` is mirrored by every skill and both indexes. |
+| `python scripts/version.py check-bump` (pull requests) | `VERSION` is exactly `origin/main`'s patch + 1. |
+| `python scripts/check_changelog.py --base origin/main` (pull requests) | A changed `VERSION` has a changed `CHANGELOG.md`. |
+| `python scripts/version.py check-merge` (pull requests) | The version claim is still free on the remote before merge. |
+| `python scripts/test_version.py` | Version, sync and release-guard behavior. |
+| `python scripts/test_release.py` | Automatic release against isolated local Git remotes. |
+| `python skills/ghc-search/scripts/test_ghc_search.py` | The search client's request/parse/error behavior. |
+| `python skills/hoa-introspect/evals/run.py` | `hoa-introspect` eval fixtures. |
+| `python skills/hoa-introspect-distill/evals/run_evals.py` | `hoa-introspect-distill` eval fixtures. |
+| `python skills/define-goal/evals/validate_fixtures.py` | `define-goal` eval fixtures. |
+| `python evals/run_trigger_evals.py` | Trigger-case structure, catalog cross-references, and baseline arithmetic (offline). |
+| `python -m unittest evals.test_judge_trigger_evals` | Judge configuration precedence, exit codes, per-case failures, baseline writes, against a local stub. |
+| `python evals/validate_skill_method_cases.py` | `skill-method-cases.json` structure and isolation paths. |
+| `python -m unittest evals.test_validate_skill_method_cases` | Setup-file isolation for skill-method cases. |
+| `python scripts/release.py` (release job, after `test` on `main`) | Publishes the version CI just tested; never bumps. |
+
+The dependency install (`python -m pip install -r scripts/requirements.txt`) precedes the gates.
+The judge's HTTP client is stdlib only; the catalog builder it imports uses the repo's PyYAML
+tooling.
+
+### How an eval case is graded — and what that proves
+
+`evals/trigger-cases.json` holds 25 routing cases: an `id`, a user `request`, exactly one
+`must_pick` artifact, and `distractors` that must not be chosen. The grader is an LLM in a fresh
+context, and it is told only what a new contributor would see:
+
+1. Build the catalog from `scripts/generate_index.py collect()`: name, type, and English summary
+   for all 49 artifacts.
+2. For one case, send the catalog and the request, and ask for exactly one artifact name.
+3. Pass iff the stripped reply is exactly the case's `must_pick`. A reply that names no catalog
+   entry is a failed case and is preserved verbatim as the pick. A network or endpoint error fails
+   that case only; the rest of the batch completes.
+4. `must_pick` and `distractors` are never shown to the judge.
+
+The judge is configured, never compiled in. Endpoint, model, and effort resolve as CLI flag →
+environment variable → `$XDG_CONFIG_HOME/evals/config.yaml` (fallback `~/.config/evals/config.yaml`)
+→ documented default:
+
+```bash
+python evals/judge_trigger_evals.py --json \
+  --base-url <openai-compatible-base> --model <judge-model> --effort low
+```
+
+The config keys are `base_url`, `model`, `effort` and optional `api_key`; the environment names are
+`EVALS_BASE_URL`, `EVALS_MODEL`, `EVALS_EFFORT` and `EVALS_API_KEY`. The request is a plain
+`POST <base_url>/chat/completions`; effort is sent as the `reasoning_effort` field. With none of
+them supplied the script exits 2, prints the keys and the config path, and never guesses a model.
+`--record` writes `evals/baseline.json` (`case_count`, `model`, `effort`, `passed`, `total`,
+`judge_endpoint_host`, `generated_at`, `per_case`) for the full case set only; an existing record is
+replaced only with `--force`. The proposed record is checked with the gate's own rules before it is
+written: a run containing transport errors or non-catalog answers cannot be represented in the
+accepted schema, so the file is left untouched and the script exits 2 naming the offending cases
+(re-run instead of losing the previous measurement); a wrong-but-catalog pick is recorded as the
+failure it is. CI never calls the model: `run_trigger_evals.py` validates the
+baseline's ids, catalog picks, recomputed pass flags and case totals offline, and reports
+`no baseline recorded yet` before the first record.
+
+The honest limit: one model, one prompt, one effort level, one curated case set. A pass rate says
+that this judge on this date read these descriptions as intended; it is not evidence that users
+will route the same way, that the descriptions are good, or that another model agrees. The baseline
+pins model, effort, endpoint host and date precisely because changing any of them breaks
+comparability. The suite proves discrimination on curated near-misses, not routing quality in the
+wild.
+
 ## Unified skill versions
 
 `VERSION` is the release version for every custom package under `skills/`, starting
