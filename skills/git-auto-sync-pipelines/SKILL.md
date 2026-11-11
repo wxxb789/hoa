@@ -7,7 +7,7 @@ description: >-
   auto-sync needs a safety review. Not for a repo with a review/PR workflow, and not for a one-off
   commit you can make yourself.
 metadata:
-  version: "0.1.30"
+  version: "0.1.31"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "scheduled commit/push for hand-edited repos: ordered gates, allowlist and size caps, staged secret scan, heartbeat and deduped alerts"
@@ -111,6 +111,7 @@ violating it.
 | `push` | `SYNC_PUSH` | `1` |
 | `alert_channel` | `SYNC_ALERT_CHANNEL` | the scheduler's own notification path |
 
-Read `$XDG_CONFIG_HOME/git-auto-sync-pipelines/config.yaml` (fallback `~/.config/...`) when present;
-a flag or env var overrides the file. The repo list and target branch belong there, not in the
-library script.
+Resolution order and the config-file path are defined once in
+[skill-porting-and-publishing § Configuration](../skill-porting-and-publishing/SKILL.md#configuration-is-a-gate-not-advice);
+this skill does not restate them. The repo list and target branch belong in the operator's config,
+not in the library script.

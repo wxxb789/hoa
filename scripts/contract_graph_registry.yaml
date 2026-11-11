@@ -5,3 +5,12 @@ external:
   - ci-result
 
 shared: []
+
+# Artifacts a skill produces that no skill consumes. Each entry needs one line
+# saying where the artifact goes; R9 rejects a produced artifact that is neither
+# consumed nor listed here.
+terminal:
+  acceptance-verdict: the operator's ruling is the destination; no phase reads this artifact
+  chain-plan: the controller's routing plan is consumed by the operator, not a skill
+  implementation: the merged code is the destination; no skill consumes the delivery
+  scope-seal: worktree-scope.py verify checks the tree; no skill consumes the artifact

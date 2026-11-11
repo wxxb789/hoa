@@ -35,7 +35,9 @@ A mechanism is never a routing target, so it must not appear in `must_pick` in
 `evals/trigger-cases.json` (it may be a distractor). A controller routes and produces only
 `chain-plan`. Every consumed artifact must be produced by exactly one skill, or registered under
 `external:`/`shared:` in `scripts/contract_graph_registry.yaml`; duplicate producers are errors
-unless listed under `shared:`. CI enforces the graph with `python scripts/check_contract_graph.py`.
+unless listed under `shared:`. Every produced artifact must be consumed by some skill or listed under
+`terminal:` in that registry with a one-line reason (`R9`); `external:` artifacts are exempt. CI
+enforces the graph with `python scripts/check_contract_graph.py`.
 
 ## Generated Artifacts Output
 

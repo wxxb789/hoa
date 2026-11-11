@@ -7,7 +7,7 @@ description: >-
   end, including the merge. Do not use for one-line fixes, exploration with no acceptance criteria, or
   work no machine can check (that is a conversation, not a delivery).
 metadata:
-  version: "0.1.30"
+  version: "0.1.31"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "goal contract → agent-authored stages → operator-run gates → scripted merge gate → resumable ledger; ships `gdd.py`, `delivery-state.py`, `pr-merge-check.py`"
@@ -98,6 +98,16 @@ verification plan, and require the matrix job to print the failing test's own ou
 | `GDD_TEMPLATES` | stage-template root | the bundled `references/stage-templates` |
 | `GDD_GOAL_GLOB` | goal-contract glob | `docs/goals/*<goal>*.md` |
 
-Resolution order: CLI flag → env var → `$XDG_CONFIG_HOME/<skill>/config.yaml` (falling back to
-`~/.config/<skill>/config.yaml`) → documented default. Nothing about one install lives in the
-protocol: a profile may point at its own files, but no path is inlined.
+Resolution order and the config-file path are defined once in
+[skill-porting-and-publishing § Configuration](../skill-porting-and-publishing/SKILL.md#configuration-is-a-gate-not-advice).
+`gdd.py` implements it through the vendored `scripts/skill_config.py`; the config-file keys are the
+six names in the table, for example:
+
+```yaml
+# $XDG_CONFIG_HOME/goal-driven-delivery/config.yaml
+GDD_STATE_FILE: /srv/state/gdd/ledger.tsv
+GDD_TASK_ROOT: /srv/state/gdd/tasks
+```
+
+Nothing about one install lives in the protocol: a profile may point at its own files, but no path is
+inlined.

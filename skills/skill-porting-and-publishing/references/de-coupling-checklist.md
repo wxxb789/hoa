@@ -7,7 +7,8 @@ package points at a template instead.
 ## Resolution rule behind every row
 
 One order, everywhere: **CLI flag → environment variable → operator config file → documented
-default**. The config file is `$XDG_CONFIG_HOME/<skill>/config.yaml`, falling back to
+default**. It is implemented once in [`scripts/skill_config.py`](../../../scripts/skill_config.py),
+not restated per skill. The config file is `$XDG_CONFIG_HOME/<skill>/config.yaml`, falling back to
 `~/.config/<skill>/config.yaml`; a single env var overrides a single key. Reading that file to
 customise the skill is the preferred shape, not a workaround. A value with no defensible default is
 documented as "must be supplied", never silently invented.

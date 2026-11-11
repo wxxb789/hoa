@@ -3,6 +3,30 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## 2026-11-11 — a mechanism, or no claim
+
+- Added **`scripts/skill_config.py`**, the one implementation of the documented chain
+  (flag → env var → `$XDG_CONFIG_HOME/<skill>/config.yaml`, fallback `~/.config` → default).
+  It is stdlib only and parses a flat `key: value` subset; nested mappings, anchors/aliases,
+  flow collections, block scalars and multi-document files are errors naming the path and line,
+  never silent defaults. `resolve()` returns the value, `explain()` adds its provenance, and
+  `python scripts/skill_config.py --skill <name> --key <KEY>` prints both.
+- **goal-driven-delivery** resolves its six documented keys through that resolver:
+  `GDD_STATE_FILE`, `GDD_TASK_ROOT`, `GDD_RUN_ROOT`, `GDD_LAUNCHER`, `GDD_TEMPLATES` and the
+  previously unused `GDD_GOAL_GLOB`. Environment behaviour is unchanged (`GDD_STATE_FILE` still
+  resolves to exactly its string), a config file now takes effect, a flag or env var still wins,
+  and a malformed file exits 2 naming the path and line. The resolver is vendored beside `gdd.py`
+  by `scripts/vendor_shared.py`, so an installed skill package stays self-contained.
+- Contract graph **R9**: every artifact a skill produces is consumed by some skill or listed under
+  `terminal:` in `scripts/contract_graph_registry.yaml` with a one-line reason; `external:`
+  artifacts are exempt. The four dangling artifacts — `implementation`, `chain-plan`,
+  `acceptance-verdict`, `scope-seal` — are terminal. The last two are not consumed by
+  goal-driven-delivery as written: phase 5 runs `worktree-scope.py`, phase 6 runs
+  `pr-merge-check.py`, and neither reads the acceptance skill's artifacts.
+- The nine skills that restated the resolution chain now point at
+  `skill-porting-and-publishing` § Configuration, which names the shared resolver once. The
+  `AGENTS.md` composition contract now states the two-sided graph rule.
+
 ## 2026-11-11 — host install parity and catalog truth
 
 - Added **`scripts/install_host_skills.py`**. `--root <host-skills-dir> --check` searches flat and

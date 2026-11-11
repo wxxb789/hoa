@@ -8,7 +8,7 @@ description: >-
   Not for open-ended prose whose quality is the only gate, and not for auditing a report already
   delivered.
 metadata:
-  version: "0.1.30"
+  version: "0.1.31"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
   summary: "meet a measurable brief: freeze the evidence packet, draft in parallel, assemble to the number, verify with the contract's own metric"
@@ -302,6 +302,7 @@ Assembly-script shape: [`references/evidence-packet.md`](references/evidence-pac
 | `draft_token_cap` | `DELIVERABLE_DRAFT_TOKEN_CAP` | `16000` — lower it on a 504 |
 | `stream_idle_timeout_s` | `DELIVERABLE_STREAM_IDLE_TIMEOUT_S` | `300` |
 
-Read `$XDG_CONFIG_HOME/contract-bound-deliverables/config.yaml` (fallback `~/.config/...`) when
-present; a flag or env var overrides the file. Per-project values — packet path, registry, QA script,
+Resolution order and the config-file path are defined once in
+[skill-porting-and-publishing § Configuration](../skill-porting-and-publishing/SKILL.md#configuration-is-a-gate-not-advice);
+this skill does not restate them. Per-project values — packet path, registry, QA script,
 measuring rule — belong in a project profile, not in this protocol.

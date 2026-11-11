@@ -7,7 +7,7 @@ description: >-
   hold between tasks. Not for discovering what to build, and not for one task you can finish in the
   current context.
 metadata:
-  version: "0.1.30"
+  version: "0.1.31"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "execute a plan with a fresh subagent per task and two-stage review: spec compliance first, code quality second"
@@ -431,7 +431,8 @@ Catch issues early
 | `review_order` | `SDD_REVIEW_ORDER` | `spec,quality` — fixed; change only with a documented reason |
 | `plan_path` | `SDD_PLAN_PATH` | none — supplied by the caller |
 
-Read `$XDG_CONFIG_HOME/subagent-driven-development/config.yaml` (fallback `~/.config/...`) when
-present; a flag or env var overrides the file.
+Resolution order and the config-file path are defined once in
+[skill-porting-and-publishing § Configuration](../skill-porting-and-publishing/SKILL.md#configuration-is-a-gate-not-advice);
+this skill does not restate them.
 
 **Quality is not an accident. It's the result of systematic process.**

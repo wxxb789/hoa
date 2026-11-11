@@ -14,19 +14,24 @@ Usage:
 Agent stages: implement, simplify, apply, review, fix. Every other stage is
 mechanical and belongs to the orchestrator.
 
-Environment:
+Environment or operator config file:
     GDD_STATE_FILE  ledger path passed to delivery-state.py
                     (default ${XDG_STATE_HOME:-$HOME/.local/state}/gdd/ledger.tsv)
     GDD_TASK_ROOT   prompt/state root
                     (default ${XDG_STATE_HOME:-$HOME/.local/state}/gdd/tasks)
-    GDD_RUN_ROOT    fallback run root when the launcher prints no run dir
-                    (default ${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs)
+    GDD_RUN_ROOT    run root exported to the launcher and used when it prints no
+                    run dir (default ${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs)
     GDD_LAUNCHER    launcher command
                     (default <script dir>/adapters/omp-run.sh)
     GDD_TEMPLATES   template root
                     (default <script dir>/../references/stage-templates)
+    GDD_GOAL_GLOB   goal-contract glob (default docs/goals/*<goal>*.md)
     GDD_MODEL, GDD_THINKING, GDD_MAX_TIME
                     passed to the launcher only when set; never defaulted here
+
+The six path/command keys resolve through the shared resolver: flag, then environment,
+then $XDG_CONFIG_HOME/goal-driven-delivery/config.yaml (fallback ~/.config/...),
+then the default. The rule is owned by skill-porting-and-publishing.
 
 Launcher contract (adapters/omp-run.sh is the reference implementation):
     <launcher> start --name SLUG --prompt FILE [--cwd DIR] [--model M] [--thinking L] [--max-time D]
@@ -43,10 +48,16 @@ import glob
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import time
 from datetime import datetime
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+if SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, SCRIPT_DIR)
+import skill_config
 
 STAGES = [
     "contract",
@@ -66,7 +77,8 @@ STAGES = [
 AGENT_STAGES = {"implement", "simplify", "apply", "review", "fix"}
 NEEDS_FINDINGS = {"apply", "fix"}
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+SKILL = "goal-driven-delivery"
+DEFAULT_GOAL_GLOB = "docs/goals/*<goal>*.md"
 DELIVERY_STATE = os.path.join(SCRIPT_DIR, "delivery-state.py")
 DEFAULT_LAUNCHER = os.path.join(SCRIPT_DIR, "adapters", "omp-run.sh")
 DEFAULT_TEMPLATES = os.path.normpath(
@@ -89,19 +101,27 @@ def xdg_state_home():
     )
 
 
-def env_path(name, *fallback):
-    value = os.environ.get(name)
-    if value:
-        return os.path.expanduser(value)
-    return os.path.join(xdg_state_home(), *fallback)
+def config(key, *, flag=None, default=None):
+    """Resolve one documented GDD key through the shared resolver."""
+    return skill_config.resolve(SKILL, key, flag=flag, default=default)
+
+
+def state_file():
+    return config(
+        "GDD_STATE_FILE", default=os.path.join(xdg_state_home(), "gdd", "ledger.tsv")
+    )
 
 
 def task_root():
-    return env_path("GDD_TASK_ROOT", "gdd", "tasks")
+    return os.path.expanduser(
+        config("GDD_TASK_ROOT", default=os.path.join(xdg_state_home(), "gdd", "tasks"))
+    )
 
 
 def run_root():
-    return env_path("GDD_RUN_ROOT", "gdd", "runs")
+    return os.path.expanduser(
+        config("GDD_RUN_ROOT", default=os.path.join(xdg_state_home(), "gdd", "runs"))
+    )
 
 
 def git(repo, *args):
@@ -135,14 +155,16 @@ def render(template_text, variables):
 
 
 def resolve_goal_file(repo, goal):
-    """Contract file for a goal: active tree first, then archive, else '-'."""
-    for directory in ("docs/goals", "docs/goals/archive"):
-        matches = sorted(
-            glob.glob(os.path.join(repo, directory, f"*{goal}*.md"))
+    """Contract file for a goal from GDD_GOAL_GLOB; '-' when nothing matches."""
+    pattern = config("GDD_GOAL_GLOB", default=DEFAULT_GOAL_GLOB)
+    expanded = os.path.expanduser(pattern.replace("<goal>", goal))
+    matches = sorted(glob.glob(os.path.join(repo, expanded)))
+    if not matches and pattern == DEFAULT_GOAL_GLOB:
+        archive = os.path.join(
+            "docs", "goals", "archive", os.path.basename(expanded)
         )
-        if matches:
-            return matches[0]
-    return "-"
+        matches = sorted(glob.glob(os.path.join(repo, archive)))
+    return matches[0] if matches else "-"
 
 
 def read_lock(run_dir):
@@ -274,9 +296,9 @@ def ledger_append(repo, goal, stage, base, head, gates, next_stage=None, note=No
         "--repo",
         repo,
     ]
-    state_file = os.environ.get("GDD_STATE_FILE")
-    if state_file:
-        cmd += ["--state-file", os.path.expanduser(state_file)]
+    state = state_file()
+    if state:
+        cmd += ["--state-file", os.path.expanduser(state)]
     cmd += [
         "--goal",
         goal,
@@ -301,6 +323,7 @@ def ledger_append(repo, goal, stage, base, head, gates, next_stage=None, note=No
 
 def launch(launcher, prompt_path, repo, goal, stage, model, thinking, max_time):
     name = f"{os.path.basename(repo)}-{goal}-{stage}"
+    resolved_run_root = run_root()
     cmd = [
         launcher,
         "start",
@@ -318,8 +341,12 @@ def launch(launcher, prompt_path, repo, goal, stage, model, thinking, max_time):
     ):
         if value:
             cmd += [flag, str(value)]
+    # The launcher resolves its run root from GDD_RUN_ROOT; export the value this
+    # process resolved so a config-file run root lands where discovery looks.
+    child_env = dict(os.environ)
+    child_env["GDD_RUN_ROOT"] = resolved_run_root
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True)
+        proc = subprocess.run(cmd, capture_output=True, text=True, env=child_env)
     except OSError as exc:
         raise LaunchError(str(exc)) from exc
     if proc.returncode != 0:
@@ -335,9 +362,9 @@ def launch(launcher, prompt_path, repo, goal, stage, model, thinking, max_time):
             run_dir = stripped.split(":", 1)[1].strip()
     if not run_dir:
         run_dir = os.path.join(
-            run_root(), datetime.now().strftime("%Y-%m-%d"), run_name
+            resolved_run_root, datetime.now().strftime("%Y-%m-%d"), run_name
         )
-    return run_name, run_dir
+    return run_name, run_dir, resolved_run_root
 
 
 def read_state(run_dir):
@@ -378,7 +405,10 @@ def cmd_stage(args):
     repo_name = os.path.basename(repo)
 
     templates = os.path.expanduser(
-        args.templates or os.environ.get("GDD_TEMPLATES") or DEFAULT_TEMPLATES
+        config("GDD_TEMPLATES", flag=args.templates, default=DEFAULT_TEMPLATES)
+    )
+    launcher = os.path.expanduser(
+        config("GDD_LAUNCHER", flag=args.launcher, default=DEFAULT_LAUNCHER)
     )
     template_path = os.path.join(templates, args.stage + ".md")
     if not os.path.isfile(template_path):
@@ -450,8 +480,8 @@ def cmd_stage(args):
         )
 
     try:
-        run_name, run_dir = launch(
-            args.launcher,
+        run_name, run_dir, launch_run_root = launch(
+            launcher,
             prompt_path,
             repo,
             args.goal,
@@ -478,7 +508,7 @@ def cmd_stage(args):
     ledger_append(repo, args.goal, args.stage, base, head, gates, next_stage=args.stage)
     print(f"run: {run_name}")
     print(f"run_dir: {run_dir}")
-    print(f"poll: {args.launcher} status {run_name}")
+    print(f"poll: GDD_RUN_ROOT={shlex.quote(launch_run_root)} {launcher} status {run_name}")
 
     if args.wait:
         deadline = time.time() + 6 * 3600
@@ -517,25 +547,35 @@ def cmd_status(args):
         args.repo,
         "--goal",
         args.goal,
+        "--state-file",
+        os.path.expanduser(state_file()),
+        "--task-root",
+        task_root(),
+        "--run-root",
+        run_root(),
     ]
-    state_file = os.environ.get("GDD_STATE_FILE")
-    if state_file:
-        cmd += ["--state-file", os.path.expanduser(state_file)]
     return subprocess.run(cmd).returncode
 
 
 EPILOG = """\
-Environment:
+Environment or operator config file:
   GDD_STATE_FILE  ledger path passed to delivery-state.py
                   (default ${XDG_STATE_HOME:-$HOME/.local/state}/gdd/ledger.tsv)
   GDD_TASK_ROOT   prompt/state root
                   (default ${XDG_STATE_HOME:-$HOME/.local/state}/gdd/tasks)
-  GDD_RUN_ROOT    fallback run root when the launcher prints no run dir
+  GDD_RUN_ROOT    run root exported to the launcher, and the fallback when it
+                  prints no run dir
                   (default ${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs)
   GDD_LAUNCHER    launcher command (default <script dir>/adapters/omp-run.sh)
   GDD_TEMPLATES   template root (default <script dir>/../references/stage-templates)
+  GDD_GOAL_GLOB   goal-contract glob (default docs/goals/*<goal>*.md)
   GDD_MODEL, GDD_THINKING, GDD_MAX_TIME
                   passed to the launcher only when set; never defaulted here
+
+The six path/command keys above also resolve from
+$XDG_CONFIG_HOME/goal-driven-delivery/config.yaml (fallback ~/.config/...).
+Order: CLI flag, then environment variable, then that file, then the default.
+The shared rule is documented in skill-porting-and-publishing.
 
 Launcher contract:
   <launcher> start --name SLUG --prompt FILE [--cwd DIR] [--model M] [--thinking L] [--max-time D]
@@ -567,8 +607,8 @@ def build_parser():
     stage.add_argument("--gates", default=None, help="gate command text")
     stage.add_argument(
         "--launcher",
-        default=os.environ.get("GDD_LAUNCHER") or DEFAULT_LAUNCHER,
-        help="launcher command (default: $GDD_LAUNCHER or the bundled adapter)",
+        default=None,
+        help="launcher command (default: $GDD_LAUNCHER, config file, or the bundled adapter)",
     )
     stage.add_argument(
         "--model", default=os.environ.get("GDD_MODEL") or None, help="passed through only when set"
@@ -594,7 +634,10 @@ def build_parser():
 
 def main():
     args = build_parser().parse_args()
-    return args.func(args)
+    try:
+        return args.func(args)
+    except skill_config.ConfigError as error:
+        fail(str(error))
 
 
 if __name__ == "__main__":

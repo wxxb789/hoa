@@ -8,7 +8,7 @@ description: >-
   legal text. Not for collecting or grading sources (that is claim auditing), and not for prose
   whose every claim is already primary-sourced.
 metadata:
-  version: "0.1.30"
+  version: "0.1.31"
   areas: "work-management"
   targets: "runtime-agnostic"
   summary: "state only what a dated source supports: tense to dateline, provenance-label parity, absence never escalates"
@@ -117,8 +117,9 @@ list that hides which is which.
 | `recheck_label` | `EVIDENCE_RECHECK_LABEL` | `not re-read` |
 | `qualifier_pattern` | `EVIDENCE_QUALIFIER_PATTERN` | none — prefer the file; a pattern is the fallback |
 
-Read `$XDG_CONFIG_HOME/evidence-boundary-discipline/config.yaml` (fallback `~/.config/...`) when present;
-a flag or env var overrides the file.
+Resolution order and the config-file path are defined once in
+[skill-porting-and-publishing § Configuration](../skill-porting-and-publishing/SKILL.md#configuration-is-a-gate-not-advice);
+this skill does not restate them.
 
 ## Pitfalls
 

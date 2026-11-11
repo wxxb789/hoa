@@ -38,6 +38,9 @@ check() {
 export GDD_TASK_ROOT="$TASK_ROOT"
 export GDD_RUN_ROOT="$RUN_ROOT"
 export GDD_STATE_FILE="$TMP/ledger.tsv"
+export XDG_CONFIG_HOME="$TMP/config-home"
+mkdir -p "$XDG_CONFIG_HOME"
+unset GDD_GOAL_GLOB
 
 # --- fixtures ---------------------------------------------------------------
 
@@ -608,6 +611,193 @@ PR_HELP="$("$SCRIPTS/pr-merge-check.py" --help 2>&1)"
 printf '%s\n' "$PR_HELP" | grep -q -- '--marker' \
   && printf '%s\n' "$PR_HELP" | grep -q -- '--allow-no-machine-review'
 check $? "pr-merge-check --help documents marker and allow-no-machine-review"
+
+# --- 13. operator config file ----------------------------------------------
+
+CFG_HOME="$XDG_CONFIG_HOME"
+CFG_DIR="$CFG_HOME/goal-driven-delivery"
+CFG_FILE="$CFG_DIR/config.yaml"
+CFG_LEDGER="$TMP/config-ledger.tsv"
+mkdir -p "$CFG_DIR"
+printf 'GDD_STATE_FILE: %s\n' "$CFG_LEDGER" >"$CFG_FILE"
+
+CFG_RUN_OUT="$TMP/config-run.out"
+env -u GDD_STATE_FILE -u GDD_LAUNCHER XDG_CONFIG_HOME="$CFG_HOME" \
+  GDD_LAUNCHER="$FAKE_LAUNCHER" \
+  "$SCRIPTS/gdd.py" stage --repo "$REPO" --goal 0003 --stage simplify \
+  --base abc1234 --head def5678 >"$CFG_RUN_OUT" 2>&1
+CFG_RC=$?
+[ "$CFG_RC" -eq 0 ] && [ -f "$CFG_LEDGER" ] && grep -q '0003' "$CFG_LEDGER"
+check $? "config-file GDD_STATE_FILE is honoured (rc=$CFG_RC)" "$(cat "$CFG_RUN_OUT")"
+
+CFG_SHOW="$TMP/config-show.out"
+env -u GDD_STATE_FILE -u GDD_LAUNCHER XDG_CONFIG_HOME="$CFG_HOME" \
+  "$SCRIPTS/gdd.py" status --repo "$REPO" --goal 0003 >"$CFG_SHOW" 2>&1
+grep -qx 'stage: simplify' "$CFG_SHOW"
+check $? "gdd status reads the config-file ledger" "$(cat "$CFG_SHOW")"
+
+ENV_LEDGER="$TMP/env-ledger.tsv"
+env GDD_STATE_FILE="$ENV_LEDGER" GDD_LAUNCHER="$FAKE_LAUNCHER" \
+  XDG_CONFIG_HOME="$CFG_HOME" \
+  "$SCRIPTS/gdd.py" stage --repo "$REPO" --goal 0004 --stage simplify \
+  --base abc1234 --head def5678 >"$TMP/env-run.out" 2>&1
+[ $? -eq 0 ] && [ -f "$ENV_LEDGER" ] && grep -q '0004' "$ENV_LEDGER" \
+  && ! grep -q '0004' "$CFG_LEDGER"
+check $? "environment beats the config file" "$(cat "$TMP/env-run.out")"
+
+printf 'GDD_STATE_FILE: %s\nGDD_LAUNCHER: /nonexistent-launcher\n' "$CFG_LEDGER" >"$CFG_FILE"
+CLI_OUT="$TMP/cli-wins.out"
+env -u GDD_STATE_FILE -u GDD_LAUNCHER XDG_CONFIG_HOME="$CFG_HOME" \
+  "$SCRIPTS/gdd.py" stage --repo "$REPO" --goal 0005 --stage simplify \
+  --base abc1234 --head def5678 --launcher "$FAKE_LAUNCHER" >"$CLI_OUT" 2>&1
+CLI_RC=$?
+[ "$CLI_RC" -eq 0 ] && grep -q '0005' "$CFG_LEDGER"
+check $? "explicit --launcher beats the config file (rc=$CLI_RC)" "$(cat "$CLI_OUT")"
+
+printf 'nested:\n  child: value\n' >"$CFG_FILE"
+BAD_OUT="$TMP/bad-config.out"
+env -u GDD_STATE_FILE -u GDD_LAUNCHER XDG_CONFIG_HOME="$CFG_HOME" \
+  "$SCRIPTS/gdd.py" stage --repo "$REPO" --goal 0006 --stage simplify \
+  --base abc1234 --head def5678 --launcher "$FAKE_LAUNCHER" >"$BAD_OUT" 2>&1
+BAD_RC=$?
+[ "$BAD_RC" -eq 2 ] && grep -q "$CFG_FILE:1:" "$BAD_OUT"
+check $? "malformed config exits 2 naming path and line (rc=$BAD_RC)" "$(cat "$BAD_OUT")"
+
+# --- 13b. config-file run root reaches the launcher -------------------------
+
+CFG_RUN_ROOT="$TMP/config-runs"
+CFG_TASK_ROOT="$TMP/config-runs-tasks"
+CFG_RUN_LEDGER="$TMP/config-runs-ledger.tsv"
+CFG_LAUNCHER="$TMP/fake-run-root.sh"
+CFG_RECORD="$TMP/launcher-run-root.txt"
+cat >"$CFG_LAUNCHER" <<'FAKE'
+#!/usr/bin/env bash
+# Records the run root it received and creates the run under it, like a real
+# launcher. Refuses to guess when the variable is absent. `status NAME` resolves
+# the run from the run root in its own environment, as adapters/omp-run.sh does.
+set -uo pipefail
+cmd="${1:-}"
+shift || true
+if [ "$cmd" = status ]; then
+  name="${1:-}"
+  run_dir=""
+  for d in "${OMP_RUN_ROOT:-${GDD_RUN_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs}}"/*/"$name"; do
+    [ -d "$d" ] && { run_dir="$d"; break; }
+  done
+  [ -n "$run_dir" ] || { echo "fake: status: no run '$name'" >&2; exit 1; }
+  python3 - "$run_dir" <<'PY'
+import json
+import sys
+
+run_dir = sys.argv[1]
+with open(run_dir + "/state.json", encoding="utf-8") as handle:
+    state = json.load(handle)
+print("name: " + str(state.get("name")))
+print("state: " + str(state.get("state")))
+print("run_dir: " + run_dir)
+PY
+  exit 0
+fi
+printf '%s' "${GDD_RUN_ROOT:-}" >"$FAKE_RECORD"
+[ -n "${GDD_RUN_ROOT:-}" ] || { echo "fake: GDD_RUN_ROOT not exported" >&2; exit 9; }
+name="" cwd=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --name) name="${2:-}"; shift 2 ;;
+    --cwd) cwd="${2:-}"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+run_dir="$GDD_RUN_ROOT/$(date +%F)/$name"
+mkdir -p "$run_dir"
+python3 - "$run_dir" "$name" "$cwd" <<'PY'
+import json
+import sys
+
+run_dir, name, cwd = sys.argv[1:4]
+with open(run_dir + "/state.json", "w", encoding="utf-8") as handle:
+    json.dump(
+        {
+            "name": name,
+            "state": "running",
+            "exit": None,
+            "cwd": cwd,
+            "started": None,
+            "ended": None,
+            "duration_s": None,
+        },
+        handle,
+    )
+PY
+echo "started: $name"
+echo "  run dir   : $run_dir"
+FAKE
+chmod +x "$CFG_LAUNCHER"
+
+printf 'GDD_STATE_FILE: %s\nGDD_TASK_ROOT: %s\nGDD_RUN_ROOT: %s\n' \
+  "$CFG_RUN_LEDGER" "$CFG_TASK_ROOT" "$CFG_RUN_ROOT" >"$CFG_FILE"
+CFG_ROOT_OUT="$TMP/config-run-root.out"
+env -u GDD_STATE_FILE -u GDD_TASK_ROOT -u GDD_RUN_ROOT -u GDD_LAUNCHER \
+  XDG_CONFIG_HOME="$CFG_HOME" FAKE_RECORD="$CFG_RECORD" \
+  GDD_LAUNCHER="$CFG_LAUNCHER" \
+  "$SCRIPTS/gdd.py" stage --repo "$REPO" --goal 0007 --stage simplify \
+  --base abc1234 --head def5678 >"$CFG_ROOT_OUT" 2>&1
+CFG_ROOT_RC=$?
+[ "$CFG_ROOT_RC" -eq 0 ] && [ "$(cat "$CFG_RECORD" 2>/dev/null)" = "$CFG_RUN_ROOT" ]
+check $? "config-file GDD_RUN_ROOT is exported to the launcher (rc=$CFG_ROOT_RC)" "$(cat "$CFG_ROOT_OUT")"
+
+CFG_RUN_STATUS="$TMP/config-run-root-status.out"
+env -u GDD_STATE_FILE -u GDD_TASK_ROOT -u GDD_RUN_ROOT -u GDD_LAUNCHER \
+  XDG_CONFIG_HOME="$CFG_HOME" \
+  "$SCRIPTS/gdd.py" status --repo "$REPO" --goal 0007 >"$CFG_RUN_STATUS" 2>&1
+grep -qx 'last_run: workrepo-0007-simplify running exit=- dur=-' "$CFG_RUN_STATUS"
+check $? "gdd status discovers the run under the config-file run root" "$(cat "$CFG_RUN_STATUS")"
+
+CFG_RUN_GUARD="$TMP/config-run-root-guard.out"
+env -u GDD_STATE_FILE -u GDD_TASK_ROOT -u GDD_RUN_ROOT -u GDD_LAUNCHER \
+  XDG_CONFIG_HOME="$CFG_HOME" FAKE_RECORD="$CFG_RECORD" \
+  GDD_LAUNCHER="$CFG_LAUNCHER" \
+  "$SCRIPTS/gdd.py" stage --repo "$REPO" --goal 0008 --stage simplify \
+  --base abc1234 --head def5678 >"$CFG_RUN_GUARD" 2>&1
+CFG_GUARD_RC=$?
+[ "$CFG_GUARD_RC" -eq 3 ] && grep -q 'workrepo-0007-simplify' "$CFG_RUN_GUARD"
+check $? "concurrency guard sees the run under the config-file run root (rc=$CFG_GUARD_RC)" "$(cat "$CFG_RUN_GUARD")"
+
+# The printed poll command must carry the resolved root itself: the operator's
+# shell has no GDD_RUN_ROOT when the key came from the config file.
+CFG_POLL_CMD="$(awk '/^poll: /{sub(/^poll: /,""); print; exit}' "$CFG_ROOT_OUT")"
+CFG_POLL_OUT="$TMP/config-run-root-poll.out"
+env -u GDD_RUN_ROOT -u GDD_TASK_ROOT -u GDD_STATE_FILE -u GDD_LAUNCHER \
+  -u XDG_CONFIG_HOME -u XDG_STATE_HOME -u OMP_RUN_ROOT -u FAKE_RECORD \
+  bash -c "$CFG_POLL_CMD" >"$CFG_POLL_OUT" 2>&1
+CFG_POLL_RC=$?
+[ "$CFG_POLL_RC" -eq 0 ] \
+  && grep -qx 'name: workrepo-0007-simplify' "$CFG_POLL_OUT" \
+  && grep -qx 'state: running' "$CFG_POLL_OUT" \
+  && grep -qx "run_dir: $CFG_RUN_ROOT/$TODAY/workrepo-0007-simplify" "$CFG_POLL_OUT"
+check $? "printed poll command reports the config-file-root run (rc=$CFG_POLL_RC)" "$(cat "$CFG_POLL_OUT")"
+
+# A root with a space must survive the printed command unchanged.
+SPACE_RUN_ROOT="$TMP/config runs"
+printf 'GDD_STATE_FILE: %s\nGDD_TASK_ROOT: %s\nGDD_RUN_ROOT: %s\n' \
+  "$CFG_RUN_LEDGER" "$CFG_TASK_ROOT" "$SPACE_RUN_ROOT" >"$CFG_FILE"
+SPACE_OUT="$TMP/config-run-root-space.out"
+env -u GDD_STATE_FILE -u GDD_TASK_ROOT -u GDD_RUN_ROOT -u GDD_LAUNCHER \
+  XDG_CONFIG_HOME="$CFG_HOME" FAKE_RECORD="$CFG_RECORD" \
+  GDD_LAUNCHER="$CFG_LAUNCHER" \
+  "$SCRIPTS/gdd.py" stage --repo "$REPO" --goal 0009 --stage simplify \
+  --base abc1234 --head def5678 --force >"$SPACE_OUT" 2>&1
+SPACE_RC=$?
+SPACE_POLL_CMD="$(awk '/^poll: /{sub(/^poll: /,""); print; exit}' "$SPACE_OUT")"
+SPACE_POLL_OUT="$TMP/config-run-root-space-poll.out"
+env -u GDD_RUN_ROOT -u GDD_TASK_ROOT -u GDD_STATE_FILE -u GDD_LAUNCHER \
+  -u XDG_CONFIG_HOME -u XDG_STATE_HOME -u OMP_RUN_ROOT -u FAKE_RECORD \
+  bash -c "$SPACE_POLL_CMD" >"$SPACE_POLL_OUT" 2>&1
+SPACE_POLL_RC=$?
+[ "$SPACE_RC" -eq 0 ] && [ "$SPACE_POLL_RC" -eq 0 ] \
+  && grep -qx "run_dir: $SPACE_RUN_ROOT/$TODAY/workrepo-0009-simplify" "$SPACE_POLL_OUT" \
+  && grep -qx 'state: running' "$SPACE_POLL_OUT"
+check $? "poll command survives a run root containing a space (rc=$SPACE_RC/$SPACE_POLL_RC)" "$(cat "$SPACE_POLL_OUT")"
 
 echo "selftest: $PASS/$TOTAL ok"
 [ "$PASS" -eq "$TOTAL" ]

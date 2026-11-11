@@ -51,7 +51,7 @@ def make_skill(root: Path, name: str, *, kind=None, consumes=None, produces=None
     return d
 
 
-def write_registry(root: Path, *, external=(), shared=()):
+def write_registry(root: Path, *, external=(), shared=(), terminal=None):
     path = root / "scripts" / "contract_graph_registry.yaml"
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = []
@@ -61,7 +61,18 @@ def write_registry(root: Path, *, external=(), shared=()):
             lines.extend(f"  - {value}" for value in values)
         else:
             lines.append(f"{key}: []")
+    if terminal:
+        lines.append("terminal:")
+        lines.extend(f"  {name}: {reason}" for name, reason in terminal.items())
+    else:
+        lines.append("terminal: {}")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def write_raw_registry(root: Path, text: str) -> None:
+    path = root / "scripts" / "contract_graph_registry.yaml"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
 
 
 def pad_skill_to(path: Path, lines: int) -> None:
@@ -102,7 +113,8 @@ class ContractGraphTests(unittest.TestCase):
                    consumes="gate-spec", produces="gate-result")
         make_skill(self.tmp, "verdict-maker", kind="stage",
                    consumes="gate-result", produces="verdict")
-        write_registry(self.tmp, external=["gate-spec"])
+        write_registry(self.tmp, external=["gate-spec"],
+                       terminal={"verdict": "the operator reads it"})
         result = self.graph()
         self.assertEqual(result.violations, ())
         self.assertEqual(len(result.skills), 2)
@@ -125,7 +137,8 @@ class ContractGraphTests(unittest.TestCase):
         make_skill(self.tmp, "consumer", kind="stage",
                    consumes="work-report", produces="result")
         self.assertIn("R3", self.assert_rule("R3"))
-        write_registry(self.tmp, external=["work-report"])
+        write_registry(self.tmp, external=["work-report"],
+                       terminal={"result": "the operator reads it"})
         self.assertEqual(self.violations(), [])
 
     def test_r4_mechanism_must_not_be_a_must_pick_but_may_be_a_distractor(self):
@@ -140,6 +153,7 @@ class ContractGraphTests(unittest.TestCase):
         write_trigger_cases(self.tmp, [
             {"id": "other-route", "must_pick": ["other"], "distractors": ["runner"]},
         ])
+        write_registry(self.tmp, terminal={"gate-result": "the operator reads it"})
         self.assertEqual(self.violations(), [])
 
     def test_r5_controller_produces_only_chain_plan(self):
@@ -153,6 +167,7 @@ class ContractGraphTests(unittest.TestCase):
 
     def test_r5_valid_controller(self):
         make_skill(self.tmp, "router", kind="controller", produces="chain-plan")
+        write_registry(self.tmp, terminal={"chain-plan": "the operator routes"})
         self.assertEqual(self.violations(), [])
 
     def test_r6_duplicate_producer_and_shared_allowlist(self):
@@ -160,7 +175,8 @@ class ContractGraphTests(unittest.TestCase):
         make_skill(self.tmp, "second", kind="stage", produces="shared-artifact")
         line = self.assert_rule("R6")
         self.assertIn("shared-artifact", line)
-        write_registry(self.tmp, shared=["shared-artifact"])
+        write_registry(self.tmp, shared=["shared-artifact"],
+                       terminal={"shared-artifact": "the operator reconciles it"})
         self.assertEqual(self.violations(), [])
 
     def test_r7_skill_missing_kind(self):
@@ -185,13 +201,61 @@ class ContractGraphTests(unittest.TestCase):
         skill_md = make_skill(self.tmp, "router", kind="controller",
                               produces="chain-plan") / "SKILL.md"
         pad_skill_to(skill_md, cg.MAX_CONTROLLER_LINES)
+        write_registry(self.tmp, terminal={"chain-plan": "the operator routes"})
+        self.assertEqual(self.violations(), [])
+
+    def test_r9_unconsumed_production_names_artifact_and_skill(self):
+        make_skill(self.tmp, "producer", kind="stage", produces="orphan")
+        line = self.assert_rule("R9")
+        self.assertIn("'orphan'", line)
+        self.assertIn("'producer'", line)
+        self.assertIn("terminal:", line)
+
+    def test_r9_consumed_artifact_passes(self):
+        make_skill(self.tmp, "producer", kind="stage", produces="handoff")
+        make_skill(self.tmp, "consumer", kind="stage",
+                   consumes="handoff", produces="verdict")
+        write_registry(self.tmp, terminal={"verdict": "the operator reads it"})
+        self.assertEqual(self.violations(), [])
+
+    def test_r9_terminal_exemption_requires_a_reason(self):
+        make_skill(self.tmp, "producer", kind="stage", produces="orphan")
+        write_registry(self.tmp, terminal={"orphan": "the operator reads it"})
+        self.assertEqual(self.violations(), [])
+        write_registry(self.tmp, terminal={"orphan": ""})
+        with self.assertRaises(ValueError) as caught:
+            self.graph()
+        self.assertIn("needs a one-line reason", str(caught.exception))
+
+    def test_r9_terminal_rejects_multiline_reason_and_wrong_shape(self):
+        make_skill(self.tmp, "producer", kind="stage", produces="orphan")
+        write_raw_registry(self.tmp, "terminal:\n  orphan: |-\n    first\n    second\n")
+        with self.assertRaises(ValueError) as caught:
+            self.graph()
+        self.assertIn("reason must be one line", str(caught.exception))
+
+        write_raw_registry(self.tmp, "terminal: []\n")
+        with self.assertRaises(ValueError) as caught:
+            self.graph()
+        self.assertIn("terminal must be a mapping", str(caught.exception))
+
+    def test_r9_external_artifacts_are_exempt(self):
+        make_skill(self.tmp, "producer", kind="stage", produces="request")
+        write_registry(self.tmp, external=["request"])
+        self.assertEqual(self.violations(), [])
+
+        make_skill(self.tmp, "consumer", kind="stage",
+                   consumes="request", produces="verdict")
+        write_registry(self.tmp, external=["request"],
+                       terminal={"verdict": "the operator reads it"})
         self.assertEqual(self.violations(), [])
 
     def test_main_summary_and_list(self):
         make_skill(self.tmp, "runner", kind="mechanism",
                    consumes="gate-spec", produces="gate-result")
         make_skill(self.tmp, "plain", kind="entry")
-        write_registry(self.tmp, external=["gate-spec"])
+        write_registry(self.tmp, external=["gate-spec"],
+                       terminal={"gate-result": "the operator reads it"})
         with patch.object(cg, "ROOT", self.tmp), \
              contextlib.redirect_stdout(io.StringIO()) as out:
             self.assertEqual(cg.main([]), 0)
