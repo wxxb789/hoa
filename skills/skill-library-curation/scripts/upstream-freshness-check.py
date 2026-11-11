@@ -10,7 +10,7 @@ Reads:
   --config (default $SKILL_RUNTIME_CONFIG, else $XDG_CONFIG_HOME/agent/config.yaml,
             i.e. ~/.config/agent/config.yaml)
             optional: `skills.disabled` list -> enabled/disabled label
-  --lock   (default $SKILLS_LOCK, else ~/.agents/.skill-lock.json)
+  --lock   (default $SKILLS_LOCK, else $SKILLS_HUB/.skill-lock.json, hub default ~/.agents)
             shared-store installs: sourceUrl, skillPath
   --skills-root (default $SKILLS_ROOT, else <lock dir>/skills)
             scanned recursively for SKILL.md; repeats allowed
@@ -39,7 +39,8 @@ import os
 import sys
 import urllib.request
 
-DEFAULT_LOCK = os.path.expanduser("~/.agents/.skill-lock.json")
+DEFAULT_LOCK = os.path.join(os.environ.get("SKILLS_HUB") or os.path.expanduser("~/.agents"),
+                            ".skill-lock.json")
 
 
 def config_path(explicit: str | None) -> str:
