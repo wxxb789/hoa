@@ -3,6 +3,13 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## 2026-11-11 — the same shell expansion, one file further
+
+- **`skills/skill-library-curation/references/skills-cli-installs.md`**: the provenance snippet passed
+  `${SKILLS_HUB:-~/.agents}` into a quoted heredoc, so Python received the literal string and
+  `expanduser()` could not make it a path — the verification command raised `FileNotFoundError`. The
+  snippet now reads `SKILLS_HUB` from `os.environ` with the same fallback as the script it documents.
+
 ## 2026-11-11 — a skill library path that is not one machine's path
 
 - **`skills/skill-library-curation`**: the shared skill store was hardcoded to `~/.agents`, so the skill

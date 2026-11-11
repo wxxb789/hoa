@@ -65,7 +65,8 @@ gh api repos/<owner>/<repo>/contents/tests/fixtures/x/SKILL.md --jq '.content' |
 # provenance and per-source counts
 python3 - <<'PY'
 import json, os, collections
-d = json.load(open(os.path.expanduser('${SKILLS_HUB:-~/.agents}/.skill-lock.json')))
+hub = os.environ.get('SKILLS_HUB') or os.path.expanduser('~/.agents')
+d = json.load(open(os.path.join(hub, '.skill-lock.json')))
 print('locked:', len(d['skills']))
 print(collections.Counter(v['source'] for v in d['skills'].values()))
 print('fixture names installed?', [k for k in d['skills'] if k in ('custom-skill', 'default-skill')])
