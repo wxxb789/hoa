@@ -3,6 +3,12 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## 2026-11-11 — `ocr-and-documents` joins the catalog
+
+- **`skills/ocr-and-documents/`** (new): extract text from PDFs and scans with pymupdf or marker-pdf. Ported from a private runtime: no machine path, no bot
+  name, no model id, and the capabilities it names are the general ones. Chinese note: 用 pymupdf 或 marker-pdf 从 PDF 与扫描件里抽文本.
+  Targets `runtime-agnostic`; areas `work-management`; kind `mechanism`.
+
 ## 2026-11-11 — `jupyter-live-kernel` joins the catalog
 
 - **`skills/jupyter-live-kernel/`** (new): iterate on Python inside a live Jupyter kernel instead of restarting scripts. Ported from a private runtime: no machine path, no bot
