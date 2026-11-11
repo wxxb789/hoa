@@ -35,6 +35,7 @@ targets:  runtime-agnostic | repo-only |
 | define-goal | skill | self-management,software-development,work-management | runtime-agnostic | `skills/define-goal/` | 把雄心转化为编号 goal 文件，近期清晰、远期可细化，不制定实现步骤 |
 | delegated-work-acceptance | skill | work-management,software-development | runtime-agnostic | `skills/delegated-work-acceptance/` | 验收被委派的交付：核对 artifact、重算关键数字、检查写入边界 |
 | design-an-interface | skill | software-development | runtime-agnostic | `skills/design-an-interface/` | 设计软件接口或公开 API：签名草稿、OpenAPI 片段、用法示例 |
+| design-md | skill | software-development | runtime-agnostic | `skills/design-md/` | 编写、校验、导出 DESIGN.md 设计 token 规范 |
 | discord-rich-message | skill | software-development,work-management | runtime-agnostic | `skills/discord-rich-message/` | 在平台限制内发送结构化 Discord 消息：Components V2、等宽对齐表格、附件兜底 |
 | dotnet-repo-workflow | skill | software-development | runtime-agnostic | `skills/dotnet-repo-workflow/` | 走仓库自带 .NET gate 而非手搓 `dotnet test`；lock 文件、Roslyn 编译陷阱、merge-ready 清单 |
 | evidence-backed-analytical-writing | skill | work-management | runtime-agnostic | `skills/evidence-backed-analytical-writing/` | 中文分析报告：证据地图与「主张 → 证据 → 机制 → 局限」骨架；时效边界、状态阶梯、否定性结论 |

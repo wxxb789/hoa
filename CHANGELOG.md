@@ -3,6 +3,12 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## 2026-11-11 — `design-md` joins the catalog
+
+- **`skills/design-md/`** (new): author, validate and export a DESIGN.md design-token spec. Ported from a private runtime: no machine path, no bot
+  name, no model id, and the capabilities it names are the general ones. Chinese note: 编写、校验、导出 DESIGN.md 设计 token 规范.
+  Targets `runtime-agnostic`; areas `software-development`; kind `entry`.
+
 ## 2026-11-11 — `design-an-interface` joins the catalog
 
 - **`skills/design-an-interface/`** (new): sketch a software interface or public API: signatures, OpenAPI snippet, usage examples. Ported from a private runtime: no machine path, no bot
