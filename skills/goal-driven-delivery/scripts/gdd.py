@@ -19,8 +19,8 @@ Environment or operator config file:
                     (default ${XDG_STATE_HOME:-$HOME/.local/state}/gdd/ledger.tsv)
     GDD_TASK_ROOT   prompt/state root
                     (default ${XDG_STATE_HOME:-$HOME/.local/state}/gdd/tasks)
-    GDD_RUN_ROOT    fallback run root when the launcher prints no run dir
-                    (default ${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs)
+    GDD_RUN_ROOT    run root exported to the launcher and used when it prints no
+                    run dir (default ${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs)
     GDD_LAUNCHER    launcher command
                     (default <script dir>/adapters/omp-run.sh)
     GDD_TEMPLATES   template root
@@ -322,6 +322,7 @@ def ledger_append(repo, goal, stage, base, head, gates, next_stage=None, note=No
 
 def launch(launcher, prompt_path, repo, goal, stage, model, thinking, max_time):
     name = f"{os.path.basename(repo)}-{goal}-{stage}"
+    resolved_run_root = run_root()
     cmd = [
         launcher,
         "start",
@@ -339,8 +340,12 @@ def launch(launcher, prompt_path, repo, goal, stage, model, thinking, max_time):
     ):
         if value:
             cmd += [flag, str(value)]
+    # The launcher resolves its run root from GDD_RUN_ROOT; export the value this
+    # process resolved so a config-file run root lands where discovery looks.
+    child_env = dict(os.environ)
+    child_env["GDD_RUN_ROOT"] = resolved_run_root
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True)
+        proc = subprocess.run(cmd, capture_output=True, text=True, env=child_env)
     except OSError as exc:
         raise LaunchError(str(exc)) from exc
     if proc.returncode != 0:
@@ -356,7 +361,7 @@ def launch(launcher, prompt_path, repo, goal, stage, model, thinking, max_time):
             run_dir = stripped.split(":", 1)[1].strip()
     if not run_dir:
         run_dir = os.path.join(
-            run_root(), datetime.now().strftime("%Y-%m-%d"), run_name
+            resolved_run_root, datetime.now().strftime("%Y-%m-%d"), run_name
         )
     return run_name, run_dir
 
@@ -557,7 +562,8 @@ Environment or operator config file:
                   (default ${XDG_STATE_HOME:-$HOME/.local/state}/gdd/ledger.tsv)
   GDD_TASK_ROOT   prompt/state root
                   (default ${XDG_STATE_HOME:-$HOME/.local/state}/gdd/tasks)
-  GDD_RUN_ROOT    fallback run root when the launcher prints no run dir
+  GDD_RUN_ROOT    run root exported to the launcher, and the fallback when it
+                  prints no run dir
                   (default ${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs)
   GDD_LAUNCHER    launcher command (default <script dir>/adapters/omp-run.sh)
   GDD_TEMPLATES   template root (default <script dir>/../references/stage-templates)
