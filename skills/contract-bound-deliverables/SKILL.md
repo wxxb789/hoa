@@ -8,7 +8,7 @@ description: >-
   Not for open-ended prose whose quality is the only gate, and not for auditing a report already
   delivered.
 metadata:
-  version: "0.1.37"
+  version: "0.1.38"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
   summary: "meet a measurable brief: freeze the evidence packet, draft in parallel, assemble to the number, verify with the contract's own metric"
