@@ -32,6 +32,19 @@ A launcher must:
 
 A missing `state.json` means **unknown**, never success.
 
+A launcher that bounds its live event log must not let the bound hide the stream's size. It reports
+`events_bytes` (retained), `events_bytes_total` (everything the agent emitted),
+`events_truncated` and `events_dropped_bytes` in `status` and in the finalized `state.json`, and any
+counter derived from a truncated stream is marked partial (the reference adapter sets
+`tool_calls_partial`, `turns_partial`, `cost_partial`).
+
+### Testing the adapter
+
+A stage run is itself hosted in a tmux session, so a test never runs `tmux kill-server` and never
+`kill-session`s a session it did not create: that tears down the run executing the test, and its
+stdout dies with it. Use a stub `tmux` on `PATH` or an isolated socket
+(`tmux -L <unique-name>`, `TMUX_TMPDIR=<temp>`), as the selftest does.
+
 ## Rules that come from delivery, not transport
 
 1. **One run per stage.** A stage run is a fresh session with clean context; that is the point. Never

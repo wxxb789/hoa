@@ -57,17 +57,25 @@
 #   OMP_RUN_ROOT  base run root (default: $GDD_RUN_ROOT or
 #                 ${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs)
 #   OMP_LEDGER    finished-run ledger (default: <run_root>/ledger.tsv)
+#   OMP_RUN_EVENTS_MAX_BYTES  ceiling for the rolling event tail in bytes
+#                 (default: 8388608). The first 64 KiB of events are kept in
+#                 addition, so the session event survives. state.json/status
+#                 report events_bytes (retained), events_bytes_total,
+#                 events_truncated and events_dropped_bytes; the writer's
+#                 sidecar is events.stats.json.
 #
 # Model / thinking / max-time have no default here: the flag is omitted when it
 # is not supplied. Run artifacts: <run_root>/<date>/<SLUG>/ = prompt.md, run.sh,
-# finalize.py, events.ndjson, stderr.log, state.json, exit.code, session.id,
-# lock, answer.md.
+# events-writer.py, finalize.py, events.ndjson, events.stats.json, stderr.log,
+# state.json, exit.code, session.id, lock, answer.md.
 set -uo pipefail
 
 OMP_BIN="${OMP_BIN:-omp}"
 RUN_ROOT_BASE="${OMP_RUN_ROOT:-${GDD_RUN_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs}}"
 RUNDIR_ROOT="$RUN_ROOT_BASE/$(date +%F)"
 export OMP_LEDGER="${OMP_LEDGER:-$RUN_ROOT_BASE/ledger.tsv}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+EVENTS_WRITER="$SCRIPT_DIR/events-writer.py"
 
 die() { echo "omp-run: $*" >&2; exit 1; }
 
@@ -200,6 +208,7 @@ cmd_start() {
   [[ -n "$prompt_file" && -f "$prompt_file" ]] || die "start: --prompt FILE is required and must exist"
   [[ -d "$cwd" ]] || die "start: --cwd '$cwd' is not a directory"
   [[ -x "$OMP_BIN" ]] || die "start: agent binary not found at $OMP_BIN (set OMP_BIN)"
+  [[ -f "$EVENTS_WRITER" ]] || die "start: bounded event writer not found at $EVENTS_WRITER"
 
   name="$(sanitize "$name")"
   [[ -n "$name" ]] || die "start: name sanitized to empty"
@@ -218,6 +227,9 @@ cmd_start() {
   mkdir -p "$run" || die "start: cannot create $run"
 
   cp "$prompt_file" "$run/prompt.md"
+  cp "$EVENTS_WRITER" "$run/events-writer.py"
+  # A resumed agent keeps its recorded id until its own session event arrives.
+  [[ -n "$resume" ]] && printf '%s\n' "$resume" > "$run/session.id"
   cwd="$(cd "$cwd" && pwd)"
 
   local args=(-p --mode=json --approval-mode yolo)
@@ -254,6 +266,25 @@ def load_state(run_dir):
         return {}
 
 
+def load_stats(run_dir):
+    """Sidecar counters from the bounded writer; {} for older run dirs."""
+    try:
+        with open(os.path.join(run_dir, "events.stats.json"), encoding="utf-8") as handle:
+            stats = json.load(handle)
+    except (OSError, ValueError):
+        return {}
+    return stats if isinstance(stats, dict) else {}
+
+
+def load_sidecar(run_dir, name):
+    try:
+        with open(os.path.join(run_dir, name), encoding="utf-8") as handle:
+            text = handle.read().strip()
+    except OSError:
+        return ""
+    return text.splitlines()[0].strip() if text else ""
+
+
 def iter_events(path):
     if not os.path.exists(path):
         return
@@ -288,16 +319,22 @@ def main():
 
     state = load_state(run_dir)
     events_path = os.path.join(run_dir, "events.ndjson")
+    stats = load_stats(run_dir)
 
-    session_id = state.get("session_id") or ""
+    session_id = state.get("session_id") or load_sidecar(run_dir, "session.id")
     answer = ""
     cost = 0.0
     tool_calls = 0
     turns = 0
     errors = []
+    marker = {}
 
     for event in iter_events(events_path):
         kind = event.get("type") or ""
+        if kind == "truncated":
+            # The writer's splice marker: a counter boundary, not an event.
+            marker = event
+            continue
         if kind == "session" and not session_id:
             session_id = event.get("id") or session_id
         elif kind == "message_end":
@@ -320,6 +357,19 @@ def main():
         elif kind == "turn_end":
             turns += 1
 
+    # The sidecar is exact at a normal exit. Without it (older runs, or a
+    # writer that died) the marker still tells us how many bytes are missing.
+    retained = os.path.getsize(events_path) if os.path.exists(events_path) else 0
+    total_bytes = stats.get("total_bytes")
+    if not isinstance(total_bytes, int) or total_bytes < 0:
+        dropped = marker.get("dropped_bytes")
+        total_bytes = retained + (dropped if isinstance(dropped, int) and dropped > 0 else 0)
+    dropped_bytes = stats.get("dropped_bytes")
+    if not isinstance(dropped_bytes, int) or dropped_bytes < 0:
+        dropped = marker.get("dropped_bytes")
+        dropped_bytes = dropped if isinstance(dropped, int) and dropped > 0 else 0
+    truncated = bool(stats.get("truncated")) or bool(marker) or dropped_bytes > 0
+
     now = datetime.now(timezone.utc)
     started = state.get("started") or now.isoformat()
     try:
@@ -339,6 +389,13 @@ def main():
             "turns": turns,
             "answer_chars": len(answer),
             "errors": errors[-5:],
+            "events_bytes": retained,
+            "events_bytes_total": total_bytes,
+            "events_truncated": truncated,
+            "events_dropped_bytes": dropped_bytes,
+            "tool_calls_partial": truncated,
+            "turns_partial": truncated,
+            "cost_partial": truncated,
         }
     )
     with open(os.path.join(run_dir, "state.json"), "w", encoding="utf-8") as handle:
@@ -397,9 +454,13 @@ PY
     printf 'set -o pipefail\n'
     printf 'cd %q || exit 90\n' "$cwd"
     printf 'export OMP_LEDGER=%q\n' "$OMP_LEDGER"
+    if [[ -n "${OMP_RUN_EVENTS_MAX_BYTES:-}" ]]; then
+      printf 'export OMP_RUN_EVENTS_MAX_BYTES=%q\n' "$OMP_RUN_EVENTS_MAX_BYTES"
+    fi
     printf '%q ' "$OMP_BIN" "${args[@]}"
     printf '"$(cat %q)"' "$run/prompt.md"
-    printf ' > >(tee %q) 2> %q\n' "$run/events.ndjson" "$run/stderr.log"
+    printf ' 2>> %q | python3 %q %q 2>> %q\n' \
+      "$run/stderr.log" "$run/events-writer.py" "$run" "$run/stderr.log"
     printf 'ec=$?\n'
     printf 'printf "%%s\\n" "$ec" > %q\n' "$run/exit.code"
     printf 'python3 %q %q "$ec"\n' "$run/finalize.py" "$run"
@@ -428,6 +489,10 @@ state = {
     "run_dir": run,
     "session_id": resume or "",
     "resumed_from": resume or None,
+    "events_bytes": 0,
+    "events_bytes_total": 0,
+    "events_truncated": False,
+    "events_dropped_bytes": 0,
 }
 with open(run + "/state.json", "w", encoding="utf-8") as handle:
     json.dump(state, handle, indent=2, ensure_ascii=False)
@@ -468,14 +533,20 @@ with open(state_path, "w", encoding="utf-8") as handle:
     json.dump(state, handle, indent=2)
 PY
 
-  # Grab the session id early so an interrupted run is resumable.
+  # The bounded writer persists the session event's id as soon as it sees it.
+  # Fall back to scanning the log head only when that sidecar is absent.
+  local sid=""
   for i in $(seq 1 40); do
-    if [[ -s "$run/events.ndjson" ]]; then
-      local sid
-      sid="$(head -n 5 "$run/events.ndjson" 2>/dev/null | jq -r 'select(.type=="session") | .id' 2>/dev/null | head -n1)"
-      if [[ -n "$sid" && "$sid" != "null" ]]; then
-        printf '%s\n' "$sid" > "$run/session.id"
-        python3 - "$run" "$sid" <<'PY'
+    sid=""
+    if [[ -s "$run/session.id" ]]; then
+      sid="$(head -n 1 "$run/session.id" 2>/dev/null)"
+    elif [[ ! -e "$run/session.id" && -s "$run/events.ndjson" ]]; then
+      sid="$(head -c 65536 "$run/events.ndjson" 2>/dev/null | jq -r 'select(.type=="session") | .id' 2>/dev/null | head -n1)"
+      [[ "$sid" == "null" ]] && sid=""
+    fi
+    if [[ -n "$sid" ]]; then
+      printf '%s\n' "$sid" > "$run/session.id"
+      python3 - "$run" "$sid" <<'PY'
 import json
 import sys
 
@@ -487,8 +558,7 @@ state["session_id"] = sid
 with open(path, "w", encoding="utf-8") as handle:
     json.dump(state, handle, indent=2)
 PY
-        break
-      fi
+      break
     fi
     sleep 0.5
   done
@@ -497,7 +567,7 @@ PY
   echo "  tmux      : $sess"
   echo "  run dir   : $run"
   echo "  session id: $(cat "$run/session.id" 2>/dev/null || echo '(pending)')"
-  echo "  events    : tail -f $run/events.ndjson"
+  echo "  events    : tail -F $run/events.ndjson"
   echo "  summary   : $0 result $name"
 }
 
@@ -565,12 +635,34 @@ alive = (
     else False
 )
 events = os.path.join(run, "events.ndjson")
+retained = os.path.getsize(events) if os.path.exists(events) else 0
+try:
+    with open(os.path.join(run, "events.stats.json"), encoding="utf-8") as handle:
+        stats = json.load(handle)
+except (OSError, ValueError):
+    stats = {}
+total = stats.get("total_bytes")
+if not isinstance(total, int):
+    total = state.get("events_bytes_total")
+if not isinstance(total, int) or total < retained:
+    # Before the first sidecar write, the retained bytes are the only
+    # lower bound on what the agent has emitted.
+    total = retained
+dropped = stats.get("dropped_bytes", state.get("events_dropped_bytes", 0))
+if not isinstance(dropped, int):
+    dropped = 0
+truncated = stats.get("truncated")
+if not isinstance(truncated, bool):
+    truncated = bool(state.get("events_truncated")) or dropped > 0
 print(
     json.dumps(
         {
             **state,
             "tmux_alive": alive,
-            "events_bytes": os.path.getsize(events) if os.path.exists(events) else 0,
+            "events_bytes": retained,
+            "events_bytes_total": total,
+            "events_truncated": truncated,
+            "events_dropped_bytes": dropped,
         },
         indent=2,
         ensure_ascii=False,
