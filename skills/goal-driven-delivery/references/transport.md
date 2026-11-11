@@ -4,8 +4,12 @@ The protocol assumes each stage is one **headless agent run** that outlives the 
 dispatched it. How the run is started is runtime-specific; this file defines the contract every
 adapter satisfies, plus the rules that come from the delivery protocol rather than from any one CLI.
 
-`scripts/adapters/omp-run.sh` is the reference adapter (an OMP-style `-p` CLI hosted in tmux). For
-another agent CLI, adapt that script — `gdd.py` only ever talks to the contract below.
+`scripts/adapters/omp-run.sh` is the reference adapter (an OMP-style `-p` CLI hosted in a detached
+session). It has two backends: `setsid` (default: own session and process group, no controlling
+terminal) and `tmux` (attachable session). Select with `start --backend setsid|tmux` or
+`OMP_RUN_BACKEND`; the lock records `{"pid","tmux","backend","started_at"}` so liveness is decided by
+the pid first and the tmux session second. For another agent CLI, adapt that script — `gdd.py` only
+ever talks to the contract below.
 
 ## Launcher contract
 
@@ -40,9 +44,9 @@ counter derived from a truncated stream is marked partial (the reference adapter
 
 ### Testing the adapter
 
-A stage run is itself hosted in a tmux session, so a test never runs `tmux kill-server` and never
-`kill-session`s a session it did not create: that tears down the run executing the test, and its
-stdout dies with it. Use a stub `tmux` on `PATH` or an isolated socket
+A stage run may itself be hosted in a tmux session (the `tmux` backend), so a test never runs
+`tmux kill-server` and never `kill-session`s a session it did not create: that tears down the run
+executing the test, and its stdout dies with it. Use a stub `tmux` on `PATH` or an isolated socket
 (`tmux -L <unique-name>`, `TMUX_TMPDIR=<temp>`), as the selftest does.
 
 ## Rules that come from delivery, not transport

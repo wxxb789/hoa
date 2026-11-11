@@ -3,6 +3,18 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## 2026-11-11 — the reference launcher gets a second backend
+
+- **`skills/goal-driven-delivery/scripts/adapters/omp-run.sh`**: the launcher no longer hardcodes tmux.
+  `OMP_RUN_BACKEND` (or `--backend`) picks `setsid` (default, survives a dropped session) or `tmux`, and the
+  chosen backend is written to `state.json` so `poll` and `kill` act on what actually started the run.
+  Resolves the "run has no lock file" and "kill the wrong process group" pair in one place.
+- **`skills/goal-driven-delivery/scripts/tests/test-omp-run-setsid.sh`** (new): drives a stub CLI through
+  both backends — start, running, finalize, kill — 7/7. Existing selftest 85/85 and the stale-lock test 7/7
+  still pass, including the case where a run recorded a pid but never wrote a lock.
+- **`skills/goal-driven-delivery/references/transport.md`**: documents the two backends and how a caller
+  chooses one, so the contract is written down next to the code that implements it.
+
 ## 2026-11-11 — `notes-to-prd` joins the catalog
 
 - **`skills/notes-to-prd/`** (new): turn notes or an idea into a structured PRD draft. Ported from a private runtime: no machine path, no bot
