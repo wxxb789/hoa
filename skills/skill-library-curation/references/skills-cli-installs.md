@@ -11,8 +11,8 @@ cached package (`~/.npm/_npx/*/node_modules/skills/package.json` carries `versio
 | Path | Role |
 |---|---|
 | `~/.npm/_npx/<hash>/node_modules/skills/` | The cached CLI bundle itself (no global bin) |
-| `~/.agents/skills/<name>/` | The shared skill store — real directories |
-| `~/.agents/.skill-lock.json` | Install manifest: every installed skill plus its source |
+| `${SKILLS_HUB:-~/.agents}/skills/<name>/` | The shared skill store — real directories |
+| `${SKILLS_HUB:-~/.agents}/.skill-lock.json` | Install manifest: every installed skill plus its source |
 | `<runtime-home>/skills/<category>/<name>` | Symlink farm into the store for one runtime |
 | `~/.config/<agent>/skills`, `.claude/skills`, `.pi/skills`, … | Farms for other agent CLIs |
 | `$TMPDIR/skills-XXXXXX/` | A throwaway **git clone** of a source repo, `mkdtemp`-created per install/update |
@@ -22,7 +22,7 @@ still feeds every farm symlink. Never classify it as orphaned without counting i
 
 ## Manifest fields
 
-`~/.agents/.skill-lock.json` → `{version, skills, dismissed, lastSelectedAgents}`;
+`${SKILLS_HUB:-~/.agents}/.skill-lock.json` → `{version, skills, dismissed, lastSelectedAgents}`;
 `skills.<name>` → `{source, sourceType, sourceUrl, skillPath, skillFolderHash, installedAt,
 updatedAt}`.
 
@@ -65,7 +65,7 @@ gh api repos/<owner>/<repo>/contents/tests/fixtures/x/SKILL.md --jq '.content' |
 # provenance and per-source counts
 python3 - <<'PY'
 import json, os, collections
-d = json.load(open(os.path.expanduser('~/.agents/.skill-lock.json')))
+d = json.load(open(os.path.expanduser('${SKILLS_HUB:-~/.agents}/.skill-lock.json')))
 print('locked:', len(d['skills']))
 print(collections.Counter(v['source'] for v in d['skills'].values()))
 print('fixture names installed?', [k for k in d['skills'] if k in ('custom-skill', 'default-skill')])

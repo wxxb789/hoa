@@ -7,7 +7,7 @@ description: >-
   editing a skill, and not for porting one into a shared repo — review and execution are separate
   modes, and execution needs its own confirmed scope.
 metadata:
-  version: "0.1.34"
+  version: "0.1.35"
   areas: "software-development,self-management"
   targets: "runtime-agnostic"
   summary: "review a skill library by evidence: inventory, overlap groups, installer provenance, upstream freshness; recommendations never change state"
@@ -16,6 +16,18 @@ metadata:
 ---
 
 # Skill Library Curation
+
+## Configuration
+
+| Variable | Resolves | Default |
+|---|---|---|
+| `SKILLS_HUB` | shared skill store (hub installs + `.skill-lock.json`) | `~/.agents` |
+| `SKILLS_ROOT` | directory the runtime loads skills from | `<hub>/skills` |
+| `SKILL_RUNTIME_CONFIG` | operator config file used for the `skills.disabled` label | `${XDG_CONFIG_HOME:-~/.config}/agent/config.yaml` |
+
+Resolution order and the config-file path are defined once in
+[skill-porting-and-publishing § Configuration](../skill-porting-and-publishing/SKILL.md).
+Nothing above has a machine-specific default: point `SKILLS_HUB` at the store and the rest follows.
 
 Use this for library review, pruning/overlap/consolidation proposals, or usage-based skill discovery.
 Review and recommendation are distinct modes; execution requires its own explicitly confirmed scope.
@@ -84,8 +96,8 @@ Sweep procedure:
 Answer "where did this skill come from", "is it actually installed", "why is the installer
 warning" from recorded state and source, never from guessing:
 
-1. **Provenance is a lookup.** Shared-store installs (`~/.agents/skills/<name>`) record their
-   origin in `~/.agents/.skill-lock.json` under `skills.<name>` (`source`, `sourceType`,
+1. **Provenance is a lookup.** Shared-store installs (`${SKILLS_HUB:-~/.agents}/skills/<name>`) record their
+   origin in `${SKILLS_HUB:-~/.agents}/.skill-lock.json` under `skills.<name>` (`source`, `sourceType`,
    `sourceUrl`, `skillPath`, `skillFolderHash`, `installedAt`, `updatedAt`; the file also holds
    `dismissed` and `lastSelectedAgents`). Hub installs use the runtime's own hub lock file.
    Per-source counts from this file answer "how many skills came from repo X" exactly.
