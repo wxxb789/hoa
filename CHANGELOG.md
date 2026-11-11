@@ -3,6 +3,17 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## 2026-11-11 — a skill library path that is not one machine's path
+
+- **`skills/skill-library-curation`**: the shared skill store was hardcoded to `~/.agents`, so the skill
+  only told the truth on the machine that wrote it. `SKILLS_HUB` (store), `SKILLS_ROOT` (what the runtime
+  loads) and `SKILL_RUNTIME_CONFIG` are now documented in a Configuration table that points at the porting
+  contract instead of restating it.
+- **`scripts/upstream-freshness-check.py`**: `DEFAULT_LOCK` reads `SKILLS_HUB` from the environment and
+  falls back to `~/.agents`. The previous value was `os.path.expanduser("${SKILLS_HUB:-~/.agents}/...")` —
+  a literal string, so the documented default never applied.
+- **`references/skills-cli-installs.md`**: provenance paths follow the same key.
+
 ## 2026-11-11 — the failure modes of a long stage run
 
 - **`skills/goal-driven-delivery/references/run-failure-modes.md`** (new) collects five rules, each from a
