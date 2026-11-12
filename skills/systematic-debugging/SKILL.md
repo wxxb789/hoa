@@ -8,7 +8,7 @@ description: >-
   Not for exploratory "make it nicer" refactors, and not for a known mechanical change with an
   already-proven cause.
 metadata:
-  version: "0.1.47"
+  version: "0.1.48"
   areas: "software-development"
   targets: "runtime-agnostic"
   summary: "root cause before fix: a tight red-capable loop, boundary evidence, ranked falsifiable hypotheses, then one fix at a time"

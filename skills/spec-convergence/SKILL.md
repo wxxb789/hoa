@@ -7,7 +7,7 @@ description: >-
   acceptance or test seam are still undecided. Not for work whose contract is already written,
   one-line fixes, or exploring what the system does today.
 metadata:
-  version: "0.1.47"
+  version: "0.1.48"
   areas: "software-development"
   targets: "runtime-agnostic"
   summary: "converge an unclear request into a confirmed spec: one root concern per round, a capped number of questions per round, every question backed by the fact that makes it real, explicit shared-understanding confirmation before writing"

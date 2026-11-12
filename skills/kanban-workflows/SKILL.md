@@ -6,7 +6,7 @@ description: >-
   or needs per-card ownership and routing. Not for a single edit, and not for uniform batch
   fan-out — that wants one resumable runner script.
 metadata:
-  version: "0.1.47"
+  version: "0.1.48"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
   summary: "multi-card board work: decomposition, parallel dispatch, review gates, stuck-card recovery"
