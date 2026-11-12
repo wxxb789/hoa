@@ -100,8 +100,9 @@ Run `scripts/fact_check.py` and trace each MISS.
 - **语气是节奏工具，不是文风装饰**：停顿（独立成行的短句）/ 反问（放在读者要做判断的位置）/ 降温
   （强判断后紧跟限定或自嘲）/ 换气（引用块、图、表、代码块）。相邻两段不复用同一种；删掉它论证仍成立
   才算合格。逐条配额与位置见 `references/blog.md`。
-- **终稿一律低推理档**：成稿模型跑在 clean context + low reasoning effort。高推理档只给写作前的规划、
-  契约评审、事实核验这类"想"的任务；成稿开高会交回更均匀、更像算法排版的文字。
+- **正文一律低推理档**：凡是要给人读的文字——初稿、修订、多模型迭代——都跑在 clean context + low
+  reasoning effort，不分模型、不分轮次。`high`/`max` 只给审计（核验、契约评审、选版判断、诊断），
+  且审计只出意见，不许直接生成或改写正文。正文开高会交回更均匀、更像算法排版的文字。
 - **No flirty / emotional padding** (operator's global preference).
 - **Don't fabricate** data, quotes, citations, benchmarks. Mark gaps as `[TODO]`.
 - **Re-check every number before publishing** when the draft builds on existing material: numbers
