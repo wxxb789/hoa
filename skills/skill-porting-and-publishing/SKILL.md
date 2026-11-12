@@ -9,7 +9,7 @@ description: >-
   Not for auditing a skill library (that is curation) and not for a prose-only edit in a repo that
   already owns the file.
 metadata:
-  version: "0.1.46"
+  version: "0.1.47"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "de-couple a private skill for publication: canonical side, five axes, config resolution, catalog/CI validation, branch-and-PR release"
