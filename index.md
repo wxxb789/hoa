@@ -84,6 +84,7 @@ targets:  runtime-agnostic | repo-only |
 | cross-agent-history-retrieval | prompt | self-management,software-development | repo-only | `prompts/cross-agent-history-retrieval.md` | one-shot search/export of local agent histories with per-source coverage, dedup, and redaction |
 | fresh-context-grader | prompt | software-development,work-management | repo-only | `prompts/fresh-context-grader.md` | one-shot judge prompt: grade a response against a rubric written before it existed |
 | parallel-agent-worktrees | prompt | software-development,work-management | repo-only | `prompts/parallel-agent-worktrees.md` | one-shot setup of one git worktree per agent CLI: layout, env/port isolation, fail-closed setup, safe cleanup |
+| generalization-rubric | rule | software-development,work-management | repo-only | `rules/generalization-rubric.md` | a skill enters the public catalog only if a stranger on a fresh machine can run it: six gates, hard fails, apply-back invariants |
 | generated-means-generated | rule | software-development,work-management,self-management | repo-only | `rules/generated-means-generated.md` | generated files are never hand-edited; regeneration rides the same commit and drift fails CI |
 | adopt-a-pattern | workflow | software-development | repo-only | `workflows/adopt-a-pattern.md` | finite recipe turning a ref-map what-to-steal note into a landed, classified, attributed artifact |
 

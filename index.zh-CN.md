@@ -82,6 +82,7 @@ targets:  runtime-agnostic | repo-only |
 | cross-agent-history-retrieval | prompt | self-management,software-development | repo-only | `prompts/cross-agent-history-retrieval.md` | 一次性检索/导出本机各 agent 历史，按来源报告覆盖、去重并打码 |
 | fresh-context-grader | prompt | software-development,work-management | repo-only | `prompts/fresh-context-grader.md` | 一次性评审 prompt：用先于回答写好的 rubric 在全新上下文里评分 |
 | parallel-agent-worktrees | prompt | software-development,work-management | repo-only | `prompts/parallel-agent-worktrees.md` | 一次性为每个 agent CLI 建独立 git worktree：布局、env/端口隔离、fail-closed 初始化、安全清理 |
+| generalization-rubric | rule | software-development,work-management | repo-only | `rules/generalization-rubric.md` | 技能进入公开目录的唯一标准：陌生人在全新机器上能跑通——六道门槛、硬性失败项、回灌不变量 |
 | generated-means-generated | rule | software-development,work-management,self-management | repo-only | `rules/generated-means-generated.md` | 生成文件绝不手改；再生成随同一提交，漂移即 CI 失败 |
 | adopt-a-pattern | workflow | software-development | repo-only | `workflows/adopt-a-pattern.md` | 把 ref 地图里的 what-to-steal 笔记变成落地、归类、带署名 artifact 的有限步骤 |
 
