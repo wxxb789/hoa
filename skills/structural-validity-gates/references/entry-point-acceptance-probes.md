@@ -19,7 +19,10 @@ side of the wire. This is the pass that turns "its 34 tests pass" into "20/20 en
    globalThis.fetch = (input, init) => {
      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
      if (new URL(url).hostname !== 'remote.invalid') return real(input, init);
-     const target = FAKE + new URL(url).pathname;
+     // pathname drops the query string: keep it, or an auth or version selector is silently
+    // dropped and the probe tests a different request.
+    const { pathname, search } = new URL(url);
+    const target = FAKE + pathname + search;
      // A signed request arrives as a Request, not as (url, init).
      return typeof input === 'string' || input instanceof URL
        ? real(target, init)
@@ -57,9 +60,11 @@ side of the wire. This is the pass that turns "its 34 tests pass" into "20/20 en
 - **Sequence the failure modes with a mode switch**: conflict with matching bytes (reuse), conflict with
   different bytes (fail closed, stored bytes unchanged), public 404 after a successful write, rejected
   credentials, redirect to another host. Each needs a non-zero exit *and* the named reason.
-- **Keep a positive control in the same run.** An ordinary build that makes zero requests proves the
-  shim would have seen traffic; without it, an all-green table is compatible with a probe that never
-  reached the network layer.
+- **Keep a positive control in the same run: a request you force through the shipped entry point and
+  require the fake to record.** A zero-request build is only a *negative* control — it looks identical
+  whether the shim works or was never loaded, so on its own it cannot show the probe can observe traffic
+  at all, and an absence-based check then passes without exercising interception. Assert the recorded
+  method and path of the forced request before reading any other verdict.
 
 ## Reporting
 
