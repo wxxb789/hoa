@@ -11,10 +11,12 @@ ledger row), the exit-code mapping, stale recovery (once, idempotently), kill of
 live run through the `stop` control file, the bounded event log's loss accounting,
 the detachment evidence — the creation flags plus what the run observed about its
 own console (Windows) or session (POSIX) — and the argument passthrough to the
-agent.
+agent, including refusal when the agent executable cannot actually be spawned.
 """
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import os
 import signal
@@ -28,6 +30,7 @@ import types
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest import mock
 
 HERE = Path(__file__).resolve().parent
 SCRIPTS = HERE.parent
@@ -1135,6 +1138,55 @@ class LauncherTests(unittest.TestCase):
         self.assertIn("cmd.exe would expand", proc.stderr)
         self.assertIn("%PATH%", proc.stderr)
         self.assertFalse(self.run_dir("percent-27").exists())
+
+    def test_28_start_refuses_an_agent_with_a_missing_shebang_interpreter(self):
+        """An existing executable is not proof that the OS can start the agent."""
+        slug = "spawn-failure-28"
+        missing_interpreter = self.bin / "missing-interpreter"
+        broken_agent = self.bin / "unspawnable-agent.exe"
+        broken_agent.write_text(f"#!{missing_interpreter}\n", encoding="utf-8")
+        broken_agent.chmod(0o755)
+        self.assertFalse(missing_interpreter.exists())
+        proc = self.start(slug, assert_started=False, env=self.env_for(OMP_BIN=broken_agent))
+        state = self.wait_for_state(slug, {"failed"})
+        self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+        self.assertNotIn("started:", proc.stdout)
+        self.assertIn("agent did not start", proc.stderr)
+        self.assertEqual(state["exit"], 127)
+        self.assertTrue(state.get("error"), state)
+        self.assertIn(state["error"], proc.stderr)
+        self.assertEqual(state["note"], f"agent did not start: {state['error']}")
+        self.assertFalse(state.get("agent_pid"), state)
+        self.assertFalse((self.run_dir(slug) / "session.id").exists())
+
+    def test_29_start_rejects_a_failed_run_even_while_the_runner_is_alive(self):
+        """A terminal startup failure differs from a healthy, slow agent spawn."""
+        for verdict in ("failed", "running"):
+            with self.subTest(state=verdict):
+                slug = f"startup-29-{verdict}"
+                args = adapter.build_parser().parse_args(
+                    ["start", "--name", slug, "--prompt", str(self.prompt),
+                     "--cwd", str(self.tmp)]
+                )
+                stdout, stderr = io.StringIO(), io.StringIO()
+                with (
+                    mock.patch.dict(os.environ, self.env, clear=True),
+                    mock.patch.object(adapter, "spawn_runner"),
+                    mock.patch.object(adapter, "wait_for_start", return_value={"state": verdict}),
+                    mock.patch.object(adapter, "recorded_pids", return_value=[os.getpid()]),
+                    mock.patch.object(adapter, "pid_alive", return_value=True),
+                    contextlib.redirect_stdout(stdout),
+                    contextlib.redirect_stderr(stderr),
+                ):
+                    if verdict == "failed":
+                        with self.assertRaises(SystemExit) as caught:
+                            adapter.cmd_start(args)
+                        self.assertEqual(caught.exception.code, 1)
+                        self.assertNotIn("started:", stdout.getvalue())
+                        self.assertIn("runner exited before the agent started", stderr.getvalue())
+                    else:
+                        self.assertEqual(adapter.cmd_start(args), 0)
+                        self.assertIn(f"started: {slug}", stdout.getvalue())
 
 
 class AdapterUnitTests(unittest.TestCase):

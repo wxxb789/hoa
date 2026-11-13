@@ -1600,10 +1600,13 @@ def cmd_start(args) -> int:
     if (
         not started.get("agent_pid")
         and not os.path.exists(os.path.join(run_dir, "session.id"))
-        and not any(pid_alive(pid) for pid in pids)
+        and (
+            started.get("state") == "failed"
+            or not any(pid_alive(pid) for pid in pids)
+        )
     ):
-        # The runner recorded its own pid and then died before starting the agent:
-        # report that here instead of letting the caller treat a dead run as dispatched.
+        # A failed startup is terminal even while its runner is still exiting;
+        # a live runner alone must not make that look like a successful dispatch.
         die(
             "start: the runner exited before the agent started "
             f"(see {os.path.join(run_dir, 'runner.log')})"
@@ -1864,7 +1867,9 @@ def runner_main(args) -> int:
             process = spawn_agent(argv, args.cwd, stderr)
         except OSError as exc:
             log.finish()
-            finalize(run_dir, 127, note=f"agent did not start: {exc}")
+            finalize(
+                run_dir, 127, note=f"agent did not start: {exc}", extra={"error": str(exc)}
+            )
             sys.stderr.write(f"omp-run: agent did not start: {exc}\n")
             return 1
         state["agent_pid"] = process.pid
