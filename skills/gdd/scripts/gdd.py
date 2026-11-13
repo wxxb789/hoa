@@ -386,7 +386,54 @@ def final_head_for(stage, head_supplied, head, post_head):
     return head
 
 
-def ledger_append(repo, goal, stage, base, head, gates, next_stage=None, note=None, pr=None):
+STAGE_BUDGETS = {"implement": 2, "simplify": 2, "review": 2}
+LEDGER_COLUMNS = (
+    "ts repo goal stage base_sha head_sha pr gates rounds_simplify rounds_review "
+    "findings next_action note"
+).split()
+
+
+def budget_problem(stage, rounds, over_budget=False):
+    """The message that refuses one dispatch too many, or None."""
+    cap = STAGE_BUDGETS.get(stage)
+    if over_budget or not cap or rounds < cap:
+        return None
+    return (
+        f"{stage} has already run {rounds}x for this goal (cap {cap}) — read the ledger, "
+        "decide what changes the outcome, and pass --over-budget only if it does"
+    )
+
+
+def ledger_rounds(state_path, repo_name, goal, stage):
+    """How many runs of this stage the ledger already records for this repo+goal."""
+    try:
+        with open(os.path.expanduser(state_path), encoding="utf-8", errors="replace") as handle:
+            lines = handle.read().splitlines()
+    except OSError:
+        return 0
+    if not lines:
+        return 0
+    header = lines[0].split("\t")
+    try:
+        i_repo = header.index("repo")
+        i_goal = header.index("goal")
+        i_stage = header.index("stage")
+    except ValueError:
+        return 0
+    count = 0
+    for line in lines[1:]:
+        cells = line.split("\t")
+        if len(cells) <= max(i_repo, i_goal, i_stage):
+            continue
+        if cells[i_stage] != stage or cells[i_goal] != goal:
+            continue
+        if repo_name and repo_name not in cells[i_repo]:
+            continue
+        count += 1
+    return count
+
+
+def ledger_append(repo, goal, stage, base, head, gates, next_stage=None, note=None, pr=None, rounds=None):
     cmd = [
         sys.executable,
         DELIVERY_STATE,
@@ -409,6 +456,8 @@ def ledger_append(repo, goal, stage, base, head, gates, next_stage=None, note=No
     ]
     if pr:
         cmd += ["--pr", str(pr)]
+    if rounds:
+        cmd += ["--rounds-simplify" if stage == "simplify" else "--rounds-review", str(rounds)]
     if gates and gates != "-":
         cmd += ["--gates", gates]
     if next_stage:
@@ -555,6 +604,15 @@ def cmd_stage(args):
         print("gdd: dispatch refused (use --force to override)", file=sys.stderr)
         return 3
 
+    rounds_state = os.path.expanduser(state_file())
+    rounds_seen = ledger_rounds(rounds_state, repo_name, args.goal, args.stage)
+    budget_message = budget_problem(
+        args.stage, rounds_seen, over_budget=args.over_budget
+    )
+    if budget_message:
+        print(f"gdd: {budget_message}", file=sys.stderr)
+        return 3
+
     gates = args.gates or os.environ.get("GDD_GATES") or "-"
     findings = os.path.abspath(os.path.expanduser(args.findings)) if args.findings else "-"
 
@@ -632,7 +690,16 @@ def cmd_stage(args):
         )
         return 3
 
-    ledger_append(repo, args.goal, args.stage, base, head, gates, next_stage=args.stage)
+    ledger_append(
+        repo,
+        args.goal,
+        args.stage,
+        base,
+        head,
+        gates,
+        next_stage=args.stage,
+        rounds=rounds_seen + 1 if args.stage in STAGE_BUDGETS else None,
+    )
     print(f"run: {run_name}")
     print(f"run_dir: {run_dir}")
     print(f"poll: GDD_RUN_ROOT={shlex.quote(launch_run_root)} {launcher} status {run_name}")
@@ -801,6 +868,11 @@ def build_parser():
     stage.add_argument("--dry-run", action="store_true", help="render only")
     stage.add_argument("--wait", action="store_true", help="poll until the run ends")
     stage.add_argument("--force", action="store_true", help="ignore active-run guard")
+    stage.add_argument(
+        "--over-budget",
+        action="store_true",
+        help="dispatch past the stage's round cap (implement/simplify/review: 2)",
+    )
     stage.set_defaults(func=cmd_stage)
 
     scope = sub.add_parser(
