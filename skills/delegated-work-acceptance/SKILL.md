@@ -7,7 +7,7 @@ description: >-
   when deciding what to authorize and what to send back. Do not use for grading your own work, or when
   no artifact exists to inspect.
 metadata:
-  version: "0.1.56"
+  version: "0.1.57"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
   summary: "verify a delegated \"done\" against the artifact, the re-derived numbers and the write boundary"
