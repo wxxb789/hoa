@@ -52,6 +52,16 @@ def model_block(cfg: dict) -> dict:
     return {k: m.get(k) for k in ("default", "provider", "api_mode", "base_url")}
 
 
+MODEL_KEYS = ("model", "default_model", "provider", "model_provider")
+
+
+def profile_pin(home: Path, name: str) -> dict:
+    """Model-ish keys a profile pins in its own profile.yaml (a second routing layer)."""
+    path = home / "profile.yaml" if name == "default" else home / "profiles" / name / "profile.yaml"
+    data = load_yaml(path)
+    return {k: data[k] for k in MODEL_KEYS if k in data}
+
+
 def describe(home: Path, name: str) -> dict:
     cfg_path = home if name == "default" else home / "profiles" / name / "config.yaml"
     if name == "default":
@@ -62,6 +72,7 @@ def describe(home: Path, name: str) -> dict:
     providers = [bare((e or {}).get("provider")) for e in chain]
     return {
         "home": str(cfg_path),
+        "profile_pin": profile_pin(home, name),
         "model": model_block(cfg),
         # Child fallback routes decide where delegated work lands; a change there is a routing change.
         "delegation": {k: (cfg.get("delegation") or {}).get(k)

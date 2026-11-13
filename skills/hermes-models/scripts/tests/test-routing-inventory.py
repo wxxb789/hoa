@@ -141,6 +141,18 @@ def main():
         active = [r for r in rows if r.get("enabled", True)]
         case("paused jobs are excluded from active diagnostics", len(active), 0)
 
+    with tempfile.TemporaryDirectory() as tmp:
+        home = Path(tmp)
+        (home / "profiles" / "alpha").mkdir(parents=True)
+        (home / "profiles" / "alpha" / "config.yaml").write_text("model: {}\n", encoding="utf-8")
+        case("a home without a profile pin reports none", module.describe(home, "alpha")["profile_pin"], {})
+        (home / "profiles" / "alpha" / "profile.yaml").write_text(
+            "model: gpt-x\nprovider: q\n", encoding="utf-8"
+        )
+        pin = module.describe(home, "alpha")["profile_pin"]
+        case("a profile-level pin is recorded", pin.get("model"), "gpt-x")
+        case("a profile-level provider is recorded", pin.get("provider"), "q")
+
     print(f"routing-inventory: {passed}/{total} ok")
     return 0 if passed == total else 1
 

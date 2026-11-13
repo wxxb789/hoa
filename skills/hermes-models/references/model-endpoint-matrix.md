@@ -23,14 +23,16 @@ curl -s $RELAY/v1/chat/completions -H 'Authorization: Bearer local' -H 'Content-
 | `gpt-5.6-*`, `gpt-6*` | yes | no | `codex_responses` (`local-openai`) |
 | `gemini-*` | no (HTTP 400 `does not support the responses endpoint`) | yes | `chat_completions` (`local-chat`) |
 | `grok-4.6` | yes | no | `codex_responses` (`local-openai`) |
-| Claude family | **no** | **no** | unavailable on this account (2026-10-14) — configure nothing |
+| Claude family | probe it | probe it | availability is per account — key the row to your own `/v1/models` |
 
 Rules that survive catalog changes:
 
 - **Probe the model id on both routes before concluding anything.** Transport is per-model: this proxy
   serves responses-only, chat-only and both-route models side by side.
-- **Claude is not available to this Copilot account (2026-10-14).** No claude id resolves — tested on
-  both routes, and `GET /v1/models` lists none. Do not add claude entries, aliases or provider blocks.
+- **Whether the Claude family is reachable depends on the account behind the relay, and it changes.**
+  Probe both routes and `/v1/models` on your own account before adding or removing claude entries; a
+  ban copied from another install hides a route that may now work, and a route copied from another
+  install advertises one that does not.
 - **The Anthropic route is `/v1/messages`, not `/messages`.** A probe against `$RELAY/messages`
   returns `404 Unknown endpoint. Check the request path.` — a wrong-path artifact, not a dead proxy.
 - **A gateway is not one host.** The Tencent GLM service exists on two hosts with *different route maps and
