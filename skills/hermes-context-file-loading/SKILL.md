@@ -48,7 +48,8 @@ official docs. Mechanics here override any vibe-based assumption — when in dou
 | **`MEMORY.md`** | volatile tier (memory tool) | `HERMES_HOME/memories/MEMORY.md` | no | ✅ injected every turn |
 | **`USER.md`** | volatile tier (memory tool) | `HERMES_HOME/memories/USER.md` | no | ✅ injected every turn |
 
-`HERMES_HOME` = `$HERMES_HOME/` (or `$HERMES_HOME/profiles/<name>/` under a named profile).
+`HERMES_HOME` = `$HERMES_HOME/` (or `$HERMES_HOME/profiles/<name>/` under a named profile; `$HERMES_HOME`
+defaults to `~/.hermes` — substitute the install root in commands when yours is relocated).
 
 ## Critical precedence rule (project context = ONE slot)
 
@@ -158,7 +159,7 @@ duplicating facts across those two costs tokens on *every* call. De-dup volatile
 ## Verification recipe (re-confirm after Hermes upgrades)
 
 ```bash
-SRC=$HERMES_HOME/hermes-agent/agent/prompt_builder.py
+SRC="${HERMES_HOME:-$HOME/.hermes}/hermes-agent/agent/prompt_builder.py"
 # Confirm the loader functions and their scopes still match this skill:
 grep -n "_load_agents_md\|_load_hermes_md\|_load_claude_md\|load_soul_md\|_find_git_root\|build_context_files_prompt" "$SRC"
 ```

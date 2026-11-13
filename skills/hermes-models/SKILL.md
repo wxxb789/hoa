@@ -217,14 +217,16 @@ hermes chat -q 'Reply with exactly: PROBE_OK'                    # 1. live answe
 hermes -p <profile> chat -q 'Reply with exactly: PROBE_OK' \
   -t clarify -Q --ignore-rules --max-turns 1                     # 1b. same, inside one home
 python3 - <<'PY'                                                 # 2. the session row
-import sqlite3, glob, os
-for home in [os.path.expanduser('$HERMES_HOME')] + sorted(glob.glob(
-        os.path.expanduser('$HERMES_HOME/profiles/*'))):
+import glob, os, sqlite3
+root = os.path.expanduser(os.environ.get("HERMES_HOME", "~/.hermes"))   # quoted heredoc: bash does not expand
+for home in [root] + sorted(glob.glob(root + "/profiles/*")):
     c=sqlite3.connect(f"file:{home}/state.db?mode=ro",uri=True)
     print(home, c.execute("select model from sessions order by started_at desc limit 2").fetchall())
 PY
-HERMES_HOME=$HERMES_HOME python3 - <<'PY'                            # 3. effort resolution
-import os, sys; sys.path.insert(0, os.path.expanduser('$HERMES_HOME/hermes-agent'))
+python3 - <<'PY'                                                    # 3. effort resolution
+import os, sys
+root = os.path.expanduser(os.environ.get("HERMES_HOME", "~/.hermes"))
+sys.path.insert(0, root + "/hermes-agent")
 from hermes_constants import resolve_reasoning_config
 from hermes_cli.config import load_config
 print(resolve_reasoning_config(load_config(), "<model>"))
