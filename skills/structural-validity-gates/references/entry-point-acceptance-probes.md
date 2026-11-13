@@ -19,14 +19,13 @@ side of the wire. This is the pass that turns "its 34 tests pass" into "20/20 en
    globalThis.fetch = (input, init) => {
      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
      if (new URL(url).hostname !== 'remote.invalid') return real(input, init);
-     // pathname drops the query string: keep it, or an auth or version selector is silently
-    // dropped and the probe tests a different request.
-    const { pathname, search } = new URL(url);
-    const target = FAKE + pathname + search;
-     // A signed request arrives as a Request, not as (url, init).
+     // `pathname` drops the query string: keep it, or an auth or version selector is silently lost.
+     const { pathname, search } = new URL(url);
+     const target = FAKE + pathname + search;
+     // A signed request arrives as a Request, not as (url, init) — and init still applies on top.
      return typeof input === 'string' || input instanceof URL
        ? real(target, init)
-       : real(new Request(target, input));
+       : real(new Request(target, input), init);
    };
    ```
 
