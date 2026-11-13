@@ -6,7 +6,7 @@
    and which behaviours are deliberate non-goals.
 1. `git fetch origin --prune`, fast-forward `main`, branch `feat/<kebab-outcome>` **from
    `origin/main`**, never from a stale local main. Report the base SHA every time.
-2. Record the baseline before dispatching: `$(scripts/gdd.py scope)` snapshot --repo <path> --label <goal>.
+2. Record the baseline before dispatching: "$(scripts/gdd.py scope)" snapshot --repo <path> --label <goal>.
    Report the count of pre-existing dirty paths in the dispatch line — they are not part of this
    increment. Refuse to dispatch on a dirty submodule or nested repository; resolve it first.
 3. Dispatch one implementation run carrying the goal file, the repo's contract docs, the most recent

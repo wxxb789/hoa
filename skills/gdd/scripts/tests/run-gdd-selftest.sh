@@ -1121,6 +1121,16 @@ NOLOCK_SHOW="$TMP/nolock-show.out"
 grep -qx 'last_run: workrepo-0001-simplify-nolock stale lock exit=- dur=-' "$NOLOCK_SHOW"
 check $? "a run with a recorded pid but no lock file reports stale lock" "$(cat "$NOLOCK_SHOW")"
 
+# --- report-only stages keep the head they were dispatched with --------------
+HEAD_KEEP_TSV="$TMP/head-keep.tsv"
+env GDD_LAUNCHER="$FAKE_LAUNCHER" GDD_STATE_FILE="$HEAD_KEEP_TSV" timeout 60 \
+  python3 "$SCRIPTS/gdd.py" stage --repo "$REPO" --goal 0001 --stage review \
+  --base abc1234 --head def5678 --wait >"$TMP/head-keep.out" 2>&1
+HEAD_KEEP_RC=$?
+LAST_HEAD="$(awk -F'\t' 'NR>1 {h=$6} END {print h}' "$HEAD_KEEP_TSV" 2>/dev/null)"
+[ "$HEAD_KEEP_RC" -eq 0 ] && [ "$LAST_HEAD" = "def5678" ]
+check $? "a report-only stage keeps the dispatched head in its completion row (got '$LAST_HEAD' rc=$HEAD_KEEP_RC)" "$(cat "$TMP/head-keep.out")"
+
 # --- dispatch guards ---------------------------------------------------------
 GUARD_OUT="$(python3 "$HERE/test-dispatch-guards.py" 2>&1)"
 check $? "dispatch guards refuse empty contract / archive / provisional / dirty tree / empty range" "$GUARD_OUT"

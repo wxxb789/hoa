@@ -154,6 +154,19 @@ def render(template_text, variables):
     return text
 
 
+def resolve_ref(repo, value):
+    """Full SHA for a supplied endpoint; the value unchanged when git cannot resolve it."""
+    if not value:
+        return value
+    proc = subprocess.run(
+        ["git", "-C", repo, "rev-parse", "--verify", "--quiet", str(value)],
+        capture_output=True,
+        text=True,
+    )
+    resolved = (proc.stdout or "").strip()
+    return resolved if proc.returncode == 0 and resolved else value
+
+
 def resolve_goal_file(repo, goal):
     """Contract file for a goal from GDD_GOAL_GLOB; '-' when nothing matches."""
     pattern = config("GDD_GOAL_GLOB", default=DEFAULT_GOAL_GLOB)
@@ -515,9 +528,10 @@ def cmd_stage(args):
     else:
         head = git(repo, "rev-parse", "HEAD")
     # Resolve supplied endpoints to commit SHAs: `--base <sha> --head HEAD` names one commit
-    # twice, and a string compare would call that a non-empty range.
-    base = git(repo, "rev-parse", base)
-    head = git(repo, "rev-parse", head)
+    # twice, and a string compare would call that a non-empty range. A value git cannot resolve
+    # is kept literally, so a caller may pass a SHA from another checkout.
+    base = resolve_ref(repo, base)
+    head = resolve_ref(repo, head)
 
     dirty = [
         line[3:]
