@@ -63,12 +63,16 @@ targets:  runtime-agnostic | repo-only |
 | microsoft-office | skill | work-management,software-development | runtime-agnostic | `skills/microsoft-office/` | 用 Python CLI 离线创建、读取、编辑与套用 Word、PowerPoint、Excel 文件模板 |
 | notes-to-prd | skill | work-management | runtime-agnostic | `skills/notes-to-prd/` | 把笔记或想法转成结构化 PRD 草稿 |
 | ocr-and-documents | skill | work-management | runtime-agnostic | `skills/ocr-and-documents/` | 用 pymupdf 或 marker-pdf 从 PDF 与扫描件里抽文本 |
+| official-document-verification | skill | work-management | runtime-agnostic | `skills/official-document-verification/` | 用文档的确切版本核验结论，含只能用真浏览器取到的被封来源 |
 | omp-headless-orchestration | skill | software-development,work-management | pi | `skills/omp-headless-orchestration/` | 脱离会话的 tmux 启动器跑 `omp -p` 长任务；轮询完成、按 session id 恢复 |
 | ops-claim-verification | skill | software-development,work-management | runtime-agnostic | `skills/ops-claim-verification/` | 把定时任务、修复或部署的说法变成证据：找准记录面、区分手动与调度运行、审查审计者 |
 | package-release-verification | skill | software-development | runtime-agnostic | `skills/package-release-verification/` | 发版：先补 changelog、同一 commit 的门禁、分派、按版本号核 registry、单独获批的清理 |
 | plan-to-issues | skill | work-management | runtime-agnostic | `skills/plan-to-issues/` | 把 PRD 或计划拆成 issue 级任务：标题、正文、标签 |
 | project-phase-closeout | skill | software-development,work-management | runtime-agnostic | `skills/project-phase-closeout/` | 清点任务面，对账记录/索引/发布/生产四层，输出带唯一决策点的收尾清单 |
 | report-claim-audit | skill | work-management,software-development | runtime-agnostic | `skills/report-claim-audit/` | 从各自的权威 artifact 重算每条报告声明、对账交付集合，并给待决事项定价 |
+| research-stream-consolidation | skill | work-management | runtime-agnostic | `skills/research-stream-consolidation/` | 把重复的研究流并成一个项目，并修好绑定旧路径的记录 |
+| review-revision-candidates | skill | work-management | runtime-agnostic | `skills/review-revision-candidates/` | 被驳回候选的返修轮：编号清单就是全部变更集，交的是字节不是辩解 |
+| rss-feeds | skill | self-management | runtime-agnostic | `skills/rss-feeds/` | 用随附的读取器看 RSS/Atom 与 Reddit 流，按发布时间去重 |
 | skill-library-curation | skill | software-development,self-management | runtime-agnostic | `skills/skill-library-curation/` | 按证据审查技能库：清点、重叠分组、安装来源、上游新鲜度；建议不改动状态 |
 | skill-porting-and-publishing | skill | software-development,work-management | runtime-agnostic | `skills/skill-porting-and-publishing/` | 把私有 skill 解耦到可发布仓库：确定权威副本、五轴改造、配置解析、目录与 CI 校验、走分支与 PR 发布 |
 | spec-convergence | skill | software-development | runtime-agnostic | `skills/spec-convergence/` | 把模糊需求收敛为已确认 spec：每轮一个根问题、每轮问题数有上限、每问附事实、写前显式确认共同理解 |
