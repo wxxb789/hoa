@@ -63,8 +63,10 @@ def describe(home: Path, name: str) -> dict:
     return {
         "home": str(cfg_path),
         "model": model_block(cfg),
+        # Child fallback routes decide where delegated work lands; a change there is a routing change.
         "delegation": {k: (cfg.get("delegation") or {}).get(k)
-                        for k in ("backend", "provider", "model")},
+                        for k in ("backend", "provider", "model", "fallback_providers",
+                                  "fallback_models")},
         "fallback_providers": chain,
         "fallback_heterogeneous": bool(providers) and any(p != default_provider for p in providers),
         # Values, not just names: a switch that repoints an existing alias leaves the name list
@@ -143,7 +145,9 @@ def main() -> int:
     homes = {n: describe(home, n) for n in names}
     jobs = cron_rows(home)
 
-    agent_jobs = [j for j in jobs if j["kind"] == "agent"]
+    # A paused job cannot double-fire or ride a hot-path model; counting it in the diagnostics
+    # reports problems the fleet does not have.
+    agent_jobs = [j for j in jobs if j["kind"] == "agent" and j.get("enabled", True)]
     findings = {
         "self_fallback_homes": [n for n, h in homes.items() if not h["fallback_heterogeneous"]],
         "unpinned_agent_jobs": [f"{j['profile']}:{j['name']}" for j in agent_jobs

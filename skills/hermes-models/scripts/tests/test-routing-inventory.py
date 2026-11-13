@@ -108,6 +108,34 @@ def main():
         after = module.describe(home, "default")["providers"]
         case("moving an endpoint changes the inventory", before != after, True)
 
+    with tempfile.TemporaryDirectory() as tmp:
+        home = Path(tmp)
+        cfg = home / "config.yaml"
+
+        def delegation(**kw):
+            body = "\n".join(f"  {k}: {v}" for k, v in kw.items())
+            cfg.write_text(f"delegation:\n{body}\n", encoding="utf-8")
+            return module.describe(home, "default")["delegation"]
+
+        before = delegation(fallback_providers="[a]")
+        after = delegation(fallback_providers="[b]")
+        case("delegation fallback routes are recorded", before.get("fallback_providers"), ["a"])
+        case("changing a child fallback route changes the inventory", before != after, True)
+
+        store = home / "profiles" / "p" / "cron"
+        store.mkdir(parents=True)
+        jobs = {
+            "jobs": [
+                {"id": "a", "name": "a", "enabled": False, "schedule": {"display": "0 * * * *"}},
+                {"id": "b", "name": "b", "enabled": False, "schedule": {"display": "0 * * * *"}},
+            ]
+        }
+        (store / "jobs.json").write_text(json.dumps(jobs), encoding="utf-8")
+        rows = module.cron_rows(home)
+        case("paused jobs are still listed in the store dump", len(rows), 2)
+        active = [r for r in rows if r.get("enabled", True)]
+        case("paused jobs are excluded from active diagnostics", len(active), 0)
+
     print(f"routing-inventory: {passed}/{total} ok")
     return 0 if passed == total else 1
 

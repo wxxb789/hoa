@@ -54,7 +54,7 @@ leave anything that changes scheduling behaviour or a peer harness for the owner
 
 ```bash
 HERMES_HOME=${HERMES_HOME:-$HOME/.hermes}
-python3 "${HERMES_SKILLS_DIR:-$HERMES_HOME/skills}/hermes-models/scripts/audit-config-drift.py"
+python3 "${HERMES_SKILLS_DIR:-$HERMES_HOME/skills}/hermes-models/scripts/audit-config-drift.py" --home "$HERMES_HOME"
 ```
 
 It prints per profile: **MISS** (root deviates from the built-in default, profile lacks the key), **DIFF**
