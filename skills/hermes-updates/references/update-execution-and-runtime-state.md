@@ -13,7 +13,8 @@ hermes --version                                     # vX+NNNN.g<sha> (release d
 cd $HERMES_HOME/hermes-agent
 git status --short --branch; git rev-parse HEAD; git rev-parse origin/main
 git for-each-ref refs/hermes-update-backups/ --format='%(refname) %(objectname:short)'
-systemctl --user is-active hermes-gateway.service
+# resolve the unit names from the install first: `systemctl --user list-units --type=service | grep -i hermes`
+systemctl --user is-active <hermes-gateway-unit>
 ```
 
 `hermes --version`'s `(YYYY.M.D)` is the release's date, not the checkout's — a checkout updated
@@ -112,7 +113,8 @@ problem and follow the `hermes pm repair` path in SKILL.md instead.
 ## Verifying the unattended updater
 
 To answer "does the auto-upgrade actually work", exercise it — never judge from a green timer.
-`systemctl --user start hermes-auto-update.service` runs the real script under systemd (`Type=oneshot`,
+`systemctl --user start <hermes-auto-update-unit>` (listed by `systemctl --user list-timers`) runs the real
+script under systemd (`Type=oneshot`,
 blocks to completion; it sleeps `HERMES_AUTO_UPDATE_START_DELAY` first). Both outcomes are PASS:
 
 - **Already current**: journal prints `already current at <sha>; no restart`, the gateway PID is

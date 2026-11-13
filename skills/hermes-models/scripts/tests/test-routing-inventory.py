@@ -128,6 +128,11 @@ def main():
         case("delegation endpoint is recorded", before.get("base_url"), "https://a.invalid")
         case("moving the delegation endpoint changes the inventory", before != after, True)
 
+        before = delegation(reasoning_effort="high")
+        after = delegation(reasoning_effort="max")
+        case("child reasoning effort is recorded", before.get("reasoning_effort"), "high")
+        case("changing child effort changes the inventory", before != after, True)
+
         store = home / "profiles" / "p" / "cron"
         store.mkdir(parents=True)
         jobs = {
