@@ -47,15 +47,19 @@ a one-key flip instead of a rebuild. Say this explicitly in the report so nobody
 
 ## 3. Generated homes: the route belongs to the generator
 
-Profile homes materialized from a repo (`*-nrs` from `the roster repo's per-bot binding files (`bots/bindings/hermes/<bot>.yaml`)`)
-write `model.provider|default|base_url|api_mode` from their binding on every apply. Editing the live
-profile config looks correct until the next `materialize.py --apply` silently reverts it.
+Some homes are **materialized from a repository** — each one writes `model.provider|default|base_url|api_mode`
+from a binding file on every apply. Editing the live profile config looks correct until the next apply
+silently reverts it. Resolve that repository, its binding files and its apply/check commands from operator
+configuration (`HERMES_FLEET_GENERATOR_DIR` and the generator's own entry point, or a `hermes-models` config
+key) — the layout below is one arrangement, not the contract.
 
-1. Edit the binding (provider, id; drop `base_url`/`api_mode` that belonged to the old provider).
-2. `python3 bots/bindings/hermes/materialize.py --apply`.
-3. `python3 bots/bindings/hermes/materialize.py --check` — **silent and exit 0 means healthy**; any
-   output is drift.
-4. Commit + push the binding (repo is the SSOT; a hand-edited live home is drift by definition).
+The generator contract, which a hand pass must also satisfy:
+
+1. The binding is the source of truth: edit it (provider, id; drop `base_url`/`api_mode` that belonged to the
+   old provider) — never the generated home.
+2. Apply writes the route into every generated home and touches no unmanaged home.
+3. Check is **silent and exits 0 when every generated home agrees with its binding**; any output is drift.
+4. Commit + push the binding (the repo is the SSOT; a hand-edited live home is drift by definition).
 
 `fallback_providers` has no binding field, so hand-set fallbacks survive the apply — re-read them
 anyway, because a generator rewrite of the `model:` block is exactly when a stale fallback hides. When the
