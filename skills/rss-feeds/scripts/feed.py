@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import html
+import os
 import json
 import re
 import sys
@@ -23,7 +24,8 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, UTC
 from email.utils import parsedate_to_datetime
 
-USER_AGENT = "hermes-agent/1.0 (rss-feeds skill; +https://github.com/NousResearch/hermes-agent)"
+# Runtime-agnostic: identify the operator's client, not this agent's runtime. Override per install.
+USER_AGENT = os.environ.get("FEED_USER_AGENT") or "rss-feeds/1.0 (+https://github.com/wxxb789/hoa)"
 TIMEOUT = 20
 NS = {
     "atom": "http://www.w3.org/2005/Atom",
@@ -191,12 +193,20 @@ def read(url: str) -> dict:
     raise SystemExit(f"no feed found at {url}; tried {len(candidates)} candidates\n" + "\n".join(errors))
 
 
-def filter_entries(entries: list[dict], limit: int, since: str | None) -> list[dict]:
+def filter_entries(entries: list[dict], limit: int, since: str | None,
+                   after: str | None = None) -> list[dict]:
+    """`since` is inclusive; `after` is exclusive — a digest that persists its last-seen timestamp
+    must use `after`, or every run reprints the entry it already reported."""
+    def cutoff_of(value: str):
+        parsed = datetime.fromisoformat(value).replace(tzinfo=UTC) if "T" not in value else datetime.fromisoformat(value)
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+
     if since:
-        cutoff = datetime.fromisoformat(since).replace(tzinfo=UTC) if "T" not in since else datetime.fromisoformat(since)
-        if cutoff.tzinfo is None:
-            cutoff = cutoff.replace(tzinfo=UTC)
+        cutoff = cutoff_of(since)
         entries = [e for e in entries if e["published"] and datetime.fromisoformat(e["published"]) >= cutoff]
+    if after:
+        cutoff = cutoff_of(after)
+        entries = [e for e in entries if e["published"] and datetime.fromisoformat(e["published"]) > cutoff]
     entries.sort(key=lambda e: e["published"] or "", reverse=True)
     return entries[:limit]
 
@@ -218,7 +228,9 @@ def main(argv: list[str] | None = None) -> int:
     r = sub.add_parser("read", help="read a feed (or discover one behind a page URL)")
     r.add_argument("url")
     r.add_argument("--limit", type=int, default=20)
-    r.add_argument("--since", help="ISO date/datetime; drop older entries")
+    r.add_argument("--since", help="ISO date/datetime; drop older entries (inclusive)")
+    r.add_argument("--after", help="ISO date/datetime; drop entries at or before it (exclusive — "
+                                   "use this when persisting the last-seen timestamp)")
     r.add_argument("--json", action="store_true")
     d = sub.add_parser("discover", help="list feed URLs advertised by a page")
     d.add_argument("url")
@@ -231,7 +243,7 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(urls, indent=2) if args.json else "\n".join(urls))
             return 0
         feed = read(args.url)
-        feed["entries"] = filter_entries(feed["entries"], args.limit, args.since)
+        feed["entries"] = filter_entries(feed["entries"], args.limit, args.since, args.after)
         print(json.dumps(feed, indent=2, ensure_ascii=False) if args.json else render_text(feed))
         return 0
     except urllib.error.HTTPError as exc:

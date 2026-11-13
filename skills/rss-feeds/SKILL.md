@@ -70,7 +70,7 @@ between several advertised feeds (comments feed vs posts feed, per-category feed
 
 ② Bound the request: `--limit` for "latest N", `--since YYYY-MM-DD` for "since last
 check". For a cron digest persist the last-seen `published` value and pass it as
-`--since` next run.
+`--after` next run.
 
 ③ For full text, hand the entry `link` to `web_extract`; feed summaries are frequently
 truncated or the first paragraph only.
@@ -88,7 +88,7 @@ truncated or the first paragraph only.
   Wait out the window when you need more
   than one Reddit call.
 - Dates: RSS `pubDate` is RFC 822 and Atom uses ISO 8601; the script normalises both to
-  UTC. Feeds that omit dates sort to the bottom and are dropped by `--since`.
+  UTC. Feeds that omit dates sort to the bottom and are dropped by `--after`.
 - Some feeds are Cloudflare-fronted and 403 non-browser clients; the blocked-page recovery path
   handles that class.
 
