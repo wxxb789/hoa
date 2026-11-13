@@ -137,6 +137,11 @@ def main() -> int:
     )
     ap.add_argument("--out", default="")
     args = ap.parse_args()
+    if not Path(args.home).is_dir():
+        raise SystemExit(
+            f"audit-routing-inventory: --home {args.home} does not exist — refusing to emit an "
+            "empty inventory for a home that was never read"
+        )
     home = Path(os.path.expanduser(args.home))
 
     names = ["default"] + sorted(p.name for p in (home / "profiles").iterdir()

@@ -2,7 +2,8 @@
 
 <!-- install-root: `$HERMES_HOME` below means the install root; it defaults to `~/.hermes` -->
 
-What each endpoint actually accepts, per model: the local ghc-proxy at `http://localhost:4141`,
+What each endpoint actually accepts, per model: the install's relay (the `base_url`/`api` of the
+provider you configured — `$RELAY` below; the reference install runs a local ghc-proxy on 4141),
 and external chat-completions relays. Verified by probing; re-probe before relying on a row,
 because the catalog churns.
 
@@ -10,10 +11,10 @@ Probe shape (header `Authorization: Bearer local`):
 
 ```bash
 # Responses protocol
-curl -s localhost:4141/v1/responses -H 'Authorization: Bearer local' -H 'Content-Type: application/json' \
+curl -s $RELAY/v1/responses -H 'Authorization: Bearer local' -H 'Content-Type: application/json' \
   -d '{"model": "<id>", "input": "hi", "max_output_tokens": 16}'
 # Chat-completions protocol
-curl -s localhost:4141/v1/chat/completions -H 'Authorization: Bearer local' -H 'Content-Type: application/json' \
+curl -s $RELAY/v1/chat/completions -H 'Authorization: Bearer local' -H 'Content-Type: application/json' \
   -d '{"model": "<id>", "messages": [{"role": "user", "content": "hi"}], "max_tokens": 16}'
 ```
 
@@ -30,7 +31,7 @@ Rules that survive catalog changes:
   serves responses-only, chat-only and both-route models side by side.
 - **Claude is not available to this Copilot account (2026-10-14).** No claude id resolves — tested on
   both routes, and `GET /v1/models` lists none. Do not add claude entries, aliases or provider blocks.
-- **The Anthropic route is `/v1/messages`, not `/messages`.** A probe against `localhost:4141/messages`
+- **The Anthropic route is `/v1/messages`, not `/messages`.** A probe against `$RELAY/messages`
   returns `404 Unknown endpoint. Check the request path.` — a wrong-path artifact, not a dead proxy.
 - **A gateway is not one host.** The Tencent GLM service exists on two hosts with *different route maps and
   different keys*: the new host (`1.14.219.252`) serves `/v1/chat/completions` only
