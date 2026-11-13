@@ -41,6 +41,7 @@ STUB_SOURCE = '''\
 """Stub agent CLI: an OMP-style --mode=json NDJSON stream, driven by env vars."""
 import json
 import os
+import subprocess
 import sys
 import time
 
@@ -62,12 +63,45 @@ def main():
         while True:
             emit({"type": "turn_end"})
             time.sleep(0.2)
+    if mode == "quiet":
+        # Stops writing after one event: a chatty agent dies with its runner's pipe
+        # (BrokenPipeError), which hides the window this mode exists to hold open.
+        time.sleep(300)
+        return 0
     if mode == "flood":
         filler = "x" * 2000
         for index in range(300):
             emit({"type": "tool_use_start", "index": index, "filler": filler})
         emit({"type": "message_end", "message": {"role": "assistant", "content": [{"type": "text", "text": "flooded"}]}})
         return 0
+    if mode == "lingering":
+        # A tool the agent started that keeps the agent's stdout open after the agent
+        # exits: the runner's reader never sees EOF.
+        child = subprocess.Popen(
+            [sys.executable, "-c", "import time; time.sleep(300)"],
+            stdout=sys.stdout, stderr=sys.stderr,
+        )
+        with open(os.environ["STUB_CHILD_PID_FILE"], "w", encoding="utf-8") as handle:
+            handle.write(str(child.pid))
+        emit({"type": "message_end", "message": {"role": "assistant", "content": [{"type": "text", "text": "started a tool and left"}]}})
+        return 0
+    if mode == "sleep_tool":
+        # A tool that ignores SIGTERM, below an agent that is later stopped: the run may
+        # only be called killed once that tool is gone too.
+        child = subprocess.Popen(
+            [
+                sys.executable,
+                "-c",
+                "import signal, time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(300)",
+            ],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        with open(os.environ["STUB_CHILD_PID_FILE"], "w", encoding="utf-8") as handle:
+            handle.write(str(child.pid))
+        emit({"type": "message_end", "message": {"role": "assistant", "content": [{"type": "text", "text": "working with a stubborn tool"}]}})
+        while True:
+            emit({"type": "turn_end"})
+            time.sleep(0.2)
     if mode == "two-messages":
         emit({"type": "message_end", "message": {"role": "assistant", "content": [{"type": "text", "text": "first draft"}]}})
         emit({"type": "turn_end"})
@@ -692,6 +726,9 @@ class LauncherTests(unittest.TestCase):
             env=self.env_for(STUB_MODE="sleep", STUB_ARGV_FILE=argv_file),
         )
         self.wait_for_state("argv-15d", {"running"}, timeout=START_TIMEOUT)
+        deadline = time.monotonic() + START_TIMEOUT
+        while time.monotonic() < deadline and not argv_file.exists():
+            time.sleep(adapter.POLL_SECONDS)
         recorded = json.loads(argv_file.read_text(encoding="utf-8"))
         self.assertIn("--no-session", recorded)
         self.assertEqual(recorded[-1].strip(), "do the thing")
@@ -820,7 +857,12 @@ class LauncherTests(unittest.TestCase):
         # comes from the documented key (with the default loud when it is unset).
         writer_class, resolve_cap = adapter.load_writer()
         self.assertTrue(writer_class)
-        self.assertEqual(list(ADAPTER.parent.glob("__pycache__/events-writer*")), [])
+        # Loading must not *create* bytecode: another tool (py_compile) may have left
+        # some, so compare before and after rather than asserting the directory empty.
+        cached_before = sorted(path.name for path in ADAPTER.parent.glob("__pycache__/*"))
+        adapter.load_writer()
+        cached_after = sorted(path.name for path in ADAPTER.parent.glob("__pycache__/*"))
+        self.assertEqual(cached_before, cached_after)
         saved = os.environ.get("OMP_RUN_EVENTS_MAX_BYTES")
         try:
             os.environ.pop("OMP_RUN_EVENTS_MAX_BYTES", None)
@@ -872,6 +914,229 @@ class LauncherTests(unittest.TestCase):
         # used, so an operator's other sessions on the same socket survive.
 
 
+    def test_20_a_second_start_cannot_clobber_a_fresh_claim(self):
+        """A run inside its pidless window is occupied work, not a stale directory."""
+        slug = "claim-20"
+        run_dir = self.run_dir(slug)
+        run_dir.mkdir(parents=True)
+        # Exactly the window `start` holds before the runner records a pid.
+        (run_dir / "start.lock").write_text("", encoding="utf-8")
+        (run_dir / "prompt.md").write_text("first dispatch\n", encoding="utf-8")
+        (run_dir / "state.json").write_text(
+            json.dumps(
+                {"name": slug, "state": "running", "exit": None, "started": adapter.now_iso()}
+            ),
+            encoding="utf-8",
+        )
+        proc = self.start(slug, assert_started=False)
+        self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+        self.assertIn("still running", proc.stderr)
+        self.assertTrue((run_dir / "prompt.md").read_text(encoding="utf-8").startswith("first"))
+        self.assertFalse((run_dir / "run.json").exists())
+
+    def test_21_a_forced_stop_is_recorded_as_killed(self):
+        """A runner that cannot finalize is stopped by force, and the stop is recorded as one."""
+        slug = "forced-21"
+        env = self.env_for(STUB_MODE="quiet", OMP_RUN_STOP_WAIT_SECONDS="1")
+        self.start(slug, env=env)
+        run_dir = self.run_dir(slug)
+        live = self.wait_for_state(slug, {"running"}, timeout=START_TIMEOUT)
+        runner = live["pid"]
+        # Kill the runner alone: the agent it started stays alive, so the run is live
+        # with nobody left to finalize it — the case the forced path exists for.
+        if IS_WINDOWS:
+            subprocess.run(
+                ["taskkill", "/F", "/PID", str(runner)], capture_output=True
+            )
+        else:
+            os.kill(runner, signal.SIGKILL)
+        deadline = time.monotonic() + 20.0
+        while time.monotonic() < deadline and adapter.pid_alive(runner):
+            time.sleep(adapter.POLL_SECONDS)
+        self.assertFalse(adapter.pid_alive(runner))
+        self.assertTrue(adapter.run_alive(str(run_dir)))
+        killed = self.adapter_run("kill", slug, env=env)
+        self.assertEqual(killed.returncode, 0, killed.stdout + killed.stderr)
+        state = self.wait_for_state(slug, {"killed"}, timeout=60.0)
+        self.assertEqual(state["exit"], adapter.KILL_EXIT)
+        self.assertEqual((run_dir / "finalized").read_text(encoding="utf-8"), "143")
+        self.assertNotIn("stale_recovered", state)
+
+    def test_22_concurrent_recovery_appends_one_row(self):
+        """Two readers seeing the same dead run finalize it once, with one ledger row."""
+        slug = "recover-22"
+        env = self.env_for(STUB_MODE="sleep")
+        self.start(slug, env=env)
+        self.wait_for_state(slug, {"running"}, timeout=START_TIMEOUT)
+        run_dir = self.run_dir(slug)
+        self.kill_hard(run_dir)
+        deadline = time.monotonic() + 20.0
+        while time.monotonic() < deadline and adapter.run_alive(str(run_dir)):
+            time.sleep(adapter.POLL_SECONDS)
+        ledger = self.run_root / "ledger.tsv"
+        readers = [
+            subprocess.Popen(
+                [sys.executable, str(ADAPTER), "status", slug],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=self.env,
+                text=True,
+            )
+            for _ in range(4)
+        ]
+        for reader in readers:
+            reader.communicate(timeout=60)
+        state = self.state_of(slug)
+        self.assertEqual(state["state"], "failed")
+        self.assertTrue(state["stale_recovered"])
+        rows = [
+            row
+            for row in ledger.read_text(encoding="utf-8").splitlines()[1:]
+            if row.split("\t")[1] == slug
+        ]
+        self.assertEqual(len(rows), 1, rows)
+
+    def test_23_a_terminal_state_without_a_marker_is_repaired(self):
+        """A finalizer that died between state.json and the marker gets the marker written."""
+        slug = "repair-23"
+        run_dir = self.run_dir(slug)
+        run_dir.mkdir(parents=True)
+        (run_dir / "state.json").write_text(
+            json.dumps(
+                {
+                    "name": slug,
+                    "state": "done",
+                    "exit": 0,
+                    # Older than the startup grace: a terminal state that young could
+                    # still be the runner's own finalization in flight.
+                    "started": (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat(),
+                    "ended": adapter.now_iso(),
+                    "duration_s": 1.0,
+                }
+            ),
+            encoding="utf-8",
+        )
+        view, output = self.status_view(slug)
+        self.assertEqual(view["state"], "done")
+        self.assertTrue((run_dir / "finalized").exists())
+        self.assertEqual((run_dir / "finalized").read_text(encoding="utf-8"), "0")
+        repaired = self.state_of(slug)
+        self.assertTrue(repaired["finalize_repaired"])
+        self.assertIn("without the finalized marker", repaired["note"])
+        before = (run_dir / "state.json").read_bytes()
+        self.adapter_run("status", slug)
+        self.assertEqual(before, (run_dir / "state.json").read_bytes())
+
+    def test_24_an_open_event_stream_is_recorded(self):
+        """A tool holding the agent's stdout after it exits is stated, not hidden."""
+        slug = "stream-24"
+        child_file = self.tmp / "linger-24.pid"
+        env = self.env_for(
+            STUB_MODE="lingering",
+            STUB_CHILD_PID_FILE=child_file,
+            OMP_RUN_DRAIN_TIMEOUT_SECONDS="1",
+        )
+        self.start(slug, env=env)
+        state = self.wait_for_state(slug, {"done"}, timeout=SETTLE_TIMEOUT)
+        self.assertTrue(state["stream_incomplete"], state)
+        self.assertIn("event stream was still open", state["note"])
+        self.assertEqual(state["state"], "done")
+        run_dir = self.run_dir(slug)
+        # The writer's terminal passthrough is off for this adapter: the event bound
+        # bounds the whole run directory's growth, not just events.ndjson.
+        self.assertLess((run_dir / "runner.log").stat().st_size, 4096)
+        lingering = int(child_file.read_text(encoding="utf-8"))
+        if IS_WINDOWS:
+            subprocess.run(["taskkill", "/F", "/PID", str(lingering)], capture_output=True)
+        else:
+            try:
+                os.kill(lingering, signal.SIGKILL)
+            except OSError:
+                pass
+
+    def test_25_a_run_is_not_killed_while_its_tool_lives(self):
+        """Escalation reaches the tool the agent started, not just the agent."""
+        slug = "tree-25"
+        child_file = self.tmp / "tool-25.pid"
+        env = self.env_for(
+            STUB_MODE="sleep_tool",
+            STUB_CHILD_PID_FILE=child_file,
+            OMP_RUN_STOP_WAIT_SECONDS="2",
+        )
+        self.start(slug, env=env)
+        self.wait_for_state(slug, {"running"}, timeout=START_TIMEOUT)
+        deadline = time.monotonic() + START_TIMEOUT
+        while time.monotonic() < deadline and not child_file.exists():
+            time.sleep(adapter.POLL_SECONDS)
+        tool = int(child_file.read_text(encoding="utf-8"))
+        self.assertTrue(adapter.pid_alive(tool))
+        killed = self.adapter_run("kill", slug, env=env)
+        self.assertEqual(killed.returncode, 0, killed.stdout + killed.stderr)
+        state = self.wait_for_state(slug, {"killed"}, timeout=60.0)
+        self.assertEqual(state["exit"], adapter.KILL_EXIT)
+        deadline = time.monotonic() + 30.0
+        while time.monotonic() < deadline and adapter.pid_alive(tool):
+            time.sleep(adapter.POLL_SECONDS)
+        self.assertFalse(adapter.pid_alive(tool), f"tool {tool} outlived the run")
+
+    def test_26_relative_configuration_resolves_against_the_callers_directory(self):
+        """A relative run root or agent path means one directory, not two."""
+        slug = "relative-26"
+        elsewhere = self.tmp / "elsewhere"
+        elsewhere.mkdir(exist_ok=True)
+        env = self.env_for(
+            OMP_RUN_ROOT="relative-runs",
+            OMP_BIN="./bin/" + ("stub-agent.cmd" if IS_WINDOWS else "stub-agent"),
+        )
+        proc = subprocess.run(
+            [
+                sys.executable,
+                str(ADAPTER),
+                "start",
+                "--name",
+                slug,
+                "--prompt",
+                str(self.prompt),
+                "--cwd",
+                str(elsewhere),
+            ],
+            cwd=str(self.tmp),
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=120,
+        )
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        expected = self.tmp / "relative-runs" / datetime.now().strftime("%Y-%m-%d") / slug
+        self.assertTrue(expected.exists(), f"run landed outside the calling directory: {expected}")
+        state = json.loads((expected / "state.json").read_text(encoding="utf-8"))
+        self.assertEqual(os.path.dirname(state["agent"]), str(self.bin))
+        self.wait_for_state_in(expected, {"done", "killed", "failed"}, timeout=SETTLE_TIMEOUT)
+
+    def wait_for_state_in(self, run_dir, states, timeout=SETTLE_TIMEOUT):
+        deadline = time.monotonic() + timeout
+        state = {}
+        while time.monotonic() < deadline:
+            state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+            if state.get("state") in states:
+                return state
+            time.sleep(adapter.POLL_SECONDS)
+        self.fail(f"{run_dir} never reached {states}: last {state}")
+
+    @unittest.skipUnless(IS_WINDOWS, "cmd.exe is the shell that expands the prompt")
+    def test_27_a_percent_prompt_is_refused_for_a_cmd_agent(self):
+        """cmd.exe rewrites %VAR% in the command line, so that prompt is refused."""
+        prompt = self.tmp / "percent-27.md"
+        prompt.write_text("set PATH like %PATH% on Windows\n", encoding="utf-8")
+        proc = self.adapter_run(
+            "start", "--name", "percent-27", "--prompt", str(prompt), "--cwd", str(self.tmp)
+        )
+        self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+        self.assertIn("cmd.exe would expand", proc.stderr)
+        self.assertIn("%PATH%", proc.stderr)
+        self.assertFalse(self.run_dir("percent-27").exists())
+
+
 class AdapterUnitTests(unittest.TestCase):
     """Pure helpers: the rules that do not need a process to prove."""
 
@@ -906,9 +1171,11 @@ class AdapterUnitTests(unittest.TestCase):
         try:
             os.environ.pop("OMP_RUN_ROOT", None)
             os.environ["GDD_RUN_ROOT"] = "/gdd/runs"
-            self.assertEqual(adapter.run_root(), "/gdd/runs")
+            # Absolute on purpose: the runner runs in the run's cwd, so a relative root
+            # would mean two different directories to the launcher and to the run.
+            self.assertEqual(adapter.run_root(), os.path.abspath("/gdd/runs"))
             os.environ["OMP_RUN_ROOT"] = "/omp/runs"
-            self.assertEqual(adapter.run_root(), "/omp/runs")
+            self.assertEqual(adapter.run_root(), os.path.abspath("/omp/runs"))
         finally:
             for key, value in saved.items():
                 if value is None:
