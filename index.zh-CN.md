@@ -36,10 +36,12 @@ targets:  runtime-agnostic | repo-only |
 | define-goal | skill | self-management,software-development,work-management | runtime-agnostic | `skills/define-goal/` | 把雄心转化为编号 goal 文件，近期清晰、远期可细化，不制定实现步骤 |
 | delegated-work-acceptance | skill | work-management,software-development | runtime-agnostic | `skills/delegated-work-acceptance/` | 验收被委派的交付：核对 artifact、重算关键数字、检查写入边界 |
 | design-an-interface | skill | software-development | runtime-agnostic | `skills/design-an-interface/` | 设计软件接口或公开 API：签名草稿、OpenAPI 片段、用法示例 |
+| design-md | skill | software-development | runtime-agnostic | `skills/design-md/` | 编写、校验并导出 DESIGN.md 令牌规范（含对比度检查与 Tailwind/DTCG 导出） |
 | discord-rich-message | skill | software-development,work-management | runtime-agnostic | `skills/discord-rich-message/` | 在平台限制内发送结构化 Discord 消息：Components V2、等宽对齐表格、附件兜底 |
 | dotnet-repo-workflow | skill | software-development | runtime-agnostic | `skills/dotnet-repo-workflow/` | 走仓库自带 .NET gate 而非手搓 `dotnet test`；lock 文件、Roslyn 编译陷阱、merge-ready 清单 |
 | evidence-backed-analytical-writing | skill | work-management | runtime-agnostic | `skills/evidence-backed-analytical-writing/` | 中文分析报告：证据地图与「主张 → 证据 → 机制 → 局限」骨架；时效边界、状态阶梯、否定性结论 |
 | evidence-boundary-discipline | skill | work-management | runtime-agnostic | `skills/evidence-boundary-discipline/` | 只陈述有日期的来源所能支持的事实：时态对齐日期、来源标签全链路一致、缺失不升级为不存在 |
+| find-nearby | skill | self-management | runtime-agnostic | `skills/find-nearby/` | 用随附脚本查找附近地点：按类别检索、按距离排序 |
 | gdd | skill | software-development,work-management | runtime-agnostic | `skills/gdd/` | 目标契约 → agent 分阶段产出 → operator 验收 → 脚本化合并门禁 → 可续跑账本；随附 `gdd.py`、`delivery-state.py`、`pr-merge-check.py` |
 | generated-runtime-repairs | skill | software-development,work-management | runtime-agnostic | `skills/generated-runtime-repairs/` | 修模板/生成器、验证暂存产物，再部署并回读线上运行时 |
 | ghc-search | skill | software-development | runtime-agnostic | `skills/ghc-search/` | 经本机 `ghc-proxy` Responses API 做 web 与 X/Twitter 搜索；返回答案加去重来源 |
@@ -81,6 +83,7 @@ targets:  runtime-agnostic | repo-only |
 | systematic-debugging | skill | software-development | runtime-agnostic | `skills/systematic-debugging/` | 先定位根因再修：紧致可复现的反馈环、边界证据、可证伪假设排序，然后一次只改一处 |
 | teams-cdp | skill | work-management | runtime-agnostic | `skills/teams-cdp/` | 通过本机桌面 CDP 向明确的 Teams 联系人或现有群组发送消息 |
 | tmux-agent-control | skill | software-development,work-management | runtime-agnostic | `skills/tmux-agent-control/` | 在 tmux 中驱动运行中的 TUI agent：定位 pane、证明空闲、一次发出完整指令 |
+| whisper | skill | software-development | runtime-agnostic | `skills/whisper/` | 用 Whisper 转写与翻译音频：模型档位选择、批处理与语言要点 |
 | writing | skill | work-management,self-management | runtime-agnostic | `skills/writing/` | 一套内容优先的共同层加分渠道契约：博客、论文、X、Reddit、小红书、公众号、教程、changelog；附可量化的 AI 味自查 |
 | writing-plans | skill | software-development,work-management | runtime-agnostic | `skills/writing-plans/` | 写出零上下文 agent 也能执行的实现计划：小步任务、精确路径、完整代码、带预期输出的命令 |
 | skill-scout | agent | software-development,work-management | repo-only | `agents/skill-scout.md` | 按请求先搜索已有 skill，再决定是否编写；只报告，不代写 |

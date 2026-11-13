@@ -7,7 +7,7 @@ description: >-
   end, including the merge. Do not use for one-line fixes, exploration with no acceptance criteria, or
   work no machine can check (that is a conversation, not a delivery).
 metadata:
-  version: "0.1.54"
+  version: "0.1.55"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "goal contract → agent-authored stages → operator-run gates → scripted merge gate → resumable ledger; ships `gdd.py`, `delivery-state.py`, `pr-merge-check.py`"

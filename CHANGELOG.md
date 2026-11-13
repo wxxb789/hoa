@@ -3,6 +3,16 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## 2026-11-13 — batch 2 closes the port list: design-md, find-nearby, whisper
+
+The rest of the A2 handover. `design-md` (Google's DESIGN.md token spec, with its starter template),
+`find-nearby` (with `scripts/find_nearby.py`) and `whisper` (with `references/languages.md`) move into
+the catalog under its schema; host-only companions in their prose are rephrased so nothing dangles.
+
+The handover's ten items resolve as seven ports and three duplicates: `to-prd` and `to-issues` are the
+older names of `notes-to-prd` and `plan-to-issues`, and `improve-codebase-architecture` is a 13-line
+stub whose description `arch-improvement-plan` already carries.
+
 ## 2026-11-13 — four research skills join the catalog (A2 batch 1)
 
 `official-document-verification`, `research-stream-consolidation`, `review-revision-candidates` and
