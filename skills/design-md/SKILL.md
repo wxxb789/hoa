@@ -7,7 +7,7 @@ description: >-
   identity that coding agents can apply exactly. Not for the HTML artifact itself (that is
   `html-artifact`) or for matching an existing site's look by eye.
 metadata:
-  version: "0.1.56"
+  version: "0.1.57"
   areas: "software-development"
   targets: "runtime-agnostic"
   summary: "author, lint and export a DESIGN.md token spec (tokens, WCAG contrast, Tailwind/DTCG export)"

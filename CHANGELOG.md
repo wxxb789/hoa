@@ -3,6 +3,13 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## 2026-11-14 — a measured plan for the catalog's own refactor
+
+`docs/plans/2026-11-14-catalog-refactor-plan.md` records what the catalog actually looks like (59 skills,
+10,116 lines, 38 over 120 lines, 16 shipping scripts with no test, a 33-step hand-listed CI, `kind` 46/59
+defaulted) and three candidate refactors with a recommended order. It is a proposal under external audit,
+not the start of the work.
+
 ## 2026-11-13 — retired names stop being headings
 
 `notes-to-prd`, `plan-to-issues` and `arch-improvement-plan` kept their pre-rename titles as the H1
