@@ -67,7 +67,12 @@ def describe(home: Path, name: str) -> dict:
                         for k in ("backend", "provider", "model")},
         "fallback_providers": chain,
         "fallback_heterogeneous": bool(providers) and any(p != default_provider for p in providers),
-        "model_aliases": sorted((cfg.get("model_aliases") or {}).keys()),
+        # Values, not just names: a switch that repoints an existing alias leaves the name list
+        # identical, so a name-only inventory reports "no change" for a real routing change.
+        "model_aliases": {
+            alias: {k: v for k, v in sorted((body or {}).items())}
+            for alias, body in sorted((cfg.get("model_aliases") or {}).items())
+        },
         "reasoning_effort": (cfg.get("agent") or {}).get("reasoning_effort"),
         "reasoning_overrides": (cfg.get("agent") or {}).get("reasoning_overrides"),
         "auxiliary": cfg.get("auxiliary"),

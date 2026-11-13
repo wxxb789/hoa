@@ -63,6 +63,21 @@ def main():
         )
         case("every store contributes a row", len(rows), 3)
 
+        # an alias repointed without renaming must show up as a change
+        alias_home = home / "profiles" / "alpha"
+        (alias_home / "config.yaml").write_text(
+            "model_aliases:\n  work:\n    model: old-id\n    base_url: https://old.invalid\n",
+            encoding="utf-8",
+        )
+        before = module.describe(alias_home, "default")["model_aliases"]
+        case("alias values are recorded", before.get("work", {}).get("model"), "old-id")
+        (alias_home / "config.yaml").write_text(
+            "model_aliases:\n  work:\n    model: new-id\n    base_url: https://new.invalid\n",
+            encoding="utf-8",
+        )
+        after = module.describe(alias_home, "default")["model_aliases"]
+        case("repointing an alias changes the inventory", before != after, True)
+
     print(f"routing-inventory: {passed}/{total} ok")
     return 0 if passed == total else 1
 
