@@ -1,5 +1,7 @@
 # Fleet model cutover (quota outage, provider retirement, restore)
 
+<!-- install-root: `$HERMES_HOME` below means the install root; it defaults to `~/.hermes` -->
+
 One gateway's quota or availability dying is not a default-model change: every surface that names it fails
 on its own schedule, and the homes that do the real work are the ones you forget. Move the whole fleet in
 one pass, leave the route reversible, verify per surface.
@@ -10,8 +12,8 @@ Enumerate, in one script, every place a default route is decided:
 
 | Surface | Where the default lives |
 |---|---|
-| Hermes root | `~/.hermes/config.yaml`: `model.default`, `model.provider`, `model.base_url`, `model.api_mode`, `fallback_providers` |
-| Hermes homes | `~/.hermes/profiles/*/config.yaml`, same keys |
+| Hermes root | `$HERMES_HOME/config.yaml`: `model.default`, `model.provider`, `model.base_url`, `model.api_mode`, `fallback_providers` |
+| Hermes homes | `$HERMES_HOME/profiles/*/config.yaml`, same keys |
 | Generated homes | bot bindings in the generator repo (see §3) |
 | omp | `~/.omp/agent/config.yml` → `modelRoles.default` (`<provider>/<id>:<effort>`) |
 | omo | `~/.omo/omo.jsonc` → `[native].model_profile` → `model_profiles.<p>.models` → `categories.<lane>.{model,fallback_models}`; `~/.omo/agent/models.json` for the catalog; `~/.omo/agent/settings.json` is a second place to check |
@@ -88,7 +90,7 @@ A provider switch can quietly drop the reasoning tier: the new provider's model 
 Probe the relay *first*, before editing any harness config — one `curl` per level:
 
 ```bash
-KEY=$(grep -h '^<PROVIDER>_API_KEY=' ~/.hermes/.env | cut -d= -f2-)
+KEY=$(grep -h '^<PROVIDER>_API_KEY=' $HERMES_HOME/.env | cut -d= -f2-)
 curl -s -o /dev/null -w '%{http_code}\n' <base>/chat/completions \
   -H "Authorization: Bearer $KEY" -H 'Content-Type: application/json' \
   -d '{"model":"<id>","messages":[{"role":"user","content":"1+1?"}],"max_tokens":32,"reasoning_effort":"max"}'
@@ -107,7 +109,7 @@ rather than letting the pin fail at runtime.
    any `fallback_providers`; fallback entry 1 is a different provider from every default.
 3. Real one-shot per surface you switched — config parsing proves shape, not routing:
    `hermes chat -q 'Reply with exactly: PROBE_OK' --oneshot -t clarify -Q` for root, and
-   `HERMES_HOME=~/.hermes/profiles/<p> hermes chat …` for one switched home. Do one switched home and
+   `HERMES_HOME=$HERMES_HOME/profiles/<p> hermes chat …` for one switched home. Do one switched home and
    one untouched home; the untouched one proves you did not break the routes you left alone.
 4. Install-level checks: `profile-layer-reconcile.py --dry-run` (no `--check` flag), `contract-drift-check.py`,
    and the generator's `--check`.

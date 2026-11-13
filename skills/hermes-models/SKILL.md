@@ -17,6 +17,8 @@ metadata:
 
 # Hermes Models & Providers
 
+<!-- install-root: `$HERMES_HOME` below means the install root; it defaults to `~/.hermes` -->
+
 Provider keys in these examples (`local-chat`, `local-openai`, …) belong to the reference install:
 read your own `providers:` block and substitute.
 
@@ -87,7 +89,7 @@ read your own `providers:` block and substitute.
     in root **and** every profile, then run one real image call per profile.
 11. **Config drift is the default failure mode.** Classify root-only keys as "never overrode" vs
     "deliberately different" before mirroring; read back after every write; regenerate
-    `~/.hermes/scripts/config-snapshot.py`.
+    `$HERMES_HOME/scripts/config-snapshot.py`.
 12. **Text-only one-shot generation is `-t clarify`, not `-t ""`.** An empty `-t` value leaves the
     FULL toolset enabled — the model can write files and emits tool/diff previews into stdout,
     corrupting programmatic parsing; `-t none` is rejected as an unknown toolset name. Inert form:
@@ -132,7 +134,7 @@ read your own `providers:` block and substitute.
     `cron/jobs.json`, so a job pinned only in root leaves the same work unpinned where it actually runs. Pins
     on `no_agent` script jobs are inert — nothing reads them, so they never count as free-pool coverage — and
     a harness catalog must be read from that harness's own `models` command, not from its config file.
-17. **`~/.hermes/config.yaml` cannot be edited with `patch`/`write_file`** — the tool refuses it ("Refusing
+17. **`$HERMES_HOME/config.yaml` cannot be edited with `patch`/`write_file`** — the tool refuses it ("Refusing
     to write to Hermes config file"); route every write through `hermes config set <dotted.key> <value>`.
     List-valued keys take a JSON string (`hermes config set fallback_providers '[{"provider":"p",
     "model":"m"}]'`) and land as proper YAML; back up the file first, then `hermes config get <key>`
@@ -216,13 +218,13 @@ hermes -p <profile> chat -q 'Reply with exactly: PROBE_OK' \
   -t clarify -Q --ignore-rules --max-turns 1                     # 1b. same, inside one home
 python3 - <<'PY'                                                 # 2. the session row
 import sqlite3, glob, os
-for home in [os.path.expanduser('~/.hermes')] + sorted(glob.glob(
-        os.path.expanduser('~/.hermes/profiles/*'))):
+for home in [os.path.expanduser('$HERMES_HOME')] + sorted(glob.glob(
+        os.path.expanduser('$HERMES_HOME/profiles/*'))):
     c=sqlite3.connect(f"file:{home}/state.db?mode=ro",uri=True)
     print(home, c.execute("select model from sessions order by started_at desc limit 2").fetchall())
 PY
-HERMES_HOME=~/.hermes python3 - <<'PY'                            # 3. effort resolution
-import os, sys; sys.path.insert(0, os.path.expanduser('~/.hermes/hermes-agent'))
+HERMES_HOME=$HERMES_HOME python3 - <<'PY'                            # 3. effort resolution
+import os, sys; sys.path.insert(0, os.path.expanduser('$HERMES_HOME/hermes-agent'))
 from hermes_constants import resolve_reasoning_config
 from hermes_cli.config import load_config
 print(resolve_reasoning_config(load_config(), "<model>"))
@@ -233,13 +235,13 @@ PY
 
 Read the session rows as a **before/after pair**: the newest row must show the new id *and* the row under it
 must still show the old one — one new row alone cannot distinguish a real switch from a route that was already
-there. Each home has its own `state.db` (`~/.hermes/profiles/<p>/state.db`); root's rows say nothing about a
+there. Each home has its own `state.db` (`$HERMES_HOME/profiles/<p>/state.db`); root's rows say nothing about a
 profile. The `sessions` table has **no `provider` column** — selecting it raises `no such column: provider`, so
 prove the provider from the config/preset and let `model` carry the runtime evidence. Free-pool probes answer in
 10–40 s each; run the per-home loop as one background command with a per-home `timeout`, not one foreground
 call per profile.
 
-Delegation: spawn one real child and read `~/.hermes/cache/delegation/live/<id>/task-0.log`.
+Delegation: spawn one real child and read `$HERMES_HOME/cache/delegation/live/<id>/task-0.log`.
 Vision: one real `vision_analyze` call per profile.
 
 ## References

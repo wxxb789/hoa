@@ -1,5 +1,7 @@
 # Switching models and fallback hygiene
 
+<!-- install-root: `$HERMES_HOME` below means the install root; it defaults to `~/.hermes` -->
+
 
 ### Switching the default model and proving the route
 
@@ -21,8 +23,8 @@ With ghc-proxy in place, direct Copilot source patches to Hermes (enterprise tok
 When a provider deprecates model slugs, remove them from both the active runtime config and the static fallback catalogs — a retired id left as a cheap/fallback entry does not fail loudly, it advertises a route that answers 404 only when it is finally used. Which ids are retired is per-account and per-date: keep that list in the install's own policy overlay, re-probe `/v1/models` before repeating it as fact, and verify the surviving set against the endpoint rather than against a note.
 
 Checklist:
-1. Back up before editing `~/.hermes/config.yaml`, `~/.hermes/context_length_cache.yaml`, or Hermes source fallback files.
-2. Active default profile first; do not silently mutate `~/.hermes/profiles/*` unless the user asks for all profiles.
+1. Back up before editing `$HERMES_HOME/config.yaml`, `$HERMES_HOME/context_length_cache.yaml`, or Hermes source fallback files.
+2. Active default profile first; do not silently mutate `$HERMES_HOME/profiles/*` unless the user asks for all profiles.
 3. Source fallback files, when relevant: `hermes_cli/setup.py` `_DEFAULT_PROVIDER_MODELS["copilot"]` and `hermes_cli/models.py` `_PROVIDER_MODELS["copilot"]`.
 4. Propagate the same ids everywhere they are declared: every served profile's `providers.*.models`, the sibling harness model lists (`~/.pi/agent/models.json`, `~/.omo/agent/models.json`, `~/.omp/agent/models.yml`), and `context_length_cache.yaml` — a tier retired in one place stays selectable in the others. Repoint auxiliary/delegation pins to a survivor **before** removing the entry.
 5. Verify with `hermes config check`, targeted model tests, and a forced-static `curated_models_for_provider("copilot")` probe. Fan-out checklist and per-file edit mechanics: `references/provider-metadata-audit.md`.

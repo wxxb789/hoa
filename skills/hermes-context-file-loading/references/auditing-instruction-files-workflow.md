@@ -1,5 +1,7 @@
 # Auditing & De-duplicating Instruction Files — Workflow
 
+<!-- install-root: `$HERMES_HOME` below means the install root; it defaults to `~/.hermes` -->
+
 A repeatable surgical procedure for cleaning the four owner-level instruction files
 (`SOUL.md`, `AGENTS.md`, `MEMORY.md`, `USER.md`) without breaking voice or losing meaning.
 Distilled from a real audit→de-dup session. Pairs with the mechanics in the parent `SKILL.md`.
@@ -13,8 +15,8 @@ or asks to make a rule "global", or asks why a file did/didn't take effect.
 
 ### 0. Resolve filenames against reality FIRST (don't audit ghosts)
 - The owner may name a file that doesn't exist (e.g. "hermes.md"). Before auditing, confirm
-  what actually exists: the real owner-editable layers are `~/.hermes/SOUL.md`,
-  `the workspace `AGENTS.md` (`$CLAW_HOME/AGENTS.md`)` (or wherever cwd points), `~/.hermes/memories/{MEMORY,USER}.md`.
+  what actually exists: the real owner-editable layers are `$HERMES_HOME/SOUL.md`,
+  `the workspace `AGENTS.md` (`$CLAW_HOME/AGENTS.md`)` (or wherever cwd points), `$HERMES_HOME/memories/{MEMORY,USER}.md`.
 - A "hermes.md" the owner mentions is almost always the **injected system prompt** (framework-
   owned, not an editable file) OR a misremembered `.hermes.md`/`HERMES.md` (project slot).
   Clarify which before touching anything.

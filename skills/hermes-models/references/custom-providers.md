@@ -1,5 +1,7 @@
 # Custom providers and per-model transport
 
+<!-- install-root: `$HERMES_HOME` below means the install root; it defaults to `~/.hermes` -->
+
 
 ## Custom providers (local proxy pattern)
 
@@ -43,7 +45,7 @@ Transport types:
 - `chat_completions` — OpenAI Chat Completions protocol (Gemini models)
 - Declare per-model metadata with plain dotted keys (a dot-escaped key is silently ignored) — full
   procedure and the "declared value does not resolve" trap: `references/provider-metadata-audit.md`;
-  install-specific values: the generated `hermes-operations/references/local-install.md` sheet (`~/.hermes/scripts/snapshot-install-facts.py`).
+  install-specific values: the generated `hermes-operations/references/local-install.md` sheet (`$HERMES_HOME/scripts/snapshot-install-facts.py`).
 
 ### Per-model transport and reasoning-budget sizing (probe, do not assume)
 
@@ -114,7 +116,7 @@ hermes config get model_aliases   # verify
   `model_overrides` in response to the warning.
 - The model id must be the id the ENDPOINT serves, not the vendor catalog name —
   ask the user for it or leave a placeholder and flag it.
-- The API key goes in `~/.hermes/.env` as `<NAME>_API_KEY=...` — secrets never in
+- The API key goes in `$HERMES_HOME/.env` as `<NAME>_API_KEY=...` — secrets never in
   config.yaml. Editing `.env` from a session requires owner confirmation (approval
   gate); prefer telling the user the exact line to add themselves.
 
@@ -132,7 +134,7 @@ every hit before calling it done:
   and `doctor`) instead of leaving it aimed at either host. Pointing a dead sibling at the new host
   trades one wrong answer for another.
 - `model_aliases.<alias>.base_url` — if the endpoint was registered as an alias instead
-- **every profile** — `~/.hermes/profiles/<p>/config.yaml` AND that profile's own `.env`. A profile
+- **every profile** — `$HERMES_HOME/profiles/<p>/config.yaml` AND that profile's own `.env`. A profile
   is a separate HERMES_HOME and inherits neither the root `config.yaml` nor the root `.env`, so a
   provider that works in the default profile is unauthenticated (or absent) everywhere else.
 
@@ -143,13 +145,13 @@ route, and probe the old pair, before you delete an entry or repeat the claim to
 "retired" gateway that still authenticates with its old key is a working fallback, not litter.
 
 Keys are not in `config.yaml`: a provider points at `key_env: <NAME>_API_KEY` and the secret
-lives in `~/.hermes/.env` (per profile: `profiles/<p>/.env`). That file refuses `read_file`
+lives in `$HERMES_HOME/.env` (per profile: `profiles/<p>/.env`). That file refuses `read_file`
 (credential store) — read it through the terminal, never echo the value.
 
 `hermes config get` MASKS values, so a line like `extra_headers: Authorization: Bear<a>...<d>`
 looks like a hardcoded literal token when it is really `Bearer ${SOME_API_KEY}` env
 interpolation. Before telling the owner there is a second credential to rotate, read the raw
-block off disk (`sed -n 'A,Bp' ~/.hermes/config.yaml`).
+block off disk (`sed -n 'A,Bp' $HERMES_HOME/config.yaml`).
 
 Apply URLs with `hermes config set …` (never hand-edit config.yaml) and say plainly that the
 change only lands in a NEW session / after a gateway restart. Verify with a real request, not
@@ -195,7 +197,7 @@ hermes config set providers.<name>.models.<model-id>.context_length <n>
 hermes config set model_aliases.<name>.base_url <url>  # the /model handle, if the owner uses one
 
 # every profile: same keys under a profile-scoped HOME …
-HERMES_HOME=~/.hermes/profiles/<p> hermes config set providers.<name>.api <url>
+HERMES_HOME=$HERMES_HOME/profiles/<p> hermes config set providers.<name>.api <url>
 # …and the key appended to that profile's OWN .env (back it up first)
 ```
 
@@ -211,7 +213,7 @@ HERMES_HOME=~/.hermes/profiles/<p> hermes config set providers.<name>.api <url>
 ```bash
 hermes chat --provider <name> -m <model-id> -q "Reply with exactly: OK" --oneshot
 hermes chat -m <alias> -q "Reply with exactly: OK" --oneshot
-HERMES_HOME=~/.hermes/profiles/<p> hermes chat --provider <name> -m <model-id> -q "…" --oneshot
+HERMES_HOME=$HERMES_HOME/profiles/<p> hermes chat --provider <name> -m <model-id> -q "…" --oneshot
 ```
 
 - `providers.<name>.*` dotted keys set cleanly and silently; the "not a recognized config key"

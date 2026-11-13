@@ -1,5 +1,7 @@
 # Config drift, reasoning effort, auxiliary vision
 
+<!-- install-root: `$HERMES_HOME` below means the install root; it defaults to `~/.hermes` -->
+
 
 ## Config drift audit across root + served profiles
 
@@ -42,7 +44,7 @@ go out without the evidence that justifies it.
    remove or repoint them, and keep the alias map empty unless something actually uses it.
 6. Legitimately per-profile, never "align": `platforms.api_server.extra.port` (ports must differ), platform
    identities, and each profile's own provider catalog.
-7. After any config change, regenerate the local config snapshot (`python3 ~/.hermes/scripts/config-snapshot.py`)
+7. After any config change, regenerate the local config snapshot (`python3 $HERMES_HOME/scripts/config-snapshot.py`)
    or the post-update checker reports `snapshot: stale` forever.
 
 ### Editing inside provider/generated config files (repeated blocks)

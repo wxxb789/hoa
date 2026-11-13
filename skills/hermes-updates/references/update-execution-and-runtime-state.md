@@ -1,5 +1,7 @@
 # Update execution and runtime state (this install)
 
+<!-- install-root: `$HERMES_HOME` below means the install root; it defaults to `~/.hermes` -->
+
 Depth for running an owner-requested upgrade and for reading checkout/dependency state afterwards.
 Pairs with SKILL.md → "Owner-requested upgrade of a live gateway install" and "Unattended
 upstream-main updates".
@@ -8,7 +10,7 @@ upstream-main updates".
 
 ```bash
 hermes --version                                     # vX+NNNN.g<sha> (release date) · upstream <sha>
-cd ~/.hermes/hermes-agent
+cd $HERMES_HOME/hermes-agent
 git status --short --branch; git rev-parse HEAD; git rev-parse origin/main
 git for-each-ref refs/hermes-update-backups/ --format='%(refname) %(objectname:short)'
 systemctl --user is-active hermes-gateway.service
@@ -22,22 +24,22 @@ hours ago still prints an older date. Compare `· upstream <sha>` to `git rev-pa
 1. Snapshot: `updates.pre_update_backup` is `false` here, so make it explicit.
 
    ```bash
-   cd ~/.hermes/hermes-agent && venv/bin/python -c "from hermes_cli.backup import create_quick_snapshot; \
+   cd $HERMES_HOME/hermes-agent && venv/bin/python -c "from hermes_cli.backup import create_quick_snapshot; \
    print(create_quick_snapshot(label='manual-upgrade-latest', keep=3, max_file_size=1 << 30))"
    ```
 
    Restore later with `hermes_cli.backup.restore_quick_snapshot(<id>)`; the directory is
-   `~/.hermes/state-snapshots/<id>`.
+   `$HERMES_HOME/state-snapshots/<id>`.
 2. Stop the gateway, then `venv/bin/hermes update --yes --no-backup --branch main` from
-   `~/.hermes/hermes-agent`. The updater owns code, Python deps, Node, the TUI build, the web build,
+   `$HERMES_HOME/hermes-agent`. The updater owns code, Python deps, Node, the TUI build, the web build,
    bundled-skill sync and config migration; `--no-backup` is only correct because step 1 exists.
 3. Restore the shallow window (below), re-apply the local tail the unattended updater owns, start the
    gateway, then run the post-check loop. `venv/bin/hermes update` runs NEITHER tail step that
    `hermes-auto-update.py` + the post-check perform, so do them by hand or the post-check fails:
-   - `python3 ~/.hermes/scripts/hermes-toolchain-shim.py` — a fresh dependency environment drops the
+   - `python3 $HERMES_HOME/scripts/hermes-toolchain-shim.py` — a fresh dependency environment drops the
      toolchain `.pth`, so `post-update-check` reports `cron worker python env: BROKEN` (same class as
      the restart-safe cron-worker breakage).
-   - `python3 ~/.hermes/scripts/config-snapshot.py` — a config-version migration (the updater prints
+   - `python3 $HERMES_HOME/scripts/config-snapshot.py` — a config-version migration (the updater prints
      `Updating config format (vN → vN+1)`) marks the snapshot stale.
 
 ### The gateway start needs its own call
@@ -74,7 +76,7 @@ yourself`), issuing that same start command again is consent, not a retry of a r
 
 ## Dependency environment, and why a child can lose it
 
-The gateway runs on the PM-managed toolchain interpreter (`~/.hermes/tools/python-<ver>.../bin/python3`;
+The gateway runs on the PM-managed toolchain interpreter (`$HERMES_HOME/tools/python-<ver>.../bin/python3`;
 `ExecStart` → a repo launcher that re-execs it with `-I -c <bootstrap>`). That interpreter's own
 site-packages holds only `pip`; Hermes' third-party deps reach the parent because the launcher path
 puts the committed dependency environment on `PYTHONPATH` (consumed into `sys.path` at interpreter
@@ -98,7 +100,7 @@ Diagnosis, cheapest first:
    occurrence separates "this update caused it" from "it predates the current version", and an
    interval equal to the job's schedule confirms it is every run, not a flake.
 3. Reproduce the child's import view:
-   `<toolchain python> -I -c "import os, sys; sys.path.insert(0, os.path.expanduser('~/.hermes/hermes-agent')); import hermes_yaml"`.
+   `<toolchain python> -I -c "import os, sys; sys.path.insert(0, os.path.expanduser('$HERMES_HOME/hermes-agent')); import hermes_yaml"`.
 4. `venv/bin/python -c "import ruamel.yaml"` succeeding while step 3 fails confirms an environment
    split, not a missing package — do not "fix" it by pip-installing into the toolchain interpreter.
 5. Re-test after the next update before treating it as durable; a PM/runtime rework can change how

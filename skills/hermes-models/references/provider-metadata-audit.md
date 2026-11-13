@@ -1,5 +1,7 @@
 # Provider / model metadata audit: declared vs authoritative
 
+<!-- install-root: `$HERMES_HOME` below means the install root; it defaults to `~/.hermes` -->
+
 When to run: the owner asks "are all the models' metadata configured correctly?", "are these providers
 redundant?", or a session under-uses context, 400s on `reasoning_effort`, or compacts only after the
 endpoint refused the request. Companion to `config-drift-audit.md` (which covers root-vs-profile key
@@ -21,7 +23,7 @@ Runnable probe: `scripts/audit-provider-metadata.py`.
    and `hermes_cli.config_providers.get_custom_provider_context_length(model, base_url, config=...)` for
    the config-override step alone. Use the second as the "did my declared value land?" probe: `None` for a
    model that IS declared means the key is malformed (see the dotted-key pitfall).
-4. **Real usage**: `~/.hermes/state.db` → `session_model_usage` (`model`, `billing_provider`,
+4. **Real usage**: `$HERMES_HOME/state.db` → `session_model_usage` (`model`, `billing_provider`,
    `billing_base_url`, `billing_mode`, `task`, `api_call_count`, token sums, `first_seen`, `last_seen`).
    `task` empty = main loop; `vision` / `compression` / `session_search` / `title_generation` /
    `background_review` = auxiliary paths. Open read-only (`sqlite3.connect("file:...?mode=ro", uri=True)`).

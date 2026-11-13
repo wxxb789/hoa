@@ -1,5 +1,7 @@
 # Upgrade execution and drift triage
 
+<!-- install-root: `$HERMES_HOME` below means the install root; it defaults to `~/.hermes` -->
+
 
 ## Upgrade-safe maintenance / source drift control
 
@@ -10,7 +12,7 @@ Use config/env/profile/prompt/scripts before Hermes source edits. Local source p
 When the owner asks whether the running Hermes is behind latest, or whether new upstream commits are worth updating to, do a source-drift assessment rather than answering from version text alone:
 
 1. Load `hermes-agent` first for current update commands and release/update semantics.
-2. Inspect active install and checkout: `hermes --version`, `hermes config path`, `cd ~/.hermes/hermes-agent`, `git status --short --branch`, `git rev-parse HEAD`, `git describe --tags --always --dirty`.
+2. Inspect active install and checkout: `hermes --version`, `hermes config path`, `cd $HERMES_HOME/hermes-agent`, `git status --short --branch`, `git rev-parse HEAD`, `git describe --tags --always --dirty`.
 3. Fetch before judging: `git fetch --all --tags --prune`.
 4. Compare active source to upstream: `git rev-list --left-right --count HEAD...origin/main`, `git log --reverse --date=short --pretty=format:'%h%x09%ad%x09%s' HEAD..origin/main`, and `git diff --stat --compact-summary HEAD..origin/main`.
 5. Run `hermes update --check` as a second opinion; if it fetches newer commits, rerun the git count/list because the first manual result may now be stale.
@@ -27,7 +29,7 @@ A public `git fetch origin main` can be rate-limited even when `gh api` works wi
 1. Verify the target SHA through authenticated GitHub API: `gh api repos/NousResearch/hermes-agent/commits/main --jq .sha`.
 2. Fetch with a preemptive Basic auth header generated in-memory from `gh auth token`.
 3. Do **not** use `--filter=blob:none` as the recovery fetch. The updater/reset may later need promised blobs, trigger an unauthenticated lazy fetch, and leave the checkout as a mixed working tree with hundreds of apparent deletions. Use a complete refetch instead: `git fetch --refetch --no-filter origin main` with the auth header, then verify a previously missing object with `git cat-file -t <oid>`.
-4. Back up the configured home (`$HERMES_HOME`, default `~/.hermes`) — not a hard-coded default, or a relocated install is left without a snapshot — confirm the pre-update source was clean, and verify `origin/main` equals the API SHA before changing HEAD.
+4. Back up the configured home (`$HERMES_HOME`, default `$HERMES_HOME`) — not a hard-coded default, or a relocated install is left without a snapshot — confirm the pre-update source was clean, and verify `origin/main` equals the API SHA before changing HEAD.
 5. If the updater itself still performs a rate-limited fetch, use a temporary `git` wrapper on `PATH` only for that updater run: no-op the already-completed `git fetch origin main`, translate `git pull --ff-only origin main` to local `git merge --ff-only origin/main`, and pass every other command to the real git binary. Remove the wrapper afterwards.
 6. If a partial checkout already failed while HEAD stayed old, restore source consistency with `git reset --hard origin/main` only after proving the original tree was clean and backups/snapshots exist. This does not touch config, credentials, memory, or sessions.
 7. A manual reset to latest makes `hermes update` take its no-op path and may skip dependency/resource sync. To exercise the official full updater safely, reset a clean checkout temporarily to `origin/main^`, run the updater through the local-fetch wrapper so it sees exactly one update, and verify it returns to the target SHA. Use this only as a recovery path with backups.
@@ -38,7 +40,7 @@ Finish by matching local HEAD to authenticated API SHA, checking a clean tree, r
 
 `hermes update` returns early when git is already current. That path proves source freshness, but it may skip dependency reinstall, bundled skill/profile sync, web build, and config migration. After any owner-requested “upgrade to latest”, always run the post-check loop even if update says “Already up to date”:
 
-1. `hermes --version` and `git status --short` in `~/.hermes/hermes-agent`.
+1. `hermes --version` and `git status --short` in `$HERMES_HOME/hermes-agent`.
 2. `hermes doctor` and `hermes config check`.
 3. If doctor/config reports new config version, run non-interactive safe migration or `hermes config migrate` as appropriate; back up config/env first.
 4. If source is current but dependencies/tooling are stale, resync dependencies from the checkout rather than re-pulling source. Treat setup-state failures as fixable install/config steps, not durable tool limitations.
@@ -53,7 +55,7 @@ every later launch printing `hermes: a source update is unfinished; run `hermes 
 finish it`, even when source, deps, and the running gateway are current and consistent. Confirm it is
 advisory before acting: `hermes update --plan` is read-only and prints the install sha and the services
 it would restart without complaining about a lock, and
-`~/.hermes/logs/update_receipts/<newest update_*.json>` shows `outcome: success` with only the specific
+`$HERMES_HOME/logs/update_receipts/<newest update_*.json>` shows `outcome: success` with only the specific
 stage marked `failed` (e.g. `build`). A stale `.git/hermes-update.lock` holding a dead PID does not block
 the next run. The notice clears on the next successful `hermes update` — do not rush a large catch-up
 update (especially during work hours) just to silence it; the unattended timer retries with snapshot
@@ -65,7 +67,7 @@ Same shape as the unattended path, run by hand. Post-check depth, checkout-state
 the dependency-environment mechanism: `references/update-execution-and-runtime-state.md`.
 
 1. Record pre-state: `hermes --version`, `git status --short --branch` plus `git rev-parse HEAD`
-   in `~/.hermes/hermes-agent`, `systemctl --user is-active hermes-gateway.service`.
+   in `$HERMES_HOME/hermes-agent`, `systemctl --user is-active hermes-gateway.service`.
    Before stopping the gateway, verify that the maintenance process is outside its service cgroup
    and process ownership; separate tool calls alone do not prove isolation. Use an independently
    supervised external maintainer when the session is gateway-served, because stopping that service
@@ -77,11 +79,11 @@ the dependency-environment mechanism: `references/update-execution-and-runtime-s
 3. Order: stop the gateway → `venv/bin/hermes update --yes --no-backup --branch main` → restore
    the shallow window (`git fetch --depth=10 --prune --no-tags origin main`) → re-apply the local
    tail the unattended updater owns → start the gateway → post-check loop (`hermes doctor`,
-   `hermes config check`, `hermes cron list --all`, `python3 ~/.hermes/scripts/post-update-check.py`).
+   `hermes config check`, `hermes cron list --all`, `python3 $HERMES_HOME/scripts/post-update-check.py`).
    A manual update runs NEITHER of the local tail steps that `hermes-auto-update.py` performs: a fresh
    dependency environment drops the shim `.pth`, and a config-version migration marks the snapshot
-   stale. Run `python3 ~/.hermes/scripts/hermes-toolchain-shim.py` and
-   `python3 ~/.hermes/scripts/config-snapshot.py` by hand after the updater returns, or
+   stale. Run `python3 $HERMES_HOME/scripts/hermes-toolchain-shim.py` and
+   `python3 $HERMES_HOME/scripts/config-snapshot.py` by hand after the updater returns, or
    `post-update-check` reports `cron worker python env: BROKEN` and `config snapshot: stale`.
 4. **Give the gateway start its own tool call.** `systemctl --user stop` and `systemctl --user start`
    do not behave alike at the approval gate: a compound command tailed by the start is refused in
@@ -101,21 +103,21 @@ Runtime-layer preference order:
 
 1. Agent/user instructions and local docs
 2. `SOUL.md` / runtime identity where relevant
-3. `~/.hermes/config.yaml`
-4. `~/.hermes/.env`
-5. Profiles under `~/.hermes/profiles/`
-6. Scripts under `~/.hermes/scripts/`
+3. `$HERMES_HOME/config.yaml`
+4. `$HERMES_HOME/.env`
+5. Profiles under `$HERMES_HOME/profiles/`
+6. Scripts under `$HERMES_HOME/scripts/`
 7. Cron jobs / webhook jobs / gateway service settings
 8. Hermes source only for upstream candidates or explicit hotfixes
 
 Required source-drift triage:
 
-1. Inspect `cd ~/.hermes/hermes-agent && git status --short` and the diff.
+1. Inspect `cd $HERMES_HOME/hermes-agent && git status --short` and the diff.
 2. Classify each local change as:
    - upstream candidate: general, tested, intended for PR
    - local preference: convert to config/env/script and revert source
    - stale experiment: revert
-3. Keep/update `~/.hermes/LOCAL_OVERRIDES.md` for runtime differences with why, path, upgrade-safety, rollback, verification command, and trade-offs.
+3. Keep/update `$HERMES_HOME/LOCAL_OVERRIDES.md` for runtime differences with why, path, upgrade-safety, rollback, verification command, and trade-offs.
 4. Verify source is clean unless explicitly preparing upstream work.
 
 Concrete upgrade-safe patterns:

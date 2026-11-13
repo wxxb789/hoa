@@ -17,6 +17,8 @@ metadata:
 
 # Hermes Updates
 
+<!-- install-root: `$HERMES_HOME` below means the install root; it defaults to `~/.hermes` -->
+
 ## When to Use
 
 | You hear / see | Do |
@@ -97,7 +99,7 @@ sessions, or backups.
 ## Proof
 
 ```bash
-hermes --version; git -C ~/.hermes/hermes-agent status --short
+hermes --version; git -C $HERMES_HOME/hermes-agent status --short
 hermes doctor; hermes config check
 python3 $HERMES_HOME/scripts/post-update-check.py  # when the install ships one; else the tail is unchecked
 hermes cron list --all                              # no job gained an `error`

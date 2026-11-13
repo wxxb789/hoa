@@ -1,5 +1,7 @@
 # Hermes upgrade-safe local operations
 
+<!-- install-root: `$HERMES_HOME` below means the install root; it defaults to `~/.hermes` -->
+
 Session lesson: when troubleshooting or configuring a locally installed Hermes runtime that should stay aligned with official upstream, prefer config/env/profile/script/user-prompt changes over source-code patches.
 
 ## Trigger
@@ -24,7 +26,7 @@ Use this pattern when:
 
 For Hermes, maintain:
 
-`~/.hermes/LOCAL_OVERRIDES.md`
+`$HERMES_HOME/LOCAL_OVERRIDES.md`
 
 It should record:
 - config/env/profile/script/cron overrides;
@@ -39,7 +41,7 @@ Symptom:
 - Discord gateway logs `400 Bad Request (error code: 30032): Maximum number of application commands reached (100)`.
 
 Upgrade-safe mitigation:
-- Set `DISCORD_COMMAND_SYNC_POLICY=off` in `~/.hermes/.env`.
+- Set `DISCORD_COMMAND_SYNC_POLICY=off` in `$HERMES_HOME/.env`.
 - Restart gateway.
 - Verify logs contain `Skipping Discord slash command sync (policy=off)`.
 
@@ -47,18 +49,18 @@ Avoid long-term local source patch unless the intent is to submit upstream. A so
 
 ## Plugins are pinned checkouts — never patch their scripts
 
-`~/.hermes/plugins/<name>/` is a git checkout at a **detached** catalog commit (`.hermes-catalog.json`
+`$HERMES_HOME/plugins/<name>/` is a git checkout at a **detached** catalog commit (`.hermes-catalog.json`
 pins the version). Unlike `hermes-agent`, a plugin update re-checks-out the pinned commit, so a local
 edit to a plugin script is dropped **silently** — no dirty-tree guard, no failure, the tuning just
-stops existing. Check with `git -C ~/.hermes/plugins/<name> status --short` and
+stops existing. Check with `git -C $HERMES_HOME/plugins/<name> status --short` and
 `git rev-parse --abbrev-ref HEAD` (`HEAD` = detached = expected).
 
 Therefore tune a plugin through layers it cannot overwrite:
-1. its config file (`~/.hermes/<plugin>.json`);
+1. its config file (`$HERMES_HOME/<plugin>.json`);
 2. the cron job's **custom prompt** (`hermes cron edit <id> --prompt "$(cat new-prompt.txt)"`) —
    `install.py --check` labels it `custom/unknown prompt — preserved`, so it survives both plugin and
    installer reruns;
-3. a wrapper script in `~/.hermes/scripts/`, if the plugin exposes one.
+3. a wrapper script in `$HERMES_HOME/scripts/`, if the plugin exposes one.
 
 `install_cron.py --rebind` rewrites only `skill`/`skills` on existing jobs and never touches a custom
 prompt — it is the right fix for a stale skill binding after a plugin rename.

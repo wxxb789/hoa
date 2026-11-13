@@ -1,13 +1,15 @@
 # hermes-updates — case notes
 
+<!-- install-root: `$HERMES_HOME` below means the install root; it defaults to `~/.hermes` -->
+
 Compressed case notes: signal, cause, fix, proof — 5–8 lines each. The rules live in `SKILL.md`;
 treat these commands as leads to re-verify against the current build.
 
 ## Upgrade-safe maintenance without source patches
 
 - **Signals**: Discord slash sync hit `Maximum number of application commands reached (100)`; a source-level fix was attempted and rejected — source drift is upgrade debt.
-- **Resolution**: `DISCORD_COMMAND_SYNC_POLICY=off` in `~/.hermes/.env` → `systemctl --user restart hermes-gateway` → log shows `Skipping Discord slash command sync (policy=off)`; trade-off: the native command picker stops updating, everything else works.
-- **Rule**: config/env/profile/script before source; keep the ledger in `~/.hermes/LOCAL_OVERRIDES.md`; `git status --short` stays clean unless preparing an upstream patch.
+- **Resolution**: `DISCORD_COMMAND_SYNC_POLICY=off` in `$HERMES_HOME/.env` → `systemctl --user restart hermes-gateway` → log shows `Skipping Discord slash command sync (policy=off)`; trade-off: the native command picker stops updating, everything else works.
+- **Rule**: config/env/profile/script before source; keep the ledger in `$HERMES_HOME/LOCAL_OVERRIDES.md`; `git status --short` stays clean unless preparing an upstream patch.
 - **Silent jobs**: health/cockpit scripts print nothing when healthy (`owner-cockpit.py`, `--full` for a manual report).
 - **Sessions**: export + `--dry-run` first; deletion needs `HERMES_SESSION_PRUNE_CONFIRM=yes`.
 - **Proof**: `config-snapshot.py --check` + `post-update-check.py` (clean tree, sync policy, gateway active, expected jobs, cockpit silent, maintenance dry-run OK, snapshot current).
@@ -16,7 +18,7 @@ treat these commands as leads to re-verify against the current build.
 
 - **Signal**: `hermes update --yes --backup` said "Already up to date", yet config version drift and a missing root `agent-browser` remained.
 - **Cause**: the no-op path skips dependency resync, config migration and the web build — "source current" ≠ "runtime current".
-- **Do**: `hermes --version` + `git status --short` + `hermes doctor` → update → then regardless: `hermes doctor`, `hermes config check`, `python ~/.hermes/scripts/post-update-check.py`.
+- **Do**: `hermes --version` + `git status --short` + `hermes doctor` → update → then regardless: `hermes doctor`, `hermes config check`, `python $HERMES_HOME/scripts/post-update-check.py`.
 - **Repairs**: back up `config.yaml` + `.env` before migration; reinstall deps from the checkout/lockfile instead of re-pulling; `agent-browser` repair is `npm install --workspaces=false agent-browser@<v>` then `git checkout -- package-lock.json`.
 - **Restart without killing the turn**: `systemd-run --user --on-active=15s --collect /usr/bin/systemctl --user restart hermes-gateway.service`.
 

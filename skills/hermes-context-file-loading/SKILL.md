@@ -17,8 +17,10 @@ metadata:
 
 # Hermes Context File Loading
 
+<!-- install-root: `$HERMES_HOME` below means the install root; it defaults to `~/.hermes` -->
+
 How Hermes builds its system prompt from instruction files. **Source-verified** against
-`~/.hermes/hermes-agent/agent/prompt_builder.py` (functions cited by line below) and the
+`$HERMES_HOME/hermes-agent/agent/prompt_builder.py` (functions cited by line below) and the
 official docs. Mechanics here override any vibe-based assumption — when in doubt, re-read
 `prompt_builder.py` and the docs at the homepage above.
 
@@ -46,7 +48,7 @@ official docs. Mechanics here override any vibe-based assumption — when in dou
 | **`MEMORY.md`** | volatile tier (memory tool) | `HERMES_HOME/memories/MEMORY.md` | no | ✅ injected every turn |
 | **`USER.md`** | volatile tier (memory tool) | `HERMES_HOME/memories/USER.md` | no | ✅ injected every turn |
 
-`HERMES_HOME` = `~/.hermes/` (or `~/.hermes/profiles/<name>/` under a named profile).
+`HERMES_HOME` = `$HERMES_HOME/` (or `$HERMES_HOME/profiles/<name>/` under a named profile).
 
 ## Critical precedence rule (project context = ONE slot)
 
@@ -81,8 +83,8 @@ duplicating facts across those two costs tokens on *every* call. De-dup volatile
 
 1. **Want a rule global / cwd-independent / loaded every session → it MUST live in `SOUL.md`.**
    `AGENTS.md`, `HERMES.md`, `CLAUDE.md`, `.cursorrules` are ALL cwd-bound. None can be made
-   global by relocating into `~/.hermes/` — that is not their mechanism. Putting `HERMES.md` or
-   `AGENTS.md` in `~/.hermes/` does **nothing** unless your session cwd happens to be there.
+   global by relocating into `$HERMES_HOME/` — that is not their mechanism. Putting `HERMES.md` or
+   `AGENTS.md` in `$HERMES_HOME/` does **nothing** unless your session cwd happens to be there.
 
 2. **`AGENTS.md` binds to the EXACT cwd directory, not a subtree.**
    - cwd = `~/proj` → `~/proj/AGENTS.md` loads ✓
@@ -156,7 +158,7 @@ duplicating facts across those two costs tokens on *every* call. De-dup volatile
 ## Verification recipe (re-confirm after Hermes upgrades)
 
 ```bash
-SRC=~/.hermes/hermes-agent/agent/prompt_builder.py
+SRC=$HERMES_HOME/hermes-agent/agent/prompt_builder.py
 # Confirm the loader functions and their scopes still match this skill:
 grep -n "_load_agents_md\|_load_hermes_md\|_load_claude_md\|load_soul_md\|_find_git_root\|build_context_files_prompt" "$SRC"
 ```

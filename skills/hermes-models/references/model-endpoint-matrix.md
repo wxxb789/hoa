@@ -1,5 +1,7 @@
 # Model endpoint matrix (local proxy + relays)
 
+<!-- install-root: `$HERMES_HOME` below means the install root; it defaults to `~/.hermes` -->
+
 What each endpoint actually accepts, per model: the local ghc-proxy at `http://localhost:4141`,
 and external chat-completions relays. Verified by probing; re-probe before relying on a row,
 because the catalog churns.
@@ -91,7 +93,7 @@ the model family's vendor profile, unless the provider name or an alias matches 
 vendor profile. Probe it live from the source tree before reasoning about wire shapes:
 
 ```bash
-cd ~/.hermes/hermes-agent && python3 -c "
+cd $HERMES_HOME/hermes-agent && python3 -c "
 from providers import get_provider_profile
 for n in ('tencent-glm', 'zai', 'glm'):
     print(n, '->', type(get_provider_profile(n)).__name__)"

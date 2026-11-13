@@ -1,5 +1,7 @@
 # Config drift audit: root vs served profiles
 
+<!-- install-root: `$HERMES_HOME` below means the install root; it defaults to `~/.hermes` -->
+
 Profiles are separate `HERMES_HOME`s: nothing inherits from root, so a setting that exists only in root is
 absent on every messaging surface. Drift is silent — no error, no warning, just a profile running stock
 behavior the owner believes he configured. This file is the procedure behind the SKILL.md section of the same
@@ -23,9 +25,9 @@ surface, and the defects that matter live in the parts it skipped.
 ```bash
 # 1. root + every profile home: model, delegation, fallback_providers, model_aliases,
 #    agent.reasoning_effort/overrides, auxiliary, moa.presets
-for f in ~/.hermes/config.yaml ~/.hermes/profiles/*/config.yaml; do …; done
+for f in $HERMES_HOME/config.yaml $HERMES_HOME/profiles/*/config.yaml; do …; done
 # 2. cron — root AND each profile home, with the script field and the pin
-~/.hermes/cron/jobs.json   ~/.hermes/profiles/*/cron/jobs.json
+$HERMES_HOME/cron/jobs.json   $HERMES_HOME/profiles/*/cron/jobs.json
 # 3. harness catalogs — ask the harness, never parse its file
 export PATH="$HOME/.local/share/mise/shims:$PATH"; omp models | head -40
 # 4. live proof from the DB, not from `config get`
@@ -110,7 +112,7 @@ Ports (`platforms.api_server.extra.port`) must differ per profile — never alig
   wait for the owner rather than rephrasing it.
 - Secrets: config values can hold placeholder keys. Mask anything matching api_key/token/secret/password in
   your own output instead of printing raw config.
-- After the writes: `python3 ~/.hermes/scripts/config-snapshot.py`, then `post-update-check.py`, then a gateway
+- After the writes: `python3 $HERMES_HOME/scripts/config-snapshot.py`, then `post-update-check.py`, then a gateway
   restart when messaging surfaces must pick the change up, then a per-profile spot check.
 
 ## Pitfalls seen in practice

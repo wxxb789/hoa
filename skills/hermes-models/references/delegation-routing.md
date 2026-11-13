@@ -1,5 +1,7 @@
 # Delegation routing and per-profile providers
 
+<!-- install-root: `$HERMES_HOME` below means the install root; it defaults to `~/.hermes` -->
+
 
 ## Delegation model routing (main session model A, subagents model B)
 
@@ -26,7 +28,7 @@ are easy to get wrong:
 5. Schema-bearing changes apply to NEW sessions only — the delegation tool schema is built at
    session start, so never flip the pin mid-conversation. Profiles never inherit root config: set
    the pin in each profile that must route children differently, then verify with a real child
-   spawn and its live transcript (`~/.hermes/cache/delegation/live/<id>/task-0.log`) —
+   spawn and its live transcript (`$HERMES_HOME/cache/delegation/live/<id>/task-0.log`) —
    `hermes config get` proves nothing about the route.
 
 ### Moving a profile onto a provider it does not define
@@ -116,7 +118,7 @@ audit any weekly gateway smoke test whose `EXPECTED` matrix still claims 200 for
 Each profile home keeps its **own** `cron/jobs.json`, so pinning the root store leaves every bot's
 schedule on its profile default. Procedure:
 
-1. Enumerate every store: `~/.hermes/cron/jobs.json` plus `~/.hermes/profiles/*/cron/jobs.json`.
+1. Enumerate every store: `$HERMES_HOME/cron/jobs.json` plus `$HERMES_HOME/profiles/*/cron/jobs.json`.
 2. Classify each job: an entry with a `script` is `no_agent` — its `provider`/`model` fields are
    **inert**, nothing reads them, so it never counts as free-pool coverage. Only entries without
    `script` are agent runs that resolve a model.

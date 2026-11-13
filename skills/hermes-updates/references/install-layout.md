@@ -1,5 +1,7 @@
 # Install layout, checkout shape, updater failure modes
 
+<!-- install-root: `$HERMES_HOME` below means the install root; it defaults to `~/.hermes` -->
+
 
 ## Main-only shallow Hermes checkout
 
@@ -36,7 +38,7 @@ Safe pattern for a live messaging gateway:
 9. On failure, stop mutation and inspect the update receipt, committed dependency selection, and state/schema migration status before choosing recovery. A source rollback ref and SQLite snapshot are separate recovery assets, not proof of a compatible downgrade. Before state migration, recover only a verified compatible code/dependency/state set using the install's current dependency manager. After migration, prefer repairing the new version; downgrade only after proving old-code compatibility or verifying a complete consistent pre-migration restore. If compatibility cannot be established, preserve evidence and report the gateway state rather than blindly resetting the SHA and starting it. Remove the rollback ref only after verified recovery.
 10. Validate the actual unit with `systemd-analyze --user verify`, manually run both update and no-update paths, then inspect `journalctl`, timer next-run state, HEAD==origin/main, depth, rollback-ref absence, and gateway health.
 
-Keep operational scripts under `~/.hermes/scripts/` and units under `~/.config/systemd/user/`. Log to journald; do not silently claim success from timer enablement alone.
+Keep operational scripts under `$HERMES_HOME/scripts/` and units under `~/.config/systemd/user/`. Log to journald; do not silently claim success from timer enablement alone.
 
 ### Unattended updater silently frozen by source drift
 
@@ -71,13 +73,13 @@ was: every launcher-mediated `hermes` command except the `pm` subcommands refuse
 and `hermes update` itself are all behind the same gate and cannot help you here.
 
 Evidence trail, most useful first:
-1. `hermes pm status` and `~/.hermes/logs/update_receipts/latest.json` plus the newest `update_*.json`
+1. `hermes pm status` and `$HERMES_HOME/logs/update_receipts/latest.json` plus the newest `update_*.json`
    — read `outcome`, `stop_reason`, `steps[].detail`, and the `pre_update` / `post_update` shas.
-2. `~/.hermes/logs/update.log` tail — where the run stopped, and the last line that printed OK.
+2. `$HERMES_HOME/logs/update.log` tail — where the run stopped, and the last line that printed OK.
 3. `journalctl --user -u hermes-gateway --since "2 hours ago" | grep -iE 'update|dependenc|uv sync'`.
    Each new CLI or gateway start retries the pending dependency completion, so the same failure
    repeats on every startup with the reason inline.
-4. `ps -eo pid,ppid,etime,cmd | grep -E 'pm/worker|gateway run'` and `~/.hermes/.hermes-update-in-progress`.
+4. `ps -eo pid,ppid,etime,cmd | grep -E 'pm/worker|gateway run'` and `$HERMES_HOME/.hermes-update-in-progress`.
 
 Pitfalls:
 - `.hermes-update-in-progress` is created and deleted by each completion attempt, so it can appear
@@ -103,7 +105,7 @@ Recovery order:
 4. `hermes update` — pulls the remaining commits and restarts the gateway so no process keeps
    serving the mixed state.
 5. Verify with the post-check loop above (`hermes --version`, `hermes doctor`, `git status --short`,
-   `python3 ~/.hermes/scripts/post-update-check.py`), not with the updater's own exit line.
+   `python3 $HERMES_HOME/scripts/post-update-check.py`), not with the updater's own exit line.
 
 - The unattended `hermes-auto-update.timer` retries this whole path at its next run, so a failed
   manual upgrade heals itself once the build dependency exists. Offer that as the zero-effort option
@@ -140,13 +142,13 @@ nightly `FATAL: checkout is not on main` while the code sat 4086 commits behind.
 
 ### `REPO/venv` is not the runtime (PM installs)
 
-On package-manager installs `~/.hermes/hermes-agent/venv` can be a legacy shim whose
+On package-manager installs `$HERMES_HOME/hermes-agent/venv` can be a legacy shim whose
 interpreter imports `installs/<id>/environments/<hash>/workspace`, a **stale mirror** of
 the checkout (observed: 375 differing files under `agent/`, `hermes --version` still
 printing the new version off the stale `VERSION` file). Helpers run through it execute
 old code — snapshots, bundled-skill sync and model probes all silently used it.
 
-- Run python helpers with the newest `~/.hermes/tools/python-*/bin/python3` and
+- Run python helpers with the newest `$HERMES_HOME/tools/python-*/bin/python3` and
   `PYTHONPATH=<repo>`; the launcher pops `PYTHONPATH` itself, so `hermes` CLI calls are
   unaffected by the export.
 - Call the `~/.local/bin/hermes` launcher for `hermes …`; never `<repo>/venv/bin/hermes`.
