@@ -27,8 +27,12 @@ import yaml
 
 def load_configs(home: str) -> dict[str, dict]:
     paths = {"default": f"{home}/config.yaml"}
-    for p in sorted(os.listdir(f"{home}/profiles")):
-        f = f"{home}/profiles/{p}/config.yaml"
+    profiles = f"{home}/profiles"
+    if not os.path.isdir(profiles):
+        # a single-home install has no profiles/ directory at all
+        return {name: (yaml.safe_load(open(path)) or {}) for name, path in paths.items()}
+    for p in sorted(os.listdir(profiles)):
+        f = f"{profiles}/{p}/config.yaml"
         if os.path.exists(f):
             paths[p] = f
     out = {}
@@ -47,7 +51,16 @@ def fetch_catalog(url: str) -> dict:
 
 
 def catalog_index(cat: dict) -> dict:
+    """Index a metadata catalog (`models[].upstream.capabilities`) or an OpenAI id list (`data[]`).
+
+    A `/v1/models` endpoint answers with `data[]` and carries no capability metadata, so the
+    comparison degrades to "this id exists upstream" — useful, and not a proof of limits.
+    """
     idx = {}
+    if not (cat.get("models")):
+        for m in (cat.get("data") or []):
+            if isinstance(m, dict) and m.get("id"):
+                idx[m["id"]] = {"ids_only": True}
     for m in (cat.get("models") or []):
         caps = ((m.get("upstream") or {}).get("capabilities") or {})
         idx[m["id"]] = {
@@ -104,9 +117,7 @@ def default_catalog_url(hermes_home: str) -> str:
         base = entry.get("base_url") or entry.get("api_base") or entry.get("api")
         if base:
             return str(base).rstrip("/") + "/models"
-    raise SystemExit(
-        "audit-provider-metadata: no catalog URL — set HERMES_CATALOG_URL or pass --catalog-url"
-    )
+    return None  # no endpoint to read: the audit still compares configs
 
 
 def main() -> int:
@@ -124,10 +135,14 @@ def main() -> int:
 
     if not args.catalog_url:
         args.catalog_url = default_catalog_url(args.hermes_home)
-    print(f"catalog: {args.catalog_url}")
+    if args.catalog_url:
+        print(f"catalog: {args.catalog_url}")
+    else:
+        print("catalog: none configured — comparing configuration only")
+        args.catalog_url = ""
 
     cfg = load_configs(args.hermes_home)
-    cat = catalog_index(fetch_catalog(args.catalog_url))
+    cat = catalog_index(fetch_catalog(args.catalog_url) if args.catalog_url else {})
     use = usage_rows(args.hermes_home)
 
     helper = None

@@ -150,8 +150,9 @@ Probe each surface with the new id itself (`opencode run -m <p>/<id>#max`, `omp 
 --model <p>/<id>`, `omo -p --model <p>/<id>`), then `model-switch.py <live-preset> --check` — the preset must be
 edited in the same pass or it reports drift against a state you just created on purpose.
 
-Run these edit scripts with `/usr/bin/python3`: the first `python3` on PATH is a Hermes install venv that has
-ruamel but no PyYAML, and the failure surfaces only after the first `import yaml`.
+Run these edit scripts with an interpreter that can `import yaml` — a project venv or a system Python, not
+necessarily the first `python3` on `PATH`: a Hermes install venv may ship ruamel without PyYAML, and the
+failure surfaces only after the first `import yaml`.
 
 ## 7. Rollback and hygiene
 
