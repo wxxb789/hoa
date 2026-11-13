@@ -27,3 +27,7 @@
    the case the goal record lists as a known limit, that limit is unpaid debt: implement the resolution
    or make the omission explicit in code, then rewrite the limit. "Documented, therefore out of scope"
    keeps a known-wrong value shipping.
+8. **Review for semantic widening, not style.** Before merging two byte-identical call sites, write down
+   per call site the grant it consumes, what it may touch, and its destination; if any differs, share
+   only the mechanics (parsing, query) and keep two decisions. After splitting a predicate, re-assign a
+   rule to every caller — any caller left on the old helper silently inherits whichever rule remained.

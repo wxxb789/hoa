@@ -114,16 +114,16 @@ category 取该 skill 的第一个 `metadata.areas` 值，可用 `--category` �
 
 | `kind` | 用途 | 当前树上 |
 |---|---|---|
-| `entry` | 可由用户请求直接路由。它可以消费/生产 artifact，但不需要 controller 来调用。 | 37 个 skill，例如 `ghc-search`、`hoa-skill-work`、`spec-convergence` |
-| `controller` | 路由一条链：决定哪个 stage 运行，且只生产 `chain-plan`。 | `goal-driven-delivery` |
-| `stage` | 链中的一个阶段，由它的 controller 调用。声明它消费和生产什么。 | `subagent-driven-development`（`plan` → `implementation`） |
+| `entry` | 可由用户请求直接路由。它可以消费/生产 artifact，但不需要 controller 来调用。 | 例如 `ghc-search`、`hoa-skill-work`、`spec-convergence` |
+| `controller` | 路由一条链：决定哪个 stage 运行，且只生产 `chain-plan`。 | `gdd` |
+| `stage` | 链中的一个阶段，由它的 controller 调用。声明它消费和生产什么。 | `subagent-driven-development` |
 | `mechanism` | 只由另一个 skill 调用，永远不是路由目标。CI 拒绝把它列为 trigger case 的 `must_pick`。 | `delegated-work-acceptance` |
 
 ### 面（Surfaces）
 
 | 目录 | 内容 | 是否下发 |
 |---|---|---|
-| `skills/` | 40 个 `SKILL.md` 包：唯一自动下发的 artifact。`npx skills add wxxb789/hoa` 安装它们。 | 是 |
+| `skills/` | `SKILL.md` 包：唯一自动下发的 artifact。`npx skills add wxxb789/hoa` 安装它们。 | 是 |
 | `agents/` | 1 个 role / authority / I-O 契约（`skill-scout`）。 | 否——库 |
 | `mcps/` | 1 个可移植 MCP 定义（`ghc-proxy`）。 | 否——库 |
 | `orchestration/` | 1 个调度/handoff/termination 模式（`typed-verification-gates`）。 | 否——库 |
@@ -136,7 +136,7 @@ category 取该 skill 的第一个 `metadata.areas` 值，可用 `--category` �
 
 skill 的 frontmatter 同时携带目录字段与组合字段：`version`、`kind`、可选的逗号分隔
 `consumes` / `produces`、`areas`、`targets`、`summary`、`summary_zh`。库 artifact 把元数据
-放在 `<!-- index: ... -->` 注释里。`index.md` 与 `index.zh-CN.md` 从这两个来源生成，覆盖 49 个
+放在 `<!-- index: ... -->` 注释里。`index.md` 与 `index.zh-CN.md` 从这两个来源生成，覆盖目录里的全部
 artifact；CI 对漂移报错。runtime **设置**（provider、模型、插件）归 chezmoi，不归本仓库。
 
 ### 契约图
@@ -199,11 +199,11 @@ job 只在 `main` 上、`test` 成功之后运行，并为 CI 验证过的提交
 
 ### eval case 如何评分——以及它能证明什么
 
-`evals/trigger-cases.json` 有 25 个路由 case：`id`、用户 `request`、恰好一个 `must_pick`
+`evals/trigger-cases.json` 存路由 case：`id`、用户 `request`、恰好一个 `must_pick`
 artifact，以及不得被选中的 `distractors`。评分者是 fresh context 中的 LLM，它只看到一个新贡献者
 会看到的东西：
 
-1. 从 `scripts/generate_index.py collect()` 构建目录：49 个 artifact 的 name、type 与英文 summary。
+1. 从 `scripts/generate_index.py collect()` 构建目录：目录里全部 artifact 的 name、type 与英文 summary。
 2. 对一个 case，发送目录与请求，要求只回复一个 artifact 名。
 3. 只有去掉首尾空白后的回复恰好等于该 case 的 `must_pick` 才算通过。回复没有命中任何目录条目
    即该 case 失败，pick 原样保留。网络或 endpoint 错误只让该 case 失败，批次其余 case 继续完成。

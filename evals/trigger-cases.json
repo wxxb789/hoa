@@ -153,6 +153,18 @@
       "distractors": ["spec-convergence", "define-goal"]
     },
     {
+      "id": "route-contract-increment-to-gdd",
+      "request": "这个增量我已经写好验收契约（可观测的通过条件、判定工件、失败对照都齐了），帮我从分支开始一路跑到合并，不用逐步问我。",
+      "must_pick": ["gdd"],
+      "distractors": ["kanban-workflows", "subagent-driven-development"]
+    },
+    {
+      "id": "route-explicit-gdd",
+      "request": "跑 GDD：下一个 goal 端到端交付并合并，合并后直接起下一个分支。",
+      "must_pick": ["gdd"],
+      "distractors": ["kanban-workflows", "project-phase-closeout"]
+    },
+    {
       "id": "route-boundaryless-goal-to-spec-first",
       "request": "我想把团队的发布流程改成全自动，目标定大一点，顺便把这季度的计划排出来。但现在连这件事该包含什么、什么算做完了都还没想清楚。",
       "must_pick": ["spec-convergence"],

@@ -7,7 +7,7 @@ description: >-
   acceptance or test seam are still undecided. Not for work whose contract is already written,
   one-line fixes, or exploring what the system does today.
 metadata:
-  version: "0.1.48"
+  version: "0.1.49"
   areas: "software-development"
   targets: "runtime-agnostic"
   summary: "converge an unclear request into a confirmed spec: one root concern per round, a capped number of questions per round, every question backed by the fact that makes it real, explicit shared-understanding confirmation before writing"
@@ -138,8 +138,8 @@ Use these headings only. Do not add a design section, a task list or an implemen
 
 - `writing-plans` consumes this spec and produces `plan`. The plan may not re-decide what the spec
   settled; if it has to, the spec is incomplete — come back here rather than widening the plan.
-- `subagent-driven-development` consumes `plan`, and reads the spec when the plan names one, as an extra
-  standard for its spec-compliance review.
+- `subagent-driven-development` executes the `plan`, and reads the spec when the plan names one, as an
+  extra standard for its spec-compliance review.
 - A goal file when the work is an outcome delivered end to end over a longer window.
 
 ## Rules

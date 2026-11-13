@@ -29,7 +29,7 @@ SOURCES: dict[str, Path] = {
 
 # shared script name → destination skill script dirs
 CONSUMERS: dict[str, list[str]] = {
-    "skill_config.py": ["skills/goal-driven-delivery/scripts"],
+    "skill_config.py": ["skills/gdd/scripts"],
     "safety.py": [
         "skills/hoa-introspect/scripts",
         "skills/hoa-introspect-distill/scripts",

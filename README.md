@@ -125,16 +125,16 @@ the layer is a fact about the tree, not a label someone remembers to add.
 
 | `kind` | What it is for | At this tree |
 |---|---|---|
-| `entry` | Directly routable from a user request. It may consume/produce artifacts, but it needs no controller to be invoked. | 37 skills, e.g. `ghc-search`, `hoa-skill-work`, `spec-convergence` |
-| `controller` | Routes a chain: decides which stage runs, and produces only `chain-plan`. | `goal-driven-delivery` |
-| `stage` | One phase of a chain, invoked by its controller. Declares what it consumes and produces. | `subagent-driven-development` (`plan` → `implementation`) |
+| `entry` | Directly routable from a user request. It may consume/produce artifacts, but it needs no controller to be invoked. | e.g. `ghc-search`, `hoa-skill-work`, `spec-convergence` |
+| `controller` | Routes a chain: decides which stage runs, and produces only `chain-plan`. | `gdd` |
+| `stage` | One phase of a chain, invoked by its controller. Declares what it consumes and produces. | `subagent-driven-development` |
 | `mechanism` | Invoked only by another skill; never a routing target. CI rejects it as a trigger-case `must_pick`. | `delegated-work-acceptance` |
 
 ### Surfaces
 
 | Folder | What lives there | Deployed? |
 |---|---|---|
-| `skills/` | 40 `SKILL.md` packages: the only auto-deployed artifact. `npx skills add wxxb789/hoa` installs them. | yes |
+| `skills/` | `SKILL.md` packages: the only auto-deployed artifact. `npx skills add wxxb789/hoa` installs them. | yes |
 | `agents/` | 1 role / authority / I-O contract (`skill-scout`). | no — library |
 | `mcps/` | 1 portable MCP definition (`ghc-proxy`). | no — library |
 | `orchestration/` | 1 scheduling/handoff/termination pattern (`typed-verification-gates`). | no — library |
@@ -148,7 +148,7 @@ the layer is a fact about the tree, not a label someone remembers to add.
 A skill's frontmatter carries the catalog and composition fields together: `version`, `kind`,
 optional comma-separated `consumes` / `produces`, `areas`, `targets`, `summary`, `summary_zh`.
 Library artifacts keep their metadata in an `<!-- index: ... -->` comment. `index.md` and
-`index.zh-CN.md` are generated from those two sources and cover 49 artifacts; CI fails on drift.
+`index.zh-CN.md` are generated from those two sources and cover every artifact in the catalog; CI fails on drift.
 Runtime **settings** (provider, models, plugins) are chezmoi's job, not this repo's.
 
 ### The contract graph
@@ -212,12 +212,12 @@ tooling.
 
 ### How an eval case is graded — and what that proves
 
-`evals/trigger-cases.json` holds 25 routing cases: an `id`, a user `request`, exactly one
+`evals/trigger-cases.json` holds the routing cases: an `id`, a user `request`, exactly one
 `must_pick` artifact, and `distractors` that must not be chosen. The grader is an LLM in a fresh
 context, and it is told only what a new contributor would see:
 
 1. Build the catalog from `scripts/generate_index.py collect()`: name, type, and English summary
-   for all 49 artifacts.
+   for every artifact in the catalog.
 2. For one case, send the catalog and the request, and ask for exactly one artifact name.
 3. Pass iff the stripped reply is exactly the case's `must_pick`. A reply that names no catalog
    entry is a failed case and is preserved verbatim as the pick. A network or endpoint error fails

@@ -7,7 +7,7 @@ description: >-
   recovering a run that was killed mid-turn. Do not use for a two-minute command (run it inline) or for
   work that needs live steering (that is a TUI session).
 metadata:
-  version: "0.1.48"
+  version: "0.1.49"
   areas: "software-development,work-management"
   targets: "pi"
   summary: "detached tmux launcher for long `omp -p` runs; polled completion, session-id recovery"
@@ -43,7 +43,7 @@ scripts/omp-run.sh list | status <slug> | tail <slug> 20 | result <slug> | answe
 A detached tmux session hangs off the tmux server (init), not off your session, so it survives session
 and gateway restarts. Verify with the ancestor chain of the omp pid, not by assumption.
 
-The implementation is maintained once, with skill `goal-driven-delivery`
+The implementation is maintained once, with skill `gdd`
 (`scripts/adapters/omp-run.sh`), because that skill's `gdd.py` defaults to it; the copy here
 (`scripts/omp-run.sh`) is a forwarder, so manual and dispatched runs share one code path.
 
@@ -131,5 +131,5 @@ process on the same session id.
 ## Related
 
 Delivery-specific transport rules (one run per stage, no cross-increment resume, one run per worktree):
-skill `goal-driven-delivery` → `references/transport.md`. That skill's `scripts/gdd.py` calls this
+skill `gdd` → `references/transport.md`. That skill's `scripts/gdd.py` calls this
 launcher through the same contract.

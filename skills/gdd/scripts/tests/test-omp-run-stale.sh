@@ -145,7 +145,7 @@ ok "forwarder finds the sibling launcher with OMP_RUN_SH unset"
 # A categorized install: only the third candidate exists.
 TREE="$TMP/tree"
 COPY="$TREE/skills/omp-headless-orchestration/scripts/omp-run.sh"
-CAT_STUB="$TREE/skills/software-development/goal-driven-delivery/scripts/adapters/omp-run.sh"
+CAT_STUB="$TREE/skills/software-development/gdd/scripts/adapters/omp-run.sh"
 mkdir -p "$(dirname "$COPY")" "$(dirname "$CAT_STUB")"
 cp "$FORWARDER" "$COPY"
 printf '#!/usr/bin/env bash\nprintf "categorized\\n"\nexit 0\n' >"$CAT_STUB"

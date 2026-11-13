@@ -1,5 +1,5 @@
 ---
-name: goal-driven-delivery
+name: gdd
 description: >-
   Land a written, machine-checkable increment in a repo end to end — one goal contract, one fresh
   authoring-agent run per stage, gates the operator re-runs, a scripted merge gate, and a durable stage
@@ -7,12 +7,13 @@ description: >-
   end, including the merge. Do not use for one-line fixes, exploration with no acceptance criteria, or
   work no machine can check (that is a conversation, not a delivery).
 metadata:
-  version: "0.1.48"
+  version: "0.1.49"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "goal contract → agent-authored stages → operator-run gates → scripted merge gate → resumable ledger; ships `gdd.py`, `delivery-state.py`, `pr-merge-check.py`"
   summary_zh: "目标契约 → agent 分阶段产出 → operator 验收 → 脚本化合并门禁 → 可续跑账本；随附 `gdd.py`、`delivery-state.py`、`pr-merge-check.py`"
   kind: "controller"
+  consumes: "goal-contract"
   produces: "chain-plan"
 ---
 
@@ -67,19 +68,19 @@ stop and report — do not burn budget in silence.
 | 7 ledger | one ledger row per stage | the operator writes it, never the agent; resume with `show` + `git status` + `git log origin/main..HEAD`; mid-flight status comes from live state | [`references/phases/07-ledger.md`](references/phases/07-ledger.md) |
 | 8 reset | a fresh base for the next goal | fresh run, never a resumed session; delete merged branches; fork from freshly fetched `origin/main`; report the base SHA | [`references/phases/07-ledger.md`](references/phases/07-ledger.md) |
 
-## Platform-significant increments
+## Before you dispatch, and before you believe a run
 
-When the repo ships on more than one OS, a green local run is not evidence. Fixtures, path literals,
-goldens, signals and mode bits each carry a platform assumption; read
-[`references/cross-platform-increments.md`](references/cross-platform-increments.md) before writing the
-verification plan, and require the matrix job to print the failing test's own output.
+Two references decide most failures. Read
+[`references/cross-platform-increments.md`](references/cross-platform-increments.md) before writing a
+verification plan for a repo that ships on more than one OS — a green local run is not evidence there.
+Read [`references/run-failure-modes.md`](references/run-failure-modes.md) before adding a selftest case or
+believing a run's report of itself: a test can kill the process under test, a stubbed test can pass for
+the wrong reason, and an exit code can disagree with the artifact it produced.
 
-## When a run dies or lies
+## Playbooks
 
-Read [`references/run-failure-modes.md`](references/run-failure-modes.md) before adding a selftest case,
-writing a verification plan, or believing a run's report of itself — a test can kill the process under
-test, a stubbed test can pass for the wrong reason, a crashed run blocks the next stage, and an exit code
-can disagree with the artifact it produced.
+Stage detail lives in `references/phases/*.md` (mapped in the Phase table above). Read the phase file
+matching the current stage directly — do not create per-phase skills.
 
 ## Stop conditions — when to stop and ask
 
@@ -108,13 +109,5 @@ can disagree with the artifact it produced.
 Resolution order and the config-file path are defined once in
 [skill-porting-and-publishing § Configuration](../skill-porting-and-publishing/SKILL.md#configuration-is-a-gate-not-advice).
 `gdd.py` implements it through the vendored `scripts/skill_config.py`; the config-file keys are the
-six names in the table, for example:
-
-```yaml
-# $XDG_CONFIG_HOME/goal-driven-delivery/config.yaml
-GDD_STATE_FILE: /srv/state/gdd/ledger.tsv
-GDD_TASK_ROOT: /srv/state/gdd/tasks
-```
-
-Nothing about one install lives in the protocol: a profile may point at its own files, but no path is
-inlined.
+six names in the table. Nothing about one install lives in the protocol: a profile may point at its own
+files, but no path is inlined.

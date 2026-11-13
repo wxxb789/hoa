@@ -3,6 +3,29 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## 2026-11-13 — `gdd` controller + phase playbooks, four standalone entries
+
+- **Monolithic `gdd` controller**: `goal-driven-delivery` → **`gdd`** (controller, ≤120 lines), with
+  per-stage detail in `references/phases/*.md` playbooks rather than separate stage/mechanism skills.
+  `GDD_*` keys, `scripts/gdd.py`, the ledger and the state directory are unchanged; only the config
+  file moves to `$XDG_CONFIG_HOME/gdd/config.yaml`.
+- **Standalone non-family skills**: among the eight candidate ports, four were falsified as separate
+  skills and removed after folding their net-new rules into `gdd/references/` (`agent-run-acceptance`,
+  `repo-gate-execution`, `unattended-pipeline-recovery`, `mechanism-propagation`); four ship as
+  independent `entry` skills outside any `gdd-*` family: `measurement-campaign-evidence`,
+  `project-phase-closeout`, `structural-validity-gates`, and `package-release-verification`.
+  `subagent-driven-development` keeps its original name (`stage`) and `SDD_*` configuration keys, with
+  an explicit boundary note against `gdd`'s single-run, no-commit stage protocol.
+- **Contract graph**: `define-goal` produces `goal-contract` (consumed by `gdd`); `external:` gained
+  nothing.
+- **Rules**: `generalization-rubric.md` now admits `controller` and `stage` when every repo-specific
+  gate, launcher, review bot and approval boundary is configuration — the old "atomic mechanisms only"
+  line contradicted the four-layer contract CI already enforces.
+- **CI**: the loop's own tests run in CI now (`run-gdd-selftest.sh` 85/85, `test-omp-run-stale.sh`
+  7/7). They were local-only, so a broken launcher path or a stale `SKILL` constant could merge green.
+- **Evals**: two routing cases for `gdd` (`route-contract-increment-to-gdd`, `route-explicit-gdd`).
+- **README**: catalog counts removed from prose, per `rules/generated-means-generated.md`.
+
 ## 2026-11-11 — the reference launcher gets a second backend
 
 - **`skills/goal-driven-delivery/scripts/adapters/omp-run.sh`**: the launcher no longer hardcodes tmux.

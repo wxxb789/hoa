@@ -901,7 +901,7 @@ check $? "the file is still bounded and valid after the terminal went away"
 # --- 13. operator config file ----------------------------------------------
 
 CFG_HOME="$XDG_CONFIG_HOME"
-CFG_DIR="$CFG_HOME/goal-driven-delivery"
+CFG_DIR="$CFG_HOME/gdd"
 CFG_FILE="$CFG_DIR/config.yaml"
 CFG_LEDGER="$TMP/config-ledger.tsv"
 mkdir -p "$CFG_DIR"

@@ -12,9 +12,9 @@ with PyYAML, so an unsupported construct is an error instead of a half-parsed gu
 Usage::
 
     from skill_config import resolve
-    value = resolve("goal-driven-delivery", "GDD_STATE_FILE", default="/tmp/ledger.tsv")
+    value = resolve("gdd", "GDD_STATE_FILE", default="/tmp/ledger.tsv")
 
-    python scripts/skill_config.py --skill goal-driven-delivery --key GDD_STATE_FILE
+    python scripts/skill_config.py --skill gdd --key GDD_STATE_FILE
 
 CLI output is one provenance line: ``<KEY>=<value> (from flag|env VAR|config PATH|default)``.
 

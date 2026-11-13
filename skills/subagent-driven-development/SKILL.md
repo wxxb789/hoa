@@ -7,7 +7,7 @@ description: >-
   hold between tasks. Not for discovering what to build, and not for one task you can finish in the
   current context.
 metadata:
-  version: "0.1.48"
+  version: "0.1.49"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "execute a plan with a fresh subagent per task and two-stage review: spec compliance first, code quality second"
@@ -28,6 +28,15 @@ fast iteration.
 
 Method adapted from the public `superpowers` subagent-driven-development flow (MIT); the role names
 and the transport-neutral dispatch contract are this port's.
+
+## Boundary — this is plan execution, not the loop's implement stage
+
+`gdd` runs one goal as **one** agent run: `gdd.py stage --stage implement` renders
+`references/stage-templates/implement.md`, forbids committing, and leaves the tree for verification.
+This skill is the other protocol: a **multi-task plan**, a fresh subagent per task, a commit per task,
+two reviews between tasks. Load it when `writing-plans` produced the plan and you are executing it
+directly; never inside a `gdd` stage run, where per-task commits break the sealed-scope and single-run
+budget assumptions of phases 1, 2 and 5.
 
 ## When to Use
 

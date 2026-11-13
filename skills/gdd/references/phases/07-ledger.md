@@ -47,5 +47,9 @@ the operator commands.
   usually describes work you already landed.
 - **A stalled increment with no ledger row is the expensive failure.** Work sits in a dirty worktree
   and the next session cannot tell "not started" from "implemented, awaiting review".
+- **On handover, inventory uncommitted work across *every* worktree** (`git worktree list`), not only the
+  main clone, before deciding which stage to re-dispatch.
+- **When a PR is `CONFLICTING`, GitHub dispatches no workflows** — an empty `gh pr checks` set is a
+  merge conflict, not "CI has not run yet".
 - **Don't start the next increment while the previous branch is unmerged** — the review range stops
   meaning anything.

@@ -30,7 +30,7 @@ Environment or operator config file:
                     passed to the launcher only when set; never defaulted here
 
 The six path/command keys resolve through the shared resolver: flag, then environment,
-then $XDG_CONFIG_HOME/goal-driven-delivery/config.yaml (fallback ~/.config/...),
+then $XDG_CONFIG_HOME/gdd/config.yaml (fallback ~/.config/...),
 then the default. The rule is owned by skill-porting-and-publishing.
 
 Launcher contract (adapters/omp-run.sh is the reference implementation):
@@ -77,7 +77,7 @@ STAGES = [
 AGENT_STAGES = {"implement", "simplify", "apply", "review", "fix"}
 NEEDS_FINDINGS = {"apply", "fix"}
 
-SKILL = "goal-driven-delivery"
+SKILL = "gdd"
 DEFAULT_GOAL_GLOB = "docs/goals/*<goal>*.md"
 DELIVERY_STATE = os.path.join(SCRIPT_DIR, "delivery-state.py")
 DEFAULT_LAUNCHER = os.path.join(SCRIPT_DIR, "adapters", "omp-run.sh")
@@ -597,7 +597,7 @@ Environment or operator config file:
                   passed to the launcher only when set; never defaulted here
 
 The six path/command keys above also resolve from
-$XDG_CONFIG_HOME/goal-driven-delivery/config.yaml (fallback ~/.config/...).
+$XDG_CONFIG_HOME/gdd/config.yaml (fallback ~/.config/...).
 Order: CLI flag, then environment variable, then that file, then the default.
 The shared rule is documented in skill-porting-and-publishing.
 

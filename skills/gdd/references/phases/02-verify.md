@@ -2,6 +2,17 @@
 
 The agent's report is a claim, never evidence:
 
+- Settle the tree before gating: sample `git status --porcelain` and the newest mtime under changed
+  paths twice a few seconds apart, and run gates only when both samples match. A failure within seconds
+  of a `done` report is suspect by default — re-run once on the settled tree before calling it real.
+- **Resolve local gate concurrency from the project profile, not from CI's default.** Take the worker
+  count from the profile or a `GDD_*` key with a conservative documented default; on a host smaller than
+  the CI runner, the default parallelism triggers an OOM kill that reads like a code regression. Record
+  the resolved value with the gate evidence, so two runs of one commit can be compared honestly.
+- If an interrupted gate did not reach its `restore` step, the artifact directory is dirty (a half-built
+  `dist/`); restore it before re-running.
+- Read model and provider metadata early before `events.ndjson` truncates (`events_truncated`); when the
+  run record says `model: null`, cite the CLI config's default as config default, never as the run's fact.
 - Run the repo's gates yourself and read real exit codes.
 - **Exit 0 means the process ended, not that the phase finished.** Read the run's final assistant text
   (`answer.md`): a report ending with "the gate is running, waiting for its result" ended mid-gate.

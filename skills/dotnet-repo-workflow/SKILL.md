@@ -7,7 +7,7 @@ description: >-
   NuGet package, or when a .NET change is ready to commit and open as a PR. Do not use for the repo's
   code style (its own AGENTS.md) or for orchestrator install maintenance.
 metadata:
-  version: "0.1.48"
+  version: "0.1.49"
   areas: "software-development"
   targets: "runtime-agnostic"
   summary: "run the repo's own .NET gate harness instead of a hand-rolled `dotnet test`; lock files, Roslyn harness traps, merge-ready checklist"
@@ -62,7 +62,7 @@ Export once per session. Read `command not found` as a PATH gap and check `~/.do
 
 Everything repo-specific — the gate list and how to read it, API-baseline rules, docs-snippet counts,
 goal-file/archive conventions, evidence-record rules — belongs in that repo's **project profile**
-(skill `goal-driven-delivery` ships the template). This skill supplies only the .NET mechanics.
+(skill `gdd` ships the template). This skill supplies only the .NET mechanics.
 
 ## Packages and lock files
 
@@ -92,7 +92,7 @@ Act only from a fresh snapshot of PR state, never from chat history. Mark a revi
 running" status comment as `dispatched` instead of spending a resolver pass on it. How to drive a PR
 snapshot helper directly, and what each tick checks: [`references/pr-babysit.md`](references/pr-babysit.md).
 "Merge-ready" is not a judgement call — in a goal-driven repo the verdict is a script
-(`goal-driven-delivery`, Phase 6), not a feeling.
+(`gdd`, Phase 6), not a feeling.
 
 ### Pre-existing red work
 
