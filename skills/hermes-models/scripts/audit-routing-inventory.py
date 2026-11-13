@@ -25,12 +25,22 @@ from pathlib import Path
 def load_yaml(path: Path) -> dict:
     try:
         import yaml
-    except ImportError:
+    except ImportError as exc:
+        raise SystemExit(
+            f"audit-routing-inventory: PyYAML is required to read {path} ({exc}); "
+            "run it with an interpreter that has it"
+        )
+    if not path.exists():
         return {}
     try:
         return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    except Exception:
-        return {}
+    except ImportError as exc:  # PyYAML absent: an empty dict would fake an empty fleet
+        raise SystemExit(
+            f"audit-routing-inventory: PyYAML is required to read {path} ({exc}); "
+            "run it with an interpreter that has it"
+        )
+    except Exception as exc:
+        raise SystemExit(f"audit-routing-inventory: cannot parse {path}: {exc}")
 
 
 def bare(provider: str | None) -> str:
