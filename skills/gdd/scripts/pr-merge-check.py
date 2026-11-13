@@ -8,6 +8,7 @@ Usage:
     pr-merge-check.py 123 --repo PATH --gates-rc 0 --verified-head SHA --json
     pr-merge-check.py 123 --repo PATH --marker 'my-bot-state:v2'
     pr-merge-check.py 123 --repo PATH --allow-no-machine-review
+    pr-merge-check.py 123 --repo PATH --gates-rc 0 --verified-head SHA --allow-no-checks
     pr-merge-check.py --selftest
 
 Exit codes: 0 MERGE-OK, 1 BLOCKED, 2 usage/gh/git error.
@@ -16,6 +17,9 @@ Checks:
   1. every CI check completed with SUCCESS/SKIPPED/NEUTRAL
   2. newest --marker comment: status completed, has_any_findings false, commit_sha
      equal to the PR head. With no marker this clause is UNKNOWN and blocks;
+     A PR with zero check runs blocks the merge: no workflow ran, or none was dispatched
+     (a CONFLICTING PR gets no workflows at all). `--allow-no-checks` accepts that state
+     explicitly, for a repo that has no CI.
      --allow-no-machine-review prints `marker: none` and accepts the clause
      explicitly (never silently).
   3. unresolved review threads == 0
@@ -39,9 +43,10 @@ from datetime import datetime
 DEFAULT_MARKER = "codex-review-state:v1"
 GOOD_CONCLUSIONS = {"SUCCESS", "SKIPPED", "NEUTRAL"}
 GRAPHQL = (
-    "query($owner:String!,$repo:String!,$pr:Int!){"
+    "query($owner:String!,$repo:String!,$pr:Int!,$cursor:String){"
     "repository(owner:$owner,name:$repo){pullRequest(number:$pr){"
-    "reviewThreads(first:100){nodes{isResolved path line}}}}}"
+    "reviewThreads(first:100,after:$cursor){pageInfo{hasNextPage endCursor}"
+    "nodes{isResolved path line}}}}}"
 )
 TEXT_CONCLUSIONS = {
     "pass": "SUCCESS",
@@ -113,7 +118,7 @@ def evaluate_review(
         status = review.get("status")
         findings = review.get("has_any_findings")
         commit_sha = review.get("commit_sha") or ""
-        head_match = bool(commit_sha) and str(head_sha).startswith(str(commit_sha))
+        head_match = same_sha(head_sha, commit_sha)
         passed = status == "completed" and findings is False and head_match
         reasons = []
         if status != "completed":
@@ -146,7 +151,8 @@ def evaluate_review(
     }
 
 
-def evaluate_checks(checks):
+def evaluate_checks(checks, allow_no_checks=False):
+    """A PR with no check runs is not green: no workflow ran, or none was dispatched."""
     total = len(checks)
     ok = pending = failing = 0
     for check in checks:
@@ -158,12 +164,22 @@ def evaluate_checks(checks):
             pending += 1
         else:
             failing += 1
+    if total == 0:
+        return {
+            "total": 0,
+            "ok": 0,
+            "pending": 0,
+            "failing": 0,
+            "pass": bool(allow_no_checks),
+            "reason": "no checks (allowed by flag)" if allow_no_checks else "no checks",
+        }
     return {
         "total": total,
         "ok": ok,
         "pending": pending,
         "failing": failing,
         "pass": pending == 0 and failing == 0,
+        "reason": "ok" if pending == 0 and failing == 0 else "checks not green",
     }
 
 
@@ -195,6 +211,54 @@ def fetch_checks(pr, repo):
         pass
     text = sh(["gh", "pr", "checks", str(pr)], cwd=repo)
     return parse_text_checks(text)
+
+
+def fetch_review_threads(owner, name, pr, repo):
+    """Every review thread, following pageInfo — a 100-thread PR must not hide one."""
+    nodes, cursor = [], None
+    while True:
+        args = [
+            "gh", "api", "graphql",
+            "-f", f"query={GRAPHQL}",
+            "-f", f"owner={owner}",
+            "-f", f"repo={name}",
+            "-F", f"pr={pr}",
+        ]
+        if cursor:
+            args.extend(["-f", f"cursor={cursor}"])
+        payload = json.loads(sh(args, cwd=repo))
+        if payload.get("errors"):
+            raise GateError(f"graphql: {payload['errors']}")
+        block = (
+            payload.get("data", {})
+            .get("repository", {})
+            .get("pullRequest", {})
+            .get("reviewThreads", {})
+            or {}
+        )
+        nodes.extend(block.get("nodes") or [])
+        page = block.get("pageInfo") or {}
+        cursor = page.get("endCursor")
+        if not page.get("hasNextPage") or not cursor:
+            return nodes
+
+
+def fetch_issue_comments(owner, name, pr, repo):
+    """Every issue comment, oldest first — `gh pr view --json comments` truncates on big PRs."""
+    comments, page = [], 1
+    while True:
+        raw = sh(
+            ["gh", "api",
+             f"repos/{owner}/{name}/issues/{pr}/comments?per_page=100&page={page}"],
+            cwd=repo,
+        )
+        batch = json.loads(raw or "[]")
+        if not isinstance(batch, list):
+            raise GateError("gh api comments: expected a JSON array")
+        comments.extend(batch)
+        if len(batch) < 100:
+            return comments
+        page += 1
 
 
 def same_sha(left, right):
@@ -297,6 +361,7 @@ def evaluate(
     verified_head=None,
     marker=DEFAULT_MARKER,
     allow_no_machine_review=False,
+    allow_no_checks=False,
 ):
     facts = {"pr": int(pr) if str(pr).isdigit() else pr, "gates": {}, "marker": marker}
     reasons = []
@@ -346,14 +411,18 @@ def evaluate(
     )
     reasons.extend(gate_reasons)
 
-    checks = evaluate_checks(fetch_checks(pr, repo))
+    checks = evaluate_checks(fetch_checks(pr, repo), allow_no_checks=allow_no_checks)
     facts["checks"] = checks
     if not checks["pass"]:
-        reasons.append("checks")
+        reasons.append("no checks" if checks["total"] == 0 else "checks")
 
-    comments = json.loads(
-        sh(["gh", "pr", "view", str(pr), "--json", "comments"], cwd=repo)
-    ).get("comments") or []
+    name_with_owner = sh(
+        ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
+        cwd=repo,
+    )
+    owner, _, name = name_with_owner.partition("/")
+
+    comments = fetch_issue_comments(owner, name, pr, repo)
     review = evaluate_review(
         list(reversed(comments)), head, marker, allow_no_machine_review
     )
@@ -361,37 +430,7 @@ def evaluate(
     if not review["pass"]:
         reasons.append(review["reason"] if not review["found"] else "review")
 
-    name_with_owner = sh(
-        ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
-        cwd=repo,
-    )
-    owner, _, name = name_with_owner.partition("/")
-    raw = sh(
-        [
-            "gh",
-            "api",
-            "graphql",
-            "-f",
-            f"query={GRAPHQL}",
-            "-f",
-            f"owner={owner}",
-            "-f",
-            f"repo={name}",
-            "-F",
-            f"pr={pr}",
-        ],
-        cwd=repo,
-    )
-    payload = json.loads(raw)
-    if payload.get("errors"):
-        raise GateError(f"graphql: {payload['errors']}")
-    nodes = (
-        payload.get("data", {})
-        .get("repository", {})
-        .get("pullRequest", {})
-        .get("reviewThreads", {})
-        .get("nodes", [])
-    )
+    nodes = fetch_review_threads(owner, name, pr, repo)
     unresolved = [node for node in nodes if not node.get("isResolved")]
     facts["threads"] = {
         "total": len(nodes),
@@ -414,11 +453,12 @@ def print_human(facts, reasons):
     checks = facts.get("checks")
     if checks:
         print(
-            "checks: {} total, {} ok, {} pending, {} failing".format(
+            "checks: {} total, {} ok, {} pending, {} failing{}".format(
                 checks["total"],
                 checks["ok"],
                 checks["pending"],
                 checks["failing"],
+                " (no checks)" if checks["total"] == 0 else "",
             )
         )
     review = facts.get("review")
@@ -623,11 +663,44 @@ def selftest():
             [],
         ),
     ]
+    check_cases = [
+        ("no-checks-refuses", ([], False), (False, "no checks")),
+        ("no-checks-allowed-by-flag", ([], True), (True, "no checks (allowed by flag)")),
+        (
+            "checks-pending-blocks",
+            ([{"state": "PENDING", "conclusion": None}], False),
+            (False, "checks not green"),
+        ),
+        (
+            "checks-failing-blocks",
+            ([{"state": "COMPLETED", "conclusion": "FAILURE"}], False),
+            (False, "checks not green"),
+        ),
+        (
+            "checks-all-green-passes",
+            (
+                [
+                    {"state": "COMPLETED", "conclusion": "SUCCESS"},
+                    {"state": "COMPLETED", "conclusion": "SKIPPED"},
+                ],
+                False,
+            ),
+            (True, "ok"),
+        ),
+    ]
+    sha_cases = [
+        ("same-sha-exact", ("abc1234def", "abc1234def"), True),
+        ("same-sha-seven", ("abc1234def", "abc1234"), True),
+        ("same-sha-short-prefix-rejected", ("abc1234def", "abc"), False),
+        ("same-sha-empty", ("abc1234def", ""), False),
+    ]
     total = (
         len(marker_cases)
         + len(head_cases)
         + len(gate_cases)
         + len(state_cases)
+        + len(check_cases)
+        + len(sha_cases)
     )
     passed = 0
 
@@ -656,6 +729,21 @@ def selftest():
         expected = (expected_reasons, expected_status)
         mark = "ok" if actual == expected else "FAIL"
         print(f"  {mark}  {name}: status={gates['status']} reasons={reasons}")
+        passed += 1 if actual == expected else 0
+
+    for name, args, expected in check_cases:
+        result = evaluate_checks(*args)
+        actual = (result["pass"], result["reason"])
+        mark = "ok" if actual == expected else "FAIL"
+        print(
+            f"  {mark}  {name}: total={result['total']} pass={actual[0]} reason={actual[1]}"
+        )
+        passed += 1 if actual == expected else 0
+
+    for name, args, expected in sha_cases:
+        actual = same_sha(*args)
+        mark = "ok" if actual == expected else "FAIL"
+        print(f"  {mark}  {name}: {args[0][:8]}~{args[1][:8]} -> {actual}")
         passed += 1 if actual == expected else 0
 
     for name, args, expected_line, expected_reasons in state_cases:
@@ -694,6 +782,11 @@ def build_parser():
         action="store_true",
         help="accept a repo with no machine-review marker (prints `marker: none`)",
     )
+    parser.add_argument(
+        "--allow-no-checks",
+        action="store_true",
+        help="accept a PR with zero check runs (only for repos with no CI; explicit opt-out)",
+    )
     parser.add_argument("--json", action="store_true", help="emit one JSON object")
     parser.add_argument("--selftest", action="store_true", help="offline fixture test")
     return parser
@@ -718,6 +811,7 @@ def main():
             verified_head=args.verified_head,
             marker=args.marker,
             allow_no_machine_review=args.allow_no_machine_review,
+            allow_no_checks=args.allow_no_checks,
         )
     except (GateError, ValueError, KeyError) as exc:
         print(f"pr-merge-check: {exc}", file=sys.stderr)

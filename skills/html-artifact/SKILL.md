@@ -7,7 +7,7 @@ description: >-
   for an artifact, explainer, plan write-up, diagram, or design variants. Not for markdown-shaped
   notes, brand-matching a known site's look, or generative canvas art.
 metadata:
-  version: "0.1.49"
+  version: "0.1.50"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "single-file, dependency-free HTML explainers, plans, reports, diagrams and throwaway editors on one house style"

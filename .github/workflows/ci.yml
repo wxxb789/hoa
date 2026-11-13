@@ -43,6 +43,9 @@ jobs:
       - name: GDD launcher forwarder tests
         run: bash skills/gdd/scripts/tests/test-omp-run-stale.sh
 
+      - name: GDD launcher setsid backend tests
+        run: bash skills/gdd/scripts/tests/test-omp-run-setsid.sh
+
       - name: Skill catalog drift check
         run: python scripts/generate_index.py --check
 
