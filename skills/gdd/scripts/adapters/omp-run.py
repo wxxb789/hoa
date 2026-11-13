@@ -761,14 +761,25 @@ def spawn_agent(argv, cwd, stderr):
 
 
 def signal_group(pid, signum) -> None:
-    """Signal a process group, falling back to the process itself."""
+    """Signal the process group this pid leads, falling back to the process itself.
+
+    The pid is a group leader by construction on POSIX — `start_new_session` for the
+    runner and for the agent — so it is used as the group id directly, and that is not
+    an optimisation: once the leader is gone, `os.getpgid(pid)` raises, and the members
+    still in its group would never be signalled. That is exactly the case a tool that
+    outlives the agent that started it leaves behind (measured: SIGKILL through
+    getpgid missed the tool and the run looked stopped while the tool kept running).
+    """
     try:
-        os.killpg(os.getpgid(pid), signum)
+        os.killpg(pid, signum)
     except OSError:
         try:
-            os.kill(pid, signum)
+            os.killpg(os.getpgid(pid), signum)
         except OSError:
-            pass
+            try:
+                os.kill(pid, signum)
+            except OSError:
+                pass
 
 
 def group_alive(pgid) -> bool:
