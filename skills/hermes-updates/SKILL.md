@@ -15,6 +15,15 @@ metadata:
   kind: "entry"
 ---
 
+## Install-side hooks (the check is required, the script is not)
+
+Commands under `$HERMES_HOME/scripts/` — a shim repair (`hermes-toolchain-shim.py`), a config snapshot
+(`config-snapshot.py`), a post-update check (`post-update-check.py`), the unattended updater
+(`hermes-auto-update.py`) — are **hooks the install may ship**. This skill states what each one must
+achieve; it does not ship them and does not require their filenames. Resolve them from the install
+(`ls "$HERMES_HOME/scripts"`), and when one is absent, record the corresponding check as
+**unavailable** rather than as passed. Substituting an equivalent command is expected, not a deviation.
+
 # Hermes Updates
 
 <!-- install-root: `$HERMES_HOME` below means the install root; it defaults to `~/.hermes` -->

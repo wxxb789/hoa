@@ -15,6 +15,16 @@ metadata:
   kind: "entry"
 ---
 
+## Install-side hooks (the check is required, the script is not)
+
+`$HERMES_HOME/scripts/*.py` in these docs names a hook the install may ship — a config snapshot
+(`config-snapshot.py`), an install-facts snapshot (`snapshot-install-facts.py`), a fleet-switch adapter
+(`model-switch.py`), catalog sync/smoke helpers, and the fleet verification pair
+(`profile-layer-reconcile.py`, `contract-drift-check.py`). What matters is the outcome each one
+verifies (the route is live, the metadata resolves, the generated layer agrees with its source), not the
+filename. Resolve the command from the install or from this skill's config keys; when the install ships
+none, say the check is **unavailable** instead of implying it passed.
+
 # Hermes Models & Providers
 
 <!-- install-root: `$HERMES_HOME` below means the install root; it defaults to `~/.hermes` -->

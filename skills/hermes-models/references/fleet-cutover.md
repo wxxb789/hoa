@@ -49,6 +49,10 @@ a one-key flip instead of a rebuild. Say this explicitly in the report so nobody
 
 ## 3. Generated homes: the route belongs to the generator
 
+Fleet verification (the generated layer agrees with its source, every home's contract hash matches) is a
+check the install may implement with its own scripts; when it ships none, run the equivalent by hand and
+record what you verified. Never let a missing script read as a passing check.
+
 Some homes are **materialized from a repository** — each one writes `model.provider|default|base_url|api_mode`
 from a binding file on every apply. Editing the live profile config looks correct until the next apply
 silently reverts it. Resolve that repository, its binding files and its apply/check commands from operator
