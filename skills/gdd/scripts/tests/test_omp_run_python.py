@@ -999,6 +999,77 @@ class LauncherTests(unittest.TestCase):
         ]
         self.assertEqual(len(rows), 1, rows)
 
+    def test_22_delayed_recovery_rechecks_marker_after_claim(self):
+        """A reader paused before claiming cannot rewrite another reader's finished run."""
+        slug = "recover-delayed-22"
+        run_dir = self.run_dir(slug)
+        run_dir.mkdir(parents=True)
+        ledger = self.tmp / "recover-delayed-22.tsv"
+        adapter.write_json(
+            str(run_dir / "state.json"),
+            {
+                "name": slug,
+                "state": "running",
+                "exit": None,
+                "started": (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat(),
+                "ledger": str(ledger),
+            },
+        )
+        events = [
+            {"type": "session", "id": "recovery-session"},
+            {"type": "message_end", "message": {
+                "role": "assistant", "content": [{"type": "text", "text": "partial report"}],
+            }},
+        ]
+        (run_dir / "events.ndjson").write_text(
+            "".join(json.dumps(event) + "\n" for event in events), encoding="utf-8"
+        )
+        real_claim = adapter.claim_finalize
+        first_ended = adapter.now_iso()
+        later_ended = (datetime.now(timezone.utc) + timedelta(seconds=1)).isoformat()
+        finished = {}
+        artifacts = {}
+
+        def delayed_claim(path):
+            # The delayed reader has passed effective_state's marker check. Let the
+            # other reader finish and release the real claim before this one takes it.
+            self.assertFalse((run_dir / "finalized").exists())
+            with (
+                mock.patch.object(adapter, "claim_finalize", real_claim),
+                mock.patch.object(adapter, "now_iso", return_value=first_ended),
+            ):
+                state, recovered = adapter.effective_state(path)
+            self.assertTrue(recovered)
+            self.assertEqual(state["state"], "failed")
+            self.assertEqual(state["exit"], -1)
+            self.assertFalse((run_dir / "finalize.lock").exists())
+            finished.update(state)
+            for name in ("state.json", "answer.md", "exit.code", "session.id", "finalized"):
+                artifact = run_dir / name
+                artifacts[name] = (artifact.read_bytes(), artifact.stat().st_mtime_ns)
+            claimed, descriptor = real_claim(path)
+            self.assertTrue(claimed)
+            self.assertIsNotNone(descriptor)
+            return claimed, descriptor
+
+        with (
+            mock.patch.dict(os.environ, self.env, clear=True),
+            mock.patch.object(adapter, "claim_finalize", side_effect=delayed_claim) as claim,
+            mock.patch.object(adapter, "now_iso", return_value=later_ended),
+        ):
+            state, _ = adapter.effective_state(str(run_dir))
+        claim.assert_called_once_with(str(run_dir))
+        rows = [
+            row for row in ledger.read_text(encoding="utf-8").splitlines()[1:]
+            if row.split("\t")[1] == slug
+        ]
+        self.assertEqual(len(rows), 1, rows)
+        self.assertEqual(state, finished)
+        for name, before in artifacts.items():
+            artifact = run_dir / name
+            self.assertEqual((artifact.read_bytes(), artifact.stat().st_mtime_ns), before, name)
+        self.assertFalse((run_dir / "finalize.lock").exists())
+
     def test_23_a_terminal_state_without_a_marker_is_repaired(self):
         """A finalizer that died between state.json and the marker gets the marker written."""
         slug = "repair-23"

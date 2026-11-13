@@ -1148,6 +1148,8 @@ def finalize(run_dir, exit_code, recovered=False, note=None, extra=None, claim_w
     `claim_wait` is how long to wait for the finalize claim: the runner passes a
     positive value because its own finalization must land, a reader passes 0 and
     reports whatever is on disk when another process is already finalizing.
+    Recheck the marker under the claim: another reader may have finished between
+    the caller's marker check and this process acquiring the claim.
     """
     claimed, descriptor = claim_finalize(run_dir)
     if not claimed and claim_wait > 0:
@@ -1159,6 +1161,8 @@ def finalize(run_dir, exit_code, recovered=False, note=None, extra=None, claim_w
         sys.stderr.write(f"omp-run: {run_dir} is being finalized by another process\n")
         return read_state_file(run_dir)
     try:
+        if os.path.exists(os.path.join(run_dir, "finalized")):
+            return read_state_file(run_dir)
         return _finalize_locked(run_dir, exit_code, recovered, note, extra)
     finally:
         if descriptor is not None:
