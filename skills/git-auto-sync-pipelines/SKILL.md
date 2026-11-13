@@ -7,7 +7,7 @@ description: >-
   auto-sync needs a safety review. Not for a repo with a review/PR workflow, and not for a one-off
   commit you can make yourself.
 metadata:
-  version: "0.1.51"
+  version: "0.1.52"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "scheduled commit/push for hand-edited repos: ordered gates, allowlist and size caps, staged secret scan, heartbeat and deduped alerts"

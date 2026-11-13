@@ -7,7 +7,7 @@ description: >-
   compared across agents. Not for a quick bounded subtask in the current turn, and not for work with
   no written task spec or acceptance command.
 metadata:
-  version: "0.1.51"
+  version: "0.1.52"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "hand a bounded coding task to an external agent CLI in an isolated worktree, then verify the diff, tests and every acceptance claim yourself"

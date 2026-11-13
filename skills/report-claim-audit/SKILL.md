@@ -8,7 +8,7 @@ description: >-
   report, repairing what the audit finds, or reviewing a diff — an audit that edits its subject
   destroys its own evidence.
 metadata:
-  version: "0.1.51"
+  version: "0.1.52"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
   summary: "recount every report claim from the artifact that owns it, diff the deliverable set, and price the open decisions"

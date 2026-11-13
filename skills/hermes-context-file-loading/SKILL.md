@@ -7,7 +7,7 @@ description: >-
   an instruction file that did or did not take effect, or reasoning about subagent context and prompt
   cache stability. Not for editing the runtime source, and not for other harnesses' context files.
 metadata:
-  version: "0.1.51"
+  version: "0.1.52"
   areas: "software-development"
   targets: "hermes"
   summary: "which Hermes instruction file loads from where, which project file wins, and which prompt tier a rule belongs to"
@@ -17,11 +17,12 @@ metadata:
 
 # Hermes Context File Loading
 
-How Hermes builds its system prompt from instruction files. Mechanics here override any
-vibe-based assumption — when in doubt, re-read the loader functions in
-`$HERMES_HOME/hermes-agent/agent/prompt_builder.py` and the runtime's context-files docs page
-(`user-guide/features/context-files/`). Function names are stable; line numbers drift between
-versions, so locate by name.
+<!-- install-root: `$HERMES_HOME` below means the install root; it defaults to `~/.hermes` -->
+
+How Hermes builds its system prompt from instruction files. **Source-verified** against
+`$HERMES_HOME/hermes-agent/agent/prompt_builder.py` (functions cited by line below) and the
+official docs. Mechanics here override any vibe-based assumption — when in doubt, re-read
+`prompt_builder.py` and the docs at the homepage above.
 
 ## When to use this skill
 
@@ -39,31 +40,31 @@ versions, so locate by name.
 
 | File | Loader fn (`prompt_builder.py`) | Discovery scope | git? | Global? |
 |------|--------------------------------|-----------------|------|---------|
-| **`SOUL.md`** | `load_soul_md()` | **`HERMES_HOME/SOUL.md` ONLY** — never probes cwd | no | ✅ **YES — the only truly global file** |
-| **`.hermes.md` / `HERMES.md`** | `_load_hermes_md` → `_find_hermes_md` | cwd, then walk **up parents to git root** | uses git root as the walk's stop boundary (no git → walks to filesystem root) | ❌ project-scoped |
-| **`AGENTS.md` / `agents.md`** | `_load_agents_md` | **`cwd / name` — that ONE directory only. No walk up, no recursion, no git** | no | ❌ binds to exact cwd |
-| **`CLAUDE.md` / `claude.md`** | `_load_claude_md` | cwd only | no | ❌ |
-| **`.cursorrules` + `.cursor/rules/*.mdc`** | `_load_cursorrules` | cwd only | no | ❌ |
+| **`SOUL.md`** | `load_soul_md()` (L1401) | **`HERMES_HOME/SOUL.md` ONLY** — never probes cwd | no | ✅ **YES — the only truly global file** |
+| **`.hermes.md` / `HERMES.md`** | `_load_hermes_md` → `_find_hermes_md` (L80) | cwd, then walk **up parents to git root** | uses git root as the walk's stop boundary (no git → walks to filesystem root) | ❌ project-scoped |
+| **`AGENTS.md` / `agents.md`** | `_load_agents_md` (L1452) | **`cwd / name` — that ONE directory only. No walk up, no recursion, no git** | no | ❌ binds to exact cwd |
+| **`CLAUDE.md` / `claude.md`** | `_load_claude_md` (L1468) | cwd only | no | ❌ |
+| **`.cursorrules` + `.cursor/rules/*.mdc`** | `_load_cursorrules` (L1484) | cwd only | no | ❌ |
 | **`MEMORY.md`** | volatile tier (memory tool) | `HERMES_HOME/memories/MEMORY.md` | no | ✅ injected every turn |
 | **`USER.md`** | volatile tier (memory tool) | `HERMES_HOME/memories/USER.md` | no | ✅ injected every turn |
 
-`HERMES_HOME` = `~/.hermes/` by default (or `~/.hermes/profiles/<name>/` under a named profile).
-The default path is a runtime convention; a deployment may point `HERMES_HOME` elsewhere.
+`HERMES_HOME` = `$HERMES_HOME/` (or `$HERMES_HOME/profiles/<name>/` under a named profile; `$HERMES_HOME`
+defaults to `~/.hermes` — substitute the install root in commands when yours is relocated).
 
 ## Critical precedence rule (project context = ONE slot)
 
-`build_context_files_prompt()` loads **exactly one** project-context type, **first match wins**, in
-this order:
+`build_context_files_prompt()` (L1514) loads **exactly one** project-context type,
+**first match wins**, in this order:
 
 ```
 .hermes.md / HERMES.md   →   AGENTS.md   →   CLAUDE.md   →   .cursorrules
 ```
 
 - They are **mutually exclusive**. If a `.hermes.md` exists, your `AGENTS.md` is **silently
-  ignored** (`HERMES.md` outranks it). Creating `HERMES.md` next to a working `AGENTS.md` is a
+  ignored** (HERMES.md outranks it). Creating `HERMES.md` next to a working `AGENTS.md` is a
   **footgun, not an upgrade**.
-- **`SOUL.md` is independent** — always loaded as identity (slot #1), regardless of the project
-  slot. It does not compete in the first-match race.
+- **`SOUL.md` is independent** — always loaded as identity (slot #1), regardless of the
+  project slot. It does not compete in the first-match race.
 
 ## Prompt-assembly tiers (cache discipline)
 
@@ -87,8 +88,8 @@ duplicating facts across those two costs tokens on *every* call. De-dup volatile
    `AGENTS.md` in `$HERMES_HOME/` does **nothing** unless your session cwd happens to be there.
 
 2. **`AGENTS.md` binds to the EXACT cwd directory, not a subtree.**
-   - cwd = `/home/user/proj` → `/home/user/proj/AGENTS.md` loads ✓
-   - cwd = `/home/user/proj/sub` → top-level `AGENTS.md` does **NOT** auto-load (no walk-up).
+   - cwd = `~/proj` → `~/proj/AGENTS.md` loads ✓
+   - cwd = `~/proj/sub` → top-level `AGENTS.md` does **NOT** auto-load (no walk-up).
      Subdirectory `AGENTS.md` files load via a *separate* progressive-discovery mechanism
      (`agent/subdirectory_hints.py`), appended to tool results only when the agent reads files
      in that subdir, and only that subdir's own file.
@@ -108,11 +109,43 @@ duplicating facts across those two costs tokens on *every* call. De-dup volatile
    (`_strip_yaml_frontmatter`). Empty file → nothing added.
 
 6. **`cd` into a directory with its own `AGENTS.md` costs context, silently.** Command-level
-   directory changes trigger the subdirectory-hint loader, so `cd <repo> && …` or a shell
+   directory changes trigger the subdirectory-hint loader, so `cd ~/repos/<repo> && …` or a shell
    call with `workdir=<subdir>` appends that directory's `AGENTS.md` (up to 20k chars) to the tool
    result — a monorepo worktree can inject a full project map you never asked for. Operate with
    `git -C <path> …`, absolute paths, or `--workdir` at the level you actually need, and note that a
    *detached git worktree* carries its own copy of every instruction file in that snapshot.
+
+7. **A profile home's `terminal.cwd` decides which repo contract that bot reads every turn.** Profile
+   homes are independent `HERMES_HOME`s, but the project slot still follows the session cwd, so a bot
+   whose `terminal.cwd` points at the front-door workspace loads the *front door's* operating contract
+   (routing tables, delivery channels, board rules it has no authority to act on) as its own project
+   context — a silent multi-thousand-token tax per turn. Audit before proposing any instruction
+   restructure:
+
+   ```bash
+   python3 - <<'PY'
+   import yaml, pathlib
+   H = pathlib.Path.home()
+   for f in [H/'.hermes/config.yaml', *sorted((H/'.hermes/profiles').glob('*/config.yaml'))]:
+       d = yaml.safe_load(open(f)) or {}
+       cwd = ((d.get('terminal') or {}).get('cwd'))
+       agents = pathlib.Path(cwd)/'AGENTS.md' if cwd else None
+       size = agents.stat().st_size if agents and agents.exists() else 0
+       print(f"{str(f).replace(str(H),''):42} cwd={cwd}  AGENTS={size} B")
+   PY
+   ```
+
+   Fix shape: give each bot its own workspace dir plus a short `AGENTS.md` (role delta + **pointers**
+   to the shared clauses by name, never copies), and leave the front-door contract in the front door's
+   cwd. Confirm the split did not drop a safety gate — pointer lines are the review surface.
+
+   **Prove the split by the loaded title, not by the config value.** Run one one-shot in the bot's own
+   home and ask it to reply with the first `#` heading of its `AGENTS.md`; then run the identical probe
+   with cwd set to the front-door workspace. Two different headings (`Forge — 执行协议` vs
+   `AGENTS.md — Zoe Operating Contract`) is the proof that cwd is doing the work; a `config get` only
+   echoes what you wrote. A local-terminal CLI takes the caller's `os.getcwd()`, so the front-door run
+   must be launched from that directory (or with `--in <dir>`) — otherwise both runs read the same file
+   and look falsely identical.
 
 ## Decision shortcut
 
@@ -126,11 +159,10 @@ duplicating facts across those two costs tokens on *every* call. De-dup volatile
 ## Verification recipe (re-confirm after Hermes upgrades)
 
 ```bash
-SRC="$HERMES_HOME/hermes-agent/agent/prompt_builder.py"
+SRC="${HERMES_HOME:-$HOME/.hermes}/hermes-agent/agent/prompt_builder.py"
 # Confirm the loader functions and their scopes still match this skill:
 grep -n "_load_agents_md\|_load_hermes_md\|_load_claude_md\|load_soul_md\|_find_git_root\|build_context_files_prompt" "$SRC"
 ```
-
-Then read each function body. If scopes changed, **patch this skill immediately**. Docs: the
-context-files page under `user-guide/features/` plus `website/docs/developer-guide/prompt-assembly.md`
-in the runtime repo.
+Then read each function body. If scopes changed, **patch this skill immediately**
+(`skill_manage action='patch'`). Docs: homepage URL in frontmatter +
+`website/docs/developer-guide/prompt-assembly.md` in the repo.

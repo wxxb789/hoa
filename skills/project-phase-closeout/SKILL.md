@@ -6,7 +6,7 @@ description: >-
   when a goal series ends and before the next phase's goals are written on top of the drift. Do not use
   mid-goal, or as a substitute for one increment's merge gate.
 metadata:
-  version: "0.1.51"
+  version: "0.1.52"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "enumerate the task surface, reconcile record/index/release/production, output a ranked closeout list with one decision"

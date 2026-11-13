@@ -5,15 +5,17 @@ Compares every declared `providers.<name>.models.<id>` entry (root + served prof
 endpoint's own catalog, the runtime context-length resolver, and real `state.db` usage; flags the
 classes of misconfiguration that are otherwise silent.
 
-Run with an interpreter that has PyYAML and can import the Hermes repo, e.g. the
-toolchain python with PYTHONPATH pointing at the checkout.
+Run with an interpreter that has PyYAML and can import the Hermes repo, e.g.
+  VENV=$(ls -d ~/.hermes/installs/*/environments/*/venv/bin/python | head -1)
+  "$VENV" ~/.hermes/skills/devops/hermes-operations/scripts/audit-provider-metadata.py
 
-Optional: --catalog-url <proxy-base>/dashboard/api/models --repo "$HERMES_HOME/hermes-agent"
+Optional: --catalog-url http://localhost:4141/dashboard/api/models --repo ~/.hermes/hermes-agent
 Nothing is written; no credentials are printed.
 """
 from __future__ import annotations
 
 import argparse
+import glob
 import json
 import os
 import sqlite3
@@ -25,8 +27,12 @@ import yaml
 
 def load_configs(home: str) -> dict[str, dict]:
     paths = {"default": f"{home}/config.yaml"}
-    for p in sorted(os.listdir(f"{home}/profiles")):
-        f = f"{home}/profiles/{p}/config.yaml"
+    profiles = f"{home}/profiles"
+    if not os.path.isdir(profiles):
+        # a single-home install has no profiles/ directory at all
+        return {name: (yaml.safe_load(open(path)) or {}) for name, path in paths.items()}
+    for p in sorted(os.listdir(profiles)):
+        f = f"{profiles}/{p}/config.yaml"
         if os.path.exists(f):
             paths[p] = f
     out = {}
@@ -36,8 +42,6 @@ def load_configs(home: str) -> dict[str, dict]:
 
 
 def fetch_catalog(url: str) -> dict:
-    if not url:
-        return {}
     try:
         with urllib.request.urlopen(url, timeout=20) as r:
             return json.loads(r.read().decode("utf-8", "replace"))
@@ -47,7 +51,16 @@ def fetch_catalog(url: str) -> dict:
 
 
 def catalog_index(cat: dict) -> dict:
+    """Index a metadata catalog (`models[].upstream.capabilities`) or an OpenAI id list (`data[]`).
+
+    A `/v1/models` endpoint answers with `data[]` and carries no capability metadata, so the
+    comparison degrades to "this id exists upstream" — useful, and not a proof of limits.
+    """
     idx = {}
+    if not (cat.get("models")):
+        for m in (cat.get("data") or []):
+            if isinstance(m, dict) and m.get("id"):
+                idx[m["id"]] = {"ids_only": True}
     for m in (cat.get("models") or []):
         caps = ((m.get("upstream") or {}).get("capabilities") or {})
         idx[m["id"]] = {
@@ -79,16 +92,81 @@ def usage_rows(home: str) -> list[dict]:
     return [{"model": r[0], "provider": r[1], "task": r[2], "calls": r[3] or 0, "last": r[4]} for r in rows]
 
 
+def default_catalog_provider(hermes_home: str) -> tuple[str, str]:
+    """(provider key, endpoint) the default catalog URL belongs to.
+
+    A provider *name* is not enough: two homes can use the same key for different endpoints, and a
+    catalogue fetched from one endpoint cannot judge the other.
+    """
+    try:
+        import yaml
+    except ImportError:
+        return "", ""
+    path = os.path.join(hermes_home, "config.yaml")
+    try:
+        cfg = yaml.safe_load(open(path, encoding="utf-8")) or {}
+    except OSError:
+        return "", ""
+    key = str((cfg.get("model") or {}).get("provider") or "").removeprefix("custom:")
+    entry = (cfg.get("providers") or {}).get(key) or {}
+    endpoint = str(entry.get("base_url") or entry.get("api_base") or entry.get("api") or "").rstrip("/")
+    return key, endpoint
+
+
+def default_catalog_url(hermes_home: str) -> str:
+    """The catalog URL this install actually uses: env, then the default provider's base_url.
+
+    A hard-coded localhost proxy compared another install's models against this one's catalog and
+    reported drift for every id it could not see.
+    """
+    env = os.environ.get("HERMES_CATALOG_URL")
+    if env:
+        return env
+    for name in ("config.yaml",):
+        path = os.path.join(hermes_home, name)
+        try:
+            import yaml
+        except ImportError:
+            break
+        try:
+            cfg = yaml.safe_load(open(path, encoding="utf-8")) or {}
+        except OSError:
+            continue
+        provider = (cfg.get("model") or {}).get("provider") or ""
+        bare = str(provider).removeprefix("custom:")
+        entry = ((cfg.get("providers") or {}).get(bare) or {})
+        base = entry.get("base_url") or entry.get("api_base") or entry.get("api")
+        if base:
+            return str(base).rstrip("/") + "/models"
+    return None  # no endpoint to read: the audit still compares configs
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--hermes-home", default=os.path.expanduser("~/.hermes"))
-    ap.add_argument("--repo", default=os.path.expanduser("~/.hermes/hermes-agent"))
-    ap.add_argument("--catalog-url", default="", help="endpoint catalog URL; omit to compare config only")
+    default_home = os.path.expanduser(os.environ.get("HERMES_HOME") or os.environ.get("HERMES_ROOT") or "~/.hermes")
+    ap.add_argument("--hermes-home", default=default_home)
+    ap.add_argument("--repo", default=os.path.join(default_home, "hermes-agent"))
+    ap.add_argument(
+        "--catalog-url",
+        default=None,
+        help="model catalog endpoint (default: $HERMES_CATALOG_URL, else <default provider>/models)",
+    )
     ap.add_argument("--threshold", type=float, default=0.75, help="compression.threshold")
     args = ap.parse_args()
 
+    catalog_owner, catalog_endpoint = "", ""
+    if not args.catalog_url:
+        catalog_owner, catalog_endpoint = default_catalog_provider(args.hermes_home)
+        args.catalog_url = default_catalog_url(args.hermes_home)
+    if args.catalog_url:
+        scope = f" (applies to provider {catalog_owner!r} only)" if catalog_owner else ""
+        print(f"catalog: {args.catalog_url}{scope}")
+    else:
+        print("catalog: none configured — comparing configuration only")
+        args.catalog_url = ""
+
     cfg = load_configs(args.hermes_home)
-    cat = catalog_index(fetch_catalog(args.catalog_url))
+    cat = catalog_index(fetch_catalog(args.catalog_url) if args.catalog_url else {})
     use = usage_rows(args.hermes_home)
 
     helper = None
@@ -100,6 +178,9 @@ def main() -> int:
         except Exception as exc:  # noqa: BLE001
             print(f"!! resolver import failed ({type(exc).__name__}) — skipping 'declared resolves?' column")
 
+    if catalog_owner:
+        print(f"note: catalog compared for provider {catalog_owner!r} only; other providers listed without a catalog")
+
     used_ids = {str(u["model"]).split("/")[-1] for u in use}
     declared_all: set[str] = set()
 
@@ -110,13 +191,21 @@ def main() -> int:
             if not isinstance(pc, dict):
                 continue
             api = (pc.get("api") or "").rstrip("/")
+            endpoint = str(
+                pc.get("base_url") or pc.get("api_base") or pc.get("api") or ""
+            ).rstrip("/")
+            # A catalog fetched from one endpoint cannot judge another provider's ids: comparing
+            # them reports "absent upstream" for a service that was never queried.
+            catalog_applies = (not catalog_owner) or (
+                pname == catalog_owner and endpoint == catalog_endpoint
+            )
             for mid in (pc.get("models") or {}):
                 raw = str(mid)
                 model = raw.replace("\\", "")
                 declared_all.add(model)
                 mcfg = pc["models"][mid] or {}
                 decl = mcfg.get("context_length") if isinstance(mcfg, dict) else None
-                ref = cat.get(model, {})
+                ref = cat.get(model, {}) if catalog_applies else {}
                 resolved = helper(model, api, config=c) if helper and api else None
                 flags = []
                 if raw != model:
@@ -129,8 +218,10 @@ def main() -> int:
                     flags.append(f"{args.threshold:g}x ctx > prompt cap {ref['prompt']}")
                 if model not in used_ids:
                     flags.append("never used in any session")
-                if model not in cat and cat:
+                if catalog_applies and model not in cat and cat:
                     flags.append("not in catalog (servable? probe it)")
+                elif not catalog_applies and cat:
+                    flags.append("catalog not consulted for this provider's endpoint")
                 print(f"   {pname:<18}{model:<24} decl={str(decl):<9} resolves={str(resolved):<9} "
                       f"cat_ctx={str(ref.get('ctx')):<9} out={str(ref.get('out')):<8} prompt={str(ref.get('prompt')):<9}"
                       f"effort={ref.get('effort')} {'; '.join(flags)}")
@@ -144,7 +235,7 @@ def main() -> int:
         if unadvertised:
             print(f"\ndeclared but NOT in catalog (verify they still answer): {', '.join(unadvertised)}")
     if served_unused:
-        print(f"used but undeclared (context falls back to the default window): {', '.join(sorted(set(served_unused)))}")
+        print(f"used but undeclared (context falls back, usually 272k): {', '.join(sorted(set(served_unused)))}")
     return 0
 
 

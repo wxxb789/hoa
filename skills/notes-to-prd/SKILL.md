@@ -4,7 +4,7 @@ description: >-
   Convert notes/ideas into structured PRD markdown. Produces a PRD draft under `docs/prd/` and
   optional issue breakdown.
 metadata:
-  version: "0.1.51"
+  version: "0.1.52"
   areas: "work-management"
   targets: "runtime-agnostic"
   summary: "turn notes or an idea into a structured PRD draft"

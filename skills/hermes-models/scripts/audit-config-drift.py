@@ -11,7 +11,8 @@ Per profile it prints:
   ONLY  profile-only key                                                       -> report, usually intentional
 
 Exit code 1 when any MISS is found (usable as a check).
-Requires PyYAML; run it with an interpreter that can import it (the install's runtime python).
+Requires PyYAML; run it with an interpreter that can import it (a Hermes venv, or the toolchain python once
+its shim is installed).
 """
 from __future__ import annotations
 
