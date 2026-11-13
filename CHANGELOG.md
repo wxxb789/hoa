@@ -3,6 +3,14 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## 2026-11-14 — the X engine's default names a model the proxy still serves
+
+An `x` search that passed no `--model` died with `HTTP 400 … the selected model could not
+be resolved`: the built-in default `grok-4.5` is no longer among the models the proxy
+serves, which now lists `grok-4.6` and `grok-4.7`. The default is `grok-4.7` now, and the
+skill's default table and the per-engine default test say the same thing. The
+`GHC_SEARCH_MODEL_X` override and the gpt engine are unchanged.
+
 ## 2026-11-14 — the delivery loop's launcher stops being bash-only
 
 The launcher was `skills/gdd/scripts/adapters/omp-run.sh`: bash, `setsid` (or `tmux`) and a POSIX
