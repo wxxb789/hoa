@@ -93,6 +93,7 @@ def describe(home: Path, name: str) -> dict:
         # Endpoints and transports are what a routing change moves; key names alone hide it.
         "providers": {
             p: {
+                "enabled": (b or {}).get("enabled"),
                 "api": (b or {}).get("api"),
                 "transport": (b or {}).get("transport") or (b or {}).get("api_mode"),
                 "base_url": (b or {}).get("base_url"),

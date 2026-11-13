@@ -100,6 +100,7 @@ def main():
         )
         before = module.describe(home, "default")["providers"]
         case("provider endpoint is recorded", before["p"]["base_url"], "https://a.invalid")
+        case("provider enablement is recorded", "enabled" in before["p"], True)
         cfg.write_text(
             "providers:\n  p:\n    api: chat\n    base_url: https://b.invalid\n"
             "    models:\n      m:\n        context_length: 2000\n",
