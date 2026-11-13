@@ -1,5 +1,5 @@
 ---
-name: gdd-implement
+name: subagent-driven-development
 description: >-
   Execute an implementation plan by dispatching a fresh subagent per task and reviewing each result
   in two stages — spec compliance first, code quality second — then a final integration review.
@@ -263,8 +263,8 @@ git add <explicit paths> && git commit -m "<the plan's final message>"
 
 ## Task Granularity
 
-**Each task = 2–5 minutes of focused work** by default (`GDD_IMPLEMENT_TASK_MINUTES_MIN`,
-`GDD_IMPLEMENT_TASK_MINUTES_MAX`).
+**Each task = 2–5 minutes of focused work** by default (`SDD_TASK_MINUTES_MIN`,
+`SDD_TASK_MINUTES_MAX`).
 
 **Too big:**
 
@@ -342,7 +342,7 @@ git add <explicit paths> && git commit -m "<the plan's final message>"
 This skill EXECUTES plans created by the `writing-plans` skill:
 
 1. User requirements → writing-plans → implementation plan
-2. Implementation plan → gdd-implement → working code
+2. Implementation plan → subagent-driven-development → working code
 
 ### With test-first development
 
@@ -433,16 +433,14 @@ Catch issues early
 
 | Key | Env | Default |
 |---|---|---|
-| `dispatch_command` | `GDD_IMPLEMENT_DISPATCH_CMD` | none — the harness's own fresh-subagent command or adapter |
-| `task_minutes_min` | `GDD_IMPLEMENT_TASK_MINUTES_MIN` | `2` |
-| `task_minutes_max` | `GDD_IMPLEMENT_TASK_MINUTES_MAX` | `5` |
-| `child_capabilities` | `GDD_IMPLEMENT_CHILD_CAPABILITIES` | shell, file read/write (pass explicitly per dispatch) |
-| `review_order` | `GDD_IMPLEMENT_REVIEW_ORDER` | `spec,quality` — fixed; change only with a documented reason |
-| `plan_path` | `GDD_IMPLEMENT_PLAN_PATH` | none — supplied by the caller |
+| `dispatch_command` | `SDD_DISPATCH_CMD` | none — the harness's own fresh-subagent command or adapter |
+| `task_minutes_min` | `SDD_TASK_MINUTES_MIN` | `2` |
+| `task_minutes_max` | `SDD_TASK_MINUTES_MAX` | `5` |
+| `child_capabilities` | `SDD_CHILD_CAPABILITIES` | shell, file read/write (pass explicitly per dispatch) |
+| `review_order` | `SDD_REVIEW_ORDER` | `spec,quality` — fixed; change only with a documented reason |
+| `plan_path` | `SDD_PLAN_PATH` | none — supplied by the caller |
 
-Older installs read the same keys from `SDD_*`; a renamed install keeps them as aliases, and the
-`GDD_IMPLEMENT_*` spelling is the one to document. Resolution order and the config-file path are
-defined once in
+Resolution order and the config-file path are defined once in
 [skill-porting-and-publishing § Configuration](../skill-porting-and-publishing/SKILL.md#configuration-is-a-gate-not-advice);
 this skill does not restate them.
 

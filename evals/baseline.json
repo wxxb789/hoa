@@ -1,11 +1,11 @@
 {
-  "case_count": 29,
+  "case_count": 27,
   "model": "gemini-4-carbon",
   "effort": "low",
-  "passed": 27,
-  "total": 29,
+  "passed": 25,
+  "total": 27,
   "judge_endpoint_host": "localhost:4141",
-  "generated_at": "2026-11-13T01:40:17Z",
+  "generated_at": "2026-11-13T02:15:46Z",
   "per_case": [
     {
       "id": "route-to-teams-send",
@@ -135,16 +135,6 @@
     {
       "id": "route-explicit-gdd",
       "pick": "gdd",
-      "passed": true
-    },
-    {
-      "id": "route-stalled-unattended-run-to-gdd-recover",
-      "pick": "gdd-recover",
-      "passed": true
-    },
-    {
-      "id": "route-phase-end-to-gdd-closeout",
-      "pick": "gdd-closeout",
       "passed": true
     },
     {

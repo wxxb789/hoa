@@ -1,8 +1,5 @@
 # Phase 5 — gates, commit, PR
 
-> Mechanics: `gdd-gates` for the gate run, `gdd-accept` for the ruling on the final tree before the
-> commit, and `delegated-work-acceptance`'s `worktree-scope.py` for the sealed scope.
-
 1. Re-run gates on the exact tree you ship.
 2. **Before committing, define the working increment.** `worktree-scope.py diff --repo <path>
    --label <goal>`, then `seal`. If `overlapping_paths` is non-empty, stop and ask the operator which

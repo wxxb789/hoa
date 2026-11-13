@@ -40,7 +40,7 @@ hand-off are this port's.
 
 - Implementing multi-step features
 - Breaking down complex requirements
-- Delegating to subagents via `gdd-implement`
+- Delegating to subagents via `subagent-driven-development`
 
 **Start from the spec, not from scratch.** When `spec-convergence` produced a spec, the plan consumes
 it: implement its Scope, Acceptance and Testing seam; do not re-decide a settled boundary. If a task
@@ -304,10 +304,10 @@ git commit -m "type: description"
 
 After saving the plan, offer the execution approach:
 
-**"Plan complete and saved. Ready to execute using gdd-implement — a fresh subagent per
+**"Plan complete and saved. Ready to execute using subagent-driven-development — a fresh subagent per
 task with two-stage review (spec compliance then code quality). Shall I proceed?"**
 
-When executing, use the `gdd-implement` skill:
+When executing, use the `subagent-driven-development` skill:
 
 - Fresh subagent per task with full context
 - Spec compliance review after each task

@@ -41,12 +41,6 @@ targets:  runtime-agnostic | repo-only |
 | evidence-backed-analytical-writing | skill | work-management | runtime-agnostic | `skills/evidence-backed-analytical-writing/` | 中文分析报告：证据地图与「主张 → 证据 → 机制 → 局限」骨架；时效边界、状态阶梯、否定性结论 |
 | evidence-boundary-discipline | skill | work-management | runtime-agnostic | `skills/evidence-boundary-discipline/` | 只陈述有日期的来源所能支持的事实：时态对齐日期、来源标签全链路一致、缺失不升级为不存在 |
 | gdd | skill | software-development,work-management | runtime-agnostic | `skills/gdd/` | 目标契约 → agent 分阶段产出 → operator 验收 → 脚本化合并门禁 → 可续跑账本；随附 `gdd.py`、`delivery-state.py`、`pr-merge-check.py` |
-| gdd-accept | skill | software-development,work-management | runtime-agnostic | `skills/gdd-accept/` | 验收 agent 产出：等树稳定、补回 provenance、重算数字、审语义放宽、分级 findings |
-| gdd-closeout | skill | software-development,work-management | runtime-agnostic | `skills/gdd-closeout/` | 清点任务面，对账记录/索引/发布/生产四层，输出带唯一决策点的收尾清单 |
-| gdd-gates | skill | software-development | runtime-agnostic | `skills/gdd-gates/` | 跑仓库门禁：钉运行时、定并行数、把被 kill 和真失败分开 |
-| gdd-implement | skill | software-development,work-management | runtime-agnostic | `skills/gdd-implement/` | 按计划逐任务派发全新 subagent，并做两阶段评审：先规格符合，再代码质量 |
-| gdd-measure | skill | software-development,work-management | runtime-agnostic | `skills/gdd-measure/` | 测量运动：先钉候选身份、串行跑、一致报告集，不让基线伪造延迟对比 |
-| gdd-recover | skill | software-development,work-management | runtime-agnostic | `skills/gdd-recover/` | 接手停住的无人值守流程：读状态、清阻塞、重派那一阶段，不从头顶重跑 |
 | generated-runtime-repairs | skill | software-development,work-management | runtime-agnostic | `skills/generated-runtime-repairs/` | 修模板/生成器、验证暂存产物，再部署并回读线上运行时 |
 | ghc-search | skill | software-development | runtime-agnostic | `skills/ghc-search/` | 经本机 `ghc-proxy` Responses API 做 web 与 X/Twitter 搜索；返回答案加去重来源 |
 | git-auto-sync-pipelines | skill | software-development,work-management | runtime-agnostic | `skills/git-auto-sync-pipelines/` | 手改仓库的定时提交推送：固定门序、白名单与体积上限、暂存区密钥扫描、心跳与去重告警 |
@@ -65,7 +59,7 @@ targets:  runtime-agnostic | repo-only |
 | jupyter-live-kernel | skill | software-development | runtime-agnostic | `skills/jupyter-live-kernel/` | 在活的 Jupyter kernel 里迭代 Python，而不是反复重启脚本 |
 | kanban-workflows | skill | work-management,software-development | runtime-agnostic | `skills/kanban-workflows/` | 多卡片看板工作：拆解、并行派发、评审门禁、卡住任务恢复 |
 | m365-copilot-cdp | skill | software-development,work-management | runtime-agnostic | `skills/m365-copilot-cdp/` | 通过 CDP 操作桌面 Copilot Chat 与 Code，选择模型并读取回复 |
-| mechanism-propagation | skill | software-development | runtime-agnostic | `skills/mechanism-propagation/` | 枚举一个解析值的所有跨进程消费者；用会重算的门禁和自我校验的写入器来证明记录 |
+| measurement-campaign-evidence | skill | software-development,work-management | runtime-agnostic | `skills/measurement-campaign-evidence/` | 测量运动：先钉候选身份、串行跑、一致报告集，不让基线伪造延迟对比 |
 | microsoft-office | skill | work-management,software-development | runtime-agnostic | `skills/microsoft-office/` | 用 Python CLI 离线创建、读取、编辑与套用 Word、PowerPoint、Excel 文件模板 |
 | notes-to-prd | skill | work-management | runtime-agnostic | `skills/notes-to-prd/` | 把笔记或想法转成结构化 PRD 草稿 |
 | ocr-and-documents | skill | work-management | runtime-agnostic | `skills/ocr-and-documents/` | 用 pymupdf 或 marker-pdf 从 PDF 与扫描件里抽文本 |
@@ -73,11 +67,13 @@ targets:  runtime-agnostic | repo-only |
 | ops-claim-verification | skill | software-development,work-management | runtime-agnostic | `skills/ops-claim-verification/` | 把定时任务、修复或部署的说法变成证据：找准记录面、区分手动与调度运行、审查审计者 |
 | package-release-verification | skill | software-development | runtime-agnostic | `skills/package-release-verification/` | 发版：先补 changelog、同一 commit 的门禁、分派、按版本号核 registry、单独获批的清理 |
 | plan-to-issues | skill | work-management | runtime-agnostic | `skills/plan-to-issues/` | 把 PRD 或计划拆成 issue 级任务：标题、正文、标签 |
+| project-phase-closeout | skill | software-development,work-management | runtime-agnostic | `skills/project-phase-closeout/` | 清点任务面，对账记录/索引/发布/生产四层，输出带唯一决策点的收尾清单 |
 | report-claim-audit | skill | work-management,software-development | runtime-agnostic | `skills/report-claim-audit/` | 从各自的权威 artifact 重算每条报告声明、对账交付集合，并给待决事项定价 |
 | skill-library-curation | skill | software-development,self-management | runtime-agnostic | `skills/skill-library-curation/` | 按证据审查技能库：清点、重叠分组、安装来源、上游新鲜度；建议不改动状态 |
 | skill-porting-and-publishing | skill | software-development,work-management | runtime-agnostic | `skills/skill-porting-and-publishing/` | 把私有 skill 解耦到可发布仓库：确定权威副本、五轴改造、配置解析、目录与 CI 校验、走分支与 PR 发布 |
 | spec-convergence | skill | software-development | runtime-agnostic | `skills/spec-convergence/` | 把模糊需求收敛为已确认 spec：每轮一个根问题、每轮问题数有上限、每问附事实、写前显式确认共同理解 |
 | structural-validity-gates | skill | software-development | runtime-agnostic | `skills/structural-validity-gates/` | 两面完整性门禁：拒掉坏的，接受格式合法的一切；上线前两侧都要探针 |
+| subagent-driven-development | skill | software-development,work-management | runtime-agnostic | `skills/subagent-driven-development/` | 按计划逐任务派发全新 subagent，并做两阶段评审：先规格符合，再代码质量 |
 | systematic-debugging | skill | software-development | runtime-agnostic | `skills/systematic-debugging/` | 先定位根因再修：紧致可复现的反馈环、边界证据、可证伪假设排序，然后一次只改一处 |
 | teams-cdp | skill | work-management | runtime-agnostic | `skills/teams-cdp/` | 通过本机桌面 CDP 向明确的 Teams 联系人或现有群组发送消息 |
 | tmux-agent-control | skill | software-development,work-management | runtime-agnostic | `skills/tmux-agent-control/` | 在 tmux 中驱动运行中的 TUI agent：定位 pane、证明空闲、一次发出完整指令 |

@@ -1,8 +1,5 @@
 # Phase 4 — review, then fix
 
-> Mechanics: `gdd-accept` grades the run's diff and triages the findings into fix-now / defer /
-> record; the reviewer itself is the repo's review bot or `github-code-review`.
-
 1. Dispatch `review` (report only) only after the simplify fixes are applied, so the reviewer reads
    the tree that will ship. The stage range is `origin/main..HEAD`, so **commit the agent's stage
    output before dispatching the next stage**: `gdd.py` does not refuse a dirty worktree, and
@@ -30,3 +27,7 @@
    the case the goal record lists as a known limit, that limit is unpaid debt: implement the resolution
    or make the omission explicit in code, then rewrite the limit. "Documented, therefore out of scope"
    keeps a known-wrong value shipping.
+8. **Review for semantic widening, not style.** Before merging two byte-identical call sites, write down
+   per call site the grant it consumes, what it may touch, and its destination; if any differs, share
+   only the mechanics (parsing, query) and keep two decisions. After splitting a predicate, re-assign a
+   rule to every caller — any caller left on the old helper silently inherits whichever rule remained.

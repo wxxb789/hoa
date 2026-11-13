@@ -2,9 +2,15 @@
 
 The agent's report is a claim, never evidence:
 
-> Mechanics: `gdd-gates` runs the repo's gates so the counts hold; `gdd-accept` rules on one run's
-> diff; `gdd-measure` is the campaign when the contract's pass condition is a measured number.
-
+- Settle the tree before gating: sample `git status --porcelain` and the newest mtime under changed
+  paths twice a few seconds apart, and run gates only when both samples match. A failure within seconds
+  of a `done` report is suspect by default — re-run once on the settled tree before calling it real.
+- Run 1 worker locally: CI's default parallelism on a smaller host triggers an OOM kill that reads like
+  a code regression.
+- If an interrupted gate did not reach its `restore` step, the artifact directory is dirty (a half-built
+  `dist/`); restore it before re-running.
+- Read model and provider metadata early before `events.ndjson` truncates (`events_truncated`); when the
+  run record says `model: null`, cite the CLI config's default as config default, never as the run's fact.
 - Run the repo's gates yourself and read real exit codes.
 - **Exit 0 means the process ended, not that the phase finished.** Read the run's final assistant text
   (`answer.md`): a report ending with "the gate is running, waiting for its result" ended mid-gate.

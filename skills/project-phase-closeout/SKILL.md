@@ -1,5 +1,5 @@
 ---
-name: gdd-closeout
+name: project-phase-closeout
 description: >-
   Close a phase: enumerate the task surface and reconcile the record, the index, the published release
   and the thing users actually load, then rank the closeout list so one decision clears the phase. Use

@@ -138,8 +138,8 @@ Use these headings only. Do not add a design section, a task list or an implemen
 
 - `writing-plans` consumes this spec and produces `plan`. The plan may not re-decide what the spec
   settled; if it has to, the spec is incomplete — come back here rather than widening the plan.
-- `gdd-implement` consumes `plan`, and reads the spec when the plan names one, as an extra
-  standard for its spec-compliance review.
+- `subagent-driven-development` executes the `plan`, and reads the spec when the plan names one, as an
+  extra standard for its spec-compliance review.
 - A goal file when the work is an outcome delivered end to end over a longer window.
 
 ## Rules

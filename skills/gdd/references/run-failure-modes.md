@@ -3,9 +3,6 @@
 Every rule below was learned from a real run that died or lied. Read this before adding a test to the
 selftest, before writing a stage's verification plan, and before trusting a run's own report of itself.
 
-> When the run is not wrong but dead, `gdd-recover` is the handover procedure: read the state, clear the
-> block, re-dispatch that stage — never restart from the top.
-
 ## 1. A test must never be able to kill the process under test
 
 A stage agent runs inside the same tmux server it is testing. One implement run executed
@@ -66,3 +63,6 @@ stored pass flags; then the recorder happily overwrote a good baseline with one 
 
 - Validate with the same function the consumer uses, and validate **before** writing.
 - Prefer one entry point that cannot be bypassed over per-call-site checks.
+- Resolve a setting once, pass it by value in `env` to child processes, and shell-quote any command you
+  print; after writing a record, self-check it with a validator that recomputes the values, or the
+  stored record cannot be falsified.

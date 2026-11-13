@@ -1,5 +1,5 @@
 ---
-name: gdd-measure
+name: measurement-campaign-evidence
 description: >-
   Run a measurement campaign as the evidence phase of a goal whose completion condition is measured:
   pin the candidate first, measure serially, keep one report set, and never let a comparator fake a
@@ -11,9 +11,7 @@ metadata:
   targets: "runtime-agnostic"
   summary: "bind the candidate, measure serially, keep one report set, never let a comparator fake a latency"
   summary_zh: "测量运动：先钉候选身份、串行跑、一致报告集，不让基线伪造延迟对比"
-  kind: "stage"
-  consumes: "goal-contract"
-  produces: "measurement-record"
+  kind: "entry"
 ---
 
 # Measurement campaign evidence
@@ -21,8 +19,7 @@ metadata:
 A campaign is the evidence phase of a goal whose completion condition is *measured*: sizes ×
 topologies, a packaged artifact, a browser/runtime profile, a comparator tree, overload controls. The
 repeatable failure is not a missing number — it is a number belonging to a slightly different artifact
-than the one the record claims. For the surrounding delivery loop see `gdd`; for gate
-mechanics (pins, workers, kills) see `gdd-gates`.
+than the one the record claims. For the surrounding delivery loop and its gate verification rules see `gdd`.
 
 ## When to use
 

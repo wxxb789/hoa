@@ -77,17 +77,10 @@ Read [`references/run-failure-modes.md`](references/run-failure-modes.md) before
 believing a run's report of itself: a test can kill the process under test, a stubbed test can pass for
 the wrong reason, and an exit code can disagree with the artifact it produced.
 
-## The `gdd` family — what each name owns
+## Playbooks
 
-These skills carry the prefix because they *are* this loop, not tools it happens to call:
-
-- `gdd-implement` — **stage**: execute a multi-task plan, one fresh subagent per task, a commit per task.
-  Not this loop's implement stage: `gdd.py stage --stage implement` runs one goal in one run and commits nothing.
-- `gdd-accept` — **mechanism**: rule on one run's diff before commit (settled tree, provenance, re-derived counts, semantic widening, findings triage).
-- `gdd-gates` — **mechanism**: run the repo's gates so the counts hold (pinned runtime, worker count, kills).
-- `gdd-measure` — **stage**: the evidence campaign when the contract's pass condition is measured.
-- `gdd-recover` — **entry**: take over a stalled run without restarting from the top.
-- `gdd-closeout` — **entry**: reconcile record, index, release and production before the next goals are written.
+Stage detail lives in `references/phases/*.md` (mapped in the Phase table above). Read the phase file
+matching the current stage directly — do not create per-phase skills.
 
 ## Stop conditions — when to stop and ask
 
