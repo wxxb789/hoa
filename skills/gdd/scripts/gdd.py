@@ -420,6 +420,7 @@ def ledger_rounds(state_path, repo_name, goal, stage):
         i_stage = header.index("stage")
     except ValueError:
         return 0
+    i_note = header.index("note") if "note" in header else None
     count = 0
     for line in lines[1:]:
         cells = line.split("\t")
@@ -428,6 +429,10 @@ def ledger_rounds(state_path, repo_name, goal, stage):
         if cells[i_stage] != stage or cells[i_goal] != goal:
             continue
         if repo_name and repo_name not in cells[i_repo]:
+            continue
+        # `--wait` writes a dispatch row and then a completion row for the same stage (its note
+        # starts with `exit=`). The cap counts dispatches, so a completion must not spend a round.
+        if i_note is not None and len(cells) > i_note and cells[i_note].startswith("exit="):
             continue
         count += 1
     return count
@@ -456,7 +461,7 @@ def ledger_append(repo, goal, stage, base, head, gates, next_stage=None, note=No
     ]
     if pr:
         cmd += ["--pr", str(pr)]
-    if rounds:
+    if rounds and stage in ("simplify", "review"):
         cmd += ["--rounds-simplify" if stage == "simplify" else "--rounds-review", str(rounds)]
     if gates and gates != "-":
         cmd += ["--gates", gates]
@@ -698,7 +703,7 @@ def cmd_stage(args):
         head,
         gates,
         next_stage=args.stage,
-        rounds=rounds_seen + 1 if args.stage in STAGE_BUDGETS else None,
+        rounds=rounds_seen + 1 if args.stage in ("simplify", "review") else None,
     )
     print(f"run: {run_name}")
     print(f"run_dir: {run_dir}")
