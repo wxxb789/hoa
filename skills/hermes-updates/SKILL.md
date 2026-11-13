@@ -7,7 +7,7 @@ description: >-
   release checkouts, or post-update health checks. Not for model/provider configuration and not for
   editing the install's own source.
 metadata:
-  version: "0.1.53"
+  version: "0.1.54"
   areas: "software-development"
   targets: "hermes"
   summary: "upgrade a live Hermes install and diagnose drift: snapshot, official updater, post-check, failure index"
