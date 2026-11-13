@@ -173,7 +173,7 @@ whisper audio.mp3 --output_format json    # JSON with timestamps
 whisper audio.mp3 --language Spanish
 
 # Translation
-whisper spanish.mp3 --task translate
+whisper spanish.mp3 --task translate --model turbo   # translate needs a multilingual model; the small/base English-only ones cannot
 ```
 
 ## Batch processing

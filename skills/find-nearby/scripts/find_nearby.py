@@ -19,18 +19,45 @@ Usage:
 import argparse
 import json
 import math
+import os
 import sys
 import urllib.parse
 import urllib.request
 from typing import Any
 
+# Endpoints and client identity come from the operator's environment: a private or regional OSM
+# mirror must be substitutable, and no request should assert this agent's runtime.
 OVERPASS_URLS = [
-    "https://overpass-api.de/api/interpreter",
-    "https://overpass.kumi.systems/api/interpreter",
+    url.strip()
+    for url in os.environ.get(
+        "OVERPASS_URLS",
+        "https://overpass-api.de/api/interpreter,https://overpass.kumi.systems/api/interpreter",
+    ).split(",")
+    if url.strip()
 ]
-NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
-USER_AGENT = "HermesAgent/1.0 (find-nearby skill)"
-TIMEOUT = 15
+NOMINATIM_URL = os.environ.get("NOMINATIM_URL", "https://nominatim.openstreetmap.org/search")
+USER_AGENT = os.environ.get("FIND_NEARBY_USER_AGENT") or "find-nearby/1.0 (+https://github.com/wxxb789/hoa)"
+TIMEOUT = int(os.environ.get("FIND_NEARBY_TIMEOUT", "15"))
+
+# A category a person says is not always the OSM key it lives under: supermarkets and hotels are
+# `shop`/`tourism`, not `amenity`, so an `amenity=`-only query silently finds nothing for them.
+CATEGORY_TAGS = {
+    "supermarket": ("shop", "supermarket"),
+    "convenience": ("shop", "convenience"),
+    "bakery": ("shop", "bakery"),
+    "hotel": ("tourism", "hotel"),
+    "hostel": ("tourism", "hostel"),
+    "park": ("leisure", "park"),
+    "atm": ("amenity", "atm"),
+    "fuel": ("amenity", "fuel"),
+    "charging_station": ("amenity", "charging_station"),
+}
+
+
+def tag_filter(category: str) -> str:
+    key, value = CATEGORY_TAGS.get(category, ("amenity", category))
+    return f'nwr["{key}"="{value}"]'
+
 
 
 def _http_get(url: str) -> Any:
@@ -71,21 +98,30 @@ def find_nearby(lat: float, lon: float, types: list[str], radius: int = 1500, li
     """Query Overpass for nearby amenities."""
     # Build Overpass QL query
     type_filters = "".join(
-        f'nwr["amenity"="{t}"](around:{radius},{lat},{lon});' for t in types
+        f"{tag_filter(t)}(around:{radius},{lat},{lon});" for t in types
     )
-    query = f"[out:json][timeout:{TIMEOUT}];({type_filters});out center tags;"
+    query = f"[out:json][timeout:{TIMEOUT}];({type_filters});out center;"
 
-    # Try each Overpass server
+    # Try each Overpass server, and say so when none answered — an empty result and an unreachable
+    # backend must not look the same to the caller.
     data = None
+    failures = []
     for url in OVERPASS_URLS:
         try:
             data = _http_post(url, f"data={urllib.parse.quote(query)}")
             break
-        except Exception:
-            continue
+        except Exception as exc:  # noqa: BLE001
+            failures.append(f"{url}: {type(exc).__name__}: {exc}")
 
     if not data:
-        return []
+        print(
+            "Error: every Overpass endpoint failed — this is a backend problem, not an empty area:",
+            file=sys.stderr,
+        )
+        for line in failures:
+            print(f"  {line}", file=sys.stderr)
+        print("  set OVERPASS_URLS to a reachable mirror if the public ones are blocked.", file=sys.stderr)
+        sys.exit(2)
 
     # Parse results
     places = []
