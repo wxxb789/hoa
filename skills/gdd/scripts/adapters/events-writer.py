@@ -37,6 +37,7 @@ import collections
 import json
 import os
 import sys
+import time
 
 DEFAULT_MAX_BYTES = 8 * 1024 * 1024
 HEAD_LIMIT = 64 * 1024
@@ -78,10 +79,15 @@ def resolve_cap():
 
 
 class Writer:
-    def __init__(self, run_dir, max_bytes, defaulted=False):
+    def __init__(self, run_dir, max_bytes, defaulted=False, passthrough=True):
         self.run_dir = run_dir
         self.max_bytes = max_bytes
         self.defaulted = defaulted
+        # Passthrough copies every line to this process's stdout. The reference
+        # adapter wants that (its stdout is the pane or launcher log); a caller whose
+        # own stdout is an unbounded file passes passthrough=False so the bound
+        # actually bounds.
+        self.passthrough = passthrough
         self.events_path = os.path.join(run_dir, "events.ndjson")
         self.stats_path = os.path.join(run_dir, "events.stats.json")
         self.session_path = os.path.join(run_dir, "session.id")
@@ -166,7 +172,18 @@ class Writer:
                 self.events = None
             with open(tmp, "wb") as handle:
                 handle.write(content)
-            os.replace(tmp, self.events_path)
+            # On Windows `os.replace` is MoveFileEx and fails with WinError 5 while any
+            # process holds the destination open — `tail` is enough. Retry briefly
+            # instead of condemning the sink: a permanent `file_ok = False` would stop
+            # retaining events while the totals kept growing, understating the loss.
+            for attempt in range(20):
+                try:
+                    os.replace(tmp, self.events_path)
+                    break
+                except PermissionError:
+                    time.sleep(0.05 + 0.05 * (attempt % 5))
+            else:
+                raise OSError("could not replace %s (still open elsewhere)" % self.events_path)
         except OSError as exc:
             self._file_error(exc)
             try:
@@ -182,7 +199,7 @@ class Writer:
             self.disk_bytes = len(content)
 
     def _passthrough(self, line):
-        if not self.stdout_ok:
+        if not self.passthrough or not self.stdout_ok:
             return
         try:
             sys.stdout.buffer.write(line)

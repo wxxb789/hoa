@@ -97,6 +97,14 @@ Configuration (nothing about one install is baked in)
     OMP_RUN_START_GRACE_SECONDS
                                how long a run that has recorded no pid is treated as
                                starting rather than dead (default: 60).
+    OMP_RUN_STOP_WAIT_SECONDS  how long `kill` waits for a run to finalize itself
+                               before forcing its tree (default: 20).
+    OMP_RUN_DRAIN_TIMEOUT_SECONDS
+                               how long the runner waits for the agent's stdout to
+                               reach EOF after the agent exits (default: 30). A tool
+                               still holding that pipe makes the run end with
+                               `stream_incomplete: true` rather than quietly losing
+                               the tail of the stream.
     --model, --thinking, --max-time, --profile, --extra
                                passed to the agent only when supplied; this adapter
                                defaults none of them.
@@ -116,6 +124,15 @@ invocation, replayable by hand. `lock` holds {"pid","agent_pid","tmux","backend"
 POSIX), `agent_pid` the agent it started, `tmux` the session under that backend.
 `start` writes the lock before spawning, the runner only ever adds `pid` and
 `agent_pid`, so a read-modify-write cannot drop a field.
+
+Two claims keep two `start`s, or two readers, from colliding in one run directory:
+`start.lock` is created exclusively before the run's artifacts and released by the
+runner once it owns the run (so a second `start` refuses instead of moving a
+starting run aside), and `finalize.lock` is created exclusively around finalization
+(so two readers seeing the same dead run produce one final state and one ledger row).
+A `finalized` marker is the authority, never the locks: a finalizer that died between
+publishing state.json and writing the marker is repaired from the recorded exit code,
+and that repair is recorded as `finalize_repaired`.
 
 `kill` writes the `stop` control file, which the runner polls, and waits for the
 run's own finalizer. A control file rather than a signal, because signal and
@@ -172,9 +189,12 @@ POLL_SECONDS = 0.25
 START_WAIT_SECONDS = 20.0
 STOP_WAIT_SECONDS = 20.0
 GRACE_SECONDS = 60.0
+DRAIN_TIMEOUT_SECONDS = 30.0
 RUN_DIR_PATTERNS = ("*", "*/*", "*/*/runs/*", "*/*/omp-runs/*")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 SANITIZE_RE = re.compile(r"[^a-z0-9._-]+")
+# A percent-delimited variable reference, which cmd.exe expands in a command line.
+PERCENT_REFERENCE_RE = re.compile(r"%[^%\s]+%")
 # Flags that take a value, for `normalize_argv` below.
 VALUE_FLAGS = {
     "--name",
@@ -252,15 +272,21 @@ def state_home() -> str:
 
 
 def run_root() -> str:
-    return os.path.expanduser(
-        os.environ.get("OMP_RUN_ROOT")
-        or os.environ.get("GDD_RUN_ROOT")
-        or os.path.join(state_home(), "gdd", "runs")
+    # Absolute: the runner gets a different cwd, so a relative root would mean two
+    # different directories to the launcher and to the run it started.
+    return os.path.abspath(
+        os.path.expanduser(
+            os.environ.get("OMP_RUN_ROOT")
+            or os.environ.get("GDD_RUN_ROOT")
+            or os.path.join(state_home(), "gdd", "runs")
+        )
     )
 
 
 def ledger_path(root) -> str:
-    return os.environ.get("OMP_LEDGER") or os.path.join(root, "ledger.tsv")
+    return os.path.abspath(
+        os.path.expanduser(os.environ.get("OMP_LEDGER") or os.path.join(root, "ledger.tsv"))
+    )
 
 
 def start_grace_seconds() -> float:
@@ -269,6 +295,46 @@ def start_grace_seconds() -> float:
     except ValueError:
         return GRACE_SECONDS
     return value if value > 0 else GRACE_SECONDS
+
+
+def drain_timeout_seconds() -> float:
+    """How long the runner waits for the agent's stdout to reach EOF after it exits."""
+    try:
+        value = float((os.environ.get("OMP_RUN_DRAIN_TIMEOUT_SECONDS") or "").strip())
+    except ValueError:
+        return DRAIN_TIMEOUT_SECONDS
+    return value if value > 0 else DRAIN_TIMEOUT_SECONDS
+
+
+def stop_wait_seconds() -> float:
+    """How long `kill` waits for a run to finalize itself before forcing the tree."""
+    try:
+        value = float((os.environ.get("OMP_RUN_STOP_WAIT_SECONDS") or "").strip())
+    except ValueError:
+        return STOP_WAIT_SECONDS
+    return value if value > 0 else STOP_WAIT_SECONDS
+
+
+def prompt_hazard(agent, prompt_text) -> str:
+    """Why this prompt must not go through a `.cmd`/`.bat` agent, or "".
+
+    A Windows `.cmd` shim runs through cmd.exe, which expands `%VAR%` on the command
+    line before the shim sees it. Measured on Windows 11: `%USERNAME%` arrives as the
+    value, `%%USERNAME%%` as `%value%` and `^%USERNAME%` as `^value` — no escaping
+    survives cmd's parser — so the launcher refuses instead of silently rewriting the
+    agent's instructions. A bare `%` with no closing pair passes through untouched.
+    """
+    if not (IS_WINDOWS and os.path.splitext(str(agent))[1].lower() in (".cmd", ".bat")):
+        return ""
+    found = PERCENT_REFERENCE_RE.search(prompt_text or "")
+    if not found:
+        return ""
+    return (
+        f"the prompt contains {found.group(0)!r}, which cmd.exe would expand before the "
+        f"{os.path.splitext(str(agent))[1]} shim sees it; point OMP_BIN at the agent's real "
+        ".exe (or drop the %VAR% reference) — a command line through cmd.exe cannot carry a "
+        "literal %VAR%"
+    )
 
 
 def agent_binary() -> str:
@@ -362,6 +428,13 @@ def remove_quietly(path) -> None:
     try:
         os.unlink(path)
     except OSError:
+        pass
+
+
+def close_quietly(stream) -> None:
+    try:
+        stream.close()
+    except (OSError, ValueError, AttributeError):
         pass
 
 
@@ -566,6 +639,37 @@ def is_starting(run_dir, state) -> bool:
     return state_age_seconds(state) < start_grace_seconds()
 
 
+def starting_claim(run_dir) -> bool:
+    """Is another `start` still writing this run directory?
+
+    Two dispatches for one slug can overlap before the runner has recorded its pid;
+    `start.lock` is created exclusively for that window and removed by the runner as
+    soon as it owns the run, so a fresh claim means "someone is starting this now"
+    and a stale one (past the grace window) means the starter died.
+    """
+    path = os.path.join(run_dir, "start.lock")
+    if not os.path.exists(path):
+        return False
+    return time.time() - mtime_of(path) < start_grace_seconds()
+
+
+def claim_start(run_dir) -> bool:
+    """Take the exclusive right to start this slug; False when another start holds it."""
+    path = os.path.join(run_dir, "start.lock")
+    for attempt in range(2):
+        try:
+            os.close(os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600))
+            return True
+        except FileExistsError:
+            if attempt or not starting_claim(run_dir):
+                remove_quietly(path)
+                continue
+            return False
+        except OSError:
+            return True  # a claim this process cannot take must not block starting
+    return False
+
+
 def observe_detachment() -> dict:
     """What this process can prove about its own detachment (not what was asked).
 
@@ -667,24 +771,65 @@ def signal_group(pid, signum) -> None:
             pass
 
 
-def terminate_agent(process) -> int:
-    """Stop the agent and the tool processes under it; report exit 143."""
+def group_alive(pgid) -> bool:
+    """Is any process still in this process group? POSIX only; False on Windows."""
+    if IS_WINDOWS or not isinstance(pgid, int) or pgid <= 0:
+        return False
+    try:
+        os.killpg(pgid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
+def tree_alive(pid) -> bool:
+    """The process itself, or on POSIX any surviving member of the group it leads."""
+    return pid_alive(pid) or group_alive(pid)
+
+
+def terminate_agent(process) -> tuple:
+    """Stop the agent and the tools under it; return (exit code, surviving pids).
+
+    Waiting for the agent's own exit is not enough. The agent leads its own process
+    group, so a tool it started can outlive it while ignoring the signal; the run
+    would then finalize as killed and free the worktree for another writer while a
+    process of the old one is still editing. The wait is therefore on the *tree*
+    (the group on POSIX, the taskkill tree on Windows), and what is still alive at
+    the end is reported instead of assumed away.
+    """
+    agent = process.pid
+
+    def settled() -> bool:
+        process.poll()  # reap a zombie before judging the group
+        return not tree_alive(agent)
+
     if process.poll() is None:
         if IS_WINDOWS:
-            run_quiet(["taskkill", "/T", "/F", "/PID", str(process.pid)])
+            run_quiet(["taskkill", "/T", "/F", "/PID", str(agent)])
         else:
-            signal_group(process.pid, signal.SIGTERM)
-            for _ in range(20):
-                if process.poll() is not None:
-                    break
-                time.sleep(POLL_SECONDS)
-            if process.poll() is None:
-                signal_group(process.pid, signal.SIGKILL)
+            signal_group(agent, signal.SIGTERM)
+        for _ in range(20):
+            if settled():
+                break
+            time.sleep(POLL_SECONDS)
     for _ in range(40):
-        if process.poll() is not None:
+        if settled():
             break
         time.sleep(POLL_SECONDS)
-    return KILL_EXIT
+    if not settled():
+        if IS_WINDOWS:
+            run_quiet(["taskkill", "/T", "/F", "/PID", str(agent)])
+        else:
+            signal_group(agent, signal.SIGKILL)
+        for _ in range(20):
+            if settled():
+                break
+            time.sleep(POLL_SECONDS)
+    return KILL_EXIT, ([] if settled() else [agent])
 
 
 def kill_tree(run_dir, state=None) -> bool:
@@ -695,16 +840,20 @@ def kill_tree(run_dir, state=None) -> bool:
     if IS_WINDOWS:
         for pid in pids:
             run_quiet(["taskkill", "/T", "/F", "/PID", str(pid)])
-        return True
+        return not any(pid_alive(pid) for pid in pids)
     for pid in pids:
         signal_group(pid, signal.SIGTERM)
     for _ in range(20):
-        if not any(pid_alive(pid) for pid in pids):
+        if not any(tree_alive(pid) for pid in pids):
             return True
         time.sleep(POLL_SECONDS)
     for pid in pids:
         signal_group(pid, signal.SIGKILL)
-    return True
+    for _ in range(20):
+        if not any(tree_alive(pid) for pid in pids):
+            return True
+        time.sleep(POLL_SECONDS)
+    return False
 
 
 def request_stop(run_dir) -> None:
@@ -825,12 +974,24 @@ class EventLog:
             sys.stderr.write(f"omp-run: {warning}\n")
         self.path = os.path.join(run_dir, "events.ndjson")
         self.stats_path = os.path.join(run_dir, "events.stats.json")
-        self.writer = writer_class(run_dir, cap, defaulted=warning is not None)
+        # passthrough=False: this adapter's own stdout is runner.log, and the writer's
+        # terminal passthrough would copy the whole stream there unbounded, so the
+        # event bound would bound nothing.
+        self.writer = writer_class(
+            run_dir, cap, defaulted=warning is not None, passthrough=False
+        )
+        self.finished = False
 
     def feed(self, raw) -> None:
+        if self.finished:
+            # A reader thread can still be draining a stream a descendant kept open.
+            # After `finish()` its remaining lines are dropped on purpose: the run has
+            # recorded `stream_incomplete` rather than pretending to have them.
+            return
         self.writer.feed(raw)
 
     def finish(self) -> dict:
+        self.finished = True
         self.writer.finish()
         stats = read_json(self.stats_path, {})
         return stats if isinstance(stats, dict) else {}
@@ -946,8 +1107,59 @@ def ledger_append(run_dir, state, exit_code) -> None:
         sys.stderr.write(f"omp-run: ledger append failed: {exc}\n")
 
 
-def finalize(run_dir, exit_code, recovered=False, note=None) -> dict:
-    """Write state.json, answer.md, exit.code, the `finalized` marker and the ledger row."""
+def claim_finalize(run_dir):
+    """(claimed, fd): the exclusive right to finalize one run.
+
+    Two readers can see the same stale `running` state at once; without a claim both
+    would write final artifacts and append a ledger row, and the second would mutate
+    a run the `finalized` marker already called finished. A claim file left behind by
+    a killed finalizer is taken over once it is older than the grace window: the
+    marker, not the lock, is the authority.
+    """
+    path = os.path.join(run_dir, "finalize.lock")
+    try:
+        return True, os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError:
+        if time.time() - mtime_of(path) < start_grace_seconds():
+            return False, None
+        remove_quietly(path)
+        try:
+            return True, os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        except OSError:
+            return True, None  # a claim this process cannot take must not block finalizing
+    except OSError:
+        return True, None
+
+
+def finalize(run_dir, exit_code, recovered=False, note=None, extra=None, claim_wait=0.0) -> dict:
+    """Write state.json, answer.md, exit.code, the `finalized` marker and the ledger row.
+
+    `claim_wait` is how long to wait for the finalize claim: the runner passes a
+    positive value because its own finalization must land, a reader passes 0 and
+    reports whatever is on disk when another process is already finalizing.
+    """
+    claimed, descriptor = claim_finalize(run_dir)
+    if not claimed and claim_wait > 0:
+        deadline = time.monotonic() + claim_wait
+        while not claimed and time.monotonic() < deadline:
+            time.sleep(POLL_SECONDS)
+            claimed, descriptor = claim_finalize(run_dir)
+    if not claimed:
+        sys.stderr.write(f"omp-run: {run_dir} is being finalized by another process\n")
+        return read_state_file(run_dir)
+    try:
+        return _finalize_locked(run_dir, exit_code, recovered, note, extra)
+    finally:
+        if descriptor is not None:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+        remove_quietly(os.path.join(run_dir, "finalize.lock"))
+
+
+def _finalize_locked(run_dir, exit_code, recovered, note, extra) -> dict:
+    """The finalization itself, with the claim already held."""
     state_path = os.path.join(run_dir, "state.json")
     state = read_state_file(run_dir)
     events_path = os.path.join(run_dir, "events.ndjson")
@@ -1006,6 +1218,8 @@ def finalize(run_dir, exit_code, recovered=False, note=None) -> dict:
         )
     elif note:
         state["note"] = note
+    if extra:
+        state.update(extra)
     with open(os.path.join(run_dir, "answer.md"), "w", encoding="utf-8") as handle:
         handle.write(summary["answer"])
     with open(os.path.join(run_dir, "exit.code"), "w", encoding="utf-8") as handle:
@@ -1022,15 +1236,40 @@ def finalize(run_dir, exit_code, recovered=False, note=None) -> dict:
 
 
 def effective_state(run_dir):
-    """(state, recovered): finalize a genuinely dead run exactly once."""
+    """(state, recovered): settle a run whose own finalizer did not get that far.
+
+    Two cases, both idempotent and both guarded by the marker: a run still `running`
+    with nothing alive is a crash (finalized `failed`, exit -1, `stale_recovered`),
+    and a run whose state is already terminal but whose `finalized` marker is missing
+    died between publishing the state and writing the marker (finalized again from
+    the exit code it recorded, so the marker — what consumers check — exists).
+    """
     state = read_state_file(run_dir)
     if os.path.exists(os.path.join(run_dir, "finalized")):
         return state, False
-    if state.get("state") != "running":
+    recorded = state.get("state")
+    if recorded not in ("running", "done", "killed", "failed"):
         return state, False
     if run_alive(run_dir, state) or is_starting(run_dir, state):
         return state, False
-    return finalize(run_dir, -1, recovered=True), True
+    if recorded == "running":
+        return finalize(run_dir, -1, recovered=True, claim_wait=0.0), True
+    exit_code = state.get("exit")
+    if not isinstance(exit_code, int) or isinstance(exit_code, bool):
+        exit_code = -1
+    repaired = finalize(
+        run_dir,
+        exit_code,
+        note=(
+            f"state.json was published as {recorded} without the finalized marker (the "
+            "finalizer died between the two); finalized again from the recorded exit code"
+        ),
+        extra={"finalize_repaired": True},
+        claim_wait=0.0,
+    )
+    if not os.path.exists(os.path.join(run_dir, "finalized")):
+        return repaired, False
+    return repaired, True
 
 
 def reported_state(state) -> dict:
@@ -1099,7 +1338,8 @@ def resolve_agent(binary) -> str:
         return ""
     if not IS_WINDOWS and not os.access(candidate, os.X_OK):
         return ""
-    return candidate
+    # Absolute: the runner runs in the run's cwd, not the dispatcher's.
+    return os.path.abspath(candidate)
 
 
 def agent_command(agent, argv) -> list:
@@ -1212,6 +1452,13 @@ def cmd_start(args) -> int:
     agent = resolve_agent(agent_binary())
     if not agent:
         die(f"start: agent binary not found at {agent_binary()} (set OMP_BIN)")
+    try:
+        with open(prompt, encoding="utf-8", errors="replace") as handle:
+            hazard = prompt_hazard(agent, handle.read())
+    except OSError as exc:
+        die(f"start: cannot read --prompt {prompt}: {exc}")
+    if hazard:
+        die(f"start: {hazard}")
     warning = interop_warning(agent)
     if warning:
         sys.stderr.write(f"omp-run: start: {warning}\n")
@@ -1225,7 +1472,16 @@ def cmd_start(args) -> int:
     session = f"omp-{slug}" if backend == "tmux" else ""
     if os.path.isdir(run_dir):
         state, _ = effective_state(run_dir)
-        if run_alive(run_dir, state) or tmux_alive(session):
+        # `is_starting` and `starting_claim` count as occupied too: a run inside its
+        # pidless window, or one another start is writing right now, is live work even
+        # though the pid is not on disk yet.
+        occupied = (
+            run_alive(run_dir, state)
+            or tmux_alive(session)
+            or is_starting(run_dir, state)
+            or starting_claim(run_dir)
+        )
+        if occupied:
             if not args.replace:
                 pids = "/".join(str(pid) for pid in recorded_pids(run_dir, state)) or "-"
                 die(
@@ -1240,6 +1496,8 @@ def cmd_start(args) -> int:
             die(f"start: cannot move {run_dir} aside for the new run")
 
     os.makedirs(run_dir, exist_ok=True)
+    if not claim_start(run_dir):
+        die(f"start: another start is claiming run '{slug}' (see {run_dir})")
     shutil.copyfile(prompt, os.path.join(run_dir, "prompt.md"))
     if args.resume:
         with open(os.path.join(run_dir, "session.id"), "w", encoding="utf-8") as handle:
@@ -1468,18 +1726,40 @@ def cmd_tail(args) -> int:
 
 
 def stop_run(run_dir, state=None, seconds=STOP_WAIT_SECONDS) -> bool:
-    """Ask the run to stop, then force it: True once its finalized marker exists."""
+    """Ask the run to stop, then force it: True once its finalized marker exists.
+
+    A run whose runner is gone cannot execute its own finalizer, so the forced path
+    finalizes the stop itself — as `killed`, exit 143, because that is what happened.
+    Recording it as a stale crash (failed, exit -1) would contradict both the
+    operator's request and the contract in references/transport.md.
+    """
     if os.path.exists(os.path.join(run_dir, "finalized")):
         return True
     request_stop(run_dir)
     if wait_for_marker(run_dir, seconds):
         return True
     state = state if state is not None else read_state_file(run_dir)
+    forced = False
     if run_alive(run_dir, state):
-        kill_tree(run_dir, state)
+        forced = kill_tree(run_dir, state)
     if wait_for_marker(run_dir, 10.0):
         return True
-    # Nothing is left to finalize the run: the recovery path owns that now.
+    if forced or not run_alive(run_dir, state):
+        finalize(
+            run_dir,
+            KILL_EXIT,
+            note=(
+                "stopped on request: the run's own finalizer did not complete after the "
+                "stop request, so the stop was recorded here"
+            ),
+        )
+        return os.path.exists(os.path.join(run_dir, "finalized"))
+    # The tree survived the escalation: leave the run to the recovery path rather
+    # than claiming a stop that did not happen.
+    sys.stderr.write(
+        f"omp-run: run in {run_dir} still has live processes after the forced stop; "
+        "not recording it as stopped\n"
+    )
     effective_state(run_dir)
     return os.path.exists(os.path.join(run_dir, "finalized"))
 
@@ -1493,7 +1773,7 @@ def cmd_kill(args) -> int:
         die(f"kill: no live process recorded for '{args.name}' (state {state.get('state')})")
     pids = "/".join(str(pid) for pid in recorded_pids(run_dir, state)) or "-"
     session = lock_of(run_dir).get("tmux")
-    stop_run(run_dir, state)
+    stop_run(run_dir, state, seconds=stop_wait_seconds())
     if session and tmux_alive(session):
         run_quiet(["tmux", "kill-session", "-t", str(session)])
     final = reported_state(read_state_file(run_dir))
@@ -1523,12 +1803,16 @@ def drain(stream, log) -> None:
 
 
 def wait_for_agent(process, run_dir, requested: threading.Event) -> int:
-    """Wait for the agent, honouring the stop control file and an external signal."""
+    """Wait for the agent, honouring the stop control file and an external signal.
+
+    Returns (exit code, surviving pids): the second is non-empty when a process below
+    the agent outlived the signal, which the caller records instead of hiding.
+    """
     stop_path = os.path.join(run_dir, "stop")
     while True:
         exit_code = process.poll()
         if exit_code is not None:
-            return exit_code
+            return exit_code, []
         if requested.is_set() or os.path.exists(stop_path):
             return terminate_agent(process)
         time.sleep(POLL_SECONDS)
@@ -1543,6 +1827,9 @@ def runner_main(args) -> int:
     # agent_pid, `start` owns everything else, so no read-modify-write can drop a
     # field that raced it.
     update_lock(run_dir, pid=os.getpid())
+    # The run owns itself now: the start claim exists only for the window before
+    # this process recorded a pid.
+    remove_quietly(os.path.join(run_dir, "start.lock"))
     state["pid"] = os.getpid()
     state["detach"] = observe_detachment()
     state["interpreter"] = interpreter()
@@ -1577,13 +1864,34 @@ def runner_main(args) -> int:
         install_stop_handler(requested)
         reader = threading.Thread(target=drain, args=(process.stdout, log), daemon=True)
         reader.start()
-        exit_code = wait_for_agent(process, run_dir, requested)
-        reader.join(timeout=30.0)
+        exit_code, survivors = wait_for_agent(process, run_dir, requested)
+        if survivors:
+            state["survivors"] = survivors
+            state["note"] = (
+                "stopped with processes still alive: "
+                + " ".join(str(pid) for pid in survivors)
+                + "; they were signalled but did not exit"
+            )
+            write_json(state_path, state)
+        reader.join(timeout=drain_timeout_seconds())
         if reader.is_alive():
-            sys.stderr.write("omp-run: event reader still draining at exit\n")
+            # A descendant of the agent still holds the write end of its stdout. Stop
+            # waiting and say in state.json that the tail is missing rather than late.
+            # The reader is a daemon and the pipe ends with this process; closing the
+            # stream from here instead would block on Windows while that read is in
+            # flight (measured: the runner wedged until it was killed).
+            sys.stderr.write(
+                "omp-run: the event stream was still open at exit; recording the truncation\n"
+            )
+            state["stream_incomplete"] = True
+            state["note"] = (
+                "finalized while the event stream was still open: a process below the agent "
+                "held its stdout, so the events after this point are missing from the log"
+            )
+            write_json(state_path, state)
         log.finish()
 
-    final = finalize(run_dir, exit_code)
+    final = finalize(run_dir, exit_code, claim_wait=30.0)
     print(
         f"[finalize] {final.get('name')} state={final['state']} exit={exit_code} "
         f"dur={final.get('duration_s')}s cost=${final.get('cost_usd')} "
