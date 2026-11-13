@@ -683,6 +683,20 @@ class LauncherTests(unittest.TestCase):
         self.assertEqual(self.state_of("argv-15c")["resumed_from"], "session-9")
         self.adapter_run("kill", "argv-15c")
         self.wait_for_state("argv-15c", {"killed"}, timeout=30.0)
+        # A single agent flag that begins with '-': the spelling the reference
+        # adapter accepts and argparse would otherwise refuse.
+        argv_file.unlink()
+        self.start(
+            "argv-15d",
+            "--extra", "--no-session",
+            env=self.env_for(STUB_MODE="sleep", STUB_ARGV_FILE=argv_file),
+        )
+        self.wait_for_state("argv-15d", {"running"}, timeout=START_TIMEOUT)
+        recorded = json.loads(argv_file.read_text(encoding="utf-8"))
+        self.assertIn("--no-session", recorded)
+        self.assertEqual(recorded[-1].strip(), "do the thing")
+        self.adapter_run("kill", "argv-15d")
+        self.wait_for_state("argv-15d", {"killed"}, timeout=30.0)
 
     def test_16_gdd_runs_a_python_launcher_through_the_interpreter(self):
         """gdd.py must not hand CreateProcess a `.py` path on Windows.
@@ -867,6 +881,24 @@ class AdapterUnitTests(unittest.TestCase):
         self.assertEqual(adapter.sanitize("UPPER_under.dot"), "upper_under.dot")
         self.assertEqual(len(adapter.sanitize("x" * 80)), 48)
         self.assertEqual(adapter.sanitize("!!!"), "")
+
+    def test_option_like_values_survive_argparse(self):
+        """`--extra --no-session` must parse: agent flags begin with '-' by nature."""
+        self.assertEqual(
+            adapter.normalize_argv(["start", "--extra", "--no-session"]),
+            ["start", "--extra=--no-session"],
+        )
+        self.assertEqual(
+            adapter.normalize_argv(["start", "--model", "some-model", "--thinking", "high"]),
+            ["start", "--model", "some-model", "--thinking", "high"],
+        )
+        self.assertEqual(adapter.normalize_argv(["status", "run"]), ["status", "run"])
+        # A flag with no value is left alone rather than swallowing the next flag.
+        self.assertEqual(adapter.normalize_argv(["--extra"]), ["--extra"])
+        parsed = adapter.build_parser().parse_args(
+            adapter.normalize_argv(["start", "--name", "n", "--prompt", "p", "--extra", "--no-session"])
+        )
+        self.assertEqual(parsed.extra, "--no-session")
 
     def test_run_root_follows_the_documented_chain(self):
         with_env = {"GDD_RUN_ROOT": "/gdd/runs", "OMP_RUN_ROOT": "/omp/runs"}

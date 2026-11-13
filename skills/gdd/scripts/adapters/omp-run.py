@@ -175,6 +175,22 @@ GRACE_SECONDS = 60.0
 RUN_DIR_PATTERNS = ("*", "*/*", "*/*/runs/*", "*/*/omp-runs/*")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 SANITIZE_RE = re.compile(r"[^a-z0-9._-]+")
+# Flags that take a value, for `normalize_argv` below.
+VALUE_FLAGS = {
+    "--name",
+    "--prompt",
+    "--cwd",
+    "--model",
+    "--thinking",
+    "--max-time",
+    "--profile",
+    "--extra",
+    "--resume",
+    "--backend",
+    "--run-dir",
+    "--agent",
+    "--ledger",
+}
 
 EPILOG = """\
 Launcher contract (full text: references/transport.md in the gdd skill):
@@ -195,6 +211,29 @@ allocating one.
 def die(message, code=1):
     print(f"omp-run: {message}", file=sys.stderr)
     sys.exit(code)
+
+
+def normalize_argv(argv):
+    """Fold `--flag value` into `--flag=value` when the value looks like an option.
+
+    argparse refuses a value that begins with `-` (`--extra --no-session`,
+    `--model -x`), while the reference adapter's hand-rolled parser accepts both
+    spellings — a shell hands it one token either way. Agent flags begin with `-`
+    by nature, so the spellings have to agree: joining them here is what keeps the
+    two adapters interchangeable. A value that is not option-like is untouched.
+    """
+    out = []
+    index = 0
+    while index < len(argv):
+        token = argv[index]
+        following = argv[index + 1] if index + 1 < len(argv) else ""
+        if token in VALUE_FLAGS and following.startswith("-"):
+            out.append(f"{token}={following}")
+            index += 2
+            continue
+        out.append(token)
+        index += 1
+    return out
 
 
 # -- configuration -----------------------------------------------------------
@@ -1626,7 +1665,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv=None) -> int:
-    args = build_parser().parse_args(argv)
+    args = build_parser().parse_args(normalize_argv(sys.argv[1:] if argv is None else list(argv)))
     return args.func(args)
 
 
