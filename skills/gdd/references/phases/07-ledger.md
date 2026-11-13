@@ -10,6 +10,11 @@ scripts/delivery-state.py show --repo <path> --goal <id>     # resume here
 scripts/gdd.py close --repo <path> --goal <id> --pr <N>       # landing row: stage=done + PR + head
 ```
 
+`gdd.py stage` counts the rows for this repo+goal+stage before dispatching and refuses the third
+`implement`, `simplify` or `review` run; `--over-budget` is the explicit override, and every dispatch
+writes its `rounds_simplify` / `rounds_review` value so the next session can read the count instead of
+guessing it. A round cap that lives only in prose is not a cap.
+
 The `close` row is not optional bookkeeping: without it the ledger's newest row for a shipped goal stays
 `fix`, and the next session reads a merged increment as unfinished. Write it in the same breath as the
 merge, not from memory later.

@@ -1,7 +1,7 @@
 # Phase 6 — merge gate (mechanical, not remembered)
 
 ```bash
-scripts/pr-merge-check.py <pr> --repo <path> --verified-head <sha> --gates-rc <rc> [--marker TEXT]
+<gdd-skill>/scripts/pr-merge-check.py <pr> --repo <path> --verified-head <sha> --gates-rc <rc> [--marker TEXT]
 ```
 
 Boolean lines and a verdict; exit 0 = merge allowed. `--verified-head` is the SHA you actually ran

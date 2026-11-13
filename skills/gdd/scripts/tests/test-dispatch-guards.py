@@ -46,6 +46,34 @@ def main():
     case("dirty worktree is expected for apply", blocked("apply", "g.md", ["a.py"], "a", "b"), False)
     case("verify stage has no extra guard", blocked("verify", "-", [], "a", "a"), False)
 
+    case("first implement round is allowed", gdd.budget_problem("implement", 0), None)
+    case("second implement round is allowed", gdd.budget_problem("implement", 1), None)
+    case("third implement round is refused", bool(gdd.budget_problem("implement", 2)), True)
+    case("over-budget flag lets it through", gdd.budget_problem("implement", 5, over_budget=True), None)
+    case("stages without a cap are never refused", gdd.budget_problem("apply", 9), None)
+
+    import tempfile as _tmp
+
+    with _tmp.TemporaryDirectory() as ledger_dir:
+        ledger = os.path.join(ledger_dir, "ledger.tsv")
+        with open(ledger, "w", encoding="utf-8") as handle:
+            handle.write("\t".join(gdd.LEDGER_COLUMNS) + "\n")
+            for stage in ("implement", "implement", "simplify"):
+                handle.write("\t".join(["ts", "/tmp/repo", "0007", stage] + ["-"] * 9) + "\n")
+        case("ledger counts the stage rows", gdd.ledger_rounds(ledger, "repo", "0007", "implement"), 2)
+        case("ledger ignores other stages", gdd.ledger_rounds(ledger, "repo", "0007", "review"), 0)
+        case("ledger ignores other goals", gdd.ledger_rounds(ledger, "repo", "0008", "implement"), 0)
+        case("missing ledger counts zero", gdd.ledger_rounds(ledger + ".nope", "repo", "0007", "implement"), 0)
+
+        # a --wait run appends a dispatch row and a completion row; only the dispatch spends a round
+        waited = os.path.join(ledger_dir, "waited.tsv")
+        with open(waited, "w", encoding="utf-8") as handle:
+            handle.write("\t".join(gdd.LEDGER_COLUMNS) + "\n")
+            handle.write("\t".join(["ts", "/tmp/repo", "0009", "implement", "-", "-", "-", "-", "-", "n/a", "-", "implement", "-"]) + "\n")
+            handle.write("\t".join(["ts", "/tmp/repo", "0009", "implement", "-", "-", "-", "-", "-", "n/a", "-", "review", "exit=0 dur=5s head=abc1234"]) + "\n")
+        case("a completion row does not spend a round", gdd.ledger_rounds(waited, "repo", "0009", "implement"), 1)
+        case("a waited stage still has a round left", gdd.budget_problem("implement", gdd.ledger_rounds(waited, "repo", "0009", "implement")), None)
+
     case("authoring stage records the post-run head", gdd.final_head_for("implement", False, "aaa1111", "bbb2222"), "bbb2222")
     case("report stage keeps the reviewed head", gdd.final_head_for("review", False, "aaa1111", "bbb2222"), "aaa1111")
     case("supplied head wins for an authoring stage", gdd.final_head_for("fix", True, "ccc3333", "bbb2222"), "ccc3333")

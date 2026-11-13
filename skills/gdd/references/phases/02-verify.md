@@ -42,6 +42,15 @@ commit and disclose it — decide, don't silently absorb.
 
 ## Pitfalls this phase answers
 
+- **A non-zero gate exit does not say *why*.** Wrappers flatten "the tool is missing", "the machine
+  killed the process" and "the code regressed" into the same `exit 1` — observed in three repos, where
+  a missing `omp`/`bun`/pinned `gitleaks` and a SIGKILL both read as a red suite. Before dispatching a
+  `fix` round on `rc=1`, grep the gate output for prerequisite markers (`not found`, `command not found`,
+  `is required to run`, `requires Gitleaks`, `ENOENT`, a missing `bin/`/`dist/`), check for a signal or
+  an OOM kill (`exit 137`, `-9`, `status: null`, a `dmesg`/`Killed` line), and only then treat it as a
+  code failure. Export the project's toolchain `PATH` (mise shims, `DOTNET_ROOT`, `GITLEAKS_VERSION`) in
+  the **same subshell** as the gate command — a fix dispatched against a missing tool burns a round for
+  nothing.
 - **A self-reported "done" with no gate output is unverified.** Ask for exit codes, then run them.
 - **Put the project's own toolchain first on `PATH` before running its gates.** An ambient interpreter
   below the project's floor fails in a way that reads like a code defect.

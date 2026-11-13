@@ -3,6 +3,21 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## 2026-11-13 — the round caps become mechanical, and a gate exit stops meaning "red"
+
+`SKILL.md` said `implement`/`simplify`/`review` run at most twice. Nothing enforced it: `stage`
+dispatched regardless, and the ledger's `rounds_simplify`/`rounds_review` columns were `-` in every
+row of a 36-row ledger, so a new session could neither read the count nor be stopped by it.
+
+- `budget_problem()` + `ledger_rounds()` (pure): `stage` counts the ledger rows for this repo+goal+stage
+  and refuses the third run with exit 3; `--over-budget` is the explicit override, and every dispatch
+  writes its own rounds value.
+- `02-verify.md`: a non-zero gate exit does not say *why*. Three consumer repos flatten "tool missing",
+  "process killed" and "code regressed" into the same `exit 1`. The phase now asks for prerequisite
+  markers, signals/OOM and a toolchain `PATH` in the same subshell before a `fix` round is dispatched.
+- `06-merge.md`: the merge gate is `<gdd-skill>/scripts/pr-merge-check.py`, not a repo-relative path
+  that no consumer repo has.
+
 ## 2026-11-13 — three live host skills flow back into the catalog
 
 `hermes-models`, `hermes-updates` and `hermes-context-file-loading` had been running from real
