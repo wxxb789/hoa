@@ -1,12 +1,12 @@
 # Phase 5 — gates, commit, PR
 
 1. Re-run gates on the exact tree you ship.
-2. **Before committing, define the working increment.** `${GDD_WORKTREE_SCOPE:-../delegated-work-acceptance/scripts/worktree-scope.py}` diff
+2. **Before committing, define the working increment.** `$(scripts/gdd.py scope)` diff
    --repo <path> --label <goal>, then `seal`. (Phase 4 already committed the stage output to give the
    reviewer a range; this step seals the increment that ships, so run it against the whole branch.) If `overlapping_paths` is non-empty, stop and ask the operator which
    writer owns each path — do not commit across it.
 3. Commit with explicit paths; push; open the PR.
-4. **After committing, verify the sealed scope.** `${GDD_WORKTREE_SCOPE:-../delegated-work-acceptance/scripts/worktree-scope.py}` verify --repo <path>
+4. **After committing, verify the sealed scope.** `$(scripts/gdd.py scope)` verify --repo <path>
    --label <goal>. Drift ⇒ stop, name the paths, and require either a re-review or an explicit operator
    acceptance recorded in the PR body. Do not move this check into `pr-merge-check.py`: that gate
    declares `Environment: none` and only judges the remote PR.

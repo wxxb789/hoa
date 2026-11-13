@@ -46,6 +46,11 @@ def main():
     case("dirty worktree is expected for apply", blocked("apply", "g.md", ["a.py"], "a", "b"), False)
     case("verify stage has no extra guard", blocked("verify", "-", [], "a", "a"), False)
 
+    case("authoring stage records the post-run head", gdd.final_head_for("implement", False, "aaa1111", "bbb2222"), "bbb2222")
+    case("report stage keeps the reviewed head", gdd.final_head_for("review", False, "aaa1111", "bbb2222"), "aaa1111")
+    case("supplied head wins for an authoring stage", gdd.final_head_for("fix", True, "ccc3333", "bbb2222"), "ccc3333")
+    case("supplied head wins for a report stage", gdd.final_head_for("simplify", True, "ccc3333", "bbb2222"), "ccc3333")
+
     with tempfile.TemporaryDirectory() as tmp:
         ready = os.path.join(tmp, "0007-ready.md")
         with open(ready, "w", encoding="utf-8") as handle:

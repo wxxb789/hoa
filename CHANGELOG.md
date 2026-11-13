@@ -13,8 +13,12 @@ was the tree *before* the final stage. More than 80% of merged PRs were absent f
 - **`gdd.py close --repo R --goal G --pr N`** (new): writes the landing row — `stage=done`, the PR, the
   merged head. It is the row the operator stopped writing by hand, which is why a new session read every
   shipped goal as still in `fix`. `07-ledger.md` now says to write it in the same breath as the merge.
-- **`--wait` backfills the head**: the finished-stage row now carries the post-run `rev-parse HEAD`
-  instead of the pre-run SHA (`note` gains `head=<sha7>`), so the ledger stops lagging one stage behind.
+- **`--wait` backfills the head**: an authoring stage (`implement`/`apply`/`fix`) now records the
+  post-run `rev-parse HEAD` instead of the pre-run SHA (`note` gains `head=<sha7>`). Report-only stages
+  keep the head they were given: the checkout may have moved on, and the reviewed SHA is the fact.
+- **`gdd.py scope`** (new): prints the resolved `worktree-scope.py`, resolving `GDD_WORKTREE_SCOPE`
+  through the same config chain as every other key — the phase docs call it, so a value in
+  `$XDG_CONFIG_HOME/gdd/config.yaml` counts, not just an exported variable.
 - **Dispatch gate** (new, pure and unit-tested): `implement` is refused when no contract resolves (it
   printed `-` and dispatched anyway), when the contract is archived, when its header says
   `Provisional`/`superseded`/`completed`, or when the worktree is dirty; `simplify`/`apply`/`review`/

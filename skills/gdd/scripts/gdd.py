@@ -356,6 +356,23 @@ def dispatch_problems(stage, goal_file, dirty_paths, base, head, force=False):
     return problems
 
 
+AUTHORING_STAGES = ("implement", "apply", "fix")
+
+
+def final_head_for(stage, head_supplied, head, post_head):
+    """The SHA a finished-stage row should record.
+
+    An authoring stage changed the tree, so the post-run HEAD is the increment. A report-only
+    stage (review, simplify) reviewed the head it was given: when the operator supplied one, the
+    checkout may have moved on and the supplied SHA is the fact worth keeping.
+    """
+    if head_supplied:
+        return head
+    if stage in AUTHORING_STAGES:
+        return post_head
+    return head
+
+
 def ledger_append(repo, goal, stage, base, head, gates, next_stage=None, note=None, pr=None):
     cmd = [
         sys.executable,
@@ -625,6 +642,7 @@ def cmd_stage(args):
                 1,
             )
         post_head = git(repo, "rev-parse", "HEAD")
+        final_head = final_head_for(args.stage, bool(args.head), head, post_head)
         note = (
             f"exit={exit_code if exit_code is not None else '-'} "
             f"dur={duration if duration is not None else '-'} "
@@ -635,12 +653,28 @@ def cmd_stage(args):
             args.goal,
             args.stage,
             base,
-            post_head,
+            final_head,
             gates,
             note=note,
         )
         print(f"finished: state={effective_state(run_dir, state)} {note}")
         print_answer_head(run_dir)
+    return 0
+
+
+def cmd_scope(args):
+    """Print the resolved worktree-scope.py path (config file, not just env)."""
+    resolved = os.path.expanduser(
+        config(
+            "GDD_WORKTREE_SCOPE",
+            default="../delegated-work-acceptance/scripts/worktree-scope.py",
+        )
+    )
+    if not os.path.isabs(resolved):
+        resolved = os.path.normpath(os.path.join(os.path.dirname(SCRIPT_DIR), resolved))
+    if not os.path.isfile(resolved):
+        fail(f"GDD_WORKTREE_SCOPE does not resolve to a file: {resolved}", 2)
+    print(resolved)
     return 0
 
 
@@ -750,6 +784,11 @@ def build_parser():
     stage.add_argument("--wait", action="store_true", help="poll until the run ends")
     stage.add_argument("--force", action="store_true", help="ignore active-run guard")
     stage.set_defaults(func=cmd_stage)
+
+    scope = sub.add_parser(
+        "scope", help="print the resolved worktree-scope.py path (GDD_WORKTREE_SCOPE)"
+    )
+    scope.set_defaults(func=cmd_scope)
 
     close = sub.add_parser(
         "close", help="record the landing row for a goal (stage=done, pr, merged head)"
