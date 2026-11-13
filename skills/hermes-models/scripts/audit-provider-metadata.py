@@ -143,7 +143,7 @@ def default_catalog_url(hermes_home: str) -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    default_home = os.path.expanduser(os.environ.get("HERMES_ROOT", os.environ.get("HERMES_HOME", "~/.hermes")))
+    default_home = os.path.expanduser(os.environ.get("HERMES_HOME") or os.environ.get("HERMES_ROOT") or "~/.hermes")
     ap.add_argument("--hermes-home", default=default_home)
     ap.add_argument("--repo", default=os.path.join(default_home, "hermes-agent"))
     ap.add_argument(
