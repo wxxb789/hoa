@@ -122,6 +122,11 @@ def main():
         case("delegation fallback routes are recorded", before.get("fallback_providers"), ["a"])
         case("changing a child fallback route changes the inventory", before != after, True)
 
+        before = delegation(base_url="https://a.invalid")
+        after = delegation(base_url="https://b.invalid")
+        case("delegation endpoint is recorded", before.get("base_url"), "https://a.invalid")
+        case("moving the delegation endpoint changes the inventory", before != after, True)
+
         store = home / "profiles" / "p" / "cron"
         store.mkdir(parents=True)
         jobs = {

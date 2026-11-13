@@ -65,8 +65,8 @@ def describe(home: Path, name: str) -> dict:
         "model": model_block(cfg),
         # Child fallback routes decide where delegated work lands; a change there is a routing change.
         "delegation": {k: (cfg.get("delegation") or {}).get(k)
-                        for k in ("backend", "provider", "model", "fallback_providers",
-                                  "fallback_models")},
+                        for k in ("backend", "provider", "model", "base_url", "api_mode",
+                                  "fallback_providers", "fallback_models")},
         "fallback_providers": chain,
         "fallback_heterogeneous": bool(providers) and any(p != default_provider for p in providers),
         # Values, not just names: a switch that repoints an existing alias leaves the name list
