@@ -8,7 +8,7 @@ description: >-
   about an environment. Not for auditing the contents of a written report, and not for accepting a
   teammate's delivery — those are separate passes.
 metadata:
-  version: "0.1.54"
+  version: "0.1.55"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "turn a scheduled-job, repair or deployment claim into evidence: find the recording surface, separate manual from scheduled runs, audit the auditor"
