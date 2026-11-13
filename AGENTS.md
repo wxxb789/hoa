@@ -10,7 +10,7 @@ only when each environment-specific value can be supplied from outside it.
   var → config file → documented default.
 - **Skills may read the operator's configuration, and should.** That is the preferred mechanism, not a
   workaround. Look for `$XDG_CONFIG_HOME/<skill>/config.yaml`, falling back to
-  `~/.config/<skill>/config.yaml`, and let an env var override a single key (the goal-driven-delivery
+  `~/.config/<skill>/config.yaml`, and let an env var override a single key (the gdd
   scripts do exactly this with `GDD_STATE_FILE`, `GDD_TASK_ROOT`, `GDD_RUN_ROOT`, `GDD_LAUNCHER`,
   `GDD_TEMPLATES`, `GDD_GOAL_GLOB`). Document every key and its default inside the skill.
 - **Prefer the capability to the tool.** When a step needs a launcher, a review bot or a scheduler,

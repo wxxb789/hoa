@@ -1,5 +1,8 @@
 # Phase 4 — review, then fix
 
+> Mechanics: `gdd-accept` grades the run's diff and triages the findings into fix-now / defer /
+> record; the reviewer itself is the repo's review bot or `github-code-review`.
+
 1. Dispatch `review` (report only) only after the simplify fixes are applied, so the reviewer reads
    the tree that will ship. The stage range is `origin/main..HEAD`, so **commit the agent's stage
    output before dispatching the next stage**: `gdd.py` does not refuse a dirty worktree, and

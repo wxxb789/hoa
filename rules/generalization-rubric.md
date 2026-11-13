@@ -8,10 +8,21 @@ not on a schedule.
 
 ## Who may enter `skills/` (public catalog)
 
-Only **atomic mechanisms**: standard file/JSON I/O, pure computation, single external call with
-declared inputs and outputs. Multi-step orchestration, approval gates, and any workflow that
-encodes *our* operating model stay in the owning private repo. A skill that needs a paragraph of
-"how we usually do it" to be useful does not belong here.
+Any portable capability that fits one of the four composition layers and keeps an
+**operator-neutral contract**:
+
+- **`entry` / `mechanism`** — a bounded file, process or API protocol, or a judgment rubric, with
+  explicit inputs, outputs and anti-triggers. Standard I/O, pure computation, one external call with
+  declared inputs and outputs.
+- **`controller` / `stage`** — a multi-step loop or one phase of it, admitted only when every
+  repo-specific gate, path, launcher, review bot and approval boundary is externalized to
+  configuration or to an ignored project profile (`references/profiles/_template.md`), and the
+  artifact contract is declared in `metadata` so CI can check the graph.
+
+Workflows that hard-code *our* repositories, bot identities, channel topology or unconfigurable
+approval ceremonies stay in the owning private workspace. If a stranger cannot substitute their own
+repo, test command and agent CLI through flags, env or config, the skill does not belong here. A skill
+that needs a paragraph of "how we usually do it" to be useful belongs in that private workspace too.
 
 ## Six gates
 

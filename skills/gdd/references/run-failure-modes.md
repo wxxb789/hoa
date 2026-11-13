@@ -3,6 +3,9 @@
 Every rule below was learned from a real run that died or lied. Read this before adding a test to the
 selftest, before writing a stage's verification plan, and before trusting a run's own report of itself.
 
+> When the run is not wrong but dead, `gdd-recover` is the handover procedure: read the state, clear the
+> block, re-dispatch that stage — never restart from the top.
+
 ## 1. A test must never be able to kill the process under test
 
 A stage agent runs inside the same tmux server it is testing. One implement run executed

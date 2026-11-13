@@ -7,7 +7,7 @@ description: >-
   hand-off to a task-per-subagent executor. Not for setting outcomes and ambition (that is goal
   definition) and not for exploring whether the work should happen at all.
 metadata:
-  version: "0.1.48"
+  version: "0.1.49"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "implementation plans an agent with zero context can execute: bite-sized tasks, exact paths, complete code, commands with expected output"
@@ -40,7 +40,7 @@ hand-off are this port's.
 
 - Implementing multi-step features
 - Breaking down complex requirements
-- Delegating to subagents via `subagent-driven-development`
+- Delegating to subagents via `gdd-implement`
 
 **Start from the spec, not from scratch.** When `spec-convergence` produced a spec, the plan consumes
 it: implement its Scope, Acceptance and Testing seam; do not re-decide a settled boundary. If a task
@@ -304,10 +304,10 @@ git commit -m "type: description"
 
 After saving the plan, offer the execution approach:
 
-**"Plan complete and saved. Ready to execute using subagent-driven-development — a fresh subagent per
+**"Plan complete and saved. Ready to execute using gdd-implement — a fresh subagent per
 task with two-stage review (spec compliance then code quality). Shall I proceed?"**
 
-When executing, use the `subagent-driven-development` skill:
+When executing, use the `gdd-implement` skill:
 
 - Fresh subagent per task with full context
 - Spec compliance review after each task

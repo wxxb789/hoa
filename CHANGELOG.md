@@ -3,6 +3,38 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## 2026-11-13 — the `gdd` family: seven prefixed skills, eight more in the catalog
+
+- **Renamed**: `goal-driven-delivery` → **`gdd`** (controller), `subagent-driven-development` →
+  **`gdd-implement`** (stage). The prefix now marks the loop itself; dependencies that are general
+  capabilities keep their names (`delegated-work-acceptance`, `spec-convergence`, `writing-plans`,
+  `dotnet-repo-workflow`, `omp-headless-orchestration`, `tmux-agent-control`, `github-code-review`).
+  `GDD_*` keys, `scripts/gdd.py`, the ledger and the state directory are unchanged; only the config
+  file moves to `$XDG_CONFIG_HOME/gdd/config.yaml`.
+- **Ported** (eight, with `kind` corrected to the composition contract): `gdd-accept` (mechanism,
+  was `agent-run-acceptance`), `gdd-gates` (mechanism, `repo-gate-execution`), `gdd-measure` (stage,
+  `measurement-campaign-evidence`), `gdd-recover` (entry, `unattended-pipeline-recovery`),
+  `gdd-closeout` (entry, `project-phase-closeout`), and the three dependencies that were still
+  local-only: `structural-validity-gates`, `mechanism-propagation`, `package-release-verification`.
+- **Controller**: still 120 lines (the cap) after moving two sections into `references/` and dropping a
+  duplicated YAML sample; it gains a "family — what each name owns" map, and phases 2, 4 and 5 now name
+  the mechanics they call.
+- **One real overlap, bounded in writing**: `gdd-implement` executes a multi-task plan with a commit per
+  task and is never this loop's implement stage — `gdd` runs one goal in one run that must not commit.
+  Both files say so, because the two protocols break each other if confused.
+- **Contract graph**: `define-goal` produces `goal-contract` (consumed by `gdd` and `gdd-measure`);
+  `gdd-accept` produces `run-verdict` + `findings-triage`; `gdd-measure` produces `measurement-record`;
+  `package-release-verification` declares no artifacts, because no skill produces a merged increment.
+  `external:` gained nothing — the graph is closed by real producers instead.
+- **Rules**: `generalization-rubric.md` now admits `controller` and `stage` when every repo-specific
+  gate, launcher, review bot and approval boundary is configuration — the old "atomic mechanisms only"
+  line contradicted the four-layer contract CI already enforces.
+- **CI**: the loop's own tests run in CI now (`run-gdd-selftest.sh` 85/85, `test-omp-run-stale.sh`
+  7/7). They were local-only, so a broken launcher path or a stale `SKILL` constant could merge green.
+- **Evals**: four routing cases for the family; baseline re-recorded (27/29). Both failures are
+  pre-existing and unrelated (`route-to-skill-judgment`, `route-boundaryless-goal-to-spec-first`).
+- **README**: catalog counts removed from prose, per `rules/generated-means-generated.md`.
+
 ## 2026-11-11 — the reference launcher gets a second backend
 
 - **`skills/goal-driven-delivery/scripts/adapters/omp-run.sh`**: the launcher no longer hardcodes tmux.

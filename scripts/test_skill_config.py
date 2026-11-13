@@ -71,7 +71,7 @@ class SkillConfigTests(unittest.TestCase):
     def test_env_name_derivation(self):
         self.assertEqual(sc.env_name("demo-skill", "some_key"), "DEMO_SKILL_SOME_KEY")
         self.assertEqual(sc.env_name("demo-skill", "some-key"), "DEMO_SKILL_SOME_KEY")
-        self.assertEqual(sc.env_name("goal-driven-delivery", "GDD_STATE_FILE"),
+        self.assertEqual(sc.env_name("gdd", "GDD_STATE_FILE"),
                          "GDD_STATE_FILE")
 
     def test_xdg_then_home_then_root(self):
@@ -213,21 +213,21 @@ class SkillConfigTests(unittest.TestCase):
         self.assertIn(f"{path}:1:", err.getvalue())
 
     def test_gdd_state_file_from_config_and_flag(self):
-        path = write_config(self.tmp, "goal-driven-delivery",
+        path = write_config(self.tmp, "gdd",
                             "GDD_STATE_FILE: /srv/state/from-config.tsv\n")
         self.assertEqual(
-            sc.config_path("goal-driven-delivery", env=self.env(XDG_CONFIG_HOME=self.tmp)),
+            sc.config_path("gdd", env=self.env(XDG_CONFIG_HOME=self.tmp)),
             path)
         self.assertEqual(
-            sc.resolve("goal-driven-delivery", "GDD_STATE_FILE",
+            sc.resolve("gdd", "GDD_STATE_FILE",
                        env=self.env(XDG_CONFIG_HOME=self.tmp)),
             "/srv/state/from-config.tsv")
         self.assertEqual(
-            sc.resolve("goal-driven-delivery", "GDD_STATE_FILE", flag="/cli/ledger.tsv",
+            sc.resolve("gdd", "GDD_STATE_FILE", flag="/cli/ledger.tsv",
                        env=self.env(XDG_CONFIG_HOME=self.tmp)),
             "/cli/ledger.tsv")
         self.assertEqual(
-            sc.resolve("goal-driven-delivery", "GDD_STATE_FILE",
+            sc.resolve("gdd", "GDD_STATE_FILE",
                        env=self.env(XDG_CONFIG_HOME=self.tmp,
                                     GDD_STATE_FILE="/env/ledger.tsv")),
             "/env/ledger.tsv")

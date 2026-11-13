@@ -1,11 +1,11 @@
 {
-  "case_count": 25,
-  "model": "deepseek-v4.1-flash",
+  "case_count": 29,
+  "model": "gemini-4-carbon",
   "effort": "low",
-  "passed": 24,
-  "total": 25,
-  "judge_endpoint_host": "litellm-proxy-hk.graydune-4a6be1e2.eastasia.azurecontainerapps.io",
-  "generated_at": "2026-11-11T01:59:02Z",
+  "passed": 27,
+  "total": 29,
+  "judge_endpoint_host": "localhost:4141",
+  "generated_at": "2026-11-13T01:40:17Z",
   "per_case": [
     {
       "id": "route-to-teams-send",
@@ -89,8 +89,8 @@
     },
     {
       "id": "route-to-skill-judgment",
-      "pick": "hoa-skill-review",
-      "passed": true
+      "pick": "fresh-context-grader",
+      "passed": false
     },
     {
       "id": "route-to-skill-creation",
@@ -125,6 +125,26 @@
     {
       "id": "route-decided-change-to-writing-plans",
       "pick": "writing-plans",
+      "passed": true
+    },
+    {
+      "id": "route-contract-increment-to-gdd",
+      "pick": "gdd",
+      "passed": true
+    },
+    {
+      "id": "route-explicit-gdd",
+      "pick": "gdd",
+      "passed": true
+    },
+    {
+      "id": "route-stalled-unattended-run-to-gdd-recover",
+      "pick": "gdd-recover",
+      "passed": true
+    },
+    {
+      "id": "route-phase-end-to-gdd-closeout",
+      "pick": "gdd-closeout",
       "passed": true
     },
     {

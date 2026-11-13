@@ -1,5 +1,5 @@
 ---
-name: subagent-driven-development
+name: gdd-implement
 description: >-
   Execute an implementation plan by dispatching a fresh subagent per task and reviewing each result
   in two stages — spec compliance first, code quality second — then a final integration review.
@@ -7,7 +7,7 @@ description: >-
   hold between tasks. Not for discovering what to build, and not for one task you can finish in the
   current context.
 metadata:
-  version: "0.1.48"
+  version: "0.1.49"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "execute a plan with a fresh subagent per task and two-stage review: spec compliance first, code quality second"
@@ -28,6 +28,15 @@ fast iteration.
 
 Method adapted from the public `superpowers` subagent-driven-development flow (MIT); the role names
 and the transport-neutral dispatch contract are this port's.
+
+## Boundary — this is plan execution, not the loop's implement stage
+
+`gdd` runs one goal as **one** agent run: `gdd.py stage --stage implement` renders
+`references/stage-templates/implement.md`, forbids committing, and leaves the tree for verification.
+This skill is the other protocol: a **multi-task plan**, a fresh subagent per task, a commit per task,
+two reviews between tasks. Load it when `writing-plans` produced the plan and you are executing it
+directly; never inside a `gdd` stage run, where per-task commits break the sealed-scope and single-run
+budget assumptions of phases 1, 2 and 5.
 
 ## When to Use
 
@@ -254,8 +263,8 @@ git add <explicit paths> && git commit -m "<the plan's final message>"
 
 ## Task Granularity
 
-**Each task = 2–5 minutes of focused work** by default (`SDD_TASK_MINUTES_MIN`,
-`SDD_TASK_MINUTES_MAX`).
+**Each task = 2–5 minutes of focused work** by default (`GDD_IMPLEMENT_TASK_MINUTES_MIN`,
+`GDD_IMPLEMENT_TASK_MINUTES_MAX`).
 
 **Too big:**
 
@@ -333,7 +342,7 @@ git add <explicit paths> && git commit -m "<the plan's final message>"
 This skill EXECUTES plans created by the `writing-plans` skill:
 
 1. User requirements → writing-plans → implementation plan
-2. Implementation plan → subagent-driven-development → working code
+2. Implementation plan → gdd-implement → working code
 
 ### With test-first development
 
@@ -424,14 +433,16 @@ Catch issues early
 
 | Key | Env | Default |
 |---|---|---|
-| `dispatch_command` | `SDD_DISPATCH_CMD` | none — the harness's own fresh-subagent command or adapter |
-| `task_minutes_min` | `SDD_TASK_MINUTES_MIN` | `2` |
-| `task_minutes_max` | `SDD_TASK_MINUTES_MAX` | `5` |
-| `child_capabilities` | `SDD_CHILD_CAPABILITIES` | shell, file read/write (pass explicitly per dispatch) |
-| `review_order` | `SDD_REVIEW_ORDER` | `spec,quality` — fixed; change only with a documented reason |
-| `plan_path` | `SDD_PLAN_PATH` | none — supplied by the caller |
+| `dispatch_command` | `GDD_IMPLEMENT_DISPATCH_CMD` | none — the harness's own fresh-subagent command or adapter |
+| `task_minutes_min` | `GDD_IMPLEMENT_TASK_MINUTES_MIN` | `2` |
+| `task_minutes_max` | `GDD_IMPLEMENT_TASK_MINUTES_MAX` | `5` |
+| `child_capabilities` | `GDD_IMPLEMENT_CHILD_CAPABILITIES` | shell, file read/write (pass explicitly per dispatch) |
+| `review_order` | `GDD_IMPLEMENT_REVIEW_ORDER` | `spec,quality` — fixed; change only with a documented reason |
+| `plan_path` | `GDD_IMPLEMENT_PLAN_PATH` | none — supplied by the caller |
 
-Resolution order and the config-file path are defined once in
+Older installs read the same keys from `SDD_*`; a renamed install keeps them as aliases, and the
+`GDD_IMPLEMENT_*` spelling is the one to document. Resolution order and the config-file path are
+defined once in
 [skill-porting-and-publishing § Configuration](../skill-porting-and-publishing/SKILL.md#configuration-is-a-gate-not-advice);
 this skill does not restate them.
 

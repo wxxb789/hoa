@@ -5,7 +5,7 @@ description: >-
   idle, then hand it one complete instruction without corrupting the session. Use when taking over
   or monitoring an interactive agent turn. Not for one-shot generation — run that headless.
 metadata:
-  version: "0.1.48"
+  version: "0.1.49"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "drive a live TUI agent in tmux: find the pane, prove idle, send one complete instruction"
@@ -25,7 +25,7 @@ session.
   tmux"
 - you must monitor a long agent turn and report its real outcome
 - a multi-phase delivery (goal → simplify → review → PR → babysit → merge) runs through a driven
-  agent → follow `goal-driven-delivery` and use this skill for the mechanics
+  agent → follow `gdd` and use this skill for the mechanics
 - NOT for one-shot generation — that is headless `pi -p` / `omp -p ... @prompt.md > out.md`
   (see `omp-headless-orchestration`); never route a one-shot through tmux
 

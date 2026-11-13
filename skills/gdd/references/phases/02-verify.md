@@ -2,6 +2,9 @@
 
 The agent's report is a claim, never evidence:
 
+> Mechanics: `gdd-gates` runs the repo's gates so the counts hold; `gdd-accept` rules on one run's
+> diff; `gdd-measure` is the campaign when the contract's pass condition is a measured number.
+
 - Run the repo's gates yourself and read real exit codes.
 - **Exit 0 means the process ended, not that the phase finished.** Read the run's final assistant text
   (`answer.md`): a report ending with "the gate is running, waiting for its result" ended mid-gate.

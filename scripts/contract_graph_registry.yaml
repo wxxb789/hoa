@@ -14,3 +14,6 @@ terminal:
   chain-plan: the controller's routing plan is consumed by the operator, not a skill
   implementation: the merged code is the destination; no skill consumes the delivery
   scope-seal: worktree-scope.py verify checks the tree; no skill consumes the artifact
+  run-verdict: the operator's ruling on one agent run is the destination; no phase reads it as an artifact
+  findings-triage: the disposition list is read by the operator and the fix prompt, not by a skill
+  measurement-record: the campaign report is the evidence a merge verdict cites; no skill consumes it

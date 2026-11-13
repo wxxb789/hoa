@@ -4,10 +4,11 @@ description: >-
   Verify work a teammate or sub-agent reports as done — the artifact, the numbers, and the write
   boundary — before you accept it or pass it on. Use when a delegated batch, repair, report, corpus
   scan or handoff comes back "complete", when a sub-agent's summary must be turned into a ruling, or
-  when deciding what to authorize and what to send back. Do not use for grading your own work, or when
-  no artifact exists to inspect.
+  when deciding what to authorize and what to send back. Do not use for ruling on one GDD coding stage
+  run's diff or for triaging code-review bot findings (that is `gdd-accept`), for grading your own work,
+  or when no artifact exists to inspect.
 metadata:
-  version: "0.1.48"
+  version: "0.1.49"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
   summary: "verify a delegated \"done\" against the artifact, the re-derived numbers and the write boundary"

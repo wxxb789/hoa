@@ -37,6 +37,12 @@ jobs:
       - name: Shared script drift check
         run: python scripts/vendor_shared.py --check
 
+      - name: GDD loop selftest
+        run: bash skills/gdd/scripts/tests/run-gdd-selftest.sh
+
+      - name: GDD launcher forwarder tests
+        run: bash skills/gdd/scripts/tests/test-omp-run-stale.sh
+
       - name: Skill catalog drift check
         run: python scripts/generate_index.py --check
 
