@@ -77,8 +77,18 @@ def describe(home: Path, name: str) -> dict:
         "reasoning_overrides": (cfg.get("agent") or {}).get("reasoning_overrides"),
         "auxiliary": cfg.get("auxiliary"),
         "moa_presets": cfg.get("moa"),
-        "providers": {p: sorted(((b or {}).get("models") or {}).keys())
-                      for p, b in (cfg.get("providers") or {}).items()},
+        # Endpoints and transports are what a routing change moves; key names alone hide it.
+        "providers": {
+            p: {
+                "api": (b or {}).get("api"),
+                "transport": (b or {}).get("transport") or (b or {}).get("api_mode"),
+                "base_url": (b or {}).get("base_url"),
+                "models": {m: {"context_length": (mb or {}).get("context_length"),
+                               "max_tokens": (mb or {}).get("max_tokens")}
+                           for m, mb in sorted(((b or {}).get("models") or {}).items())},
+            }
+            for p, b in sorted((cfg.get("providers") or {}).items())
+        },
     }
 
 
@@ -94,8 +104,11 @@ def cron_rows(home: Path) -> list[dict]:
             continue
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
-            continue
+        except Exception as exc:
+            raise SystemExit(
+                f"audit-routing-inventory: cannot read cron store {path}: {exc} "
+                "(an unreadable store must not look like a fleet with no jobs)"
+            )
         jobs = data.get("jobs", data) if isinstance(data, dict) else data
         for j in jobs if isinstance(jobs, list) else []:
             rows.append({
@@ -113,7 +126,13 @@ def cron_rows(home: Path) -> list[dict]:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--home", default=str(Path.home() / ".hermes"))
+    ap.add_argument(
+        "--home",
+        default=os.environ.get("HERMES_HOME")
+        or os.environ.get("HERMES_ROOT")
+        or str(Path.home() / ".hermes"),
+        help="install root (default: $HERMES_HOME / $HERMES_ROOT, else ~/.hermes)",
+    )
     ap.add_argument("--out", default="")
     args = ap.parse_args()
     home = Path(os.path.expanduser(args.home))

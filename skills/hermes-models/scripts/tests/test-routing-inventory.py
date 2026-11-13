@@ -78,6 +78,36 @@ def main():
         after = module.describe(alias_home, "default")["model_aliases"]
         case("repointing an alias changes the inventory", before != after, True)
 
+    with tempfile.TemporaryDirectory() as tmp:
+        home = Path(tmp)
+        store = home / "profiles" / "broken" / "cron"
+        store.mkdir(parents=True)
+        (store / "jobs.json").write_text("{not json", encoding="utf-8")
+        try:
+            module.cron_rows(home)
+            raised = ""
+        except SystemExit as exc:
+            raised = str(exc)
+        case("a malformed cron store stops the audit", "broken" in raised, True)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        home = Path(tmp)
+        cfg = home / "config.yaml"
+        cfg.write_text(
+            "providers:\n  p:\n    api: chat\n    base_url: https://a.invalid\n"
+            "    models:\n      m:\n        context_length: 1000\n",
+            encoding="utf-8",
+        )
+        before = module.describe(home, "default")["providers"]
+        case("provider endpoint is recorded", before["p"]["base_url"], "https://a.invalid")
+        cfg.write_text(
+            "providers:\n  p:\n    api: chat\n    base_url: https://b.invalid\n"
+            "    models:\n      m:\n        context_length: 2000\n",
+            encoding="utf-8",
+        )
+        after = module.describe(home, "default")["providers"]
+        case("moving an endpoint changes the inventory", before != after, True)
+
     print(f"routing-inventory: {passed}/{total} ok")
     return 0 if passed == total else 1
 
