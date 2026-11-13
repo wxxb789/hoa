@@ -10,7 +10,12 @@ because the catalog churns.
 Probe shape (header `Authorization: Bearer $RELAY_KEY`)
 
 `$RELAY` is your configured provider's endpoint and `$RELAY_KEY` its credential: read both from the
-install (`providers.<key>.api` and its `api_key`) or export them yourself.
+install (`providers.<key>.api` and its `api_key`) or export them yourself. Normalize the base first —
+a provider entry may already end in the API prefix, and the paths below add it:
+
+```bash
+RELAY=${RELAY%/v1}          # providers.<key>.api often stores the prefix; these probes append it
+```
 
 ```bash
 # Responses protocol
