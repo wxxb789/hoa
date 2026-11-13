@@ -70,7 +70,9 @@ def describe(home: Path, name: str) -> dict:
 def cron_rows(home: Path) -> list[dict]:
     rows: list[dict] = []
     stores = [(home / "cron" / "jobs.json", "default")]
-    stores += [(Path(p), Path(p).parent.parent.parent.name)
+    # <home>/profiles/<name>/cron/jobs.json -> the store's own directory holds the profile name
+    # (`parent.parent.parent` is "profiles", which attributed every non-root job to one fake home).
+    stores += [(Path(p), Path(p).parent.parent.name)
                for p in glob.glob(str(home / "profiles" / "*" / "cron" / "jobs.json"))]
     for path, prof in stores:
         if not path.exists():

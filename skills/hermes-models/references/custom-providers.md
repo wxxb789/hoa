@@ -217,13 +217,21 @@ HERMES_HOME=~/.hermes/profiles/<p> hermes chat --provider <name> -m <model-id> -
 - `providers.<name>.*` dotted keys set cleanly and silently; the "not a recognized config key"
   warning is expected only for `model_aliases.<alias>.*` (the set still lands).
 
-## This install's hard policy (owner rules, not upstream defaults)
+## Account-specific policy is the operator's, not this file's
 
-- **Banned ids/providers**: the builtin `copilot` provider, `*-1m`, `*-internal`, `gpt-5-mini`, and the
-  whole pre-5.6 GPT tier (`gpt-5.3-codex`, `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.5`). They are retired on
-  this account; a config that still lists them silently advertises dead routes.
-- **Claude family is unavailable on this account** — no claude id answers on either proxy route. Do not
-  re-add a claude provider or alias "to try again"; if that changes, probe `/v1/models` first.
+Which ids an account can actually serve is per-account: one installation's retired tier is another's
+working route. This skill therefore ships the **method**, not a ban list — a config that lists a provider
+the account cannot serve silently advertises dead routes, and that is the defect worth catching.
+
+- **Derive the live set, do not inherit it.** Probe `/v1/models` on each configured route, then call each
+  candidate once. A 404, `does not support the responses endpoint`, or an auth failure means the route is
+  dead *for this account*; the fix is to remove or gate it, not to retry it under a new alias.
+- **Keep each install's own bans in that install's overlay** — `$HERMES_HOME/LOCAL_OVERRIDES.md` or the
+  home's own memory — and treat a stale entry there as the same defect in the other direction: a ban that
+  outlived the account change hides a route that now works. Re-probe before repeating a ban as fact.
+- **A retired id is a catalog question, not a routing one.** If a model must stay reachable for rollback,
+  leave the entry and remove only the live route (`model.default`, delegation pins) — that is what makes a
+  rollback a single key flip.
 - **`auxiliary.vision` must be pinned, never `auto`.** With `auto` the vision task resolves to the
   session model (expensive, and transport-mismatched on some routes). Pin `provider` + `model` in root
   **and** every profile to a route that profile actually defines (`local-chat` + a `gemini-*` model on

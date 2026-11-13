@@ -18,7 +18,7 @@ Enumerate, in one script, every place a default route is decided:
 | opencode | `~/.config/opencode/opencode.jsonc` → `model`, `agents.<name>.model`, `providers.<p>.models` |
 | pi | `~/.pi/agent/models.json` → `providers` (the CLI usually gets `--model` per call) |
 | dsh | `~/.dsh/cordis.patch.yml` + `profiles/*/` |
-| Wrapper scripts | `~/claw/tools/omp-*.sh` (`DEFAULT_MODEL`) and any launcher that hardcodes a route |
+| Wrapper scripts | the launcher wrapper scripts (`omp-*.sh` in the workspace's tools directory) (`DEFAULT_MODEL`) and any launcher that hardcodes a route |
 | Cron | `hermes cron list`; each profile home keeps its own `cron/jobs.json` |
 
 **omo's category routing is a third layer, and a base-profile swap does not touch it.** `categories.<lane>.model`
@@ -47,7 +47,7 @@ a one-key flip instead of a rebuild. Say this explicitly in the report so nobody
 
 ## 3. Generated homes: the route belongs to the generator
 
-Profile homes materialized from a repo (`*-nrs` from `nana-research/bots/bindings/hermes/<bot>.yaml`)
+Profile homes materialized from a repo (`*-nrs` from `the roster repo's per-bot binding files (`bots/bindings/hermes/<bot>.yaml`)`)
 write `model.provider|default|base_url|api_mode` from their binding on every apply. Editing the live
 profile config looks correct until the next `materialize.py --apply` silently reverts it.
 
@@ -155,7 +155,7 @@ ruamel but no PyYAML, and the failure surfaces only after the first `import yaml
 
 ## 7. Rollback and hygiene
 
-- One script, one backup root: `~/claw/backups/<cutover>/<ts>/` mirroring home-relative paths, printing
+- One script, one backup root: the workspace's backup directory for the cutover (`backups/<cutover>/<ts>/`) mirroring home-relative paths, printing
   the changed-file list so the report can cite it. Restore = copy back, then `git revert` the binding commit.
 - Do the edits in a single idempotent script that prints `changed N files` plus any `MISS <pattern>` lines;
   a text-anchored replacement that silently misses leaves a half-cutover with a clean exit code.

@@ -14,7 +14,7 @@ or asks to make a rule "global", or asks why a file did/didn't take effect.
 ### 0. Resolve filenames against reality FIRST (don't audit ghosts)
 - The owner may name a file that doesn't exist (e.g. "hermes.md"). Before auditing, confirm
   what actually exists: the real owner-editable layers are `~/.hermes/SOUL.md`,
-  `~/claw/AGENTS.md` (or wherever cwd points), `~/.hermes/memories/{MEMORY,USER}.md`.
+  `the workspace `AGENTS.md` (`$CLAW_HOME/AGENTS.md`)` (or wherever cwd points), `~/.hermes/memories/{MEMORY,USER}.md`.
 - A "hermes.md" the owner mentions is almost always the **injected system prompt** (framework-
   owned, not an editable file) OR a misremembered `.hermes.md`/`HERMES.md` (project slot).
   Clarify which before touching anything.
@@ -43,9 +43,9 @@ Three recurring decision points that are NOT yours to decide unilaterally:
 
 ### 4. Backup before editing (Yellow gate)
 ```bash
-BK=~/claw/tasks/$(date +%F)/contract-audit/backup; mkdir -p "$BK"
+BK=$CLAW_HOME/tasks/$(date +%F)/contract-audit/backup; mkdir -p "$BK"
 cp ~/.hermes/SOUL.md "$BK/SOUL.md.bak"
-cp ~/claw/AGENTS.md "$BK/AGENTS.md.bak"
+cp $CLAW_HOME/AGENTS.md "$BK/AGENTS.md.bak"
 cp ~/.hermes/memories/USER.md "$BK/USER.md.bak"
 cp ~/.hermes/memories/MEMORY.md "$BK/MEMORY.md.bak"
 sha256sum "$BK"/*.bak   # proof trail
@@ -78,7 +78,7 @@ sha256sum "$BK"/*.bak   # proof trail
 # confirm the removed/duplicated content is actually gone
 grep -n "OLD METAPHOR\|DUP TABLE FIRST LINE\|CONFLICTING ORDERED LIST LINE" ~/.hermes/SOUL.md \
   || echo "✓ removed"
-wc -l -c ~/.hermes/SOUL.md ~/claw/AGENTS.md   # sanity: not truncated/corrupted
+wc -l -c ~/.hermes/SOUL.md $CLAW_HOME/AGENTS.md   # sanity: not truncated/corrupted
 ```
 Report: per-file what changed, backup path, and one line of "what behavior should differ next
 session." Note that instruction-file edits only take effect in a NEW session (system prompt is

@@ -46,6 +46,9 @@ jobs:
       - name: GDD launcher setsid backend tests
         run: bash skills/gdd/scripts/tests/test-omp-run-setsid.sh
 
+      - name: Routing inventory fixture tests
+        run: python3 skills/hermes-models/scripts/tests/test-routing-inventory.py
+
       - name: Skill catalog drift check
         run: python scripts/generate_index.py --check
 
