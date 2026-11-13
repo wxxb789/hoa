@@ -6,7 +6,7 @@ description: >-
   latency number. Use when the pass condition is a size, duration, count or ratio rather than a passing
   test. Do not use for a plain gate run, or when the numbers are not the acceptance criterion.
 metadata:
-  version: "0.1.53"
+  version: "0.1.54"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "bind the candidate, measure serially, keep one report set, never let a comparator fake a latency"

@@ -3,6 +3,16 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## 2026-11-13 — four research skills join the catalog (A2 batch 1)
+
+`official-document-verification`, `research-stream-consolidation`, `review-revision-candidates` and
+`rss-feeds` were running from the host with hub-style frontmatter. Their bodies are now in the catalog
+under its schema, and the references that pointed at skills nobody can install
+(`research-control-record-repair`, `reddit-reading`, `blocked-page-recovery`) are rephrased.
+
+Two of the ten skills in the same handover, `to-prd` and `to-issues`, are the older names of
+`notes-to-prd` and `plan-to-issues` — not ports.
+
 ## 2026-11-13 — the round caps become mechanical, and a gate exit stops meaning "red"
 
 `SKILL.md` said `implement`/`simplify`/`review` run at most twice. Nothing enforced it: `stage`
