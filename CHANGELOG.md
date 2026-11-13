@@ -3,6 +3,20 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## 2026-11-13 — the merge gate stops accepting "no checks"
+
+- **`skills/gdd/scripts/pr-merge-check.py`**: `evaluate_checks()` returned `pass = pending == 0 and
+  failing == 0`, so a PR with **zero check runs** — a `CONFLICTING` PR, for which GitHub dispatches no
+  workflow at all — printed `MERGE-OK`. An empty list is now a block with reason `no checks`; accepting
+  that state takes an explicit `--allow-no-checks`, for a repo that genuinely has no CI.
+- **Same gate, two truncations**: `reviewThreads(first:100)` never followed `pageInfo`, so the 101st
+  unresolved thread was invisible; issue comments came from `gh pr view --json comments`, which truncates
+  on a large PR. Both are paginated now, and the bot marker's `commit_sha` goes through the file's own
+  `same_sha()` (>= 7 chars) instead of `startswith`, which accepted a 4-character prefix.
+- **Tests**: `--selftest` covers `evaluate_checks` (empty, pending, failing, all-green, allowed-by-flag)
+  and `same_sha` (exact, 7-char, short prefix, empty) — 19 -> 28 cases. `.github/workflows/ci.yml` now
+  runs `test-omp-run-setsid.sh`, the default launcher backend, which had no CI coverage at all.
+
 ## 2026-11-13 — `gdd` controller + phase playbooks, four standalone entries
 
 - **Monolithic `gdd` controller**: `goal-driven-delivery` → **`gdd`** (controller, ≤120 lines), with

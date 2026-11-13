@@ -3,7 +3,7 @@ name: jupyter-live-kernel
 description: >-
   Iterative Python via live Jupyter kernel (hamelnb).
 metadata:
-  version: "0.1.49"
+  version: "0.1.50"
   areas: "software-development"
   targets: "runtime-agnostic"
   summary: "iterate on Python inside a live Jupyter kernel instead of restarting scripts"
