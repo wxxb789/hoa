@@ -90,3 +90,25 @@
 - 每个 PR 必须 bump patch、加 CHANGELOG、过 `check_frontmatter` / `check_contract_graph` / `generate_index --check` / `version.py check`。
 - 不写死本机路径、bot/频道 id、个人数据（公开仓）。
 - `/usr/bin/python3`（mise shim 的 python3 无 PyYAML）。
+
+---
+
+## 5 追加扫描：超大文件与冗余（owner 2026-11-14 追加提问）
+
+**结论先说：本仓没有任何 SQL。** `git ls-files` 里 0 个 `.sql` / `.db` / `.sqlite`；工作树里唯一的
+"sqlite" 字样出现在 `skills/teams-cdp/scripts/node_modules/@types/node/sqlite.d.ts`（第三方类型定义，
+且 `node_modules/` 已在 `.gitignore`，未被跟踪）。所以"超大 SQL 冗余"这一项无对象。
+
+但同一类问题（体积大、重复、可重构）在别处真实存在，实测如下：
+
+| 类别 | 实测 | 说明 |
+|---|---|---|
+| 单文件超大（>600 行） | **9 个** | `run-gdd-selftest.sh` 1139、`omp-run.sh` 960、`gdd.py` 917、`pr-merge-check.py` 838、`test_version.py` 704、`grounded-citations/scripts/sources.py` 676、`m365-copilot-cdp/scripts/copilot.ts` 642、`delivery-state.py` 621、`teams-cdp/scripts/teams.ts` 591 |
+| SKILL.md 超大（>480 行） | 2 个 | `github-repo-management` 516、`github-code-review` 481 |
+| 参考区 | `ref/` = **38 个 git submodule**（8.3MB 检出，只跟踪指针） | 不是入库冗余，但**同主题重复**：`humanizer`/`Humanizer-zh`/`say-it-human`/`shuorenhua`（四个"去 AI 味"）、`yao-open-skills`/`yao-open-prompts`/`yao-meta-skill`（三个同作者） |
+| 并行目录文档 | 4 份 | `README.md` 458 + `README.zh-CN.md` + `index.md` + `index.zh-CN.md`（后两者自动生成；前两者手写，内容重叠） |
+| 工作树体积 | 166MB（`.git` 17MB，`node_modules` 未跟踪） | 体积主要由 submodule 检出贡献 |
+
+**因此重构优先级里新增两项**：
+- **A′（并入方案 A）**：把 9 个 >600 行文件按"一个职责一个文件"拆开——判据是机械的：单文件 >400 行且包含 ≥2 个顶层职责（函数组/子命令）即拆。
+- **A″（并入方案 A）**：`ref/` 参考区瘦身——同一主题保留一个上游，其余移出（submodule 删除是可逆的：`.gitmodules` 里有 URL）；4 份目录文档收敛为"生成 2 份 + 手写 1 份英文，中文 README 只留入口指针"。
