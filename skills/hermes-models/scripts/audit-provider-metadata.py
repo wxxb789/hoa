@@ -5,15 +5,17 @@ Compares every declared `providers.<name>.models.<id>` entry (root + served prof
 endpoint's own catalog, the runtime context-length resolver, and real `state.db` usage; flags the
 classes of misconfiguration that are otherwise silent.
 
-Run with an interpreter that has PyYAML and can import the Hermes repo, e.g. the
-toolchain python with PYTHONPATH pointing at the checkout.
+Run with an interpreter that has PyYAML and can import the Hermes repo, e.g.
+  VENV=$(ls -d ~/.hermes/installs/*/environments/*/venv/bin/python | head -1)
+  "$VENV" ~/.hermes/skills/devops/hermes-operations/scripts/audit-provider-metadata.py
 
-Optional: --catalog-url <proxy-base>/dashboard/api/models --repo "$HERMES_HOME/hermes-agent"
+Optional: --catalog-url http://localhost:4141/dashboard/api/models --repo ~/.hermes/hermes-agent
 Nothing is written; no credentials are printed.
 """
 from __future__ import annotations
 
 import argparse
+import glob
 import json
 import os
 import sqlite3
@@ -36,8 +38,6 @@ def load_configs(home: str) -> dict[str, dict]:
 
 
 def fetch_catalog(url: str) -> dict:
-    if not url:
-        return {}
     try:
         with urllib.request.urlopen(url, timeout=20) as r:
             return json.loads(r.read().decode("utf-8", "replace"))
@@ -81,9 +81,10 @@ def usage_rows(home: str) -> list[dict]:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--hermes-home", default=os.path.expanduser("~/.hermes"))
-    ap.add_argument("--repo", default=os.path.expanduser("~/.hermes/hermes-agent"))
-    ap.add_argument("--catalog-url", default="", help="endpoint catalog URL; omit to compare config only")
+    default_home = os.path.expanduser(os.environ.get("HERMES_ROOT", os.environ.get("HERMES_HOME", "~/.hermes")))
+    ap.add_argument("--hermes-home", default=default_home)
+    ap.add_argument("--repo", default=os.path.join(default_home, "hermes-agent"))
+    ap.add_argument("--catalog-url", default="http://localhost:4141/dashboard/api/models")
     ap.add_argument("--threshold", type=float, default=0.75, help="compression.threshold")
     args = ap.parse_args()
 
@@ -144,7 +145,7 @@ def main() -> int:
         if unadvertised:
             print(f"\ndeclared but NOT in catalog (verify they still answer): {', '.join(unadvertised)}")
     if served_unused:
-        print(f"used but undeclared (context falls back to the default window): {', '.join(sorted(set(served_unused)))}")
+        print(f"used but undeclared (context falls back, usually 272k): {', '.join(sorted(set(served_unused)))}")
     return 0
 
 

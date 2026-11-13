@@ -3,6 +3,24 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## 2026-11-13 — three live host skills flow back into the catalog
+
+`hermes-models`, `hermes-updates` and `hermes-context-file-loading` had been running from real
+directories in the host for weeks while the catalog kept the earlier port. The host copies are the ones
+edited daily (Chinese trigger tables, the routing-audit rules, several new failure cases), so the
+catalog was quietly behind: `install_host_skills.py --check` reported all three as drifted and refused
+to re-link them.
+
+- Bodies now come from the host; the frontmatter schema stays hoa's (the checker owns it).
+- `hermes-models` gains `references/fleet-cutover.md` and `scripts/audit-routing-inventory.py`; every
+  changed reference (`config-drift*.md`, `custom-providers.md`, `delegation-routing.md`,
+  `model-endpoint-matrix.md`, `model-switching.md`, `provider-metadata-audit.md`, `cases.md`,
+  `install-layout.md`, `upgrade-*.md`, `maintenance-window-recovery.md`,
+  `update-execution-and-runtime-state.md`, `auditing-instruction-files-workflow.md`) and its scripts
+  and template come across too.
+- Scanned for host-private literals before landing: no home paths, handles, ids or keys in any of the
+  three.
+
 ## 2026-11-13 — the ledger gets its landing row, and the protocol loses two phantom commands
 
 Field audit of four consumer repos (`anc`, `funnysharp`, `passquest`, `symmetry`) against
