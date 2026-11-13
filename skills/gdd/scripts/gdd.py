@@ -514,6 +514,10 @@ def cmd_stage(args):
         head = args.head
     else:
         head = git(repo, "rev-parse", "HEAD")
+    # Resolve supplied endpoints to commit SHAs: `--base <sha> --head HEAD` names one commit
+    # twice, and a string compare would call that a non-empty range.
+    base = git(repo, "rev-parse", base)
+    head = git(repo, "rev-parse", head)
 
     dirty = [
         line[3:]
