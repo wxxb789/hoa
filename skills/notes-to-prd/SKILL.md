@@ -4,7 +4,7 @@ description: >-
   Convert notes/ideas into structured PRD markdown. Produces a PRD draft under `docs/prd/` and
   optional issue breakdown.
 metadata:
-  version: "0.1.55"
+  version: "0.1.56"
   areas: "work-management"
   targets: "runtime-agnostic"
   summary: "turn notes or an idea into a structured PRD draft"
@@ -12,7 +12,7 @@ metadata:
   kind: "entry"
 ---
 
-# to-prd
+# notes-to-prd
 
 Use this skill to turn bullet notes or chat into a PRD skeleton. Outputs a markdown file and an optional issues CSV or GH issue payloads.
 

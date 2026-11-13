@@ -3,6 +3,15 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## 2026-11-13 — retired names stop being headings
+
+`notes-to-prd`, `plan-to-issues` and `arch-improvement-plan` kept their pre-rename titles as the H1
+(`# to-prd`, `# to-issues`, `# improve-codebase-architecture`), so a reader following the old name landed
+on a document that still called itself that. The headings now match the skill names, which is what makes
+a rename finished rather than merely staged.
+
+The three host copies the same names came from are retired on the host side (backup kept).
+
 ## 2026-11-13 — batch 2 closes the port list: design-md, find-nearby, whisper
 
 The rest of the A2 handover. `design-md` (Google's DESIGN.md token spec, with its starter template),

@@ -3,7 +3,7 @@ name: github-repo-management
 description: >-
   Clone/create/fork repos; manage remotes, releases.
 metadata:
-  version: "0.1.55"
+  version: "0.1.56"
   areas: "software-development"
   targets: "runtime-agnostic"
   summary: "clone, create and fork repositories; manage remotes and releases"

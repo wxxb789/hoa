@@ -4,7 +4,7 @@ description: >-
   Guided workflow for incremental architecture improvements: identify boundaries, propose migration
   plans, and produce PRD + tasks.
 metadata:
-  version: "0.1.55"
+  version: "0.1.56"
   areas: "software-development"
   targets: "runtime-agnostic"
   summary: "incremental architecture improvement: find boundaries, plan the migration, emit PRD plus tasks"
@@ -12,6 +12,6 @@ metadata:
   kind: "entry"
 ---
 
-# improve-codebase-architecture
+# arch-improvement-plan
 
 Input: codebase path or repo + pain points. Output: prioritized migration plan, impact analysis, and task-level breakdown ready for to-issues.
