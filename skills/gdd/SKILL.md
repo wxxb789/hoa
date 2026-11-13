@@ -102,7 +102,7 @@ matching the current stage directly — do not create per-phase skills.
 | `GDD_STATE_FILE` | ledger path | `${XDG_STATE_HOME:-$HOME/.local/state}/gdd/ledger.tsv` |
 | `GDD_TASK_ROOT` | task/state root | `${XDG_STATE_HOME:-$HOME/.local/state}/gdd/tasks` |
 | `GDD_RUN_ROOT` | launcher run root | `${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs` |
-| `GDD_LAUNCHER` | launcher command | the bundled `scripts/adapters/omp-run.sh` |
+| `GDD_LAUNCHER` | launcher command | the bundled `scripts/adapters/omp-run.py` (cross-platform; the POSIX `adapters/omp-run.sh` remains for the attachable `tmux` backend) |
 | `GDD_TEMPLATES` | stage-template root | the bundled `references/stage-templates` |
 | `GDD_GOAL_GLOB` | goal-contract glob | `docs/goals/*<goal>*.md` |
 | round caps | `implement` / `simplify` / `review` run at most **2x** — enforced by `gdd.py stage`, override with `--over-budget` | `scripts/gdd.py` |
@@ -113,3 +113,8 @@ Resolution order and the config-file path are defined once in
 `gdd.py` implements it through the vendored `scripts/skill_config.py`; the config-file keys are the
 six names in the table. Nothing about one install lives in the protocol: a profile may point at its own
 files, but no path is inlined.
+
+The launcher runs on Windows, Linux, macOS and inside a WSL2 distro; `references/transport.md` carries
+the platform matrix with the evidence for each row, the adapter's own keys (`OMP_BIN`, `OMP_RUN_ROOT`,
+`OMP_LEDGER`, `OMP_RUN_EVENTS_MAX_BYTES`, `OMP_RUN_START_GRACE_SECONDS`) and the two platform rules
+worth remembering: one hidden console on Windows, and never a Windows launcher from inside a distro.

@@ -58,5 +58,7 @@ failure. Launcher contract, artifacts, recovery and liveness: [`references/trans
 - `references/profiles/_template.md` — per-repo profile template.
 - `scripts/` — `gdd.py` (dispatch), `delivery-state.py` (ledger/resume), `pr-merge-check.py`
   (merge gate), `watch-pr-checks.sh` (bounded CI poller with infra-only rerun),
-  `adapters/omp-run.sh` (reference tmux launcher), `adapters/events-writer.py` (bounded NDJSON
-  writer the launcher copies into each run), `tests/run-gdd-selftest.sh`.
+  `adapters/omp-run.py` (bundled cross-platform launcher), `adapters/omp-run.sh` (POSIX reference
+  launcher, the one with the attachable `tmux` backend), `adapters/events-writer.py` (bounded NDJSON
+  writer shared by both adapters), `tests/run-gdd-selftest.sh`,
+  `tests/test_omp_run_python.py` (the launcher suite that runs on any platform).
