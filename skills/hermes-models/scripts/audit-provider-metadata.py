@@ -79,14 +79,52 @@ def usage_rows(home: str) -> list[dict]:
     return [{"model": r[0], "provider": r[1], "task": r[2], "calls": r[3] or 0, "last": r[4]} for r in rows]
 
 
+def default_catalog_url(hermes_home: str) -> str:
+    """The catalog URL this install actually uses: env, then the default provider's base_url.
+
+    A hard-coded localhost proxy compared another install's models against this one's catalog and
+    reported drift for every id it could not see.
+    """
+    env = os.environ.get("HERMES_CATALOG_URL")
+    if env:
+        return env
+    for name in ("config.yaml",):
+        path = os.path.join(hermes_home, name)
+        try:
+            import yaml
+        except ImportError:
+            break
+        try:
+            cfg = yaml.safe_load(open(path, encoding="utf-8")) or {}
+        except OSError:
+            continue
+        provider = (cfg.get("model") or {}).get("provider") or ""
+        bare = str(provider).removeprefix("custom:")
+        entry = ((cfg.get("providers") or {}).get(bare) or {})
+        base = entry.get("base_url") or entry.get("api_base") or entry.get("api")
+        if base:
+            return str(base).rstrip("/") + "/models"
+    raise SystemExit(
+        "audit-provider-metadata: no catalog URL — set HERMES_CATALOG_URL or pass --catalog-url"
+    )
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     default_home = os.path.expanduser(os.environ.get("HERMES_ROOT", os.environ.get("HERMES_HOME", "~/.hermes")))
     ap.add_argument("--hermes-home", default=default_home)
     ap.add_argument("--repo", default=os.path.join(default_home, "hermes-agent"))
-    ap.add_argument("--catalog-url", default="http://localhost:4141/dashboard/api/models")
+    ap.add_argument(
+        "--catalog-url",
+        default=None,
+        help="model catalog endpoint (default: $HERMES_CATALOG_URL, else <default provider>/models)",
+    )
     ap.add_argument("--threshold", type=float, default=0.75, help="compression.threshold")
     args = ap.parse_args()
+
+    if not args.catalog_url:
+        args.catalog_url = default_catalog_url(args.hermes_home)
+    print(f"catalog: {args.catalog_url}")
 
     cfg = load_configs(args.hermes_home)
     cat = catalog_index(fetch_catalog(args.catalog_url))
