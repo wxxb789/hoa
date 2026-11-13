@@ -41,6 +41,8 @@ export GDD_STATE_FILE="$TMP/ledger.tsv"
 export XDG_CONFIG_HOME="$TMP/config-home"
 mkdir -p "$XDG_CONFIG_HOME"
 unset GDD_GOAL_GLOB
+# These fixtures dispatch synthetic goals on purpose; the guards have their own case below.
+export GDD_DISPATCH_GUARDS=off
 
 # --- fixtures ---------------------------------------------------------------
 
@@ -213,11 +215,11 @@ grep -qx 'run: workrepo-0001-simplify' "$LAUNCH_OUT"
 check $? "launch prints the run name"
 
 grep -qx "run_dir: $RUN_ROOT/$TODAY/workrepo-0001-simplify" "$LAUNCH_OUT" \
-  && grep -qx 'finished: state=done exit=0 dur=1' "$LAUNCH_OUT"
+  && grep -Eqx 'finished: state=done exit=0 dur=1 head=[0-9a-f]{7}' "$LAUNCH_OUT"
 check $? "launch prints run_dir and --wait observes the fake done state" "$(cat "$LAUNCH_OUT")"
 
 LEDGER_ROWS="$(awk -F'\t' '$3=="0001" && $4=="simplify"' "$TMP/launch.tsv" | wc -l)"
-[ "$LEDGER_ROWS" -eq 2 ] && grep -q 'exit=0 dur=1' "$TMP/launch.tsv"
+[ "$LEDGER_ROWS" -eq 2 ] && grep -Eq 'exit=0 dur=1 head=[0-9a-f]{7}' "$TMP/launch.tsv"
 check $? "ledger has the stage row plus the --wait result row (got $LEDGER_ROWS)"
 
 LAUNCH_PROMPT="$(ls "$TASK_ROOT/$TODAY/workrepo-0001/prompts/"simplify-*.md 2>/dev/null | head -n1)"
@@ -1118,6 +1120,10 @@ NOLOCK_SHOW="$TMP/nolock-show.out"
   --state-file "$TMP/s3.tsv" --task-root "$TASK_ROOT" --run-root "$RUN_ROOT" >"$NOLOCK_SHOW" 2>&1
 grep -qx 'last_run: workrepo-0001-simplify-nolock stale lock exit=- dur=-' "$NOLOCK_SHOW"
 check $? "a run with a recorded pid but no lock file reports stale lock" "$(cat "$NOLOCK_SHOW")"
+
+# --- dispatch guards ---------------------------------------------------------
+GUARD_OUT="$(python3 "$HERE/test-dispatch-guards.py" 2>&1)"
+check $? "dispatch guards refuse empty contract / archive / provisional / dirty tree / empty range" "$GUARD_OUT"
 
 echo "selftest: $PASS/$TOTAL ok"
 [ "$PASS" -eq "$TOTAL" ]

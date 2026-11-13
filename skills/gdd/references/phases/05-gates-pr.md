@@ -1,12 +1,13 @@
 # Phase 5 — gates, commit, PR
 
 1. Re-run gates on the exact tree you ship.
-2. **Before committing, define the working increment.** `worktree-scope.py diff --repo <path>
-   --label <goal>`, then `seal`. If `overlapping_paths` is non-empty, stop and ask the operator which
+2. **Before committing, define the working increment.** `${GDD_WORKTREE_SCOPE:-../delegated-work-acceptance/scripts/worktree-scope.py}` diff
+   --repo <path> --label <goal>, then `seal`. (Phase 4 already committed the stage output to give the
+   reviewer a range; this step seals the increment that ships, so run it against the whole branch.) If `overlapping_paths` is non-empty, stop and ask the operator which
    writer owns each path — do not commit across it.
 3. Commit with explicit paths; push; open the PR.
-4. **After committing, verify the sealed scope.** `worktree-scope.py verify --repo <path> --label
-   <goal>`. Drift ⇒ stop, name the paths, and require either a re-review or an explicit operator
+4. **After committing, verify the sealed scope.** `${GDD_WORKTREE_SCOPE:-../delegated-work-acceptance/scripts/worktree-scope.py}` verify --repo <path>
+   --label <goal>. Drift ⇒ stop, name the paths, and require either a re-review or an explicit operator
    acceptance recorded in the PR body. Do not move this check into `pr-merge-check.py`: that gate
    declares `Environment: none` and only judges the remote PR.
 5. **Check every number on the final tree:** every count, duration or table value in the PR body and
@@ -18,7 +19,9 @@
    `test "$(git merge-base HEAD origin/main)" = "$(git rev-parse origin/main)"`; when it fails, a sibling
    PR merged mid-increment and you must rebase onto `origin/main` first, or the review range is not
    exactly one increment. Pushing a branch does not freeze its version claim: if a sibling PR merges,
-   re-run `python scripts/version.py check-merge` before asking for a merge.
+   re-run the profile's merge-time version gate (in `hoa`: `python scripts/version.py check-merge`)
+   before asking for a merge. A repo whose profile declares no such gate skips it — never invent one
+   and never skip one silently.
 7. The PR body is a contract artifact — shape in [`references/pr-body.md`](../pr-body.md):
    what landed by subsystem, decisions with explicit non-adoptions naming the goal that owns them, one
    evidence table measured on the **final** tree, every "Done when" clause mapped to the command that

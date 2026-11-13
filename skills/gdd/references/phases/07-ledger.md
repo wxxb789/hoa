@@ -7,7 +7,12 @@ scripts/delivery-state.py append --repo <path> --goal <id> --stage <stage> \
   [--base SHA] [--head SHA] [--pr N] [--gates "test rc=0"] [--rounds-review N] \
   [--findings "real=3 rej=1"] [--next <stage>] [--note "…"]
 scripts/delivery-state.py show --repo <path> --goal <id>     # resume here
+scripts/gdd.py close --repo <path> --goal <id> --pr <N>       # landing row: stage=done + PR + head
 ```
+
+The `close` row is not optional bookkeeping: without it the ledger's newest row for a shipped goal stays
+`fix`, and the next session reads a merged increment as unfinished. Write it in the same breath as the
+merge, not from memory later.
 
 `show` prints the latest row, the stage history, live git/PR facts (including whether the branch is
 **behind** `origin/main`, which the ahead-count alone cannot show), and rewrites
