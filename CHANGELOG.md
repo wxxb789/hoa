@@ -50,6 +50,13 @@ The launcher was `skills/gdd/scripts/adapters/omp-run.sh`: bash, `setsid` (or `t
 - Also: `os.replace` of `state.json` now retries on Windows (`WinError 5` when any process holds the
   file open — a plain `status` poll was enough to kill a starting run), the selftest exercises the
   bundled adapter's contract and its default in `gdd.py`, and CI runs the new suite.
+- **`skills/gdd/scripts/watch-pr-checks.py`** (new, the loop's other bash-only tool): the CI poller
+  ported with the same semantics — bounded polls, the under-60 s infra rerun, a `MERGEABLE CLEAN`
+  requirement before it reports green, exit 0/1/2/3, every poll in `ci-watch-<head7>.log`. Its
+  intervals are configuration now (`WATCH_POLL_SECONDS`, `WATCH_FAST_FAIL_SECONDS`,
+  `WATCH_RERUN_WAIT_SECONDS`, `GH_BIN`) instead of literals, which is also what lets
+  `scripts/tests/test_watch_pr_checks.py` drive the whole state machine against a scripted `gh` in
+  seconds. `watch-pr-checks.sh` stays as the POSIX twin.
 
 ## 2026-11-13 — retired names stop being headings
 

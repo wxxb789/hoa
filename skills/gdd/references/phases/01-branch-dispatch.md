@@ -57,8 +57,10 @@ failure. Launcher contract, artifacts, recovery and liveness: [`references/trans
 - `references/evidence-fairness.md` — making a "cheaper/faster" claim survive review.
 - `references/profiles/_template.md` — per-repo profile template.
 - `scripts/` — `gdd.py` (dispatch), `delivery-state.py` (ledger/resume), `pr-merge-check.py`
-  (merge gate), `watch-pr-checks.sh` (bounded CI poller with infra-only rerun),
+  (merge gate), `watch-pr-checks.py` (bounded CI poller with infra-only rerun; the `.sh` twin has the
+  same semantics),
   `adapters/omp-run.py` (bundled cross-platform launcher), `adapters/omp-run.sh` (POSIX reference
   launcher, the one with the attachable `tmux` backend), `adapters/events-writer.py` (bounded NDJSON
   writer shared by both adapters), `tests/run-gdd-selftest.sh`,
-  `tests/test_omp_run_python.py` (the launcher suite that runs on any platform).
+  `tests/test_omp_run_python.py` (the launcher suite that runs on any platform),
+  `tests/test_watch_pr_checks.py` (the CI watcher's state machine, against a scripted `gh`).

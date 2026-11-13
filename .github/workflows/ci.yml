@@ -49,6 +49,9 @@ jobs:
       - name: GDD launcher Python adapter tests
         run: python3 skills/gdd/scripts/tests/test_omp_run_python.py
 
+      - name: GDD CI watcher tests
+        run: python3 skills/gdd/scripts/tests/test_watch_pr_checks.py
+
       - name: Routing inventory fixture tests
         run: python3 skills/hermes-models/scripts/tests/test-routing-inventory.py
 
