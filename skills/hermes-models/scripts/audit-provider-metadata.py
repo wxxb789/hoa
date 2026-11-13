@@ -206,8 +206,10 @@ def main() -> int:
                     flags.append(f"{args.threshold:g}x ctx > prompt cap {ref['prompt']}")
                 if model not in used_ids:
                     flags.append("never used in any session")
-                if model not in cat and cat:
+                if catalog_applies and model not in cat and cat:
                     flags.append("not in catalog (servable? probe it)")
+                elif not catalog_applies and cat:
+                    flags.append("catalog not consulted for this provider's endpoint")
                 print(f"   {pname:<18}{model:<24} decl={str(decl):<9} resolves={str(resolved):<9} "
                       f"cat_ctx={str(ref.get('ctx')):<9} out={str(ref.get('out')):<8} prompt={str(ref.get('prompt')):<9}"
                       f"effort={ref.get('effort')} {'; '.join(flags)}")
