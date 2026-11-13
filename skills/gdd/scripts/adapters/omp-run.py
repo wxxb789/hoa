@@ -185,9 +185,9 @@ ADAPTER = os.path.abspath(__file__)
 EVENTS_WRITER = os.path.join(HERE, "events-writer.py")
 IS_WINDOWS = os.name == "nt"
 # Exit codes that mean "the process was stopped", not "it failed": 130 SIGINT,
-# 143 SIGTERM, 137 SIGKILL by shell convention, -2 the raw SIGINT of a CLI that
-# reports the signal instead of 128+n.
-KILLED_EXITS = (130, -2, 137, 143)
+# 137 SIGKILL, 143 SIGTERM by shell convention, and their raw POSIX signal return
+# codes. Classify both forms without changing the exit code recorded for the run.
+KILLED_EXITS = (130, -2, 137, -9, 143, -15)
 KILL_EXIT = 143
 # Creation-flag values as documented by Microsoft, repeated here because
 # subprocess only exposes them on Windows and the rule must be assertable

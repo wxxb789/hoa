@@ -44,6 +44,7 @@ STUB_SOURCE = '''\
 """Stub agent CLI: an OMP-style --mode=json NDJSON stream, driven by env vars."""
 import json
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -61,6 +62,8 @@ def main():
             json.dump(sys.argv[1:], handle)
     mode = os.environ.get("STUB_MODE", "settle")
     emit({"type": "session", "id": os.environ.get("STUB_SESSION") or "stub-session-1"})
+    if mode == "signal":
+        os.kill(os.getpid(), getattr(signal, os.environ["STUB_SIGNAL"]))
     if mode == "sleep":
         emit({"type": "message_end", "message": {"role": "assistant", "content": [{"type": "text", "text": "half a report"}], "usage": {"cost": {"total": 0.25}}}})
         while True:
@@ -415,6 +418,26 @@ class LauncherTests(unittest.TestCase):
                     (self.run_dir(slug) / "finalized").read_text(encoding="utf-8"), str(code)
                 )
 
+    @unittest.skipIf(IS_WINDOWS, "raw negative signal return codes are POSIX-only")
+    def test_04_posix_sigterm_records_killed_with_raw_exit(self):
+        slug = "sigterm-04"
+        state = self.settle(slug, STUB_MODE="signal", STUB_SIGNAL="SIGTERM")
+        self.assertEqual((state["state"], state["exit"]), ("killed", -15), state)
+        run_dir = self.run_dir(slug)
+        self.assertEqual((run_dir / "finalized").read_text(encoding="utf-8"), "-15")
+        self.assertEqual((run_dir / "exit.code").read_text(encoding="utf-8").strip(), "-15")
+        self.assertFalse((run_dir / "stop").exists())
+
+    @unittest.skipIf(IS_WINDOWS, "raw negative signal return codes are POSIX-only")
+    def test_04_posix_sigkill_records_killed_with_raw_exit(self):
+        slug = "sigkill-04"
+        state = self.settle(slug, STUB_MODE="signal", STUB_SIGNAL="SIGKILL")
+        self.assertEqual((state["state"], state["exit"]), ("killed", -9), state)
+        run_dir = self.run_dir(slug)
+        self.assertEqual((run_dir / "finalized").read_text(encoding="utf-8"), "-9")
+        self.assertEqual((run_dir / "exit.code").read_text(encoding="utf-8").strip(), "-9")
+        self.assertFalse((run_dir / "stop").exists())
+
     def test_05_stale_recovery_finalizes_once(self):
         slug = "stale-05"
         self.start(slug, env=self.env_for(STUB_MODE="sleep"))
@@ -457,8 +480,9 @@ class LauncherTests(unittest.TestCase):
         self.assertEqual(killed.returncode, 0, killed.stderr)
         self.assertIn(f"killed: {slug}", killed.stdout)
         state = self.wait_for_state(slug, {"killed"}, timeout=30.0)
-        self.assertEqual(state["exit"], adapter.KILL_EXIT)
+        self.assertEqual(state["exit"], 143)
         self.assertEqual((run_dir / "finalized").read_text(encoding="utf-8"), "143")
+        self.assertEqual((run_dir / "exit.code").read_text(encoding="utf-8").strip(), "143")
         self.assertTrue((run_dir / "stop").exists())
         deadline = time.monotonic() + 20.0
         while time.monotonic() < deadline and any(adapter.pid_alive(pid) for pid in pids):
@@ -1544,7 +1568,7 @@ class AdapterUnitTests(unittest.TestCase):
             self.assertEqual(adapter.interop_warning(r"C:\tools\omp.exe"), "")
 
     def test_killed_exit_codes_are_the_documented_set(self):
-        self.assertEqual(adapter.KILLED_EXITS, (130, -2, 137, 143))
+        self.assertEqual(adapter.KILLED_EXITS, (130, -2, 137, -9, 143, -15))
         self.assertEqual(adapter.KILL_EXIT, 143)
 
     def test_state_age_tolerates_a_missing_or_broken_started_stamp(self):
