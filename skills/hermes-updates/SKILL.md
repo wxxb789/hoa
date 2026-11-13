@@ -51,9 +51,12 @@ sessions, or backups.
   (`FATAL: working tree is dirty`).
 - **Order:** stop gateway → `venv/bin/hermes update --yes --no-backup --branch main` → restore shallow
   window (`git fetch --depth=10 --prune --no-tags origin main`) → re-apply local tail → start gateway →
-  post-check. A manual update runs **neither** local-tail step `hermes-auto-update.py` performs: run
-  `python3 ~/.hermes/scripts/hermes-toolchain-shim.py` and `python3 ~/.hermes/scripts/config-snapshot.py`
-  by hand or `post-update-check.py` reports `cron worker python env: BROKEN` / `config snapshot: stale`.
+  post-check. A manual update runs **none** of the local-tail steps an unattended updater performs, so
+  whatever maintenance hooks the install ships — a toolchain-shim repair, a config snapshot, a
+  post-update check under its own `scripts/` — must be run by hand. Resolve them from the install
+  (`ls $HERMES_HOME/scripts`), and when it ships none, say the tail was unchecked instead of implying it
+  passed: an unchecked tail is exactly what makes a later `cron worker python env: BROKEN` or a stale
+  config snapshot look like a mystery.
 - **One self-update path only**: the `systemd --user` timer. Never schedule `hermes update` from a Hermes
   cron job, and prefer an external shell over a gateway-served chat (its process can be drained).
 - **Give the gateway start its own tool call.** A compound command tailed by the start is refused in full;
@@ -96,7 +99,7 @@ sessions, or backups.
 ```bash
 hermes --version; git -C ~/.hermes/hermes-agent status --short
 hermes doctor; hermes config check
-python3 ~/.hermes/scripts/post-update-check.py      # "all good"
+python3 $HERMES_HOME/scripts/post-update-check.py  # when the install ships one; else the tail is unchecked
 hermes cron list --all                              # no job gained an `error`
 ```
 

@@ -43,9 +43,12 @@ Three recurring decision points that are NOT yours to decide unilaterally:
 
 ### 4. Backup before editing (Yellow gate)
 ```bash
-BK=$CLAW_HOME/tasks/$(date +%F)/contract-audit/backup; mkdir -p "$BK"
+set -euo pipefail
+CLAW_HOME="${CLAW_HOME:-$HOME/claw}"        # set this to the workspace that holds AGENTS.md
+[ -f "$CLAW_HOME/AGENTS.md" ] || { echo "no instruction file at $CLAW_HOME/AGENTS.md" >&2; exit 1; }
+BK="$CLAW_HOME/tasks/$(date +%F)/contract-audit/backup"; mkdir -p "$BK"
 cp ~/.hermes/SOUL.md "$BK/SOUL.md.bak"
-cp $CLAW_HOME/AGENTS.md "$BK/AGENTS.md.bak"
+cp "$CLAW_HOME/AGENTS.md" "$BK/AGENTS.md.bak"
 cp ~/.hermes/memories/USER.md "$BK/USER.md.bak"
 cp ~/.hermes/memories/MEMORY.md "$BK/MEMORY.md.bak"
 sha256sum "$BK"/*.bak   # proof trail
@@ -78,7 +81,7 @@ sha256sum "$BK"/*.bak   # proof trail
 # confirm the removed/duplicated content is actually gone
 grep -n "OLD METAPHOR\|DUP TABLE FIRST LINE\|CONFLICTING ORDERED LIST LINE" ~/.hermes/SOUL.md \
   || echo "✓ removed"
-wc -l -c ~/.hermes/SOUL.md $CLAW_HOME/AGENTS.md   # sanity: not truncated/corrupted
+wc -l -c ~/.hermes/SOUL.md "$CLAW_HOME/AGENTS.md"   # sanity: not truncated/corrupted
 ```
 Report: per-file what changed, backup path, and one line of "what behavior should differ next
 session." Note that instruction-file edits only take effect in a NEW session (system prompt is

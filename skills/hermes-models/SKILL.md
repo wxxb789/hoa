@@ -203,20 +203,21 @@ read your own `providers:` block and substitute.
 
 ## Proof
 
-**Both lines' main entry = root `model` (Zoe) + `nana-nrs` (NRS 前门); "RS/NRS 系列" means the five
-`*-nrs` homes.** A "switch the default model" request therefore spans root, all five bindings, and all
-five profile configs — one preset apply, not a per-profile edit. Bindings and `bots/matrix.yaml`'s `tiers:`
-block are prose-level truth: materialize only validates tier *names*, so a tier left naming the old model
-makes the repo lie about the fleet after a cutover.
+**The scope is the operator's fleet, not a fixed roster.** A "switch the default model" request spans the
+root `model` entry plus every home and binding that pins a model: enumerate `$HERMES_HOME/profiles/*/config.yaml`
+(`hermes config` paths), the harness settings that carry ids, and the roster repo's per-bot bindings **before**
+deciding the scope, then state what you enumerated. A home you could not enumerate is not covered — say so
+rather than assuming it is. Bindings and a roster `tiers:` block are prose-level truth: the materializer only
+validates tier *names*, so a tier left naming the old model makes that repo lie about the fleet after a cutover.
 
 ```bash
 hermes chat -q 'Reply with exactly: PROBE_OK'                    # 1. live answer
 hermes -p <profile> chat -q 'Reply with exactly: PROBE_OK' \
   -t clarify -Q --ignore-rules --max-turns 1                     # 1b. same, inside one home
 python3 - <<'PY'                                                 # 2. the session row
-import sqlite3,os
-for home in [os.path.expanduser('~/.hermes')] + [
-        os.path.expanduser('~/.hermes/profiles/'+p) for p in ('nana-nrs','analyst-nrs')]:
+import sqlite3, glob, os
+for home in [os.path.expanduser('~/.hermes')] + sorted(glob.glob(
+        os.path.expanduser('~/.hermes/profiles/*'))):
     c=sqlite3.connect(f"file:{home}/state.db?mode=ro",uri=True)
     print(home, c.execute("select model from sessions order by started_at desc limit 2").fetchall())
 PY
@@ -243,7 +244,8 @@ Vision: one real `vision_analyze` call per profile.
 ## References
 
 - `references/custom-providers.md` — provider YAML shape, transport table, per-model sizing, relay header
-  quirks, **this install's hard policy** (banned ids, no Claude, vision pinning).
+  quirks, and **the install's own policy overlay** (banned ids, unavailable families, vision pinning) —
+  the method for each is above; the list itself belongs to the install, not to this skill.
 - `references/model-switching.md` — switching order, three-signal proof, ghc-proxy deployment, Copilot
   fallback hygiene.
 - `references/fleet-cutover.md` — multi-home, multi-harness provider cutover (quota outage, retirement,

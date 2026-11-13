@@ -18,7 +18,7 @@ With ghc-proxy in place, direct Copilot source patches to Hermes (enterprise tok
 
 ### Copilot supported-model fallback hygiene
 
-When Copilot deprecates model slugs, remove them from both active runtime config and static fallback catalogs. In particular, do not keep `*-1m`, `*-internal`, or `gpt-5-mini` as fallback/cheap models for this setup — and as of 2026-10-14 the whole gpt-below-5.6 tier (`gpt-5.3-codex`, `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.5`) was retired from this install's config too. Prefer the current supported ghc-proxy split and verify it against `/v1/models`; the kept OpenAI Responses set is `gpt-5.6-luna`, `gpt-5.6-sol`, `gpt-6-luna` (default) and `grok-4.6`.
+When a provider deprecates model slugs, remove them from both the active runtime config and the static fallback catalogs — a retired id left as a cheap/fallback entry does not fail loudly, it advertises a route that answers 404 only when it is finally used. Which ids are retired is per-account and per-date: keep that list in the install's own policy overlay, re-probe `/v1/models` before repeating it as fact, and verify the surviving set against the endpoint rather than against a note.
 
 Checklist:
 1. Back up before editing `~/.hermes/config.yaml`, `~/.hermes/context_length_cache.yaml`, or Hermes source fallback files.
