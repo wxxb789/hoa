@@ -92,6 +92,20 @@ def usage_rows(home: str) -> list[dict]:
     return [{"model": r[0], "provider": r[1], "task": r[2], "calls": r[3] or 0, "last": r[4]} for r in rows]
 
 
+def default_catalog_provider(hermes_home: str) -> str:
+    """The provider the default catalog URL belongs to (empty when nothing resolves)."""
+    try:
+        import yaml
+    except ImportError:
+        return ""
+    path = os.path.join(hermes_home, "config.yaml")
+    try:
+        cfg = yaml.safe_load(open(path, encoding="utf-8")) or {}
+    except OSError:
+        return ""
+    return str((cfg.get("model") or {}).get("provider") or "").removeprefix("custom:")
+
+
 def default_catalog_url(hermes_home: str) -> str:
     """The catalog URL this install actually uses: env, then the default provider's base_url.
 
@@ -133,10 +147,13 @@ def main() -> int:
     ap.add_argument("--threshold", type=float, default=0.75, help="compression.threshold")
     args = ap.parse_args()
 
+    catalog_owner = ""
     if not args.catalog_url:
+        catalog_owner = default_catalog_provider(args.hermes_home) or ""
         args.catalog_url = default_catalog_url(args.hermes_home)
     if args.catalog_url:
-        print(f"catalog: {args.catalog_url}")
+        scope = f" (applies to provider {catalog_owner!r} only)" if catalog_owner else ""
+        print(f"catalog: {args.catalog_url}{scope}")
     else:
         print("catalog: none configured — comparing configuration only")
         args.catalog_url = ""
@@ -154,6 +171,9 @@ def main() -> int:
         except Exception as exc:  # noqa: BLE001
             print(f"!! resolver import failed ({type(exc).__name__}) — skipping 'declared resolves?' column")
 
+    if catalog_owner:
+        print(f"note: catalog compared for provider {catalog_owner!r} only; other providers listed without a catalog")
+
     used_ids = {str(u["model"]).split("/")[-1] for u in use}
     declared_all: set[str] = set()
 
@@ -164,13 +184,16 @@ def main() -> int:
             if not isinstance(pc, dict):
                 continue
             api = (pc.get("api") or "").rstrip("/")
+            # A catalog fetched from one endpoint cannot judge another provider's ids: comparing
+            # them reports "absent upstream" for a service that was never queried.
+            catalog_applies = (not catalog_owner) or (pname == catalog_owner)
             for mid in (pc.get("models") or {}):
                 raw = str(mid)
                 model = raw.replace("\\", "")
                 declared_all.add(model)
                 mcfg = pc["models"][mid] or {}
                 decl = mcfg.get("context_length") if isinstance(mcfg, dict) else None
-                ref = cat.get(model, {})
+                ref = cat.get(model, {}) if catalog_applies else {}
                 resolved = helper(model, api, config=c) if helper and api else None
                 flags = []
                 if raw != model:

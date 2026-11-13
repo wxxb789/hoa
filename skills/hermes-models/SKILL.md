@@ -227,7 +227,8 @@ from hermes_constants import resolve_reasoning_config
 from hermes_cli.config import load_config
 print(resolve_reasoning_config(load_config(), "<model>"))
 PY
-python3 ~/.hermes/scripts/snapshot-install-facts.py --check       # sheet matches live
+# if the install ships a fact-snapshot hook (look under $HERMES_HOME/scripts), run it here;
+# with none, record this check as unavailable rather than implying the sheet matches
 ```
 
 Read the session rows as a **before/after pair**: the newest row must show the new id *and* the row under it
