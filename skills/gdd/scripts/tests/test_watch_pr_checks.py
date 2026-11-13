@@ -239,6 +239,9 @@ class WatchTests(unittest.TestCase):
         done = self.watch(env={"GH_BIN": str(self.tmp / "no-such-gh")})
         self.assertEqual(done.returncode, 3)
         self.assertIn("gh not found", done.stderr)
+        done = self.watch(max_reruns="later")
+        self.assertEqual(done.returncode, 3, done.stdout + done.stderr)
+        self.assertIn("must be integers", done.stderr)
 
     def test_an_unreadable_duration_is_logged_and_treated_as_infra_sized(self):
         failing = "build\tfail\t-\thttps://github.com/o/r/actions/runs/7/job/9\n"

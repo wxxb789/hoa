@@ -104,8 +104,16 @@ def main(argv=None) -> int:
         )
         return 3
     pull_request = argv[0]
-    max_reruns = int(argv[1]) if len(argv) > 1 else 2
-    max_polls = int(argv[2]) if len(argv) > 2 else 40
+    try:
+        max_reruns = int(argv[1]) if len(argv) > 1 else 2
+        max_polls = int(argv[2]) if len(argv) > 2 else 40
+    except ValueError:
+        print(
+            "watch-pr-checks: max_reruns and max_polls must be integers; "
+            f"got {argv[1:3]!r}",
+            file=sys.stderr,
+        )
+        return 3
     poll_seconds = env_seconds("WATCH_POLL_SECONDS", 30)
     fast_fail_seconds = env_seconds("WATCH_FAST_FAIL_SECONDS", 60)
     rerun_wait = env_seconds("WATCH_RERUN_WAIT_SECONDS", 20)
