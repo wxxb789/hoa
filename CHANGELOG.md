@@ -35,9 +35,11 @@ The launcher was `skills/gdd/scripts/adapters/omp-run.sh`: bash, `setsid` (or `t
   answer extraction, the exit-code mapping, stale recovery (once), `kill` through the stop file, the
   event bound with a non-zero `events_dropped_bytes`, argument passthrough, the detachment evidence
   above, the Windows `os.replace` retry, and the `tmux` backend on an isolated socket. 34 tests by the
-  end; the `tmux` one skips where tmux is absent. The extra ones pin what an adversarial review found: a
-  second `start` over a live claim, a finalizer that died before its marker, a forced stop recorded as
-  `failed`, a tool that outlives the agent, and the event bound held under a live reader.
+  end; the `tmux` one skips where tmux is absent. One drives `gdd.py stage --wait` through the bundled
+  default launcher into a temp repo, so the dispatch path itself — not just the adapter — is pinned; the
+  rest pin what an adversarial review found: a second `start` over a live claim, a finalizer that died
+  before its marker, a forced stop recorded as `failed`, a tool that outlives the agent, and the event
+  bound held under a live reader.
 - **`skills/gdd/references/transport.md`**: a platform matrix with the evidence for every row, the
   adapter's own keys (`OMP_BIN`, `OMP_RUN_ROOT`, `OMP_LEDGER`, `OMP_RUN_EVENTS_MAX_BYTES`,
   `OMP_RUN_START_GRACE_SECONDS`, `OMP_RUN_DRAIN_TIMEOUT_SECONDS`, `OMP_RUN_STOP_WAIT_SECONDS`) and the
