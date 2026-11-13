@@ -715,6 +715,88 @@ class LauncherTests(unittest.TestCase):
             self.assertEqual(commands["py"], [path])
             self.assertEqual(commands["bin"], ["/opt/tools/gdd-launcher.exe"])
 
+    def test_19_gdd_dispatches_through_the_bundled_launcher(self):
+        """The dispatcher's own path: gdd.py -> the bundled adapter -> state, ledger, answer.
+
+        The bash selftest covers this shape with a fake launcher on PATH. This runs
+        the real default — `adapters/omp-run.py`, named by `DEFAULT_LAUNCHER`, spawned
+        the way `launcher_command` decides — against the stub agent, which is what a
+        Windows operator actually dispatches.
+        """
+        repo = self.tmp / "dispatch-repo"
+        goals = repo / "docs" / "goals"
+        goals.mkdir(parents=True)
+        (goals / "0002-dispatch-smoke.md").write_text(
+            "# 0002 — dispatch smoke\n\nState: Ready\n\nDone when: the smoke runs.\n",
+            encoding="utf-8",
+        )
+        git = ["git", "-C", str(repo)]
+        identity = ["-c", "user.email=t@example.invalid", "-c", "user.name=t", "-c", "commit.gpgsign=false"]
+
+        def run_git(*args):
+            done = subprocess.run([*git, *args], capture_output=True, text=True)
+            self.assertEqual(done.returncode, 0, done.stderr)
+            return done
+
+        run_git("init", "-q")
+        run_git("add", "-A")
+        run_git(*identity, "commit", "-q", "-m", "base")
+        run_git("update-ref", "refs/remotes/origin/main", "HEAD")
+        (repo / "second.txt").write_text("a second commit, so base..head is a range\n", encoding="utf-8")
+        run_git("add", "-A")
+        run_git(*identity, "commit", "-q", "-m", "head")
+
+        env = self.env_for(
+            GDD_STATE_FILE=self.tmp / "dispatch-ledger.tsv",
+            GDD_TASK_ROOT=self.tmp / "dispatch-tasks",
+            STUB_TEXT="BUNDLED LAUNCHER SMOKE: implement stage done.",
+        )
+        done = subprocess.run(
+            [
+                sys.executable,
+                "-B",
+                str(SCRIPTS / "gdd.py"),
+                "stage",
+                "--repo",
+                str(repo),
+                "--goal",
+                "0002",
+                "--stage",
+                "implement",
+                "--wait",
+            ],
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=180,
+        )
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("state=done", done.stdout)
+        self.assertIn("BUNDLED LAUNCHER SMOKE", done.stdout)
+        run_dir = Path(
+            [
+                line.split(":", 1)[1].strip()
+                for line in done.stdout.splitlines()
+                if line.startswith("run_dir:")
+            ][0]
+        )
+        state = json.loads((run_dir / "state.json").read_text(encoding="utf-8"))
+        self.assertEqual(state["state"], "done")
+        self.assertEqual(state["exit"], 0)
+        # The launcher the dispatcher actually ran is the bundled adapter.
+        self.assertEqual(Path(state["launcher"]).name, ADAPTER.name)
+        self.assertEqual(
+            (run_dir / "answer.md").read_text(encoding="utf-8").strip(),
+            "BUNDLED LAUNCHER SMOKE: implement stage done.",
+        )
+        ledger = (self.tmp / "dispatch-ledger.tsv").read_text(encoding="utf-8").splitlines()
+        self.assertTrue(any("\timplement\t" in row for row in ledger[1:]), ledger)
+        self.assertTrue(
+            any(row.split("\t")[10] == "-" and "exit=0" in row for row in ledger[2:]),
+            f"no completion row in {ledger}",
+        )
+        self.assertTrue(state["detach"]["mode"] in {"hidden-console", "new-session"}, state["detach"])
+
     def test_17_events_writer_is_the_shared_implementation(self):
         """The adapter uses adapters/events-writer.py, not a second copy of the bound."""
         source = ADAPTER.read_text(encoding="utf-8")
