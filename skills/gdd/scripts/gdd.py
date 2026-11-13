@@ -746,6 +746,7 @@ def cmd_stage(args):
             final_head,
             gates,
             note=note,
+            rounds=rounds_seen + 1 if args.stage in ("simplify", "review") else None,
         )
         print(f"finished: state={effective_state(run_dir, state)} {note}")
         print_answer_head(run_dir)
