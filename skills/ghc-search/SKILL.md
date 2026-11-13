@@ -2,7 +2,7 @@
 name: ghc-search
 description: Open-ended web search and X/Twitter search through a local ghc-proxy (OpenAI-compatible Responses API). Use when you need to find something on the web and do not already have a URL, or when you need posts from X/Twitter. Fetch pages directly when you already have the URL; prefer a documentation MCP (e.g. context7) for library/API docs.
 metadata:
-  version: "0.1.56"
+  version: "0.1.57"
   areas: "software-development"
   targets: "runtime-agnostic"
   summary: "web and X/Twitter search via a local ghc-proxy Responses API; answer plus deduped sources"
@@ -58,7 +58,7 @@ environment variables (a different proxy host, or different default models):
 |---|---|---|
 | `GHC_SEARCH_ENDPOINT` | proxy endpoint | `http://127.0.0.1:4141/v1/responses` |
 | `GHC_SEARCH_MODEL_GPT` | gpt-engine default model | `gpt-5.6-luna` |
-| `GHC_SEARCH_MODEL_X` | x-engine default model | `grok-4.5` |
+| `GHC_SEARCH_MODEL_X` | x-engine default model | `grok-4.7` |
 
 `--model` and `--endpoint` flags win over env vars.
 

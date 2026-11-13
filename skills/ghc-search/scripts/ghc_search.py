@@ -27,7 +27,7 @@ def default_endpoint() -> str:
 # different corpora, and picking one for the caller guesses at intent.
 def engine_model(engine: str) -> str:
     env_key = "GHC_SEARCH_MODEL_GPT" if engine == "gpt" else "GHC_SEARCH_MODEL_X"
-    return os.environ.get(env_key, {"gpt": "gpt-5.6-luna", "x": "grok-4.5"}[engine])
+    return os.environ.get(env_key, {"gpt": "gpt-5.6-luna", "x": "grok-4.7"}[engine])
 
 
 ENGINE_EFFORT = {"gpt": "high", "x": "medium"}
