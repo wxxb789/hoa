@@ -944,6 +944,14 @@ class LauncherTests(unittest.TestCase):
         self.start(slug, env=env)
         run_dir = self.run_dir(slug)
         live = self.wait_for_state(slug, {"running"}, timeout=START_TIMEOUT)
+        # A recorded pid precedes the stub's only write. Let the product consume
+        # its session event before killing the pipe reader, or BrokenPipe kills it too.
+        deadline = time.monotonic() + START_TIMEOUT
+        while (adapter.read_sidecar(str(run_dir), "session.id") != "stub-session-1"
+               and time.monotonic() < deadline):
+            time.sleep(adapter.POLL_SECONDS)
+        self.assertEqual(adapter.read_sidecar(str(run_dir), "session.id"), "stub-session-1",
+                         "quiet agent never published session readiness before the forced stop")
         runner = live["pid"]
         # Kill the runner alone: the agent it started stays alive, so the run is live
         # with nobody left to finalize it — the case the forced path exists for.
@@ -1353,9 +1361,126 @@ class LauncherTests(unittest.TestCase):
         for name, content in artifacts.items():
             self.assertEqual((run_dir / name).read_bytes(), content, name)
 
+    def test_32_completed_slug_starts_cannot_archive_a_live_run(self):
+        """Pause after occupancy, then dispatch a rival before the first rename."""
+        slug = "start-race-32"
+        run_dir = self.run_dir(slug)
+        run_dir.mkdir(parents=True)
+        adapter.write_json(str(run_dir / "state.json"), {"name": slug, "state": "done"})
+        (run_dir / "finalized").write_text("0\n", encoding="utf-8")
+        (run_dir / "answer.md").write_text("previous answer\n", encoding="utf-8")
+        args = adapter.build_parser().parse_args(
+            ["start", "--name", slug, "--prompt", str(self.prompt),
+             "--cwd", str(self.tmp)]
+        )
+        real_move = adapter.move_aside
+        rival = []
+        launches = []
+        interleaved = False
+        runner_pid = 987654321
+        stdout, stderr = io.StringIO(), io.StringIO()
+
+        def move_after_rival(path):
+            nonlocal interleaved
+            if not interleaved:
+                interleaved = True
+                try:
+                    rival.append(adapter.cmd_start(args))
+                except SystemExit as exc:
+                    rival.append(exc.code)
+            return real_move(path)
+
+        def runner_owns_run(command, cwd, log_path):
+            launches.append(command)
+            adapter.update_lock(str(run_dir), pid=runner_pid, agent_pid=runner_pid)
+            state = adapter.read_state_file(str(run_dir))
+            state.update(pid=runner_pid, agent_pid=runner_pid)
+            adapter.write_json(str(run_dir / "state.json"), state)
+            adapter.remove_quietly(str(run_dir / "start.lock"))
+
+        with (
+            mock.patch.dict(os.environ, self.env, clear=True),
+            mock.patch.object(adapter, "move_aside", side_effect=move_after_rival),
+            mock.patch.object(adapter, "spawn_runner", side_effect=runner_owns_run),
+            mock.patch.object(adapter, "wait_for_start", side_effect=adapter.read_state_file),
+            mock.patch.object(adapter, "pid_alive", side_effect=lambda pid: pid == runner_pid),
+            contextlib.redirect_stdout(stdout),
+            contextlib.redirect_stderr(stderr),
+        ):
+            self.assertEqual(adapter.cmd_start(args), 0)
+            self.assertTrue(adapter.run_alive(str(run_dir)))
+        self.assertEqual(rival, [1], stderr.getvalue())
+        self.assertIn("another start", stderr.getvalue())
+        self.assertEqual(len(launches), 1)
+        self.assertEqual(stdout.getvalue().count(f"started: {slug}"), 1)
+        self.assertEqual(self.state_of(slug)["state"], "running")
+        self.assertFalse((run_dir / "finalized").exists())
+        previous = list(run_dir.parent.glob(f"{slug}.prev-*"))
+        self.assertEqual(len(previous), 1, previous)
+        self.assertTrue((previous[0] / "finalized").exists())
+        self.assertEqual(adapter.read_state_file(str(previous[0]))["state"], "done")
+        self.assertEqual((previous[0] / "answer.md").read_text(encoding="utf-8"),
+                         "previous answer\n")
+
+    def test_33_a_killed_starter_releases_the_slug_claim(self):
+        """The claim file survives, but a killed holder cannot wedge a later start."""
+        slug = "killed-starter-33"
+        run_dir = self.run_dir(slug)
+        code = """
+import sys, types
+module = types.ModuleType("gdd_omp_run_claim_holder")
+module.__file__ = sys.argv[1]
+with open(module.__file__, "rb") as source:
+    exec(compile(source.read(), module.__file__, "exec"), module.__dict__)
+with module.slug_start_claim(sys.argv[2]) as claimed:
+    print("claimed" if claimed else "refused", flush=True)
+    sys.stdin.buffer.read(1)
+"""
+        with subprocess.Popen(
+            [sys.executable, "-c", code, str(ADAPTER), str(run_dir)],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True, env=self.env,
+        ) as holder:
+            try:
+                # The pipe is the barrier: do not race the child acquiring its lock.
+                self.assertEqual(holder.stdout.readline(), "claimed\n")
+                refused = self.start(slug, assert_started=False)
+                self.assertEqual(refused.returncode, 1, refused.stdout + refused.stderr)
+                self.assertIn("another start", refused.stderr)
+                self.assertFalse(run_dir.exists())
+            finally:
+                holder.kill()
+                holder.communicate(timeout=START_TIMEOUT)
+        self.assertTrue(Path(f"{run_dir}.start.lock").exists())
+        state = self.settle(slug)
+        self.assertEqual(state["state"], "done")
+        self.assertEqual(list(run_dir.parent.glob(f"{slug}.prev-*")), [])
+
 
 class AdapterUnitTests(unittest.TestCase):
     """Pure helpers: the rules that do not need a process to prove."""
+
+    def test_slug_claim_fails_closed_when_the_file_cannot_be_opened(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch("builtins.open", side_effect=PermissionError("claim denied")):
+                with adapter.slug_start_claim(str(Path(tmp) / "unavailable")) as claimed:
+                    self.assertFalse(claimed)
+
+    def test_slug_claim_ownership_not_file_age_controls_takeover(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = str(Path(tmp) / "claim-age")
+            path = Path(f"{run_dir}.start.lock")
+            with adapter.slug_start_claim(run_dir) as claimed:
+                self.assertTrue(claimed)
+                # An active initialization cannot be stolen even after the grace.
+                old = time.time() - adapter.start_grace_seconds() - 1
+                os.utime(path, (old, old))
+                with adapter.slug_start_claim(run_dir) as second:
+                    self.assertFalse(second)
+            # Conversely, a fresh file with no holder is immediately reusable.
+            path.touch()
+            with adapter.slug_start_claim(run_dir) as claimed:
+                self.assertTrue(claimed)
 
     def test_sanitize_matches_the_reference_slug_rule(self):
         self.assertEqual(adapter.sanitize("Repo-0041-Implement"), "repo-0041-implement")

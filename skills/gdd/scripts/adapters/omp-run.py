@@ -130,11 +130,15 @@ directory is preserved as `<SLUG>.prev-<time>`, then the recorded runner command
 starts in a new directory at the original path, with the same prompt, cwd, agent,
 flags and ledger. The old finalized artifacts are never overwritten by the replay.
 
-Two claims keep two `start`s, or two readers, from colliding in one run directory:
-`start.lock` is created exclusively before the run's artifacts and released by the
-runner once it owns the run (so a second `start` refuses instead of moving a
-starting run aside), and `finalize.lock` is created exclusively around finalization
-(so two readers seeing the same dead run produce one final state and one ledger row).
+The persistent sibling file `<SLUG>.start.lock` is OS-locked before checking or
+moving the run directory, through initialization and `wait_for_start`. It stays
+outside both `<SLUG>` and its `.prev-*` archives; file existence does not mean it
+is held. Contention or an unavailable lock refuses the start. Closing the handle
+(including on process death) releases ownership immediately, so no stale-file
+takeover or grace delay is needed for this claim.
+Inside the run, `start.lock` still guards the pidless window and is released by
+the runner once it owns the run, and `finalize.lock` is created exclusively around
+finalization (so two readers produce one final state and one ledger row).
 A `finalized` marker is the authority, never the locks: a finalizer that died between
 publishing state.json and writing the marker is repaired from the recorded exit code,
 and that repair is recorded as `finalize_repaired`.
@@ -170,6 +174,7 @@ import subprocess
 import sys
 import threading
 import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
 
 if os.name == "nt":  # Windows-only: console inspection and open-process checks
@@ -673,6 +678,37 @@ def claim_start(run_dir) -> bool:
         except OSError:
             return True  # a claim this process cannot take must not block starting
     return False
+
+
+@contextmanager
+def slug_start_claim(run_dir):
+    """Hold a non-blocking OS lock on a stable sibling, never a renamed artifact.
+
+    Keep the file: unlinking a locked inode lets another start lock a new inode
+    at the same path. The kernel releases this claim when its handle closes,
+    even if the starter dies; unlike `start.lock`, its age is not ownership.
+    """
+    handle = None
+    try:
+        os.makedirs(os.path.dirname(run_dir) or ".", exist_ok=True)
+        handle = open(f"{run_dir}.start.lock", "a+b")
+        if IS_WINDOWS:
+            import msvcrt
+
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        close_quietly(handle)
+        yield False
+        return
+    try:
+        yield True
+    finally:
+        handle.close()
 
 
 def observe_detachment() -> dict:
@@ -1498,6 +1534,19 @@ def start_run(args, run_dir, binary, ledger, backend, replace=False) -> int:
     if backend == "tmux" and not tmux_available():
         die("start: tmux not found (use --backend setsid)")
 
+    with slug_start_claim(run_dir) as claimed:
+        if not claimed:
+            die(
+                f"start: another start is claiming run '{slug}' or the claim is unavailable "
+                f"(see {run_dir}.start.lock)"
+            )
+        return _start_run_claimed(
+            args, run_dir, agent, ledger, backend, replace, slug, cwd, prompt_bytes,
+        )
+
+
+def _start_run_claimed(args, run_dir, agent, ledger, backend, replace, slug, cwd, prompt_bytes):
+    """Check occupancy and initialize only while the stable slug claim is held."""
     session = f"omp-{slug}" if backend == "tmux" else ""
     if os.path.isdir(run_dir):
         state, _ = effective_state(run_dir)
