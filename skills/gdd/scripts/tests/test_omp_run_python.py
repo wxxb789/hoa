@@ -1260,6 +1260,100 @@ class LauncherTests(unittest.TestCase):
                         self.assertIn(f"started: {slug}", stdout.getvalue())
 
 
+    def test_30_completed_replay_initializes_a_fresh_run(self):
+        """The replay's events, answer, exit and counters belong to one new execution."""
+        slug = "replay-30"
+        argv_file = self.tmp / "replay-30-argv.json"
+        ledger = self.tmp / "replay-30-ledger.tsv"
+        env = self.env_for(
+            STUB_MODE="two-messages", STUB_TEXT="the original answer",
+            STUB_SESSION="original-session", STUB_ARGV_FILE=argv_file,
+            OMP_LEDGER=ledger, OMP_RUN_EVENTS_MAX_BYTES="4096",
+        )
+        self.start(slug, "--model", "some-model", "--extra", "--no-session", env=env)
+        first = self.wait_for_state(slug, {"done"})
+        run_dir = self.run_dir(slug)
+        self.assertEqual(adapter.wait_for_marker(str(run_dir), START_TIMEOUT), "0")
+        deadline = time.monotonic() + START_TIMEOUT
+        while time.monotonic() < deadline and adapter.run_alive(str(run_dir)):
+            time.sleep(adapter.POLL_SECONDS)
+        self.assertFalse(adapter.run_alive(str(run_dir)))
+        original = {name: (run_dir / name).read_bytes() for name in (
+            "state.json", "answer.md", "exit.code", "events.ndjson", "events.stats.json",
+            "session.id", "finalized", "prompt.md", "run.json",
+        )}
+        original_argv = json.loads(argv_file.read_text(encoding="utf-8"))
+        script = run_dir / ("run.cmd" if IS_WINDOWS else "run.sh")
+        command = ([os.environ.get("COMSPEC", "cmd.exe"), "/c", str(script)]
+                   if IS_WINDOWS else ["bash", str(script)])
+        replay_env = dict(env)
+        replay_env.update(
+            STUB_MODE="settle", STUB_TEXT="a different replay answer", STUB_EXIT="3",
+            STUB_SESSION="replay-session", OMP_BIN="must-not-resolve-this-agent",
+            OMP_RUN_ROOT=str(self.tmp / "not-the-recorded-root"),
+            OMP_LEDGER=str(self.tmp / "not-the-recorded-ledger.tsv"),
+            OMP_RUN_EVENTS_MAX_BYTES="1",
+        )
+        replay = subprocess.run(
+            command, cwd=str(self.bin), env=replay_env, capture_output=True, text=True,
+            timeout=SETTLE_TIMEOUT,
+        )
+        self.assertEqual(replay.returncode, 0, replay.stdout + replay.stderr)
+        state = self.wait_for_state(slug, {"done", "failed"})
+        # Check the event first: the old bug executes again but keeps the old answer.
+        self.assertIn("a different replay answer", (run_dir / "events.ndjson").read_text(encoding="utf-8"))
+        self.assertEqual((run_dir / "answer.md").read_text(encoding="utf-8"), "a different replay answer")
+        self.assertEqual(adapter.wait_for_marker(str(run_dir), SETTLE_TIMEOUT), "3")
+        self.assertEqual((run_dir / "exit.code").read_text(encoding="utf-8").strip(), "3")
+        self.assertEqual(state["state"], "failed")
+        self.assertEqual(state["exit"], 3)
+        self.assertEqual(state["turns"], 1)
+        self.assertEqual(first["turns"], 2)
+        self.assertEqual(state["session_id"], "replay-session")
+        self.assertEqual(state["answer_chars"], len("a different replay answer"))
+        self.assertEqual(state["events_bytes"], (run_dir / "events.ndjson").stat().st_size)
+        self.assertEqual(state["events_bytes_total"], state["events_bytes"])
+        self.assertFalse(state["events_truncated"])
+        self.assertEqual(state["cwd"], str(self.tmp))
+        self.assertNotEqual(state["started"], first["started"])
+        self.assertNotEqual(state["pid"], first["pid"])
+        self.assertEqual(json.loads(argv_file.read_text(encoding="utf-8")), original_argv)
+        self.assertEqual((run_dir / "run.json").read_bytes(), original["run.json"])
+        previous = list(run_dir.parent.glob(f"{slug}.prev-*"))
+        self.assertEqual(len(previous), 1, previous)
+        for name, content in original.items():
+            self.assertEqual((previous[0] / name).read_bytes(), content, name)
+        with mock.patch.dict(os.environ, self.env, clear=True):
+            self.assertEqual(adapter.find_run(slug), str(run_dir))
+            old_state, recovered = adapter.effective_state(str(previous[0]))
+        self.assertEqual(old_state, first)
+        self.assertFalse(recovered)
+        self.assertEqual(old_state["state"], "done")
+        rows = ledger.read_text(encoding="utf-8").splitlines()[1:]
+        self.assertEqual(len(rows), 2, rows)
+        self.assertEqual([row.split("\t")[3] for row in rows], ["0", "3"])
+        self.assertFalse((self.tmp / "not-the-recorded-root").exists())
+        self.assertFalse((self.tmp / "not-the-recorded-ledger.tsv").exists())
+
+    def test_31_delayed_finalizer_keeps_the_first_final_state(self):
+        """A second finalizer with a stale exit code returns the first state unchanged."""
+        slug = "finalize-delayed-31"
+        ledger = self.tmp / "finalize-delayed-31.tsv"
+        first = self.settle(slug, STUB_TEXT="the final answer", OMP_LEDGER=ledger)
+        run_dir = self.run_dir(slug)
+        self.assertEqual(adapter.wait_for_marker(str(run_dir), START_TIMEOUT), "0")
+        artifacts = {name: (run_dir / name).read_bytes() for name in (
+            "state.json", "answer.md", "exit.code", "session.id", "finalized",
+        )}
+        before = ledger.read_bytes()
+        delayed = adapter.finalize(str(run_dir), -1, recovered=True)
+        self.assertEqual(delayed, first)
+        self.assertEqual(ledger.read_bytes(), before)
+        self.assertEqual(len(before.decode("utf-8").splitlines()), 2)
+        for name, content in artifacts.items():
+            self.assertEqual((run_dir / name).read_bytes(), content, name)
+
+
 class AdapterUnitTests(unittest.TestCase):
     """Pure helpers: the rules that do not need a process to prove."""
 

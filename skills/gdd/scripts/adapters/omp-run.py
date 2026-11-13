@@ -125,6 +125,11 @@ POSIX), `agent_pid` the agent it started, `tmux` the session under that backend.
 `start` writes the lock before spawning, the runner only ever adds `pid` and
 `agent_pid`, so a read-modify-write cannot drop a field.
 
+Replaying a finished invocation goes through the same fresh-start path: the old
+directory is preserved as `<SLUG>.prev-<time>`, then the recorded runner command
+starts in a new directory at the original path, with the same prompt, cwd, agent,
+flags and ledger. The old finalized artifacts are never overwritten by the replay.
+
 Two claims keep two `start`s, or two readers, from colliding in one run directory:
 `start.lock` is created exclusively before the run's artifacts and released by the
 runner once it owns the run (so a second `start` refuses instead of moving a
@@ -1454,7 +1459,15 @@ def move_aside(run_dir) -> str:
 
 def cmd_start(args) -> int:
     root = run_root()
-    ledger = ledger_path(root)
+    run_dir = os.path.join(root, datetime.now().strftime("%Y-%m-%d"), sanitize(args.name))
+    return start_run(
+        args, run_dir, agent_binary(), ledger_path(root),
+        args.backend or os.environ.get("OMP_RUN_BACKEND") or "setsid", args.replace,
+    )
+
+
+def start_run(args, run_dir, binary, ledger, backend, replace=False) -> int:
+    """Initialize and dispatch a fresh run, for `start` or a completed replay."""
     slug = sanitize(args.name)
     if not slug:
         die("start: --name is required (and must not sanitize to nothing)")
@@ -1464,26 +1477,27 @@ def cmd_start(args) -> int:
     cwd = os.path.abspath(os.path.expanduser(args.cwd or os.getcwd()))
     if not os.path.isdir(cwd):
         die(f"start: --cwd '{args.cwd}' is not a directory")
-    agent = resolve_agent(agent_binary())
+    agent = resolve_agent(binary)
     if not agent:
-        die(f"start: agent binary not found at {agent_binary()} (set OMP_BIN)")
+        die(f"start: agent binary not found at {binary} (set OMP_BIN)")
     try:
-        with open(prompt, encoding="utf-8", errors="replace") as handle:
-            hazard = prompt_hazard(agent, handle.read())
+        # A replay's prompt lives inside the directory about to be moved aside.
+        # Read it first, retaining its exact bytes for the new run's prompt.md.
+        with open(prompt, "rb") as handle:
+            prompt_bytes = handle.read()
     except OSError as exc:
         die(f"start: cannot read --prompt {prompt}: {exc}")
+    hazard = prompt_hazard(agent, prompt_bytes.decode("utf-8", "replace"))
     if hazard:
         die(f"start: {hazard}")
     warning = interop_warning(agent)
     if warning:
         sys.stderr.write(f"omp-run: start: {warning}\n")
-    backend = args.backend or os.environ.get("OMP_RUN_BACKEND") or "setsid"
     if backend not in ("setsid", "tmux"):
         die(f"start: --backend must be setsid or tmux (got '{backend}')")
     if backend == "tmux" and not tmux_available():
         die("start: tmux not found (use --backend setsid)")
 
-    run_dir = os.path.join(root, datetime.now().strftime("%Y-%m-%d"), slug)
     session = f"omp-{slug}" if backend == "tmux" else ""
     if os.path.isdir(run_dir):
         state, _ = effective_state(run_dir)
@@ -1497,7 +1511,7 @@ def cmd_start(args) -> int:
             or starting_claim(run_dir)
         )
         if occupied:
-            if not args.replace:
+            if not replace:
                 pids = "/".join(str(pid) for pid in recorded_pids(run_dir, state)) or "-"
                 die(
                     f"start: run '{slug}' is still running (pid {pids}; "
@@ -1513,7 +1527,8 @@ def cmd_start(args) -> int:
     os.makedirs(run_dir, exist_ok=True)
     if not claim_start(run_dir):
         die(f"start: another start is claiming run '{slug}' (see {run_dir})")
-    shutil.copyfile(prompt, os.path.join(run_dir, "prompt.md"))
+    with open(os.path.join(run_dir, "prompt.md"), "wb") as handle:
+        handle.write(prompt_bytes)
     if args.resume:
         with open(os.path.join(run_dir, "session.id"), "w", encoding="utf-8") as handle:
             handle.write(args.resume + "\n")
@@ -1582,7 +1597,7 @@ def cmd_start(args) -> int:
             "agent": agent,
             "ledger": ledger,
             "backend": effective_backend,
-            "note": "replay of one run: the exact runner command, rerun in place",
+            "note": "the exact runner command; a completed replay preserves the previous run",
         },
     )
 
@@ -1841,6 +1856,11 @@ def runner_main(args) -> int:
     run_dir = args.run_dir
     state_path = os.path.join(run_dir, "state.json")
     state = read_state_file(run_dir)
+    if os.path.exists(os.path.join(run_dir, "finalized")):
+        # Replay must initialize before touching any finished artifact. Keep the
+        # recorded command's paths and agent, not the caller's current defaults.
+        backend = "tmux" if state.get("backend") == "tmux" else "setsid"
+        return start_run(args, run_dir, args.agent, args.ledger, backend)
     # Claim the lock `start` wrote before the spawn: the runner owns pid and
     # agent_pid, `start` owns everything else, so no read-modify-write can drop a
     # field that raced it.
