@@ -92,18 +92,25 @@ def usage_rows(home: str) -> list[dict]:
     return [{"model": r[0], "provider": r[1], "task": r[2], "calls": r[3] or 0, "last": r[4]} for r in rows]
 
 
-def default_catalog_provider(hermes_home: str) -> str:
-    """The provider the default catalog URL belongs to (empty when nothing resolves)."""
+def default_catalog_provider(hermes_home: str) -> tuple[str, str]:
+    """(provider key, endpoint) the default catalog URL belongs to.
+
+    A provider *name* is not enough: two homes can use the same key for different endpoints, and a
+    catalogue fetched from one endpoint cannot judge the other.
+    """
     try:
         import yaml
     except ImportError:
-        return ""
+        return "", ""
     path = os.path.join(hermes_home, "config.yaml")
     try:
         cfg = yaml.safe_load(open(path, encoding="utf-8")) or {}
     except OSError:
-        return ""
-    return str((cfg.get("model") or {}).get("provider") or "").removeprefix("custom:")
+        return "", ""
+    key = str((cfg.get("model") or {}).get("provider") or "").removeprefix("custom:")
+    entry = (cfg.get("providers") or {}).get(key) or {}
+    endpoint = str(entry.get("base_url") or entry.get("api_base") or entry.get("api") or "").rstrip("/")
+    return key, endpoint
 
 
 def default_catalog_url(hermes_home: str) -> str:
@@ -147,9 +154,9 @@ def main() -> int:
     ap.add_argument("--threshold", type=float, default=0.75, help="compression.threshold")
     args = ap.parse_args()
 
-    catalog_owner = ""
+    catalog_owner, catalog_endpoint = "", ""
     if not args.catalog_url:
-        catalog_owner = default_catalog_provider(args.hermes_home) or ""
+        catalog_owner, catalog_endpoint = default_catalog_provider(args.hermes_home)
         args.catalog_url = default_catalog_url(args.hermes_home)
     if args.catalog_url:
         scope = f" (applies to provider {catalog_owner!r} only)" if catalog_owner else ""
@@ -186,7 +193,9 @@ def main() -> int:
             api = (pc.get("api") or "").rstrip("/")
             # A catalog fetched from one endpoint cannot judge another provider's ids: comparing
             # them reports "absent upstream" for a service that was never queried.
-            catalog_applies = (not catalog_owner) or (pname == catalog_owner)
+            catalog_applies = (not catalog_owner) or (
+                pname == catalog_owner and api == catalog_endpoint
+            )
             for mid in (pc.get("models") or {}):
                 raw = str(mid)
                 model = raw.replace("\\", "")

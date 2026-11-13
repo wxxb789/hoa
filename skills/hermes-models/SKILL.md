@@ -120,11 +120,12 @@ read your own `providers:` block and substitute.
 14. **A single bounded task on a non-default model: harness CLI first (`pi`, then `omp`), not
     `hermes chat`.** `pi -p --no-tools --no-skills --model <provider>/<id> --thinking high @prompt.md`
     carries the prompt and nothing else — no tool schemas, no session context — so instruction
-    following on long writing/analysis prompts is measurably tighter. Check the binary with
-    `mise which pi` (`mise ls`), not `command -v`: mise-managed CLIs live in
-    `~/.local/share/mise/shims`, which is not on the PATH of a non-interactive shell, so
-    `command -v pi` returning empty means "not on PATH", not "not installed". Export the shims dir
-    or call the absolute path. `omp -p` is the fallback (it truncates large attachments).
+    following on long writing/analysis prompts is measurably tighter. Resolve the binary before
+    concluding it is missing: `command -v pi`, then the install's own lookup if it has one
+    (`mise which pi`), then an explicit path the operator keeps. A CLI installed through npm, a
+    tool manager, or a pinned path is just as valid — and `command -v` returning empty in a
+    non-interactive shell means "not on this PATH", not "not installed". Export whatever directory
+    holds it, or call the absolute path. `omp -p` is the fallback (it truncates large attachments).
 15. **Long generation runs in the background; wait on the event, never on a foreground `sleep`.**
     `terminal(background=true, notify_on_complete=true)` then end the turn, or block once with
     `process_manage wait` (600 s) — do not poll a file size with `sleep 60..240` calls: each one
