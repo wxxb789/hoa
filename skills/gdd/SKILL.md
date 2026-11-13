@@ -114,7 +114,9 @@ Resolution order and the config-file path are defined once in
 six names in the table. Nothing about one install lives in the protocol: a profile may point at its own
 files, but no path is inlined.
 
-The launcher runs on Windows, Linux, macOS and inside a WSL2 distro; `references/transport.md` carries
-the platform matrix with the evidence for each row, the adapter's own keys (`OMP_BIN`, `OMP_RUN_ROOT`,
-`OMP_LEDGER`, `OMP_RUN_EVENTS_MAX_BYTES`, `OMP_RUN_START_GRACE_SECONDS`) and the two platform rules
-worth remembering: one hidden console on Windows, and never a Windows launcher from inside a distro.
+The launcher runs on Windows and Linux today, and inside a WSL2 distro — macOS is implemented on the same
+POSIX path but **unverified** (no macOS host has run it). `references/transport.md` carries the platform
+matrix with the evidence for each row, the adapter's own keys (`OMP_BIN`, `OMP_RUN_ROOT`, `OMP_LEDGER`,
+`OMP_RUN_EVENTS_MAX_BYTES`, `OMP_RUN_START_GRACE_SECONDS`, `OMP_RUN_DRAIN_TIMEOUT_SECONDS`,
+`OMP_RUN_STOP_WAIT_SECONDS`) and the two platform rules worth remembering: one hidden console on Windows,
+and never a Windows launcher from inside a distro.

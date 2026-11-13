@@ -15,10 +15,16 @@ file — `gdd.py` only ever talks to the contract below.
 
 | Platform | Adapter | How the run is detached | Evidence |
 |---|---|---|---|
-| Windows 11 x64, CPython 3.12.10 | `omp-run.py` (executed through `sys.executable`) | `CREATE_NO_WINDOW \| CREATE_NEW_PROCESS_GROUP`: one hidden console the whole descendant tree inherits | **executed** — `python3 -B skills/gdd/scripts/tests/test_omp_run_python.py` on a Windows host, plus one real `omp -p` run through the adapter |
-| Linux (Ubuntu 24.04 inside WSL2, distro python3) | `omp-run.py`, and `omp-run.sh` where bash is wanted | `start_new_session=True` in the child (setsid): own session and process group, no controlling terminal | **executed** — the same suite inside the distro, and in CI (ubuntu-latest) |
-| macOS | `omp-run.py` | same POSIX path as Linux | **documented, unverified** — no macOS host here. `omp-run.sh` cannot be the default there: macOS ships no `setsid`, so it would need `--backend tmux` |
+| Windows 11 x64, CPython 3.12.10 | `omp-run.py` (executed through `sys.executable`) | `CREATE_NO_WINDOW \| CREATE_NEW_PROCESS_GROUP`: one hidden console the whole descendant tree inherits | **executed** — `python3 -B skills/gdd/scripts/tests/test_omp_run_python.py` → 34 tests, `OK (skipped=1)`; one real `omp -p` run through the adapter → `state=done exit=0`, `answer.md = SMOKE OK`, 7.3 s, one turn; `test_19` dispatches `gdd.py stage --wait` through the bundled launcher |
+| Linux (Ubuntu 24.04 inside WSL2, distro python3 3.12.3) | `omp-run.py`, and `omp-run.sh` where bash is wanted | `start_new_session=True` in the child (setsid): own session and process group, no controlling terminal | **executed** — the same suite inside the distro (`OK`, two skips: no tmux, Windows-only cases), `tests/test-omp-run-stale.sh` 7/7, `tests/run-gdd-selftest.sh` 90/91 (the one failure needs `jq`, absent there, and fails identically on a pristine `origin/main`), and every pushed head on GitHub Actions ubuntu-latest |
+| macOS | `omp-run.py` | same POSIX path as Linux | **documented, unverified** — no macOS host here, so the POSIX path is executed only on Linux. `omp-run.sh` cannot be the default there: macOS ships no `setsid`, so it would need `--backend tmux` |
 | WSL2 (Windows host, run *inside* the distro) | `omp-run.py` with the distro's own python3 | same POSIX path as Linux | **executed** for one distro (the row above); the rule below is what a Windows-side launcher gets wrong |
+
+What the console evidence is, precisely: Windows tests observe the *runner's* own console
+(`detach`: attached console, no window) and compare a hidden-console spawn against `DETACHED_PROCESS`
+in a controlled probe (grandchild joins the hidden console vs. allocates a visible one). They do not
+trace a full launch through a `.cmd` shim into a real agent's tool commands; that chain is the reason
+the rule exists, and a Windows-side operator sees it directly (no window appears at dispatch).
 
 Two rules carry that matrix:
 
@@ -92,6 +98,15 @@ Resolution order for all of these: the operator's environment (the launcher read
 | `OMP_LEDGER` | finished-run ledger | `<run_root>/ledger.tsv` |
 | `OMP_RUN_EVENTS_MAX_BYTES` | bound for the retained event log, read by `adapters/events-writer.py` | `8388608` |
 | `OMP_RUN_START_GRACE_SECONDS` | how long a run that has recorded no pid is still *starting*, not dead | `60` |
+| `OMP_RUN_STOP_WAIT_SECONDS` | how long `kill` waits for a run to finalize itself before forcing its tree | `20` |
+| `OMP_RUN_DRAIN_TIMEOUT_SECONDS` | how long the runner waits for the agent's stdout to reach EOF after the agent exits | `30` |
+
+Two transient claims live in the run directory: `start.lock` (held from before the run's artifacts until
+the runner owns the run, so a second `start` refuses instead of moving a starting run aside) and
+`finalize.lock` (held around finalization, so two readers seeing the same dead run write one final state
+and one ledger row). The `finalized` marker is the authority either way; a run whose finalizer died
+between publishing `state.json` and writing the marker is finalized again from its recorded exit code
+and marked `finalize_repaired`.
 
 ## Testing the adapter
 
