@@ -22,7 +22,7 @@ Environment or operator config file:
     GDD_RUN_ROOT    run root exported to the launcher and used when it prints no
                     run dir (default ${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs)
     GDD_LAUNCHER    launcher command
-                    (default <script dir>/adapters/omp-run.sh)
+                    (default <script dir>/adapters/omp-run.py)
     GDD_TEMPLATES   template root
                     (default <script dir>/../references/stage-templates)
     GDD_GOAL_GLOB   goal-contract glob (default docs/goals/*<goal>*.md)
@@ -33,9 +33,10 @@ The six path/command keys resolve through the shared resolver: flag, then enviro
 then $XDG_CONFIG_HOME/gdd/config.yaml (fallback ~/.config/...),
 then the default. The rule is owned by skill-porting-and-publishing.
 
-Launcher contract (adapters/omp-run.sh is the reference implementation):
+Launcher contract (adapters/omp-run.py is the bundled implementation; the POSIX
+reference adapters/omp-run.sh adds the attachable tmux backend):
     <launcher> start --name SLUG --prompt FILE [--cwd DIR] [--model M] [--thinking L] [--max-time D]
-    <launcher> status SLUG | result SLUG | answer SLUG | kill SLUG
+    <launcher> list | status SLUG | result SLUG | answer SLUG | kill SLUG
 
 The launcher owns <run_root>/<date>/<SLUG>/state.json with at least
 {"name","state","exit","cwd","started","ended","duration_s"} (state is one of
@@ -80,7 +81,10 @@ NEEDS_FINDINGS = {"apply", "fix"}
 SKILL = "gdd"
 DEFAULT_GOAL_GLOB = "docs/goals/*<goal>*.md"
 DELIVERY_STATE = os.path.join(SCRIPT_DIR, "delivery-state.py")
-DEFAULT_LAUNCHER = os.path.join(SCRIPT_DIR, "adapters", "omp-run.sh")
+# The bundled adapter is Python so the loop runs where bash, setsid and tmux do
+# not (Windows above all). adapters/omp-run.sh stays as the POSIX reference,
+# which is also the one that offers the attachable tmux backend.
+DEFAULT_LAUNCHER = os.path.join(SCRIPT_DIR, "adapters", "omp-run.py")
 DEFAULT_TEMPLATES = os.path.normpath(
     os.path.join(SCRIPT_DIR, "..", "references", "stage-templates")
 )
@@ -475,11 +479,37 @@ def ledger_append(repo, goal, stage, base, head, gates, next_stage=None, note=No
         fail(f"ledger append failed: {reason}", 1)
 
 
+def launcher_command(launcher):
+    """argv prefix for the launcher: a Python launcher needs the interpreter on Windows.
+
+    POSIX executes a `.py` adapter through its shebang and executable bit, which is
+    how the bundled adapter has always run there. Windows CreateProcess cannot
+    execute a `.py` file at all (WinError 193: there is no shebang handling), so on
+    Windows the dispatcher prefixes the current interpreter instead and leaves
+    POSIX byte-identical.
+    """
+    path = os.path.expanduser(launcher)
+    if os.name == "nt" and path.lower().endswith(".py"):
+        return [sys.executable, path]
+    return [path]
+
+
+def launcher_creationflags():
+    """CREATE_NO_WINDOW on Windows: a dispatch must not flash a console.
+
+    The adapter then gives the whole run one hidden console that the runner, the
+    agent and the agent's own tool commands inherit. Without it, every dispatched
+    run allocates a visible console for a moment, and a run started with
+    DETACHED_PROCESS instead leaves each of those commands to allocate its own.
+    """
+    return subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+
+
 def launch(launcher, prompt_path, repo, goal, stage, model, thinking, max_time):
     name = f"{os.path.basename(repo)}-{goal}-{stage}"
     resolved_run_root = run_root()
     cmd = [
-        launcher,
+        *launcher_command(launcher),
         "start",
         "--name",
         name,
@@ -500,7 +530,13 @@ def launch(launcher, prompt_path, repo, goal, stage, model, thinking, max_time):
     child_env = dict(os.environ)
     child_env["GDD_RUN_ROOT"] = resolved_run_root
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, env=child_env)
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            env=child_env,
+            creationflags=launcher_creationflags(),
+        )
     except OSError as exc:
         raise LaunchError(str(exc)) from exc
     if proc.returncode != 0:
@@ -817,7 +853,7 @@ Environment or operator config file:
   GDD_RUN_ROOT    run root exported to the launcher, and the fallback when it
                   prints no run dir
                   (default ${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs)
-  GDD_LAUNCHER    launcher command (default <script dir>/adapters/omp-run.sh)
+  GDD_LAUNCHER    launcher command (default <script dir>/adapters/omp-run.py)
   GDD_TEMPLATES   template root (default <script dir>/../references/stage-templates)
   GDD_GOAL_GLOB   goal-contract glob (default docs/goals/*<goal>*.md)
   GDD_MODEL, GDD_THINKING, GDD_MAX_TIME
@@ -830,7 +866,7 @@ The shared rule is documented in skill-porting-and-publishing.
 
 Launcher contract:
   <launcher> start --name SLUG --prompt FILE [--cwd DIR] [--model M] [--thinking L] [--max-time D]
-  <launcher> status SLUG | result SLUG | answer SLUG | kill SLUG
+  <launcher> list | status SLUG | result SLUG | answer SLUG | kill SLUG
 
 The launcher writes <run_root>/<date>/<SLUG>/state.json with at least
 {"name","state","exit","cwd","started","ended","duration_s"} and answer.md.
