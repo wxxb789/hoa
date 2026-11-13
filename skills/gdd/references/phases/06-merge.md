@@ -19,11 +19,15 @@ on any other basis:
 ## Version precondition — after the rebase, before the merge
 
 A version claim is only true for the main it was measured against. **After** any rebase onto
-`origin/main` — never before it — run:
+`origin/main` — never before it — run the gate the project **profile** declares for merge time:
 
 ```bash
-python scripts/version.py check-merge
+python scripts/version.py check-merge      # hoa; other repos: whatever their profile names
 ```
+
+A repo whose profile declares no merge-time version gate skips this step. It is not part of the
+generic protocol: `version.py` exists in `hoa` only, and writing it as universal made every consumer
+repo silently skip Phase 6.
 
 A non-zero exit blocks the merge. `check-merge` reads the remote's real main with `git ls-remote`, so a
 sibling PR that merged after your last fetch cannot hide behind a stale `origin/main`; it also fails

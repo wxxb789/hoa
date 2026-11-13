@@ -7,7 +7,7 @@ description: >-
   identity, routing, delegation, or persistence. Not for ordinary repo coding rules, and not for
   one-off task notes.
 metadata:
-  version: "0.1.50"
+  version: "0.1.51"
   areas: "software-development,work-management,self-management"
   targets: "runtime-agnostic"
   summary: "evolve an agent's identity file and operating protocol by layer, with coverage markers, behavioral evals, and load-scope probes"

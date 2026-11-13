@@ -39,3 +39,15 @@ var with a documented default — `GDD_STATE_FILE`, `GDD_TASK_ROOT`, `GDD_RUN_RO
 profile may point at its own files. When adding behaviour, resolve it the same way rather than
 inlining a path: a skill that reads the operator's configuration customises itself, one that hard-codes
 a path only works where it was written.
+
+## The dispatch gate (mechanical, not advisory)
+
+`gdd.py stage` refuses to start an `implement` run when the contract cannot carry the increment: no
+goal file resolved from `GDD_GOAL_GLOB` (it prints `-` otherwise, which an agent would happily
+implement against), an archived contract, or a header declaring `Provisional` / `superseded` /
+`completed`. It also refuses `implement` on a dirty worktree — uncommitted work makes the increment
+unattributable — and refuses `simplify` / `apply` / `review` / `fix` when `base == head`, because the
+range to read is empty.
+
+`--force` overrides all of it for a case you can defend out loud. `GDD_DISPATCH_GUARDS=off` exists for
+harness fixtures only.

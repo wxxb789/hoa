@@ -3,6 +3,35 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## 2026-11-13 — the ledger gets its landing row, and the protocol loses two phantom commands
+
+Field audit of four consumer repos (`anc`, `funnysharp`, `passquest`, `symmetry`) against
+`~/.local/state/gdd/ledger.tsv`: 36 rows, **zero** `verify`/`review`/`gates`/`pr`/`merge`/`done`
+entries, `pr`/`rounds_*`/`findings` columns empty throughout, and four goals whose recorded `head_sha`
+was the tree *before* the final stage. More than 80% of merged PRs were absent from the ledger.
+
+- **`gdd.py close --repo R --goal G --pr N`** (new): writes the landing row — `stage=done`, the PR, the
+  merged head. It is the row the operator stopped writing by hand, which is why a new session read every
+  shipped goal as still in `fix`. `07-ledger.md` now says to write it in the same breath as the merge.
+- **`--wait` backfills the head**: an authoring stage (`implement`/`apply`/`fix`) now records the
+  post-run `rev-parse HEAD` instead of the pre-run SHA (`note` gains `head=<sha7>`). Report-only stages
+  keep the head they were given: the checkout may have moved on, and the reviewed SHA is the fact.
+- **`gdd.py scope`** (new): prints the resolved `worktree-scope.py`, resolving `GDD_WORKTREE_SCOPE`
+  through the same config chain as every other key — the phase docs call it, so a value in
+  `$XDG_CONFIG_HOME/gdd/config.yaml` counts, not just an exported variable.
+- **Dispatch gate** (new, pure and unit-tested): `implement` is refused when no contract resolves (it
+  printed `-` and dispatched anyway), when the contract is archived, when its header says
+  `Provisional`/`superseded`/`completed`, or when the worktree is dirty; `simplify`/`apply`/`review`/
+  `fix` are refused when `base == head` (empty range). `--force` overrides; `GDD_DISPATCH_GUARDS=off`
+  exists for the selftest fixtures.
+- **Two phantom commands removed from the protocol**: `worktree-scope.py` is invoked as
+  `${GDD_WORKTREE_SCOPE:-../delegated-work-acceptance/scripts/worktree-scope.py}` (a bare command made
+  Phase 1 a `command not found` for anyone who installed `gdd` alone), and `python scripts/version.py
+  check-merge` is now the profile-declared merge-time gate — it exists in `hoa` only, and writing it as
+  universal made all four consumer repos silently skip Phase 6.
+- **Tests**: `tests/test-dispatch-guards.py` (13 cases: empty/archived/provisional/dirty/empty-range/
+  force/state-header) runs inside `run-gdd-selftest.sh`, which is now 86 cases.
+
 ## 2026-11-13 — the merge gate stops accepting "no checks"
 
 - **`skills/gdd/scripts/pr-merge-check.py`**: `evaluate_checks()` returned `pass = pending == 0 and

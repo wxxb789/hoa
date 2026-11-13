@@ -154,6 +154,19 @@ def render(template_text, variables):
     return text
 
 
+def resolve_ref(repo, value):
+    """Full SHA for a supplied endpoint; the value unchanged when git cannot resolve it."""
+    if not value:
+        return value
+    proc = subprocess.run(
+        ["git", "-C", repo, "rev-parse", "--verify", "--quiet", str(value)],
+        capture_output=True,
+        text=True,
+    )
+    resolved = (proc.stdout or "").strip()
+    return resolved if proc.returncode == 0 and resolved else value
+
+
 def resolve_goal_file(repo, goal):
     """Contract file for a goal from GDD_GOAL_GLOB; '-' when nothing matches."""
     pattern = config("GDD_GOAL_GLOB", default=DEFAULT_GOAL_GLOB)
@@ -303,7 +316,77 @@ def active_runs(repo_path):
     return active
 
 
-def ledger_append(repo, goal, stage, base, head, gates, next_stage=None, note=None):
+NOT_READY_STATES = ("provisional", "superseded", "completed", "draft")
+DIFF_STAGES = ("simplify", "apply", "review", "fix")
+
+
+def goal_state_header(goal_file):
+    """(state, status) words from the first 15 lines of a contract file."""
+    try:
+        with open(goal_file, encoding="utf-8", errors="replace") as handle:
+            head_text = "".join(handle.readline() for _ in range(15))
+    except OSError:
+        return ""
+    found = re.search(
+        r"(?im)^[\s*#]*(?:state|status)[\s*]*:[*\s]*([a-z]+)", head_text
+    )
+    return found.group(1).lower() if found else ""
+
+
+def dispatch_problems(stage, goal_file, dirty_paths, base, head, force=False):
+    """Why this dispatch must not start. Pure: the caller supplies the facts."""
+    if force:
+        return []
+    problems = []
+    if stage == "implement":
+        if goal_file in ("", "-"):
+            problems.append(
+                "no goal contract found — pass --goal that matches GDD_GOAL_GLOB, "
+                "or write the contract first (phase 0)"
+            )
+        elif "/archive/" in goal_file.replace("\\", "/"):
+            problems.append(
+                f"contract {goal_file} is archived — an increment starts from an active goal"
+            )
+        else:
+            state = goal_state_header(goal_file)
+            if state in NOT_READY_STATES:
+                problems.append(
+                    f"contract {goal_file} declares state {state!r}; refine and activate it "
+                    "in its own commit before implementing"
+                )
+        if dirty_paths:
+            shown = ", ".join(dirty_paths[:5])
+            problems.append(
+                f"worktree is dirty before implement ({len(dirty_paths)} path(s): {shown}) — "
+                "commit or stash it, so the increment stays attributable"
+            )
+    if stage in DIFF_STAGES and base and head and base == head:
+        problems.append(
+            f"base == head ({head[:7]}): there is no committed range to read — commit the "
+            "stage output first (phase 4) or pass --base/--head explicitly"
+        )
+    return problems
+
+
+AUTHORING_STAGES = ("implement", "apply", "fix")
+
+
+def final_head_for(stage, head_supplied, head, post_head):
+    """The SHA a finished-stage row should record.
+
+    An authoring stage changed the tree, so the post-run HEAD is the increment. A report-only
+    stage (review, simplify) reviewed the head it was given: when the operator supplied one, the
+    checkout may have moved on and the supplied SHA is the fact worth keeping.
+    """
+    if head_supplied:
+        return head
+    if stage in AUTHORING_STAGES:
+        return post_head
+    return head
+
+
+def ledger_append(repo, goal, stage, base, head, gates, next_stage=None, note=None, pr=None):
     cmd = [
         sys.executable,
         DELIVERY_STATE,
@@ -324,6 +407,8 @@ def ledger_append(repo, goal, stage, base, head, gates, next_stage=None, note=No
         "--head",
         head,
     ]
+    if pr:
+        cmd += ["--pr", str(pr)]
     if gates and gates != "-":
         cmd += ["--gates", gates]
     if next_stage:
@@ -442,6 +527,33 @@ def cmd_stage(args):
         head = args.head
     else:
         head = git(repo, "rev-parse", "HEAD")
+    # Resolve supplied endpoints to commit SHAs: `--base <sha> --head HEAD` names one commit
+    # twice, and a string compare would call that a non-empty range. A value git cannot resolve
+    # is kept literally, so a caller may pass a SHA from another checkout.
+    base = resolve_ref(repo, base)
+    head = resolve_ref(repo, head)
+
+    dirty = [
+        line[3:]
+        for line in git(repo, "status", "--porcelain").splitlines()
+        if line.strip()
+    ]
+    # `GDD_DISPATCH_GUARDS=off` exists for harness fixtures that dispatch synthetic
+    # goals on purpose; a real run leaves it unset.
+    guard_off = os.environ.get("GDD_DISPATCH_GUARDS", "on").lower() in (
+        "off",
+        "0",
+        "false",
+        "no",
+    )
+    problems = [] if guard_off else dispatch_problems(
+        args.stage, goal_file, dirty, base, head, force=args.force
+    )
+    if problems:
+        for problem in problems:
+            print(f"gdd: {problem}", file=sys.stderr)
+        print("gdd: dispatch refused (use --force to override)", file=sys.stderr)
+        return 3
 
     gates = args.gates or os.environ.get("GDD_GATES") or "-"
     findings = os.path.abspath(os.path.expanduser(args.findings)) if args.findings else "-"
@@ -547,18 +659,60 @@ def cmd_stage(args):
                 f"--prompt <same prompt> --resume {resume}",
                 1,
             )
-        note = f"exit={exit_code if exit_code is not None else '-'} dur={duration if duration is not None else '-'}"
+        post_head = git(repo, "rev-parse", "HEAD")
+        final_head = final_head_for(args.stage, bool(args.head), head, post_head)
+        note = (
+            f"exit={exit_code if exit_code is not None else '-'} "
+            f"dur={duration if duration is not None else '-'} "
+            f"head={post_head[:7]}"
+        )
         ledger_append(
             repo,
             args.goal,
             args.stage,
             base,
-            head,
+            final_head,
             gates,
             note=note,
         )
         print(f"finished: state={effective_state(run_dir, state)} {note}")
         print_answer_head(run_dir)
+    return 0
+
+
+def cmd_scope(args):
+    """Print the resolved worktree-scope.py path (config file, not just env)."""
+    resolved = os.path.expanduser(
+        config(
+            "GDD_WORKTREE_SCOPE",
+            default="../delegated-work-acceptance/scripts/worktree-scope.py",
+        )
+    )
+    if not os.path.isabs(resolved):
+        resolved = os.path.normpath(os.path.join(os.path.dirname(SCRIPT_DIR), resolved))
+    if not os.path.isfile(resolved):
+        fail(f"GDD_WORKTREE_SCOPE does not resolve to a file: {resolved}", 2)
+    print(resolved)
+    return 0
+
+
+def cmd_close(args):
+    """Write the landing row: stage=done with the PR and the merged head.
+
+    The operator used to record this by hand, and stopped: 36 ledger rows held zero
+    `pr`/`done` entries, so a new session read every merged goal as still in `fix`.
+    """
+    if not os.path.isdir(args.repo):
+        fail(f"--repo is not a directory: {args.repo}")
+    repo = os.path.realpath(git(args.repo, "rev-parse", "--show-toplevel"))
+    base = args.base or git(repo, "merge-base", "origin/main", "HEAD")
+    head = args.head or git(repo, "rev-parse", "HEAD")
+    pr = args.pr or "-"
+    note = args.note or f"pr={pr} head={head[:7]}"
+    ledger_append(repo, args.goal, "done", base, head, args.gates or "-", note=note, pr=pr)
+    print(
+        f"closed: {os.path.basename(repo)} {args.goal} pr={pr} head={head[:7]}"
+    )
     return 0
 
 
@@ -648,6 +802,23 @@ def build_parser():
     stage.add_argument("--wait", action="store_true", help="poll until the run ends")
     stage.add_argument("--force", action="store_true", help="ignore active-run guard")
     stage.set_defaults(func=cmd_stage)
+
+    scope = sub.add_parser(
+        "scope", help="print the resolved worktree-scope.py path (GDD_WORKTREE_SCOPE)"
+    )
+    scope.set_defaults(func=cmd_scope)
+
+    close = sub.add_parser(
+        "close", help="record the landing row for a goal (stage=done, pr, merged head)"
+    )
+    close.add_argument("--repo", required=True)
+    close.add_argument("--goal", required=True)
+    close.add_argument("--pr", default=None, help="PR number")
+    close.add_argument("--base", default=None, help="base sha (default merge-base)")
+    close.add_argument("--head", default=None, help="merged head sha (default HEAD)")
+    close.add_argument("--gates", default=None, help="gate summary")
+    close.add_argument("--note", default=None, help="free-form note")
+    close.set_defaults(func=cmd_close)
 
     status = sub.add_parser("status", help="delegate to delivery-state.py show")
     status.add_argument("--repo", required=True)
