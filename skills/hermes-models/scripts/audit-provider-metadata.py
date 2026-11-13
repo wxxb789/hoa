@@ -191,10 +191,13 @@ def main() -> int:
             if not isinstance(pc, dict):
                 continue
             api = (pc.get("api") or "").rstrip("/")
+            endpoint = str(
+                pc.get("base_url") or pc.get("api_base") or pc.get("api") or ""
+            ).rstrip("/")
             # A catalog fetched from one endpoint cannot judge another provider's ids: comparing
             # them reports "absent upstream" for a service that was never queried.
             catalog_applies = (not catalog_owner) or (
-                pname == catalog_owner and api == catalog_endpoint
+                pname == catalog_owner and endpoint == catalog_endpoint
             )
             for mid in (pc.get("models") or {}):
                 raw = str(mid)

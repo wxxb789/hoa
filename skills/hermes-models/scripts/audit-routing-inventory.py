@@ -137,6 +137,7 @@ def main() -> int:
     )
     ap.add_argument("--out", default="")
     args = ap.parse_args()
+    args.home = os.path.expanduser(str(args.home))     # `~` in HERMES_HOME is the shell's job, not Path's
     if not Path(args.home).is_dir():
         raise SystemExit(
             f"audit-routing-inventory: --home {args.home} does not exist — refusing to emit an "
