@@ -7,14 +7,17 @@ provider you configured — `$RELAY` below; the reference install runs a local g
 and external chat-completions relays. Verified by probing; re-probe before relying on a row,
 because the catalog churns.
 
-Probe shape (header `Authorization: Bearer local`):
+Probe shape (header `Authorization: Bearer $RELAY_KEY`)
+
+`$RELAY` is your configured provider's endpoint and `$RELAY_KEY` its credential: read both from the
+install (`providers.<key>.api` and its `api_key`) or export them yourself.
 
 ```bash
 # Responses protocol
-curl -s $RELAY/v1/responses -H 'Authorization: Bearer local' -H 'Content-Type: application/json' \
+curl -s $RELAY/v1/responses -H "Authorization: Bearer $RELAY_KEY" -H 'Content-Type: application/json' \
   -d '{"model": "<id>", "input": "hi", "max_output_tokens": 16}'
 # Chat-completions protocol
-curl -s $RELAY/v1/chat/completions -H 'Authorization: Bearer local' -H 'Content-Type: application/json' \
+curl -s $RELAY/v1/chat/completions -H "Authorization: Bearer $RELAY_KEY" -H 'Content-Type: application/json' \
   -d '{"model": "<id>", "messages": [{"role": "user", "content": "hi"}], "max_tokens": 16}'
 ```
 
