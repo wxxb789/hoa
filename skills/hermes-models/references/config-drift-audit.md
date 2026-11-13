@@ -3,7 +3,9 @@
 Profiles are separate `HERMES_HOME`s: nothing inherits from root, so a setting that exists only in root is
 absent on every messaging surface. Drift is silent — no error, no warning, just a profile running stock
 behavior the owner believes he configured. This file is the procedure behind the SKILL.md section of the same
-name; `scripts/audit-config-drift.py` runs the mechanical part.
+name; `scripts/audit-config-drift.py` ships with this skill and runs the mechanical part — call it
+at the path this skill was installed to (e.g. `skills/hermes-models/scripts/audit-config-drift.py`
+under the install root), not a path from another install.
 
 ## When to run
 
@@ -51,7 +53,7 @@ leave anything that changes scheduling behaviour or a peer harness for the owner
 ## Pass 1 — presence and value drift (mechanical)
 
 ```bash
-python3 ~/.hermes/skills/devops/hermes-operations/scripts/audit-config-drift.py
+python3 "$(dirname "$(readlink -f "$(command -v hermes)")")/../skills/hermes-models/scripts/audit-config-drift.py"
 ```
 
 It prints per profile: **MISS** (root deviates from the built-in default, profile lacks the key), **DIFF**
