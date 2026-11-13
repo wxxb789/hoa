@@ -209,7 +209,16 @@ def fetch_checks(pr, repo):
             return data
     except (GateError, ValueError):
         pass
-    text = sh(["gh", "pr", "checks", str(pr)], cwd=repo)
+    try:
+        text = sh(["gh", "pr", "checks", str(pr)], cwd=repo)
+    except GateError as exc:
+        # `gh pr checks` exits 1 with "no checks reported" when nothing registered yet (or ever,
+        # for a repo with no CI). That is an empty list, not a CLI failure — otherwise the
+        # --allow-no-checks opt-out could never be reached. Genuine errors still raise.
+        message = str(exc).lower()
+        if "no checks reported" in message or "no check runs found" in message:
+            return []
+        raise
     return parse_text_checks(text)
 
 
