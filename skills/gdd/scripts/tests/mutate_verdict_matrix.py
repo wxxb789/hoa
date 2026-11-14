@@ -6,16 +6,22 @@ memory to the module source (the checkout is never written) and the whole verdic
 against the mutant: at least one cell must flip, or the mutation survived an exhaustive matrix and
 the harness fails loudly with the mutation id.
 
-Run: python3 skills/gdd/scripts/tests/mutate_verdict_matrix.py
+Two catalogues make up the run:
 
-The catalogue is the twelve mutations from the previous sweep (sh_raw normalising the exit code or
-the streams, a dropped non-object row, a non-list payload read as zero checks, the bucket/state
-precedence, an unknown bucket or a missing bucket read as ok, pending or the opt-out not blocking, a
-name-based header drop, an unrecognized verdict passing, a command error read as zero checks) plus
-the five this round's findings named (the all-green non-zero fallback, the recognized-bucket/raw-state
-disagreement, a reserved column name dropped as a header, and the missing-bucket default), plus
-others the surface implies (a tab-less line parsed as a row, the header parsed as a check, the cancel
-and skipping bucket mappings, and the zero-check opt-out granted unconditionally).
+* the anchored mutations: the twelve from the previous sweep (sh_raw normalising the exit code or
+  the streams, a dropped non-object row, a non-list payload read as zero checks, the bucket/state
+  precedence, an unknown bucket or a missing bucket read as ok, pending or the opt-out not blocking,
+  a name-based header drop, an unrecognized verdict passing, a command error read as zero checks),
+  the five this round's earlier findings named, and the ones the surface implies (a tab-less line
+  parsed as a row, the header parsed as a check, the cancel and skipping bucket mappings, the
+  zero-check opt-out granted unconditionally, an unordered header, a pending bucket read as
+  failing);
+* one generated mutation per declared `CHECK_VOCABULARY` entry, reclassifying that token into every
+  other classification ("a failing verdict read as ok", "an ok verdict read as pending"). They are
+  generated from the vocabulary, so a token added to the gate arrives with its own mutations and
+  cannot be added without being pinned.
+
+Run: python3 skills/gdd/scripts/tests/mutate_verdict_matrix.py
 """
 
 from __future__ import annotations
@@ -27,8 +33,9 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 SCRIPTS = HERE.parent
-if str(SCRIPTS) not in sys.path:
-    sys.path.insert(0, str(SCRIPTS))
+for _path in (str(SCRIPTS), str(HERE)):
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
 
 import test_verdict_matrix as matrix  # noqa: E402
 
@@ -36,7 +43,7 @@ GATE_SOURCE_PATH = SCRIPTS / "pr-merge-check.py"
 SOURCE = GATE_SOURCE_PATH.read_text(encoding="utf-8")
 
 
-# --- the mutation catalogue -------------------------------------------------
+# --- the anchored catalogue -------------------------------------------------
 # (id, anchor present exactly once in the source, replacement, note)
 
 MUTATIONS = [
@@ -81,6 +88,14 @@ MUTATIONS = [
      "    conclusion = BUCKET_CONCLUSIONS.get(bucket)",
      '    conclusion = BUCKET_CONCLUSIONS.get(bucket, "SUCCESS")',
      "an unknown bucket becomes ok"),
+    ("bucket-pending-counts-as-failure",
+     "    waits = conclusion is None or conclusion in PENDING_CONCLUSIONS",
+     "    waits = conclusion is None",
+     "a declared pending bucket is reported as failing instead of pending"),
+    ("vocabulary-keys-keep-the-surface",
+     "        key[len(prefix):]: value",
+     "        key: value",
+     "the vocabulary keys keep their surface, so no token maps to a conclusion"),
     ("pending-does-not-block",
      """        "pass": pending == 0 and failing == 0,
         "reason": "ok" if pending == 0 and failing == 0 else "checks not green",""",
@@ -95,25 +110,18 @@ MUTATIONS = [
      '            "pass": bool(allow_no_checks),',
      "            \"pass\": True,",
      "a zero-check read passes without the opt-out"),
-    ("header-accepts-status-first-field",
-     """        and {"NAME", "STATUS"} <= set(fields)
-        and set(fields) <= TEXT_CHECK_COLUMNS
-    )""",
-     """        and {"NAME", "STATUS"} <= set(fields)
-        and set(fields) <= TEXT_CHECK_COLUMNS
-    ) or (bool(fields) and fields[0] == "STATUS")""",
-     "a check named STATUS is dropped as a header"),
+    ("header-accepts-unordered-fields",
+     "    return fields == list(TEXT_CHECK_COLUMNS)",
+     """    return (len(fields) >= 2 and {"NAME", "STATUS"} <= set(fields)
+            and set(fields) <= set(TEXT_CHECK_COLUMNS))""",
+     "the header is matched as an unordered set of column names"),
+    ("header-accepts-a-leading-run",
+     "    return fields == list(TEXT_CHECK_COLUMNS)",
+     "    return len(fields) >= 2 and fields == list(TEXT_CHECK_COLUMNS[: len(fields)])",
+     "a leading run of the column names is accepted as the header"),
     ("header-prefix-match",
-     """    return (
-        len(fields) >= 2
-        and {"NAME", "STATUS"} <= set(fields)
-        and set(fields) <= TEXT_CHECK_COLUMNS
-    )""",
-     """    return line.upper().startswith("NAME") or (
-        len(fields) >= 2
-        and {"NAME", "STATUS"} <= set(fields)
-        and set(fields) <= TEXT_CHECK_COLUMNS
-    )""",
+     "    return fields == list(TEXT_CHECK_COLUMNS)",
+     """    return line.upper().startswith("NAME") or fields == list(TEXT_CHECK_COLUMNS)""",
      "a NAME-prefixed row is dropped as a header"),
     ("tabless-line-becomes-a-row",
      '        if not line or "\\t" not in line or is_text_check_header(line):',
@@ -132,12 +140,12 @@ MUTATIONS = [
      'GOOD_CONCLUSIONS = {"SUCCESS", "SKIPPED", "NEUTRAL", "CANCELLED"}',
      "a cancelled check passes"),
     ("cancel-bucket-becomes-neutral",
-     '    "cancel": "CANCELLED",',
-     '    "cancel": "NEUTRAL",',
+     '    "bucket/cancel": "CANCELLED",',
+     '    "bucket/cancel": "NEUTRAL",',
      "the cancel bucket is ok"),
     ("skipping-bucket-becomes-failure",
-     '    "pass": "SUCCESS",\n    "skipping": "SKIPPED",',
-     '    "pass": "SUCCESS",\n    "skipping": "FAILURE",',
+     '    "bucket/pass": "SUCCESS",\n    "bucket/skipping": "SKIPPED",',
+     '    "bucket/pass": "SUCCESS",\n    "bucket/skipping": "FAILURE",',
      "the skipping bucket is a failure"),
     ("command-error-becomes-empty",
      """            if "no checks reported" in lowered or "no check runs found" in lowered:
@@ -160,6 +168,34 @@ MUTATIONS = [
      "        pass",
      "an all-green table under a non-zero exit becomes permission"),
 ]
+
+
+# --- the generated catalogue: one mutation per declared vocabulary entry ----
+# Each entry is reclassified into every other classification — "a failing verdict read as ok", "an
+# ok verdict read as pending" — anchored on the entry's own source line, so the vocabulary cannot
+# grow without its mutations arriving with it.
+_TARGETS = (("ok", "SUCCESS"), ("pending", "PENDING"), ("failing", "FAILURE"))
+
+
+def vocabulary_mutations():
+    mutations = []
+    for key in sorted(matrix.VOCABULARY):
+        conclusion = matrix.VOCABULARY[key]
+        current = matrix.classification(conclusion)
+        anchor = '    "%s": "%s",' % (key, conclusion)
+        for target, replacement in _TARGETS:
+            if target == current:
+                continue
+            mutations.append((
+                "vocab-%s-to-%s" % (key.replace("/", "-"), target),
+                anchor,
+                '    "%s": "%s",' % (key, replacement),
+                "the declared token %s is read as %s instead of %s" % (key, target, current),
+            ))
+    return mutations
+
+
+MUTATIONS.extend(vocabulary_mutations())
 
 
 def load_mutated(source):

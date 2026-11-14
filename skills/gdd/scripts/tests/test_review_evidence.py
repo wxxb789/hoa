@@ -713,6 +713,28 @@ class CheckFetchTests(unittest.TestCase):
                                    "conclusion": "FAILURE"}])
         self.assertFalse(gate.evaluate_checks(checks)["pass"])
 
+    def test_an_unordered_header_row_is_read_as_a_row_and_blocks(self):
+        # The header is NAME then STATUS, in print order (gh 2.103 pkg/cmd/pr/checks/output.go: the
+        # non-TTY header is NAME STATUS ELAPSED URL DESCRIPTION). Matching the column names as an
+        # unordered set accepted `STATUS\tNAME` as the header, so the row — whose verdict is the
+        # unknown word `NAME` — vanished and the remaining passing row reported MERGE-OK. Order is
+        # part of the header, and every line that is not the header is a row.
+        for flag in (False, True):
+            with self.subTest(allow_no_checks=flag):
+                checks, _ = self.fetch(JSON_FIELD_GONE, (0, "build\tpass\nSTATUS\tNAME\n", ""))
+                self.assertEqual([(check["name"], check["conclusion"]) for check in checks],
+                                 [("build", "SUCCESS"), ("STATUS", "FAILURE")])
+                facts = gate.evaluate_checks(checks, allow_no_checks=flag)
+                self.assertFalse(facts["pass"])
+                self.assertEqual((facts["total"], facts["ok"], facts["failing"]), (2, 1, 1))
+
+    def test_an_unordered_full_header_is_a_row_not_the_header(self):
+        checks, _ = self.fetch(JSON_FIELD_GONE,
+                               (0, "STATUS\tNAME\tELAPSED\tURL\tDESCRIPTION\n", ""))
+        self.assertEqual([(check["name"], check["conclusion"]) for check in checks],
+                         [("STATUS", "FAILURE")])
+        self.assertFalse(gate.evaluate_checks(checks)["pass"])
+
 
 class CheckFetchCliTests(unittest.TestCase):
     """main() end to end: the exit code, the checks line and the verdict, without a real gh."""
@@ -751,6 +773,19 @@ class CheckFetchCliTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("checks: 1 total, 0 ok, 1 pending, 0 failing", out)
         self.assertIn("verdict: BLOCKED: checks pending", out)
+
+    def test_the_unordered_header_repro_blocks_with_and_without_the_flag(self):
+        # main() end to end on the fail-open: the row is counted, so neither run reports MERGE-OK
+        # and --allow-no-checks cannot turn a counted row into permission.
+        for extra in ((), ("--allow-no-checks",)):
+            with self.subTest(extra=extra):
+                code, out, err = self.gate_main(
+                    "--verified-head", HEAD, "--gates-rc", "0", "--allow-no-machine-review",
+                    *extra, table_result=(0, "build\tpass\nSTATUS\tNAME\n", ""))
+                self.assertEqual(code, 1)
+                self.assertIn("checks: 2 total, 1 ok, 0 pending, 1 failing", out)
+                self.assertIn("verdict: BLOCKED: checks", out)
+                self.assertEqual(err, "")
 
     def test_mixed_valid_and_malformed_check_rows_exit_2_without_a_verdict(self):
         # One valid row beside a null must not read as all-green, and the table must not rescue it.

@@ -15,15 +15,18 @@ Exit codes: 0 MERGE-OK, 1 BLOCKED, 2 usage/gh/git error.
 
 Checks:
   1. every CI check completed with SUCCESS/SKIPPED/NEUTRAL — read from gh's `bucket` field
-     (`pass`/`skipping`/`neutral`); `fail`/`cancel` are failures, anything else (including
-     `pending`) is pending. A run still in flight is reported as
+     (`pass`/`skipping`/`neutral` are ok, `fail`/`cancel` are failures, `pending` is pending; the
+     full vocabulary is the declared CHECK_VOCABULARY, and a token it does not know is never ok).
+     A run still in flight is reported as
      `checks: N total, M ok, P pending, F failing` with verdict reason `checks pending`.
      When `--json` is unusable the human table is the fallback, and a non-zero table exit
      (8 while pending, 1 when one failed) is CI state, not a CLI failure: an unfinished run
      still reports pending and blocks. A non-zero exit whose parsed table is *entirely green*
      is different — the read was incomplete (a dropped row, an ignored command error), so the
      tool exits 2 rather than reporting MERGE-OK. Only a successful read of zero check runs is
-     the empty state, and only `--allow-no-checks` accepts it.
+     the empty state, and only `--allow-no-checks` accepts it. Only the header — all five printed
+     column names in print order — is skipped: every other line is a row, and a row whose verdict
+     word is unknown blocks.
   2. newest --marker comment: completed, has_any_findings false, full 40-hex
      commit_sha exactly equal to the PR head, nonempty model/provider and full
      UTF-8 report with a matching SHA256. Custom markers use the same schema.
@@ -57,37 +60,61 @@ from machine_review import (
 )
 
 GOOD_CONCLUSIONS = {"SUCCESS", "SKIPPED", "NEUTRAL"}
-# `gh pr checks --json bucket` is gh's own grouping of `state`; `conclusion` was removed in
-# gh 2.103, so the bucket is the only per-check verdict the CLI still reports. A bucket that is
-# not listed here — including `pending` itself — counts as pending, which blocks.
-BUCKET_CONCLUSIONS = {
-    "pass": "SUCCESS",
-    "skipping": "SKIPPED",
-    "neutral": "NEUTRAL",
-    "fail": "FAILURE",
-    "cancel": "CANCELLED",
+# A conclusion that waits: never ok, and reported as pending rather than failing so the verdict
+# reason names the real state (`checks pending`, not `checks`).
+PENDING_CONCLUSIONS = {"PENDING"}
+# The check-classification vocabulary: the one declared source for the verdict words a read surface
+# can print. Keyed `<surface>/<token>`, valued with the conclusion the gate classifies that token
+# as. `bucket` is `gh pr checks --json bucket` and — because gh prints its bucket there — the
+# non-TTY table's STATUS column, except that `cancel` prints as `fail` (pkg/cmd/pr/checks/output.go
+# at gh 2.103): `cancel` is therefore a bucket token only. `table` also carries the words earlier
+# revisions accepted. `conclusion` was removed from `--json` in gh 2.103, so the bucket is the only
+# per-check verdict gh still reports. A token missing from this mapping is not permission: a table
+# row falls back to FAILURE, a JSON bucket to pending. tests/gh_checks_fixtures.py holds the
+# captured `gh` output this vocabulary is read from, and tests/test_verdict_matrix.py enumerates the
+# mapping cell by cell, so a token cannot be added or reclassified without a pinned expectation.
+CHECK_VOCABULARY = {
+    "bucket/pass": "SUCCESS",
+    "bucket/skipping": "SKIPPED",
+    "bucket/neutral": "NEUTRAL",
+    "bucket/fail": "FAILURE",
+    "bucket/cancel": "CANCELLED",
+    "bucket/pending": "PENDING",
+    "table/pass": "SUCCESS",
+    "table/skipping": "SKIPPED",
+    "table/skip": "SKIPPED",
+    "table/neutral": "NEUTRAL",
+    "table/failing": "FAILURE",
+    "table/fail": "FAILURE",
+    "table/cancelled": "CANCELLED",
+    "table/canceled": "CANCELLED",
+    "table/timed_out": "TIMED_OUT",
+    "table/pending": "PENDING",
 }
+
+
+def vocabulary(surface):
+    """The `<surface>` slice of CHECK_VOCABULARY, as the {token: conclusion} the gate reads."""
+    prefix = surface + "/"
+    return {
+        key[len(prefix):]: value
+        for key, value in CHECK_VOCABULARY.items()
+        if key.startswith(prefix)
+    }
+
+
+BUCKET_CONCLUSIONS = vocabulary("bucket")
+TEXT_CONCLUSIONS = vocabulary("table")
 GRAPHQL = (
     "query($owner:String!,$repo:String!,$pr:Int!,$cursor:String){"
     "repository(owner:$owner,name:$repo){pullRequest(number:$pr){"
     "reviewThreads(first:100,after:$cursor){pageInfo{hasNextPage endCursor}"
     "nodes{isResolved path line}}}}}"
 )
-TEXT_CONCLUSIONS = {
-    "pass": "SUCCESS",
-    "failing": "FAILURE",
-    "fail": "FAILURE",
-    "skipping": "SKIPPED",
-    "skip": "SKIPPED",
-    "neutral": "NEUTRAL",
-    "cancelled": "CANCELLED",
-    "canceled": "CANCELLED",
-    "timed_out": "TIMED_OUT",
-    "pending": "PENDING",
-}
-# The column names `gh pr checks` prints above the rows (gh 2.103, pkg/cmd/pr/checks/output.go).
-# Only a row built entirely from these is a header; see is_text_check_header.
-TEXT_CHECK_COLUMNS = {"NAME", "STATUS", "ELAPSED", "URL", "DESCRIPTION"}
+# The column names `gh pr checks` prints above the rows, in print order (gh 2.103,
+# pkg/cmd/pr/checks/output.go: NAME STATUS ELAPSED URL DESCRIPTION). The header is exactly these
+# names in this order — anything else is a row; see is_text_check_header.
+TEXT_CHECK_COLUMNS = ("NAME", "STATUS", "ELAPSED", "URL", "DESCRIPTION")
 
 
 class GateError(Exception):
@@ -199,22 +226,20 @@ def evaluate_checks(checks, allow_no_checks=False):
 
 
 def is_text_check_header(line):
-    """True for the table's own header row, recognized by its fields, never by a `NAME` prefix.
+    """True for the table's own header row: every printed column name, in the printed order.
 
-    `gh pr checks` labels the columns `NAME STATUS ELAPSED URL DESCRIPTION` (pkg/cmd/pr/checks/
-    output.go at gh 2.103). A check may legitimately be *named* `NAME-required`, and skipping it by
-    a `NAME` prefix dropped an unread row from the verdict — with a failed row beside it the gate
-    still printed MERGE-OK. Only a row whose every field is a column name, carrying both `NAME` and
-    `STATUS`, is the header. The TTY header is space-aligned, so it never reaches this tab-delimited
-    parser.
+    `gh pr checks` labels the columns NAME STATUS ELAPSED URL DESCRIPTION (pkg/cmd/pr/checks/
+    output.go at gh 2.103), so the header is exactly that line and nothing else. Two weaker tests
+    each dropped a real row from the verdict: a `NAME` prefix dropped checks named `NAME-required`,
+    and an unordered *set* of column names accepted `STATUS\\tNAME` — given the table `build\\tpass`
+    then `STATUS\\tNAME`, the second line vanished and the gate printed MERGE-OK counting only the
+    passing row. Everything that is not the header is a row, and a row whose verdict is unknown
+    blocks; a check may legitimately be *named* `NAME-required`, `NAME` or `STATUS`. The TTY header
+    is space-aligned and carries a mark column, so it never reaches this tab-delimited parser.
     """
     fields = [cell.strip().upper() for cell in line.split("\t")]
     fields = [cell for cell in fields if cell]
-    return (
-        len(fields) >= 2
-        and {"NAME", "STATUS"} <= set(fields)
-        and set(fields) <= TEXT_CHECK_COLUMNS
-    )
+    return fields == list(TEXT_CHECK_COLUMNS)
 
 
 def parse_text_checks(text):
@@ -236,9 +261,12 @@ def bucket_check(entry):
     """One `--json name,state,bucket` row, in the state/conclusion vocabulary evaluate_checks reads."""
     bucket = str(entry.get("bucket") or "").lower()
     conclusion = BUCKET_CONCLUSIONS.get(bucket)
+    # A declared pending bucket and an unknown one alike carry no completed verdict, so both reach
+    # evaluate_checks as a pending state — an unknown bucket with no conclusion to report either.
+    waits = conclusion is None or conclusion in PENDING_CONCLUSIONS
     return {
         "name": entry.get("name"),
-        "state": "COMPLETED" if conclusion else "PENDING",
+        "state": "PENDING" if waits else "COMPLETED",
         "conclusion": conclusion,
     }
 
@@ -774,8 +802,9 @@ def selftest():
         ("same-sha-short-prefix-rejected", ("abc1234def", "abc"), False),
         ("same-sha-empty", ("abc1234def", ""), False),
     ]
-    # The non-zero-exit table fallback. A check whose name starts with `NAME` is a row, not the
-    # header; only a row whose every field is a column name is a header.
+    # The non-zero-exit table fallback. The header is the printed column names in print order; only
+    # a row whose fields are that leading run is a header. Anything else is a row, and a row whose
+    # verdict word is unknown blocks.
     table_header = "NAME\tSTATUS\tELAPSED\tURL\tDESCRIPTION\n"
     text_cases = [
         (
@@ -799,6 +828,26 @@ def selftest():
             table_header + "NAME\tpass\t1s\thttps://example/0\t\n",
             [("NAME", "COMPLETED", "SUCCESS")],
         ),
+        (
+            "unordered-header-is-a-row",
+            "build\tpass\nSTATUS\tNAME\n",
+            [("build", "COMPLETED", "SUCCESS"), ("STATUS", "COMPLETED", "FAILURE")],
+        ),
+        (
+            "unordered-five-column-header-is-a-row",
+            "STATUS\tNAME\tELAPSED\tURL\tDESCRIPTION\n",
+            [("STATUS", "COMPLETED", "FAILURE")],
+        ),
+        (
+            "partial-header-is-a-row",
+            "NAME\tSTATUS\n",
+            [("NAME", "COMPLETED", "FAILURE")],
+        ),
+        (
+            "captured-pending-row",
+            "build\tpending\t0\thttps://example/1/job/1\t\n",
+            [("build", "PENDING", "PENDING")],
+        ),
     ]
     bucket_cases = [
         ("bucket-pass", "SUCCESS", "pass", ("COMPLETED", "SUCCESS")),
@@ -806,7 +855,7 @@ def selftest():
         ("bucket-neutral", "NEUTRAL", "neutral", ("COMPLETED", "NEUTRAL")),
         ("bucket-fail", "FAILURE", "fail", ("COMPLETED", "FAILURE")),
         ("bucket-cancel", "CANCELLED", "cancel", ("COMPLETED", "CANCELLED")),
-        ("bucket-pending", "PENDING", "pending", ("PENDING", None)),
+        ("bucket-pending", "PENDING", "pending", ("PENDING", "PENDING")),
         ("bucket-unreleased", "MYSTERY", "unreleased-bucket", ("PENDING", None)),
         # The bucket is the authority: a recognized raw state under an unknown bucket is pending.
         ("bucket-unknown-with-success-state", "SUCCESS", "unreleased-bucket", ("PENDING", None)),
@@ -820,7 +869,10 @@ def selftest():
         + len(sha_cases)
         + len(bucket_cases)
         + len(text_cases)
-        + 2  # the bucket tally and the name-prefixed row tally
+        + len(TEXT_CONCLUSIONS)
+        # the bucket tally, the name-prefixed row tally, the unordered-header tally and the
+        # table-vocabulary tally
+        + 4
     )
     passed = 0
 
@@ -902,6 +954,47 @@ def selftest():
     expected = (2, 1, 0, 1, False)
     mark = "ok" if actual == expected else "FAIL"
     print(f"  {mark}  name-prefixed-tally: total/ok/pending/failing/pass={actual}")
+    passed += 1 if actual == expected else 0
+
+    # A row that is not the header keeps its unknown verdict: `STATUS\tNAME` is counted as a
+    # failing row beside the passing one, so the tally is never all green.
+    unordered = evaluate_checks(parse_text_checks("build\tpass\nSTATUS\tNAME\n"))
+    actual = (unordered["total"], unordered["ok"], unordered["pending"], unordered["failing"],
+              unordered["pass"])
+    expected = (2, 1, 0, 1, False)
+    mark = "ok" if actual == expected else "FAIL"
+    print(f"  {mark}  unordered-header-tally: total/ok/pending/failing/pass={actual}")
+    passed += 1 if actual == expected else 0
+
+    # Every declared table verdict, classified. Generated from TEXT_CONCLUSIONS, so a token cannot
+    # be added to the vocabulary without a fixture here; only a conclusion in GOOD_CONCLUSIONS
+    # passes, and a waiting conclusion counts as pending rather than failing.
+    table_vocabulary_rows = []
+    for token, conclusion in sorted(TEXT_CONCLUSIONS.items()):
+        rows = parse_text_checks(f"check\t{token}\n")
+        table_vocabulary_rows.extend(rows)
+        facts = evaluate_checks(rows)
+        waiting = conclusion in PENDING_CONCLUSIONS
+        expected = (
+            1,
+            1 if conclusion in GOOD_CONCLUSIONS else 0,
+            1 if waiting else 0,
+            0 if conclusion in GOOD_CONCLUSIONS or waiting else 1,
+            conclusion in GOOD_CONCLUSIONS,
+        )
+        actual = (facts["total"], facts["ok"], facts["pending"], facts["failing"], facts["pass"])
+        mark = "ok" if actual == expected else "FAIL"
+        print(f"  {mark}  table-vocabulary-{token}: conclusion={conclusion} tally/pass={actual}")
+        passed += 1 if actual == expected else 0
+
+    # The whole declared vocabulary in one tally: 4 ok (pass, skipping, skip, neutral), 1 pending,
+    # 5 failing, never green. The literal pins the vocabulary size and its classification split.
+    vocabulary_tally = evaluate_checks(table_vocabulary_rows)
+    actual = (vocabulary_tally["total"], vocabulary_tally["ok"], vocabulary_tally["pending"],
+              vocabulary_tally["failing"], vocabulary_tally["pass"])
+    expected = (10, 4, 1, 5, False)
+    mark = "ok" if actual == expected else "FAIL"
+    print(f"  {mark}  table-vocabulary-tally: total/ok/pending/failing/pass={actual}")
     passed += 1 if actual == expected else 0
 
     for name, args, expected_line, expected_reasons in state_cases:
