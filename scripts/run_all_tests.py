@@ -17,10 +17,12 @@ Every suite settles as PASS, FAIL, ERROR, TIMEOUT or SKIP (see `settle`), and th
   2  the plan itself is not trustworthy: manifest or schema error, an unmet discovery floor, an
      unknown or duplicate suite id, a stale refinement, or nothing left to run
 
-Each suite runs in its own process and process group, with a task-local TMPDIR/HOME/XDG root under
-the system temp directory (not inside the checkout, matching CI), a per-suite timeout, and
-process-group teardown on timeout.  Per-suite logs and the JSON result record stay under
-`.tmp-artifacts/test-runs/<UTC stamp>/` in the checkout.  A required suite that executed zero
+Each suite runs in its own process and process group, with a task-local TMPDIR/HOME/XDG root under a
+short `/tmp` directory of its own — never the checkout, and never an inherited operator `TMPDIR`
+(`scratch_root_for`) — a per-suite timeout, and process-group teardown on timeout.  A scratch tree
+too long to hold the toolkit's AF_UNIX socket is reported as that suite's ERROR before it runs
+(`socket_path_length`).  Per-suite logs and the JSON result record stay under
+`.tmp-artifacts/test-runs/<UTC stamp>-<pid>/` in the checkout.  A required suite that executed zero
 checks is never PASS: unittest suites must collect at least one test, and suites with a declared
 count adapter must report a positive executed-check count.
 """
@@ -52,6 +54,14 @@ FAILING_STATES = ("FAIL", "ERROR", "TIMEOUT")
 RUNTIMES = ("python", "bash", "bun", "npm")
 ASSERTION_KINDS = ("auto", "unittest", "counter", "exit")
 CONDITIONS = ("always", "pull_request")
+
+# Scratch lives in /tmp rather than under an inherited TMPDIR: `sun_path` in `struct
+# sockaddr_un` caps AF_UNIX socket paths at 108 bytes including the terminating NUL, and a
+# long operator TMPDIR used to push the suites' tmux sockets past it.
+SHORT_TEMP_ROOT = Path("/tmp")
+SCRATCH_PREFIX = "hoa-t-"
+AF_UNIX_PATH_LIMIT = 108
+
 UNITTEST_SUMMARY = re.compile(r"^Ran (\d+) tests? in (?:\d|\.)", re.MULTILINE)
 UNITTEST_SKIPPED = re.compile(r"skipped=(\d+)")
 # Tools colour their output even when it is redirected to a file (vitest, npm, bun),
@@ -553,18 +563,49 @@ def base_environment(document: dict, python: str) -> dict[str, str]:
 
 
 def scratch_root_for(override: str | None = None) -> Path:
-    """Task-local scratch root for one run, outside the checkout.
+    """Task-local scratch root for one run, short and outside the checkout.
 
-    Suites reason about paths *inside* the repository — a working-tree PII gate refuses
-    a tracked path, and tmux needs a unix socket path under 108 bytes — and in CI
-    TMPDIR is /tmp, not the checkout.  The name is deliberately short for the same
-    reason: `test_omp_run_python` puts a tmux socket three levels below TMPDIR.
+    `/tmp` is preferred over `tempfile`'s default chain on purpose: the default honours an
+    inherited `TMPDIR`, and an operator `TMPDIR` long enough pushes the suites' tmux sockets
+    past the AF_UNIX `sun_path` limit (see `socket_path_length`).  Platforms without a
+    writable `/tmp` keep the standard chain — `TMPDIR`, `TEMP`, `TMP`, then the OS default —
+    and any root that cannot hold a socket is reported per suite before it runs.
     """
     if override:
         path = Path(override).resolve()
         path.mkdir(parents=True, exist_ok=True)
         return path
-    return Path(tempfile.mkdtemp(prefix="hoa-t-"))
+    if SHORT_TEMP_ROOT.is_dir():
+        created = _mkdtemp(str(SHORT_TEMP_ROOT))
+        if created is not None:
+            return created
+    return Path(tempfile.mkdtemp(prefix=SCRATCH_PREFIX))
+
+
+def _mkdtemp(parent: str) -> Path | None:
+    """`mkdtemp` under `parent`, or None when that parent cannot hold a directory."""
+    try:
+        return Path(tempfile.mkdtemp(prefix=SCRATCH_PREFIX, dir=parent))
+    except OSError:
+        return None
+
+
+def socket_path_length(scratch: Path) -> int | None:
+    """Worst-case AF_UNIX socket path length (bytes) a suite can build below `scratch`.
+
+    The bound comes from `sun_path` in `struct sockaddr_un`: 108 bytes on Linux *including*
+    the terminating NUL, i.e. a 107-byte path.  tmux is the toolkit in this repository that
+    needs it — its socket is `<TMUX_TMPDIR or TMPDIR>/tmux-<uid>/default` — and
+    `skills/gdd/scripts/tests/test_omp_run_python.py` uses
+    `<TMPDIR>/omp-run-py.XXXXXXXX/tmux-tmp` as its TMUX_TMPDIR, which is the deepest tree any
+    scheduled suite builds below the task-local TMPDIR (`<scratch>/tmp`).  Returns None
+    where AF_UNIX does not apply.
+    """
+    if os.name != "posix":
+        return None
+    uid = os.getuid() if hasattr(os, "getuid") else 0
+    tail = f"/tmp/omp-run-py.XXXXXXXX/tmux-tmp/tmux-{uid}/default"
+    return len(os.fsencode(str(scratch) + tail))
 
 
 def _suite_slug(suite_id: str) -> str:
@@ -775,10 +816,19 @@ def run_suite(suite: Suite, *, root: Path, scratch_root: Path, log_root: Path,
               environment: dict[str, str], timeout_override: float | None = None) -> Outcome:
     """Run one suite in its own process, group and task-local scratch tree."""
     slug = _suite_slug(suite.id)
-    # Short directory name: AF_UNIX paths (tmux) are capped at 108 bytes and suites put
-    # their own temp trees below TMPDIR.
+    # Short directory name: AF_UNIX paths are capped (see `socket_path_length`).
     scratch_root.mkdir(parents=True, exist_ok=True)  # never fail to isolate for want of a directory
     suite_scratch = Path(tempfile.mkdtemp(prefix=f"{slug[:12]}-", dir=scratch_root))
+    worst_case = socket_path_length(suite_scratch)
+    if worst_case is not None and worst_case >= AF_UNIX_PATH_LIMIT:
+        shutil.rmtree(suite_scratch, ignore_errors=True)
+        return Outcome(
+            suite_id=suite.id, state="ERROR", duration=0.0,
+            reason=(f"task-local scratch is too long for an AF_UNIX socket: worst case "
+                    f"{worst_case} bytes >= the {AF_UNIX_PATH_LIMIT}-byte sun_path limit "
+                    f"(scratch root {scratch_root}); use a shorter TMPDIR or --scratch"),
+            covered_by=suite.covered_by,
+        )
     directories = {
         "tmp": suite_scratch / "tmp",
         "home": suite_scratch / "home",
@@ -915,7 +965,8 @@ def _print_plan(plan: Plan) -> None:
 
 
 def _payload(plan: Plan, outcomes: list[Outcome], *, event: str, root: Path, python: str,
-             started: str, duration: float, exit_code: int, log_root: Path) -> dict:
+             started: str, duration: float, exit_code: int, log_root: Path,
+             scratch_root: Path) -> dict:
     summary = {state: 0 for state in TERMINAL_STATES}
     for outcome in outcomes:
         summary[outcome.state] = summary.get(outcome.state, 0) + 1
@@ -929,6 +980,7 @@ def _payload(plan: Plan, outcomes: list[Outcome], *, event: str, root: Path, pyt
         "duration_seconds": round(duration, 3),
         "filtered": plan.filtered,
         "logs": str(log_root),
+        "scratch_root": str(scratch_root),
         "discovery": {
             "pattern_matches": len(plan.discovered),
             "floor_missing": plan.floor_missing,
@@ -1069,7 +1121,7 @@ def main(argv: list[str] | None = None) -> int:
     _write_report(Path(args.report).resolve() if args.report else None,
                   _payload(plan, outcomes, event=event, root=root, python=python,
                            started=started, duration=duration, exit_code=exit_code,
-                           log_root=log_root))
+                           log_root=log_root, scratch_root=scratch_root))
     print(f"exit {exit_code}")
     return exit_code
 

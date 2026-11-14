@@ -456,6 +456,10 @@ class EndToEndTests(unittest.TestCase):
         ARTIFACTS.mkdir(parents=True, exist_ok=True)
         self.addCleanup(shutil.rmtree, ARTIFACTS, ignore_errors=True)
         self.report = ARTIFACTS / "report.json"
+        # Short and outside the checkout, like the operator default -- the runner refuses
+        # scratch roots that cannot hold a socket.
+        self.scratch = runner.scratch_root_for()
+        self.addCleanup(shutil.rmtree, self.scratch, ignore_errors=True)
 
     def build(self) -> Path:
         root = synthetic_tree(
@@ -515,7 +519,7 @@ class EndToEndTests(unittest.TestCase):
         # 20s, not 5s: these suites start real interpreters and the machine may be
         # loaded; only the injected hang suite is meant to hit the timeout.
         argv = ["--root", str(root), "--event", "local", "--timeout", "20",
-                "--scratch", str(ARTIFACTS / "scratch"), "--report", str(self.report), *extra]
+                "--scratch", str(self.scratch), "--report", str(self.report), *extra]
         with contextlib.redirect_stdout(buffer):
             code = runner.main(argv)
         payload = json.loads(self.report.read_text(encoding="utf-8"))
@@ -570,7 +574,7 @@ class EndToEndTests(unittest.TestCase):
         self.addCleanup(os.environ.pop, "OMP_RUN_ROOT", None)
         self.run_main(root, "--suite", "scripts/test_env.py")
         dump = json.loads((ARTIFACTS / "env-dump.json").read_text(encoding="utf-8"))
-        scratch = str(ARTIFACTS / "scratch")
+        scratch = str(self.scratch)
         for name in ("HOME", "TMPDIR", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME",
                      "XDG_STATE_HOME"):
             self.assertTrue(dump[name].startswith(scratch), f"{name}={dump[name]}")
@@ -584,7 +588,54 @@ class EndToEndTests(unittest.TestCase):
         self.addCleanup(shutil.rmtree, scratch, ignore_errors=True)
         self.assertTrue(scratch.is_dir())
         self.assertFalse(scratch.is_relative_to(ROOT), scratch)
-        self.assertTrue(scratch.is_relative_to(Path(tempfile.gettempdir()).resolve()), scratch)
+        if runner.SHORT_TEMP_ROOT.is_dir():
+            self.assertTrue(scratch.is_relative_to(runner.SHORT_TEMP_ROOT), scratch)
+
+    @unittest.skipUnless(runner.SHORT_TEMP_ROOT.is_dir(), "no short temp root on this platform")
+    def test_default_scratch_stays_socket_sized_under_a_long_operator_tmpdir(self):
+        """A long inherited TMPDIR must not reach the scratch tree (§4 item 4)."""
+        long_tmpdir = ARTIFACTS / ("operator-tmpdir-" + "x" * 80)
+        long_tmpdir.mkdir(parents=True, exist_ok=True)
+        saved = os.environ.get("TMPDIR")
+        os.environ["TMPDIR"] = str(long_tmpdir)
+        try:
+            scratch = runner.scratch_root_for()
+        finally:
+            if saved is None:
+                os.environ.pop("TMPDIR", None)
+            else:
+                os.environ["TMPDIR"] = saved
+        self.addCleanup(shutil.rmtree, scratch, ignore_errors=True)
+        self.assertFalse(scratch.is_relative_to(long_tmpdir),
+                         f"scratch inherited TMPDIR: {scratch}")
+        suite_scratch = Path(tempfile.mkdtemp(prefix="skills-gdd-s-", dir=scratch))
+        self.addCleanup(shutil.rmtree, suite_scratch, ignore_errors=True)
+        worst_case = runner.socket_path_length(suite_scratch)
+        self.assertIsNotNone(worst_case)
+        self.assertLess(worst_case, runner.AF_UNIX_PATH_LIMIT,
+                        f"worst-case socket path {worst_case} bytes for {suite_scratch}")
+
+    @unittest.skipIf(os.name != "posix", "AF_UNIX path limits do not apply")
+    def test_a_scratch_root_too_long_for_a_socket_errors_before_running(self):
+        """The bound is enforced, not assumed: no suite runs under an unusable root."""
+        marker = ARTIFACTS / "should-not-exist.txt"
+        marker.unlink(missing_ok=True)
+        deep = ARTIFACTS / ("deep-" + "d" * 80) / "deeper"
+        deep.mkdir(parents=True, exist_ok=True)
+        suite = runner.Suite(
+            id="scripts/test_marker.py", origin="declared", cwd=ROOT, runtime="python",
+            commands=(("{python}", "-c", f"open({str(marker)!r}, 'w').close()"),),
+        )
+        log_root = ARTIFACTS / "logs"
+        log_root.mkdir(parents=True, exist_ok=True)
+        outcome = runner.run_suite(suite, root=ROOT, scratch_root=deep, log_root=log_root,
+                                   environment=runner.base_environment({}, sys.executable))
+        self.assertEqual(outcome.state, "ERROR")
+        self.assertIn("AF_UNIX", outcome.reason)
+        self.assertIn(str(runner.AF_UNIX_PATH_LIMIT), outcome.reason)
+        self.assertFalse(marker.exists(), "the suite ran despite an unusable scratch root")
+        self.assertEqual([entry.name for entry in deep.iterdir()], [],
+                         "the unusable per-suite scratch tree was not cleaned up")
 
     def test_timeout_tears_down_the_whole_process_group(self):
         root = self.build()

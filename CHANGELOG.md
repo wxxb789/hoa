@@ -28,6 +28,9 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
 - The CI test job installs the runtimes and dependencies, then calls the discoverer. The hand-written
   per-suite commands it replaces are reconciled one by one in `scripts/test_manifest.toml`, and were
   deleted only after that reconciliation and the five injected faults produced their evidence.
+- Per-suite scratch trees are created under `/tmp`, never under an inherited operator `TMPDIR`, and a
+  root whose worst-case tmux socket would exceed the 108-byte `sun_path` limit is reported as that
+  suite's ERROR before it runs instead of failing later as a tmux mystery.
 - Bumped shared skill/catalog version from 0.1.61 to 0.1.62.
 
 ## [0.1.61] — 2026-11-14

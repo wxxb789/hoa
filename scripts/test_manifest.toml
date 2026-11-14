@@ -144,8 +144,10 @@ floor = [
 # PYTHONDONTWRITEBYTECODE, GIT_TERMINAL_PROMPT, NO_COLOR (captured logs are parsed,
 # so no tool may colour them), and PATH with the discoverer's own interpreter
 # directory prepended so a suite's internal `python3` is the interpreter that
-# carries the repository dependencies (§4.3).  The task-local scratch root lives in
-# the system temp directory, outside the checkout, the way CI's TMPDIR is.
+# carries the repository dependencies (§4.3).  The task-local scratch root is created
+# under /tmp — never under an inherited operator TMPDIR, and outside the checkout the way
+# CI's TMPDIR is; a root too long to hold a tmux AF_UNIX socket is reported as that
+# suite's ERROR before it runs.
 passthrough = [
   "PATH",
   "LANG",
