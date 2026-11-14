@@ -179,6 +179,14 @@ implementation, acceptance-verdict, scope-seal). Every rule is enforced by that 
 The `test` job runs on every push to `main`, every pull request, and `workflow_dispatch`; the
 `release` job runs only after it on `main` and tags the commit CI tested.
 
+The `test` job provisions the runtimes and dependencies, then runs
+`python scripts/run_all_tests.py`. That discoverer schedules every command in the table below, which
+lists manifest entries from `scripts/test_manifest.toml` rather than separate CI steps. It also
+schedules the Python suites that were never wired in before —
+`skills/delegated-work-acceptance/scripts/tests/test_worktree_scope.py` and
+`skills/gdd/scripts/tests/test_paseo_run_python.py` — and the `paseo-plugins/gdd-run-observer` Vitest
+package.
+
 | Gate command (CI step) | Protects |
 |---|---|
 | `bun install --frozen-lockfile && bun run check && bun test` in `scripts/shared`, `skills/teams-cdp/scripts`, `skills/m365-copilot-cdp/scripts` | Desktop CDP types and behavior in the shared code and both desktop skills. |

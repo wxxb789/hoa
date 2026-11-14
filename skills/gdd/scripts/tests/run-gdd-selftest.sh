@@ -1161,7 +1161,14 @@ LAST_HEAD="$(awk -F'\t' 'NR>1 {h=$6} END {print h}' "$HEAD_KEEP_TSV" 2>/dev/null
 check $? "a report-only stage keeps the dispatched head in its completion row (got '$LAST_HEAD' rc=$HEAD_KEEP_RC)" "$(cat "$TMP/head-keep.out")"
 
 # --- dispatch guards ---------------------------------------------------------
+# The coverage manifest accounts for test-dispatch-guards.py through this suite
+# (covered_by in scripts/test_manifest.toml) and reads its positive count back out
+# of this log, so echo the child's own summary line after asserting it.
 GUARD_OUT="$(python3 "$HERE/test-dispatch-guards.py" 2>&1)"
+GUARD_RC=$?
+printf '%s\n' "$GUARD_OUT" | tail -n 1
+[ "$GUARD_RC" -eq 0 ] \
+  && printf '%s\n' "$GUARD_OUT" | grep -qE '^dispatch-guards: [1-9][0-9]*/[1-9][0-9]* ok$'
 check $? "dispatch guards refuse empty contract / archive / provisional / dirty tree / empty range" "$GUARD_OUT"
 
 echo "selftest: $PASS/$TOTAL ok"

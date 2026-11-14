@@ -1,0 +1,419 @@
+# scripts/test_manifest.toml — data for scripts/run_all_tests.py
+#
+# Everything the test discoverer schedules lives here: discovery patterns, the
+# reviewed discovery floor, the non-glob suites (gates and packages), and the
+# refinements that preserve an invocation or account for a suite a parent already
+# runs.  The runner holds no suite knowledge of its own.
+#
+# Entry shapes, both in [[suite]]:
+#   declared    `id` + `command`    discovery cannot name it (a gate, a package, a
+#                                   command that is not a test file).  A declared
+#                                   entry may also carry `path`; when that path is
+#                                   also discovered, the declared entry owns it and
+#                                   the path is not scheduled twice.
+#   refinement  `path` only         a discovered entry point, re-declared to
+#                                   preserve its invocation, attach an assertion
+#                                   adapter, change its timeout, or withdraw it from
+#                                   scheduling because a parent suite runs it
+#                                   (`covered_by`).
+#
+# Fields
+#   id             suite identity; required for a declared entry.  A refinement's
+#                  identity is its path.
+#   path           repo-relative entry point.
+#   command        list of argv vectors executed in order; every one must exit 0.
+#                  `{python}` is replaced by the interpreter running the
+#                  discoverer (`sys.executable`), never a PATH `python3`.
+#   provision      argv vectors run before `command`; a failure is ERROR
+#                  (environment), never FAIL.
+#   cwd            repo-relative working directory; default the repository root.
+#   runtime        python | bash | bun | npm.  Declarative: it names the runtime the
+#                  reconciliation accounts for; argv[0] is what actually runs.
+#   required       default true.  A FAIL/ERROR/TIMEOUT in a required suite makes the
+#                  run exit nonzero.  Discovered suites are required unless a
+#                  refinement says otherwise.
+#   condition      always (default) | pull_request.  A suite whose condition is not
+#                  met settles SKIP with `skip_reason` and is never executed.
+#   skip_reason    required whenever condition != "always".
+#   assertion      auto (default) | unittest | counter | exit.
+#                    auto      `-m unittest` on the command line, or a Python entry
+#                              point that imports unittest, is a unittest suite.
+#                    unittest  require `Ran N tests` with N > 0; `Ran 0 tests` and a
+#                              missing summary are ERROR, never PASS.
+#                    counter   require a declared count_regexes line with
+#                              passed > 0 and with every non-passed check accounted
+#                              for by `skipped`; zero checks is ERROR.
+#                    exit      the exit status is the contract.
+#   count_regexes  counter patterns, named groups `passed` (required, > 0), `total`
+#                  (optional, all checks the suite executed) and `skipped`
+#                  (optional).  The last output line matching any pattern wins.
+#   require_regex  optional pattern that must appear when the suite passes; a miss
+#                  is ERROR.  For runners whose positive evidence is a marker rather
+#                  than a count.
+#   timeout        seconds before the process group is terminated (default 120).
+#   env            extra environment variables for the suite process.
+#   covered_by     id of the suite that already executes this one.  The child is
+#                  accounted for, never scheduled, and settles from the parent's own
+#                  output: the parent must name the child (checked at plan time) and
+#                  the child's count_regexes must match in the parent's log.
+#   detached       detached resources the suite creates (setsid runs, tmux sessions)
+#                  and where its teardown is asserted.
+#   notes          provenance: the CI step this entry replaces, or why it exists.
+
+schema = 1
+
+[discovery]
+
+# Named entry-point patterns only (§4.1).  Never a bare `*.sh`, never fixture data,
+# never `judge_*.py` (that belongs to online evaluation).
+patterns = [
+  "scripts/test_*.py",
+  "skills/*/scripts/test_*.py",
+  "skills/*/scripts/test-*.py",
+  "skills/*/scripts/tests/test*.py",
+  "skills/*/scripts/tests/test*.sh",
+  "skills/*/scripts/tests/run-*-selftest.sh",
+  "skills/*/evals/run*.py",
+  "skills/*/evals/validate_*.py",
+  "evals/run_*.py",
+  "evals/validate_*.py",
+  "evals/test_*.py",
+]
+
+# Never descended into and never collected from, even if a future pattern would
+# match inside.  A slash-less entry prunes that name at any depth; a path entry
+# prunes the subtree.
+prune = [
+  ".git",
+  ".tmp-artifacts",
+  "__pycache__",
+  "node_modules",
+  "ref",
+  "fixtures",
+  # Package trees with their own package-manager commands instead of a test glob
+  # (§4.2); the Bun CDP packages and the Paseo plugin are declared suites below.
+  "scripts/shared",
+  "skills/teams-cdp/scripts",
+  "skills/m365-copilot-cdp/scripts",
+  "paseo-plugins",
+]
+
+# Reviewed discovery floor: a full run that does not discover every one of these
+# paths is a plan error (exit 2).  Adding a suite to the catalog means adding its
+# path here; a path leaving this list is a deliberate, reviewed removal, which is
+# what keeps a silently empty or shrunken discovery set from going green (§4.6).
+floor = [
+  "scripts/test_catalog_measurement.py",
+  "scripts/test_check_changelog.py",
+  "scripts/test_check_contract_graph.py",
+  "scripts/test_check_frontmatter.py",
+  "scripts/test_generate_index.py",
+  "scripts/test_install_host_skills.py",
+  "scripts/test_release.py",
+  "scripts/test_run_all_tests.py",
+  "scripts/test_skill_config.py",
+  "scripts/test_version.py",
+  "skills/delegated-work-acceptance/scripts/tests/test_worktree_scope.py",
+  "skills/define-goal/evals/validate_fixtures.py",
+  "skills/gdd/scripts/tests/run-gdd-selftest.sh",
+  "skills/gdd/scripts/tests/test-dispatch-guards.py",
+  "skills/gdd/scripts/tests/test-omp-run-setsid.sh",
+  "skills/gdd/scripts/tests/test-omp-run-stale.sh",
+  "skills/gdd/scripts/tests/test_omp_run_python.py",
+  "skills/gdd/scripts/tests/test_paseo_run_python.py",
+  "skills/gdd/scripts/tests/test_review_evidence.py",
+  "skills/gdd/scripts/tests/test_watch_pr_checks.py",
+  "skills/ghc-search/scripts/test_ghc_search.py",
+  "skills/hermes-models/scripts/tests/test-provider-metadata.py",
+  "skills/hermes-models/scripts/tests/test-routing-inventory.py",
+  "skills/hoa-introspect-distill/evals/run_evals.py",
+  "skills/hoa-introspect/evals/run.py",
+  "evals/run_trigger_evals.py",
+  "evals/test_judge_trigger_evals.py",
+  "evals/test_validate_skill_method_cases.py",
+  "evals/validate_skill_method_cases.py",
+]
+
+[env]
+
+# Allowlist copied from the operator/CI environment into every suite process.
+# Everything else is dropped, so an operator's GDD_* / OMP_* / PASEO_* / profile
+# variables cannot reach a suite.  The runner additionally sets, per suite and
+# task-local: HOME, TMPDIR, TMP, TEMP, XDG_CONFIG_HOME, XDG_CACHE_HOME,
+# XDG_DATA_HOME, XDG_STATE_HOME, PYTHONPATH (= the repository root),
+# PYTHONDONTWRITEBYTECODE, GIT_TERMINAL_PROMPT, NO_COLOR (captured logs are parsed,
+# so no tool may colour them), and PATH with the discoverer's own interpreter
+# directory prepended so a suite's internal `python3` is the interpreter that
+# carries the repository dependencies (§4.3).  The task-local scratch root lives in
+# the system temp directory, outside the checkout, the way CI's TMPDIR is.
+passthrough = [
+  "PATH",
+  "LANG",
+  "LC_ALL",
+  "LC_CTYPE",
+  "LC_MESSAGES",
+  "TERM",
+  "TZ",
+  "CI",
+  "GITHUB_ACTIONS",
+  "GITHUB_EVENT_NAME",
+  "GITHUB_REF",
+  "GITHUB_SHA",
+  "GITHUB_HEAD_REF",
+  "GITHUB_BASE_REF",
+]
+
+[provisioning]
+
+# Provisioned for the runner by the CI job (and by the operator locally) before
+# the discoverer starts.  The discoverer does not repeat these: they belong to the
+# machine, not to a suite.  Per-suite provisioning is the `provision` field.
+runner = [
+  "python 3.12 via actions/setup-python",
+  "bun 1.4.4 via oven-sh/setup-bun",
+  "node 20.19.4 via actions/setup-node (the Paseo plugin's documented minimum)",
+  "python -m pip install -r scripts/requirements.txt",
+  "actions/checkout with fetch-depth 0 (the version and changelog gates read origin/main)",
+]
+
+# ── declared: gates ──────────────────────────────────────────────────────────
+# Cheap static gates first, so a drift failure is reported before the slow
+# packages.  Each replaces a hand-written CI step (§4.8 reconciliation).
+
+[[suite]]
+id = "gate:frontmatter"
+command = [["{python}", "scripts/check_frontmatter.py"]]
+runtime = "python"
+required = true
+notes = "replaces the CI step 'SKILL.md frontmatter and catalog fields'"
+
+[[suite]]
+id = "gate:contract-graph"
+command = [["{python}", "scripts/check_contract_graph.py"]]
+runtime = "python"
+required = true
+notes = "replaces the CI step 'Composition contract graph'"
+
+[[suite]]
+id = "gate:index-drift"
+command = [["{python}", "scripts/generate_index.py", "--check"]]
+runtime = "python"
+required = true
+notes = "replaces the CI step 'Skill catalog drift check'"
+
+[[suite]]
+id = "gate:version-check"
+command = [["{python}", "scripts/version.py", "check"]]
+runtime = "python"
+required = true
+notes = "replaces the CI step 'Unified version and catalog check'"
+
+[[suite]]
+id = "gate:vendor-shared"
+command = [["{python}", "scripts/vendor_shared.py", "--check"]]
+runtime = "python"
+required = true
+notes = "replaces the CI step 'Shared script drift check'"
+
+[[suite]]
+id = "gate:version-bump"
+command = [["{python}", "scripts/version.py", "check-bump"]]
+runtime = "python"
+required = true
+condition = "pull_request"
+skip_reason = "pull-request guard: a push to main has nothing to bump"
+notes = "replaces the CI step 'Pull request bumps the patch' (if: pull_request)"
+
+[[suite]]
+id = "gate:changelog"
+command = [["{python}", "scripts/check_changelog.py", "--base", "origin/main"]]
+runtime = "python"
+required = true
+condition = "pull_request"
+skip_reason = "pull-request guard: compared against the merge base with origin/main"
+notes = "replaces the CI step 'Pull request adds a changelog entry' (if: pull_request)"
+
+[[suite]]
+id = "gate:version-merge"
+command = [["{python}", "scripts/version.py", "check-merge"]]
+runtime = "python"
+required = true
+condition = "pull_request"
+skip_reason = "pull-request guard: the remote patch + 1 and the tag check"
+notes = "replaces the CI step 'Version claim is still free' (if: pull_request)"
+
+# ── declared: packages ───────────────────────────────────────────────────────
+# These keep their own package-manager commands instead of a discovered test glob
+# (§4.2).  `bun install` / `npm ci` are the provisioning step of the suite itself,
+# and their caches land in the task-local HOME, not the operator's.
+
+[[suite]]
+id = "pkg:cdp-shared"
+command = [["bun", "run", "check"], ["bun", "test"]]
+provision = [["bun", "install", "--frozen-lockfile"]]
+cwd = "scripts/shared"
+runtime = "bun"
+required = true
+assertion = "counter"
+count_regexes = ['^ *(?P<passed>\d+) pass$']
+timeout = 300
+notes = "replaces the CI step 'Desktop CDP types and behavioral tests' for scripts/shared"
+
+[[suite]]
+id = "pkg:teams-cdp"
+command = [["bun", "run", "check"], ["bun", "test"]]
+provision = [["bun", "install", "--frozen-lockfile"]]
+cwd = "skills/teams-cdp/scripts"
+runtime = "bun"
+required = true
+assertion = "counter"
+count_regexes = ['^ *(?P<passed>\d+) pass$']
+timeout = 300
+notes = "replaces the CI loop body for skills/teams-cdp/scripts; tsc alone runs ~26s"
+
+[[suite]]
+id = "pkg:m365-copilot-cdp"
+command = [["bun", "run", "check"], ["bun", "test"]]
+provision = [["bun", "install", "--frozen-lockfile"]]
+cwd = "skills/m365-copilot-cdp/scripts"
+runtime = "bun"
+required = true
+assertion = "counter"
+count_regexes = ['^ *(?P<passed>\d+) pass$']
+timeout = 300
+notes = "replaces the CI loop body for skills/m365-copilot-cdp/scripts"
+
+[[suite]]
+id = "pkg:paseo-run-observer"
+command = [["npm", "run", "typecheck"], ["npm", "test"]]
+provision = [["npm", "ci"]]
+cwd = "paseo-plugins/gdd-run-observer"
+runtime = "npm"
+required = true
+assertion = "counter"
+count_regexes = ['^ *Tests +(?P<passed>\d+) passed(?: \| (?P<skipped>\d+) skipped)? \((?P<total>\d+)\)$']
+timeout = 600
+notes = "previously unwired Vitest package (§4.2): cwd, npm ci provisioning, typecheck and vitest; all four server/tests sources run here"
+
+# ── refinements: preserved invocations ───────────────────────────────────────
+# The repository declares these as `python -m unittest <module>`; the discovery
+# default (direct execution, `[sys.executable, "-B", path]`) is not the declared
+# form, so the manifest keeps the module invocation (§4.3).  Coverage is otherwise
+# unchanged: the same modules, the same tests.
+
+[[suite]]
+path = "scripts/test_check_changelog.py"
+command = [["{python}", "-B", "-m", "unittest", "scripts.test_check_changelog"]]
+notes = "preserved invocation of the CI step 'Changelog rule tests'"
+
+[[suite]]
+path = "scripts/test_check_frontmatter.py"
+command = [["{python}", "-B", "-m", "unittest", "scripts.test_check_frontmatter"]]
+notes = "preserved invocation of the CI step 'Frontmatter checker tests'"
+
+[[suite]]
+path = "scripts/test_install_host_skills.py"
+command = [["{python}", "-B", "-m", "unittest", "scripts.test_install_host_skills"]]
+notes = "preserved invocation of the CI step 'Host install parity tests'"
+
+[[suite]]
+path = "scripts/test_skill_config.py"
+command = [["{python}", "-B", "-m", "unittest", "scripts.test_skill_config"]]
+notes = "preserved invocation of the CI step 'Skill configuration resolver tests'"
+
+[[suite]]
+path = "evals/test_judge_trigger_evals.py"
+command = [["{python}", "-B", "-m", "unittest", "evals.test_judge_trigger_evals"]]
+notes = "preserved invocation of the CI step 'Eval judge configuration and baseline tests'"
+
+[[suite]]
+path = "evals/test_validate_skill_method_cases.py"
+command = [["{python}", "-B", "-m", "unittest", "evals.test_validate_skill_method_cases"]]
+notes = "preserved invocation of the CI step 'Skill-method setup isolation tests'"
+
+# ── refinements: assertion adapters and timeouts ─────────────────────────────
+# Suites whose positive evidence is a count rather than unittest's summary.  The
+# three custom-assertion Python suites of §4.6 get real adapters: a zero-assertion
+# run is ERROR, never PASS.
+
+[[suite]]
+path = "skills/hermes-models/scripts/tests/test-routing-inventory.py"
+assertion = "counter"
+count_regexes = ['^routing-inventory: (?P<passed>\d+)/(?P<total>\d+) ok$']
+notes = "custom assertion format; previously the CI step 'Routing inventory fixture tests'"
+
+[[suite]]
+path = "skills/hermes-models/scripts/tests/test-provider-metadata.py"
+assertion = "counter"
+count_regexes = ['^provider-metadata: (?P<passed>\d+)/(?P<total>\d+) ok$']
+notes = "custom assertion format; previously the CI step 'Provider metadata fixture tests'"
+
+[[suite]]
+path = "skills/gdd/scripts/tests/test-dispatch-guards.py"
+covered_by = "skills/gdd/scripts/tests/run-gdd-selftest.sh"
+assertion = "counter"
+count_regexes = ['^dispatch-guards: (?P<passed>\d+)/(?P<total>\d+) ok$']
+notes = "already executed by run-gdd-selftest.sh; accounted here, never scheduled twice (§4.1)"
+
+[[suite]]
+path = "skills/gdd/scripts/tests/run-gdd-selftest.sh"
+assertion = "counter"
+count_regexes = ['^selftest: (?P<passed>\d+)/(?P<total>\d+) ok$']
+timeout = 300
+notes = "replaces the CI step 'GDD loop selftest'; its own count line covers its children"
+
+[[suite]]
+path = "skills/gdd/scripts/tests/test-omp-run-setsid.sh"
+assertion = "counter"
+count_regexes = [
+  '^setsid-test: (?P<passed>\d+)/(?P<total>\d+) ok$',
+  '^setsid-test: (?P<passed>\d+) ok, (?P<skipped>\d+) skipped \(tmux unavailable\)$',
+]
+timeout = 300
+detached = "setsid process groups and, when tmux is present, tmux sessions. The suite kills both in its own EXIT trap and asserts the session is gone (test-omp-run-setsid.sh:38-46,264-270); the tmux cases skip loudly and are recorded as subcase skips."
+notes = "replaces the CI step 'GDD launcher setsid backend tests'; tmux cases are an optional subcase, not an optional suite"
+
+[[suite]]
+path = "skills/gdd/scripts/tests/test_omp_run_python.py"
+timeout = 300
+notes = "replaces the CI step 'GDD launcher Python adapter tests'; drives a stub agent through the launcher's wait loops"
+
+[[suite]]
+path = "skills/gdd/scripts/tests/test_paseo_run_python.py"
+timeout = 300
+notes = "previously unwired (§1: exists but not in baseline CI); ~45s of launcher wait loops"
+
+[[suite]]
+path = "skills/gdd/scripts/tests/test-omp-run-stale.sh"
+timeout = 300
+notes = "replaces the CI step 'GDD launcher forwarder tests'"
+
+# ── refinements: positive-evidence markers ──────────────────────────────────
+# Eval runners and validators whose contract is an exit status plus a marker; the
+# marker is required so an exit-0 run that never reached its result cannot pass.
+
+[[suite]]
+path = "evals/run_trigger_evals.py"
+assertion = "counter"
+count_regexes = ['^PASS: (?P<passed>\d+) trigger cases valid']
+notes = "offline case validation; the count is the number of validated cases"
+
+[[suite]]
+path = "skills/hoa-introspect/evals/run.py"
+require_regex = '^PASS: '
+notes = "replaces the CI step 'hoa-introspect evals'"
+
+[[suite]]
+path = "skills/hoa-introspect-distill/evals/run_evals.py"
+require_regex = '"pii_gate": "PASS"'
+notes = "replaces the CI step 'hoa-introspect-distill evals'; the runner prints one JSON result per fixture"
+
+[[suite]]
+path = "skills/define-goal/evals/validate_fixtures.py"
+require_regex = '^PASS: define-goal fixtures'
+notes = "replaces the CI step 'define-goal fixture validation'"
+
+[[suite]]
+path = "evals/validate_skill_method_cases.py"
+require_regex = '^PASS: skill-method cases'
+notes = "replaces the CI step 'Skill-method case validation'"

@@ -3,6 +3,33 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## [0.1.62] — 2026-11-14
+
+### Added
+
+- `scripts/run_all_tests.py` discovers, isolates and settles every repository test suite from the
+  data in `scripts/test_manifest.toml`: named entry-point patterns only, a reviewed discovery floor
+  that turns a shrunken discovery set into a plan error, per-suite process groups with task-local
+  TMPDIR/HOME/XDG roots and a timeout, and PASS/FAIL/ERROR/TIMEOUT/SKIP terminal states with a JSON
+  result record.
+- Tested assertion adapters stop a required suite from passing with zero executed checks: declared
+  unittest suites reject `Ran 0 tests` and a missing summary, the custom-assertion suites must report
+  a positive count, and a covered child settles from the parent output that claims to run it.
+- The manifest declares the non-glob suites discovery cannot name: five static gates, three
+  pull-request gates, the three Bun CDP packages, and the `paseo-plugins/gdd-run-observer` Vitest
+  package with its own cwd, provisioning, typecheck and test commands.
+- Coverage the old globs missed: `skills/ghc-search/scripts/test_ghc_search.py`, plus two Python
+  suites that existed but were never wired into CI —
+  `skills/delegated-work-acceptance/scripts/tests/test_worktree_scope.py` and
+  `skills/gdd/scripts/tests/test_paseo_run_python.py`.
+
+### Changed
+
+- The CI test job installs the runtimes and dependencies, then calls the discoverer. The hand-written
+  per-suite commands it replaces are reconciled one by one in `scripts/test_manifest.toml`, and were
+  deleted only after that reconciliation and the five injected faults produced their evidence.
+- Bumped shared skill/catalog version from 0.1.61 to 0.1.62.
+
 ## [0.1.61] — 2026-11-14
 
 ### Added

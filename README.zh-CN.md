@@ -167,6 +167,13 @@ scope-seal）。每条规则都由该命令执行：
 `test` job 在每次 push 到 `main`、每个 pull request 与 `workflow_dispatch` 时运行；`release`
 job 只在 `main` 上、`test` 成功之后运行，并为 CI 验证过的提交打 tag。
 
+`test` job 先装好运行时与依赖，然后运行 `python scripts/run_all_tests.py`。该 discoverer 调度下
+表里的每一条命令——这些是 `scripts/test_manifest.toml` 里的 manifest 条目，而非独立的 CI
+step。它同时调度此前从未接入 CI 的 Python 测试套件——
+`skills/delegated-work-acceptance/scripts/tests/test_worktree_scope.py` 与
+`skills/gdd/scripts/tests/test_paseo_run_python.py`——以及 `paseo-plugins/gdd-run-observer`
+这个 Vitest 包。
+
 | 检查命令（CI step） | 保护什么 |
 |---|---|
 | 在 `scripts/shared`、`skills/teams-cdp/scripts`、`skills/m365-copilot-cdp/scripts` 中运行 `bun install --frozen-lockfile && bun run check && bun test` | 共享代码与两个桌面 skill 的 CDP 类型和行为。 |
