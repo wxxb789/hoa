@@ -3,6 +3,42 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## [0.1.62] — 2026-11-15
+
+### Added
+
+- An opt-in DeepSeek Harness launcher, `skills/gdd/scripts/adapters/dsh-run.py`, implements the GDD
+  launcher contract on `dsh --profile headless`. `start` spawns a detached runner that pipes the
+  `--json` NDJSON stream through the shared `adapters/events-writer.py` bound, keeps `state.json`
+  current, and refuses a second `start` for a live slug. Completion is `exit 0` **and** the last
+  `final` event carrying `reason.kind == "completed"`; a runner-level `error` or a missing `final` is
+  `failed`, an unfinalized death is recovered as `failed`/`-1` with `stale_recovered: true` behind the
+  `finalized` marker, and `kill` writes a `stop` control file the runner polls before escalating to a
+  process-group TERM/KILL. `--max-time` is the runner's own stop path (`killed`/`143`,
+  `deadline_exceeded: true`); `--model`/`--thinking` are refused before a run directory exists because
+  headless composes no agent presets. Every setting is environment-only: `DSH_BIN`,
+  `DSH_RUN_ROOT`/`GDD_RUN_ROOT`, `DSH_RUN_PROFILE`, `DSH_PERMISSION_MODE`, `DSH_APPROVAL_POLICY`, the
+  three timeouts and `DSH_RUN_EVENTS_MAX_BYTES`.
+- `skills/dsh-headless-gdd/SKILL.md` is the `kind: mechanism` operating method for that route:
+  launcher flags before app flags, one worktree per recorded session, resume of the same increment in
+  the same cwd, the two-condition completion rule with `tool_result.status == "completed"` read as
+  "the tool returned", and the file-only recovery substrate (worktree, harness session log, run
+  artifacts).
+- `skills/gdd/scripts/tests/test_dsh_run_python.py` runs the adapter against a stub `dsh` on `PATH`
+  that emits canned headless NDJSON, with no network or model: 55 tests pin the completion rule, the
+  `--max-time` deadline, the control-file kill and its forced escalation, stale recovery, the bounded
+  event accounting, argv/stdin passthrough, and the second-start refusal.
+
+### Changed
+
+- `skills/gdd/references/transport.md` adds the DSH row to the route table, the DSH headless adapter
+  section with the two route-specific rules (the run's cwd must be the worktree its session recorded;
+  `--approval-policy never` is required for unattended runs), the DSH configuration table, and the
+  route's stub-driven suite beside the OMP and Paseo suites. The route is selected with
+  `GDD_LAUNCHER`, never by a reachability probe.
+- Bumped the shared skill/catalog version from `0.1.61` to `0.1.62` through `scripts/version.py bump`,
+  which mirrors every `skills/*/SKILL.md` `metadata.version` and regenerates both indexes.
+
 ## [0.1.61] — 2026-11-14
 
 ### Added

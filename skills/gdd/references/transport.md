@@ -13,11 +13,13 @@ Paths below are relative to the installed `gdd` skill directory.
 | Route | Launcher | Runtime requirement |
 |---|---|---|
 | Headless CLI (default) | `scripts/adapters/omp-run.py` | An OMP-style `-p` CLI hosted in a detached process; stdlib Python 3, no bash, `setsid`, or `tmux` dependency |
+| Headless CLI — DeepSeek Harness (opt-in) | Set `GDD_LAUNCHER` to `scripts/adapters/dsh-run.py` | An installed `dsh` CLI with a `headless` profile; each stage is one `dsh --profile headless` task in a detached runner. Operating method for this route: the [`dsh-headless-gdd`](../../dsh-headless-gdd/SKILL.md) mechanism skill |
 | Native Paseo (opt-in) | Set `GDD_LAUNCHER` to `scripts/adapters/paseo-run.py` | An installed Paseo CLI and a reachable Paseo daemon; each stage is a native Paseo agent |
 
 Select the route as configuration, never from a daemon reachability probe. An unreachable daemon
 does not substitute the headless launcher, and a reachable daemon does not opt a default install into
-native agents. Both Python adapters use the existing launcher contract and add no Python dependencies.
+native agents. All three Python adapters use the existing launcher contract and add no Python
+dependencies.
 `scripts/adapters/omp-run.sh` remains the POSIX reference adapter with the attachable `tmux` backend;
 `scripts/tests/test-omp-run-setsid.sh` and `test-omp-run-stale.sh` pin its behaviour.
 
@@ -143,6 +145,99 @@ the runner owns the run, so a second `start` refuses instead of moving a startin
 and one ledger row). The `finalized` marker is the authority either way; a run whose finalizer died
 between publishing `state.json` and writing the marker is finalized again from its recorded exit code
 and marked `finalize_repaired`.
+
+## DSH headless adapter
+
+`dsh-run.py` implements the same `start`, `list`, `status`, `result`, `answer`, `tail` and `kill`
+commands on top of `dsh --profile headless`, which answers one task and exits. A detached runner owns
+the run: POSIX it is spawned with its own session, Windows with one hidden console the whole tree
+inherits. The runner pipes dsh's `--json` NDJSON stream through the same bounded writer the OMP
+adapters use (`scripts/adapters/events-writer.py`), so the event bound and `events.stats.json` have
+one implementation.
+
+The invocation is `dsh --profile headless [launcher flags] [app flags] -` with `prompt.md` on stdin:
+launcher flags must precede the app's own flags (a `--patch` after an app flag is rejected with
+`unknown option '--patch'`), and a lone `-` is the only stdin marker. The app flags this adapter
+passes are `--json`, `--session-id ID`, `--permission-mode MODE` and `--approval-policy POLICY`;
+`--permission-mode` and `--approval-policy` are repeated on every start and resume because session
+adoption requires them again. The contract's `--resume ID` is an alias of `--session-id ID`: `start`
+adopts the one id, dies immediately with exit `1` and
+`start: --session-id 'A' and --resume 'B' disagree` when both are given with different values, and
+passes the resolved id to dsh as `--session-id`; with neither, dsh starts a fresh session.
+
+The operating method for this route — session/worktree rules, the completion judgement, recovery and the
+harness traps — is the [`dsh-headless-gdd`](../../dsh-headless-gdd/SKILL.md) mechanism skill, which
+operates the contract below.
+
+Two rules are specific to this route:
+
+1. **The run's cwd must be the worktree the stage's session recorded.** DSH refuses `--session-id`
+   when the stored session was recorded in another directory, and a stage dispatched into a different
+   tree is worse than a refusal. The adapter resolves `--cwd`, records it in `state.json` and never
+   rewrites it; a resume must name the same directory.
+2. **`--approval-policy never` is required for unattended runs.** Headless has no live approval
+   channel, so a call that needs approval is rejected and the turn ends without completing. That is
+   this adapter's documented default (`DSH_APPROVAL_POLICY`), and `workspace-write`
+   (`DSH_PERMISSION_MODE`) keeps the sandbox at the stage's worktree rather than reaching for
+   `danger-full-access`.
+
+Completion is `exit 0` **and** the last `final` event carrying `reason.kind == "completed"`; a
+`tool_result` status of `completed` only means the tool returned. Anything else is `failed` (with its
+own exit code, or `-1` when the process disappeared without finalizing and the next
+`status`/`result`/`list`/`answer` recovered it with `stale_recovered: true`), or `killed` with exit
+`143` when this adapter stopped it. A run with no `final` event keeps the last committed `text` event
+as a partial `answer.md`. `--max-time` has no DSH equivalent, so it is the adapter's own deadline: the
+runner stops the run through the same path `kill` uses and records `killed`/`143` with
+`deadline_exceeded: true`; it is never silently dropped. `--model` and `--thinking` are **refused**:
+headless composes no presets and has no such flags, so the provider route and model are the profile's
+own configuration.
+
+Stopping needs no signals: `kill` writes the `stop` control file the runner polls, waits for the
+runner's own finalizer, and only then escalates to a process-group TERM/KILL (POSIX) or
+`taskkill /T /F` (Windows). A runner-level `error` event means no `final` event was written; the
+adapter records `failed` with dsh's own exit code and keeps the message. Token accounting is DSH's
+own: the last `status` event carrying `usage` is recorded as `usage` (`input_tokens`,
+`output_tokens`, `total_tokens`, `cache_read_tokens`), never inferred from anything else.
+
+### DSH configuration
+
+| Key | Resolves | Default |
+|---|---|---|
+| `DSH_BIN` | dsh CLI | `dsh`, resolved through `PATH`; a Windows `.cmd`/`.bat` shim is run through `%COMSPEC%` |
+| `DSH_RUN_ROOT`, `GDD_RUN_ROOT` | run root; `DSH_RUN_ROOT` wins over `GDD_RUN_ROOT`, which wins over the default | `${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs`, the same tree as every other route |
+| `DSH_RUN_PROFILE` | launcher `--profile` | `headless` |
+| `DSH_PERMISSION_MODE` | app `--permission-mode` | `workspace-write` |
+| `DSH_APPROVAL_POLICY` | app `--approval-policy` | `never` (required unattended) |
+| `DSH_RUN_EVENTS_MAX_BYTES` | bound for the retained event log, handed to the shared writer | `8388608` |
+| `DSH_RUN_START_GRACE_SECONDS` | how long a run that has recorded no pid is *starting*, not dead | `60` |
+| `DSH_RUN_STOP_WAIT_SECONDS` | how long `kill` waits for the run's own finalizer before forcing its tree | `20` |
+| `DSH_RUN_DRAIN_TIMEOUT_SECONDS` | how long the runner waits for dsh's stdout to reach EOF after dsh exits | `30` |
+
+Every setting above is environment-only: of the contract's flags, this adapter accepts exactly
+`--name --prompt --cwd --session-id --model --thinking --max-time --resume --replace` on `start` (plus the
+other subcommand arguments), and nothing else is a flag. The profile key is `DSH_RUN_PROFILE`:
+`DSH_PROFILE`, `DSH_PROFILE_DIR` and `DSH_SESSION_ID` are DeepSeek Harness's own session identity, exported
+into every model shell call, so the adapter never reads them and removes all three from the environment of
+every child it spawns — the profile and any adopted session id travel on `argv`, and a stage dispatched from
+inside a live `dsh` session cannot inherit its caller's identity.
+
+`gdd.py` exports `GDD_RUN_ROOT` (its own resolved value) and never sets `DSH_RUN_ROOT`. With both set, the
+adapter files the run under `DSH_RUN_ROOT` while `gdd.py`'s `poll:` hint prints the root it resolved;
+`stage --wait` still polls the run directory the adapter printed. Leave `DSH_RUN_ROOT` unset to keep one tree
+with every other route; set it deliberately when the DSH route should file runs elsewhere.
+
+Credentials are the environment's business: headless resolves a key from the launch environment, then
+`<cwd>/.env`, then `$DSH_HOME/.env`, ignoring GUI-saved logins, and the adapter passes the
+environment through without reading, logging or storing a key. A missing key fails loudly with a
+runner-level `error` event and exit `1`. The DSH route writes no `ledger.tsv` row — that file is the
+OMP adapters' finished-run ledger — and `state.json` plus the `finalized` marker stay the authority.
+
+`--model`/`--thinking` are refused before a run directory is created: headless composes no presets and has no
+such flags, so the provider route and model are the profile's own configuration. A GDD install that pins a
+model or thinking level for another route must leave `GDD_MODEL`/`GDD_THINKING` unset (or drop `--model` /
+`--thinking`) for this one: `gdd.py` passes them through only when set, and `start` then exits `1` with
+`start: --model is not supported on the DSH route: …` (or the `--thinking` form) — an immediate, named
+refusal, not a silently ignored setting. Nothing here selects a PTC, preset or executor.
 
 ## Native Paseo adapter
 
@@ -286,8 +381,12 @@ The default headless adapter's suite is stdlib `unittest` (`scripts/tests/test_o
 every platform, with a stub agent CLI that emits OMP-style NDJSON — no network, no model, no real
 agent. It covers start → settled run, the exit-code mapping, stale recovery, `kill` through the stop
 file, the event-bound accounting with a non-zero `events_dropped_bytes`, the argument passthrough, and
-the detachment evidence above. The real `omp -p` smoke is an operator step, not a CI step: CI has no
-agent credentials.
+the detachment evidence above. The DSH route's suite is `scripts/tests/test_dsh_run_python.py`, the
+same shape driven by a stub `dsh` on `PATH` that emits canned headless NDJSON; it pins the completion
+rule (exit 0 **and** `reason.kind == completed`), the `--max-time` deadline, the control-file kill and
+its forced escalation, the argument passthrough with the prompt on stdin, and the refusal of a second
+`start`. The real `omp -p` or `dsh` smoke is an operator step, not a CI step: CI has no agent
+credentials.
 
 On WSL over DrvFS, the tmux-backed test needs `TMPDIR` on a **native Linux filesystem** (for example,
 a fresh directory under `/tmp`). The fixture derives `TMUX_TMPDIR` from it. On this host DrvFS temp

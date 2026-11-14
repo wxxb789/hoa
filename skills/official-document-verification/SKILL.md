@@ -7,7 +7,7 @@ description: >-
   regulator's page, or any artifact whose wording and version decide the answer. Not for
   ordinary web reading where the page itself is the source of record.
 metadata:
-  version: "0.1.61"
+  version: "0.1.62"
   areas: "work-management"
   targets: "runtime-agnostic"
   summary: "verify a claim against the exact print of the document, including artifacts a plain client cannot fetch"
