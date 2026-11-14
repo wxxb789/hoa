@@ -8,7 +8,7 @@ description: >-
   Not for citation mechanics (that is grounded-citations), social posts, changelogs, or any piece
   where the claims are already verified and only the wording needs work.
 metadata:
-  version: "0.1.61"
+  version: "0.1.62"
   areas: "work-management"
   targets: "runtime-agnostic"
   summary: "evidence map plus a claim → evidence → mechanism → limitation spine for Chinese analytical reports; recency window, status ladder, negative findings"

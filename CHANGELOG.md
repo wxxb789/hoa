@@ -3,6 +3,29 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## [0.1.62] — 2026-11-14
+
+### Fixed
+
+- **The merge gate could not be run while CI was in flight.** `pr-merge-check.py` asked
+  `gh pr checks --json name,state,conclusion`; gh 2.103 removed `conclusion` (`Unknown JSON field:
+  "conclusion"`), so the JSON path always failed and every run fell back to the human table, whose
+  non-zero exits — 8 while a check is pending, 1 when one failed — reached `sh()` and ended the gate
+  at **exit 2** with a message about the CLI instead of the PR. `fetch_checks()` now reads
+  `--json name,state,bucket` and maps gh's own grouping to the tool's vocabulary: `pass`, `skipping`
+  and `neutral` are ok, `fail` and `cancel` are failures, and anything else — including `pending` —
+  is pending. A non-zero exit whose table parses is data: an unfinished run reports
+  `checks: N total, M ok, P pending, F failing` and verdict `BLOCKED: checks pending`, so the
+  operator knows to re-run rather than guess. Unparseable output still raises and exits 2, and the
+  zero-check-runs block, `--allow-no-checks`, the marker evidence schema and the
+  `--gates-rc`/`--verified-head` clauses are untouched: pending is never green.
+- **Tests**: `tests/test_review_evidence.py` gains `CheckFetchTests` and `CheckFetchCliTests` — the
+  requested JSON fields, the bucket mapping (including an unknown bucket, which must stay pending),
+  a pending table at exit 8 and at exit 1, unparseable output, the non-JSON fallback, zero checks
+  with and without `--allow-no-checks`, and `main()`'s exit code plus verdict for each — 42 -> 53
+  test methods. The shipped `--selftest` gains the bucket vocabulary and its tally (30 -> 38
+  fixtures).
+
 ## [0.1.61] — 2026-11-14
 
 ### Added
