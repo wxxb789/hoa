@@ -556,6 +556,37 @@ class CheckFetchTests(unittest.TestCase):
         self.assertEqual([check["conclusion"] for check in checks], ["SKIPPED", "SUCCESS"])
         self.assertEqual(calls[1][:3], ["gh", "pr", "checks"])
 
+    def test_non_object_check_row_raises_instead_of_being_dropped(self):
+        # Dropping a malformed row would turn incomplete evidence into permission: a valid row
+        # beside a null would read as an all-green list.
+        for payload in [[{"name": "build", "state": "SUCCESS", "bucket": "pass"}, None],
+                        [None], ["pass"]]:
+            with self.subTest(payload=payload), self.assertRaises(gate.GateError) as raised:
+                self.fetch((0, json.dumps(payload), ""), (0, GREEN_TABLE, ""))
+            self.assertIn("object per check", str(raised.exception))
+
+    def test_unknown_bucket_with_success_state_is_pending_not_ok(self):
+        # gh's bucket — not the removed/raw `state` — is the per-check verdict (gh >= 2.103).
+        rows = [{"name": "future", "state": "SUCCESS", "bucket": "unreleased-bucket"}]
+        checks, _ = self.fetch((0, json.dumps(rows), ""), (0, "", ""))
+        self.assertEqual(checks, [{"name": "future", "state": "PENDING", "conclusion": None}])
+        facts = gate.evaluate_checks(checks)
+        self.assertFalse(facts["pass"])
+        self.assertEqual((facts["ok"], facts["pending"], facts["failing"]), (0, 1, 0))
+
+    def test_empty_fallback_table_blocks_and_only_the_flag_passes_it(self):
+        # JSON is unusable (removed field), so the table is the only source. An empty table is
+        # zero check runs, not a green PR — this path returns before any JSON result is seen.
+        checks, calls = self.fetch(JSON_FIELD_GONE, (0, "", ""))
+        self.assertEqual(checks, [])
+        self.assertEqual(calls[1][:3], ["gh", "pr", "checks"])
+        facts = gate.evaluate_checks(checks)
+        self.assertFalse(facts["pass"])
+        self.assertEqual(facts["reason"], "no checks")
+        allowed = gate.evaluate_checks(checks, allow_no_checks=True)
+        self.assertTrue(allowed["pass"])
+        self.assertEqual(allowed["reason"], "no checks (allowed by flag)")
+
     def test_missing_binary_raises_gate_error_not_oserror(self):
         # A missing gh/git must reach the exit-2 path (GateError), never an OSError traceback.
         with patch.object(gate.subprocess, "run",
@@ -603,6 +634,29 @@ class CheckFetchCliTests(unittest.TestCase):
         self.assertIn("checks: 1 total, 0 ok, 1 pending, 0 failing", out)
         self.assertIn("verdict: BLOCKED: checks pending", out)
 
+    def test_mixed_valid_and_malformed_check_rows_exit_2_without_a_verdict(self):
+        # One valid row beside a null must not read as all-green, and the table must not rescue it.
+        payload = [{"name": "build", "state": "SUCCESS", "bucket": "pass"}, None]
+        code, out, err = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",
+                                        "--allow-no-machine-review",
+                                        json_result=(0, json.dumps(payload), ""),
+                                        table_result=(0, GREEN_TABLE, ""))
+        self.assertEqual(code, 2)
+        self.assertEqual(out, "")
+        self.assertIn("object per check", err)
+
+    def test_malformed_only_check_rows_exit_2_even_with_allow_no_checks(self):
+        # --allow-no-checks forgives a PR with zero check runs, never a malformed list.
+        for extra in [(), ("--allow-no-checks",)]:
+            with self.subTest(extra=extra):
+                code, out, err = self.gate_main(
+                    "--verified-head", HEAD, "--gates-rc", "0", "--allow-no-machine-review",
+                    *extra, json_result=(0, json.dumps([None]), ""),
+                    table_result=(0, GREEN_TABLE, ""))
+                self.assertEqual(code, 2)
+                self.assertEqual(out, "")
+                self.assertIn("object per check", err)
+
     def test_skipping_and_passing_table_is_merge_ok(self):
         code, out, _ = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",
                                       "--allow-no-machine-review",
@@ -621,6 +675,20 @@ class CheckFetchCliTests(unittest.TestCase):
         code, out, _ = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",
                                      "--allow-no-machine-review", "--allow-no-checks",
                                      table_result=no_checks)
+        self.assertEqual(code, 0)
+        self.assertIn("verdict: MERGE-OK", out)
+
+    def test_empty_fallback_table_blocks_main_and_only_the_flag_merges(self):
+        # The table is reached with a zero exit and empty stdout: zero check runs, not green.
+        code, out, _ = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",
+                                      "--allow-no-machine-review",
+                                      json_result=JSON_FIELD_GONE, table_result=(0, "", ""))
+        self.assertEqual(code, 1)
+        self.assertIn("checks: 0 total, 0 ok, 0 pending, 0 failing (no checks)", out)
+        self.assertIn("verdict: BLOCKED: no checks", out)
+        code, out, _ = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",
+                                      "--allow-no-machine-review", "--allow-no-checks",
+                                      json_result=JSON_FIELD_GONE, table_result=(0, "", ""))
         self.assertEqual(code, 0)
         self.assertIn("verdict: MERGE-OK", out)
 

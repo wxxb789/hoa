@@ -225,7 +225,15 @@ def fetch_checks(pr, repo):
         except ValueError:
             data = None
         if isinstance(data, list):
-            return [bucket_check(entry) for entry in data if isinstance(entry, dict)]
+            # A malformed row is not permission: dropping non-objects would turn an incomplete
+            # response into a green check list. Fail closed instead (exit 2).
+            for entry in data:
+                if not isinstance(entry, dict):
+                    raise GateError(
+                        "gh pr checks --json: expected an object per check, got "
+                        + type(entry).__name__
+                    )
+            return [bucket_check(entry) for entry in data]
     # Fallback: the human table. `gh pr checks` exits 8 while any check is pending and 1 when one
     # failed — with a table that parses, that is the CI state, not a CLI failure.
     returncode, stdout, stderr = sh_raw(["gh", "pr", "checks", str(pr)], cwd=repo)
@@ -729,13 +737,15 @@ def selftest():
         ("same-sha-empty", ("abc1234def", ""), False),
     ]
     bucket_cases = [
-        ("bucket-pass", "pass", ("COMPLETED", "SUCCESS")),
-        ("bucket-skipping", "skipping", ("COMPLETED", "SKIPPED")),
-        ("bucket-neutral", "neutral", ("COMPLETED", "NEUTRAL")),
-        ("bucket-fail", "fail", ("COMPLETED", "FAILURE")),
-        ("bucket-cancel", "cancel", ("COMPLETED", "CANCELLED")),
-        ("bucket-pending", "pending", ("PENDING", None)),
-        ("bucket-unreleased", "unreleased-bucket", ("PENDING", None)),
+        ("bucket-pass", "SUCCESS", "pass", ("COMPLETED", "SUCCESS")),
+        ("bucket-skipping", "SKIPPED", "skipping", ("COMPLETED", "SKIPPED")),
+        ("bucket-neutral", "NEUTRAL", "neutral", ("COMPLETED", "NEUTRAL")),
+        ("bucket-fail", "FAILURE", "fail", ("COMPLETED", "FAILURE")),
+        ("bucket-cancel", "CANCELLED", "cancel", ("COMPLETED", "CANCELLED")),
+        ("bucket-pending", "PENDING", "pending", ("PENDING", None)),
+        ("bucket-unreleased", "MYSTERY", "unreleased-bucket", ("PENDING", None)),
+        # The bucket is the authority: a recognized raw state under an unknown bucket is pending.
+        ("bucket-unknown-with-success-state", "SUCCESS", "unreleased-bucket", ("PENDING", None)),
     ]
     total = (
         len(marker_cases)
@@ -791,18 +801,21 @@ def selftest():
         print(f"  {mark}  {name}: {args[0][:8]}~{args[1][:8]} -> {actual}")
         passed += 1 if actual == expected else 0
 
-    for name, bucket, expected in bucket_cases:
-        row = bucket_check({"name": name, "bucket": bucket})
+    for name, state, bucket, expected in bucket_cases:
+        row = bucket_check({"name": name, "state": state, "bucket": bucket})
         actual = (row["state"], row["conclusion"])
         mark = "ok" if actual == expected else "FAIL"
         print(f"  {mark}  {name}: state={actual[0]} conclusion={actual[1]}")
         passed += 1 if actual == expected else 0
 
     tally = evaluate_checks(
-        [bucket_check({"name": name, "bucket": bucket}) for name, bucket, _ in bucket_cases]
+        [
+            bucket_check({"name": name, "state": state, "bucket": bucket})
+            for name, state, bucket, _ in bucket_cases
+        ]
     )
     actual = (tally["total"], tally["ok"], tally["pending"], tally["failing"], tally["pass"])
-    expected = (7, 3, 2, 2, False)
+    expected = (8, 3, 3, 2, False)
     mark = "ok" if actual == expected else "FAIL"
     print(f"  {mark}  bucket-tally: total/ok/pending/failing/pass={actual}")
     passed += 1 if actual == expected else 0
