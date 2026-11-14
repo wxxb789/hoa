@@ -127,7 +127,7 @@ export function applyEventLine(counters: RunCounters, line: string): RunEvent | 
     counters.hasCounters = true;
   }
 
-  const at = timestampOf(event.timestamp);
+  const at = timestampOf(type === "paseo_status" ? event.at : event.timestamp);
   if (at) counters.lastEventAt = at;
 
   if (type === "truncated") {
@@ -195,6 +195,9 @@ export function summarizeValue(value: unknown, limit = DETAIL_LIMIT): string | n
 }
 
 function detailOf(type: string, event: Record<string, unknown>): string | null {
+  if (type === "paseo_status") {
+    return summarizeValue({ state: event.state, status: event.status });
+  }
   if (type === "truncated") {
     const dropped = asNumber(event.dropped_bytes);
     return dropped ? `${dropped} bytes dropped` : "log spliced";

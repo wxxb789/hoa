@@ -98,6 +98,43 @@ describe("applyEventLine", () => {
     expect(snapshotCounters(counters).lastEventAt).toBe("2026-11-14T01:00:00.000Z");
   });
 
+  it("advances lastEventAt from native Paseo lifecycle timestamps", () => {
+    const counters = createCounters();
+    // refresh_locked writes `at`, not the headless instrumented stream's `timestamp`.
+    for (const event of [
+      { type: "paseo_status", at: "2026-11-14T01:00:00+00:00", state: "running", status: "running" },
+      { type: "paseo_status", at: "2026-11-14T01:00:01+00:00", state: "unknown", status: null },
+      { type: "paseo_status", at: "2026-11-14T01:00:02+00:00", state: "failed", status: "error" },
+    ]) {
+      const compact = applyEventLine(counters, line(event));
+      expect(snapshotCounters(counters).lastEventAt).toBe(event.at);
+      expect(compact?.at).toBe(event.at);
+    }
+    expect(snapshotCounters(counters).hasCounters).toBe(false);
+  });
+
+  it("keeps native Paseo lifecycle states distinguishable in compact details", () => {
+    const events = [
+      { state: "running", status: "initializing" },
+      { state: "running", status: "running" },
+      { state: "running", status: "idle" }, // Pending permissions keep an idle agent running.
+      { state: "unknown", status: null }, // An inspect outage is not a terminal failure.
+      { state: "failed", status: "error" },
+      { state: "done", status: "idle" },
+      { state: "killed", status: "closed" },
+    ].map((lifecycle) => ({ type: "paseo_status", at: "2026-11-14T01:00:00+00:00", ...lifecycle }));
+    const compact = parseEventWindow(events.map(line).join("\n"), events.length);
+    expect(compact.map((event) => event.detail)).toEqual([
+      '{"state":"running","status":"initializing"}',
+      '{"state":"running","status":"running"}',
+      '{"state":"running","status":"idle"}',
+      '{"state":"unknown","status":null}',
+      '{"state":"failed","status":"error"}',
+      '{"state":"done","status":"idle"}',
+      '{"state":"killed","status":"closed"}',
+    ]);
+  });
+
   it("describes tool events with bounded, redacted argument summaries", () => {
     const counters = createCounters();
     const event = applyEventLine(

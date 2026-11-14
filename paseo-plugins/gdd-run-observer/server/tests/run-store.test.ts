@@ -416,6 +416,7 @@ describe("run store", () => {
       "events.ndjson":
         event({ type: "turn_end" }) +
         event({ type: "tool_execution_start", toolCallId: "a", toolName: "bash", intent: "Run tests" }) +
+        event({ type: "paseo_status", at: "2026-11-14T00:00:03+00:00", state: "failed", status: "error" }) +
         event({ type: "truncated", dropped_bytes: 12 }),
       "answer.md": "done\n",
     });
