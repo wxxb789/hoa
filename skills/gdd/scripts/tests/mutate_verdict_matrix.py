@@ -273,6 +273,21 @@ MUTATIONS = [
      '"headRefOid,headRefName,state",',
      "the structured PR read asks for fewer fields than the gate needs — no cell names this argv, "
      "so only the golden call log catches it"),
+    ("comment-pagination-inclusive-boundary",
+     "        if len(batch) < 100:",
+     "        if len(batch) <= 100:",
+     "the comment-page continuation stops at a full page, so it never reads page 2 and the "
+     "machine-review marker there cannot block"),
+    ("thread-pagination-cursor-dropped",
+     '        cursor = page.get("endCursor")',
+     "        cursor = None",
+     "the thread-page cursor is dropped, so the loop stops after page 1 and an unresolved thread "
+     "on page 2 never blocks"),
+    ("sh-does-not-trim",
+     "    return stdout.strip()",
+     "    return stdout",
+     "sh() returns the child's stream untrimmed, so a newline-terminated branch name fails the "
+     "local-branch comparison and a verified head reads as unverified"),
 ]
 
 
@@ -344,7 +359,8 @@ def main():
                   % (mutation_id, note, len(flipped), flipped[0]))
 
     elapsed = time.monotonic() - start
-    cells = len(matrix.CELLS) + len(matrix.STREAM_CELLS) + len(matrix.BOUNDARY_CELLS)
+    cells = (len(matrix.CELLS) + len(matrix.STREAM_CELLS) + len(matrix.SH_TRIM_CELLS)
+             + len(matrix.BOUNDARY_CELLS))
     print("mutation-harness: %d mutations over %d cells, %d survived, %.2fs"
           % (len(MUTATIONS), cells, len(survivors), elapsed))
     return 1 if survivors else 0

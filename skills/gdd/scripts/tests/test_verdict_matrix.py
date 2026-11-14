@@ -40,8 +40,8 @@ obligation the snapshot exists to hold: it converts "the gate now invokes someth
 test agrees with the mutation", which is what every round of findings in this file was about.
 
 Scope: the log records the calls the gate itself issues through `main()` (the `_fake_run_for()`
-fake). The stream cells' `sh_raw()` probe is a direct unit call whose argv the *test* chooses, so it
-is pinned by its own cell rather than here.
+fake). The stream cells' `sh_raw()` probe and the sh-trim cell's `sh()` probe are direct unit calls
+whose argv the *test* chooses, so each is pinned by its own cell rather than here.
 
 Run: python3 skills/gdd/scripts/tests/test_verdict_matrix.py
 """
@@ -247,19 +247,25 @@ JSON_PASS_PENDING = _json([{"name": "build", "state": "SUCCESS", "bucket": "pass
                            {"name": "gates", "state": "PENDING", "bucket": "pending"}])
 
 Cell = namedtuple("Cell", "id json_result table_result allow_no_checks exit_code verdict reason "
-                          "checks why allow_table_only error_contains", defaults=(None,))
+                          "checks why allow_table_only error_contains comment_pages thread_pages",
+                  defaults=(None, None))
 StreamCell = namedtuple("StreamCell", "id stdout stderr exit_code why")
+ShCell = namedtuple("ShCell", "id stdout stderr exit_code expected why")
 
 
 def cell(cid, json_result, table_result, allow_no_checks, exit_code, verdict, reason, checks, why,
-         allow_table_only=False, error_contains=None):
+         allow_table_only=False, error_contains=None, comment_pages=None, thread_pages=None):
     """One verdict cell. `checks` is the expected `checks:` tally, or None when there is no read.
 
     `error_contains` is the fragments the one-line stderr of an ERROR cell must carry — so an
     operator error's own exit code and diagnostic are pinned, not merely its exit status.
+    `comment_pages` and `thread_pages` are the multi-page evidence the fake serves: a list of
+    comment batches (page 1 first) and a list of `(nodes, hasNextPage, endCursor)` thread pages.
+    `None` keeps the single terminal page every other cell uses, so only a cell that names them
+    observes the pagination continuation.
     """
     return Cell(cid, json_result, table_result, allow_no_checks, exit_code, verdict, reason,
-                checks, why, allow_table_only, error_contains)
+                checks, why, allow_table_only, error_contains, comment_pages, thread_pages)
 
 
 # --- the matrix -------------------------------------------------------------
@@ -739,6 +745,41 @@ for _label, _row in (("absent", {"name": "row", "bucket": "pass"}),
         "the bucket is the verdict; a raw state that is absent or null cannot change it"))
 
 
+# --- paginated evidence: the continuation pages the gate exists to follow ----
+# Both evidence readers paginate, and every other fake hands back a single terminal page — 100
+# comments then a stop, or `hasNextPage: false`. So neither continuation rule was exercised and
+# either could be broken invisibly: `fetch_issue_comments()`'s `if len(batch) < 100: return` read as
+# `<= 100` stops at a full page *before* the page 2 that carries the machine-review marker, and
+# `fetch_review_threads()`'s `cursor = page.get("endCursor")` read as `None` stops the thread loop
+# before the page 2 that carries an unresolved thread. Each turns a blocked verdict into MERGE-OK
+# once the blocking evidence lives on page 2, so each cell drives `main()` with a two-page fixture
+# whose page 2 is what changes the verdict, and both continuation calls — the comment page 2 read
+# and the cursor-carrying GraphQL request — are pinned in the golden call log below.
+CLEAN_COMMENT = {"id": 0, "body": "no marker in this one"}
+FINDINGS_MARKER_BODY = ('machine-review-state:v1 '
+                        '{"code_review": {"status": "completed", "has_any_findings": true}}')
+# A full first page, so only the continuation rule (not the batch size) decides whether page 2 is
+# read; the marker lives on the newest page, which `evaluate_review()` reaches first after reversal.
+COMMENT_PAGES_WITH_MARKER = [
+    [dict(CLEAN_COMMENT, id=100 + index) for index in range(100)],
+    [{"id": 200, "body": FINDINGS_MARKER_BODY}],
+]
+UNRESOLVED_THREAD = {"isResolved": False, "path": "skills/gdd/SKILL.md", "line": 3}
+THREAD_PAGES_WITH_UNRESOLVED = [([], True, "THREAD-CURSOR-2"),
+                                ([UNRESOLVED_THREAD], False, None)]
+
+CELLS += [
+    cell("comments-page-2-marker-blocks", JSON_GREEN, TABLE_UNUSED, False, 1, "BLOCKED", "review",
+         (1, 1, 0, 0),
+         "the machine-review marker on comment page 2 is read, so a stale page-1 read cannot "
+         "report MERGE-OK over newer findings", comment_pages=COMMENT_PAGES_WITH_MARKER),
+    cell("threads-page-2-unresolved-blocks", JSON_GREEN, TABLE_UNUSED, False, 1, "BLOCKED",
+         "threads", (1, 1, 0, 0),
+         "an unresolved review thread on page 2 is counted, so stopping after page 1 cannot "
+         "report MERGE-OK with a thread still open", thread_pages=THREAD_PAGES_WITH_UNRESOLVED),
+]
+
+
 # --- stream fidelity (invariant 7) ------------------------------------------
 # A verdict cell cannot express this: sh_raw's padding is invisible to every verdict because
 # parse_text_checks strips each data field and json.loads tolerates surrounding whitespace. These
@@ -750,6 +791,21 @@ STREAM_CELLS = [
                "sh_raw must return stderr unchanged, padding and newlines included"),
     StreamCell("stream-both-padded", "\n\n  x  \n\n", "\n  y  \n", 8,
                "both streams survive a non-zero exit verbatim"),
+]
+
+
+# --- sh()'s required trimming (round-10 F2) ---------------------------------
+# Every fake above feeds the gate a child that prints exactly `feature`/`HEAD` with no trailing
+# newline, so the final `stdout.strip()` in sh() never had to remove anything and deleting it
+# survived the whole matrix. A real child prints `feature\n`; handed on unchanged,
+# `resolve_head()` compares "feature\n" against the PR's `headRefName` ("feature"), fails the
+# local-branch test and reports `head not verified` for a branch that did verify. Pin the value
+# sh() returns from newline-terminated output, compared against the literal and never a
+# normalised copy of it.
+SH_TRIM_CELLS = [
+    ShCell("sh-trims-trailing-newline", "feature\n", "", 0, "feature",
+           "sh() must return the child's value with the trailing newline removed, or a verified "
+           "local branch reads as unverified"),
 ]
 
 
@@ -829,10 +885,19 @@ def fixture_problems():
 
 # --- the harness ------------------------------------------------------------
 
+def _threads_page(nodes, has_next, end_cursor):
+    """One `reviewThreads` page, as the JSON `gh api graphql` prints."""
+    return json.dumps({"data": {"repository": {"pullRequest": {"reviewThreads": {
+        "pageInfo": {"hasNextPage": has_next, "endCursor": end_cursor},
+        "nodes": nodes}}}}})
+
+
+# The single terminal page every cell without a `thread_pages` fixture sees: no nodes to follow.
+TERMINAL_THREADS = _threads_page([], False, None)
+
+
 def _fake_run_for(cell_, records=None, repo_token=None):
     view = {"state": "OPEN", "isDraft": False, "headRefOid": HEAD, "headRefName": "feature"}
-    threads = json.dumps({"data": {"repository": {"pullRequest": {"reviewThreads": {
-        "pageInfo": {"hasNextPage": False, "endCursor": None}, "nodes": []}}}}})
 
     def fake_run(cmd, cwd=None, capture_output=False, text=False, env=None):
         # The golden call log keeps what the gate forwards to the child: the command, the working
@@ -854,9 +919,29 @@ def _fake_run_for(cell_, records=None, repo_token=None):
         if cmd[:3] == ["gh", "repo", "view"]:
             return subprocess.CompletedProcess(cmd, 0, "fixture-owner/fixture-repo", "")
         if cmd[:3] == ["gh", "api", "graphql"]:
-            return subprocess.CompletedProcess(cmd, 0, threads, "")
+            # Without a fixture the thread read is terminal; with one, the page the request's
+            # cursor names decides — so a gate that drops the cursor is served page 1 again and
+            # cannot see the page-2 thread.
+            pages = cell_.thread_pages
+            if not pages:
+                return subprocess.CompletedProcess(cmd, 0, TERMINAL_THREADS, "")
+            cursor = next((part[len("cursor="):] for part in cmd
+                           if isinstance(part, str) and part.startswith("cursor=")), None)
+            index = 0
+            if cursor is not None:
+                index = next((position + 1 for position, page in enumerate(pages)
+                              if page[2] == cursor), None)
+                if index is None:
+                    raise AssertionError("unexpected review-threads cursor: %r" % (cursor,))
+            nodes, has_next, end_cursor = pages[index]
+            return subprocess.CompletedProcess(cmd, 0,
+                                              _threads_page(nodes, has_next, end_cursor), "")
         if cmd[:2] == ["gh", "api"]:
-            return subprocess.CompletedProcess(cmd, 0, "[]", "")
+            pages = cell_.comment_pages
+            if not pages:
+                return subprocess.CompletedProcess(cmd, 0, "[]", "")
+            page = int(cmd[2].split("&page=")[1])
+            return subprocess.CompletedProcess(cmd, 0, json.dumps(pages[page - 1]), "")
         raise AssertionError("unexpected command: %s" % (cmd,))
 
     return fake_run
@@ -949,6 +1034,28 @@ def check_stream_cell(module, stream_cell):
     return None
 
 
+def run_sh_cell(module, sh_cell):
+    """sh() with subprocess.run() faked: returns the value sh() handed back."""
+
+    def fake_run(cmd, cwd=None, capture_output=False, text=False):
+        return subprocess.CompletedProcess(cmd, sh_cell.exit_code, sh_cell.stdout, sh_cell.stderr)
+
+    with patch.object(module.subprocess, "run", side_effect=fake_run):
+        return module.sh(["git", "-C", ".", "rev-parse", "--abbrev-ref", "HEAD"])
+
+
+def check_sh_cell(module, sh_cell):
+    """The value sh() returns must equal the pinned literal — never a normalised copy of it, which
+    would agree with the mutant that skips the trimming."""
+    try:
+        observed = run_sh_cell(module, sh_cell)
+    except Exception as exc:
+        return "raised %s: %s" % (type(exc).__name__, exc)
+    if observed != sh_cell.expected:
+        return "expected the returned value %r, got %r" % (sh_cell.expected, observed)
+    return None
+
+
 def run_boundary_cell(module, boundary_cell, repo, records):
     """Drive main() from `repo` over the cell's read, recording every raw (cmd, cwd)."""
     driver = cell(boundary_cell.id, boundary_cell.reads[0], boundary_cell.reads[1], False, 0,
@@ -1030,6 +1137,10 @@ def evaluate(module):
         problem = check_stream_cell(module, stream_cell)
         if problem is not None:
             problems.append((stream_cell.id, problem))
+    for sh_cell in SH_TRIM_CELLS:
+        problem = check_sh_cell(module, sh_cell)
+        if problem is not None:
+            problems.append((sh_cell.id, problem))
     for boundary_cell in BOUNDARY_CELLS:
         problem = check_boundary_cell(module, boundary_cell)
         if problem is not None:
@@ -1074,8 +1185,23 @@ GOLDEN_CALLS = frozenset({
       "nodes{isResolved path line}}}}}",
       "-f", "owner=fixture-owner", "-f", "repo=fixture-repo", "-F", "pr=7"),
      REPO_TOKEN, False),
+    # The review-thread read's second page: the same GraphQL query with the `endCursor` page 1
+    # returned, issued only for a cell whose thread fixture has a page 2.
+    (("gh", "api", "graphql",
+      "-f",
+      "query=query($owner:String!,$repo:String!,$pr:Int!,$cursor:String){"
+      "repository(owner:$owner,name:$repo){pullRequest(number:$pr){"
+      "reviewThreads(first:100,after:$cursor){pageInfo{hasNextPage endCursor}"
+      "nodes{isResolved path line}}}}}",
+      "-f", "owner=fixture-owner", "-f", "repo=fixture-repo", "-F", "pr=7",
+      "-f", "cursor=THREAD-CURSOR-2"),
+     REPO_TOKEN, False),
     # The issue-comment read: the REST endpoint for the requested PR, in the named repository.
     (("gh", "api", "repos/fixture-owner/fixture-repo/issues/7/comments?per_page=100&page=1"),
+     REPO_TOKEN, False),
+    # The issue-comment read's second page, issued only for a cell whose comment fixture fills
+    # page 1 — the continuation the marker's own page depends on.
+    (("gh", "api", "repos/fixture-owner/fixture-repo/issues/7/comments?per_page=100&page=2"),
      REPO_TOKEN, False),
     # The check-fetch fallback (human table) for the requested PR, in the named repository.
     (("gh", "pr", "checks", "7"), REPO_TOKEN, False),
@@ -1130,11 +1256,11 @@ def main():
     for cell_id, problem in problems:
         print("  FAIL  %s: %s" % (cell_id, problem))
     elapsed = time.monotonic() - start
-    total = len(CELLS) + len(STREAM_CELLS) + len(BOUNDARY_CELLS)
-    print("verdict-matrix: %d verdict cells + %d stream cells + %d boundary cells = %d cells, "
-          "%d golden calls, %d failed, %.2fs"
-          % (len(CELLS), len(STREAM_CELLS), len(BOUNDARY_CELLS), total, len(GOLDEN_CALLS),
-             len(problems), elapsed))
+    total = len(CELLS) + len(STREAM_CELLS) + len(SH_TRIM_CELLS) + len(BOUNDARY_CELLS)
+    print("verdict-matrix: %d verdict cells + %d stream cells + %d sh cells + %d boundary cells "
+          "= %d cells, %d golden calls, %d failed, %.2fs"
+          % (len(CELLS), len(STREAM_CELLS), len(SH_TRIM_CELLS), len(BOUNDARY_CELLS), total,
+             len(GOLDEN_CALLS), len(problems), elapsed))
     return 1 if problems else 0
 
 
