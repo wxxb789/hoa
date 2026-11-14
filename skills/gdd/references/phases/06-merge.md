@@ -30,8 +30,10 @@ default fails closed, and the opt-in bypasses neither the exact-header rule nor 
 rule. In that fallback only gh's check-result exits carry CI state — 1 (a check failed) and 8 (a
 check is pending). Any other non-zero exit is an operator error: it exits 2 with its own exit code
 and message preserved, so an interrupted (2) or unauthorised (4) read cannot become a `checks
-pending` verdict. `--allow-no-checks` forgives only a *structured* zero-check read, and neither
-opt-in forgives a reported pending or failing check, with or without the other.
+pending` verdict. `--allow-no-checks` forgives a zero-check read, but on its own cannot authorise
+table-only evidence; together with `--allow-table-only-checks` the table is authoritative and an
+empty one is accepted. Neither opt-in forgives a reported pending or failing check, with or
+without the other.
 
 `--marker TEXT` changes only the token, not the required evidence schema. The newest malformed,
 incomplete, stale, or hash-invalid marker blocks older clean evidence and cannot be overridden by

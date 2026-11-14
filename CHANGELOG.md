@@ -7,6 +7,20 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
 
 ### Fixed
 
+- **Round-11 review findings: the structured read's exit code is required, and the opt-in wording is
+  corrected.** Every non-zero structured-read fixture paired its exit with *empty* stdout, so the
+  cells could not tell "require exit 0" from "trust any parseable stdout": `if returncode == 0:` read
+  as `if returncode == 0 or stdout:` survived all 379 cells (the total then), the golden call log,
+  the 94 evidence tests and the selftest — a structured exit 4 whose stdout parsed reported MERGE-OK
+  while the real gate fell back to the table and its operator error. Three cells now hand the
+  structured read a non-zero exit *and* a parseable payload — a passing array (falling back to a table
+  at exit 4 with `authentication failed`, exit 2 with the diagnostic preserved, and to an all-green
+  table, exit 1 `checks unreadable`), and, with `--allow-no-checks`, an empty array — and the mutation
+  is registered (74 -> 75 mutations, 42 -> 43 anchored), so the matrix ran 382 cells (375 verdict + 3
+  stream + 1 sh-trim + 3 boundary). Separately, the *structured-only* wording of `--allow-no-checks`
+  was wrong in Phase 6, the module docstring and this entry: alone the flag cannot authorise
+  table-only evidence, but together with `--allow-table-only-checks` the table is authoritative and an
+  empty one is accepted, so the documented boundary now matches the implemented and tested one.
 - **Round-8 review finding: the subprocess boundary pins the repository it forwards.**
   Both boundary fakes accepted `cwd` and ignored it, and every `gh` argument was the same whichever
   directory was passed, so dropping `cwd=repo` at a call site — or replacing `cwd=cwd` inside
@@ -173,15 +187,17 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   the other — and *generates* the rest: one cell per declared `CHECK_VOCABULARY` entry (on the table
   surface with and without the opt-in) and the bucket x state dimension from the raw state vocabulary
   gh reports, with each expectation computed from the invariants (fail closed; the bucket governs;
-  pending and failing block; a table-only read may never authorise; the opt-out forgives only a
-  structured zero-check read). Every cell drives `main()` with `subprocess.run()` mocked and compares
+  pending and failing block; a table-only read may never authorise; the opt-out forgives a
+  zero-check read, and the two opt-ins are independent — the table opt-in alone makes an empty
+  table the zero-check state, which only `--allow-no-checks` forgives). Every cell drives `main()`
+  with `subprocess.run()` mocked and compares
   the **complete** verdict line plus the printed `checks:` tally, so a failing read cannot pass as a
-  pending one (`verdict: BLOCKED: checks` is a prefix of `verdict: BLOCKED: checks pending`) — 372
+  pending one (`verdict: BLOCKED: checks` is a prefix of `verdict: BLOCKED: checks pending`) — 375
   verdict cells + 3 stream cells + 1 sh-trim cell + 3 boundary cells, plus the 10-entry golden call
   log that pins every `subprocess.run()` invocation the gate issues. The captured live output in
   `tests/gh_checks_fixtures.py` is a matrix input as well: a value gh prints that the declared
   vocabulary does not know fails the matrix instead of reaching the gate as an unknown token.
-  `tests/mutate_verdict_matrix.py` applies 74 in-memory mutations of the module — 42 anchored plus
+  `tests/mutate_verdict_matrix.py` applies 75 in-memory mutations of the module — 43 anchored plus
   two generated per declared vocabulary entry, reclassifying that token into every other
   classification — and requires each to flip at least one cell (or change the golden call log),
   naming the survivor loudly if one does not. Both run in CI. The paths the artefacts still do not

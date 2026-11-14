@@ -6,7 +6,7 @@ into an ordered queue an operator can work one entry at a time.
 
 Scope: every reachable path in `skills/gdd/scripts/pr-merge-check.py` (and what it calls in this
 repo) that the round-10 increment did not touch and that the artefacts — `test_verdict_matrix.py`
-(the 379 cells + the 10-entry golden call log + the mutation catalogue), `test_review_evidence.py`
+(the 382 cells + the 10-entry golden call log + the mutation catalogue), `test_review_evidence.py`
 and `pr-merge-check.py --selftest` — still do not pin. Entries already pinned somewhere say so, so
 the queue does not re-litigate covered ground.
 

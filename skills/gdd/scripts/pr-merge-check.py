@@ -24,8 +24,10 @@ Checks:
      (8 while pending, 1 when one failed) is CI state, not a CLI failure: an unfinished run
      still reports pending and blocks. A non-zero exit whose parsed table is *entirely green*
      is different — the read was incomplete (a dropped row, an ignored command error), so the
-     tool exits 2 rather than reporting MERGE-OK. Only a successful read of zero check runs is
-     the empty state, and only `--allow-no-checks` accepts it. Only the header — all five printed
+     tool exits 2 rather than reporting MERGE-OK. Only a read that succeeds with zero check runs is
+     the empty state, and only `--allow-no-checks` accepts it — the structured read directly, and
+     the *table* one too once `--allow-table-only-checks` has made the table authoritative (see 2),
+     so neither opt-in alone forgives a table-only read. Only the header — all five printed
      column names in print order — is skipped: every other line is a row, and a row whose verdict
      word is unknown blocks. The header comparison is exact (field count, empty fields and case
      preserved), so no data row can be mistaken for it.

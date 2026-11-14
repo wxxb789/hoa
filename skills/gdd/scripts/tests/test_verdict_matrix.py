@@ -9,8 +9,9 @@ The oracle is a literal, test-side declaration — never the artefact it pins:
   finding F2);
 * the expectation for each row is computed from the invariants stated once below: only a completed
   success or the skipping/neutral conventions are ok, a waiting conclusion is pending, everything
-  else blocks, an undeclared verdict blocks, and `--allow-no-checks` forgives only a *structured*
-  zero-check read;
+  else blocks, an undeclared verdict blocks, and `--allow-no-checks` forgives a zero-check read —
+  the structured one always, and the *table* one too once `--allow-table-only-checks` has made the
+  table authoritative, so neither opt-in alone forgives a table-only read;
 * the class-closing rule is a dimension of its own: the structured read is authoritative, and a
   table-only read may never authorise a merge — an all-green or empty table blocks with
   `checks unreadable` unless the operator passes `--allow-table-only-checks`, which bypasses
@@ -321,6 +322,29 @@ CELLS = [
          "checks unreadable", (0, 0, 0, 0),
          "the empty fallback table is unverifiable, so it blocks with the structured-read reason"),
 
+    # --- the structured read's exit code is required (round-11 F1) ---------
+    # Every non-zero structured fixture above pairs its exit with *empty* stdout, so it cannot tell
+    # "require exit 0" from "trust any parseable stdout": `if returncode == 0:` read as
+    # `if returncode == 0 or stdout:` survived every cell, the golden call log, the evidence tests
+    # and the selftest. These cells hand the structured read a non-zero exit *and* a parseable
+    # payload — a passing array, and (with the opt-out) an empty one — so trusting the stdout
+    # reports MERGE-OK where the real gate falls back to the table and its operator error, and the
+    # fallback-table cell shows the fallback actually ran.
+    cell("json-nonzero-exit-passing-array-falls-back", (4, JSON_GREEN[1], ""),
+         (4, "", "authentication failed"), False, 2, "ERROR", None, None,
+         "a non-zero structured exit is not a read: the passing array on its stdout is not "
+         "permission, and the fallback's operator error (exit 4) is preserved",
+         error_contains=("exit 4", "authentication failed")),
+    cell("json-nonzero-exit-empty-array-allow-no-checks-falls-back", (4, "[]", ""),
+         (4, "", "authentication failed"), True, 2, "ERROR", None, None,
+         "with --allow-no-checks a non-zero structured exit carrying an empty array is still not a "
+         "zero-check read; the fallback's operator error survives",
+         error_contains=("exit 4", "authentication failed")),
+    cell("json-nonzero-exit-passing-array-fallback-table", (4, JSON_GREEN[1], ""),
+         (0, GREEN_TABLE, ""), False, 1, "BLOCKED", "checks unreadable", (2, 2, 0, 0),
+         "a non-zero structured exit falls back to the table even when the stdout parses: the "
+         "all-green table is then table-only and may not authorise"),
+
     # --- table path: exit codes (invariant 6) ------------------------------
     cell("table-green-exit-0", JSON_ABSENT, (0, GREEN_TABLE, ""), False, 1, "BLOCKED",
          "checks unreadable", (2, 2, 0, 0),
@@ -360,7 +384,8 @@ CELLS = [
          "a header-only table is an empty table-only read, which cannot authorise a merge"),
     cell("table-header-only-flag", JSON_ABSENT, (0, TABLE_HEADER, ""), True, 1, "BLOCKED",
          "checks unreadable", (0, 0, 0, 0),
-         "--allow-no-checks forgives a zero-check *structured* read, never a table-only one"),
+         "--allow-no-checks forgives a zero-check *structured* read, and an empty table only once "
+         "--allow-table-only-checks has made it authoritative: neither alone forgives this read"),
     cell("table-header-only-exit-1", JSON_ABSENT, (1, TABLE_HEADER, ""), False, 2, "ERROR", None,
          None, "a non-zero exit with no rows is not the recognized 'no checks reported' state"),
     cell("table-empty-exit-0", JSON_ABSENT, (0, "", ""), False, 1, "BLOCKED",
@@ -376,7 +401,8 @@ CELLS = [
     cell("table-no-checks-reported-flag", JSON_ABSENT,
          (1, "", "no checks reported on the 'feature' branch"), True, 1, "BLOCKED",
          "checks unreadable", (0, 0, 0, 0),
-         "the structured read is what --allow-no-checks forgives, and it did not produce rows"),
+         "the structured read is what --allow-no-checks forgives directly, and it did not produce "
+         "rows; the table is not authoritative without --allow-table-only-checks"),
     cell("table-garbage-exit-1", JSON_ABSENT, (1, "gh: Not Found (HTTP 404)\n", ""), False, 2,
          "ERROR", None, None, "unparseable output is not zero checks: exit 2"),
     cell("table-garbage-exit-1-flag", JSON_ABSENT, (1, "gh: Not Found (HTTP 404)\n", ""), True, 2,
@@ -540,7 +566,8 @@ CELLS += [
 
 # --- both opt-ins together, against non-green evidence (round-7 F2) ---------
 # The two opt-ins each cover one read: --allow-table-only-checks makes the parsed table
-# authoritative, --allow-no-checks forgives a *structured* zero-check read. Neither forgives a
+# authoritative, --allow-no-checks forgives a zero-check read (the structured one always, the
+# empty table once the table opt-in has made it authoritative). Neither forgives a
 # reported pending or failing check, and the two together are still two narrow opt-ins, not a
 # general bypass — so a pending or failing verdict must survive both. The single cell that used
 # both flags only exercised an *empty* table, so `not (allow_no_checks and allow_table_only_checks)`

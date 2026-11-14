@@ -22,7 +22,9 @@ Two catalogues make up the run:
   the round-9 findings named (the structured read's dropped PR number, the fallback read's dropped
   PR number and its dropped working directory, the two `git` calls' `-C <repo>` pair kept as a bare
   path, and a trimmed `gh pr view --json` field list — the last reached by no cell, so only the
-  golden call log catches it), and the ones the surface implies (a tab-less line parsed as a row,
+  golden call log catches it), the one the round-11 finding named (the structured read's non-zero
+  exit accepted whenever its stdout is non-empty, so a parseable payload beside an operator error is
+  trusted as the read), and the ones the surface implies (a tab-less line parsed as a row,
   the header parsed as a check, the cancel and skipping bucket mappings, the zero-check opt-out
   granted unconditionally, an unordered header, a pending bucket read as failing);
 * one generated mutation per declared `CHECK_VOCABULARY` entry, reclassifying that token into every
@@ -288,6 +290,13 @@ MUTATIONS = [
      "    return stdout",
      "sh() returns the child's stream untrimmed, so a newline-terminated branch name fails the "
      "local-branch comparison and a verified head reads as unverified"),
+    ("structured-read-accepts-any-nonzero-with-stdout",
+     "    if returncode == 0:",
+     "    if returncode == 0 or stdout:",
+     "the structured read's non-zero exit is ignored whenever its stdout is non-empty, so a "
+     "non-zero structured read whose stdout parses (a passing array, or an empty one under "
+     "--allow-no-checks) is trusted as the read instead of falling back to the table and its "
+     "operator error"),
 ]
 
 
