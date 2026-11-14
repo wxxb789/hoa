@@ -18,6 +18,12 @@ Checks:
      (`pass`/`skipping`/`neutral`); `fail`/`cancel` are failures, anything else (including
      `pending`) is pending. A run still in flight is reported as
      `checks: N total, M ok, P pending, F failing` with verdict reason `checks pending`.
+     When `--json` is unusable the human table is the fallback, and a non-zero table exit
+     (8 while pending, 1 when one failed) is CI state, not a CLI failure: an unfinished run
+     still reports pending and blocks. A non-zero exit whose parsed table is *entirely green*
+     is different — the read was incomplete (a dropped row, an ignored command error), so the
+     tool exits 2 rather than reporting MERGE-OK. Only a successful read of zero check runs is
+     the empty state, and only `--allow-no-checks` accepts it.
   2. newest --marker comment: completed, has_any_findings false, full 40-hex
      commit_sha exactly equal to the PR head, nonempty model/provider and full
      UTF-8 report with a matching SHA256. Custom markers use the same schema.
@@ -260,15 +266,25 @@ def fetch_checks(pr, repo):
     # failed — with a table that parses, that is the CI state, not a CLI failure.
     returncode, stdout, stderr = sh_raw(["gh", "pr", "checks", str(pr)], cwd=repo)
     checks = parse_text_checks(stdout)
-    if returncode != 0 and not checks:
-        # `gh pr checks` exits 1 with "no checks reported" when nothing registered yet (or ever,
-        # for a repo with no CI). That is an empty list, not a CLI failure — otherwise the
-        # --allow-no-checks opt-out could never be reached. Genuine errors still raise.
+    if returncode != 0:
         message = (stderr or stdout).strip()
-        lowered = message.lower()
-        if "no checks reported" in lowered or "no check runs found" in lowered:
-            return []
-        raise GateError(message.splitlines()[0] if message else f"exit {returncode}")
+        if not checks:
+            # `gh pr checks` exits 1 with "no checks reported" when nothing registered yet (or ever,
+            # for a repo with no CI). That is an empty list, not a CLI failure — otherwise the
+            # --allow-no-checks opt-out could never be reached. Genuine errors still raise.
+            lowered = message.lower()
+            if "no checks reported" in lowered or "no check runs found" in lowered:
+                return []
+            raise GateError(message.splitlines()[0] if message else f"exit {returncode}")
+        if evaluate_checks(checks)["pass"]:
+            # A non-zero exit means the read was not complete (gh exits 8 while any check is
+            # pending and 1 when one failed), so an all-green parsed table is a partial read —
+            # a truncated row or an ignored command error. That is never permission.
+            detail = message.splitlines()[0] if message else f"exit {returncode}"
+            raise GateError(
+                "gh pr checks: non-zero exit with an all-green table "
+                f"({detail}); the read was incomplete"
+            )
     return checks
 
 

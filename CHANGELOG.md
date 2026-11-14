@@ -22,8 +22,11 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   PR with zero check runs, never an unreadable list. The table fallback no longer skips rows by a
   `NAME` prefix — that dropped checks named e.g. `NAME-required` and could report MERGE-OK over a
   failing run; gh's column header is now recognized structurally, by every field being a column
-  name. The zero-check-runs block, `--allow-no-checks`, the marker schema and the
-  `--gates-rc`/`--verified-head` clauses are untouched: pending is never green.
+  name. A non-zero exit is also evidence the read was incomplete, so an *all-green* parsed table
+  under one — a truncated row that vanished, or a command error beside passing rows — now exits 2
+  instead of reporting MERGE-OK; only a successful read of zero check runs is the empty state, and
+  only `--allow-no-checks` accepts it. The zero-check-runs block, `--allow-no-checks`, the marker
+  schema and the `--gates-rc`/`--verified-head` clauses are untouched: pending is never green.
 - **Tests**: `tests/test_review_evidence.py` gains `CheckFetchTests` and `CheckFetchCliTests` — the
   requested JSON fields, the bucket mapping (including an unknown bucket, which must stay pending
   even when the raw `state` reads `SUCCESS`), a pending table at exit 8 and at exit 1, unparseable
@@ -32,9 +35,18 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   non-list-JSON fallbacks, zero checks with and without `--allow-no-checks`, and `main()`'s exit
   code plus verdict for each — plus `RealSubprocessBoundaryTests`, which patches `subprocess.run()`
   only, keeping `sh()`/`sh_raw()` real: the exit code and both streams are forwarded verbatim, and a
-  non-zero exit never becomes an empty-but-valid check list — 42 -> 75 test methods. The shipped
+  non-zero exit never becomes an empty-but-valid check list — 42 -> 87 test methods. The shipped
   `--selftest` gains the bucket vocabulary (a recognized raw state under an unknown bucket stays
   pending), its tally, and the table rows whose names begin with `NAME` (30 -> 44 fixtures).
+- **The check-fetch surface is pinned by two self-verifying artefacts** rather than hand-picked
+  cases. `tests/test_verdict_matrix.py` enumerates the closed input space — JSON shape x fallback
+  table shape x exit code x `--allow-no-checks`, plus the bucket x state dimension — with each
+  expectation written from the invariants (fail closed; the bucket governs; pending and failing
+  block; the opt-out forgives only a zero-check read) and justified in the table, and drives every
+  cell through `main()` with `subprocess.run()` mocked (97 verdict cells + 3 stream cells).
+  `tests/mutate_verdict_matrix.py` applies a catalogue of 20 in-memory mutations of the module and
+  requires each to flip at least one cell, naming the survivor loudly if one does not. Both run in
+  CI.
 
 ## [0.1.61] — 2026-11-14
 

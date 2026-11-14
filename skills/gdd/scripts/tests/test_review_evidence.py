@@ -649,6 +649,70 @@ class CheckFetchTests(unittest.TestCase):
                          [("release", "SKIPPED"), ("test", "SUCCESS")])
         self.assertTrue(gate.evaluate_checks(checks)["pass"])
 
+    def test_a_recognized_bucket_governs_a_contradictory_raw_state(self):
+        # gh's `bucket` is the per-check verdict; the raw `state` must not overrule it in either
+        # direction. A fixture where the two agree cannot distinguish the precedence.
+        rows = [{"name": "pass-bucket-failed-state", "state": "SUCCESS", "bucket": "fail"},
+                {"name": "fail-bucket-passed-state", "state": "FAILURE", "bucket": "pass"},
+                {"name": "pending-bucket-skipped-state", "state": "PENDING", "bucket": "skipping"}]
+        checks, _ = self.fetch((0, json.dumps(rows), ""), (0, "", ""))
+        self.assertEqual(checks, [
+            {"name": "pass-bucket-failed-state", "state": "COMPLETED", "conclusion": "FAILURE"},
+            {"name": "fail-bucket-passed-state", "state": "COMPLETED", "conclusion": "SUCCESS"},
+            {"name": "pending-bucket-skipped-state", "state": "COMPLETED", "conclusion": "SKIPPED"},
+        ])
+        facts = gate.evaluate_checks(checks)
+        self.assertEqual((facts["ok"], facts["pending"], facts["failing"]), (2, 0, 1))
+        self.assertFalse(facts["pass"])
+
+    def test_a_missing_or_null_bucket_is_pending_never_ok(self):
+        # The bucket is the only verdict source; absent it nothing is known, so the row is pending.
+        # A missing-bucket default of "pass" would turn an empty object into permission.
+        for row in [{}, {"name": "required"}, {"name": "required", "state": "SUCCESS"},
+                    {"name": "required", "state": "SUCCESS", "bucket": None},
+                    {"name": "required", "bucket": ""}]:
+            with self.subTest(row=row):
+                checks, _ = self.fetch((0, json.dumps([row]), ""), (0, "", ""))
+                self.assertEqual(checks,
+                                 [{"name": row.get("name"), "state": "PENDING", "conclusion": None}])
+                facts = gate.evaluate_checks(checks)
+                self.assertFalse(facts["pass"])
+                self.assertEqual((facts["ok"], facts["pending"], facts["failing"]), (0, 1, 0))
+
+    def test_a_check_named_after_a_column_is_a_row_not_a_header(self):
+        # Only a row whose every field is a column name is the header. A check legitimately named
+        # `STATUS` (or any other printed column) must be counted; a name-based drop merges it away.
+        for name in ("STATUS", "NAME", "ELAPSED", "URL", "DESCRIPTION"):
+            for verdict, exit_code, pending, failing in (("fail", 1, 0, 1), ("pending", 8, 1, 0)):
+                with self.subTest(name=name, verdict=verdict):
+                    table = (TABLE_HEADER + GREEN_TABLE
+                             + f"{name}\t{verdict}\t2m0s\thttps://example/2\t\n")
+                    checks, _ = self.fetch(JSON_FIELD_GONE, (exit_code, table, ""))
+                    self.assertEqual([check["name"] for check in checks], ["lint", "unit", name])
+                    facts = gate.evaluate_checks(checks)
+                    self.assertEqual(
+                        (facts["total"], facts["ok"], facts["pending"], facts["failing"]),
+                        (3, 2, pending, failing))
+                    self.assertFalse(facts["pass"])
+
+    def test_the_two_column_reserved_name_form_is_retained_and_blocks(self):
+        for name, verdict, exit_code, pending, failing in [("STATUS", "pending", 8, 1, 0),
+                                                           ("NAME", "fail", 1, 0, 1)]:
+            with self.subTest(name=name):
+                checks, _ = self.fetch(JSON_FIELD_GONE, (exit_code, f"{name}\t{verdict}\n", ""))
+                self.assertEqual([check["name"] for check in checks], [name])
+                facts = gate.evaluate_checks(checks)
+                self.assertEqual((facts["total"], facts["ok"], facts["pending"], facts["failing"]),
+                                 (1, 0, pending, failing))
+                self.assertFalse(facts["pass"])
+
+    def test_an_unknown_table_verdict_is_a_failure_not_an_ok(self):
+        # An unrecognized verdict word is never green; the default must fail closed.
+        checks, _ = self.fetch(JSON_FIELD_GONE, (0, "mystery\tunreleased\n", ""))
+        self.assertEqual(checks, [{"name": "mystery", "state": "COMPLETED",
+                                   "conclusion": "FAILURE"}])
+        self.assertFalse(gate.evaluate_checks(checks)["pass"])
+
 
 class CheckFetchCliTests(unittest.TestCase):
     """main() end to end: the exit code, the checks line and the verdict, without a real gh."""
@@ -796,6 +860,60 @@ class CheckFetchCliTests(unittest.TestCase):
                 self.assertEqual(code, 2)
                 self.assertEqual(out, "")
 
+    def test_allow_no_checks_cannot_forgive_a_contradictory_or_absent_bucket(self):
+        # The flag forgives zero check runs; a recognized bucket whose raw state disagrees, and a
+        # row with no bucket at all, are reported checks and must both block.
+        for rows, expected_counts in [
+            ([{"name": "required", "state": "SUCCESS", "bucket": "fail"}],
+             "checks: 1 total, 0 ok, 0 pending, 1 failing"),
+            ([{}], "checks: 1 total, 0 ok, 1 pending, 0 failing"),
+            ([{"name": "required", "state": "SUCCESS"}],
+             "checks: 1 total, 0 ok, 1 pending, 0 failing"),
+        ]:
+            with self.subTest(rows=rows):
+                code, out, _ = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",
+                                              "--allow-no-machine-review", "--allow-no-checks",
+                                              json_result=(0, json.dumps(rows), ""),
+                                              table_result=(0, GREEN_TABLE, ""))
+                self.assertEqual(code, 1)
+                self.assertIn(expected_counts, out)
+                self.assertIn("verdict: BLOCKED", out)
+
+    def test_allow_no_checks_cannot_forgive_a_pending_check(self):
+        # Pending is a reported state, not an absent one: the flag must not reach it on either path.
+        for json_result, table_result, expected_counts in [
+            ((0, json.dumps([BUCKET_ROW]), ""), (0, "", ""),
+             "checks: 1 total, 0 ok, 1 pending, 0 failing"),
+            ((0, json.dumps([{"name": "build", "state": "SUCCESS", "bucket": "pass"}, BUCKET_ROW]),
+              ""), (0, "", ""), "checks: 2 total, 1 ok, 1 pending, 0 failing"),
+            (JSON_FIELD_GONE, (8, IN_FLIGHT_TABLE, ""),
+             "checks: 2 total, 1 ok, 1 pending, 0 failing"),
+            (JSON_FIELD_GONE, (0, IN_FLIGHT_TABLE, ""),
+             "checks: 2 total, 1 ok, 1 pending, 0 failing"),
+        ]:
+            with self.subTest(json_result=json_result, table_result=table_result):
+                code, out, _ = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",
+                                              "--allow-no-machine-review", "--allow-no-checks",
+                                              json_result=json_result, table_result=table_result)
+                self.assertEqual(code, 1)
+                self.assertIn(expected_counts, out)
+                self.assertIn("verdict: BLOCKED: checks pending", out)
+
+    def test_a_reserved_column_name_row_reaches_the_verdict_as_blocked(self):
+        # The reproduction: GREEN_TABLE plus a pending row named STATUS at exit 8 merged before,
+        # because the row was dropped as a header. It must be counted and block.
+        for row, exit_code, expected_counts, reason in [
+            ("STATUS\tpending\n", 8, "checks: 3 total, 2 ok, 1 pending, 0 failing", "checks pending"),
+            ("STATUS\tfail\n", 1, "checks: 3 total, 2 ok, 0 pending, 1 failing", "checks"),
+        ]:
+            with self.subTest(row=row):
+                code, out, _ = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",
+                                              "--allow-no-machine-review",
+                                              table_result=(exit_code, GREEN_TABLE + row, ""))
+                self.assertEqual(code, 1)
+                self.assertIn(expected_counts, out)
+                self.assertIn(f"verdict: BLOCKED: {reason}", out)
+
 
 class RealSubprocessBoundaryTests(unittest.TestCase):
     """sh()/sh_raw() stay real here; only subprocess.run() is faked.
@@ -886,6 +1004,58 @@ class RealSubprocessBoundaryTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("checks: 0 total, 0 ok, 0 pending, 0 failing (no checks)", out)
         self.assertIn("verdict: MERGE-OK", out)
+
+    # The non-zero table exit is CI state only while the parsed rows report it. A truncated row
+    # (the line without a tab) does not, so the table looks all green under exit 8; and a command
+    # error on stderr beside a green table is ignored once passing rows exist. Both read as
+    # MERGE-OK before the guard below; a non-zero exit is evidence the read was incomplete.
+    TRUNCATED_TABLE = "build\tpass\t1s\thttps://example/1\t\nrequired\n"
+
+    def test_a_nonzero_exit_with_a_partially_read_table_exits_2(self):
+        code, out, err, _ = self.run_boundary(
+            json_result=JSON_FIELD_GONE,
+            table_result=(8, self.TRUNCATED_TABLE, ""),
+            extra=("--verified-head", HEAD, "--gates-rc", "0", "--allow-no-machine-review"))
+        self.assertEqual(code, 2)
+        self.assertEqual(out, "")
+        self.assertIn("all-green table", err)
+
+    def test_a_nonzero_exit_with_an_all_green_table_is_not_an_ignored_command_error(self):
+        code, out, err, _ = self.run_boundary(
+            json_result=JSON_FIELD_GONE,
+            table_result=(1, GREEN_TABLE, "error reading checks: unexpected EOF"),
+            extra=("--verified-head", HEAD, "--gates-rc", "0", "--allow-no-machine-review"))
+        self.assertEqual(code, 2)
+        self.assertEqual(out, "")
+        self.assertIn("error reading checks: unexpected EOF", err)
+        self.assertIn("all-green table", err)
+
+    def test_allow_no_checks_cannot_forgive_a_partial_read(self):
+        for table in [(8, self.TRUNCATED_TABLE, ""),
+                      (1, GREEN_TABLE, "error reading checks: unexpected EOF")]:
+            with self.subTest(table=table):
+                code, out, err, _ = self.run_boundary(
+                    json_result=JSON_FIELD_GONE,
+                    table_result=table,
+                    extra=("--verified-head", HEAD, "--gates-rc", "0",
+                           "--allow-no-machine-review", "--allow-no-checks"))
+                self.assertEqual(code, 2)
+                self.assertEqual(out, "")
+                self.assertIn("all-green table", err)
+
+    def test_sh_raw_preserves_surrounding_whitespace_and_newlines_verbatim(self):
+        # The callers re-read these bytes — the "no checks reported" match, the comment JSON — so
+        # a `.strip()` inside sh_raw() must be visible here. The fixture carries padding in both
+        # streams, or the normalization would be undetectable.
+        stdout = "  leading\nbody\n\n"
+        stderr = "\ttrailing \n\n"
+
+        def fake_run(cmd, cwd=None, capture_output=False, text=False):
+            return subprocess.CompletedProcess(cmd, 7, stdout, stderr)
+
+        with patch.object(gate.subprocess, "run", side_effect=fake_run):
+            self.assertEqual(gate.sh_raw(["gh", "pr", "checks", "7"]),
+                             (7, stdout, stderr))
 
 
 if __name__ == "__main__":
