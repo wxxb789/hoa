@@ -327,7 +327,8 @@ class RuntimeReceiptTests(unittest.TestCase):
     def records(self, model=MODEL, api="openai-responses"):
         return [{"type": "model_change", "provider": PROVIDER, "modelId": model},
                 {"type": "message", "message": {"role": "assistant", "provider": PROVIDER,
-                 "model": model, "api": api, "stopReason": "stop"}}]
+                 "model": model, "api": api, "stopReason": "stop",
+                 "content": [{"type": "text", "text": "No findings."}]}}]
 
     def test_all_supported_responses_transports_and_namespaced_ids(self):
         for model in [MODEL, "namespace/fixture-model"]:
@@ -366,6 +367,42 @@ class RuntimeReceiptTests(unittest.TestCase):
             records[1]["message"]["stopReason"] = reason
             with self.subTest(reason=reason), self.assertRaises(EvidenceError):
                 validate_runtime_receipt(records, PROVIDER, MODEL, "responses", ["openai-responses"])
+
+    def test_final_stop_reason_must_be_successful_and_known(self):
+        for reason in [None, "pending", "deferred", "toolUse", [], {}, True]:
+            records = self.records()
+            records[-1]["message"]["stopReason"] = reason
+            with self.subTest(reason=reason), self.assertRaises(EvidenceError):
+                validate_runtime_receipt(records, PROVIDER, MODEL, "responses", ["openai-responses"])
+
+    def test_intermediate_tools_need_a_completed_final_response(self):
+        for reason in ["toolUse", "deferred"]:
+            records = self.records()
+            intermediate = copy.deepcopy(records[-1])
+            intermediate["message"]["stopReason"] = reason
+            records.insert(1, intermediate)
+            self.assertEqual(validate_runtime_receipt(records, PROVIDER, MODEL, "responses",
+                             ["openai-responses"])["model"], MODEL)
+
+    def test_final_report_text_cannot_be_missing_empty_or_malformed(self):
+        for content in [None, [], {}, [{"type": "thinking", "text": "not a report"}],
+                        [{"type": "text", "text": " "}], [{"type": "text", "text": False}]]:
+            records = self.records()
+            records[-1]["message"]["content"] = content
+            with self.subTest(content=content), self.assertRaises(EvidenceError):
+                validate_runtime_receipt(records, PROVIDER, MODEL, "responses", ["openai-responses"])
+
+    def test_jsonl_literal_unicode_separators_are_not_record_delimiters(self):
+        with tempfile.TemporaryDirectory(prefix="review-receipt-unicode-") as folder:
+            for separator in ["\u0085", "\u2028", "\u2029"]:
+                records = self.records()
+                records[-1]["message"]["content"][0]["text"] = "No" + separator + "findings."
+                (Path(folder) / "session.jsonl").write_text(
+                    "\n".join(json.dumps(r, ensure_ascii=False) for r in records) + "\n", encoding="utf-8")
+                result = subprocess.run([sys.executable, str(SCRIPTS / "review-receipt.py"),
+                    "--session-dir", folder, "--provider", PROVIDER, "--model", MODEL,
+                    "--transport", "responses", "--api-id", "openai-responses"], capture_output=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_real_receipt_cli_and_missing_multiple_receipts(self):
         with tempfile.TemporaryDirectory(prefix="review-receipt-") as folder:

@@ -65,6 +65,8 @@ test "$REVIEW_HEAD" = "$(gh pr view "$PR" --json headRefOid --jq .headRefOid)" |
 Keep the exact registry row, session receipt with actual provider/model/API, invocation, prompt,
 exact diff, stderr/exit result, and **unabridged actual report** as the
 review provenance. A push/rebase invalidates the old review; repeat the entire run on the new head.
+The receipt validator requires a completed final assistant response with nonempty report text;
+tool/deferred progress alone, malformed stop reasons and failed/aborted/truncated output do not count.
 Do not assume a push triggers a hosted bot, or use an unpinned hosted verdict as this lane's evidence.
 
 ## Generate complete, hash-bound evidence

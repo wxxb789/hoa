@@ -24,7 +24,9 @@ def main(argv=None):
         files = list(a.session_dir.rglob('*.jsonl'))
         if len(files) != 1:
             raise EvidenceError('expected exactly one current-run session receipt')
-        records = [json.loads(line) for line in files[0].read_text(encoding='utf-8').splitlines()]
+        # JSONL uses LF delimiters; Unicode separators inside strings are data.
+        with files[0].open(encoding='utf-8') as stream:
+            records = [json.loads(line) for line in stream]
         identity = validate_runtime_receipt(records, a.provider, a.model, a.transport, a.api_id)
         identity['session_file'] = str(files[0])
         print(json.dumps(identity, sort_keys=True))

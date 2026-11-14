@@ -199,7 +199,16 @@ def validate_runtime_receipt(records, provider, model, transport, api_ids):
         raise EvidenceError("assistant runtime provider/model mismatched")
     if any(not nonempty_text(m.get("api")) or m["api"] not in allowed for m in answers):
         raise EvidenceError("assistant runtime API is not allowed for this lane")
-    if any(m.get("stopReason") in ("error", "aborted", "length") for m in answers):
-        raise EvidenceError("review contains failed/aborted assistant output")
+    if any(not isinstance(m.get("stopReason"), str)
+           or m["stopReason"] not in {"stop", "toolUse", "deferred"} for m in answers):
+        raise EvidenceError("review contains unknown/failed/aborted/truncated assistant output")
+    if answers[-1]["stopReason"] != "stop":
+        raise EvidenceError("final assistant response is not completed")
+    content = answers[-1].get("content")
+    if not isinstance(content, list) or not any(
+        isinstance(block, dict) and block.get("type") == "text" and nonempty_text(block.get("text"))
+        for block in content
+    ):
+        raise EvidenceError("completed final assistant response has no report text")
     return {"provider": provider, "model": model, "transport": transport,
             "apis": sorted({m["api"] for m in answers})}

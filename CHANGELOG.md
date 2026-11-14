@@ -32,7 +32,8 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   and Responses transport from a fresh runtime session receipt before stamping provenance.
 - `review-receipt.py` validates explicit lane API IDs and transport independently of model spelling;
   all supported Responses adapters are accepted when declared, while namespaced models cannot bypass
-  that requirement. Failed, aborted or truncated assistant receipts block evidence generation.
+  that requirement. Failed, aborted, truncated or incomplete final assistant receipts block the lane;
+  Unicode separators inside JSON strings are preserved by LF-delimited receipt reading.
 - Bumped the shared skill/catalog version from `0.1.59` to `0.1.60`.
 
 ## [0.1.59] — 2026-11-14
