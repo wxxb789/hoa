@@ -4,20 +4,56 @@ The protocol assumes each stage is one **headless agent run** that outlives the 
 dispatched it. How the run is started is runtime-specific; this file defines the contract every
 adapter satisfies, plus the rules that come from the delivery protocol rather than from any one CLI.
 
-`scripts/adapters/omp-run.sh` is the reference adapter (an OMP-style `-p` CLI hosted in a detached
-session). It has two backends: `setsid` (default: own session and process group, no controlling
-terminal) and `tmux` (attachable session). Select with `start --backend setsid|tmux` or
-`OMP_RUN_BACKEND`; the lock records `{"pid","tmux","backend","started_at"}` so liveness is decided by
-the pid first and the tmux session second. For another agent CLI, adapt that script — `gdd.py` only
-ever talks to the contract below.
+`scripts/adapters/omp-run.py` is the bundled adapter: stdlib Python 3, an OMP-style `-p` CLI hosted in
+a detached process, no bash, no `setsid`, no `tmux`. `scripts/adapters/omp-run.sh` stays as the POSIX
+reference adapter — it is the one with the attachable `tmux` backend, and
+`scripts/tests/test-omp-run-setsid.sh` plus `test-omp-run-stale.sh` pin its behaviour. `gdd.py` calls
+whichever command `GDD_LAUNCHER` names (default: the `.py` adapter); for another agent CLI, adapt that
+file — `gdd.py` only ever talks to the contract below.
+
+## Platform matrix
+
+| Platform | Adapter | How the run is detached | Evidence |
+|---|---|---|---|
+| Windows 11 x64, CPython 3.12.10 | `omp-run.py` (executed through `sys.executable`) | `CREATE_NO_WINDOW \| CREATE_NEW_PROCESS_GROUP`: one hidden console the whole descendant tree inherits | **executed** — `python3 -B skills/gdd/scripts/tests/test_omp_run_python.py` → 34 tests, `OK (skipped=1)`; one real `omp -p` run through the adapter → `state=done exit=0`, `answer.md = SMOKE OK`, 7.3 s, one turn; `test_19` dispatches `gdd.py stage --wait` through the bundled launcher |
+| Linux (Ubuntu 24.04 inside WSL2, distro python3 3.12.3) | `omp-run.py`, and `omp-run.sh` where bash is wanted | `start_new_session=True` in the child (setsid): own session and process group, no controlling terminal | **executed** — the same suite inside the distro (`OK`, two skips: no tmux, Windows-only cases), `tests/test-omp-run-stale.sh` 7/7, `tests/run-gdd-selftest.sh` 90/91 (the one failure needs `jq`, absent there, and fails identically on a pristine `origin/main`), and every pushed head on GitHub Actions ubuntu-latest |
+| macOS | `omp-run.py` | same POSIX path as Linux | **documented, unverified** — no macOS host here, so the POSIX path is executed only on Linux. `omp-run.sh` cannot be the default there: macOS ships no `setsid`, so it would need `--backend tmux` |
+| WSL2 (Windows host, run *inside* the distro) | `omp-run.py` with the distro's own python3 | same POSIX path as Linux | **executed** for one distro (the row above); the rule below is what a Windows-side launcher gets wrong |
+
+What the console evidence is, precisely: Windows tests observe the *runner's* own console
+(`detach`: attached console, no window) and compare a hidden-console spawn against `DETACHED_PROCESS`
+in a controlled probe (grandchild joins the hidden console vs. allocates a visible one). They do not
+trace a full launch through a `.cmd` shim into a real agent's tool commands; that chain is the reason
+the rule exists, and a Windows-side operator sees it directly (no window appears at dispatch).
+
+Two rules carry that matrix:
+
+1. **One hidden console, inherited by the run (Windows).** A `.cmd` shim runs through `cmd.exe`, a
+   console-subsystem program, so Windows allocates a visible console on every dispatch. The run and
+   everything it starts are therefore spawned with `CREATE_NO_WINDOW` (plus
+   `CREATE_NEW_PROCESS_GROUP`), never with `DETACHED_PROCESS`: detached means *no* console, and then
+   the first console-subsystem process the agent runs allocates one of its own. Measured on Windows 11
+   with the same launcher and only the flags differing — `CREATE_NO_WINDOW`: the run and a grandchild
+   share one console, no window anywhere; `DETACHED_PROCESS`: the run has no console and the grandchild
+   opens a visible window. `omp-run.py --help` states the rule; `state.json` records both halves —
+   `spawn` (the flags that were requested) and `detach` (what the run observed about its own console
+   or session) — and the test suite asserts the two against each other.
+2. **A Windows launcher must not be driven from inside a WSL distro, or the reverse.** WSL2 interop is
+   asymmetric: Windows environment variables do not reach the distro, and a detached Windows `.exe`
+   started from a distro has been observed to record its session and then never exit, so the run never
+   finalizes. Run the adapter *inside* the distro with the distro's own python3, and point
+   `GDD_RUN_ROOT` at one root both halves can see. `omp-run.py` warns on `start` when a WSL distro is
+   about to launch a `/mnt/<drive>/…` or `.exe`/`.cmd` agent.
 
 ## Launcher contract
 
 ```
 <launcher> start  --name SLUG --prompt FILE [--cwd DIR] [--model M] [--thinking L] [--max-time D]
+<launcher> list
 <launcher> status SLUG
 <launcher> result SLUG
 <launcher> answer SLUG
+<launcher> tail   SLUG [N]
 <launcher> kill   SLUG
 ```
 
@@ -39,15 +75,52 @@ A missing `state.json` means **unknown**, never success.
 A launcher that bounds its live event log must not let the bound hide the stream's size. It reports
 `events_bytes` (retained), `events_bytes_total` (everything the agent emitted),
 `events_truncated` and `events_dropped_bytes` in `status` and in the finalized `state.json`, and any
-counter derived from a truncated stream is marked partial (the reference adapter sets
+counter derived from a truncated stream is marked partial (both adapters set
 `tool_calls_partial`, `turns_partial`, `cost_partial`).
 
-### Testing the adapter
+Stopping a run is the launcher's business, and it has to work where signals do not: `omp-run.py`
+writes a `stop` control file the run polls, waits for the run's own finalizer, and only then escalates
+to a process-group TERM/KILL (POSIX) or `taskkill /T /F` (Windows). A run stopped this way ends as
+`killed` with exit `143`; a run that died without finalizing is finalized as `failed` with exit `-1`
+by the next `status`/`result`/`list`/`answer`, which sets `stale_recovered: true` — and only while no
+`finalized` marker exists, so recovery stays idempotent.
+
+## Configuration the adapter adds
+
+Resolution order for all of these: the operator's environment (the launcher reads no config file —
+`gdd.py` resolves the config file and exports `GDD_RUN_ROOT` to it).
+
+| Key | Resolves | Default |
+|---|---|---|
+| `OMP_BIN` | agent CLI | `omp`, resolved through `PATH`; a Windows `.cmd`/`.bat` shim is run through `%COMSPEC%` |
+| `GDD_RUN_ROOT`, `OMP_RUN_ROOT` | run root | `${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs` — on Windows that resolves under `%USERPROFILE%`, deliberately not `%LOCALAPPDATA%`, so both platforms and every script see one tree |
+| `OMP_RUN_BACKEND` | default for `start --backend` | `setsid` (`omp-run.sh`: `setsid|tmux`) |
+| `OMP_LEDGER` | finished-run ledger | `<run_root>/ledger.tsv` |
+| `OMP_RUN_EVENTS_MAX_BYTES` | bound for the retained event log, read by `adapters/events-writer.py` | `8388608` |
+| `OMP_RUN_START_GRACE_SECONDS` | how long a run that has recorded no pid is still *starting*, not dead | `60` |
+| `OMP_RUN_STOP_WAIT_SECONDS` | how long `kill` waits for a run to finalize itself before forcing its tree | `20` |
+| `OMP_RUN_DRAIN_TIMEOUT_SECONDS` | how long the runner waits for the agent's stdout to reach EOF after the agent exits | `30` |
+
+Two transient claims live in the run directory: `start.lock` (held from before the run's artifacts until
+the runner owns the run, so a second `start` refuses instead of moving a starting run aside) and
+`finalize.lock` (held around finalization, so two readers seeing the same dead run write one final state
+and one ledger row). The `finalized` marker is the authority either way; a run whose finalizer died
+between publishing `state.json` and writing the marker is finalized again from its recorded exit code
+and marked `finalize_repaired`.
+
+## Testing the adapter
 
 A stage run may itself be hosted in a tmux session (the `tmux` backend), so a test never runs
 `tmux kill-server` and never `kill-session`s a session it did not create: that tears down the run
 executing the test, and its stdout dies with it. Use a stub `tmux` on `PATH` or an isolated socket
 (`tmux -L <unique-name>`, `TMUX_TMPDIR=<temp>`), as the selftest does.
+
+The bundled adapter's suite is stdlib `unittest` (`scripts/tests/test_omp_run_python.py`) so it runs on
+every platform, with a stub agent CLI that emits OMP-style NDJSON — no network, no model, no real
+agent. It covers start → settled run, the exit-code mapping, stale recovery, `kill` through the stop
+file, the event-bound accounting with a non-zero `events_dropped_bytes`, the argument passthrough, and
+the detachment evidence above. The real `omp -p` smoke is an operator step, not a CI step: CI has no
+agent credentials.
 
 ## Rules that come from delivery, not transport
 

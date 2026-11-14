@@ -11,6 +11,63 @@ serves, which now lists `grok-4.6` and `grok-4.7`. The default is `grok-4.7` now
 skill's default table and the per-engine default test say the same thing. The
 `GHC_SEARCH_MODEL_X` override and the gpt engine are unchanged.
 
+## 2026-11-14 — the delivery loop's launcher stops being bash-only
+
+The launcher was `skills/gdd/scripts/adapters/omp-run.sh`: bash, `setsid` (or `tmux`) and a POSIX
+`python3`. On Windows the loop could not run at all, and macOS ships no `setsid` either, so it needed
+`--backend tmux` there. The contract now has a cross-platform implementation, and `gdd.py` defaults to it.
+
+- **`skills/gdd/scripts/adapters/omp-run.py`** (new, stdlib Python 3): the whole contract — `start`,
+  `list`, `status`, `result`, `answer`, `tail`, `kill` — with the same run-directory artifacts, the same
+  bounded event log (`adapters/events-writer.py` is reused, not reimplemented), the same stale recovery
+  (`failed`, exit `-1`, `stale_recovered: true`, idempotent, never over a `finalized` marker) and the
+  same ledger row. Detachment is `start_new_session=True` on POSIX and
+  `CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP` on Windows.
+- **The Windows console rule is measured, not asserted.** Same launcher, only the creation flags
+  differing: with `DETACHED_PROCESS` the run has *no* console and the first console-subsystem process
+  below it allocates a **visible** one (the flash, once per tool command); with `CREATE_NO_WINDOW` the
+  run and its descendants share one console that has no window at all. `state.json` records both halves
+  — `spawn` (the flags requested) and `detach` (what the run observed: console, console process count,
+  window, window visibility on Windows; session/process-group leader and controlling terminal on POSIX)
+  — and the suite asserts them against each other.
+- **`kill` works where signals do not.** The adapter writes a `stop` control file the run polls, waits
+  for the run's own finalizer, and only then escalates to a process-group TERM/KILL (POSIX) or
+  `taskkill /T /F` (Windows). A stopped run ends as `killed` with exit `143` on both platforms, instead
+  of only being discovered dead by the next `status`.
+- **`skills/gdd/scripts/gdd.py`**: a `.py` launcher is spawned through the current interpreter on
+  Windows — `CreateProcess` cannot execute a `.py` file at all — and with `CREATE_NO_WINDOW`, so a
+  dispatch flashes nothing either. POSIX spawns exactly as before, and `DEFAULT_LAUNCHER` is the `.py`
+  adapter.
+- **`skills/gdd/scripts/tests/test_omp_run_python.py`** (new): stdlib `unittest`, so it runs where the
+  bash suites cannot. A stub agent CLI emits OMP-style NDJSON; the suite covers start → settled run,
+  answer extraction, the exit-code mapping, stale recovery (once), `kill` through the stop file, the
+  event bound with a non-zero `events_dropped_bytes`, argument passthrough, the detachment evidence
+  above, the Windows `os.replace` retry, and the `tmux` backend on an isolated socket. 34 tests by the
+  end; the `tmux` one skips where tmux is absent. One drives `gdd.py stage --wait` through the bundled
+  default launcher into a temp repo, so the dispatch path itself — not just the adapter — is pinned; the
+  rest pin what an adversarial review found: a second `start` over a live claim, a finalizer that died
+  before its marker, a forced stop recorded as `failed`, a tool that outlives the agent, and the event
+  bound held under a live reader.
+- **`skills/gdd/references/transport.md`**: a platform matrix with the evidence for every row, the
+  adapter's own keys (`OMP_BIN`, `OMP_RUN_ROOT`, `OMP_LEDGER`, `OMP_RUN_EVENTS_MAX_BYTES`,
+  `OMP_RUN_START_GRACE_SECONDS`, `OMP_RUN_DRAIN_TIMEOUT_SECONDS`, `OMP_RUN_STOP_WAIT_SECONDS`) and the
+  two platform rules: one hidden console on Windows, and never a
+  Windows launcher from inside a WSL2 distro — interop is asymmetric, so `start` warns when a distro is
+  about to launch a `/mnt/<drive>/…` or `.exe`/`.cmd` agent.
+- **`adapters/omp-run.sh` stays** the POSIX reference adapter, the one with the attachable `tmux`
+  backend, and its two bash suites are unchanged. The forwarder in `omp-headless-orchestration`
+  resolves the bundled `.py` adapter first so manual and dispatched runs still share one code path.
+- Also: `os.replace` of `state.json` now retries on Windows (`WinError 5` when any process holds the
+  file open — a plain `status` poll was enough to kill a starting run), the selftest exercises the
+  bundled adapter's contract and its default in `gdd.py`, and CI runs the new suite.
+- **`skills/gdd/scripts/watch-pr-checks.py`** (new, the loop's other bash-only tool): the CI poller
+  ported with the same semantics — bounded polls, the under-60 s infra rerun, a `MERGEABLE CLEAN`
+  requirement before it reports green, exit 0/1/2/3, every poll in `ci-watch-<head7>.log`. Its
+  intervals are configuration now (`WATCH_POLL_SECONDS`, `WATCH_FAST_FAIL_SECONDS`,
+  `WATCH_RERUN_WAIT_SECONDS`, `GH_BIN`) instead of literals, which is also what lets
+  `scripts/tests/test_watch_pr_checks.py` drive the whole state machine against a scripted `gh` in
+  seconds. `watch-pr-checks.sh` stays as the POSIX twin.
+
 ## 2026-11-13 — retired names stop being headings
 
 `notes-to-prd`, `plan-to-issues` and `arch-improvement-plan` kept their pre-rename titles as the H1

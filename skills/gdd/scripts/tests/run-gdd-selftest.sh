@@ -599,6 +599,35 @@ OMP_BIN="$TMP/no-such-agent" "$ADAPTER" start --name x --prompt "$IMPL_PROMPT" \
 [ $? -eq 1 ] && grep -q 'agent binary not found' "$TMP/adapter.out"
 check $? "adapter refuses to start without an agent binary" "$(cat "$TMP/adapter.out")"
 
+# The bundled adapter is the cross-platform one, so the launch path CI can reach
+# must be the one gdd.py defaults to.
+PY_ADAPTER="$SCRIPTS/adapters/omp-run.py"
+PY_ADAPTER_HELP="$(python3 "$PY_ADAPTER" --help 2>&1)"
+printf '%s\n' "$PY_ADAPTER_HELP" | grep -q 'status SLUG | result SLUG | answer SLUG | kill SLUG'
+check $? "the bundled Python adapter prints the launcher contract"
+
+PY_EMPTY="$TMP/py-empty-runs"
+PY_LIST="$(OMP_RUN_ROOT="$PY_EMPTY" python3 "$PY_ADAPTER" list 2>&1)"
+[ $? -eq 0 ] && printf '%s\n' "$PY_LIST" | grep -q '(no runs recorded)'
+check $? "the bundled Python adapter lists an empty run root" "$PY_LIST"
+
+OMP_BIN="$TMP/no-such-agent" OMP_RUN_ROOT="$PY_EMPTY" \
+  python3 "$PY_ADAPTER" start --name x --prompt "$IMPL_PROMPT" --cwd "$TMP" \
+  >"$TMP/py-adapter.out" 2>&1
+[ $? -eq 1 ] && grep -q 'agent binary not found' "$TMP/py-adapter.out"
+check $? "the bundled Python adapter refuses to start without an agent binary" \
+  "$(cat "$TMP/py-adapter.out")"
+
+GDD_DEFAULT_LAUNCHER="$(python3 -c '
+import sys
+sys.dont_write_bytecode = True
+sys.path.insert(0, sys.argv[1])
+import gdd
+print(gdd.DEFAULT_LAUNCHER)
+' "$SCRIPTS" 2>&1)"
+[ "$GDD_DEFAULT_LAUNCHER" = "$PY_ADAPTER" ]
+check $? "gdd.py defaults to the bundled Python adapter (got '$GDD_DEFAULT_LAUNCHER')"
+
 GDD_HELP="$("$SCRIPTS/gdd.py" --help 2>&1)"
 printf '%s\n' "$GDD_HELP" | grep -q 'GDD_LAUNCHER' \
   && printf '%s\n' "$GDD_HELP" | grep -q 'status SLUG'

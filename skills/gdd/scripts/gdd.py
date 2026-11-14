@@ -22,7 +22,7 @@ Environment or operator config file:
     GDD_RUN_ROOT    run root exported to the launcher and used when it prints no
                     run dir (default ${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs)
     GDD_LAUNCHER    launcher command
-                    (default <script dir>/adapters/omp-run.sh)
+                    (default <script dir>/adapters/omp-run.py)
     GDD_TEMPLATES   template root
                     (default <script dir>/../references/stage-templates)
     GDD_GOAL_GLOB   goal-contract glob (default docs/goals/*<goal>*.md)
@@ -33,9 +33,10 @@ The six path/command keys resolve through the shared resolver: flag, then enviro
 then $XDG_CONFIG_HOME/gdd/config.yaml (fallback ~/.config/...),
 then the default. The rule is owned by skill-porting-and-publishing.
 
-Launcher contract (adapters/omp-run.sh is the reference implementation):
+Launcher contract (adapters/omp-run.py is the bundled implementation; the POSIX
+reference adapters/omp-run.sh adds the attachable tmux backend):
     <launcher> start --name SLUG --prompt FILE [--cwd DIR] [--model M] [--thinking L] [--max-time D]
-    <launcher> status SLUG | result SLUG | answer SLUG | kill SLUG
+    <launcher> list | status SLUG | result SLUG | answer SLUG | kill SLUG
 
 The launcher owns <run_root>/<date>/<SLUG>/state.json with at least
 {"name","state","exit","cwd","started","ended","duration_s"} (state is one of
@@ -52,7 +53,7 @@ import shlex
 import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 if SCRIPT_DIR not in sys.path:
@@ -80,7 +81,10 @@ NEEDS_FINDINGS = {"apply", "fix"}
 SKILL = "gdd"
 DEFAULT_GOAL_GLOB = "docs/goals/*<goal>*.md"
 DELIVERY_STATE = os.path.join(SCRIPT_DIR, "delivery-state.py")
-DEFAULT_LAUNCHER = os.path.join(SCRIPT_DIR, "adapters", "omp-run.sh")
+# The bundled adapter is Python so the loop runs where bash, setsid and tmux do
+# not (Windows above all). adapters/omp-run.sh stays as the POSIX reference,
+# which is also the one that offers the attachable tmux backend.
+DEFAULT_LAUNCHER = os.path.join(SCRIPT_DIR, "adapters", "omp-run.py")
 DEFAULT_TEMPLATES = os.path.normpath(
     os.path.join(SCRIPT_DIR, "..", "references", "stage-templates")
 )
@@ -199,23 +203,54 @@ def read_lock(run_dir):
             except ValueError:
                 return None, True
             if isinstance(data, dict):
-                return {"pid": data.get("pid"), "tmux": data.get("tmux")}, True
+                return (
+                    {
+                        "pid": data.get("pid"),
+                        "agent_pid": data.get("agent_pid"),
+                        "tmux": data.get("tmux"),
+                    },
+                    True,
+                )
             return None, True
         try:
-            return {"pid": int(raw.split()[0]), "tmux": None}, True
+            return {"pid": int(raw.split()[0]), "agent_pid": None, "tmux": None}, True
         except (ValueError, IndexError):
             return None, True
     return None, False
 
 
 def pid_alive(pid):
-    """True/False, or None when the pid is unusable."""
+    """True/False, or None when the pid is unusable.
+
+    Windows needs a process query rather than os.kill(pid, 0): measured on Windows 11,
+    os.kill on a live console process raises (a live run read as `stale lock`) and on
+    an exited one whose handle is still open it succeeds (a dead run read as live). A
+    dispatcher that polls must get both answers right. Keep in step with
+    adapters/omp-run.py and delivery-state.py.
+    """
     try:
         pid = int(pid)
     except (TypeError, ValueError):
         return None
     if pid <= 0:
         return None
+    if os.name == "nt":
+        import ctypes
+
+        SYNCHRONIZE = 0x00100000
+        QUERY_LIMITED = 0x1000
+        STILL_ACTIVE = 259
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.OpenProcess(SYNCHRONIZE | QUERY_LIMITED, False, pid)
+        if not handle:
+            return False
+        try:
+            code = ctypes.c_ulong()
+            if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
+                return None
+            return code.value == STILL_ACTIVE
+        finally:
+            kernel32.CloseHandle(handle)
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
@@ -242,7 +277,15 @@ def tmux_alive(session):
 
 
 def effective_state(run_dir, state):
-    """Recorded run state, with `stale lock` for a lock whose process is gone."""
+    """Recorded run state, with `stale lock` for a lock whose processes are gone.
+
+    Liveness follows the launcher's rule instead of forming a second opinion: a run is
+    live while either the runner or the agent it started is alive (the cross-platform
+    adapter records both, and the agent can outlive its runner), and a run inside the
+    startup grace has not recorded a pid yet, so it is starting rather than stale.
+    Without that, a live Windows run read as `stale lock`, `--wait` failed on it, and
+    the one-writer guard let a second agent into the same worktree.
+    """
     recorded = str((state or {}).get("state") or "?")
     if recorded != "running":
         return recorded
@@ -253,10 +296,38 @@ def effective_state(run_dir, state):
         return recorded
     if not lock:
         return "stale lock"
-    alive = pid_alive(lock.get("pid"))
-    if alive is None:
+    verdicts = [pid_alive(lock.get("pid")), pid_alive(lock.get("agent_pid"))]
+    if any(verdict is True for verdict in verdicts):
+        return "running"
+    if all(verdict is None for verdict in verdicts):
         alive = tmux_alive(lock.get("tmux"))
-    return "running" if alive else "stale lock"
+        if alive is None:
+            return "running" if run_is_young(state) else "stale lock"
+        return "running" if alive else "stale lock"
+    return "stale lock"
+
+
+def startup_grace_seconds():
+    """The launcher's OMP_RUN_START_GRACE_SECONDS, so both sides agree on "starting"."""
+    try:
+        value = float((os.environ.get("OMP_RUN_START_GRACE_SECONDS") or "").strip())
+    except ValueError:
+        return 60.0
+    return value if value > 0 else 60.0
+
+
+def run_is_young(state):
+    """Was this run started inside the grace window (so it may still be claiming a pid)?"""
+    started = (state or {}).get("started")
+    if not started:
+        return False
+    try:
+        age = (
+            datetime.now(timezone.utc) - datetime.fromisoformat(str(started))
+        ).total_seconds()
+    except ValueError:
+        return False
+    return age < startup_grace_seconds()
 
 
 def recorded_lock(state):
@@ -264,12 +335,14 @@ def recorded_lock(state):
 
     omp-run.sh records `pid` (null under tmux) and `tmux` in state.json but writes no lock, so
     `read_lock` found nothing and a run that died kept reading as "running" until the 6h deadline.
+    Both adapters also record the agent's own pid; treating only the runner as proof of
+    life would read a run as stale while the agent it started is still editing.
     """
     text = state or {}
-    pid, tmux = text.get("pid"), text.get("tmux")
-    if not pid and not tmux:
+    pid, agent_pid, tmux = text.get("pid"), text.get("agent_pid"), text.get("tmux")
+    if not pid and not agent_pid and not tmux:
         return None, False
-    return {"pid": pid, "tmux": tmux}, True
+    return {"pid": pid, "agent_pid": agent_pid, "tmux": tmux}, True
 
 
 def run_state_paths(task_root_dir, run_root_dir):
@@ -475,11 +548,37 @@ def ledger_append(repo, goal, stage, base, head, gates, next_stage=None, note=No
         fail(f"ledger append failed: {reason}", 1)
 
 
+def launcher_command(launcher):
+    """argv prefix for the launcher: a Python launcher needs the interpreter on Windows.
+
+    POSIX executes a `.py` adapter through its shebang and executable bit, which is
+    how the bundled adapter has always run there. Windows CreateProcess cannot
+    execute a `.py` file at all (WinError 193: there is no shebang handling), so on
+    Windows the dispatcher prefixes the current interpreter instead and leaves
+    POSIX byte-identical.
+    """
+    path = os.path.expanduser(launcher)
+    if os.name == "nt" and path.lower().endswith(".py"):
+        return [sys.executable, path]
+    return [path]
+
+
+def launcher_creationflags():
+    """CREATE_NO_WINDOW on Windows: a dispatch must not flash a console.
+
+    The adapter then gives the whole run one hidden console that the runner, the
+    agent and the agent's own tool commands inherit. Without it, every dispatched
+    run allocates a visible console for a moment, and a run started with
+    DETACHED_PROCESS instead leaves each of those commands to allocate its own.
+    """
+    return subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+
+
 def launch(launcher, prompt_path, repo, goal, stage, model, thinking, max_time):
     name = f"{os.path.basename(repo)}-{goal}-{stage}"
     resolved_run_root = run_root()
     cmd = [
-        launcher,
+        *launcher_command(launcher),
         "start",
         "--name",
         name,
@@ -500,7 +599,13 @@ def launch(launcher, prompt_path, repo, goal, stage, model, thinking, max_time):
     child_env = dict(os.environ)
     child_env["GDD_RUN_ROOT"] = resolved_run_root
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, env=child_env)
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            env=child_env,
+            creationflags=launcher_creationflags(),
+        )
     except OSError as exc:
         raise LaunchError(str(exc)) from exc
     if proc.returncode != 0:
@@ -817,7 +922,7 @@ Environment or operator config file:
   GDD_RUN_ROOT    run root exported to the launcher, and the fallback when it
                   prints no run dir
                   (default ${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs)
-  GDD_LAUNCHER    launcher command (default <script dir>/adapters/omp-run.sh)
+  GDD_LAUNCHER    launcher command (default <script dir>/adapters/omp-run.py)
   GDD_TEMPLATES   template root (default <script dir>/../references/stage-templates)
   GDD_GOAL_GLOB   goal-contract glob (default docs/goals/*<goal>*.md)
   GDD_MODEL, GDD_THINKING, GDD_MAX_TIME
@@ -830,7 +935,7 @@ The shared rule is documented in skill-porting-and-publishing.
 
 Launcher contract:
   <launcher> start --name SLUG --prompt FILE [--cwd DIR] [--model M] [--thinking L] [--max-time D]
-  <launcher> status SLUG | result SLUG | answer SLUG | kill SLUG
+  <launcher> list | status SLUG | result SLUG | answer SLUG | kill SLUG
 
 The launcher writes <run_root>/<date>/<SLUG>/state.json with at least
 {"name","state","exit","cwd","started","ended","duration_s"} and answer.md.

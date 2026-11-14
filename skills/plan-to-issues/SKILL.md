@@ -4,7 +4,7 @@ description: >-
   Break PRDs or plans into issue-level tasks. Produces a list of issues (title + body + labels) and
   can optionally open them via `github-issues` skill.
 metadata:
-  version: "0.1.57"
+  version: "0.1.58"
   areas: "work-management"
   targets: "runtime-agnostic"
   summary: "break a PRD or plan into issue-level tasks with titles, bodies and labels"
