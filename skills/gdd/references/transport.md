@@ -68,15 +68,16 @@ Two rules carry that headless matrix:
 
 | Platform | Native validation status |
 |---|---|
-| Windows | Executed: `python3 -B -m unittest discover -s skills/gdd/scripts/tests` → 77 tests, `OK (skipped=3)`, exit 0. Native stub cases cover argv/state/answer/deletion. Live CLI 0.15.4 native-argv multiline smoke returned the exact requested answer; real inspect verified the stage cwd despite inherited caller/workspace identities; deletion receipt and both list formats confirmed agent removal. |
-| WSL2 (Ubuntu 24.04, inside the distro) | Executed: the same 77-test command with a fresh native-filesystem `TMPDIR` → `OK (skipped=4)`, exit 0; includes the native stub cases and the inherited tmux case. No real-daemon native smoke claimed. |
+| Windows | Executed: `python3 -B -m unittest discover -s skills/gdd/scripts/tests` → 83 tests, `OK (skipped=3)`, exit 0. Native stub cases cover argv/state/answer/deletion and monitor finalization after a 33-second refresh-claim hold. Live CLI 0.15.4 native-argv multiline smoke returned the exact requested answer; real inspect verified the stage cwd despite inherited caller/workspace identities; deletion receipt and both list formats confirmed agent removal. |
+| WSL2 (Ubuntu 24.04, inside the distro) | Executed: the same 83-test command with a fresh native-filesystem `TMPDIR` → `OK (skipped=4)`, exit 0; includes the native stub cases and the inherited tmux case. No real-daemon native smoke claimed. |
 | Linux / macOS | No native live-test evidence claimed; the headless POSIX evidence above is not transferable |
 
 The Windows daemon smoke used the explicit native executable/entrypoint argv described below;
 the `.cmd` multiline attempt was refused before dispatch. It proves one configured daemon/provider
 path, not macOS, a Linux daemon, every provider, or successful completion of an arbitrary stage.
-Plugin typecheck and synthetic tests also executed on Windows: 34 passed, one opt-in live test
-skipped; plugin installation into the daemon and desktop rendering remain unverified.
+Plugin typecheck executed during the original native integration. Current Windows synthetic tests
+(`npm test`, exit 0): 45 passed, one opt-in live test skipped; plugin installation into the daemon
+and desktop rendering remain unverified.
 
 ## Launcher contract
 
@@ -229,6 +230,18 @@ An unresolved native run (`running` or `unknown`) reserves its recorded worktree
 local monitor is gone. The stage-dispatch guard releases that reservation only after a terminal
 state or `finalized` marker is recorded; restored reachability alone does not release it. This
 reservation does not relabel an `unknown` status as `running` or change headless run states.
+
+Each native CLI subprocess has a **60-second timeout**. One attempt to acquire the refresh claim
+waits **30 seconds**, half that budget, keeping foreground requests bounded while another request
+owns the claim. This is not a run deadline: a holder can make several CLI calls under one claim,
+so increasing the claim wait to one CLI timeout would still not bound its full critical section.
+The detached monitor catches claim-acquisition timeouts, leaves the last published observation
+unchanged, sleeps one second, and retries **without a retry limit**. It stops only after observing
+a terminal state (`done`, `failed`, `killed`) or a `finalized` marker, not because a claim is busy
+or state/agent identity is temporarily missing. File-only consumers such as `gdd.py stage --wait`
+therefore need no manual status refresh after contention ends. Persistent contention or an
+unresolved/missing daemon run can keep the monitor waiting indefinitely; neither is completion
+evidence. Unexpected non-contention errors are not suppressed, and this is not a monitor supervisor.
 
 `kill` maps to **`paseo delete <id> --json`**, not `paseo stop`. CLI 0.15.4's `stop` only interrupts
 a turn; it leaves a resumable idle agent and is not termination evidence. The installed `delete.js`

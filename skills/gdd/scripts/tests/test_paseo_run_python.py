@@ -409,6 +409,72 @@ class PaseoLauncherTests(unittest.TestCase):
         self.status()
         self.assertEqual(len((self.root / "ledger.tsv").read_text().splitlines()), 2)
 
+    def test_monitor_retries_refresh_claim_after_thirty_seconds_for_file_only_waiter(self):
+        spec = importlib.util.spec_from_file_location("paseo_under_test", ADAPTER)
+        adapter = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(adapter)
+        spec = importlib.util.spec_from_file_location("gdd_under_test", ADAPTER.parent.parent / "gdd.py")
+        gdd = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(gdd)
+        self.start()
+        run_dir = str(self.run_dir())
+        pid = gdd.read_state(run_dir)["pid"]
+        with adapter.claim(os.path.join(run_dir, "refresh")):
+            # A legal 60-second CLI call can hold this claim past the monitor's
+            # 30-second acquisition budget. Exercise the real detached process.
+            time.sleep(33)
+            state = gdd.read_state(run_dir)
+            self.assertEqual(state["state"], "running")
+            self.assertIsNone(state["exit"])
+            self.assertFalse((self.run_dir() / "finalized").exists())
+            self.assertTrue(adapter.support.pid_alive(pid),
+                            "detached monitor exited during refresh contention:\n" +
+                            (self.run_dir() / "runner.log").read_text(encoding="utf-8"))
+            self.assertEqual(gdd.effective_state(run_dir, state), "running")
+            self.save_fixture(status="idle")
+
+        # These are the file-only reads used by gdd.py stage --wait, not an
+        # adapter status/result call that could repair a dead monitor for us.
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline:
+            state = gdd.read_state(run_dir)
+            if (gdd.effective_state(run_dir, state) == "done" and
+                    (self.run_dir() / "finalized").exists()):
+                break
+            time.sleep(0.1)
+        else:
+            self.fail(f"file-only waiter never observed finalized completion: {state}")
+        self.assertEqual(state["exit"], 0)
+        self.assertEqual((self.run_dir() / "finalized").read_text().strip(), "0")
+
+    def test_monitor_retries_until_terminal_state_or_finalized_marker(self):
+        spec = importlib.util.spec_from_file_location("paseo_under_test", ADAPTER)
+        adapter = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(adapter)
+        for outcome in ("done", "failed", "killed", "finalized"):
+            with self.subTest(outcome=outcome):
+                terminal = {"state": "unknown" if outcome == "finalized" else outcome}
+                observations = [adapter.ClaimTimeout("busy"), adapter.ClaimTimeout("still busy"),
+                                {}, terminal]
+                with mock.patch.object(adapter, "refresh", side_effect=observations) as refresh, \
+                        mock.patch.object(adapter.support, "read_state_file",
+                                          side_effect=[{}, {"state": "unknown"}]), \
+                        mock.patch.object(adapter.os.path, "exists", side_effect=[False, False, False, True]), \
+                        mock.patch.object(adapter.time, "sleep") as sleep, \
+                        mock.patch.object(adapter, "publish") as publish:
+                    self.assertEqual(adapter.watch(mock.Mock(run_dir=str(self.run_dir()))), 0)
+                self.assertEqual(refresh.call_count, 4)
+                self.assertEqual(sleep.call_args_list, [mock.call(1)] * 3)
+                publish.assert_not_called()
+
+    def test_monitor_does_not_swallow_unexpected_refresh_errors(self):
+        spec = importlib.util.spec_from_file_location("paseo_under_test", ADAPTER)
+        adapter = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(adapter)
+        with mock.patch.object(adapter, "refresh", side_effect=RuntimeError("unexpected failure")):
+            with self.assertRaisesRegex(RuntimeError, "unexpected failure"):
+                adapter.watch(mock.Mock(run_dir=str(self.run_dir())))
+
     def test_kill_records_confirmed_agent_deletion(self):
         self.start()
         result = self.run_adapter("kill", "stage")

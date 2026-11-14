@@ -61,6 +61,15 @@ STATES = {"initializing": "running", "running": "running", "idle": "done",
           "error": "failed", "closed": "killed"}
 EXITS = {"done": 0, "failed": 1, "killed": 143}
 CMD_UNSAFE = re.compile(r'[\r\n"&|<>^()%!]')
+# Foreground claim attempts wait half of one CLI call's 60-second budget.
+# A holder may make several calls, so no finite claim wait resolves a run:
+# the detached monitor retries every timeout until terminal evidence exists.
+CLI_TIMEOUT_SECONDS = 60
+CLAIM_WAIT_SECONDS = CLI_TIMEOUT_SECONDS / 2
+
+
+class ClaimTimeout(RuntimeError):
+    """The claim is unavailable, not evidence that the native run ended."""
 
 
 def fail(message):
@@ -107,14 +116,14 @@ def text_file(run_dir, name, text):
 
 @contextmanager
 def claim(path):
-    deadline = time.monotonic() + 30
+    deadline = time.monotonic() + CLAIM_WAIT_SECONDS
     while True:
         with support.slug_start_claim(path) as held:
             if held:
                 yield
                 return
         if time.monotonic() >= deadline:
-            fail(f"cannot acquire claim: {path}")
+            raise ClaimTimeout(f"cannot acquire claim: {path}")
         time.sleep(0.05)
 
 
@@ -129,7 +138,7 @@ def cli(state, argv):
             environment.pop(key, None)
     try:
         result = subprocess.run(command, cwd=state["cwd"], capture_output=True,
-                                text=True, encoding="utf-8", errors="replace", timeout=60,
+                                text=True, encoding="utf-8", errors="replace", timeout=CLI_TIMEOUT_SECONDS,
                                 creationflags=support.hidden_flags(), env=environment)
         code, stdout, stderr = result.returncode, result.stdout, result.stderr
     except (OSError, subprocess.TimeoutExpired) as exc:
@@ -336,8 +345,13 @@ def start(args):
 
 def watch(args):
     while True:
-        state = refresh(args.run_dir)
-        if state.get("state") in EXITS or not state.get("agent_id"):
+        try:
+            state = refresh(args.run_dir)
+        except ClaimTimeout:
+            # Another reader may still be inside a permitted CLI call. Preserve
+            # its published observation; contention is not a lifecycle update.
+            state = support.read_state_file(args.run_dir)
+        if state.get("state") in EXITS or os.path.exists(os.path.join(args.run_dir, "finalized")):
             return 0
         time.sleep(1)
 

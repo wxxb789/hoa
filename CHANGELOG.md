@@ -17,6 +17,11 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
 
 ### Changed
 
+- The native Paseo detached monitor retries refresh-claim contention indefinitely instead of
+  exiting after 30 seconds while a permitted 60-second CLI call still holds the claim. Only
+  terminal state or a finalized marker resolves its wait; contention preserves the published
+  observation. A real 33-second stub regression covers monitor liveness, finalization, and the
+  file-only reads used by `gdd.py stage --wait`.
 - Unresolved native Paseo runs keep reserving their worktree through offline status refreshes
   and monitor loss without disguising `unknown` as `running`; confirmed terminal outcomes or
   deletion release the reservation. Headless run-state handling is unchanged.
@@ -37,7 +42,8 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   caller/workspace identity variables so the explicit stage cwd controls placement.
 - Native `kill` requires a confirmed hard-delete receipt, not a turn interrupt. It preserves
   cached answer text and appends deletion evidence without changing finalized outcomes.
-- Recorded Windows/WSL aggregate verification (77 tests each) and a corrected Windows native
+- Recorded Windows/WSL aggregate verification (83 tests each, exit 0; three Windows skips and
+  four WSL skips) and observer plugin tests (45 passed, one skipped, exit 0), plus a corrected Windows native
   multiline daemon smoke, separate from inherited headless evidence. Documented WSL tmux's
   native-filesystem temp-directory requirement after DrvFS rejected unsafe permissions.
 - Bumped the shared skill/catalog version from `0.1.58` to `0.1.59`.
