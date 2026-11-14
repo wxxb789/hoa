@@ -73,6 +73,9 @@ jobs:
       - name: Index generator tests
         run: python scripts/test_generate_index.py
 
+      - name: Catalog measurement convention tests
+        run: python scripts/test_catalog_measurement.py
+
       - name: Host install parity tests
         run: python -m unittest scripts.test_install_host_skills
 
