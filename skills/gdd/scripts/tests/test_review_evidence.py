@@ -480,6 +480,20 @@ IN_FLIGHT_TABLE = ("foreign-notes\tpass\t20s\thttps://example/2\t\n"
                    "docs\tpending\t1m2s\thttps://example/3\t\n")
 JSON_FIELD_GONE = (1, "", 'Unknown JSON field: "conclusion"')
 BUCKET_ROW = {"name": "gates", "state": "PENDING", "bucket": "pending"}
+# `gh pr checks` labels the columns `NAME STATUS ELAPSED URL DESCRIPTION` (gh 2.103, pkg/cmd/pr/
+# checks/output.go). The fallback must recognize that header structurally, never by a `NAME`
+# prefix: a check may be *named* `NAME-required`, and dropping it read a failing run as MERGE-OK.
+TABLE_HEADER = "NAME\tSTATUS\tELAPSED\tURL\tDESCRIPTION\n"
+NAME_PREFIXED_TABLE = (TABLE_HEADER
+                       + "build\tpass\t1m0s\thttps://example/1\t\n"
+                       + "NAME-required\tfail\t4m9s\thttps://example/2\t\n")
+NAME_PREFIXED_PENDING_TABLE = (TABLE_HEADER
+                               + "build\tpass\t1m0s\thttps://example/1\t\n"
+                               + "NAME-required\tpending\t2m0s\thttps://example/2\t\n")
+# The shape `gh pr checks` emits on this host (gh 2.103.3, non-TTY): name, state, elapsed, link,
+# description — five tab-separated fields, the last empty. Rows observed live on a real PR.
+REAL_GH_TABLE = ("release\tskipping\t0\thttps://example/runs/1/job/2\t\n"
+                 "test\tpass\t1m52s\thttps://example/runs/1/job/3\t\n")
 
 
 class CheckFetchTests(unittest.TestCase):
@@ -594,6 +608,46 @@ class CheckFetchTests(unittest.TestCase):
             with self.assertRaises(gate.GateError) as raised:
                 gate.sh_raw(["gh", "pr", "checks", "7"])
         self.assertIn("No such file or directory", str(raised.exception))
+
+    def test_the_header_is_recognized_structurally_not_by_a_name_prefix(self):
+        # The old filter was `line.startswith("NAME")`, which dropped every such check.
+        checks, _ = self.fetch(JSON_FIELD_GONE, (1, NAME_PREFIXED_TABLE, ""))
+        self.assertEqual([check["name"] for check in checks], ["build", "NAME-required"])
+        facts = gate.evaluate_checks(checks)
+        self.assertEqual((facts["total"], facts["ok"], facts["pending"], facts["failing"]),
+                         (2, 1, 0, 1))
+        self.assertFalse(facts["pass"])
+
+    def test_a_pending_name_prefixed_row_is_counted_and_blocks(self):
+        checks, _ = self.fetch(JSON_FIELD_GONE, (8, NAME_PREFIXED_PENDING_TABLE, ""))
+        self.assertEqual([check["name"] for check in checks], ["build", "NAME-required"])
+        facts = gate.evaluate_checks(checks)
+        self.assertEqual((facts["total"], facts["ok"], facts["pending"], facts["failing"]),
+                         (2, 1, 1, 0))
+        self.assertFalse(facts["pass"])
+
+    def test_the_header_row_is_not_counted_as_a_phantom_check(self):
+        checks, _ = self.fetch(JSON_FIELD_GONE, (0, TABLE_HEADER + GREEN_TABLE, ""))
+        self.assertEqual([check["name"] for check in checks], ["lint", "unit"])
+        self.assertTrue(gate.evaluate_checks(checks)["pass"])
+
+    def test_a_check_named_name_is_not_the_header(self):
+        table = TABLE_HEADER + "NAME\tpass\t1s\thttps://example/0\t\n"
+        checks, _ = self.fetch(JSON_FIELD_GONE, (0, table, ""))
+        self.assertEqual(checks, [{"name": "NAME", "state": "COMPLETED", "conclusion": "SUCCESS"}])
+
+    def test_allow_no_checks_never_forgives_a_failing_row(self):
+        # The flag forgives zero check runs that were read successfully — not a reported failure.
+        checks, _ = self.fetch(JSON_FIELD_GONE, (1, NAME_PREFIXED_TABLE, ""))
+        facts = gate.evaluate_checks(checks, allow_no_checks=True)
+        self.assertFalse(facts["pass"])
+        self.assertEqual((facts["total"], facts["failing"]), (2, 1))
+
+    def test_a_real_gh_table_parses_to_the_expected_verdicts(self):
+        checks, _ = self.fetch(JSON_FIELD_GONE, (0, REAL_GH_TABLE, ""))
+        self.assertEqual([(check["name"], check["conclusion"]) for check in checks],
+                         [("release", "SKIPPED"), ("test", "SUCCESS")])
+        self.assertTrue(gate.evaluate_checks(checks)["pass"])
 
 
 class CheckFetchCliTests(unittest.TestCase):
@@ -711,6 +765,127 @@ class CheckFetchCliTests(unittest.TestCase):
         self.assertEqual(out.getvalue(), "")
         self.assertEqual(err.getvalue().splitlines(),
                          ["pr-merge-check: [Errno 2] No such file or directory: 'gh'"])
+
+    def test_name_prefixed_rows_reach_the_verdict_as_blocked(self):
+        # A failing and a pending `NAME-required` row must both block main(), never merge.
+        for table, expected_counts, expected_reason in [
+            ((1, NAME_PREFIXED_TABLE, ""), "checks: 2 total, 1 ok, 0 pending, 1 failing", "checks"),
+            ((8, NAME_PREFIXED_PENDING_TABLE, ""), "checks: 2 total, 1 ok, 1 pending, 0 failing",
+             "checks pending"),
+        ]:
+            with self.subTest(table=table):
+                code, out, _ = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",
+                                              "--allow-no-machine-review", table_result=table)
+                self.assertEqual(code, 1)
+                self.assertIn(expected_counts, out)
+                self.assertIn(f"verdict: BLOCKED: {expected_reason}", out)
+
+    def test_allow_no_checks_cannot_forgive_a_name_prefixed_row(self):
+        code, out, _ = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",
+                                      "--allow-no-machine-review", "--allow-no-checks",
+                                      table_result=(1, NAME_PREFIXED_TABLE, ""))
+        self.assertEqual(code, 1)
+        self.assertIn("verdict: BLOCKED: checks", out)
+
+    def test_unparseable_output_exits_2_even_with_allow_no_checks(self):
+        for table in [(1, "gh: Not Found (HTTP 404)\n", ""), (8, "", "checks pending")]:
+            with self.subTest(table=table):
+                code, out, _ = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",
+                                              "--allow-no-machine-review", "--allow-no-checks",
+                                              table_result=table)
+                self.assertEqual(code, 2)
+                self.assertEqual(out, "")
+
+
+class RealSubprocessBoundaryTests(unittest.TestCase):
+    """sh()/sh_raw() stay real here; only subprocess.run() is faked.
+
+    CheckFetchCliTests patches sh()/sh_raw() themselves, so a mutation inside sh_raw() — dropping
+    the exit code, or turning a non-zero exit into an empty success — is invisible there. At the
+    real boundary that mutation reads an unsupported JSON field as zero checks and merges under
+    --allow-no-checks. These tests put the fake at subprocess.run() so the forwarding itself runs.
+    """
+
+    THREADS = json.dumps({"data": {"repository": {"pullRequest": {"reviewThreads": {
+        "pageInfo": {"hasNextPage": False, "endCursor": None}, "nodes": []}}}}})
+
+    def run_boundary(self, *, json_result, table_result, extra=()):
+        calls = []
+        view = {"state": "OPEN", "isDraft": False, "headRefOid": HEAD, "headRefName": "feature"}
+
+        def fake_run(cmd, cwd=None, capture_output=False, text=False):
+            calls.append(list(cmd))
+            if cmd[:1] == ["git"]:
+                branch = "--abbrev-ref" in cmd
+                return subprocess.CompletedProcess(cmd, 0, "feature" if branch else HEAD, "")
+            if cmd[:3] == ["gh", "pr", "checks"]:
+                return subprocess.CompletedProcess(cmd, *(json_result if "--json" in cmd
+                                                          else table_result))
+            if cmd[:3] == ["gh", "pr", "view"]:
+                return subprocess.CompletedProcess(cmd, 0, json.dumps(view), "")
+            if cmd[:3] == ["gh", "repo", "view"]:
+                return subprocess.CompletedProcess(cmd, 0, "fixture-owner/fixture-repo", "")
+            if cmd[:3] == ["gh", "api", "graphql"]:
+                return subprocess.CompletedProcess(cmd, 0, self.THREADS, "")
+            if cmd[:2] == ["gh", "api"]:
+                return subprocess.CompletedProcess(cmd, 0, "[]", "")
+            raise AssertionError(f"unexpected command: {cmd}")
+
+        out, err = io.StringIO(), io.StringIO()
+        argv = ["pr-merge-check.py", "7", "--repo", ".", *extra]
+        with patch.object(gate.subprocess, "run", side_effect=fake_run), \
+             patch.object(sys, "argv", argv), redirect_stdout(out), redirect_stderr(err):
+            code = gate.main()
+        return code, out.getvalue(), err.getvalue(), calls
+
+    def test_sh_raw_forwards_exit_code_and_both_streams_verbatim(self):
+        def fake_run(cmd, cwd=None, capture_output=False, text=False):
+            return subprocess.CompletedProcess(cmd, 8, "stdout text", "stderr text")
+
+        with patch.object(gate.subprocess, "run", side_effect=fake_run):
+            self.assertEqual(gate.sh_raw(["gh", "pr", "checks", "7"]),
+                             (8, "stdout text", "stderr text"))
+            # sh() makes a non-zero exit an error; sh_raw() hands it back as data.
+            with self.assertRaises(gate.GateError) as raised:
+                gate.sh(["gh", "pr", "checks", "7"])
+        self.assertEqual(str(raised.exception), "stderr text")
+
+    def test_nonzero_json_exit_falls_through_to_the_table_at_the_real_boundary(self):
+        code, out, err, calls = self.run_boundary(
+            json_result=JSON_FIELD_GONE,
+            table_result=(8, IN_FLIGHT_TABLE, ""),
+            extra=("--verified-head", HEAD, "--gates-rc", "0", "--allow-no-machine-review"))
+        self.assertEqual(err, "")
+        self.assertEqual(code, 1)
+        self.assertIn("checks: 2 total, 1 ok, 1 pending, 0 failing", out)
+        self.assertIn("verdict: BLOCKED: checks pending", out)
+        checks_calls = [call for call in calls if call[:3] == ["gh", "pr", "checks"]]
+        self.assertEqual(len(checks_calls), 2)
+        self.assertIn("--json", checks_calls[0])
+        self.assertNotIn("--json", checks_calls[1])
+
+    def test_a_command_error_cannot_become_an_allowed_zero_check_result(self):
+        # A real failure (exit 1, no table) must exit 2 even with --allow-no-checks: only a
+        # successful read of zero check runs is forgivable.
+        code, out, err, _ = self.run_boundary(
+            json_result=JSON_FIELD_GONE,
+            table_result=(1, "gh: Not Found (HTTP 404)\n", ""),
+            extra=("--verified-head", HEAD, "--gates-rc", "0", "--allow-no-machine-review",
+                   "--allow-no-checks"))
+        self.assertEqual(code, 2)
+        self.assertEqual(out, "")
+        self.assertEqual(err.splitlines(), ["pr-merge-check: gh: Not Found (HTTP 404)"])
+
+    def test_a_successful_empty_read_is_genuinely_zero_checks_and_the_flag_forgives_it(self):
+        code, out, err, _ = self.run_boundary(
+            json_result=(0, "[]", ""),
+            table_result=(0, "", ""),
+            extra=("--verified-head", HEAD, "--gates-rc", "0", "--allow-no-machine-review",
+                   "--allow-no-checks"))
+        self.assertEqual(err, "")
+        self.assertEqual(code, 0)
+        self.assertIn("checks: 0 total, 0 ok, 0 pending, 0 failing (no checks)", out)
+        self.assertIn("verdict: MERGE-OK", out)
 
 
 if __name__ == "__main__":

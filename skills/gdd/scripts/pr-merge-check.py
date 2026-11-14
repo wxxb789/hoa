@@ -79,6 +79,9 @@ TEXT_CONCLUSIONS = {
     "timed_out": "TIMED_OUT",
     "pending": "PENDING",
 }
+# The column names `gh pr checks` prints above the rows (gh 2.103, pkg/cmd/pr/checks/output.go).
+# Only a row built entirely from these is a header; see is_text_check_header.
+TEXT_CHECK_COLUMNS = {"NAME", "STATUS", "ELAPSED", "URL", "DESCRIPTION"}
 
 
 class GateError(Exception):
@@ -189,11 +192,30 @@ def evaluate_checks(checks, allow_no_checks=False):
     }
 
 
+def is_text_check_header(line):
+    """True for the table's own header row, recognized by its fields, never by a `NAME` prefix.
+
+    `gh pr checks` labels the columns `NAME STATUS ELAPSED URL DESCRIPTION` (pkg/cmd/pr/checks/
+    output.go at gh 2.103). A check may legitimately be *named* `NAME-required`, and skipping it by
+    a `NAME` prefix dropped an unread row from the verdict — with a failed row beside it the gate
+    still printed MERGE-OK. Only a row whose every field is a column name, carrying both `NAME` and
+    `STATUS`, is the header. The TTY header is space-aligned, so it never reaches this tab-delimited
+    parser.
+    """
+    fields = [cell.strip().upper() for cell in line.split("\t")]
+    fields = [cell for cell in fields if cell]
+    return (
+        len(fields) >= 2
+        and {"NAME", "STATUS"} <= set(fields)
+        and set(fields) <= TEXT_CHECK_COLUMNS
+    )
+
+
 def parse_text_checks(text):
     checks = []
     for line in text.splitlines():
         line = line.strip()
-        if not line or line.startswith("NAME") or "\t" not in line:
+        if not line or "\t" not in line or is_text_check_header(line):
             continue
         cells = line.split("\t")
         name = cells[0].strip()
@@ -736,6 +758,32 @@ def selftest():
         ("same-sha-short-prefix-rejected", ("abc1234def", "abc"), False),
         ("same-sha-empty", ("abc1234def", ""), False),
     ]
+    # The non-zero-exit table fallback. A check whose name starts with `NAME` is a row, not the
+    # header; only a row whose every field is a column name is a header.
+    table_header = "NAME\tSTATUS\tELAPSED\tURL\tDESCRIPTION\n"
+    text_cases = [
+        (
+            "table-header-is-not-a-row",
+            table_header + "build\tpass\t1m0s\thttps://example/1\t\n",
+            [("build", "COMPLETED", "SUCCESS")],
+        ),
+        (
+            "name-prefixed-failing-row-is-counted",
+            table_header + "build\tpass\t1m0s\thttps://example/1\t\n"
+            "NAME-required\tfail\t4m9s\thttps://example/2\t\n",
+            [("build", "COMPLETED", "SUCCESS"), ("NAME-required", "COMPLETED", "FAILURE")],
+        ),
+        (
+            "name-prefixed-pending-row-is-counted",
+            table_header + "NAME-required\tpending\t2m0s\thttps://example/2\t\n",
+            [("NAME-required", "PENDING", "PENDING")],
+        ),
+        (
+            "a-check-named-name-is-not-the-header",
+            table_header + "NAME\tpass\t1s\thttps://example/0\t\n",
+            [("NAME", "COMPLETED", "SUCCESS")],
+        ),
+    ]
     bucket_cases = [
         ("bucket-pass", "SUCCESS", "pass", ("COMPLETED", "SUCCESS")),
         ("bucket-skipping", "SKIPPED", "skipping", ("COMPLETED", "SKIPPED")),
@@ -755,7 +803,8 @@ def selftest():
         + len(check_cases)
         + len(sha_cases)
         + len(bucket_cases)
-        + 1  # the bucket tally
+        + len(text_cases)
+        + 2  # the bucket tally and the name-prefixed row tally
     )
     passed = 0
 
@@ -818,6 +867,25 @@ def selftest():
     expected = (8, 3, 3, 2, False)
     mark = "ok" if actual == expected else "FAIL"
     print(f"  {mark}  bucket-tally: total/ok/pending/failing/pass={actual}")
+    passed += 1 if actual == expected else 0
+
+    for name, text, expected in text_cases:
+        actual = [
+            (row["name"], row["state"], row["conclusion"]) for row in parse_text_checks(text)
+        ]
+        mark = "ok" if actual == expected else "FAIL"
+        print(f"  {mark}  {name}: {actual}")
+        passed += 1 if actual == expected else 0
+
+    prefixed = parse_text_checks(
+        table_header + "build\tpass\t1m0s\thttps://example/1\t\n"
+        "NAME-required\tfail\t4m9s\thttps://example/2\t\n"
+    )
+    facts = evaluate_checks(prefixed)
+    actual = (facts["total"], facts["ok"], facts["pending"], facts["failing"], facts["pass"])
+    expected = (2, 1, 0, 1, False)
+    mark = "ok" if actual == expected else "FAIL"
+    print(f"  {mark}  name-prefixed-tally: total/ok/pending/failing/pass={actual}")
     passed += 1 if actual == expected else 0
 
     for name, args, expected_line, expected_reasons in state_cases:

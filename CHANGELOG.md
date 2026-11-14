@@ -19,18 +19,22 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   pending, F failing` and verdict `BLOCKED: checks pending`, so the operator re-runs. Unparseable
   output raises and exits 2. A malformed `--json` array — a non-object row beside a passing one, or
   only non-objects — also exits 2 rather than dropping the bad row: `--allow-no-checks` forgives a
-  PR with zero check runs, never an unreadable list. The zero-check-runs block, `--allow-no-checks`,
-  the marker schema and the `--gates-rc`/`--verified-head` clauses are untouched: pending is never
-  green.
+  PR with zero check runs, never an unreadable list. The table fallback no longer skips rows by a
+  `NAME` prefix — that dropped checks named e.g. `NAME-required` and could report MERGE-OK over a
+  failing run; gh's column header is now recognized structurally, by every field being a column
+  name. The zero-check-runs block, `--allow-no-checks`, the marker schema and the
+  `--gates-rc`/`--verified-head` clauses are untouched: pending is never green.
 - **Tests**: `tests/test_review_evidence.py` gains `CheckFetchTests` and `CheckFetchCliTests` — the
   requested JSON fields, the bucket mapping (including an unknown bucket, which must stay pending
   even when the raw `state` reads `SUCCESS`), a pending table at exit 8 and at exit 1, unparseable
   output, malformed check rows at exit 2 with and without `--allow-no-checks`, the empty fallback
   table with a zero exit (zero checks, not green), a missing gh binary at exit 2, the non-JSON and
   non-list-JSON fallbacks, zero checks with and without `--allow-no-checks`, and `main()`'s exit
-  code plus verdict for each — 42 -> 62 test methods. The shipped `--selftest` gains the bucket
-  vocabulary (a recognized raw state under an unknown bucket stays pending) and its tally
-  (30 -> 39 fixtures).
+  code plus verdict for each — plus `RealSubprocessBoundaryTests`, which patches `subprocess.run()`
+  only, keeping `sh()`/`sh_raw()` real: the exit code and both streams are forwarded verbatim, and a
+  non-zero exit never becomes an empty-but-valid check list — 42 -> 75 test methods. The shipped
+  `--selftest` gains the bucket vocabulary (a recognized raw state under an unknown bucket stays
+  pending), its tally, and the table rows whose names begin with `NAME` (30 -> 44 fixtures).
 
 ## [0.1.61] — 2026-11-14
 
