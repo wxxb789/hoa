@@ -23,6 +23,26 @@ Cells that cannot be expressed this way (the JSON shapes, the non-zero-exit fall
 listed explicitly, each with its expected tally and its reason. `subprocess.run()` is mocked and
 every cell is driven through `main()`, so the matrix is end to end.
 
+The **golden call log** pins the whole forwarding surface at once. Every `subprocess.run()`
+invocation the gate issues while a cell drives `main()` is recorded as `(argv, cwd, has_env)`,
+normalised only by folding the repository the operator named — `"."` here, the boundary cells'
+scratch directory there — onto the single token `<repo>` (nothing the module relies on is dropped;
+`capture_output` and `text` are not recorded because they are invisible to the child's command, and
+cwd/env are because the gate forwards them). The collected *set* of distinct invocations is compared
+with `GOLDEN_CALLS` below, so any change to a command, an argument, a flag, the PR number, the
+`-C <repo>` pair or a call's working directory — or a new call — is a loud failure that names the
+added or removed entry.
+
+To update the snapshot deliberately: read the diff of this file's gate source (`git diff
+skills/gdd/scripts/pr-merge-check.py`), confirm every command change is intended, and only then edit
+`GOLDEN_CALLS`. A blind update — pasting the observed set the failure printed — deletes the exact
+obligation the snapshot exists to hold: it converts "the gate now invokes something new" into "the
+test agrees with the mutation", which is what every round of findings in this file was about.
+
+Scope: the log records the calls the gate itself issues through `main()` (the `_fake_run_for()`
+fake). The stream cells' `sh_raw()` probe is a direct unit call whose argv the *test* chooses, so it
+is pinned by its own cell rather than here.
+
 Run: python3 skills/gdd/scripts/tests/test_verdict_matrix.py
 """
 
@@ -51,6 +71,37 @@ for _path in (str(SCRIPTS), str(HERE)):
 import gh_checks_fixtures as captured  # noqa: E402
 
 HEAD = "a1b2c3d4" + "0" * 32
+# The PR number every cell requests, and the token the recorded call log folds any repository path
+# onto (the verdict cells' `--repo .` and the boundary cells' scratch directory). Both are named
+# here so the boundary assertions below can require the *requested* PR and the repository pair.
+REQUESTED_PR = "7"
+REPO_TOKEN = "<repo>"
+
+
+# --- the golden call log ----------------------------------------------------
+# One recorder, off unless a run turns it on. `_fake_run_for()` appends every invocation the gate
+# issues through `main()`; `evaluate_with_calls()` turns recording on around a matrix run and
+# compares the distinct set with `GOLDEN_CALLS` below.
+_calls_seen = None
+
+
+def _record_call(argv, cwd, has_env):
+    if _calls_seen is not None:
+        _calls_seen.add((argv, cwd, has_env))
+
+
+def _normalize_argv(argv, repo_token):
+    """The command with the repository the operator named folded onto `REPO_TOKEN`."""
+    if repo_token is None:
+        return tuple(argv)
+    return tuple(REPO_TOKEN if part == repo_token else part for part in argv)
+
+
+def _normalize_cwd(cwd, repo_token):
+    """The working directory, `None` kept as `None` and the named repository folded like argv."""
+    if cwd is None:
+        return None
+    return REPO_TOKEN if repo_token is not None and cwd == repo_token else cwd
 
 
 def load_gate(path=None):
@@ -711,16 +762,35 @@ STREAM_CELLS = [
 # the working directory, `git` through `-C <path>` in argv. Each cell runs the gate from a
 # repository directory distinct from the runner's and reads back what the fake actually handed to
 # subprocess.run(), so a dropped directory is a failure and not an invisible rename.
-BoundaryCell = namedtuple("BoundaryCell", "id surface why")
+#
+# The cells also pin the whole check-command shape, not just its prefix: the argv of every
+# `gh pr checks` call must be exactly the structured read or the fallback read of the *requested*
+# PR, and every `git` call must carry the adjacent `["-C", <repo>]` pair — a `["git", repo, ...]`
+# form keeps the path in argv while giving Git no valid repository selection. The fallback read is
+# exercised here on purpose (`boundary-repo-gh-fallback-cwd`): the structured read succeeds in every
+# other boundary cell, so the fallback call site — and its `cwd=repo` — was never reached, and
+# dropping that one `cwd` survived the whole matrix.
+BoundaryCell = namedtuple("BoundaryCell", "id surface reads require_fallback why")
 
 BOUNDARY_CELLS = [
-    BoundaryCell("boundary-repo-gh-cwd", "gh",
+    # The structured read succeeds: every gh call must carry the repository directory.
+    BoundaryCell("boundary-repo-gh-cwd", "gh", (JSON_GREEN, TABLE_UNUSED), False,
                  "gh takes the repository as the child's working directory, so the directory "
                  "--repo names must reach subprocess.run() unchanged"),
-    BoundaryCell("boundary-repo-git-flag", "git",
+    # The structured read does not produce rows, so the *fallback* read runs: it too must carry the
+    # repository directory, and it must actually have been issued.
+    BoundaryCell("boundary-repo-gh-fallback-cwd", "gh", (JSON_ABSENT, (0, GREEN_TABLE, "")), True,
+                 "the fallback read is a second gh call site: its cwd must reach the child and the "
+                 "call must have happened, or dropping it there is invisible"),
+    BoundaryCell("boundary-repo-git-flag", "git", (JSON_GREEN, TABLE_UNUSED), False,
                  "git takes the repository as `-C <path>` in argv, so the same directory must "
-                 "reach the child that way"),
+                 "reach the child that way, as the adjacent pair"),
 ]
+
+# The two check-command shapes `gh pr checks` may be called with, for the requested PR. A call
+# whose argv is neither is a shape this gate does not document.
+STRUCTURED_CHECKS_ARGV = ("gh", "pr", "checks", REQUESTED_PR, "--json", "name,state,bucket")
+FALLBACK_CHECKS_ARGV = ("gh", "pr", "checks", REQUESTED_PR)
 
 
 # --- the captured vocabulary ------------------------------------------------
@@ -759,12 +829,17 @@ def fixture_problems():
 
 # --- the harness ------------------------------------------------------------
 
-def _fake_run_for(cell_, records=None):
+def _fake_run_for(cell_, records=None, repo_token=None):
     view = {"state": "OPEN", "isDraft": False, "headRefOid": HEAD, "headRefName": "feature"}
     threads = json.dumps({"data": {"repository": {"pullRequest": {"reviewThreads": {
         "pageInfo": {"hasNextPage": False, "endCursor": None}, "nodes": []}}}}})
 
-    def fake_run(cmd, cwd=None, capture_output=False, text=False):
+    def fake_run(cmd, cwd=None, capture_output=False, text=False, env=None):
+        # The golden call log keeps what the gate forwards to the child: the command, the working
+        # directory and whether it passed an environment. capture_output/text describe how the gate
+        # reads the streams, not what the child is asked to run.
+        _record_call(_normalize_argv(cmd, repo_token), _normalize_cwd(cwd, repo_token),
+                     env is not None)
         if records is not None:
             records.append((list(cmd), cwd))
         if cmd[:1] == ["git"]:
@@ -789,14 +864,15 @@ def _fake_run_for(cell_, records=None):
 
 def run_cell(module, cell_):
     """Drive one verdict cell through the real entry point. Returns (code, stdout, stderr)."""
-    argv = ["pr-merge-check.py", "7", "--repo", ".", "--verified-head", HEAD,
+    argv = ["pr-merge-check.py", REQUESTED_PR, "--repo", ".", "--verified-head", HEAD,
             "--gates-rc", "0", "--allow-no-machine-review"]
     if cell_.allow_no_checks:
         argv.append("--allow-no-checks")
     if cell_.allow_table_only:
         argv.append("--allow-table-only-checks")
     out, err = io.StringIO(), io.StringIO()
-    with patch.object(module.subprocess, "run", side_effect=_fake_run_for(cell_)), \
+    with patch.object(module.subprocess, "run",
+                      side_effect=_fake_run_for(cell_, repo_token=".")), \
             patch.object(sys, "argv", argv), redirect_stdout(out), redirect_stderr(err):
         code = module.main()
     return code, out.getvalue(), err.getvalue()
@@ -873,14 +949,16 @@ def check_stream_cell(module, stream_cell):
     return None
 
 
-def run_boundary_cell(module, repo, records):
-    """Drive main() from `repo` over a green structured read, recording every (cmd, cwd)."""
-    baseline = cell("boundary-baseline", JSON_GREEN, TABLE_UNUSED, False, 0, "MERGE-OK", None,
-                    (1, 1, 0, 0), "the recording run only needs a read that completes")
-    argv = ["pr-merge-check.py", "7", "--repo", repo, "--verified-head", HEAD,
+def run_boundary_cell(module, boundary_cell, repo, records):
+    """Drive main() from `repo` over the cell's read, recording every raw (cmd, cwd)."""
+    driver = cell(boundary_cell.id, boundary_cell.reads[0], boundary_cell.reads[1], False, 0,
+                  "MERGE-OK", None, (1, 1, 0, 0),
+                  "the recording run only needs the read the cell names")
+    argv = ["pr-merge-check.py", REQUESTED_PR, "--repo", repo, "--verified-head", HEAD,
             "--gates-rc", "0", "--allow-no-machine-review"]
     out, err = io.StringIO(), io.StringIO()
-    with patch.object(module.subprocess, "run", side_effect=_fake_run_for(baseline, records)), \
+    with patch.object(module.subprocess, "run",
+                      side_effect=_fake_run_for(driver, records, repo_token=repo)), \
             patch.object(sys, "argv", argv), redirect_stdout(out), redirect_stderr(err):
         module.main()
 
@@ -889,7 +967,11 @@ def check_boundary_cell(module, boundary_cell):
     """The repository the operator named must reach the child on its surface, unchanged.
 
     The run happens in a directory distinct from the runner's, so a dropped directory cannot pass
-    by coincidence, and only the calls on the cell's own surface are judged.
+    by coincidence, and only the calls on the cell's own surface are judged. On the `gh` surface
+    every call must carry that directory *and* every `gh pr checks` call must be exactly one of the
+    two documented reads of the requested PR — a prefix check accepted `--json` alone, which let a
+    dropped `str(pr)` reach real `gh` (and its current-branch PR). When the cell names the fallback
+    read, that call must have been issued, or its forwarded directory is unobserved.
     """
     repo = os.path.realpath(tempfile.mkdtemp(prefix="gdd-boundary-repo-"))
     try:
@@ -897,7 +979,7 @@ def check_boundary_cell(module, boundary_cell):
             return "the boundary repository must differ from the runner's directory"
         records = []
         try:
-            run_boundary_cell(module, repo, records)
+            run_boundary_cell(module, boundary_cell, repo, records)
         except Exception as exc:  # a mutant may crash where the gate must run
             return "raised %s: %s" % (type(exc).__name__, exc)
         calls = [(cmd, cwd) for cmd, cwd in records if cmd[:1] == [boundary_cell.surface]]
@@ -908,18 +990,37 @@ def check_boundary_cell(module, boundary_cell):
             if wrong:
                 return ("%d gh call(s) ran outside the repository: cwd=%r, expected %r "
                         "(first: %r)" % (len(wrong), wrong[0][1], repo, wrong[0][0]))
+            shapes = {tuple(cmd) for cmd, _ in calls if cmd[:3] == ["gh", "pr", "checks"]}
+            allowed = (STRUCTURED_CHECKS_ARGV, FALLBACK_CHECKS_ARGV)
+            unexpected = sorted(shape for shape in shapes if shape not in allowed)
+            if unexpected:
+                return ("a gh pr checks call carries an argv this gate does not document: %r; the "
+                        "documented shapes are %r and %r"
+                        % (unexpected[0], STRUCTURED_CHECKS_ARGV, FALLBACK_CHECKS_ARGV))
+            if STRUCTURED_CHECKS_ARGV not in shapes:
+                return ("PR %s was not read with the documented structured argv %r; saw %r"
+                        % (REQUESTED_PR, STRUCTURED_CHECKS_ARGV, sorted(shapes)))
+            if boundary_cell.require_fallback and FALLBACK_CHECKS_ARGV not in shapes:
+                return ("the fallback read %r was never issued, so its forwarded directory is "
+                        "unobserved (saw %r)" % (FALLBACK_CHECKS_ARGV, sorted(shapes)))
         else:
-            wrong = [cmd for cmd, _ in calls if repo not in cmd]
-            if wrong:
-                return ("%d git call(s) did not carry the repository in argv (first: %r)"
-                        % (len(wrong), wrong[0]))
+            for cmd, _ in calls:
+                # The pair must be adjacent: `["git", repo, ...]` keeps the path in argv while Git
+                # no longer has a valid repository selection.
+                if cmd[1:3] != ["-C", repo]:
+                    return ("a git call did not carry the adjacent [\"-C\", repo] pair (first: %r)"
+                            % (cmd,))
         return None
     finally:
         shutil.rmtree(repo, ignore_errors=True)
 
 
 def evaluate(module):
-    """Every cell that the module under test violates, as (id, problem)."""
+    """Every cell that the module under test violates, as (id, problem).
+
+    When recording is on (see `evaluate_with_calls`) the golden call-log comparison is part of this,
+    so the invocations the module issued are judged alongside the cells.
+    """
     problems = declaration_problems(module)
     for cell_ in CELLS:
         problem = check_cell(module, cell_)
@@ -933,20 +1034,107 @@ def evaluate(module):
         problem = check_boundary_cell(module, boundary_cell)
         if problem is not None:
             problems.append((boundary_cell.id, problem))
+    if _calls_seen is not None:
+        problems.extend(call_log_problems(set(_calls_seen)))
+    return problems
+
+
+def evaluate_with_calls(module):
+    """`evaluate` over one instrumented run: every call the module issues is compared with the log.
+
+    The mutation harness drives each mutant through this, so the snapshot is mutation-tested too: a
+    change no cell happens to name still has to change the recorded call set.
+    """
+    global _calls_seen
+    _calls_seen = set()
+    try:
+        return evaluate(module)
+    finally:
+        _calls_seen = None
+
+
+# --- the golden snapshot ----------------------------------------------------
+# One entry per distinct invocation the gate issues through main(), in canonical `repr` order, each
+# with the reason it is there. Any change to a command, an argument, a flag, the PR number, the
+# repository pair or a call's working directory changes this set and fails the matrix, so the
+# forwarding obligations are pinned by construction rather than by a hand-written assertion per
+# obligation. The existing cells and the boundary assertions stay: they give better failure
+# messages; this snapshot is the backstop that catches what no assertion happens to name.
+#
+# To update: read the gate diff, decide the change is intended, then edit this set by hand. Never
+# paste back the set the failure printed — that turns "the gate invokes something new" into "the
+# test agrees with the mutation", which is the failure mode this snapshot exists to prevent.
+GOLDEN_CALLS = frozenset({
+    # The review-thread read: one graphql call, paged, carrying owner/name/pr for the requested PR.
+    (("gh", "api", "graphql",
+      "-f",
+      "query=query($owner:String!,$repo:String!,$pr:Int!,$cursor:String){"
+      "repository(owner:$owner,name:$repo){pullRequest(number:$pr){"
+      "reviewThreads(first:100,after:$cursor){pageInfo{hasNextPage endCursor}"
+      "nodes{isResolved path line}}}}}",
+      "-f", "owner=fixture-owner", "-f", "repo=fixture-repo", "-F", "pr=7"),
+     REPO_TOKEN, False),
+    # The issue-comment read: the REST endpoint for the requested PR, in the named repository.
+    (("gh", "api", "repos/fixture-owner/fixture-repo/issues/7/comments?per_page=100&page=1"),
+     REPO_TOKEN, False),
+    # The check-fetch fallback (human table) for the requested PR, in the named repository.
+    (("gh", "pr", "checks", "7"), REPO_TOKEN, False),
+    # The structured check read: the requested PR, the bucket field list, in the named repository.
+    (("gh", "pr", "checks", "7", "--json", "name,state,bucket"), REPO_TOKEN, False),
+    # The PR state/head read: the requested PR and the four fields it needs.
+    (("gh", "pr", "view", "7", "--json", "headRefOid,headRefName,state,isDraft"),
+     REPO_TOKEN, False),
+    # The repository identity read that names owner/name for the two api calls above.
+    (("gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"),
+     REPO_TOKEN, False),
+    # The local branch read; `--repo` travels as the adjacent `-C <repo>` pair, not as a cwd.
+    (("git", "-C", REPO_TOKEN, "rev-parse", "--abbrev-ref", "HEAD"), None, False),
+    # The local head read; same `-C <repo>` forwarding.
+    (("git", "-C", REPO_TOKEN, "rev-parse", "HEAD"), None, False),
+})
+
+
+def _format_call(entry):
+    """One recorded invocation as a copyable line: the argv, the working directory, the env flag."""
+    argv, cwd, has_env = entry
+    return "argv=%r cwd=%r passed_env=%s" % (list(argv), cwd, has_env)
+
+
+def call_log_problems(observed):
+    """Every way the invocations the gate issued differ from `GOLDEN_CALLS`.
+
+    A *set* comparison, so a call issued by one cell more or fewer times is not a change — the
+    cells are enumerated elsewhere; the claim pinned here is which commands the gate runs, with
+    which arguments, in which directory.
+    """
+    golden = set(GOLDEN_CALLS)
+    problems = []
+    for entry in sorted(golden - set(observed), key=repr):
+        problems.append((
+            "call-log-removed",
+            "the gate no longer issues %s; if removing it is intended, review the gate diff and "
+            "update GOLDEN_CALLS deliberately (do not paste the observed set back)"
+            % _format_call(entry)))
+    for entry in sorted(set(observed) - golden, key=repr):
+        problems.append((
+            "call-log-added",
+            "the gate now issues %s, which GOLDEN_CALLS does not name; if the new invocation is "
+            "intended, review the gate diff and add it deliberately" % _format_call(entry)))
     return problems
 
 
 def main():
     start = time.monotonic()
     problems = fixture_problems()
-    problems.extend(evaluate(GATE))
+    problems.extend(evaluate_with_calls(GATE))
     for cell_id, problem in problems:
         print("  FAIL  %s: %s" % (cell_id, problem))
     elapsed = time.monotonic() - start
     total = len(CELLS) + len(STREAM_CELLS) + len(BOUNDARY_CELLS)
     print("verdict-matrix: %d verdict cells + %d stream cells + %d boundary cells = %d cells, "
-          "%d failed, %.2fs" % (len(CELLS), len(STREAM_CELLS), len(BOUNDARY_CELLS), total,
-                                len(problems), elapsed))
+          "%d golden calls, %d failed, %.2fs"
+          % (len(CELLS), len(STREAM_CELLS), len(BOUNDARY_CELLS), total, len(GOLDEN_CALLS),
+             len(problems), elapsed))
     return 1 if problems else 0
 
 

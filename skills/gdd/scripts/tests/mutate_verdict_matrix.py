@@ -2,9 +2,10 @@
 """Mutation harness over the verdict matrix.
 
 Every mutation below is a plausible wrong implementation of `pr-merge-check.py`. Each is applied in
-memory to the module source (the checkout is never written) and the whole verdict matrix is re-run
-against the mutant: at least one cell must flip, or the mutation survived an exhaustive matrix and
-the harness fails loudly with the mutation id.
+memory to the module source (the checkout is never written) and the whole verdict matrix — every
+cell plus the golden call-log comparison — is re-run against the mutant: at least one cell must
+flip, or the recorded call set must change, or the mutation survived an exhaustive matrix and the
+harness fails loudly with the mutation id.
 
 Two catalogues make up the run:
 
@@ -17,10 +18,13 @@ Two catalogues make up the run:
   swap), the two round-6 findings named (a flag conflation that lets the table-only opt-in grant the
   zero-check opt-out, and a whole line normalised before the header comparison), the two the round-8
   finding named (the working directory dropped inside `sh_raw`, so `gh` inspects the caller's
-  repository instead of the one `--repo` names, and a `git` call that drops its repository), and the
-  ones the surface implies (a tab-less line parsed as a row, the header parsed as a check, the cancel
-  and skipping bucket mappings, the zero-check opt-out granted unconditionally, an unordered header,
-  a pending bucket read as failing);
+  repository instead of the one `--repo` names, and a `git` call that drops its repository), the six
+  the round-9 findings named (the structured read's dropped PR number, the fallback read's dropped
+  PR number and its dropped working directory, the two `git` calls' `-C <repo>` pair kept as a bare
+  path, and a trimmed `gh pr view --json` field list — the last reached by no cell, so only the
+  golden call log catches it), and the ones the surface implies (a tab-less line parsed as a row,
+  the header parsed as a check, the cancel and skipping bucket mappings, the zero-check opt-out
+  granted unconditionally, an unordered header, a pending bucket read as failing);
 * one generated mutation per declared `CHECK_VOCABULARY` entry, reclassifying that token into every
   other classification ("a failing verdict read as ok", "an ok verdict read as pending"). They are
   generated from the vocabulary, so a token added to the gate arrives with its own mutations and
@@ -242,6 +246,33 @@ MUTATIONS = [
      'sh(["git", "-C", repo, "rev-parse", "HEAD"])',
      'sh(["git", "rev-parse", "HEAD"])',
      "a git call drops its repository, so the local head is read from the caller's repository"),
+    ("structured-checks-pr-dropped",
+     '["gh", "pr", "checks", str(pr), "--json", "name,state,bucket"], cwd=repo',
+     '["gh", "pr", "checks", "--json", "name,state,bucket"], cwd=repo',
+     "the structured read drops the PR number, so real gh reads the current branch's PR instead"),
+    ("fallback-checks-pr-dropped",
+     'sh_raw(["gh", "pr", "checks", str(pr)], cwd=repo)',
+     'sh_raw(["gh", "pr", "checks"], cwd=repo)',
+     "the fallback read drops the PR number, so real gh reads the current branch's PR instead"),
+    ("fallback-checks-cwd-dropped",
+     'sh_raw(["gh", "pr", "checks", str(pr)], cwd=repo)',
+     'sh_raw(["gh", "pr", "checks", str(pr)])',
+     "the fallback read drops its working directory at the call site, so gh inspects the caller's "
+     "repository instead of the one --repo named"),
+    ("git-repository-path-kept-but-flag-dropped",
+     'sh(["git", "-C", repo, "rev-parse", "HEAD"])',
+     'sh(["git", repo, "rev-parse", "HEAD"])',
+     "a git call keeps the repository in argv but drops the adjacent -C pair, so Git no longer has "
+     "a valid repository selection while a membership check still sees the path"),
+    ("git-abbrev-ref-flag-dropped",
+     'sh(["git", "-C", repo, "rev-parse", "--abbrev-ref", "HEAD"])',
+     'sh(["git", repo, "rev-parse", "--abbrev-ref", "HEAD"])',
+     "the second git call loses its -C pair too, so the branch is read from the caller's repository"),
+    ("pr-view-field-list-trimmed",
+     '"headRefOid,headRefName,state,isDraft",',
+     '"headRefOid,headRefName,state",',
+     "the structured PR read asks for fewer fields than the gate needs — no cell names this argv, "
+     "so only the golden call log catches it"),
 ]
 
 
@@ -283,7 +314,7 @@ def load_mutated(source):
 def main():
     start = time.monotonic()
     gate = matrix.load_gate()
-    baseline = matrix.evaluate(gate)
+    baseline = matrix.evaluate_with_calls(gate)
     if baseline:
         for cell_id, problem in baseline:
             print("  BASELINE FAIL  %s: %s" % (cell_id, problem))
@@ -304,12 +335,12 @@ def main():
                   % (mutation_id, type(exc).__name__, exc))
             survivors.append(mutation_id)
             continue
-        flipped = [cell_id for cell_id, problem in matrix.evaluate(mutant) if problem is not None]
+        flipped = [cell_id for cell_id, problem in matrix.evaluate_with_calls(mutant) if problem is not None]
         if not flipped:
-            print("  SURVIVOR  %s (%s): no matrix cell flipped" % (mutation_id, note))
+            print("  SURVIVOR  %s (%s): no cell or golden call-log entry flipped" % (mutation_id, note))
             survivors.append(mutation_id)
         else:
-            print("  caught    %s (%s): %d cell(s), first %s"
+            print("  caught    %s (%s): %d problem(s), first %s"
                   % (mutation_id, note, len(flipped), flipped[0]))
 
     elapsed = time.monotonic() - start

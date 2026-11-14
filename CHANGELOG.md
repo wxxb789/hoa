@@ -10,7 +10,7 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
 - **Round-8 review finding: the subprocess boundary pins the repository it forwards.**
   Both boundary fakes accepted `cwd` and ignored it, and every `gh` argument was the same whichever
   directory was passed, so dropping `cwd=repo` at a call site — or replacing `cwd=cwd` inside
-  `sh_raw()` with `cwd=None` — left all 373 cells, the 92 review-evidence tests and the 68-fixture
+  `sh_raw()` with `cwd=None` — left all 376 cells, the 94 review-evidence tests and the 68-fixture
   selftest green while the child inspected the caller's repository instead of the one `--repo`
   named, invalidating the evidence the gate exists to collect. The matrix gains a **boundary
   dimension** — `boundary-repo-gh-cwd` (`gh` must run in the working directory `--repo` names) and
@@ -22,8 +22,37 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   directory, text mode and captured output at once. Both surviving mutations are registered in the
   catalogue (63 -> 65 mutations, 31 -> 33 anchored). This is the only relied-on obligation of that
   shape besides the repository: the gate passes no `env=` (its docstring states "Environment:
-  none"), so no test pins an environment the gate does not use, and the `gh` argv is already pinned
-  by the verdict cells, which dispatch on it.
+  none"), so no test pins an environment the gate does not use. The `gh` argv was **not** pinned:
+  the cells branch on `cmd[:3]` and on the presence of `--json`, so a dropped `str(pr)` or a trimmed
+  field list is invisible to them — round 9 closes that with the golden call log below.
+- **Round-9 review findings: the whole forwarded call surface is pinned mechanically, not case by
+  case.** Round 8 added the boundary dimension, but two holes of the same family remained, both
+  invisible to every cell, every evidence test and the selftest. First, the boundary cells all drove
+  a *successful* structured read, so the **table-fallback** call site
+  (`sh_raw(["gh", "pr", "checks", str(pr)], cwd=repo)`) was never reached and dropping its `cwd=repo`
+  survived the whole matrix — with the requested repository pending and the caller's green, the
+  baseline blocked with `checks pending` while the mutant merged. Second, the disk assertions
+  dispatched on prefixes (`cmd[:3] == ["gh", "pr", "checks"]`, `"--json" in cmd`) and on path
+  membership (`repo in cmd`), so dropping `str(pr)` from the structured argv survived — real `gh`
+  then reads the *current branch's* PR — as did `["git", "-C", repo, ...]` -> `["git", repo, ...]`,
+  where the path is still in argv but Git no longer has a valid repository selection. The matrix now
+  exercises the fallback read at the boundary (`boundary-repo-gh-fallback-cwd`), requires that call
+  to have happened with the repository directory, asserts the **complete** check-command shape — the
+  structured `gh pr checks <pr> --json name,state,bucket` or the fallback `gh pr checks <pr>`, for
+  the requested PR — on both read surfaces, and asserts the adjacent `["-C", <repo>]` pair for every
+  `git` call. The class is closed by construction with a **golden call log**: every
+  `subprocess.run()` invocation the gate issues while a cell drives `main()` is recorded as
+  `(argv, cwd, has_env)` — normalised only by folding the named repository onto `<repo>`; nothing the
+  gate relies on is dropped — and the distinct set is compared with an **8-entry snapshot committed
+  in the test file**, one entry per distinct call with the reason it is there. Any change to a
+  command, an argument, a flag, the PR number, the repository pair or a call's working directory, or
+  any new call, fails with the added or removed entry spelled out, and the failure tells the operator
+  to review the gate diff and update the snapshot deliberately — a blind paste-back would turn "the
+  gate invokes something new" into "the test agrees with the mutation". `evaluate_with_calls()` runs
+  the comparison, so the mutation harness exercises it per mutant as well: a mutation that trims the
+  `gh pr view --json` field list, which no cell names, is caught by the log alone. Six mutations are
+  registered (65 -> 71 mutations, 33 -> 39 anchored), and the matrix runs 376 cells (one more
+  boundary cell).
 - **Round-7 review findings: only a check-result exit is CI data, and both opt-ins together still
   cannot forgive a non-green read.** `gh pr checks` reports CI state through exactly two exit codes —
   1 (a check failed) and 8 (a check is pending). The table fallback accepted *every* non-zero exit as
@@ -100,7 +129,7 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   or unknown-verdict rules, and `main()`'s exit code plus verdict for each — plus
   `RealSubprocessBoundaryTests`, which patches `subprocess.run()` only, keeping `sh()`/`sh_raw()`
   real: the exit code and both streams are forwarded verbatim, and a non-zero exit never becomes an
-  empty-but-valid check list — 42 -> 92 test methods. The shipped `--selftest` gains the bucket
+  empty-but-valid check list — 42 -> 94 test methods. The shipped `--selftest` gains the bucket
   vocabulary (a recognized raw state under an unknown bucket stays pending), its tally, the table
   rows whose names begin with `NAME`, the unordered and partial headers that used to vanish, the four
   header-shaped data rows a normalising comparison dropped (an empty middle field, a lower-cased
@@ -122,13 +151,14 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   structured zero-check read). Every cell drives `main()` with `subprocess.run()` mocked and compares
   the **complete** verdict line plus the printed `checks:` tally, so a failing read cannot pass as a
   pending one (`verdict: BLOCKED: checks` is a prefix of `verdict: BLOCKED: checks pending`) — 370
-  verdict cells + 3 stream cells + 2 boundary cells. The captured live output in
+  verdict cells + 3 stream cells + 3 boundary cells, plus the 8-entry golden call log that pins every
+  `subprocess.run()` invocation the gate issues. The captured live output in
   `tests/gh_checks_fixtures.py` is a matrix input as well: a value gh prints that the declared
   vocabulary does not know fails the matrix instead of reaching the gate as an unknown token.
-  `tests/mutate_verdict_matrix.py` applies 65 in-memory mutations of the module — 33 anchored plus
+  `tests/mutate_verdict_matrix.py` applies 71 in-memory mutations of the module — 39 anchored plus
   two generated per declared vocabulary entry, reclassifying that token into every other
-  classification — and requires each to flip at least one cell, naming the survivor loudly if one
-  does not. Both run in CI.
+  classification — and requires each to flip at least one cell (or change the golden call log),
+  naming the survivor loudly if one does not. Both run in CI.
 
 ## [0.1.61] — 2026-11-14
 
