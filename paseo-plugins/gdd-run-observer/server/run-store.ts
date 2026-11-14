@@ -136,10 +136,10 @@ export function createRunStore(deps: StoreDeps): RunStore {
       };
     }
     const fileId = `${info.ino}:${info.birthtimeMs}`;
-    const replaced = current.fileId !== "" && current.fileId !== fileId;
 
     // Two passes at most: a rewritten log restarts the count from byte 0, then a recount settles.
     for (let pass = 0; pass < 2; pass += 1) {
+      const replaced = current.fileId !== "" && current.fileId !== fileId;
       const completeOffset = current.offset - current.pending.length;
       const shifted =
         replaced ||

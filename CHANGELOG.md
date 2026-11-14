@@ -17,6 +17,8 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
 
 ### Changed
 
+- Observer counters recount retained events in the same list, follow, or detail scan after the
+  launcher atomically replaces `events.ndjson`, instead of briefly returning null metrics.
 - Preserved native Paseo cwd provenance failures across refreshes until inspect verifies the
   requested directory. Observer counters now share per-run in-flight updates, retain split NDJSON
   lines without rereading buffered bytes, and keep complete UTF-8 events in detail/follow tails.

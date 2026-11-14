@@ -1,4 +1,4 @@
-import { appendFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, mkdtemp, rename, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -238,6 +238,70 @@ describe("run store", () => {
     expect(summary.eventsDroppedBytes).toBe(5000);
     expect(summary.warnings).toContain("log-truncated");
   });
+
+  it.each(["list", "follow", "detail"] as const)(
+    "recounts retained metrics in the same %s scan after atomic replacement",
+    async (scan) => {
+      const head =
+        event({ type: "turn_end" }) +
+        event({ type: "tool_execution_start", toolCallId: "a", toolName: "read" }) +
+        event({ type: "tool_execution_end", toolCallId: "a", toolName: "read" }) +
+        event({ type: "message_end", message: { role: "assistant", usage: { cost: { total: 0.02 } } } });
+      const original = head +
+        event({ type: "tool_execution_start", toolCallId: "dropped", toolName: "old-tool" }) +
+        event({ type: "message_end", message: { role: "assistant", usage: { cost: { total: 0.5 } } } }) +
+        event({ type: "tool_execution_error", error: "dropped error" });
+      const dir = await writeRun("stage-implement", {
+        "state.json": STATE_RUNNING,
+        "events.ndjson": original,
+      });
+      const runs = store([222]);
+      expect((await runs.listRuns()).runs[0]).toMatchObject({
+        turns: 1, toolCalls: 2, costUsd: 0.52, currentTool: "old-tool", errorCount: 1, eventLines: 7,
+      });
+
+      const lastEventAt = "2026-11-14T00:00:03.000Z";
+      const retainedError = { type: "tool_execution_error", error: "retained error", timestamp: lastEventAt };
+      const retained = head +
+        event({ type: "truncated", dropped_bytes: 5000 }) +
+        event({ type: "turn_end" }) +
+        event({ type: "tool_execution_start", toolCallId: "b", toolName: "bash", intent: "Run tests" }) +
+        event({ type: "message_end", message: { role: "assistant", usage: { cost: { total: 0.03 } } } }) +
+        event(retainedError);
+      // Match the writer's head + marker + tail replacement, not an in-place truncate.
+      const path = join(dir, "events.ndjson");
+      const replacement = join(dir, "events.ndjson.tmp");
+      const before = await stat(path);
+      await writeFile(replacement, retained, "utf8");
+      await rename(replacement, path);
+      const after = await stat(path);
+      expect(`${after.ino}:${after.birthtimeMs}`).not.toBe(`${before.ino}:${before.birthtimeMs}`);
+      expect(after.size).toBeGreaterThan(before.size);
+
+      const id = `${DATE}/stage-implement`;
+      const summary = scan === "list" ? (await runs.listRuns()).runs[0]
+        : scan === "follow" ? (await runs.follow(id)).summary
+        : (await runs.runDetail(id)).summary;
+      const expected = {
+        turns: 2,
+        toolCalls: 2,
+        costUsd: 0.05,
+        countersFrom: "events",
+        countersPartial: true,
+        currentTool: "bash",
+        currentToolIntent: "Run tests",
+        errorCount: 1,
+        lastError: JSON.stringify(retainedError),
+        lastEventAt,
+        eventLines: 9,
+        eventsTruncated: true,
+        eventsDroppedBytes: 5000,
+      };
+      expect(summary).toMatchObject(expected);
+      expect(summary?.warnings).toContain("log-truncated");
+      expect((await runs.listRuns()).runs[0]).toMatchObject(expected);
+    },
+  );
 
   it("prefers launcher counters once a run finalized", async () => {
     await writeRun("stage-implement", {
