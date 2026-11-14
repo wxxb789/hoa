@@ -4,7 +4,7 @@ description: >-
   Help design a software interface or public API. Produces interface sketches, example method
   signatures, swagger/openapi snippet, and usage examples.
 metadata:
-  version: "0.1.59"
+  version: "0.1.60"
   areas: "software-development"
   targets: "runtime-agnostic"
   summary: "sketch a software interface or public API: signatures, OpenAPI snippet, usage examples"

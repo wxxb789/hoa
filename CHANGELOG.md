@@ -3,6 +3,19 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## [0.1.60] — 2026-11-14
+
+### Changed
+
+- `docs/plans/2026-11-14-catalog-refactor-plan.md` is rewritten as the revised plan: the catalog
+  re-measured on `cabf8c6`, the two independent audits' verdict absorbed (the test discoverer stays one
+  mechanical PR behind a name-based discovery contract, the static checks are split from the script
+  tests, and oversized entries are split by progressive disclosure rather than rewritten as
+  `controller`s), and the two claims the audits refused — `kind` as a dead field, `hermes`/`pi` as enum
+  drift — withdrawn along with the code that refutes them. The plan also records what version 1 missed:
+  four stub skills, three orphan references, five unresolvable local paths, and a routing blind spot that
+  no static check can see.
+
 ## [0.1.59] — 2026-11-14
 
 ### Added
