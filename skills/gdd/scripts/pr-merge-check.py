@@ -9,6 +9,7 @@ Usage:
     pr-merge-check.py 123 --repo PATH --marker 'my-bot-state:v2'
     pr-merge-check.py 123 --repo PATH --allow-no-machine-review
     pr-merge-check.py 123 --repo PATH --gates-rc 0 --verified-head SHA --allow-no-checks
+    pr-merge-check.py 123 --repo PATH --gates-rc 0 --verified-head SHA --allow-table-only-checks
     pr-merge-check.py --selftest
 
 Exit codes: 0 MERGE-OK, 1 BLOCKED, 2 usage/gh/git error.
@@ -26,8 +27,16 @@ Checks:
      tool exits 2 rather than reporting MERGE-OK. Only a successful read of zero check runs is
      the empty state, and only `--allow-no-checks` accepts it. Only the header — all five printed
      column names in print order — is skipped: every other line is a row, and a row whose verdict
-     word is unknown blocks.
-  2. newest --marker comment: completed, has_any_findings false, full 40-hex
+     word is unknown blocks. The header comparison is exact (field count, empty fields and case
+     preserved), so no data row can be mistaken for it.
+  2. **A table-only read can never produce MERGE-OK.** When the structured read
+     (`--json name,state,bucket`) did not produce the rows, the parsed human table is *advisory*:
+     a non-green row blocks as above, and an all-green or empty table blocks too, with the reason
+     `checks unreadable`. That is a verdict about unverifiable evidence, not an operator error, so
+     it is BLOCKED (exit 1), not exit 2. `--allow-table-only-checks` is the explicit, documented
+     opt-in that restores the table's authority for an operator whose gh cannot do `--json`; it
+     does not bypass the exact-vs-normalised header rule or the unknown-verdict rule.
+  3. newest --marker comment: completed, has_any_findings false, full 40-hex
      commit_sha exactly equal to the PR head, nonempty model/provider and full
      UTF-8 report with a matching SHA256. Custom markers use the same schema.
      Malformed newest evidence blocks; it never falls back to an older comment.
@@ -37,8 +46,8 @@ Checks:
      explicitly, for a repo that has no CI.
      --allow-no-machine-review prints `marker: none` and accepts the clause
      explicitly (never silently).
-  3. unresolved review threads == 0
-  4. local gates supplied via --gates-rc 0; a gate result only counts when the
+  4. unresolved review threads == 0
+  5. local gates supplied via --gates-rc 0; a gate result only counts when the
      head it ran on is verified, otherwise gates are UNKNOWN
 
 Head precondition: the PR head is verified via --verified-head (the SHA the gates
@@ -229,16 +238,19 @@ def is_text_check_header(line):
     """True for the table's own header row: every printed column name, in the printed order.
 
     `gh pr checks` labels the columns NAME STATUS ELAPSED URL DESCRIPTION (pkg/cmd/pr/checks/
-    output.go at gh 2.103), so the header is exactly that line and nothing else. Two weaker tests
-    each dropped a real row from the verdict: a `NAME` prefix dropped checks named `NAME-required`,
-    and an unordered *set* of column names accepted `STATUS\\tNAME` — given the table `build\\tpass`
-    then `STATUS\\tNAME`, the second line vanished and the gate printed MERGE-OK counting only the
-    passing row. Everything that is not the header is a row, and a row whose verdict is unknown
-    blocks; a check may legitimately be *named* `NAME-required`, `NAME` or `STATUS`. The TTY header
-    is space-aligned and carries a mark column, so it never reaches this tab-delimited parser.
+    output.go at gh 2.103), so the header is exactly that line and nothing else: those five column
+    names, in print order, with the field count, the empty fields and the case preserved. Three
+    weaker tests each dropped a real row from the verdict. A `NAME` prefix dropped checks named
+    `NAME-required`; an unordered *set* of column names accepted `STATUS\\tNAME` — given the table
+    `build\\tpass` then `STATUS\\tNAME`, the second line vanished and the gate printed MERGE-OK
+    counting only the passing row; and a comparison that strips empty fields and uppercases before
+    comparing turned two more data rows into the header: `NAME\\t\\tSTATUS\\tELAPSED\\tURL\\
+    tDESCRIPTION` (an empty field) and `name\\tstatus\\telapsed\\turl\\tdescription` (lower case).
+    Everything that is not the exact header is a row, and a row whose verdict is unknown blocks; a
+    check may legitimately be *named* `NAME-required`, `NAME` or `STATUS`. The TTY header is
+    space-aligned and carries a mark column, so it never reaches this tab-delimited parser.
     """
-    fields = [cell.strip().upper() for cell in line.split("\t")]
-    fields = [cell for cell in fields if cell]
+    fields = line.split("\t")
     return fields == list(TEXT_CHECK_COLUMNS)
 
 
@@ -272,6 +284,12 @@ def bucket_check(entry):
 
 
 def fetch_checks(pr, repo):
+    """The PR's check rows, and the surface that produced them: `(rows, "json" | "table")`.
+
+    The structured read (`--json name,state,bucket`) is authoritative. When it does not produce
+    rows the human table is the fallback, and `"table"` marks the rows advisory: the caller must
+    never let a table-only read authorise a merge (the class-closing rule; see `evaluate`).
+    """
     returncode, stdout, _ = sh_raw(
         ["gh", "pr", "checks", str(pr), "--json", "name,state,bucket"], cwd=repo
     )
@@ -289,7 +307,7 @@ def fetch_checks(pr, repo):
                         "gh pr checks --json: expected an object per check, got "
                         + type(entry).__name__
                     )
-            return [bucket_check(entry) for entry in data]
+            return [bucket_check(entry) for entry in data], "json"
     # Fallback: the human table. `gh pr checks` exits 8 while any check is pending and 1 when one
     # failed — with a table that parses, that is the CI state, not a CLI failure.
     returncode, stdout, stderr = sh_raw(["gh", "pr", "checks", str(pr)], cwd=repo)
@@ -298,11 +316,11 @@ def fetch_checks(pr, repo):
         message = (stderr or stdout).strip()
         if not checks:
             # `gh pr checks` exits 1 with "no checks reported" when nothing registered yet (or ever,
-            # for a repo with no CI). That is an empty list, not a CLI failure — otherwise the
+            # for a repo with no CI). That is an empty read, not a CLI failure — otherwise the
             # --allow-no-checks opt-out could never be reached. Genuine errors still raise.
             lowered = message.lower()
             if "no checks reported" in lowered or "no check runs found" in lowered:
-                return []
+                return [], "table"
             raise GateError(message.splitlines()[0] if message else f"exit {returncode}")
         if evaluate_checks(checks)["pass"]:
             # A non-zero exit means the read was not complete (gh exits 8 while any check is
@@ -313,7 +331,7 @@ def fetch_checks(pr, repo):
                 "gh pr checks: non-zero exit with an all-green table "
                 f"({detail}); the read was incomplete"
             )
-    return checks
+    return checks, "table"
 
 
 def fetch_review_threads(owner, name, pr, repo):
@@ -465,6 +483,7 @@ def evaluate(
     marker=DEFAULT_MARKER,
     allow_no_machine_review=False,
     allow_no_checks=False,
+    allow_table_only_checks=False,
 ):
     facts = {"pr": int(pr) if str(pr).isdigit() else pr, "gates": {}, "marker": marker}
     reasons = []
@@ -514,9 +533,23 @@ def evaluate(
     )
     reasons.extend(gate_reasons)
 
-    checks = evaluate_checks(fetch_checks(pr, repo), allow_no_checks=allow_no_checks)
+    checks_rows, checks_source = fetch_checks(pr, repo)
+    checks = evaluate_checks(checks_rows, allow_no_checks=allow_no_checks)
     facts["checks"] = checks
-    if not checks["pass"]:
+    facts["checks_source"] = checks_source
+    # The class-closing rule: `gh pr checks` prints a display format whose field count, emptiness,
+    # case and row set are not a contract, and every attempt to parse it has produced another way
+    # to lose a row. So when the structured read did not produce the rows, the parsed table is
+    # *advisory* — it may only block. A non-green row blocks as it always did; an all-green or
+    # empty table blocks too, because the check list could not be read in structured form. That is
+    # a verdict about unverifiable evidence, not an operator error, so it is BLOCKED (exit 1), not
+    # exit 2. `--allow-table-only-checks` is the documented opt-in that restores the table's
+    # authority for an operator whose gh cannot do `--json`; it does not bypass the exact-header
+    # rule or the unknown-verdict rule, which are inside `parse_text_checks`.
+    table_only = checks_source == "table" and not allow_table_only_checks
+    if table_only and (checks["total"] == 0 or checks["pass"]):
+        reasons.append("checks unreadable")
+    elif not checks["pass"]:
         if checks["total"] == 0:
             reasons.append("no checks")
         elif checks["pending"] and not checks["failing"]:
@@ -848,6 +881,16 @@ def selftest():
             "build\tpending\t0\thttps://example/1/job/1\t\n",
             [("build", "PENDING", "PENDING")],
         ),
+        (
+            "empty-field-row-is-not-the-header",
+            "build\tpass\nNAME\t\tSTATUS\tELAPSED\tURL\tDESCRIPTION\n",
+            [("build", "COMPLETED", "SUCCESS"), ("NAME", "COMPLETED", "FAILURE")],
+        ),
+        (
+            "lower-case-header-is-not-the-header",
+            "build\tpass\nname\tstatus\telapsed\turl\tdescription\n",
+            [("build", "COMPLETED", "SUCCESS"), ("name", "COMPLETED", "FAILURE")],
+        ),
     ]
     bucket_cases = [
         ("bucket-pass", "SUCCESS", "pass", ("COMPLETED", "SUCCESS")),
@@ -870,9 +913,9 @@ def selftest():
         + len(bucket_cases)
         + len(text_cases)
         + len(TEXT_CONCLUSIONS)
-        # the bucket tally, the name-prefixed row tally, the unordered-header tally and the
-        # table-vocabulary tally
-        + 4
+        # the bucket tally, the name-prefixed row tally, the unordered-header tally, the two
+        # header-shaped-row tallies and the table-vocabulary tally
+        + 6
     )
     passed = 0
 
@@ -966,6 +1009,20 @@ def selftest():
     print(f"  {mark}  unordered-header-tally: total/ok/pending/failing/pass={actual}")
     passed += 1 if actual == expected else 0
 
+    # The two header-shaped *data* rows a normalising comparison dropped: an empty field and a
+    # lower-cased row. With the exact comparison each is a row counted as failing, so neither
+    # tally is all green — the fail-open these fixtures close.
+    for name, text in [
+        ("empty-field-header-tally", "build\tpass\nNAME\t\tSTATUS\tELAPSED\tURL\tDESCRIPTION\n"),
+        ("lower-case-header-tally", "build\tpass\nname\tstatus\telapsed\turl\tdescription\n"),
+    ]:
+        facts = evaluate_checks(parse_text_checks(text))
+        actual = (facts["total"], facts["ok"], facts["pending"], facts["failing"], facts["pass"])
+        expected = (2, 1, 0, 1, False)
+        mark = "ok" if actual == expected else "FAIL"
+        print(f"  {mark}  {name}: total/ok/pending/failing/pass={actual}")
+        passed += 1 if actual == expected else 0
+
     # Every declared table verdict, classified. Generated from TEXT_CONCLUSIONS, so a token cannot
     # be added to the vocabulary without a fixture here; only a conclusion in GOOD_CONCLUSIONS
     # passes, and a waiting conclusion counts as pending rather than failing.
@@ -1038,6 +1095,12 @@ def build_parser():
         action="store_true",
         help="accept a PR with zero check runs (only for repos with no CI; explicit opt-out)",
     )
+    parser.add_argument(
+        "--allow-table-only-checks",
+        action="store_true",
+        help="accept a checks verdict read from gh's human table when `--json` is unavailable "
+             "(older gh); the default blocks, because the table is not a stable contract",
+    )
     parser.add_argument("--json", action="store_true", help="emit one JSON object")
     parser.add_argument("--selftest", action="store_true", help="offline fixture test")
     return parser
@@ -1064,6 +1127,7 @@ def main():
             marker=args.marker,
             allow_no_machine_review=args.allow_no_machine_review,
             allow_no_checks=args.allow_no_checks,
+            allow_table_only_checks=args.allow_table_only_checks,
         )
     except (GateError, ValueError, KeyError) as exc:
         print(f"pr-merge-check: {exc}", file=sys.stderr)

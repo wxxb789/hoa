@@ -427,8 +427,8 @@ class MergeGateIntegrationTests(unittest.TestCase):
         view = {"state": "OPEN", "isDraft": False, "headRefOid": HEAD, "headRefName": "feature"}
         responses = [HEAD, "feature", json.dumps(view), "fixture-owner/fixture-repo"]
         with patch.object(gate, "sh", side_effect=responses), \
-             patch.object(gate, "fetch_checks", return_value=checks if checks is not None else
-                          [{"state": "COMPLETED", "conclusion": "SUCCESS"}]), \
+             patch.object(gate, "fetch_checks", return_value=(checks if checks is not None else
+                          [{"state": "COMPLETED", "conclusion": "SUCCESS"}], "json")), \
              patch.object(gate, "fetch_issue_comments", return_value=[comment(evidence or clean_evidence())]), \
              patch.object(gate, "fetch_review_threads", return_value=threads or []):
             return gate.evaluate(1, ".", gates_rc, verified_head=verified_head)
@@ -497,7 +497,8 @@ REAL_GH_TABLE = ("release\tskipping\t0\thttps://example/runs/1/job/2\t\n"
 
 
 class CheckFetchTests(unittest.TestCase):
-    def fetch(self, json_result, table_result):
+    def fetch_with_source(self, json_result, table_result):
+        """`fetch_checks` rows, the surface that produced them, and the commands it ran."""
         calls = []
 
         def fake_sh_raw(cmd, cwd=None):
@@ -505,8 +506,28 @@ class CheckFetchTests(unittest.TestCase):
             return json_result if "--json" in cmd else table_result
 
         with patch.object(gate, "sh_raw", side_effect=fake_sh_raw):
-            checks = gate.fetch_checks(7, ".")
+            checks, source = gate.fetch_checks(7, ".")
+        return checks, source, calls
+
+    def fetch(self, json_result, table_result):
+        checks, _source, calls = self.fetch_with_source(json_result, table_result)
         return checks, calls
+
+    def test_fetch_reports_the_surface_that_produced_the_rows(self):
+        # The verdict's class-closing decision hangs on this label: a wrong "json" would let a
+        # table-only read authorise a merge, and a wrong "table" would block a structured one.
+        rows = [{"name": "build", "state": "SUCCESS", "bucket": "pass"}]
+        _checks, source, calls = self.fetch_with_source((0, json.dumps(rows), ""), (0, "", ""))
+        self.assertEqual(source, "json")
+        self.assertEqual(calls[0][-2:], ["--json", "name,state,bucket"])
+        _checks, source, calls = self.fetch_with_source(JSON_FIELD_GONE, (0, GREEN_TABLE, ""))
+        self.assertEqual(source, "table")
+        self.assertEqual(calls[1][:3], ["gh", "pr", "checks"])
+        # gh's recognized empty message arrives on the table path too, so it is table-only.
+        checks, source, _ = self.fetch_with_source(JSON_FIELD_GONE,
+                                                   (1, "", "no checks reported on 'feature'"))
+        self.assertEqual(source, "table")
+        self.assertEqual(checks, [])
 
     def test_json_asks_for_the_bucket_not_the_removed_conclusion(self):
         rows = [{"name": "build", "state": "SUCCESS", "bucket": "pass"}]
@@ -810,37 +831,71 @@ class CheckFetchCliTests(unittest.TestCase):
                 self.assertEqual(out, "")
                 self.assertIn("object per check", err)
 
-    def test_skipping_and_passing_table_is_merge_ok(self):
+    def test_a_table_only_green_read_blocks_and_the_opt_in_restores_it(self):
+        # Round-5 class-closing rule: gh's table is a display format, not a contract, so a
+        # table-only read is advisory. A green table blocks by default; only the documented
+        # opt-in makes it authoritative again.
         code, out, _ = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",
                                       "--allow-no-machine-review",
                                       table_result=(0, GREEN_TABLE, ""))
-        self.assertEqual(code, 0)
+        self.assertEqual(code, 1)
         self.assertIn("checks: 2 total, 2 ok, 0 pending, 0 failing", out)
+        self.assertIn("verdict: BLOCKED: checks unreadable", out)
+        code, out, _ = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",
+                                      "--allow-no-machine-review", "--allow-table-only-checks",
+                                      table_result=(0, GREEN_TABLE, ""))
+        self.assertEqual(code, 0)
         self.assertIn("verdict: MERGE-OK", out)
 
-    def test_zero_check_runs_block_unless_the_flag_forgives_them(self):
+    def test_the_opt_in_cannot_bypass_the_header_or_unknown_verdict_rules(self):
+        for table in [(0, "build\tpass\nSTATUS\tNAME\n", ""), (0, "mystery\tunreleased\n", "")]:
+            with self.subTest(table=table):
+                code, out, _ = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",
+                                              "--allow-no-machine-review",
+                                              "--allow-table-only-checks", table_result=table)
+                self.assertEqual(code, 1)
+                self.assertIn("verdict: BLOCKED: checks", out)
+
+    def test_a_table_only_zero_check_read_blocks_and_the_opt_in_forgives_it(self):
+        # The recognized "no checks reported" message arrives on the *table* path, so it is a
+        # table-only read: advisory, blocked as `checks unreadable`. --allow-no-checks forgives a
+        # *structured* zero-check read (see RealSubprocessBoundaryTests), never this one; the
+        # opt-in makes the table authoritative, and only then does the zero-check flag apply.
         no_checks = (1, "", "no checks reported on the 'feature' branch")
         code, out, _ = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",
                                      "--allow-no-machine-review", table_result=no_checks)
         self.assertEqual(code, 1)
         self.assertIn("checks: 0 total, 0 ok, 0 pending, 0 failing (no checks)", out)
-        self.assertIn("verdict: BLOCKED: no checks", out)
+        self.assertIn("verdict: BLOCKED: checks unreadable", out)
         code, out, _ = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",
                                      "--allow-no-machine-review", "--allow-no-checks",
                                      table_result=no_checks)
+        self.assertEqual(code, 1)
+        self.assertIn("verdict: BLOCKED: checks unreadable", out)
+        code, out, _ = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",
+                                     "--allow-no-machine-review", "--allow-table-only-checks",
+                                     "--allow-no-checks", table_result=no_checks)
         self.assertEqual(code, 0)
         self.assertIn("verdict: MERGE-OK", out)
 
-    def test_empty_fallback_table_blocks_main_and_only_the_flag_merges(self):
-        # The table is reached with a zero exit and empty stdout: zero check runs, not green.
+    def test_empty_fallback_table_blocks_main_and_needs_both_flags_to_merge(self):
+        # The table is reached with a zero exit and empty stdout: a table-only read, not a
+        # structured zero-check success. It blocks with or without --allow-no-checks, and merges
+        # only once the opt-in has made the table authoritative.
         code, out, _ = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",
                                       "--allow-no-machine-review",
                                       json_result=JSON_FIELD_GONE, table_result=(0, "", ""))
         self.assertEqual(code, 1)
         self.assertIn("checks: 0 total, 0 ok, 0 pending, 0 failing (no checks)", out)
-        self.assertIn("verdict: BLOCKED: no checks", out)
+        self.assertIn("verdict: BLOCKED: checks unreadable", out)
         code, out, _ = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",
                                       "--allow-no-machine-review", "--allow-no-checks",
+                                      json_result=JSON_FIELD_GONE, table_result=(0, "", ""))
+        self.assertEqual(code, 1)
+        self.assertIn("verdict: BLOCKED: checks unreadable", out)
+        code, out, _ = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",
+                                      "--allow-no-machine-review", "--allow-table-only-checks",
+                                      "--allow-no-checks",
                                       json_result=JSON_FIELD_GONE, table_result=(0, "", ""))
         self.assertEqual(code, 0)
         self.assertIn("verdict: MERGE-OK", out)

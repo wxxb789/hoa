@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
 """Exhaustive verdict matrix for the merge gate's check-fetch surface.
 
-The matrix is generated from what `pr-merge-check.py` declares plus what `gh` prints, not from
-what the implementation happens to answer:
+The oracle is a literal, test-side declaration — never the artefact it pins:
 
-* the rows come from the gate's single declared `CHECK_VOCABULARY` (every verdict token each read
-  surface can print) and from the raw `state` vocabulary beside them in
-  `tests/gh_checks_fixtures.py` — captured live from `gh pr checks` on three open PRs;
+* `DECLARED_VOCABULARY` writes out, here, the meaning of every verdict token each read surface can
+  print; the gate's own `CHECK_VOCABULARY` is checked token by token against it, so a swapped or
+  silently added token fails loudly instead of moving the expectation along with the gate (round-5
+  finding F2);
 * the expectation for each row is computed from the invariants stated once below: only a completed
   success or the skipping/neutral conventions are ok, a waiting conclusion is pending, everything
-  else blocks, an undeclared verdict blocks, and `--allow-no-checks` forgives only a successfully
-  read zero-check result;
+  else blocks, an undeclared verdict blocks, and `--allow-no-checks` forgives only a *structured*
+  zero-check read;
+* the class-closing rule is a dimension of its own: the structured read is authoritative, and a
+  table-only read may never authorise a merge — an all-green or empty table blocks with
+  `checks unreadable` unless the operator passes `--allow-table-only-checks`, which bypasses
+  neither the exact-header rule nor the unknown-verdict rule;
 * the comparison is exact — the whole verdict line plus the printed `checks:` tally — so a cell
   cannot accept one classification in place of another.
 
@@ -54,18 +58,63 @@ def load_gate(path=None):
     return module
 
 
-# The gate as shipped. The vocabulary is read once, here, so the expectations below are those of the
-# declared artefact: a mutation that reclassifies a token in memory changes the gate's behaviour
-# without changing what this matrix expects, which is what makes the mutation visible.
+# The gate as shipped. Its vocabulary is read once here and used only to *enumerate inputs* and to
+# check that the gate still declares exactly what the matrix declares below. It is never the source
+# of an expectation: reading the artefact for what is correct is what made a two-token swap
+# invisible (round-5 finding F2).
 GATE = load_gate()
 VOCABULARY = dict(GATE.CHECK_VOCABULARY)
 
+# --- the oracle: the declared meaning of every vocabulary token -------------
+# Written out here, literally and test-side, independent of the gate it pins. The cells derive
+# their expected classification from *this* declaration, never from `CHECK_VOCABULARY`, so
+# exchanging two production values — or adding one silently — fails against a fixed expectation
+# instead of moving the expectation along with the artefact.
+DECLARED_VOCABULARY = {
+    "bucket/pass": "SUCCESS",
+    "bucket/skipping": "SKIPPED",
+    "bucket/neutral": "NEUTRAL",
+    "bucket/fail": "FAILURE",
+    "bucket/cancel": "CANCELLED",
+    "bucket/pending": "PENDING",
+    "table/pass": "SUCCESS",
+    "table/skipping": "SKIPPED",
+    "table/skip": "SKIPPED",
+    "table/neutral": "NEUTRAL",
+    "table/failing": "FAILURE",
+    "table/fail": "FAILURE",
+    "table/cancelled": "CANCELLED",
+    "table/canceled": "CANCELLED",
+    "table/timed_out": "TIMED_OUT",
+    "table/pending": "PENDING",
+}
+
 
 def vocabulary(surface):
-    """The `<surface>` slice of the declared vocabulary, as {token: conclusion}."""
+    """The `<surface>` slice of the *declared* vocabulary, as {token: conclusion}."""
     prefix = surface + "/"
-    return {key[len(prefix):]: value for key, value in VOCABULARY.items()
+    return {key[len(prefix):]: value for key, value in DECLARED_VOCABULARY.items()
             if key.startswith(prefix)}
+
+
+def declaration_problems(module):
+    """Every way `module.CHECK_VOCABULARY` departs from the literal declaration above.
+
+    Token by token: a missing or extra token fails, and a token whose production value is not the
+    declared conclusion fails. A swap — two tokens present with their meanings exchanged — is
+    therefore a loud failure rather than a silent one, which is exactly what the oracle must catch.
+    """
+    problems = []
+    production = dict(getattr(module, "CHECK_VOCABULARY", {}) or {})
+    for key in sorted(set(DECLARED_VOCABULARY) - set(production)):
+        problems.append((key, "the declaration names a token the gate does not declare"))
+    for key in sorted(set(production) - set(DECLARED_VOCABULARY)):
+        problems.append((key, "the gate declares a token the declaration does not name"))
+    for key in sorted(set(production) & set(DECLARED_VOCABULARY)):
+        if production[key] != DECLARED_VOCABULARY[key]:
+            problems.append((key, "declared %r, the gate maps it to %r"
+                             % (DECLARED_VOCABULARY[key], production[key])))
+    return problems
 
 
 # --- the invariants, stated once --------------------------------------------
@@ -90,6 +139,16 @@ _VERDICT = {
     "ok": (0, None, (1, 1, 0, 0)),
     "pending": (1, "checks pending", (1, 0, 1, 0)),
     "failing": (1, "checks", (1, 0, 0, 1)),
+}
+
+# The class-closing rule: a table-only read is advisory and may never authorise a merge. An
+# all-green or empty table is unverifiable evidence, so it blocks with `checks unreadable`; a
+# non-green table blocks with its own classification's reason. (exit code, verdict reason) per
+# classification, for the table surface without `--allow-table-only-checks`.
+_TABLE_ONLY_VERDICT = {
+    "ok": (1, "checks unreadable"),
+    "pending": (1, "checks pending"),
+    "failing": (1, "checks"),
 }
 
 # --- fixtures ---------------------------------------------------------------
@@ -133,14 +192,15 @@ JSON_PASS_PENDING = _json([{"name": "build", "state": "SUCCESS", "bucket": "pass
                            {"name": "gates", "state": "PENDING", "bucket": "pending"}])
 
 Cell = namedtuple("Cell", "id json_result table_result allow_no_checks exit_code verdict reason "
-                          "checks why")
+                          "checks why allow_table_only")
 StreamCell = namedtuple("StreamCell", "id stdout stderr exit_code why")
 
 
-def cell(cid, json_result, table_result, allow_no_checks, exit_code, verdict, reason, checks, why):
+def cell(cid, json_result, table_result, allow_no_checks, exit_code, verdict, reason, checks, why,
+         allow_table_only=False):
     """One verdict cell. `checks` is the expected `checks:` tally, or None when there is no read."""
     return Cell(cid, json_result, table_result, allow_no_checks, exit_code, verdict, reason,
-                checks, why)
+                checks, why, allow_table_only)
 
 
 # --- the matrix -------------------------------------------------------------
@@ -177,22 +237,29 @@ CELLS = [
          "a list of only non-objects is unreadable: exit 2"),
     cell("json-malformed-only-flag", JSON_MALFORMED_ONLY, TABLE_UNUSED, True, 2, "ERROR", None,
          None, "the flag cannot rescue a malformed list"),
-    cell("json-nonlist-empty-table", JSON_NONLIST, (0, "", ""), False, 1, "BLOCKED", "no checks",
-         (0, 0, 0, 0), "a non-list payload is not a check list; the table is the fallback and empty"),
-    cell("json-nonlist-empty-table-flag", JSON_NONLIST, (0, "", ""), True, 0, "MERGE-OK", None,
-         (0, 0, 0, 0), "the fallback read succeeded and is genuinely empty, so the flag forgives it"),
-    cell("json-nonlist-green-table", JSON_NONLIST, (0, GREEN_TABLE, ""), False, 0, "MERGE-OK", None,
-         (2, 2, 0, 0), "a non-list payload falls back to the table, which here is green"),
-    cell("json-garbage-green-table", JSON_GARBAGE, (0, GREEN_TABLE, ""), False, 0, "MERGE-OK", None,
-         (2, 2, 0, 0), "unparseable JSON falls back to the table"),
-    cell("json-absent-green-table", JSON_ABSENT, (0, GREEN_TABLE, ""), False, 0, "MERGE-OK", None,
-         (2, 2, 0, 0), "a non-zero JSON exit falls back to the table, which here is green"),
-    cell("json-absent-empty-table", JSON_ABSENT, (0, "", ""), False, 1, "BLOCKED", "no checks",
-         (0, 0, 0, 0), "the fallback is reached and reports zero checks"),
+    cell("json-nonlist-empty-table", JSON_NONLIST, (0, "", ""), False, 1, "BLOCKED",
+         "checks unreadable", (0, 0, 0, 0),
+         "a non-list payload is not a check list; the empty fallback table cannot authorise"),
+    cell("json-nonlist-empty-table-flag", JSON_NONLIST, (0, "", ""), True, 1, "BLOCKED",
+         "checks unreadable", (0, 0, 0, 0),
+         "a table-only read is advisory even with --allow-no-checks: the flag cannot authorise it"),
+    cell("json-nonlist-green-table", JSON_NONLIST, (0, GREEN_TABLE, ""), False, 1, "BLOCKED",
+         "checks unreadable", (2, 2, 0, 0),
+         "a non-list payload falls back to a table-only read, which may never report MERGE-OK"),
+    cell("json-garbage-green-table", JSON_GARBAGE, (0, GREEN_TABLE, ""), False, 1, "BLOCKED",
+         "checks unreadable", (2, 2, 0, 0),
+         "unparseable JSON falls back to a table-only read, which may never report MERGE-OK"),
+    cell("json-absent-green-table", JSON_ABSENT, (0, GREEN_TABLE, ""), False, 1, "BLOCKED",
+         "checks unreadable", (2, 2, 0, 0),
+         "a non-zero JSON exit falls back to a table-only read, which may never report MERGE-OK"),
+    cell("json-absent-empty-table", JSON_ABSENT, (0, "", ""), False, 1, "BLOCKED",
+         "checks unreadable", (0, 0, 0, 0),
+         "the empty fallback table is unverifiable, so it blocks with the structured-read reason"),
 
     # --- table path: exit codes (invariant 6) ------------------------------
-    cell("table-green-exit-0", JSON_ABSENT, (0, GREEN_TABLE, ""), False, 0, "MERGE-OK", None,
-         (2, 2, 0, 0), "every row ok and the read exited 0"),
+    cell("table-green-exit-0", JSON_ABSENT, (0, GREEN_TABLE, ""), False, 1, "BLOCKED",
+         "checks unreadable", (2, 2, 0, 0),
+         "every row ok but the read was table-only, and that may never report MERGE-OK"),
     cell("table-green-exit-1", JSON_ABSENT, (1, GREEN_TABLE, ""), False, 2, "ERROR", None, None,
          "a non-zero exit with an all-green table is an incomplete read, never permission"),
     cell("table-green-exit-8", JSON_ABSENT, (8, GREEN_TABLE, ""), False, 2, "ERROR", None, None,
@@ -223,22 +290,28 @@ CELLS = [
          "checks pending", (2, 1, 1, 0), "the flag does not forgive a reported pending check"),
 
     # --- table path: zero-check and error shapes (invariants 1, 2) ---------
-    cell("table-header-only", JSON_ABSENT, (0, TABLE_HEADER, ""), False, 1, "BLOCKED", "no checks",
-         (0, 0, 0, 0), "a header is not a check; zero rows read successfully is the empty state"),
-    cell("table-header-only-flag", JSON_ABSENT, (0, TABLE_HEADER, ""), True, 0, "MERGE-OK", None,
-         (0, 0, 0, 0), "a header-only table is a genuinely zero-check read, which the flag forgives"),
+    cell("table-header-only", JSON_ABSENT, (0, TABLE_HEADER, ""), False, 1, "BLOCKED",
+         "checks unreadable", (0, 0, 0, 0),
+         "a header-only table is an empty table-only read, which cannot authorise a merge"),
+    cell("table-header-only-flag", JSON_ABSENT, (0, TABLE_HEADER, ""), True, 1, "BLOCKED",
+         "checks unreadable", (0, 0, 0, 0),
+         "--allow-no-checks forgives a zero-check *structured* read, never a table-only one"),
     cell("table-header-only-exit-1", JSON_ABSENT, (1, TABLE_HEADER, ""), False, 2, "ERROR", None,
          None, "a non-zero exit with no rows is not the recognized 'no checks reported' state"),
-    cell("table-empty-exit-0", JSON_ABSENT, (0, "", ""), False, 1, "BLOCKED", "no checks",
-         (0, 0, 0, 0), "an empty successful read is zero checks"),
-    cell("table-empty-exit-0-flag", JSON_ABSENT, (0, "", ""), True, 0, "MERGE-OK", None,
-         (0, 0, 0, 0), "the flag forgives a genuinely empty successful read"),
+    cell("table-empty-exit-0", JSON_ABSENT, (0, "", ""), False, 1, "BLOCKED",
+         "checks unreadable", (0, 0, 0, 0),
+         "an empty table-only read is unverifiable, not a successful zero-check read"),
+    cell("table-empty-exit-0-flag", JSON_ABSENT, (0, "", ""), True, 1, "BLOCKED",
+         "checks unreadable", (0, 0, 0, 0),
+         "the empty table-only read blocks with and without --allow-no-checks"),
     cell("table-no-checks-reported", JSON_ABSENT,
-         (1, "", "no checks reported on the 'feature' branch"), False, 1, "BLOCKED", "no checks",
-         (0, 0, 0, 0), "gh's own 'no checks reported' is the empty state, not a CLI failure"),
+         (1, "", "no checks reported on the 'feature' branch"), False, 1, "BLOCKED",
+         "checks unreadable", (0, 0, 0, 0),
+         "gh's own 'no checks reported' is a table-only read, so the list is unverifiable"),
     cell("table-no-checks-reported-flag", JSON_ABSENT,
-         (1, "", "no checks reported on the 'feature' branch"), True, 0, "MERGE-OK", None,
-         (0, 0, 0, 0), "the recognized empty state is exactly what the flag forgives"),
+         (1, "", "no checks reported on the 'feature' branch"), True, 1, "BLOCKED",
+         "checks unreadable", (0, 0, 0, 0),
+         "the structured read is what --allow-no-checks forgives, and it did not produce rows"),
     cell("table-garbage-exit-1", JSON_ABSENT, (1, "gh: Not Found (HTTP 404)\n", ""), False, 2,
          "ERROR", None, None, "unparseable output is not zero checks: exit 2"),
     cell("table-garbage-exit-1-flag", JSON_ABSENT, (1, "gh: Not Found (HTTP 404)\n", ""), True, 2,
@@ -251,8 +324,9 @@ CELLS = [
          None, "the flag cannot make an unparseable read a zero-check read"),
 
     # --- table path: rows that must not be dropped (invariant 5) -----------
-    cell("table-two-column-green", JSON_ABSENT, (0, "build\tpass\n", ""), False, 0, "MERGE-OK",
-         None, (1, 1, 0, 0), "the two-column form parses to one ok row"),
+    cell("table-two-column-green", JSON_ABSENT, (0, "build\tpass\n", ""), False, 1, "BLOCKED",
+         "checks unreadable", (1, 1, 0, 0),
+         "the two-column form parses to one ok row, but the read is table-only"),
     cell("table-two-column-pending", JSON_ABSENT, (0, "build\tpending\n", ""), False, 1, "BLOCKED",
          "checks pending", (1, 0, 1, 0), "the two-column form parses to one pending row"),
     cell("table-unknown-verdict", JSON_ABSENT, (0, "mystery\tunreleased\n", ""), False, 1,
@@ -264,10 +338,12 @@ CELLS = [
     cell("table-name-prefixed-flag", JSON_ABSENT, (1, NAME_PREFIXED_TABLE, ""), True, 1, "BLOCKED",
          "checks", (2, 1, 0, 1), "the flag cannot forgive a reported failure"),
     cell("table-check-named-name", JSON_ABSENT,
-         (0, TABLE_HEADER + "NAME\tpass\t1s\thttps://example/0\t\n", ""), False, 0, "MERGE-OK", None,
-         (1, 1, 0, 0), "a row named NAME with a pass verdict is a row, not the header"),
-    cell("table-real-gh-shape", JSON_ABSENT, (0, REAL_GH_TABLE, ""), False, 0, "MERGE-OK", None,
-         (2, 2, 0, 0), "the shape gh emits on this host parses to its verdicts"),
+         (0, TABLE_HEADER + "NAME\tpass\t1s\thttps://example/0\t\n", ""), False, 1, "BLOCKED",
+         "checks unreadable", (1, 1, 0, 0),
+         "a row named NAME with a pass verdict is a row, not the header, and the read is table-only"),
+    cell("table-real-gh-shape", JSON_ABSENT, (0, REAL_GH_TABLE, ""), False, 1, "BLOCKED",
+         "checks unreadable", (2, 2, 0, 0),
+         "the shape gh emits on this host parses to its verdicts, but the read is table-only"),
 
     # --- the unordered header (invariant 5, the fail-open this pins) --------
     # `gh pr checks` prints NAME then STATUS, the full five column names in print order. A set
@@ -318,9 +394,73 @@ CELLS = [
          TABLE_UNUSED, False, 0, "MERGE-OK", None, (7, 7, 0, 0),
          "a finished all-green run passes"),
     cell("live-finished-table", JSON_ABSENT,
-         (captured.FINISHED["table_rc"], captured.FINISHED["table"], ""), False, 0, "MERGE-OK",
-         None, (7, 7, 0, 0), "the live finished table (exit 0) parses to its verdicts"),
+         (captured.FINISHED["table_rc"], captured.FINISHED["table"], ""), False, 1, "BLOCKED",
+         "checks unreadable", (7, 7, 0, 0),
+         "a finished live table is still a table-only read, so it may not authorise a merge"),
 ]
+
+
+# --- the class-closing rule: a table-only read may never authorise ----------
+# The structured read is authoritative; the human table is advisory. These cells pin both paths —
+# the default (a table-only read blocks) and the documented opt-in that restores the table's
+# authority. Without the opt-in an all-green or empty table must block with `checks unreadable`,
+# and a non-green one still blocks with its own reason; with it a green table merges but a
+# non-green row, an unknown verdict word and a non-header are unchanged (the opt-in bypasses
+# neither the exact-header rule nor the unknown-verdict rule).
+CELLS += [
+    cell("rule-structured-read-authoritative", JSON_GREEN, TABLE_UNUSED, False, 0, "MERGE-OK", None,
+         (1, 1, 0, 0), "the structured read is authoritative: a green bucket is MERGE-OK"),
+    cell("rule-table-only-blocks-without-opt-in", JSON_ABSENT, (0, GREEN_TABLE, ""), False, 1,
+         "BLOCKED", "checks unreadable", (2, 2, 0, 0),
+         "an all-green table-only read blocks: it cannot be verified in structured form"),
+    cell("rule-table-only-empty-blocks", JSON_ABSENT, (0, "", ""), False, 1, "BLOCKED",
+         "checks unreadable", (0, 0, 0, 0),
+         "an empty table-only read blocks: unverifiable, not a reported zero-check state"),
+    cell("rule-table-only-opt-in-restores-green", JSON_ABSENT, (0, GREEN_TABLE, ""), False, 0,
+         "MERGE-OK", None, (2, 2, 0, 0),
+         "--allow-table-only-checks restores the table's authority, so the green table merges",
+         allow_table_only=True),
+    cell("rule-table-only-opt-in-empty-with-flag", JSON_ABSENT, (0, "", ""), True, 0, "MERGE-OK",
+         None, (0, 0, 0, 0),
+         "with the table authoritative an empty read is the zero-check state --allow-no-checks "
+         "forgives", allow_table_only=True),
+    cell("rule-table-only-opt-in-still-blocks-failing", JSON_ABSENT, (1, MIXED_TABLE, ""), False,
+         1, "BLOCKED", "checks", (3, 1, 1, 1),
+         "the opt-in does not make a failing row green", allow_table_only=True),
+    cell("rule-table-only-opt-in-still-blocks-pending", JSON_ABSENT, (8, IN_FLIGHT_TABLE, ""),
+         False, 1, "BLOCKED", "checks pending", (2, 1, 1, 0),
+         "the opt-in does not make a pending row green", allow_table_only=True),
+    cell("rule-table-only-opt-in-cannot-bypass-unknown-verdict", JSON_ABSENT,
+         (0, "mystery\tunreleased\n", ""), False, 1, "BLOCKED", "checks", (1, 0, 0, 1),
+         "the opt-in cannot bypass the unknown-verdict rule: an unknown word is never ok",
+         allow_table_only=True),
+    cell("rule-table-only-opt-in-cannot-bypass-header", JSON_ABSENT, (0, "STATUS\tNAME\n", ""),
+         False, 1, "BLOCKED", "checks", (1, 0, 0, 1),
+         "the opt-in cannot bypass the exact-header rule: `STATUS\\tNAME` is a row, not a header",
+         allow_table_only=True),
+]
+
+# --- the negative header fixtures (round-5 finding F1) ----------------------
+# The header is matched exactly: field count, empty fields and case preserved. A comparison that
+# strips empty fields and uppercases turned both of these data rows into the header, so the row
+# vanished and the remaining passing row could report MERGE-OK. Each is counted, its unknown
+# verdict blocks, and neither flag variant — nor the opt-in — can forgive it.
+EMPTY_FIELD_HEADER_ROW = "build\tpass\nNAME\t\tSTATUS\tELAPSED\tURL\tDESCRIPTION\n"
+LOWER_CASE_HEADER_ROW = "build\tpass\nname\tstatus\telapsed\turl\tdescription\n"
+for _label, _table in (("empty-field", EMPTY_FIELD_HEADER_ROW),
+                       ("lower-case", LOWER_CASE_HEADER_ROW)):
+    CELLS += [
+        cell("table-%s-header-row" % _label, JSON_ABSENT, (0, _table, ""), False, 1, "BLOCKED",
+             "checks", (2, 1, 0, 1),
+             "the %s header-shaped data row is counted and its unknown verdict blocks" % _label),
+        cell("table-%s-header-row-allow-no-checks" % _label, JSON_ABSENT, (0, _table, ""), True, 1,
+             "BLOCKED", "checks", (2, 1, 0, 1),
+             "--allow-no-checks cannot forgive the %s header-shaped data row" % _label),
+        cell("table-%s-header-row-opt-in" % _label, JSON_ABSENT, (0, _table, ""), False, 1,
+             "BLOCKED", "checks", (2, 1, 0, 1),
+             "the opt-in cannot bypass the exact-header rule for the %s row" % _label,
+             allow_table_only=True),
+    ]
 
 
 # --- reserved column names as check names (invariant 5) ---------------------
@@ -345,28 +485,37 @@ for _name, _verdict, _exit_code, _reason in (("STATUS", "pending", 8, "checks pe
         "the two-column form of a reserved column name is still a row"))
 
 
-# --- the declared vocabulary, one cell per entry (both surfaces) ------------
-# The rows are the declared tokens and the expectations are computed from the invariants above, so
-# a token added to CHECK_VOCABULARY arrives with a cell and cannot be added unpinned.
+# --- the declared vocabulary, one cell per declared entry (both surfaces) ---
+# The rows enumerate the *declaration* above, never the gate: the expectation is the declared
+# conclusion's classification, so a token the gate reclassifies — or swaps with another — fails
+# here against a fixed expectation. On the table surface the class-closing rule applies as well:
+# without the opt-in the token's row is advisory, so an ok token blocks as `checks unreadable`.
 def vocabulary_cells():
     cells = []
-    for key in sorted(VOCABULARY):
+    for key in sorted(DECLARED_VOCABULARY):
         surface, token = key.split("/", 1)
-        conclusion = VOCABULARY[key]
-        code, reason, tally = _VERDICT[classification(conclusion)]
+        cls = classification(DECLARED_VOCABULARY[key])
+        code, reason, tally = _VERDICT[cls]
         if surface == "bucket":
-            json_result = _json([{"name": "row", "state": "COMPLETED", "bucket": token}])
-            table_result = TABLE_UNUSED
-        else:
-            json_result = JSON_ABSENT
-            table_result = (0, "check\t%s\n" % token, "")
-        for flag in (False, True):
             cells.append(cell(
-                "%s-vocabulary-%s%s" % (surface, token, "-flag" if flag else ""),
-                json_result, table_result, flag, code,
-                "MERGE-OK" if reason is None else "BLOCKED", reason, tally,
-                "the declared %s token %r classifies as %s; the flag cannot change a reported row"
-                % (surface, token, classification(conclusion))))
+                "bucket-vocabulary-%s" % token,
+                _json([{"name": "row", "state": "COMPLETED", "bucket": token}]), TABLE_UNUSED,
+                False, code, "MERGE-OK" if reason is None else "BLOCKED", reason, tally,
+                "the declared bucket token %r classifies as %s through the structured read"
+                % (token, cls)))
+            continue
+        table_result = (0, "check\t%s\n" % token, "")
+        advisory_code, advisory_reason = _TABLE_ONLY_VERDICT[cls]
+        cells.append(cell(
+            "table-vocabulary-%s" % token, JSON_ABSENT, table_result, False,
+            advisory_code, "BLOCKED", advisory_reason, tally,
+            "the declared table token %r classifies as %s; with no structured read the table is "
+            "advisory, so an ok token never merges" % (token, cls)))
+        cells.append(cell(
+            "table-vocabulary-%s-opt-in" % token, JSON_ABSENT, table_result, False,
+            code, "MERGE-OK" if reason is None else "BLOCKED", reason, tally,
+            "with --allow-table-only-checks the declared table token %r classifies as %s"
+            % (token, cls), allow_table_only=True))
     return cells
 
 
@@ -376,9 +525,10 @@ def vocabulary_cells():
 # cell where the raw state disagrees is what tells the bucket from the state.
 def dimension_cells():
     cells = []
-    for token in sorted(vocabulary("bucket")):
-        conclusion = VOCABULARY["bucket/" + token]
-        code, reason, tally = _VERDICT[classification(conclusion)]
+    buckets = vocabulary("bucket")
+    for token in sorted(buckets):
+        cls = classification(buckets[token])
+        code, reason, tally = _VERDICT[cls]
         for state in captured.STATE_VOCABULARY:
             row = {"name": "row", "state": state, "bucket": token}
             for flag in (False, True):
@@ -387,7 +537,7 @@ def dimension_cells():
                     _json([row]), TABLE_UNUSED, flag, code,
                     "MERGE-OK" if reason is None else "BLOCKED", reason, tally,
                     "the %s bucket is %s whatever raw state %s says; the flag cannot change a "
-                    "bucket" % (token, classification(conclusion), state)))
+                    "bucket" % (token, cls, state)))
     return cells
 
 
@@ -495,6 +645,8 @@ def run_cell(module, cell_):
             "--gates-rc", "0", "--allow-no-machine-review"]
     if cell_.allow_no_checks:
         argv.append("--allow-no-checks")
+    if cell_.allow_table_only:
+        argv.append("--allow-table-only-checks")
     out, err = io.StringIO(), io.StringIO()
     with patch.object(module.subprocess, "run", side_effect=_fake_run_for(cell_)), \
             patch.object(sys, "argv", argv), redirect_stdout(out), redirect_stderr(err):
@@ -571,8 +723,8 @@ def check_stream_cell(module, stream_cell):
 
 
 def evaluate(module):
-    """Every cell that the module under test violates, as (cell id, problem)."""
-    problems = []
+    """Every cell that the module under test violates, as (id, problem)."""
+    problems = declaration_problems(module)
     for cell_ in CELLS:
         problem = check_cell(module, cell_)
         if problem is not None:

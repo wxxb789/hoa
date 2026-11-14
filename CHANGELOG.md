@@ -24,47 +24,68 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   failing run; gh's column header is now recognized as exactly the five printed column names in
   print order (`NAME STATUS ELAPSED URL DESCRIPTION`), because matching them as an unordered set
   accepted `STATUS\tNAME` as a header and let a row whose verdict word was unknown *vanish* under an
-  all-green remainder. Every other line — a permutation of the column names, a partial header, a
-  check named after a column — is a row, and a row whose verdict word is unknown blocks. The verdict
-  words are one declared `CHECK_VOCABULARY` (`pass`/`skipping`/`neutral` ok, `fail`/`cancel`
-  failures, `pending` pending, plus the words earlier revisions accepted) rather than two hand-kept
-  maps, and `tests/gh_checks_fixtures.py` holds the `gh pr checks` table and
+  all-green remainder; and a comparison that stripped empty fields and uppercased before comparing
+  made two more data rows indistinguishable from the header — `NAME\t\tSTATUS\tELAPSED\tURL\t
+  DESCRIPTION` (an empty field) and `name\tstatus\telapsed\turl\tdescription` (lower case) — so the
+  row vanished and only the passing remainder counted. The header comparison is now exact: the five
+  printed column names, in print order, with the field count, the empty fields and the case
+  preserved. Every other line — a permutation of the column names, a partial header, an empty-field
+  row, a lower-cased row, a check named after a column — is a row, and a row whose verdict word is
+  unknown blocks. The verdict words are one declared `CHECK_VOCABULARY` (`pass`/`skipping`/`neutral`
+  ok, `fail`/`cancel` failures, `pending` pending, plus the words earlier revisions accepted) rather
+  than two hand-kept maps, and `tests/gh_checks_fixtures.py` holds the `gh pr checks` table and
   `--json` output captured live from three open PRs — one with a pending run, one failing, one
   finished — so the vocabulary is read from the tool rather than remembered. A non-zero exit is also
   evidence the read was incomplete, so an *all-green* parsed table under one — a truncated row that
   vanished, or a command error beside passing rows — now exits 2 instead of reporting MERGE-OK; only
   a successful read of zero check runs is the empty state, and
-  only `--allow-no-checks` accepts it. The zero-check-runs block, `--allow-no-checks`, the marker
+  only `--allow-no-checks` accepts it. The class-closing rule ends the whole family of fail-opens
+  this increment produced, all of which came from the human table fallback authorising a merge: a
+  **table-only read may never produce MERGE-OK**. When the structured read did not produce the rows,
+  the parsed table is *advisory* — a non-green row blocks as before, and an all-green or empty table
+  blocks too, with reason `checks unreadable` and **exit 1** (a verdict about unverifiable evidence,
+  not an operator error, so not exit 2). `--allow-table-only-checks`, named in the module docstring
+  and in Phase 6, is the explicit opt-in that restores the table's authority for an operator whose
+  gh cannot do `--json`; the default fails closed, and the opt-in bypasses neither the exact-header
+  rule nor the unknown-verdict rule. The zero-check-runs block, `--allow-no-checks`, the marker
   schema and the `--gates-rc`/`--verified-head` clauses are untouched: pending is never green.
 - **Tests**: `tests/test_review_evidence.py` gains `CheckFetchTests` and `CheckFetchCliTests` — the
-  requested JSON fields, the bucket mapping (including an unknown bucket, which must stay pending
-  even when the raw `state` reads `SUCCESS`), a pending table at exit 8 and at exit 1, unparseable
-  output, malformed check rows at exit 2 with and without `--allow-no-checks`, the empty fallback
-  table with a zero exit (zero checks, not green), a missing gh binary at exit 2, the non-JSON and
-  non-list-JSON fallbacks, zero checks with and without `--allow-no-checks`, and `main()`'s exit
-  code plus verdict for each — plus `RealSubprocessBoundaryTests`, which patches `subprocess.run()`
-  only, keeping `sh()`/`sh_raw()` real: the exit code and both streams are forwarded verbatim, and a
-  non-zero exit never becomes an empty-but-valid check list — 42 -> 90 test methods. The shipped
-  `--selftest` gains the bucket vocabulary (a recognized raw state under an unknown bucket stays
-  pending), its tally, the table rows whose names begin with `NAME`, the unordered and partial
-  headers that used to vanish, the captured pending row, and one fixture per declared table verdict
-  with the whole vocabulary's tally (30 -> 60 fixtures).
+  requested JSON fields, the surface label each read carries (`json` authoritative, `table`
+  advisory), the bucket mapping (including an unknown bucket, which must stay pending even when the
+  raw `state` reads `SUCCESS`), a pending table at exit 8 and at exit 1, unparseable output,
+  malformed check rows at exit 2 with and without `--allow-no-checks`, the empty fallback table with
+  a zero exit (table-only: it blocks `checks unreadable`, and only the opt-in restores it), a
+  missing gh binary at exit 2, the non-JSON and non-list-JSON fallbacks, a table-only green read
+  blocking with `--allow-table-only-checks` restoring it, the opt-in unable to bypass the header or
+  unknown-verdict rules, and `main()`'s exit code plus verdict for each — plus
+  `RealSubprocessBoundaryTests`, which patches `subprocess.run()` only, keeping `sh()`/`sh_raw()`
+  real: the exit code and both streams are forwarded verbatim, and a non-zero exit never becomes an
+  empty-but-valid check list — 42 -> 92 test methods. The shipped `--selftest` gains the bucket
+  vocabulary (a recognized raw state under an unknown bucket stays pending), its tally, the table
+  rows whose names begin with `NAME`, the unordered and partial headers that used to vanish, the two
+  header-shaped data rows the normalising comparison dropped (an empty field and a lower-cased row)
+  with their tallies, the captured pending row, and one fixture per declared table verdict with the
+  whole vocabulary's tally (30 -> 64 fixtures).
 - **The check-fetch surface is pinned by two self-verifying artefacts** rather than hand-picked
-  cases. `tests/test_verdict_matrix.py` enumerates the closed input space — JSON shape x fallback
-  table shape x exit code x `--allow-no-checks` — and *generates* the rest: one cell per declared
-  `CHECK_VOCABULARY` entry (both surfaces, with and without `--allow-no-checks`) and the bucket x
-  state dimension from the raw state vocabulary gh reports, with each expectation computed from the
-  invariants (fail closed; the bucket governs; pending and failing block; the opt-out forgives only
-  a zero-check read) rather than from what the implementation prints. Every cell drives `main()` with
-  `subprocess.run()` mocked and compares the **complete** verdict line plus the printed `checks:`
-  tally, so a failing read cannot pass as a pending one (`verdict: BLOCKED: checks` is a prefix of
-  `verdict: BLOCKED: checks pending`) — 304 verdict cells + 3 stream cells. The captured live output
-  in `tests/gh_checks_fixtures.py` is a matrix input as well: a value gh prints that the declared
-  vocabulary does not know fails the matrix instead of reaching the gate as an unknown token.
-  `tests/mutate_verdict_matrix.py` applies 55 in-memory mutations of the module — 23 anchored plus
-  one generated per declared vocabulary entry, reclassifying that token into every other
-  classification — and requires each to flip at least one cell, naming the survivor loudly if one
-  does not. Both run in CI.
+  cases. `tests/test_verdict_matrix.py` declares, test-side and literally, the meaning of every
+  vocabulary token (`DECLARED_VOCABULARY`) and asserts the gate's `CHECK_VOCABULARY` matches it token
+  by token; the cells derive their expectations from that declaration, never from the gate, so a
+  reclassified token — or a swap of two tokens' meanings, the shape that stayed invisible while the
+  matrix read the artefact for what was correct — fails loudly. It enumerates the closed input space
+  — JSON shape x fallback table shape x exit code x `--allow-no-checks` x the table-only opt-in — and
+  *generates* the rest: one cell per declared `CHECK_VOCABULARY` entry (on the table surface with and
+  without the opt-in) and the bucket x state dimension from the raw state vocabulary gh reports, with
+  each expectation computed from the invariants (fail closed; the bucket governs; pending and failing
+  block; a table-only read may never authorise; the opt-out forgives only a structured zero-check
+  read). Every cell drives `main()` with `subprocess.run()` mocked and compares the **complete**
+  verdict line plus the printed `checks:` tally, so a failing read cannot pass as a pending one
+  (`verdict: BLOCKED: checks` is a prefix of `verdict: BLOCKED: checks pending`) — 313 verdict cells +
+  3 stream cells. The captured live output in `tests/gh_checks_fixtures.py` is a matrix input as well:
+  a value gh prints that the declared vocabulary does not know fails the matrix instead of reaching
+  the gate as an unknown token. `tests/mutate_verdict_matrix.py` applies 58 in-memory mutations of the
+  module — 26 anchored plus one generated per declared vocabulary entry, reclassifying that token into
+  every other classification — and requires each to flip at least one cell, naming the survivor loudly
+  if one does not. Both run in CI.
 
 ## [0.1.61] — 2026-11-14
 

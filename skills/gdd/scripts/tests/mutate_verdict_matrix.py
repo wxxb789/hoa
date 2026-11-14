@@ -12,14 +12,18 @@ Two catalogues make up the run:
   the streams, a dropped non-object row, a non-list payload read as zero checks, the bucket/state
   precedence, an unknown bucket or a missing bucket read as ok, pending or the opt-out not blocking,
   a name-based header drop, an unrecognized verdict passing, a command error read as zero checks),
-  the five this round's earlier findings named, and the ones the surface implies (a tab-less line
-  parsed as a row, the header parsed as a check, the cancel and skipping bucket mappings, the
-  zero-check opt-out granted unconditionally, an unordered header, a pending bucket read as
-  failing);
+  the five this round's earlier findings named, the three round-5 findings named (a normalising
+  header comparison, a table-only read that authorises by default, and a two-token vocabulary
+  swap), and the ones the surface implies (a tab-less line parsed as a row, the header parsed as a
+  check, the cancel and skipping bucket mappings, the zero-check opt-out granted unconditionally,
+  an unordered header, a pending bucket read as failing);
 * one generated mutation per declared `CHECK_VOCABULARY` entry, reclassifying that token into every
   other classification ("a failing verdict read as ok", "an ok verdict read as pending"). They are
   generated from the vocabulary, so a token added to the gate arrives with its own mutations and
-  cannot be added without being pinned.
+  cannot be added without being pinned. A single-token reclassification is caught both by the
+  declaration check and by a cell, and the explicit `vocabulary-swap-*` mutation exchanges two
+  tokens' meanings at once — the shape that was invisible while the cells read the gate for what
+  was correct (round-5 finding F2).
 
 Run: python3 skills/gdd/scripts/tests/mutate_verdict_matrix.py
 """
@@ -62,15 +66,16 @@ MUTATIONS = [
                         "gh pr checks --json: expected an object per check, got "
                         + type(entry).__name__
                     )
-            return [bucket_check(entry) for entry in data]""",
-     "            return [bucket_check(entry) for entry in data if isinstance(entry, dict)]",
+            return [bucket_check(entry) for entry in data], "json\"""",
+     """            return [bucket_check(entry) for entry in data
+                    if isinstance(entry, dict)], "json\"""",
      "a non-object row is dropped instead of raising"),
     ("json-nonlist-becomes-empty",
      "        if isinstance(data, list):",
      """        if not isinstance(data, list):
-            return []
+            return [], "json"
         if isinstance(data, list):""",
-     "a non-list payload is read as zero checks"),
+     "a non-list payload is read as a structured zero-check success"),
     ("bucket-raw-state-wins",
      """    bucket = str(entry.get("bucket") or "").lower()
     conclusion = BUCKET_CONCLUSIONS.get(bucket)""",
@@ -149,12 +154,12 @@ MUTATIONS = [
      "the skipping bucket is a failure"),
     ("command-error-becomes-empty",
      """            if "no checks reported" in lowered or "no check runs found" in lowered:
-                return []
+                return [], "table"
             raise GateError(message.splitlines()[0] if message else f"exit {returncode}")""",
      """            if "no checks reported" in lowered or "no check runs found" in lowered:
-                return []
-            return []""",
-     "an unparseable command error becomes zero checks"),
+                return [], "table"
+            return [], "json\"""",
+     "an unparseable command error becomes a structured zero-check success"),
     ("all-green-nonzero-returns",
      """        if evaluate_checks(checks)["pass"]:
             # A non-zero exit means the read was not complete (gh exits 8 while any check is
@@ -167,6 +172,31 @@ MUTATIONS = [
             )""",
      "        pass",
      "an all-green table under a non-zero exit becomes permission"),
+    ("header-comparison-normalises",
+     """    fields = line.split("\\t")
+    return fields == list(TEXT_CHECK_COLUMNS)""",
+     """    fields = [cell.strip().upper() for cell in line.split("\\t")]
+    fields = [cell for cell in fields if cell]
+    return fields == list(TEXT_CHECK_COLUMNS)""",
+     "the header comparison strips empty fields and case, so a data row vanishes"),
+    ("table-only-all-green-authorises",
+     '    if table_only and (checks["total"] == 0 or checks["pass"]):',
+     "    if False:",
+     "a table-only read authorises a merge by default instead of blocking"),
+    ("vocabulary-swap-neutral-and-timed-out",
+     """    "table/neutral": "NEUTRAL",
+    "table/failing": "FAILURE",
+    "table/fail": "FAILURE",
+    "table/cancelled": "CANCELLED",
+    "table/canceled": "CANCELLED",
+    "table/timed_out": "TIMED_OUT",""",
+     """    "table/neutral": "TIMED_OUT",
+    "table/failing": "FAILURE",
+    "table/fail": "FAILURE",
+    "table/cancelled": "CANCELLED",
+    "table/canceled": "CANCELLED",
+    "table/timed_out": "NEUTRAL",""",
+     "two token meanings are exchanged in memory: neutral now blocks and timed_out is ok"),
 ]
 
 

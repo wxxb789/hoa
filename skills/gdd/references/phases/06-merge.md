@@ -19,6 +19,16 @@ on any other basis:
 3. unresolved review threads = 0;
 4. local gate re-run recorded for this tree (no `--gates-rc` ⇒ `UNKNOWN` ⇒ blocked).
 
+The checks clause reads gh's structured output (`gh pr checks --json name,state,bucket`). When that
+read is unavailable and only gh's human table remains, the parsed table is **advisory**: a non-green
+row blocks as always, and an all-green or empty table blocks too, with `verdict: BLOCKED: checks
+unreadable`. A table-only read can never produce MERGE-OK — gh's table is a display format whose
+field count, emptiness, case and row set are not a contract, and every parse of it has produced
+another way to lose a row. An operator whose gh cannot do `--json` restores the table's authority
+explicitly with `--allow-table-only-checks` (named in `pr-merge-check.py`'s docstring as well); the
+default fails closed, and the opt-in bypasses neither the exact-header rule nor the unknown-verdict
+rule.
+
 `--marker TEXT` changes only the token, not the required evidence schema. The newest malformed,
 incomplete, stale, or hash-invalid marker blocks older clean evidence and cannot be overridden by
 the no-review opt-out. Generate evidence from the actual completed report with
