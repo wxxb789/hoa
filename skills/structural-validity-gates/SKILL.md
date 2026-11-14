@@ -7,7 +7,7 @@ description: >-
   integrity check before publish, upload, extraction or decode, or when an existing gate rejects a valid
   file. Do not use for schema validation of a repo's own config, or for a test-suite gate.
 metadata:
-  version: "0.1.59"
+  version: "0.1.60"
   areas: "software-development"
   targets: "runtime-agnostic"
   summary: "a two-sided integrity gate: reject the broken, accept every legal construct; probe both sides before shipping"

@@ -6,7 +6,7 @@ description: >-
   when verifying that the release users can install is the one the gates ran on. Do not use for landing
   the increment itself — merging is the merge phase of `gdd`.
 metadata:
-  version: "0.1.59"
+  version: "0.1.60"
   areas: "software-development"
   targets: "runtime-agnostic"
   summary: "changelog → gate-on-the-same-commit → dispatch → per-version registry check → approved cleanup"

@@ -24,18 +24,23 @@ bullet in §1 of the parent skill; this file is the command-level detail.
 - Quote which run produced each number (`local focused 30/30`, `CI verify 3m32s pass`). A worker's
   self-reported pass count is a claim; the run is the evidence.
 
-## The review bot's state marker, not its prose
+## Machine-review evidence, not a prose approval
 
-- External review bots publish a hidden marker comment; the marker is the machine-readable verdict, the
-  rendered summary is decoration.
-- Read the newest one:
-  `gh api repos/<owner>/<repo>/issues/<n>/comments --jq '[.[] | select(.body|contains("<marker-token>"))] | last | .body'`
-- Gate on three things: `status: completed`, `commit_sha` equal to the head you pushed, and no
-  unresolved findings. A marker naming an **older** commit is the previous round's verdict: it reads
-  green while the pushed head is unreviewed.
-- A push does not re-request the review. Post the documented trigger comment after pushing, then poll
-  the marker in the background.
-- Inline review threads block the merge on their own: resolve them only after the fix is on the head.
+- Use the project profile's configured review lane. GDD's reference adapter runs headless with explicit
+  operator-selected provider/model flags; GPT-family endpoints require the configured Responses API
+  route. No runtime reconfiguration, login, or silent model substitution belongs in this step.
+- Generate `machine-review-state:v1` with GDD's `review-evidence.py` from the actual complete UTF-8
+  report: completed status, explicit findings boolean, exact full 40-hex head, nonempty model/provider,
+  embedded report, and its SHA256. A status/SHA-only marker is not sufficient evidence for this lane.
+- Post via `--body-file` and read back the exact comment by returned id. GDD's merge gate reads all
+  comment pages and validates the newest selected marker, including the report digest; malformed or
+  stale newest evidence blocks older clean evidence. A custom token never relaxes that schema.
+- A push/rebase invalidates the old verdict. Rerun the configured reviewer on the new head, retain
+  finding dispositions, and obtain a new complete clean report; do not flip a dirty report's flag.
+- Inline threads block independently of the report verdict. Answer with the fixing SHA and measured
+  result, resolve after the fixing head's CI is green, and read back the exact thread and all pages.
+- Complete invocation, evidence-generation, posting/readback and thread commands:
+  [`gdd/references/bot-review-loop.md`](../../gdd/references/bot-review-loop.md).
 
 ## Verify the finding before dispatching a fix
 

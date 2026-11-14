@@ -50,14 +50,15 @@ failure. Launcher contract, artifacts, recovery and liveness: [`references/trans
 - `references/stage-templates/` — stage prompts rendered by `gdd.py`; the only copy of prompt text.
 - `references/phase-prompts.md` — the variable table for those templates (no prompt bodies).
 - `references/transport.md` — launcher contract, artifacts, recovery, liveness.
-- `references/bot-review-loop.md` — request/read/resolve cycle for an external review bot, marker
-  shape, thread ids, infra vs real CI failure.
+- `references/bot-review-loop.md` — model-pinned machine-review invocation, full report/hash
+  evidence, comment readback, finding dispositions, thread ids, infra vs real CI failure.
 - `references/pr-body.md` — the PR body shape for a goal increment (evidence table, non-adoptions,
   clause→evidence mapping).
 - `references/evidence-fairness.md` — making a "cheaper/faster" claim survive review.
 - `references/profiles/_template.md` — per-repo profile template.
 - `scripts/` — `gdd.py` (dispatch), `delivery-state.py` (ledger/resume), `pr-merge-check.py`
-  (merge gate), `watch-pr-checks.py` (bounded CI poller with infra-only rerun; the `.sh` twin has the
+  (merge gate), `review-evidence.py` (full report evidence generator), `watch-pr-checks.py`
+  (bounded CI poller with infra-only rerun; the `.sh` twin has the
   same semantics),
   `adapters/omp-run.py` (bundled cross-platform launcher), `adapters/omp-run.sh` (POSIX reference
   launcher, the one with the attachable `tmux` backend), `adapters/events-writer.py` (bounded NDJSON

@@ -6,7 +6,7 @@ description: >-
   or when a reviewed patch must be landed and then materialized into a live runtime. Not for editing
   generated output by hand.
 metadata:
-  version: "0.1.59"
+  version: "0.1.60"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "repair the template/generator, prove the staged artifact, then deploy and read back the live runtime"

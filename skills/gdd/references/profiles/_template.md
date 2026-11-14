@@ -46,11 +46,26 @@ Name the command that proves the surface did not move, and what a behaviour-pres
 Branch naming, squash vs merge commit, commit title style (`git log --oneline`), whether the plan ships
 inside the feature commit, and what the PR body must contain.
 
-## 8. Machine review bot
+## 8. Model-pinned machine review
 
-Which bot (`chatgpt-codex-connector`, none, other), how its verdict is encoded (marker vs prose — the
-marker string is `pr-merge-check.py --marker`), how to trigger a re-review, and what blocks merge. If
-the repo has no bot, say so and pass `--allow-no-machine-review` explicitly — that changes Phase 6.
+Name the reviewer adapter (headless CLI, configured service, or `none`), the operator-selected model
+and provider identifiers, and where the operator supplies them. No implicit model/provider defaults
+or hosted model assumptions. The reference CLI is `pi -p --provider <selected-provider> --model
+<selected-model> @<prompt-file> @<diff-file>`; GPT-family endpoints require the configured Responses
+API route. Read existing provider configuration; do not log in, edit credentials, start services,
+or mutate runtime settings as part of review.
+
+Specify the prompt/base-ref selection, actual full-report artifact path, invocation/exit log, finding
+disposition table, and re-review procedure after a head change. Generate the comment with
+`review-evidence.py --report <file> --head <full-40-hex-sha> --model <selected-model> --provider
+<configured-provider> --findings <true|false> --output <comment-file>`. Post from the file and verify
+the exact comment body by id readback. The default token is `machine-review-state:v1`; customized
+`--marker` values must be identical on generator and gate and never relax the schema (completed,
+clean, exact full head, nonempty model/provider, full UTF-8 report with matching SHA256).
+
+Declare how findings are reproduced/disposed and inline threads answered/resolved. Malformed newest
+evidence blocks older clean evidence. If there is **no review lane**, state `none` and pass
+`--allow-no-machine-review` explicitly; it accepts only absence, not broken/dirty/stale evidence.
 
 ## 9. Evidence conventions
 
