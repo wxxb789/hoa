@@ -3,6 +3,32 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## [0.1.60] — 2026-11-14
+
+### Added
+
+- GDD's `review-evidence.py` generates a PR comment from the exact completed UTF-8 report file,
+  with explicit full head, model, provider, and findings flags. Shared `machine_review.py` embeds
+  the entire report and hashes its original bytes without newline or Unicode normalization.
+- Offline schema/mutation, Unicode/CRLF, hash-tamper, malformed JSON/type, newest-evidence,
+  custom-marker, real CLI file roundtrip, and full merge-gate integration regressions run in CI.
+
+### Changed
+
+- `pr-merge-check.py` defaults to provider-independent `machine-review-state:v1` and requires
+  completed, clean evidence with an exact full 40-hex current head, nonempty model/provider,
+  nonempty UTF-8 report, and matching SHA256. Abbreviated SHAs and status/SHA-only evidence no
+  longer pass. Custom markers retain the same schema; malformed newest evidence blocks older
+  clean evidence, and the explicit no-review opt-out applies only when no selected marker exists.
+- Restored the documented local-gates clause: absent `--gates-rc` now blocks instead of merely
+  displaying `UNKNOWN` while allowing an otherwise green PR. CI, PR-state, verified-head, and
+  unresolved-thread clauses remain independent of the machine-review verdict.
+- Replaced stale hosted-bot request instructions with an explicitly provider/model-pinned
+  headless review lane, configured Responses-route requirements for GPT-family endpoints,
+  full-report evidence generation, exact PR-comment readback, head rechecks, and finding/thread
+  dispositions. No login, credentials, services, runtime configuration, or model defaults are changed.
+- Bumped the shared skill/catalog version from `0.1.59` to `0.1.60`.
+
 ## [0.1.59] — 2026-11-14
 
 ### Added

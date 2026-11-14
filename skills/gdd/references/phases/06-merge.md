@@ -7,14 +7,24 @@
 Boolean lines and a verdict; exit 0 = merge allowed. `--verified-head` is the SHA you actually ran
 the gates on (usually `git rev-parse HEAD` in the worktree you verified), and `--gates-rc` without it
 is `UNKNOWN`. A PR whose branch is not checked out reports `head not verified`, never a false mismatch;
-a merged or draft PR reports `pr not open` / `pr is draft`. A repo with no machine-review bot reports
-`marker: none` and stays blocked unless `--allow-no-machine-review` is passed explicitly. Never merge
+a merged or draft PR reports `pr not open` / `pr is draft`. A repo with no machine-review lane reports
+`marker: UNKNOWN` and stays blocked unless `--allow-no-machine-review` is passed explicitly, in which
+case it prints `marker: none`. That opt-out applies only when no selected marker exists. Never merge
 on any other basis:
 
 1. every CI check green **on the head SHA**;
-2. machine-review marker `status: completed`, `has_any_findings: false`, **on that same head SHA**;
+2. newest `machine-review-state:v1` evidence: `status: completed`, `has_any_findings: false`,
+   **full 40-hex `commit_sha` exactly equal to that head**, nonempty operator-selected `model` and
+   configured `provider`, full UTF-8 `report`, and matching `report_sha256`;
 3. unresolved review threads = 0;
 4. local gate re-run recorded for this tree (no `--gates-rc` ⇒ `UNKNOWN` ⇒ blocked).
+
+`--marker TEXT` changes only the token, not the required evidence schema. The newest malformed,
+incomplete, stale, or hash-invalid marker blocks older clean evidence and cannot be overridden by
+the no-review opt-out. Generate evidence from the actual completed report with
+`<gdd-skill>/scripts/review-evidence.py --report <file> --head <full-sha> --model <selected-model>
+--provider <configured-provider> --findings false --output <comment-file>`; post via `--body-file`
+and read back the exact comment before accepting it. Never turn a dirty report into a clean flag.
 
 ## Version precondition — after the rebase, before the merge
 
@@ -54,18 +64,20 @@ jobs that died on an infra step (<60 s fail), and logs every poll. A download st
 minute is infra — `gh run rerun <run-id> --failed` first, then look at the code.
 `watch-pr-checks.sh` is the POSIX twin with the same exit codes.
 
-A review bot typically posts minutes AFTER CI turns green; a merge fired at "checks pass" skips it
-every time. A push does not trigger a re-review — request one and match the marker's `commit_sha` to
-the NEW head; the old review keeps the old sha and looks finished. The bot writes its marker when the
-review *starts* (`status: running`) with the new sha already in it, so a poll that matches the sha alone
-returns a fake verdict on the first iteration — test `completed` and the sha together. Request/read/
-resolve commands, thread ids and infra-flake handling: [`references/bot-review-loop.md`](../bot-review-loop.md).
+CI green does not run or finish the machine-review lane. Invoke the configured headless reviewer
+with explicit provider/model flags; GPT-family endpoints require the configured Responses API route,
+not Chat Completions. Do not change runtime configuration or substitute a model to obtain a verdict.
+After every push/rebase, rerun review, generate full report evidence, and match the exact NEW head;
+an old review can look finished while no longer applying. A running marker never passes, even if its
+SHA matches. Recheck the head after review, after posting/readback, and immediately before merge.
+Invocation/evidence/readback commands, finding dispositions, thread ids, and infra-flake handling:
+[`references/bot-review-loop.md`](../bot-review-loop.md).
 
 ## Pitfalls this phase answers
 
 - **CI green is not merge permission.** PRs have been squashed with unresolved P2 findings under green
   checks; the findings were real. That is why Phase 6 is a script.
-- **The bot review loop repeats after a fix.** A fix produces a NEW review on the new head with its
+- **The machine-review loop repeats after a fix.** A fix needs a NEW review on the new head with its
   own findings; budget a second round instead of assuming one fix closes the PR.
 - **A release job that bumps after the merge invalidates every other open branch.** If the repo mirrors
   a new version into artifacts on each main push, a branch cut before that bump passes the version check

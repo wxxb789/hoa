@@ -15,8 +15,11 @@ Exit codes: 0 MERGE-OK, 1 BLOCKED, 2 usage/gh/git error.
 
 Checks:
   1. every CI check completed with SUCCESS/SKIPPED/NEUTRAL
-  2. newest --marker comment: status completed, has_any_findings false, commit_sha
-     equal to the PR head. With no marker this clause is UNKNOWN and blocks;
+  2. newest --marker comment: completed, has_any_findings false, full 40-hex
+     commit_sha exactly equal to the PR head, nonempty model/provider and full
+     UTF-8 report with a matching SHA256. Custom markers use the same schema.
+     Malformed newest evidence blocks; it never falls back to an older comment.
+     With no marker this clause is UNKNOWN and blocks;
      A PR with zero check runs blocks the merge: no workflow ran, or none was dispatched
      (a CONFLICTING PR gets no workflows at all). `--allow-no-checks` accepts that state
      explicitly, for a repo that has no CI.
@@ -40,7 +43,10 @@ import subprocess
 import sys
 from datetime import datetime
 
-DEFAULT_MARKER = "codex-review-state:v1"
+from machine_review import (
+    DEFAULT_MARKER, EvidenceError, make_evidence, parse_marker, review_facts, validate_marker,
+)
+
 GOOD_CONCLUSIONS = {"SUCCESS", "SKIPPED", "NEUTRAL"}
 GRAPHQL = (
     "query($owner:String!,$repo:String!,$pr:Int!,$cursor:String){"
@@ -78,27 +84,26 @@ def sh(cmd, cwd=None):
 
 
 def extract_marker(body, marker=DEFAULT_MARKER):
-    """First JSON object following the marker token in a comment body."""
-    start = body.find(marker)
-    while start != -1:
-        brace = body.find("{", start + len(marker))
-        if brace != -1:
-            try:
-                obj, _ = json.JSONDecoder().raw_decode(body[brace:])
-                if isinstance(obj, dict):
-                    return obj
-            except ValueError:
-                pass
-        start = body.find(marker, start + len(marker))
-    return None
+    """Strict first-marker parsing, including duplicate-key rejection."""
+    try:
+        return parse_marker(body, marker)
+    except EvidenceError:
+        return None
 
 
 def evaluate_review(
     comments, head_sha, marker=DEFAULT_MARKER, allow_no_machine_review=False
 ):
     """comments are newest-first. Pure: no gh/git."""
+    validate_marker(marker)
     for comment in comments or []:
-        body = comment.get("body") or ""
+        if not isinstance(comment, dict):
+            raise GateError("comment must be an object")
+        body = comment.get("body", "")
+        if body is None:
+            body = ""
+        if not isinstance(body, str):
+            raise GateError("comment body must be text")
         if marker not in body:
             continue
         parsed = extract_marker(body, marker)
@@ -114,29 +119,11 @@ def evaluate_review(
                 "comment_id": comment.get("id"),
                 "reason": "marker unparsable",
             }
-        review = parsed.get("code_review") or {}
-        status = review.get("status")
-        findings = review.get("has_any_findings")
-        commit_sha = review.get("commit_sha") or ""
-        head_match = same_sha(head_sha, commit_sha)
-        passed = status == "completed" and findings is False and head_match
-        reasons = []
-        if status != "completed":
-            reasons.append("status")
-        if findings is not False:
-            reasons.append("findings")
-        if not head_match:
-            reasons.append("sha")
         return {
+            **review_facts(parsed, head_sha),
             "found": True,
             "allowed": False,
-            "pass": passed,
-            "status": status,
-            "has_any_findings": findings,
-            "commit_sha": commit_sha,
-            "head_match": head_match,
             "comment_id": comment.get("id"),
-            "reason": ",".join(reasons) if reasons else "ok",
         }
     return {
         "found": False,
@@ -352,7 +339,7 @@ def evaluate_gates(gates_rc, gates_note, head_verified, now):
     facts = {"rc": gates_rc, "ts": now, "note": gates_note, "pass": None}
     if gates_rc is None:
         facts["status"] = "UNKNOWN"
-        return facts, []
+        return facts, ["gates missing"]
     if not head_verified:
         facts["status"] = "UNKNOWN"
         return facts, ["verified head missing"]
@@ -475,15 +462,20 @@ def print_human(facts, reasons):
         marker = facts.get("marker") or DEFAULT_MARKER
         if review["found"]:
             findings = review["has_any_findings"]
-            findings_text = "-" if findings is None else ("true" if findings else "false")
+            findings_text = "-" if findings is None else json.dumps(findings)
             print(
-                "review: marker={} status={} findings={} sha={} head_match={} comment={}".format(
+                "review: marker={} status={} findings={} sha={} head_match={} comment={} "
+                "model={} provider={} report_hash={} reason={}".format(
                     marker,
                     review["status"],
                     findings_text,
                     str(review["commit_sha"])[:7] if review["commit_sha"] else "-",
                     "yes" if review["head_match"] else "no",
                     review["comment_id"] if review["comment_id"] is not None else "-",
+                    review.get("model") or "-",
+                    review.get("provider") or "-",
+                    "match" if review.get("hash_match") else "INVALID",
+                    review["reason"],
                 )
             )
         elif review.get("allowed"):
@@ -520,30 +512,12 @@ def print_human(facts, reasons):
 
 
 def selftest():
-    head = "abc1234def5678abc1234def5678abc1234def5"
-    other = "5a6d4ea000000000000000000000000000000000"
+    head = "abc1234" + "0" * 33
+    other = "5a6d4ea" + "0" * 33
     ref = "feat/x"
-    marker_ok = {
-        "code_review": {
-            "status": "completed",
-            "has_any_findings": False,
-            "commit_sha": "abc1234",
-        }
-    }
-    marker_findings = {
-        "code_review": {
-            "status": "completed",
-            "has_any_findings": True,
-            "commit_sha": "abc1234",
-        }
-    }
-    marker_old = {
-        "code_review": {
-            "status": "completed",
-            "has_any_findings": False,
-            "commit_sha": "9999999",
-        }
-    }
+    marker_ok = make_evidence(b"No findings.\n", head, "fixture-model", "fixture-provider", False)
+    marker_findings = make_evidence(b"One finding.\n", head, "fixture-model", "fixture-provider", True)
+    marker_old = make_evidence(b"No findings.\n", other, "fixture-model", "fixture-provider", False)
     custom_marker = "alt-review-state:v2"
     marker_cases = [
         (
@@ -610,6 +584,17 @@ def selftest():
             True,
             "ok",
         ),
+        (
+            "newest-bad-blocks-older-clean-even-with-opt-out",
+            [
+                {"id": 10, "body": DEFAULT_MARKER + "\n{not json"},
+                {"id": 9, "body": DEFAULT_MARKER + "\n" + json.dumps(marker_ok)},
+            ],
+            DEFAULT_MARKER,
+            True,
+            False,
+            "marker unparsable",
+        ),
     ]
     head_cases = [
         (
@@ -642,6 +627,7 @@ def selftest():
         ),
     ]
     gate_cases = [
+        ("gates-unknown-without-rc", (None, None, True), ["gates missing"], "UNKNOWN"),
         ("gates-unknown-without-head", (0, None, False), ["verified head missing"], "UNKNOWN"),
         ("gates-pass-on-verified-head", (0, None, True), [], "PASS"),
         ("gates-fail-on-verified-head", (1, None, True), ["gates unverified"], "FAIL"),
@@ -784,7 +770,7 @@ def build_parser():
     parser.add_argument(
         "--marker",
         default=DEFAULT_MARKER,
-        help="machine-review marker token (default: %(default)s)",
+        help="machine-review marker token; same strict evidence schema for all markers (default: %(default)s)",
     )
     parser.add_argument(
         "--allow-no-machine-review",
@@ -812,6 +798,7 @@ def main():
         print(f"pr-merge-check: PR must be numeric, got {args.pr!r}", file=sys.stderr)
         return 2
     try:
+        validate_marker(args.marker)
         facts, reasons = evaluate(
             args.pr,
             args.repo,
