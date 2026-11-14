@@ -167,9 +167,10 @@ scope-seal）。每条规则都由该命令执行：
 `test` job 在每次 push 到 `main`、每个 pull request 与 `workflow_dispatch` 时运行；`release`
 job 只在 `main` 上、`test` 成功之后运行，并为 CI 验证过的提交打 tag。
 
-`test` job 先装好运行时与依赖，然后运行 `python scripts/run_all_tests.py`。该 discoverer 调度下
-表里的每一条命令——这些是 `scripts/test_manifest.toml` 里的 manifest 条目，而非独立的 CI
-step。它同时调度此前从未接入 CI 的 Python 测试套件——
+`test` job 先装好运行时与依赖，然后运行 `python scripts/run_all_tests.py`。该 discoverer 将下表
+中的每一条命令作为 `scripts/test_manifest.toml` 里的 manifest 条目来调度，而非独立的 CI
+step（该表将在本系列的后续步骤中与 manifest 收敛；表末 `scripts/release.py` 一行描述的是
+release job 自己的命令，不是被调度的测试套件）。它同时调度此前从未接入 CI 的 Python 测试套件——
 `skills/delegated-work-acceptance/scripts/tests/test_worktree_scope.py` 与
 `skills/gdd/scripts/tests/test_paseo_run_python.py`——以及 `paseo-plugins/gdd-run-observer`
 这个 Vitest 包。

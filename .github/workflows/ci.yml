@@ -39,7 +39,7 @@ jobs:
 
       # ── every suite: discovered patterns, declared gates, declared packages ──
       - name: Repository test discoverer
-        run: python scripts/run_all_tests.py --report .tmp-artifacts/test-report.json
+        run: python scripts/run_all_tests.py
 
   release:
     needs: test

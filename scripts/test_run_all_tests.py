@@ -77,10 +77,8 @@ time.sleep(120)
 ENV_SUITE = '''import json
 import os
 
-names = ("HOME", "TMPDIR", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME",
-         "XDG_STATE_HOME", "PYTHONPATH", "PYTHONDONTWRITEBYTECODE", "PATH", "GDD_LAUNCHER")
 with open(os.environ["DUMP_FILE"], "w", encoding="utf-8") as handle:
-    json.dump({name: os.environ.get(name) for name in names}, handle)
+    json.dump(dict(os.environ), handle)
 '''
 
 
@@ -195,9 +193,16 @@ class SuiteEnvironmentTests(unittest.TestCase):
                            OMP_RUN_ROOT="must-not-leak"):
             environment = runner.base_environment(self.document, sys.executable)
         allowed = set((self.document.get("env") or {}).get("passthrough") or [])
-        allowed |= {"PATH", "NO_COLOR"} | set(runner.SHIM_STATE_DEFAULTS)
+        # Frozen rather than read from `runner.SHIM_STATE_DEFAULTS`: deriving the permitted
+        # set from the constant it polices is how a name appended there starts reaching
+        # every suite unnoticed.
+        allowed |= {"PATH", "NO_COLOR", "MISE_STATE_DIR", "MISE_DATA_DIR"}
         self.assertLessEqual(set(environment), allowed)
         self.assertNotIn("MISE_VERBOSE", environment)
+
+    def test_the_pinned_shim_state_is_exactly_two_named_directories(self):
+        """What may reach every suite as operator state is pinned by name, not by count."""
+        self.assertEqual(set(runner.SHIM_STATE_DEFAULTS), {"MISE_STATE_DIR", "MISE_DATA_DIR"})
 
     def test_a_shim_style_tool_finds_its_state_under_a_task_local_home(self):
         """End to end: the suite process runs the shim, not the operator's HOME."""
@@ -295,6 +300,7 @@ class DiscoveryTests(unittest.TestCase):
                                  event="local")
         self.assertEqual(plan.problems, [])
         self.assertEqual(plan.unpinned, ["scripts/test_new.py"])
+        self.assertEqual([suite.id for suite in plan.scheduled], ["scripts/test_new.py"])
 
 
 class ManifestValidationTests(unittest.TestCase):
@@ -389,7 +395,9 @@ class RealTreePlanTests(unittest.TestCase):
     def test_the_plan_has_no_problems_and_no_filtered_floor(self):
         self.assertEqual(self.plan.problems, [])
         self.assertEqual(self.plan.floor_missing, [])
-        self.assertEqual(self.plan.unpinned, [])
+        # This repository pins every discovered path, so it has no unpinned discovery to
+        # name here; an unpinned one is scheduled and reported, never a problem (owner
+        # decision, 2026-11-14), which DiscoveryTests pins on a synthetic tree.
 
     def test_discovery_finds_the_suites_the_old_globs_missed(self):
         self.assertIn("skills/ghc-search/scripts/test_ghc_search.py", self.ids)
@@ -609,7 +617,11 @@ class EndToEndTests(unittest.TestCase):
                 "",
                 "[[suite]]",
                 'path = "scripts/test_env.py"',
-                f'env = {{ DUMP_FILE = "{ARTIFACTS / "env-dump.json"}" }}',
+                # PYTHONCOERCECLOCALE=0 so the dump is exactly what the runner sets: under a C
+                # locale the interpreter itself would add LC_CTYPE to its own environment
+                # (PEP 538), which is a property of CPython, not of the suite's isolation.
+                f'env = {{ DUMP_FILE = "{ARTIFACTS / "env-dump.json"}", '
+                f'PYTHONCOERCECLOCALE = "0" }}',
                 "",
                 "[[suite]]",
                 'path = "scripts/test_hang.py"',
@@ -655,13 +667,17 @@ class EndToEndTests(unittest.TestCase):
 
     def test_covered_child_settles_from_the_parent_output(self):
         root = self.build()
-        _, _, payload = self.run_main(root, "--suite", "parent")
+        code, _, payload = self.run_main(root, "--suite", "parent")
         states = self.states(payload)
         self.assertEqual(len(payload["suites"]), 2)
         self.assertEqual(states["parent"]["state"], "PASS")
         child = states["scripts/tests/test-counter-child.py"]
         self.assertEqual(child["state"], "PASS")
         self.assertEqual(child["counts"], {"passed": 3, "executed": 3, "total": 3})
+        # Unpinned, and selected through its parent: still named in the record's discovery
+        # section, and the run is green (owner decision, 2026-11-14).
+        self.assertIn("scripts/tests/test-counter-child.py", payload["discovery"]["unpinned"])
+        self.assertEqual(code, 0)
 
     def test_covered_child_without_parent_evidence_is_error(self):
         root = self.build()
@@ -681,15 +697,34 @@ class EndToEndTests(unittest.TestCase):
         os.environ.pop("XDG_CONFIG_HOME", None)
         self.addCleanup(os.environ.pop, "GDD_LAUNCHER", None)
         self.addCleanup(os.environ.pop, "OMP_RUN_ROOT", None)
+        # Controlled, not this host's own setting: the shim pins belong to the exact set
+        # asserted below, so they must not depend on what the operator happens to have.
+        for name in ("MISE_STATE_DIR", "MISE_DATA_DIR"):
+            directory = ARTIFACTS / f"operator-{name.lower()}"
+            directory.mkdir(parents=True, exist_ok=True)
+            self.addCleanup(os.environ.pop, name, None)
+            os.environ[name] = str(directory)
         self.run_main(root, "--suite", "scripts/test_env.py")
         dump = json.loads((ARTIFACTS / "env-dump.json").read_text(encoding="utf-8"))
         scratch = str(self.scratch)
+        # The exact set of names, not a subset: the synthetic manifest declares no `[env]`
+        # allowlist, so only PATH may come from the operator, and a suite sees the runner's
+        # task-local block, the two shim state pins and its own `env` table.  Frozen on
+        # purpose: deriving it from the runner would follow the code it exists to police.
+        self.assertEqual(set(dump), {
+            "PATH", "NO_COLOR", "DUMP_FILE", "PYTHONCOERCECLOCALE",
+            "HOME", "TMPDIR", "TMP", "TEMP",
+            "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME",
+            "PYTHONPATH", "PYTHONDONTWRITEBYTECODE", "GIT_TERMINAL_PROMPT",
+            "MISE_STATE_DIR", "MISE_DATA_DIR",
+        })
         for name in ("HOME", "TMPDIR", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME",
                      "XDG_STATE_HOME"):
             self.assertTrue(dump[name].startswith(scratch), f"{name}={dump[name]}")
         self.assertEqual(dump["PYTHONPATH"], str(root))
         self.assertEqual(dump["PYTHONDONTWRITEBYTECODE"], "1")
-        self.assertIsNone(dump["GDD_LAUNCHER"])
+        self.assertNotIn("GDD_LAUNCHER", dump)
+        self.assertNotIn("OMP_RUN_ROOT", dump)
         self.assertTrue(dump["PATH"].startswith(str(Path(sys.executable).resolve().parent)))
 
     def test_default_scratch_lives_outside_the_checkout(self):
@@ -719,7 +754,10 @@ class EndToEndTests(unittest.TestCase):
                          f"scratch inherited TMPDIR: {scratch}")
         suite_scratch = Path(tempfile.mkdtemp(prefix="skills-gdd-s-", dir=scratch))
         self.addCleanup(shutil.rmtree, suite_scratch, ignore_errors=True)
-        worst_case = runner.socket_path_length(suite_scratch)
+        plan = runner.build_plan(ROOT, runner.load_manifest(ROOT / runner.MANIFEST_RELATIVE),
+                                 event="local")
+        self.assertTrue(plan.socket_tail, "no suite declares the socket tree this bound models")
+        worst_case = runner.socket_path_length(suite_scratch, plan.socket_tail)
         self.assertIsNotNone(worst_case)
         self.assertLess(worst_case, runner.AF_UNIX_PATH_LIMIT,
                         f"worst-case socket path {worst_case} bytes for {suite_scratch}")

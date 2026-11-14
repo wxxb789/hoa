@@ -3,7 +3,8 @@
 # Everything the test discoverer schedules lives here: discovery patterns, the
 # reviewed discovery floor, the non-glob suites (gates and packages), and the
 # refinements that preserve an invocation or account for a suite a parent already
-# runs.  The runner holds no suite knowledge of its own.
+# runs.  The runner holds no suite knowledge of its own.  The top-level `schema`
+# names the manifest format; the runner accepts 1 and rejects anything else.
 #
 # Entry shapes, both in [[suite]]:
 #   declared    `id` + `command`    discovery cannot name it (a gate, a package, a
@@ -58,6 +59,10 @@
 #                  the child's count_regexes must match in the parent's log.
 #   detached       detached resources the suite creates (setsid runs, tmux sessions)
 #                  and where its teardown is asserted.
+#   socket_tail    the deepest path tree the suite builds below its own task-local
+#                  scratch root, with `{uid}` replaced by the running user's id.  A run
+#                  is bounded by the longest declared tail, so the suite that creates an
+#                  AF_UNIX socket deeper than the others declares its layout here.
 #   notes          provenance: the CI step this entry replaces, or why it exists.
 
 schema = 1
@@ -99,9 +104,11 @@ prune = [
 ]
 
 # Reviewed discovery floor: a full run that does not discover every one of these
-# paths is a plan error (exit 2).  Adding a suite to the catalog means adding its
-# path here; a path leaving this list is a deliberate, reviewed removal, which is
-# what keeps a silently empty or shrunken discovery set from going green (§4.6).
+# paths is a plan error (exit 2).  A new test file is scheduled and reported whether
+# or not it is pinned here (owner decision, 2026-11-14): pinning a path keeps it
+# inside the reviewed floor, and a path leaving this list is a deliberate, reviewed
+# removal — which is what keeps a silently empty or shrunken discovery set from
+# going green (§4.6).
 floor = [
   "scripts/test_catalog_measurement.py",
   "scripts/test_check_changelog.py",
@@ -189,43 +196,31 @@ runner = [
 [[suite]]
 id = "gate:frontmatter"
 command = [["{python}", "scripts/check_frontmatter.py"]]
-runtime = "python"
-required = true
 notes = "replaces the CI step 'SKILL.md frontmatter and catalog fields'"
 
 [[suite]]
 id = "gate:contract-graph"
 command = [["{python}", "scripts/check_contract_graph.py"]]
-runtime = "python"
-required = true
 notes = "replaces the CI step 'Composition contract graph'"
 
 [[suite]]
 id = "gate:index-drift"
 command = [["{python}", "scripts/generate_index.py", "--check"]]
-runtime = "python"
-required = true
 notes = "replaces the CI step 'Skill catalog drift check'"
 
 [[suite]]
 id = "gate:version-check"
 command = [["{python}", "scripts/version.py", "check"]]
-runtime = "python"
-required = true
 notes = "replaces the CI step 'Unified version and catalog check'"
 
 [[suite]]
 id = "gate:vendor-shared"
 command = [["{python}", "scripts/vendor_shared.py", "--check"]]
-runtime = "python"
-required = true
 notes = "replaces the CI step 'Shared script drift check'"
 
 [[suite]]
 id = "gate:version-bump"
 command = [["{python}", "scripts/version.py", "check-bump"]]
-runtime = "python"
-required = true
 condition = "pull_request"
 skip_reason = "pull-request guard: a push to main has nothing to bump"
 notes = "replaces the CI step 'Pull request bumps the patch' (if: pull_request)"
@@ -233,8 +228,6 @@ notes = "replaces the CI step 'Pull request bumps the patch' (if: pull_request)"
 [[suite]]
 id = "gate:changelog"
 command = [["{python}", "scripts/check_changelog.py", "--base", "origin/main"]]
-runtime = "python"
-required = true
 condition = "pull_request"
 skip_reason = "pull-request guard: compared against the merge base with origin/main"
 notes = "replaces the CI step 'Pull request adds a changelog entry' (if: pull_request)"
@@ -242,8 +235,6 @@ notes = "replaces the CI step 'Pull request adds a changelog entry' (if: pull_re
 [[suite]]
 id = "gate:version-merge"
 command = [["{python}", "scripts/version.py", "check-merge"]]
-runtime = "python"
-required = true
 condition = "pull_request"
 skip_reason = "pull-request guard: the remote patch + 1 and the tag check"
 notes = "replaces the CI step 'Version claim is still free' (if: pull_request)"
@@ -259,7 +250,6 @@ command = [["bun", "run", "check"], ["bun", "test"]]
 provision = [["bun", "install", "--frozen-lockfile"]]
 cwd = "scripts/shared"
 runtime = "bun"
-required = true
 assertion = "counter"
 count_regexes = ['^ *(?P<passed>\d+) pass$']
 timeout = 300
@@ -271,7 +261,6 @@ command = [["bun", "run", "check"], ["bun", "test"]]
 provision = [["bun", "install", "--frozen-lockfile"]]
 cwd = "skills/teams-cdp/scripts"
 runtime = "bun"
-required = true
 assertion = "counter"
 count_regexes = ['^ *(?P<passed>\d+) pass$']
 timeout = 300
@@ -283,7 +272,6 @@ command = [["bun", "run", "check"], ["bun", "test"]]
 provision = [["bun", "install", "--frozen-lockfile"]]
 cwd = "skills/m365-copilot-cdp/scripts"
 runtime = "bun"
-required = true
 assertion = "counter"
 count_regexes = ['^ *(?P<passed>\d+) pass$']
 timeout = 300
@@ -295,7 +283,6 @@ command = [["npm", "run", "typecheck"], ["npm", "test"]]
 provision = [["npm", "ci"]]
 cwd = "paseo-plugins/gdd-run-observer"
 runtime = "npm"
-required = true
 assertion = "counter"
 count_regexes = ['^ *Tests +(?P<passed>\d+) passed(?: \| (?P<skipped>\d+) skipped)? \((?P<total>\d+)\)$']
 timeout = 600
@@ -379,9 +366,15 @@ timeout = 300
 detached = "setsid process groups and, when tmux is present, tmux sessions. The suite kills both in its own EXIT trap and asserts the session is gone (test-omp-run-setsid.sh:38-46,264-270); the tmux cases skip loudly and are recorded as subcase skips."
 notes = "replaces the CI step 'GDD launcher setsid backend tests'; tmux cases are an optional subcase, not an optional suite"
 
+# The AF_UNIX bound of §4 item 4: tmux builds its socket at
+# `<TMUX_TMPDIR or TMPDIR>/tmux-<uid>/default`, and this suite points TMUX_TMPDIR at
+# `<TMPDIR>/omp-run-py.XXXXXXXX/tmux-tmp`, the deepest tree any scheduled suite builds
+# below its task-local TMPDIR.  Declared here, not in the runner, so the bound can never
+# describe a tree the manifest no longer schedules.
 [[suite]]
 path = "skills/gdd/scripts/tests/test_omp_run_python.py"
 timeout = 300
+socket_tail = "/tmp/omp-run-py.XXXXXXXX/tmux-tmp/tmux-{uid}/default"
 notes = "replaces the CI step 'GDD launcher Python adapter tests'; drives a stub agent through the launcher's wait loops"
 
 [[suite]]

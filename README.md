@@ -180,9 +180,11 @@ The `test` job runs on every push to `main`, every pull request, and `workflow_d
 `release` job runs only after it on `main` and tags the commit CI tested.
 
 The `test` job provisions the runtimes and dependencies, then runs
-`python scripts/run_all_tests.py`. That discoverer schedules every command in the table below, which
-lists manifest entries from `scripts/test_manifest.toml` rather than separate CI steps. It also
-schedules the Python suites that were never wired in before —
+`python scripts/run_all_tests.py`. That discoverer schedules the commands below as entries in
+`scripts/test_manifest.toml` rather than as separate CI steps (the table is being converged onto the
+manifest in a later step of this series, and its `scripts/release.py` row describes the release job's
+own command, not a scheduled suite). It also schedules the Python suites that were never wired in
+before —
 `skills/delegated-work-acceptance/scripts/tests/test_worktree_scope.py` and
 `skills/gdd/scripts/tests/test_paseo_run_python.py` — and the `paseo-plugins/gdd-run-observer` Vitest
 package.

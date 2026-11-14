@@ -20,9 +20,10 @@ Every suite settles as PASS, FAIL, ERROR, TIMEOUT or SKIP (see `settle`), and th
 Each suite runs in its own process and process group, with a task-local TMPDIR/HOME/XDG root under a
 short `/tmp` directory of its own — never the checkout, and never an inherited operator `TMPDIR`
 (`scratch_root_for`) — a per-suite timeout, and process-group teardown on timeout.  A scratch tree
-too long to hold the toolkit's AF_UNIX socket is reported as that suite's ERROR before it runs
-(`socket_path_length`).  Per-suite logs and the JSON result record stay under
-`.tmp-artifacts/test-runs/<UTC stamp>-<pid>/` in the checkout.  Suite processes also keep the shim
+too long to hold the toolkit's AF_UNIX socket — given the deepest `socket_tail` the scheduled suites
+declare in the manifest — is reported as that suite's ERROR before it runs (`socket_path_length`).
+Per-suite logs stay under `.tmp-artifacts/test-runs/<UTC stamp>-<pid>/logs/`, and the JSON result
+record is `result.json` in that same run directory (`--report` writes it elsewhere).  Suite processes also keep the shim
 toolchain's absolute state directories (`shim_state_environment`), because a task-local HOME otherwise
 makes a mise shim on PATH refuse to run.  A required suite that executed zero
 checks is never PASS: unittest suites must collect at least one test, and suites with a declared
@@ -108,8 +109,8 @@ class Suite:
     covered_by: str | None = None
     detached: str | None = None
     notes: str | None = None
+    socket_tail: str | None = None    # declared AF_UNIX tree below the suite's scratch root
     path: str | None = None           # repo-relative entry point, when there is one
-    replaced_discovery: bool = False   # declared entry that owns a discovered path
 
 
 @dataclass
@@ -137,6 +138,7 @@ class Plan:
     floor_missing: list[str]
     unpinned: list[str]
     filtered: bool
+    socket_tail: str = ""  # deepest `socket_tail` declared by the suites this run settles
 
     @property
     def settled_total(self) -> int:
@@ -157,6 +159,10 @@ def load_manifest(path: Path) -> dict:
         raise ManifestError(f"manifest is not valid TOML ({path}): {exc}") from exc
     if not isinstance(document, dict):
         raise ManifestError(f"manifest is not a table ({path})")
+    if document.get("schema") != 1:
+        raise ManifestError(
+            f"manifest schema is {document.get('schema')!r}, not the supported 1 ({path})"
+        )
     return document
 
 
@@ -301,7 +307,7 @@ def _validate_entry(entry: dict, label: str, problems: list[str]) -> None:
             re.compile(entry["require_regex"])
         except (re.error, TypeError) as exc:
             problems.append(f"{label}: require_regex does not compile ({exc})")
-    runtime = entry.get("runtime", "python" if has_command else "python")
+    runtime = entry.get("runtime", "python")
     if runtime not in RUNTIMES:
         problems.append(f"{label}: runtime must be one of {', '.join(RUNTIMES)}")
     condition = entry.get("condition", "always")
@@ -312,6 +318,15 @@ def _validate_entry(entry: dict, label: str, problems: list[str]) -> None:
     timeout = entry.get("timeout", DEFAULT_TIMEOUT)
     if not isinstance(timeout, (int, float)) or timeout <= 0:
         problems.append(f"{label}: timeout must be a positive number")
+    socket_tail = entry.get("socket_tail")
+    if socket_tail is not None:
+        if not isinstance(socket_tail, str):
+            problems.append(f"{label}: socket_tail must be a string")
+        else:
+            try:
+                socket_tail.format(uid=0)
+            except (KeyError, IndexError, ValueError) as exc:
+                problems.append(f"{label}: socket_tail is not a format template ({exc})")
     for key in ("env",):
         value = entry.get(key) or {}
         if not isinstance(value, dict) or not all(isinstance(v, str) for v in value.values()):
@@ -351,7 +366,7 @@ def _infer_runtime(commands: tuple[tuple[str, ...], ...]) -> str:
 
 
 def _suite_from_entry(entry: dict, label: str, root: Path, python: str, problems: list[str],
-                      *, origin: str, path: str | None, replaced: bool) -> Suite:
+                      *, origin: str, path: str | None) -> Suite:
     if "command" in entry:
         commands = tuple(
             _resolve_command(argv, python, label, problems) for argv in entry["command"]
@@ -393,8 +408,8 @@ def _suite_from_entry(entry: dict, label: str, root: Path, python: str, problems
         covered_by=entry.get("covered_by"),
         detached=entry.get("detached"),
         notes=entry.get("notes"),
+        socket_tail=entry.get("socket_tail"),
         path=path,
-        replaced_discovery=replaced,
     )
 
 
@@ -447,7 +462,7 @@ def build_plan(root: Path, document: dict, *, event: str, only: list[str] | None
         path = entry.get("path")
         replaced = bool(path and path in found)
         suite = _suite_from_entry(entry, label, root, python, problems,
-                                 origin="declared", path=path, replaced=replaced)
+                                 origin="declared", path=path)
         if suite.id in suites:
             problems.append(f"{label}: duplicate suite id {suite.id}")
             continue
@@ -463,7 +478,7 @@ def build_plan(root: Path, document: dict, *, event: str, only: list[str] | None
         if entry and "id" in entry:
             problems.append(f"{label}: a refinement takes its id from its path")
         suite = _suite_from_entry(entry or {"assertion": "auto"}, label, root, python, problems,
-                                  origin="discovered", path=path, replaced=False)
+                                  origin="discovered", path=path)
         if suite.id in suites:
             problems.append(f"{label}: duplicate suite id {suite.id}")
             continue
@@ -546,6 +561,10 @@ def build_plan(root: Path, document: dict, *, event: str, only: list[str] | None
         floor_missing=floor_missing,
         unpinned=unpinned,
         filtered=bool(only),
+        socket_tail=max(
+            (suite.socket_tail or "" for suite in runnable + covered),
+            key=lambda tail: len(_socket_tail_path(tail)), default="",
+        ),
     )
 
 
@@ -630,22 +649,28 @@ def _mkdtemp(parent: str) -> Path | None:
         return None
 
 
-def socket_path_length(scratch: Path) -> int | None:
+def _socket_tail_path(tail: str) -> str:
+    """A declared `socket_tail` with `{uid}` substituted; an unformattable tail as declared."""
+    uid = os.getuid() if hasattr(os, "getuid") else 0
+    try:
+        return tail.format(uid=uid)
+    except (KeyError, IndexError, ValueError):
+        return tail
+
+
+def socket_path_length(scratch: Path, tail: str = "") -> int | None:
     """Worst-case AF_UNIX socket path length (bytes) a suite can build below `scratch`.
 
     The bound comes from `sun_path` in `struct sockaddr_un`: 108 bytes on Linux *including*
     the terminating NUL, i.e. a 107-byte path.  tmux is the toolkit in this repository that
-    needs it — its socket is `<TMUX_TMPDIR or TMPDIR>/tmux-<uid>/default` — and
-    `skills/gdd/scripts/tests/test_omp_run_python.py` uses
-    `<TMPDIR>/omp-run-py.XXXXXXXX/tmux-tmp` as its TMUX_TMPDIR, which is the deepest tree any
-    scheduled suite builds below the task-local TMPDIR (`<scratch>/tmp`).  Returns None
-    where AF_UNIX does not apply.
+    needs it — its socket is `<TMUX_TMPDIR or TMPDIR>/tmux-<uid>/default` — and the deepest
+    tree a suite builds below its task-local TMPDIR is that suite's own `socket_tail`
+    declaration in `scripts/test_manifest.toml`, where `{uid}` is the running user's id.
+    Returns None where AF_UNIX does not apply.
     """
     if os.name != "posix":
         return None
-    uid = os.getuid() if hasattr(os, "getuid") else 0
-    tail = f"/tmp/omp-run-py.XXXXXXXX/tmux-tmp/tmux-{uid}/default"
-    return len(os.fsencode(str(scratch) + tail))
+    return len(os.fsencode(str(scratch) + _socket_tail_path(tail)))
 
 
 def _suite_slug(suite_id: str) -> str:
@@ -732,7 +757,8 @@ def _terminate_group(process: subprocess.Popen, log) -> None:
         log.flush()
 
 
-def _tail(path: Path, limit: int = 25) -> str:
+def _read_log(path: Path, limit: int | None = None) -> str:
+    """The log's tail (its last LOG_TAIL_BYTES), optionally cut to its last `limit` lines."""
     try:
         with path.open("rb") as handle:
             handle.seek(0, os.SEEK_END)
@@ -741,8 +767,9 @@ def _tail(path: Path, limit: int = 25) -> str:
             text = handle.read().decode("utf-8", errors="replace")
     except OSError:
         return ""
-    lines = _plain(text).splitlines()
-    return "\n".join(lines[-limit:])
+    if limit is None:
+        return text
+    return "\n".join(_plain(text).splitlines()[-limit:])
 
 
 def _plain(output: str) -> str:
@@ -853,13 +880,14 @@ def _apply_require_regex(suite: Suite, state: str, reason: str, counts: dict,
 
 
 def run_suite(suite: Suite, *, root: Path, scratch_root: Path, log_root: Path,
-              environment: dict[str, str], timeout_override: float | None = None) -> Outcome:
+              environment: dict[str, str], timeout_override: float | None = None,
+              socket_tail: str = "") -> Outcome:
     """Run one suite in its own process, group and task-local scratch tree."""
     slug = _suite_slug(suite.id)
     # Short directory name: AF_UNIX paths are capped (see `socket_path_length`).
     scratch_root.mkdir(parents=True, exist_ok=True)  # never fail to isolate for want of a directory
     suite_scratch = Path(tempfile.mkdtemp(prefix=f"{slug[:12]}-", dir=scratch_root))
-    worst_case = socket_path_length(suite_scratch)
+    worst_case = socket_path_length(suite_scratch, socket_tail)
     if worst_case is not None and worst_case >= AF_UNIX_PATH_LIMIT:
         shutil.rmtree(suite_scratch, ignore_errors=True)
         return Outcome(
@@ -907,7 +935,7 @@ def run_suite(suite: Suite, *, root: Path, scratch_root: Path, log_root: Path,
             outcome = Outcome(
                 suite_id=suite.id, state="ERROR", duration=0.0, exit_code=code,
                 reason="provisioning failed: " + _display(suite.provision[0]),
-                log=str(log_path), tail=_tail(log_path), covered_by=suite.covered_by,
+                log=str(log_path), tail=_read_log(log_path, 25), covered_by=suite.covered_by,
             )
             shutil.rmtree(suite_scratch, ignore_errors=True)
             return outcome
@@ -921,21 +949,10 @@ def run_suite(suite: Suite, *, root: Path, scratch_root: Path, log_root: Path,
     outcome = Outcome(
         suite_id=suite.id, state=state, duration=round(duration, 3), exit_code=code,
         reason=reason, counts=counts, log=str(log_path),
-        tail=_tail(log_path) if state != "PASS" else "", covered_by=suite.covered_by,
+        tail=_read_log(log_path, 25) if state != "PASS" else "", covered_by=suite.covered_by,
     )
     shutil.rmtree(suite_scratch, ignore_errors=True)
     return outcome
-
-
-def _read_log(path: Path) -> str:
-    try:
-        with path.open("rb") as handle:
-            handle.seek(0, os.SEEK_END)
-            size = handle.tell()
-            handle.seek(max(size - LOG_TAIL_BYTES, 0))
-            return handle.read().decode("utf-8", errors="replace")
-    except OSError:
-        return ""
 
 
 def settle_covered(child: Suite, parent: Suite, parent_outcome: Outcome,
@@ -993,10 +1010,13 @@ def _print_plan(plan: Plan) -> None:
     for suite in plan.scheduled:
         print(f"  {suite.origin:<10} {suite.id:<70} {suite.runtime:<6} "
               f"{_display(suite.commands[0])}  assertion={suite.assertion}")
+        _print_declarations(suite)
     for suite in plan.skipped:
         print(f"  {'skipped':<10} {suite.id:<70} {suite.runtime:<6} condition={suite.condition}")
+        _print_declarations(suite)
     for child in plan.covered:
         print(f"  {'covered':<10} {child.id:<70} covered_by={child.covered_by}")
+        _print_declarations(child)
     for problem in plan.problems:
         print(f"problem: {problem}")
     if not plan.filtered:
@@ -1004,12 +1024,24 @@ def _print_plan(plan: Plan) -> None:
               f"{len(plan.floor_missing)} pinned missing, {len(plan.unpinned)} unpinned")
 
 
+def _print_declarations(suite: Suite) -> None:
+    """Print the manifest declarations of one planned suite.
+
+    `detached` and `socket_tail` state boundaries (teardown, AF_UNIX room) that nothing
+    else in a run reads, so printing them is what keeps them from drifting unseen.
+    """
+    if suite.detached:
+        print(f"      detached: {suite.detached}")
+    if suite.socket_tail:
+        print(f"      socket_tail: {suite.socket_tail}")
+    if suite.notes:
+        print(f"      notes: {suite.notes}")
+
+
 def _payload(plan: Plan, outcomes: list[Outcome], *, event: str, root: Path, python: str,
              started: str, duration: float, exit_code: int, log_root: Path,
-             scratch_root: Path, shim_state: dict[str, str]) -> dict:
-    summary = {state: 0 for state in TERMINAL_STATES}
-    for outcome in outcomes:
-        summary[outcome.state] = summary.get(outcome.state, 0) + 1
+             scratch_root: Path, shim_state: dict[str, str], summary: dict[str, int],
+             suites: dict[str, Suite]) -> dict:
     return {
         "schema": 1,
         "event": event,
@@ -1036,19 +1068,25 @@ def _payload(plan: Plan, outcomes: list[Outcome], *, event: str, root: Path, pyt
         "summary": summary,
         "problems": plan.problems,
         "exit_code": exit_code,
-        "suites": [
-            {
-                "id": outcome.suite_id,
-                "state": outcome.state,
-                "duration_seconds": outcome.duration,
-                "exit_code": outcome.exit_code,
-                "reason": outcome.reason,
-                "counts": outcome.counts,
-                "covered_by": outcome.covered_by,
-                "log": outcome.log,
-            }
-            for outcome in outcomes
-        ],
+        "suites": [_suite_record(outcome, suites.get(outcome.suite_id))
+                   for outcome in outcomes],
+    }
+
+
+def _suite_record(outcome: Outcome, suite: Suite | None) -> dict:
+    """The record's per-suite entry: how it settled plus its manifest declarations."""
+    return {
+        "id": outcome.suite_id,
+        "state": outcome.state,
+        "duration_seconds": outcome.duration,
+        "exit_code": outcome.exit_code,
+        "reason": outcome.reason,
+        "counts": outcome.counts,
+        "covered_by": outcome.covered_by,
+        "detached": suite.detached if suite else None,
+        "socket_tail": suite.socket_tail if suite else None,
+        "notes": suite.notes if suite else None,
+        "log": outcome.log,
     }
 
 
@@ -1066,7 +1104,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--scratch", default=None,
                         help="task-local scratch root (default: a fresh directory in the "
                              "system temp directory, outside the checkout)")
-    parser.add_argument("--report", default=None, help="write the JSON result record here")
+    parser.add_argument("--report", default=None,
+                        help="write the JSON result record here (default: <run root>/result.json)")
     parser.add_argument("--list", action="store_true", dest="list_only", help="print the plan only")
     args = parser.parse_args(argv)
 
@@ -1087,12 +1126,14 @@ def main(argv: list[str] | None = None) -> int:
     _print_plan(plan)
     if args.list_only:
         return 2 if plan.problems else 0
+    by_suite = {suite.id: suite for suite in plan.scheduled + plan.covered + plan.skipped}
 
     stamp = f"{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}-{os.getpid()}"
     scratch_root = scratch_root_for(args.scratch)
     run_root = root / ".tmp-artifacts" / "test-runs" / stamp
     log_root = run_root / "logs"
     log_root.mkdir(parents=True, exist_ok=True)
+    report_path = Path(args.report).resolve() if args.report else run_root / "result.json"
     environment = base_environment(document, python)
     shim_state = {name: environment[name] for name in SHIM_STATE_DEFAULTS if name in environment}
 
@@ -1111,7 +1152,8 @@ def main(argv: list[str] | None = None) -> int:
     for suite in plan.scheduled:
         index += 1
         outcome = run_suite(suite, root=root, scratch_root=scratch_root, log_root=log_root,
-                            environment=environment, timeout_override=args.timeout)
+                            environment=environment, timeout_override=args.timeout,
+                            socket_tail=plan.socket_tail)
         outcomes.append(outcome)
         by_id[suite.id] = outcome
         print(f"[{index:>3}/{total}] {outcome.state:<7} {outcome.duration:>6.2f}s  {suite.id}"
@@ -1119,7 +1161,6 @@ def main(argv: list[str] | None = None) -> int:
         if outcome.tail and outcome.state != "PASS":
             for line in outcome.tail.splitlines()[-25:]:
                 print(f"      | {line}")
-    by_suite = {suite.id: suite for suite in plan.scheduled + plan.covered + plan.skipped}
     for child in plan.covered:
         index += 1
         parent = by_suite[child.covered_by]
@@ -1150,8 +1191,6 @@ def main(argv: list[str] | None = None) -> int:
     if plan.unpinned:
         print(f"floor: ok; {len(plan.unpinned)} unpinned discoveries: "
               + ", ".join(plan.unpinned))
-    for problem in plan.problems:
-        print(f"problem: {problem}")
     print(f"logs: {log_root}")
     if not args.scratch:
         with contextlib.suppress(OSError):
@@ -1160,11 +1199,11 @@ def main(argv: list[str] | None = None) -> int:
     exit_code = 2 if plan.problems else (1 if failed else 0)
     if failed:
         print("failed: " + ", ".join(failed))
-    _write_report(Path(args.report).resolve() if args.report else None,
+    _write_report(report_path,
                   _payload(plan, outcomes, event=event, root=root, python=python,
                            started=started, duration=duration, exit_code=exit_code,
                            log_root=log_root, scratch_root=scratch_root,
-                           shim_state=shim_state))
+                           shim_state=shim_state, summary=summary, suites=by_suite))
     print(f"exit {exit_code}")
     return exit_code
 
