@@ -64,6 +64,7 @@ type Tailer = {
   resets: number;
   unreadable: boolean;
   fileId: string;
+  updating: Promise<{ counters: CounterSnapshot | null; unreadable: boolean }> | null;
 };
 
 export function createRunStore(deps: StoreDeps): RunStore {
@@ -89,7 +90,7 @@ export function createRunStore(deps: StoreDeps): RunStore {
   }
 
   /**
-   * Counters are derived by tailing `events.ndjson` from the last complete line we consumed, so a
+   * Counters are derived by tailing `events.ndjson` from the last byte we read, so a
    * scan costs only the appended window. The launcher splices the log at its bound by replacing it
    * with `head + truncated marker + tail`, so any of three cheap signals restarts the count from
    * byte 0 (a replaced file, a shrunken file, or a lost line boundary) and the numbers stay a
@@ -107,10 +108,22 @@ export function createRunStore(deps: StoreDeps): RunStore {
         resets: 0,
         unreadable: false,
         fileId: "",
+        updating: null,
       };
       tailers.set(dir, tailer);
     }
+    if (tailer.updating) return tailer.updating;
     const current = tailer;
+    current.updating = updateCounters(dir, current).finally(() => {
+      current.updating = null;
+    });
+    return current.updating;
+  }
+
+  async function updateCounters(
+    dir: string,
+    current: Tailer,
+  ): Promise<{ counters: CounterSnapshot | null; unreadable: boolean }> {
     const path = join(dir, "events.ndjson");
     let info: Stats;
     try {
@@ -127,10 +140,11 @@ export function createRunStore(deps: StoreDeps): RunStore {
 
     // Two passes at most: a rewritten log restarts the count from byte 0, then a recount settles.
     for (let pass = 0; pass < 2; pass += 1) {
+      const completeOffset = current.offset - current.pending.length;
       const shifted =
         replaced ||
         info.size < current.offset ||
-        (current.offset > 0 && !(await endsWithNewline(path, current.offset)));
+        (completeOffset > 0 && !(await endsWithNewline(path, completeOffset)));
       current.fileId = fileId;
       const restart = shifted || (await readAppended(path, current, info.size)) === "spliced";
       if (!restart) break;
@@ -147,8 +161,8 @@ export function createRunStore(deps: StoreDeps): RunStore {
   }
 
   /**
-   * Fold the appended window into the tailer's counters. `offset` only ever advances past a
-   * complete line, so the byte before it is a newline and a partial line is re-read next scan.
+   * Fold the appended window into the tailer's counters. `offset` advances past every byte read;
+   * `pending` retains an incomplete suffix exactly once until a later read completes the line.
    * Returns `"spliced"` when a `truncated` marker appeared after bytes already counted.
    */
   async function readAppended(
@@ -169,17 +183,16 @@ export function createRunStore(deps: StoreDeps): RunStore {
           const { bytesRead } = await handle.read(buffer, 0, length, offset);
           if (bytesRead <= 0) break;
           const chunk = buffer.subarray(0, bytesRead);
+          offset += bytesRead;
           const combined =
             tailer.pending.length > 0 ? Buffer.concat([tailer.pending, chunk]) : chunk;
           const lastNewline = combined.lastIndexOf(0x0a);
           if (lastNewline === -1) {
             tailer.pending = Buffer.from(combined);
-            offset += bytesRead;
             continue;
           }
           const complete = combined.subarray(0, lastNewline).toString("utf8");
           tailer.pending = Buffer.from(combined.subarray(lastNewline + 1));
-          offset += bytesRead - tailer.pending.length;
           for (const line of complete.split("\n")) {
             const event = applyEventLine(tailer.counters, line);
             if (event?.type === "truncated" && startOffset > 0) spliced = true;
@@ -198,7 +211,7 @@ export function createRunStore(deps: StoreDeps): RunStore {
   }
 
   /** Read the last `bytes` of a file as text, without ever loading the whole file. */
-  async function readTailText(path: string, bytes: number): Promise<string | null> {
+  async function readTailText(path: string, bytes: number, dropFragment = false): Promise<string | null> {
     let size: number;
     try {
       size = (await stat(path)).size;
@@ -212,7 +225,8 @@ export function createRunStore(deps: StoreDeps): RunStore {
     try {
       const buffer = Buffer.allocUnsafe(length);
       const { bytesRead } = await handle.read(buffer, 0, length, start);
-      return buffer.subarray(0, bytesRead).toString("utf8");
+      const text = buffer.subarray(0, bytesRead).toString("utf8");
+      return dropFragment ? dropLeadingFragment(text, start) : text;
     } finally {
       await handle.close();
     }
@@ -351,9 +365,7 @@ export function createRunStore(deps: StoreDeps): RunStore {
     }
     const files = await readFiles(found.dir, found.date, found.slug);
     const summary = await summarize(files);
-    const eventsText = await readTailText(join(found.dir, "events.ndjson"), TAIL_BYTES);
-    // A window read starts mid-line; drop that fragment only when it is not the file's first line.
-    const window = eventsText === null ? "" : dropLeadingFragment(eventsText, files.events.bytes);
+    const eventsText = await readTailText(join(found.dir, "events.ndjson"), TAIL_BYTES, true);
     const answerTail = await readTailText(join(found.dir, "answer.md"), ANSWER_TAIL_BYTES);
     const paths = includePaths
       ? await Promise.all(
@@ -367,7 +379,7 @@ export function createRunStore(deps: StoreDeps): RunStore {
     return {
       found: true,
       summary,
-      events: parseEventWindow(window, tailLines),
+      events: parseEventWindow(eventsText ?? "", tailLines),
       answerTail: answerTail === null ? null : tailText(answerTail, tailLines),
       stats: files.stats,
       paths,
@@ -454,10 +466,10 @@ export function createRunStore(deps: StoreDeps): RunStore {
   };
 }
 
-function dropLeadingFragment(text: string, fileBytes: number): string {
+function dropLeadingFragment(text: string, startOffset: number): string {
+  if (startOffset === 0) return text;
   const index = text.indexOf("\n");
-  if (index === -1) return fileBytes > text.length ? "" : text;
-  return text.length === fileBytes ? text : text.slice(index + 1);
+  return index === -1 ? "" : text.slice(index + 1);
 }
 
 /** True when the byte before `offset` is a newline, i.e. the log was not rewritten underneath us. */

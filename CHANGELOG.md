@@ -17,6 +17,9 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
 
 ### Changed
 
+- Preserved native Paseo cwd provenance failures across refreshes until inspect verifies the
+  requested directory. Observer counters now share per-run in-flight updates, retain split NDJSON
+  lines without rereading buffered bytes, and keep complete UTF-8 events in detail/follow tails.
 - Documented explicit transport selection through `GDD_LAUNCHER`: bundled `omp-run.py` remains the
   default; `paseo-run.py` requires a reachable daemon, with no reachability-driven substitution.
   Native provider/thinking overrides leave daemon defaults intact when unset. CLI 0.15.4 answer

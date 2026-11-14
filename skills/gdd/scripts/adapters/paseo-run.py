@@ -17,6 +17,8 @@ never proof of success or permission to launch a substitute. Lifecycle mapping
 closed -> killed. kill hard-deletes exactly the recorded agent, not merely its
 current turn. A confirmed deletion finalizes an active stage as killed; deleting
 an already-finalized agent preserves its historical stage outcome.
+An unverified dispatch cwd stays unknown until inspect explicitly confirms the
+requested directory, regardless of the agent's lifecycle state.
 
 inspect --json exposes Id/Status, not an answer field. Verified CLI 0.15.4
 `logs ID --filter assistant_message --tail 1` returns the last assistant text;
@@ -169,6 +171,11 @@ def publish(state):
     support.write_json(os.path.join(state["run_dir"], "state.json"), state)
 
 
+def cwd_matches(actual, requested):
+    return (isinstance(actual, str) and bool(actual.strip()) and
+            os.path.normcase(os.path.realpath(actual)) == os.path.normcase(os.path.realpath(requested)))
+
+
 def finalize(state):
     run_dir = state["run_dir"]
     state["ended"] = support.now_iso()
@@ -191,6 +198,12 @@ def refresh_locked(run_dir):
         agent = json_cli(state, ["inspect", state["agent_id"], "--json"])
         if not isinstance(agent, dict) or agent.get("Id") != state["agent_id"]:
             fail("missing or mismatched agent in inspect response")
+        if not state.get("cwd_verified"):
+            state["reported_cwd"] = agent.get("Cwd")
+            if not cwd_matches(state["reported_cwd"], state["cwd"]):
+                fail(state.get("cwd_error") or "inspect did not verify the requested cwd; dispatch provenance is unknown")
+            state["cwd_verified"] = True
+            state.pop("cwd_error", None)
         native = agent.get("Status")
         word = STATES.get(native, "unknown")
         if native == "idle" and agent.get("PendingPermissions"):
@@ -262,6 +275,7 @@ def start(args):
         os.makedirs(run_dir)
         with claim(os.path.join(run_dir, "refresh")):
             state = {"name": slug, "state": "unknown", "exit": None, "cwd": cwd,
+                     "cwd_verified": False,
                      "started": support.now_iso(), "ended": None, "duration_s": None,
                      "backend": "paseo", "launcher": ADAPTER, "agent": binary,
                      "paseo_argv": prefix,
@@ -292,10 +306,12 @@ def start(args):
                 support.write_json(os.path.join(run_dir, "lock"),
                                    {"pid": None, "agent_id": agent_id, "backend": "paseo",
                                     "started_at": state["started"]})
-                actual_cwd = result.get("cwd")
-                if not isinstance(actual_cwd, str) or os.path.normcase(os.path.realpath(actual_cwd)) != os.path.normcase(os.path.realpath(cwd)):
-                    fail("run returned a different cwd; dispatch provenance is unknown "
-                         "(agent identity preserved; inspect before retrying)")
+                state["reported_cwd"] = result.get("cwd")
+                if not cwd_matches(state["reported_cwd"], cwd):
+                    state["cwd_error"] = ("run returned a different cwd; dispatch provenance is unknown "
+                                          "(agent identity preserved; inspect before retrying)")
+                    fail(state["cwd_error"])
+                state["cwd_verified"] = True
                 with open(os.path.join(run_dir, "runner.log"), "ab", buffering=0) as log:
                     options = {"cwd": cwd, "stdin": subprocess.DEVNULL, "stdout": log,
                                "stderr": subprocess.STDOUT}

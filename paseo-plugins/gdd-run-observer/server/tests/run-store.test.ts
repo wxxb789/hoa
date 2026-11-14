@@ -156,6 +156,68 @@ describe("run store", () => {
     expect(second.runs[0].eventLines).toBe(2);
   });
 
+  it("counts appended events once across concurrent list, follow, and detail handlers", async () => {
+    const dir = await writeRun("stage-implement", {
+      "state.json": STATE_RUNNING,
+      "events.ndjson": "",
+    });
+    const runs = store([222]);
+    await runs.listRuns();
+    await appendFile(join(dir, "events.ndjson"),
+      event({ type: "turn_end" }) +
+      event({ type: "tool_execution_start", toolCallId: "a", toolName: "read" }) +
+      event({ type: "message_end", message: { role: "assistant", usage: { cost: { total: 0.02 } } } }),
+      "utf8");
+
+    const id = `${DATE}/stage-implement`;
+    const responses = await Promise.all(Array.from({ length: 10 }, async () => {
+      const [listed, followed, detail] = await Promise.all([
+        runs.listRuns(), runs.follow(id), runs.runDetail(id),
+      ]);
+      return [listed.runs[0], followed.summary, detail.summary];
+    }));
+    const subsequent = (await runs.listRuns()).runs[0];
+    for (const summary of [subsequent, ...responses.flat()]) {
+      expect(summary?.turns).toBe(1);
+      expect(summary?.toolCalls).toBe(1);
+      expect(summary?.costUsd).toBeCloseTo(0.02, 6);
+      expect(summary?.eventLines).toBe(3);
+    }
+  });
+
+  it("counts an event straddling the 256 KiB read boundary exactly once", async () => {
+    const first = event({ type: "session", id: "session-1", padding: "x".repeat(256 * 1024 - 128) });
+    const second = event({ type: "turn_end", padding: "y".repeat(256) });
+    expect(Buffer.byteLength(first)).toBeLessThan(256 * 1024);
+    expect(Buffer.byteLength(first + second)).toBeGreaterThan(256 * 1024);
+    await writeRun("stage-implement", {
+      "state.json": STATE_RUNNING,
+      "events.ndjson": first + second,
+    });
+    const runs = store([222]);
+    for (let scan = 0; scan < 2; scan += 1) {
+      const summary = (await runs.listRuns()).runs[0];
+      expect(summary.turns).toBe(1);
+      expect(summary.eventLines).toBe(2);
+    }
+  });
+
+  it("retains an incomplete event once until a later append completes it", async () => {
+    const line = event({ type: "turn_end", padding: "x".repeat(256 * 1024) });
+    const split = 256 * 1024 - 10;
+    const dir = await writeRun("stage-implement", {
+      "state.json": STATE_RUNNING,
+      "events.ndjson": event({ type: "session", id: "session-1" }) + line.slice(0, split),
+    });
+    const runs = store([222]);
+    expect((await runs.listRuns()).runs[0].turns).toBe(0);
+    expect((await runs.listRuns()).runs[0].turns).toBe(0);
+    await appendFile(join(dir, "events.ndjson"), line.slice(split), "utf8");
+    const summary = (await runs.listRuns()).runs[0];
+    expect(summary.turns).toBe(1);
+    expect(summary.eventLines).toBe(2);
+  });
+
   it("recounts from scratch when the launcher splices the log", async () => {
     const dir = await writeRun("stage-implement", {
       "state.json": STATE_RUNNING,
@@ -260,6 +322,20 @@ describe("run store", () => {
     const summary = (await store([222]).listRuns()).runs[0];
     expect(summary.turns).toBe(2);
     expect(summary.eventLines).toBe(2);
+  });
+
+  it("keeps the first complete non-ASCII event in detail and follow tails", async () => {
+    await writeRun("stage-implement", {
+      "state.json": STATE_RUNNING,
+      "events.ndjson": event({ type: "tool_execution_start", toolCallId: "a", toolName: "read", intent: "读取配置文件" }),
+    });
+    const runs = store([222]);
+    const id = `${DATE}/stage-implement`;
+    for (const result of [await runs.runDetail(id), await runs.follow(id)]) {
+      expect(result.events).toHaveLength(1);
+      expect(result.events[0].type).toBe("tool_execution_start");
+      expect(result.events[0].intent).toBe("读取配置文件");
+    }
   });
 
   it("reports an unknown run id as not found", async () => {

@@ -32,13 +32,13 @@ if command == "run":
     cwd = (os.environ.get("PASEO_AGENT_CWD") if os.environ.get("PASEO_AGENT_ID") or
            os.environ.get("PASEO_WORKSPACE_ID") else None) or os.getcwd()
     print(json.dumps({"agentId": config["id"], "status": "running",
-                      "provider": "stub", "cwd": cwd, "title": "stage"}))
+                      "provider": "stub", "cwd": config.get("run_cwd", cwd), "title": "stage"}))
 elif command == "inspect":
     if config.get("missing"):
         print("Agent not found", file=sys.stderr)
         sys.exit(1)
     print(json.dumps({"Id": config["id"], "Status": config["status"],
-                      "Cwd": os.getcwd(), "PendingPermissions": config.get("permissions", [])}))
+                      "Cwd": config.get("inspect_cwd", os.getcwd()), "PendingPermissions": config.get("permissions", [])}))
 elif command == "logs":
     print(config.get("answer", "No activity to display."))
 elif command == "stop":
@@ -196,6 +196,40 @@ class PaseoLauncherTests(unittest.TestCase):
         state = self.status()
         self.assertEqual(state["cwd"], str(self.home))
         self.assertEqual(json.loads((self.home / "run-env.json").read_text(encoding="utf-8")), {})
+
+    def test_start_cwd_mismatch_stays_unknown_until_verified(self):
+        wrong_cwd = str(self.home / "not-the-stage")
+        self.save_fixture(status="idle", run_cwd=wrong_cwd, inspect_cwd=wrong_cwd)
+        result = self.run_adapter("start", "--name", "stage", "--prompt", str(self.prompt),
+                                  "--cwd", str(self.home))
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("different cwd", result.stderr)
+        recorded = json.loads((self.run_dir() / "state.json").read_text(encoding="utf-8"))
+        self.assertEqual(recorded["state"], "unknown")
+        self.assertEqual(recorded["agent_id"], self.fixture["id"])
+
+        for inspected_cwd in (wrong_cwd, None):
+            self.save_fixture(inspect_cwd=inspected_cwd)
+            for command in ("status", "result", "list"):
+                with self.subTest(inspected_cwd=inspected_cwd, command=command):
+                    result = self.run_adapter(command, *([] if command == "list" else ["stage"]))
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    state = json.loads((self.run_dir() / "state.json").read_text(encoding="utf-8"))
+                    self.assertEqual(state["state"], "unknown")
+                    self.assertIsNone(state["exit"])
+                    self.assertEqual(state["agent_id"], self.fixture["id"])
+                    self.assertEqual(state["cwd"], str(self.home))
+                    self.assertIn("cwd", state["error"])
+                    for name in ("finalized", "exit.code", "answer.md"):
+                        self.assertFalse((self.run_dir() / name).exists(), name)
+                    self.assertFalse((self.root / "ledger.tsv").exists())
+
+        self.save_fixture(inspect_cwd=str(self.home))
+        verified = self.status()
+        self.assertEqual(verified["state"], "done")
+        self.assertEqual(verified["exit"], 0)
+        self.assertNotIn("error", verified)
+        self.assertEqual((self.run_dir() / "finalized").read_text().strip(), "0")
 
     def test_unset_options_are_not_defaulted(self):
         self.start()
