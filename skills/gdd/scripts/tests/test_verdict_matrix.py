@@ -30,7 +30,12 @@ exit code) that no cell represented; this guard turns that class of gap into a l
 read surfaces share one exit domain (`EXIT_CATEGORIES`), so both exit dimensions are driven from
 that single declaration and `cross_surface_exit_problems()` fails on a category represented on one
 surface but missing from the other — round 13 slipped through as exactly that asymmetry (the
-structured dimension named four exits, the table one seven).
+structured dimension named four exits, the table one seven). Both exit dimensions count only
+*executed* reads: a cell whose structured read succeeded never consults the table, so its
+`TABLE_UNUSED` fixture cannot stand in for a table that ran (round 14). Two cells drive the table
+opt-in beside a mismatched verified head and a failing local gate, so the opt-in cannot silently
+override a blocker decided before the checks read; `guard_self_check()` proves the guards fire when
+a consumed table exit disappears, the reproduction that round 14 found them blind to.
 
 Cells that cannot be expressed this way (the JSON shapes, the non-zero-exit fallback rules) are
 listed explicitly, each with its expected tally and its reason. `subprocess.run()` is mocked and
@@ -84,6 +89,10 @@ for _path in (str(SCRIPTS), str(HERE)):
 import gh_checks_fixtures as captured  # noqa: E402
 
 HEAD = "a1b2c3d4" + "0" * 32
+# A head that cannot denote HEAD, so `--verified-head MISMATCHED_HEAD` is a head mismatch against
+# the fixture's `headRefOid` and blocks. Used by the cells that prove the table opt-in does not
+# waive the verified-head requirement.
+MISMATCHED_HEAD = "deadbeef" + "0" * 32
 # The PR number every cell requests, and the token the recorded call log folds any repository path
 # onto (the verdict cells' `--repo .` and the boundary cells' scratch directory). Both are named
 # here so the boundary assertions below can require the *requested* PR and the repository pair.
@@ -260,14 +269,16 @@ JSON_PASS_PENDING = _json([{"name": "build", "state": "SUCCESS", "bucket": "pass
                            {"name": "gates", "state": "PENDING", "bucket": "pending"}])
 
 Cell = namedtuple("Cell", "id json_result table_result allow_no_checks exit_code verdict reason "
-                          "checks why allow_table_only error_contains comment_pages thread_pages",
-                  defaults=(None, None))
+                          "checks why allow_table_only error_contains comment_pages thread_pages "
+                          "verified_head gates_rc",
+                  defaults=(None, None, HEAD, 0))
 StreamCell = namedtuple("StreamCell", "id stdout stderr exit_code why")
 ShCell = namedtuple("ShCell", "id stdout stderr exit_code expected why")
 
 
 def cell(cid, json_result, table_result, allow_no_checks, exit_code, verdict, reason, checks, why,
-         allow_table_only=False, error_contains=None, comment_pages=None, thread_pages=None):
+         allow_table_only=False, error_contains=None, comment_pages=None, thread_pages=None,
+         verified_head=HEAD, gates_rc=0):
     """One verdict cell. `checks` is the expected `checks:` tally, or None when there is no read.
 
     `error_contains` is the fragments the one-line stderr of an ERROR cell must carry — so an
@@ -276,9 +287,13 @@ def cell(cid, json_result, table_result, allow_no_checks, exit_code, verdict, re
     comment batches (page 1 first) and a list of `(nodes, hasNextPage, endCursor)` thread pages.
     `None` keeps the single terminal page every other cell uses, so only a cell that names them
     observes the pagination continuation.
+    `verified_head` and `gates_rc` are the `--verified-head`/`--gates-rc` pair the cell is driven
+    with; the defaults are the matching head and a passing local gate, so only a cell that names
+    them exercises a head mismatch or a failing gate.
     """
     return Cell(cid, json_result, table_result, allow_no_checks, exit_code, verdict, reason,
-                checks, why, allow_table_only, error_contains, comment_pages, thread_pages)
+                checks, why, allow_table_only, error_contains, comment_pages, thread_pages,
+                verified_head, gates_rc)
 
 
 # --- the exit-code domain, declared once for both read surfaces -------------
@@ -658,6 +673,25 @@ CELLS += [
          allow_table_only=True),
 ]
 
+# --- the table opt-in does not waive the head/gate blockers (round-14 F1) ---
+# `--allow-table-only-checks` decides only whether the *table* read is authoritative; the verified
+# head and the local gate are decided before the checks read, and the opt-in must not touch them.
+# Every other cell that enables the opt-in supplies a matching verified head and `--gates-rc 0`, so
+# a mutant that drops the reasons already accumulated at the `table_only = …` assignment —
+# `if allow_table_only_checks: reasons = []` — survived every cell: with a green fallback table a
+# mismatched head or a failing local gate reached MERGE-OK. These cells enable the opt-in and give
+# each blocker its own negative context, so the reason must survive it.
+CELLS += [
+    cell("rule-table-opt-in-head-mismatch-blocks", JSON_ABSENT, (0, GREEN_TABLE, ""), False, 1,
+         "BLOCKED", "head mismatch, verified head missing", (2, 2, 0, 0),
+         "the table opt-in does not waive the verified-head requirement: a mismatched head still "
+         "blocks", allow_table_only=True, verified_head=MISMATCHED_HEAD),
+    cell("rule-table-opt-in-gates-rc-blocks", JSON_ABSENT, (0, GREEN_TABLE, ""), False, 1,
+         "BLOCKED", "gates unverified", (2, 2, 0, 0),
+         "the table opt-in does not waive the local-gate result: a failing --gates-rc still "
+         "blocks", allow_table_only=True, gates_rc=1),
+]
+
 # --- the negative header fixtures (round-5 finding F1) ----------------------
 # The header is matched exactly: field count, empty fields and case preserved. A comparison that
 # strips empty fields and uppercases turned both of these data rows into the header, so the row
@@ -956,6 +990,16 @@ def _cell_source(cell_):
     return {"table"}
 
 
+def _table_consumed(cell_):
+    """True when the gate's checks read ends on the table surface — the fallback actually ran.
+
+    The structured read is authoritative: when it yields rows the table is never consulted, so the
+    cell's `table_result` fixture describes a read that did not happen and must not be counted as
+    evidence that a table at that exit was executed (round-14 F2).
+    """
+    return _cell_source(cell_) == {"table"}
+
+
 def _cell_buckets(cell_):
     """The bucket tokens a cell's structured rows carry, with an undeclared sentinel."""
     values = set()
@@ -984,11 +1028,15 @@ Dimension = namedtuple("Dimension", "name values negative_values extract")
 DIMENSIONS = (
     Dimension("source", ("structured", "table"), ("structured", "table"), _cell_source),
     # Both read surfaces carry the same exit domain, so both dimensions are driven from the single
-    # `EXIT_CATEGORIES` declared above — a category cannot be represented on one surface only.
+    # `EXIT_CATEGORIES` declared above — a category cannot be represented on one surface only. Only
+    # an *executed* table read counts: when the structured read succeeds the gate never consults the
+    # table, so a cell's `TABLE_UNUSED` fixture (exit 0, empty stdout) must not be read as a table
+    # that returned exit 0 — that supplied exit-0 coverage, negative included, from cells whose
+    # table never ran (round-14 F2).
     Dimension("structured-exit", EXIT_CATEGORIES, EXIT_CATEGORIES,
               lambda cell_: {cell_.json_result[0]}),
     Dimension("table-exit", EXIT_CATEGORIES, EXIT_CATEGORIES,
-              lambda cell_: {cell_.table_result[0]}),
+              lambda cell_: {cell_.table_result[0]} if _table_consumed(cell_) else set()),
     Dimension("flags", ((False, False), (True, False), (False, True), (True, True)),
               ((False, False), (True, False), (False, True), (True, True)),
               lambda cell_: {(cell_.allow_no_checks, cell_.allow_table_only)}),
@@ -1012,9 +1060,14 @@ DIMENSIONS = (
     # bucket somewhere, so each has a negative cell.
     Dimension("state", tuple(captured.STATE_VOCABULARY) + (STATE_ABSENT,),
               tuple(captured.STATE_VOCABULARY) + (STATE_ABSENT,), _cell_states),
-    # The cells never vary this: `run_cell` fixes `--verified-head HEAD --gates-rc 0`, so the only
-    # value to represent is that pair. Declared so a future dimension of the cells cannot hide here.
-    Dimension("verified-head/gates-rc", (("HEAD", "0"),), (), lambda cell_: {("HEAD", "0")}),
+    # The `--verified-head`/`--gates-rc` pair the cells are driven with. Every cell but the two
+    # round-14 opt-in cells uses the matching head and a passing local gate; those two carry the
+    # negative contexts (a head mismatch, a failing gate) that the blockers were otherwise never
+    # tested against while the table opt-in was enabled.
+    Dimension("verified-head/gates-rc",
+              ((HEAD, 0), (MISMATCHED_HEAD, 0), (HEAD, 1)),
+              ((MISMATCHED_HEAD, 0), (HEAD, 1)),
+              lambda cell_: {(cell_.verified_head, cell_.gates_rc)}),
 )
 
 
@@ -1056,13 +1109,16 @@ def cross_surface_exit_problems(cells):
     cells exercise on one surface and never on the other is the round-13 gap: a mutation that
     special-cases that exit on the *unrepresented* surface has nothing to flip, and the
     per-dimension assertion above only sees the surface it is asked about. This check is across the
-    two dimensions, naming the category and the surface that is missing it.
+    two dimensions, naming the category and the surface that is missing it. Only an *executed*
+    table read counts (round-14 F2): a cell whose structured read succeeded never consults the
+    table, so its `TABLE_UNUSED` fixture cannot stand in for a table that ran at that exit.
     """
     problems = []
     seen = {"structured-exit": set(), "table-exit": set()}
     for cell_ in cells:
         seen["structured-exit"].add(cell_.json_result[0])
-        seen["table-exit"].add(cell_.table_result[0])
+        if _table_consumed(cell_):
+            seen["table-exit"].add(cell_.table_result[0])
     for code in EXIT_CATEGORIES:
         missing = sorted(surface for surface, values in seen.items() if code not in values)
         if not missing:
@@ -1076,6 +1132,40 @@ def cross_surface_exit_problems(cells):
                 "cross-surface-exit",
                 "the exit category %r is represented on one read surface but missing from the %s "
                 "surface" % (code, missing[0])))
+    return problems
+
+
+def guard_self_check():
+    """The completeness guards must fire when an *executed* table exit disappears.
+
+    Round-14 F2 was a gap in the guards, not the gate: they counted `table_result[0]` for every
+    cell, including the ones whose structured read succeeded and whose table was never consulted,
+    so `TABLE_UNUSED = (0, "", "")` kept supplying table-exit-0 coverage from cells whose table did
+    not run. This drives the reviewer's reproduction — replace every *consumed* table fixture at
+    exit 0 with a pending exit-8 table — and requires both guards to name the now-missing table
+    exit 0. With the old counting the replacement still left exit 0 supplied by the unused fixtures
+    and both guards stayed silent, which is exactly how a missing executed exit could hide.
+    """
+    replaced = [
+        cell_._replace(table_result=(8, cell_.table_result[1], cell_.table_result[2]))
+        if _table_consumed(cell_) and cell_.table_result[0] == 0 else cell_
+        for cell_ in CELLS
+    ]
+    problems = []
+    dimension = dimension_problems(replaced)
+    cross_surface = cross_surface_exit_problems(replaced)
+    if not any("the value 0 of the table-exit dimension" in message
+               for _kind, message in dimension):
+        problems.append((
+            "guard-self-check",
+            "replacing every consumed table exit 0 with exit 8 must make the table-exit dimension "
+            "guard report the missing 0"))
+    if not any(kind == "cross-surface-exit" and "table-exit" in message
+               for kind, message in cross_surface):
+        problems.append((
+            "guard-self-check",
+            "replacing every consumed table exit 0 with exit 8 must make the cross-surface guard "
+            "report table exit 0 missing"))
     return problems
 
 
@@ -1248,8 +1338,8 @@ def _fake_run_for(cell_, records=None, repo_token=None):
 
 def run_cell(module, cell_):
     """Drive one verdict cell through the real entry point. Returns (code, stdout, stderr)."""
-    argv = ["pr-merge-check.py", REQUESTED_PR, "--repo", ".", "--verified-head", HEAD,
-            "--gates-rc", "0", "--allow-no-machine-review"]
+    argv = ["pr-merge-check.py", REQUESTED_PR, "--repo", ".", "--verified-head",
+            cell_.verified_head, "--gates-rc", str(cell_.gates_rc), "--allow-no-machine-review"]
     if cell_.allow_no_checks:
         argv.append("--allow-no-checks")
     if cell_.allow_table_only:
@@ -1553,6 +1643,7 @@ def main():
     problems = fixture_problems()
     problems.extend(dimension_problems(CELLS))
     problems.extend(cross_surface_exit_problems(CELLS))
+    problems.extend(guard_self_check())
     problems.extend(evaluate_with_calls(GATE))
     for cell_id, problem in problems:
         print("  FAIL  %s: %s" % (cell_id, problem))

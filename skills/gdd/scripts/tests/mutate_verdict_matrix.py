@@ -25,8 +25,10 @@ Two catalogues make up the run:
   golden call log catches it), the one the round-11 finding named (the structured read's non-zero
   exit accepted whenever its stdout is non-empty, so a parseable payload beside an operator error is
   trusted as the read), the one the round-12 finding named (the same acceptance narrowed to the two
-  check-result exits 1 and 8 — the shape the round-11 fixtures, all at exit 4, left invisible), and
-  the ones the surface implies (a tab-less line parsed as a row,
+  check-result exits 1 and 8 — the shape the round-11 fixtures, all at exit 4, left invisible), the
+  one the round-14 finding named (the table opt-in clearing the verified-head and local-gate
+  reasons already accumulated, so a blocker decided before the checks read merged over a green
+  table), and the ones the surface implies (a tab-less line parsed as a row,
   the header parsed as a check, the cancel and skipping bucket mappings, the zero-check opt-out
   granted unconditionally, an unordered header, a pending bucket read as failing);
 * one generated mutation per declared `CHECK_VOCABULARY` entry, reclassifying that token into every
@@ -211,6 +213,12 @@ MUTATIONS = [
      "\n                                 or allow_table_only_checks)",
      "--allow-table-only-checks is conflated with --allow-no-checks, so an empty table-only read "
      "merges on one flag instead of requiring both"),
+    ("table-opt-in-clears-the-other-reasons",
+     '    table_only = checks_source == "table" and not allow_table_only_checks',
+     '    table_only = checks_source == "table" and not allow_table_only_checks'
+     '\n    if allow_table_only_checks:\n        reasons = []',
+     "the table opt-in clears the verified-head and local-gate reasons already accumulated, so a "
+     "mismatched head or a failing --gates-rc merges over a green table"),
     ("vocabulary-swap-neutral-and-timed-out",
      """    "table/neutral": "NEUTRAL",
     "table/failing": "FAILURE",

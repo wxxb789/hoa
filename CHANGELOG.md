@@ -7,6 +7,24 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
 
 ### Fixed
 
+- **Round-14 review findings: the table opt-in is pinned against the head/gate blockers, and the
+  completeness guards count only executed reads.** `--allow-table-only-checks` decides only whether
+  the *table* read is authoritative; every cell that enabled it supplied a matching verified head
+  and `--gates-rc 0`, so a mutant that clears the reasons already accumulated at the `table_only = …`
+  assignment — `if allow_table_only_checks: reasons = []` — survived all 391 cells (the total then),
+  the golden call log, the 94 evidence tests and the selftest, turning a mismatched verified head or
+  a failing local gate into MERGE-OK over a green table. Two cells now drive the opt-in beside
+  `--verified-head MISMATCHED_HEAD` (BLOCKED `head mismatch, verified head missing`) and
+  `--gates-rc 1` (BLOCKED `gates unverified`), and the mutation is registered (78 -> 79 mutations,
+  46 -> 47 anchored). Separately, the two completeness guards read `cell.table_result[0]` for every
+  cell, including the ones whose structured read succeeded and whose `TABLE_UNUSED = (0, "", "")`
+  fixture was never consulted — so table-exit 0 (and its negative coverage) was supplied by cells
+  whose table never ran. Both guards now count a table exit only when the cell's read actually ends
+  on the table (`_table_consumed()`), and `guard_self_check()` runs the reviewer's reproduction —
+  replace every *consumed* table exit 0 with a pending exit-8 table — requiring both guards to name
+  the missing table exit 0. The matrix now runs 393 cells (386 verdict + 3 stream + 1 sh-trim + 3
+  boundary) over 9 declared dimensions.
+
 - **Round-13 review finding: the exit-code domain is declared once, and both read surfaces carry it.**
   The structured-exit dimension named `0, 1, 4, 8` while the table-exit one named `0, 1, 8, 2, 4,
   -15, 127` — the same `gh pr checks` domain written twice, so one copy fell behind and a category
@@ -22,7 +40,7 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   the exact verdict and tally. The completeness guard gains a **cross-surface** check
   (`cross_surface_exit_problems()`) that fails by name on a category represented on one surface but
   missing from the other, alongside the per-dimension `dimension_problems()`. Both mutations are
-  registered (76 -> 78 mutations, 44 -> 46 anchored); the matrix now runs 391 cells (384 verdict + 3
+  registered (76 -> 78 mutations, 44 -> 46 anchored); the matrix then ran 391 cells (384 verdict + 3
   stream + 1 sh-trim + 3 boundary) over 9 declared dimensions.
 
 - **Round-11 review findings: the structured read's exit code is required, and the opt-in wording is
@@ -231,7 +249,7 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   table the zero-check state, which only `--allow-no-checks` forgives). Every cell drives `main()`
   with `subprocess.run()` mocked and compares
   the **complete** verdict line plus the printed `checks:` tally, so a failing read cannot pass as a
-  pending one (`verdict: BLOCKED: checks` is a prefix of `verdict: BLOCKED: checks pending`) — 384
+  pending one (`verdict: BLOCKED: checks` is a prefix of `verdict: BLOCKED: checks pending`) — 386
   verdict cells + 3 stream cells + 1 sh-trim cell + 3 boundary cells over 9 declared dimensions, plus
   the 10-entry golden call
   log that pins every `subprocess.run()` invocation the gate issues. `dimension_problems()` asserts
@@ -242,7 +260,7 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   live output in
   `tests/gh_checks_fixtures.py` is a matrix input as well: a value gh prints that the declared
   vocabulary does not know fails the matrix instead of reaching the gate as an unknown token.
-  `tests/mutate_verdict_matrix.py` applies 78 in-memory mutations of the module — 46 anchored plus
+  `tests/mutate_verdict_matrix.py` applies 79 in-memory mutations of the module — 47 anchored plus
   two generated per declared vocabulary entry, reclassifying that token into every other
   classification — and requires each to flip at least one cell (or change the golden call log),
   naming the survivor loudly if one does not. Both run in CI. The paths the artefacts still do not
