@@ -22,7 +22,7 @@ class MeasurementTests(unittest.TestCase):
         self.assertEqual(row['body_words'], 3)
         self.assertEqual(row['h2'], 1)
         self.assertEqual(row['kind'], 'entry')
-        self.assertGreater(row['full_lines'], row['body_lines'])
+        self.assertEqual(row['full_lines'], 9)
 
     def test_backtick_and_tilde_fences_hide_pseudo_headings(self):
         row = MODULE.body_metrics(text('## Real\n```text\n## Hidden\n```\n~~~\n## Hidden too\n~~~\n   ## Real too'))
