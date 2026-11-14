@@ -3,7 +3,7 @@ name: ocr-and-documents
 description: >-
   Extract text from PDFs/scans (pymupdf, marker-pdf).
 metadata:
-  version: "0.1.60"
+  version: "0.1.61"
   areas: "work-management"
   targets: "runtime-agnostic"
   summary: "extract text from PDFs and scans with pymupdf or marker-pdf"

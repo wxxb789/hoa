@@ -3,6 +3,29 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## [0.1.61] — 2026-11-14
+
+### Added
+
+- A portable pinned-snapshot catalog measurement helper and regression tests distinguish
+  trimmed SKILL.md bodies from complete files and exclude fenced pseudoheadings. The baseline
+  split predicate selects 13 skills; sanitized evidence records input/report hashes and all findings.
+
+### Changed
+
+- Revised the catalog plan after simplify/code-review findings: withdraw the five false dead-path
+  claims and retain them as scoped positive fixtures; correct test-presence, targets, registry,
+  code-size and body-size measurements. Claims that kind is dead or runtime targets are enum drift
+  are withdrawn; the plan cites the checker code that refutes them, without removing that code.
+- Keep explicit kind/R2/R7 and role-aware routing, including the mechanism must_pick prohibition.
+  Discovery uses named shell patterns, covered-child accounting, explicit Paseo/Vitest package
+  reconciliation, tested result/skip protocols and complete fault evidence before deleting CI commands.
+- Separate universal static syntax from safe bounded CLI-help remediation and dependency-tier
+  behavior tests; preserve every split migration/refusal/install/rule-removal evidence requirement.
+  Attribute audit conclusions instead of claiming unverified independence or host automation.
+- Bumped shared skill/catalog version from 0.1.60 to 0.1.61 after integrating the machine-review PR.
+  This is a corrected implementation plan, not execution of its future refactor phases.
+
 ## [0.1.60] — 2026-11-14
 
 ### Added
