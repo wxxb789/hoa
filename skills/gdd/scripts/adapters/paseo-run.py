@@ -29,6 +29,7 @@ argv recorded, never a fabricated assistant response.
 Run artifacts include prompt.md, run.json (exact argv), state.json, lock
 (monitor pid and agent_id), events.ndjson (observed lifecycle transitions),
 stderr.log, cli.ndjson (raw command evidence), answer.md when addressable,
+answer.partial.md while a pre-delete capture awaits confirmation,
 exit.code and finalized. Claims use the existing adapter's cross-platform OS
 locks; a finalized marker is immutable and ledger rows are serialized per run.
 An existing slug is refused rather than silently reused or replaced. Unsupported
@@ -174,13 +175,15 @@ def answer_argv(state):
     return ["logs", state["agent_id"], "--filter", "assistant_message", "--tail", "1"]
 
 
-def fetch_answer(state):
+def fetch_answer(state, provisional=False):
     code, stdout, _ = cli(state, answer_argv(state))
     available = code == 0 and bool(stdout.strip()) and stdout.strip() != "No activity to display."
     state["answer_available"] = available
     state["answer_argv"] = [*state["paseo_argv"], *answer_argv(state)]
     if available:
-        text_file(state["run_dir"], "answer.md", stdout)
+        # A capture taken before the deletion is confirmed stays provisional: a
+        # draft at answer.md would let the answer command report it as final.
+        text_file(state["run_dir"], "answer.partial.md" if provisional else "answer.md", stdout)
 
 
 def publish(state):
@@ -371,20 +374,28 @@ def kill(run_dir):
         if not state.get("agent_id"):
             fail("kill: no recorded agent identity")
         settled = os.path.exists(os.path.join(run_dir, "finalized"))
+        partial = os.path.join(run_dir, "answer.partial.md")
         if not state.get("answer_available"):
             captured = dict(state)
-            fetch_answer(captured)
+            fetch_answer(captured, provisional=True)
             if not settled:
                 state = captured
-        result = json_cli(state, ["delete", state["agent_id"], "--json"])
-        # delete can exit zero even when the underlying deletion failed.
-        if (not isinstance(result, dict) or type(result.get("deletedCount")) is not int
-                or result["deletedCount"] != 1 or result.get("agentIds") != [state["agent_id"]]):
-            fail("delete did not confirm termination; agent state is not killed")
+        try:
+            result = json_cli(state, ["delete", state["agent_id"], "--json"])
+            # delete can exit zero even when the underlying deletion failed.
+            if (not isinstance(result, dict) or type(result.get("deletedCount")) is not int
+                    or result["deletedCount"] != 1 or result.get("agentIds") != [state["agent_id"]]):
+                fail("delete did not confirm termination; agent state is not killed")
+        except BaseException:
+            support.remove_quietly(partial)
+            raise
         state.update(agent_deleted=True, termination_verb="delete", terminated_at=support.now_iso())
         if settled:
+            support.remove_quietly(partial)
             publish(state)
         else:
+            if os.path.exists(partial):
+                os.replace(partial, os.path.join(run_dir, "answer.md"))
             state.update(state="killed", exit=143, answer_partial=bool(state.get("answer_available")))
             finalize(state)
         return state

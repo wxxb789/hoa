@@ -497,6 +497,22 @@ class PaseoLauncherTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(self.status()["state"], "running")
 
+    def test_failed_deletion_does_not_publish_a_provisional_answer(self):
+        self.start()
+        self.save_fixture(delete_failed=True)
+        result = self.run_adapter("kill", "stage")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((self.run_dir() / "answer.md").exists())
+        # The agent later completes while the final logs stay unavailable: the
+        # discarded pre-delete capture must not stand in as the final answer.
+        self.save_fixture(status="idle", answer="No activity to display.")
+        state = self.wait_state("done")
+        self.assertFalse(state["answer_available"])
+        answer = self.run_adapter("answer", "stage")
+        self.assertEqual(answer.returncode, 1, answer.stdout + answer.stderr)
+        self.assertIn("final assistant text unavailable", answer.stderr)
+        self.assertFalse((self.run_dir() / "answer.md").exists())
+
     def test_mismatched_deletion_receipt_records_no_termination(self):
         self.start()
         for receipt in ({"deletedCount": 0, "agentIds": [self.fixture["id"]]},
