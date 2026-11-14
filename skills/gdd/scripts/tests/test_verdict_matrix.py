@@ -20,6 +20,14 @@ The oracle is a literal, test-side declaration — never the artefact it pins:
 * the comparison is exact — the whole verdict line plus the printed `checks:` tally — so a cell
   cannot accept one classification in place of another.
 
+Every dimension the cells vary over (the read source, the structured and table exit codes, the flag
+combinations, the JSON and table shapes, the bucket and the raw state, and the fixed
+`--verified-head`/`--gates-rc` pair) is declared once as a constant list, and `dimension_problems()`
+asserts that every declared value is represented by at least one cell — and by at least one
+*negative* cell where the value has a verdict consequence — naming the missing value and dimension
+otherwise. Rounds 11 and 12 both slipped through as a value of a declared dimension (a structured
+exit code) that no cell represented; this guard turns that class of gap into a loud failure.
+
 Cells that cannot be expressed this way (the JSON shapes, the non-zero-exit fallback rules) are
 listed explicitly, each with its expected tally and its reason. `subprocess.run()` is mocked and
 every cell is driven through `main()`, so the matrix is end to end.
@@ -330,6 +338,13 @@ CELLS = [
     # payload — a passing array, and (with the opt-out) an empty one — so trusting the stdout
     # reports MERGE-OK where the real gate falls back to the table and its operator error, and the
     # fallback-table cell shows the fallback actually ran.
+    #
+    # Round-12 F1: every one of those non-zero exits is 4, which is *not* a check-result exit, so a
+    # narrower mutant — `if returncode == 0 or (returncode in (1, 8) and stdout):`, trusting a
+    # parseable stdout only at the two exits `gh pr checks` uses for CI state — survived all 382
+    # cells. The next three cells pair a structured exit **1** and **8** carrying a parseable
+    # payload with a *non-green* fallback table, so the fallback verdict (and its exact tally) is
+    # asserted and the mutant reports MERGE-OK where the real gate blocks.
     cell("json-nonzero-exit-passing-array-falls-back", (4, JSON_GREEN[1], ""),
          (4, "", "authentication failed"), False, 2, "ERROR", None, None,
          "a non-zero structured exit is not a read: the passing array on its stdout is not "
@@ -344,6 +359,18 @@ CELLS = [
          (0, GREEN_TABLE, ""), False, 1, "BLOCKED", "checks unreadable", (2, 2, 0, 0),
          "a non-zero structured exit falls back to the table even when the stdout parses: the "
          "all-green table is then table-only and may not authorise"),
+    cell("json-nonzero-check-exit-1-passing-array-falls-back", (1, JSON_GREEN[1], ""),
+         (1, MIXED_TABLE, ""), False, 1, "BLOCKED", "checks", (3, 1, 1, 1),
+         "exit 1 is a check-result exit, but a non-zero *structured* exit is still not a read: the "
+         "passing array on its stdout is not permission, and the failing fallback table decides"),
+    cell("json-nonzero-check-exit-8-passing-array-falls-back", (8, JSON_GREEN[1], ""),
+         (8, IN_FLIGHT_TABLE, ""), False, 1, "BLOCKED", "checks pending", (2, 1, 1, 0),
+         "exit 8 is a check-result exit, but a non-zero structured exit carrying a passing array "
+         "is still not the read; the pending fallback table decides"),
+    cell("json-nonzero-check-exit-8-empty-array-allow-no-checks-falls-back", (8, "[]", ""),
+         (8, IN_FLIGHT_TABLE, ""), True, 1, "BLOCKED", "checks pending", (2, 1, 1, 0),
+         "with --allow-no-checks a non-zero structured exit at a check exit carrying an empty "
+         "array is still not a zero-check read; the pending fallback table decides"),
 
     # --- table path: exit codes (invariant 6) ------------------------------
     cell("table-green-exit-0", JSON_ABSENT, (0, GREEN_TABLE, ""), False, 1, "BLOCKED",
@@ -805,6 +832,179 @@ CELLS += [
          "an unresolved review thread on page 2 is counted, so stopping after page 1 cannot "
          "report MERGE-OK with a thread still open", thread_pages=THREAD_PAGES_WITH_UNRESOLVED),
 ]
+
+
+# --- the dimensions the cells vary over, declared once ----------------------
+# Round 11's finding was "the non-zero structured-exit fixture only used exit 4"; round 12's was
+# "…and only exit 4, not 1 or 8" — the same shape a third time (an unrecognised verdict word, flag
+# combinations and table shapes before them). Each time a value of a dimension the cells vary over
+# was simply unrepresented, so a mutation only that value could catch survived an
+# exhaustive-looking matrix. So every dimension the cells vary over is declared *here*, with the
+# values the cells must represent, and `dimension_problems()` asserts — over the assembled `CELLS`
+# — that each declared value is represented by at least one cell, and that at least one cell among
+# those is *negative* (a BLOCKED or ERROR verdict) for every value that has a verdict consequence.
+# A value no cell represents fails by name and dimension, which is the failure round 11 and round
+# 12 both should have produced.
+#
+# Buckets and raw states are *generated* from `DECLARED_VOCABULARY` above and `STATE_VOCABULARY`
+# below, so a token added to the gate arrives with its own cells; the other dimensions are *grouped*
+# here — the assertion reads the assembled `CELLS` back and names whatever a declared value is
+# missing from.
+
+# Sentinels, named so a failure message can print them. They stand for "the dimension takes its
+# absent/undeclared value in this cell" as one value, so a cell that leaves the field out still
+# counts as representing it.
+JSON_ABSENT_SHAPE = "(empty stdout)"
+TABLE_UNUSED_SHAPE = "(no table)"
+STATE_ABSENT = "(state absent, null or undeclared)"
+BUCKET_UNDECLARED = "(undeclared bucket)"
+
+
+def _json_shape(result):
+    """The structural shape of one structured-read (`--json`) fixture's stdout."""
+    _returncode, stdout, _stderr = result
+    if stdout == "":
+        return JSON_ABSENT_SHAPE
+    try:
+        data = json.loads(stdout)
+    except ValueError:
+        return "unparseable"
+    if isinstance(data, list):
+        return ("list-of-objects" if all(isinstance(entry, dict) for entry in data)
+                else "list-with-non-object")
+    return "non-list"
+
+
+def _table_shape(result):
+    """The structural shape of one table fixture's stdout/stderr, header rule aside."""
+    _returncode, stdout, stderr = result
+    if stdout == "":
+        return "stderr-only" if stderr else TABLE_UNUSED_SHAPE
+    lines = [line for line in stdout.splitlines() if line.strip()]
+    header = TABLE_HEADER.rstrip("\n")
+    if all("\t" not in line for line in lines):
+        return "garbage"
+    if lines == [header]:
+        return "header-only"
+    if any("\t" not in line for line in lines):
+        return "rows-with-truncated-line"
+    if lines[0].rstrip("\n") == header:
+        return "header-plus-rows"
+    return "rows"
+
+
+def _structured_rows(cell_):
+    """The `--json` rows a cell's fixture yields, or `[]` when its stdout is not a JSON list."""
+    _returncode, stdout, _stderr = cell_.json_result
+    try:
+        data = json.loads(stdout or "[]")
+    except ValueError:
+        return []
+    return data if isinstance(data, list) else []
+
+
+def _cell_source(cell_):
+    """The surface the gate's read ends on for a cell: a structured list, or the table."""
+    returncode, stdout, _stderr = cell_.json_result
+    if returncode == 0:
+        try:
+            data = json.loads(stdout or "[]")
+        except ValueError:
+            data = None
+        if isinstance(data, list):
+            return {"structured"}
+    return {"table"}
+
+
+def _cell_buckets(cell_):
+    """The bucket tokens a cell's structured rows carry, with an undeclared sentinel."""
+    values = set()
+    for row in _structured_rows(cell_):
+        if isinstance(row, dict):
+            token = str(row.get("bucket") or "").lower()
+            values.add(token if "bucket/%s" % token in DECLARED_VOCABULARY else BUCKET_UNDECLARED)
+    return values
+
+
+def _cell_states(cell_):
+    """The raw states a cell's structured rows carry, with an absent/undeclared sentinel."""
+    values = set()
+    for row in _structured_rows(cell_):
+        if isinstance(row, dict):
+            state = row.get("state")
+            values.add(state if state in captured.STATE_VOCABULARY else STATE_ABSENT)
+    return values
+
+
+Dimension = namedtuple("Dimension", "name values negative_values extract")
+
+# The declared value lists. `values` is every value the cells must represent; `negative_values` is
+# the subset that must appear in at least one negative (BLOCKED or ERROR) cell, i.e. the values
+# whose presence has a verdict consequence — an ok bucket need only appear, it has no negative.
+DIMENSIONS = (
+    Dimension("source", ("structured", "table"), ("structured", "table"), _cell_source),
+    Dimension("structured-exit", (0, 1, 4, 8), (0, 1, 4, 8),
+              lambda cell_: {cell_.json_result[0]}),
+    Dimension("table-exit", (0, 1, 8, 2, 4, -15, 127), (0, 1, 8, 2, 4, -15, 127),
+              lambda cell_: {cell_.table_result[0]}),
+    Dimension("flags", ((False, False), (True, False), (False, True), (True, True)),
+              ((False, False), (True, False), (False, True), (True, True)),
+              lambda cell_: {(cell_.allow_no_checks, cell_.allow_table_only)}),
+    Dimension("json-shape",
+              (JSON_ABSENT_SHAPE, "unparseable", "list-of-objects", "list-with-non-object",
+               "non-list"),
+              (JSON_ABSENT_SHAPE, "unparseable", "list-of-objects", "list-with-non-object",
+               "non-list"),
+              lambda cell_: {_json_shape(cell_.json_result)}),
+    Dimension("table-shape",
+              (TABLE_UNUSED_SHAPE, "stderr-only", "garbage", "header-only",
+               "rows-with-truncated-line", "header-plus-rows", "rows"),
+              (TABLE_UNUSED_SHAPE, "stderr-only", "garbage", "header-only",
+               "rows-with-truncated-line", "header-plus-rows", "rows"),
+              lambda cell_: {_table_shape(cell_.table_result)}),
+    # The declared bucket tokens, plus the undeclared sentinel. The ok tokens (pass/skipping/
+    # neutral) never block, so only the blocking ones are required in a negative cell.
+    Dimension("bucket", tuple(sorted(vocabulary("bucket"))) + (BUCKET_UNDECLARED,),
+              ("fail", "cancel", "pending", BUCKET_UNDECLARED), _cell_buckets),
+    # Every raw state gh prints, plus the absent/undeclared sentinel — each paired with a non-green
+    # bucket somewhere, so each has a negative cell.
+    Dimension("state", tuple(captured.STATE_VOCABULARY) + (STATE_ABSENT,),
+              tuple(captured.STATE_VOCABULARY) + (STATE_ABSENT,), _cell_states),
+    # The cells never vary this: `run_cell` fixes `--verified-head HEAD --gates-rc 0`, so the only
+    # value to represent is that pair. Declared so a future dimension of the cells cannot hide here.
+    Dimension("verified-head/gates-rc", (("HEAD", "0"),), (), lambda cell_: {("HEAD", "0")}),
+)
+
+
+def dimension_problems(cells):
+    """Every declared dimension value no cell represents, or represents only positively.
+
+    A value with a verdict consequence that appears in no negative cell is as invisible as a value
+    that appears in no cell: in both cases a mutation that only that value can catch survives the
+    matrix. The failure names the value and its dimension so the gap is fixed where it belongs.
+    """
+    problems = []
+    for dimension in DIMENSIONS:
+        seen, seen_negative = set(), set()
+        for cell_ in cells:
+            values = dimension.extract(cell_)
+            if not values:
+                continue
+            seen |= values
+            if cell_.verdict != "MERGE-OK":
+                seen_negative |= values
+        for value in dimension.values:
+            if value not in seen:
+                problems.append((
+                    "dimension-%s" % dimension.name,
+                    "the value %r of the %s dimension is represented by no cell"
+                    % (value, dimension.name)))
+            elif value in dimension.negative_values and value not in seen_negative:
+                problems.append((
+                    "dimension-%s" % dimension.name,
+                    "the value %r of the %s dimension has no negative (BLOCKED or ERROR) cell"
+                    % (value, dimension.name)))
+    return problems
 
 
 # --- stream fidelity (invariant 7) ------------------------------------------
@@ -1279,15 +1479,16 @@ def call_log_problems(observed):
 def main():
     start = time.monotonic()
     problems = fixture_problems()
+    problems.extend(dimension_problems(CELLS))
     problems.extend(evaluate_with_calls(GATE))
     for cell_id, problem in problems:
         print("  FAIL  %s: %s" % (cell_id, problem))
     elapsed = time.monotonic() - start
     total = len(CELLS) + len(STREAM_CELLS) + len(SH_TRIM_CELLS) + len(BOUNDARY_CELLS)
     print("verdict-matrix: %d verdict cells + %d stream cells + %d sh cells + %d boundary cells "
-          "= %d cells, %d golden calls, %d failed, %.2fs"
+          "= %d cells, %d dimensions, %d golden calls, %d failed, %.2fs"
           % (len(CELLS), len(STREAM_CELLS), len(SH_TRIM_CELLS), len(BOUNDARY_CELLS), total,
-             len(GOLDEN_CALLS), len(problems), elapsed))
+             len(DIMENSIONS), len(GOLDEN_CALLS), len(problems), elapsed))
     return 1 if problems else 0
 
 

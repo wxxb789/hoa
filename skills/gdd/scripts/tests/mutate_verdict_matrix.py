@@ -24,7 +24,9 @@ Two catalogues make up the run:
   path, and a trimmed `gh pr view --json` field list — the last reached by no cell, so only the
   golden call log catches it), the one the round-11 finding named (the structured read's non-zero
   exit accepted whenever its stdout is non-empty, so a parseable payload beside an operator error is
-  trusted as the read), and the ones the surface implies (a tab-less line parsed as a row,
+  trusted as the read), the one the round-12 finding named (the same acceptance narrowed to the two
+  check-result exits 1 and 8 — the shape the round-11 fixtures, all at exit 4, left invisible), and
+  the ones the surface implies (a tab-less line parsed as a row,
   the header parsed as a check, the cancel and skipping bucket mappings, the zero-check opt-out
   granted unconditionally, an unordered header, a pending bucket read as failing);
 * one generated mutation per declared `CHECK_VOCABULARY` entry, reclassifying that token into every
@@ -297,6 +299,14 @@ MUTATIONS = [
      "non-zero structured read whose stdout parses (a passing array, or an empty one under "
      "--allow-no-checks) is trusted as the read instead of falling back to the table and its "
      "operator error"),
+    ("structured-read-accepts-check-exits-with-stdout",
+     "    if returncode == 0:",
+     "    if returncode == 0 or (returncode in (1, 8) and stdout):",
+     "the structured read's non-zero exit is trusted whenever its stdout parses *and* the exit is "
+     "one of the two `gh pr checks` uses for CI state (1 failing, 8 pending); every round-11 "
+     "non-zero structured fixture used exit 4, so this narrower shape survived the matrix until "
+     "round 12 added a structured exit 1 and 8 carrying a parseable payload over a non-green "
+     "fallback"),
 ]
 
 

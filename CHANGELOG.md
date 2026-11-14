@@ -15,12 +15,33 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   while the real gate fell back to the table and its operator error. Three cells now hand the
   structured read a non-zero exit *and* a parseable payload — a passing array (falling back to a table
   at exit 4 with `authentication failed`, exit 2 with the diagnostic preserved, and to an all-green
-  table, exit 1 `checks unreadable`), and, with `--allow-no-checks`, an empty array — and the mutation
-  is registered (74 -> 75 mutations, 42 -> 43 anchored), so the matrix ran 382 cells (375 verdict + 3
-  stream + 1 sh-trim + 3 boundary). Separately, the *structured-only* wording of `--allow-no-checks`
-  was wrong in Phase 6, the module docstring and this entry: alone the flag cannot authorise
-  table-only evidence, but together with `--allow-table-only-checks` the table is authoritative and an
-  empty one is accepted, so the documented boundary now matches the implemented and tested one.
+  `checks unreadable`), and, with `--allow-no-checks`, an empty array — and the mutation
+  is registered (74 -> 75 mutations, 42 -> 43 anchored), so the matrix then ran 382 cells (375
+  verdict + 3 stream + 1 sh-trim + 3 boundary). Separately, the *structured-only* wording of
+  `--allow-no-checks` was wrong in Phase 6, the module docstring and this entry: alone the flag
+  cannot authorise table-only evidence, but together with `--allow-table-only-checks` the table is
+  authoritative and an empty one is accepted, so the documented boundary now matches the implemented
+  and tested one.
+
+- **Round-12 review finding: the check-result exits are covered, and the completeness of the cell
+  dimensions is asserted.** Every round-11 non-zero structured-read fixture used exit **4** — not a
+  check-result exit — so the narrower mutant `if returncode == 0 or (returncode in (1, 8) and
+  stdout):`, trusting a parseable stdout only at the two exits `gh pr checks` uses for CI state,
+  survived all 382 cells and the golden call log. Three cells now pair a structured exit **1** and
+  **8** carrying a parseable payload (a passing array, and an empty one under `--allow-no-checks`)
+  with a **non-green** fallback table, so the fallback verdict and its exact tally are asserted —
+  BLOCKED `checks` (3/1/1/1) at exit 1, BLOCKED `checks pending` (2/1/1/0) at exit 8 — and the
+  mutation is registered (75 -> 76 mutations, 43 -> 44 anchored). The class-closing fix is
+  structural: every dimension the cells vary over — read source, structured exit code, table exit
+  code, flag combinations, JSON shape, table shape, bucket, state, and the fixed
+  `--verified-head`/`--gates-rc` pair — is declared as a constant list in the test file, and
+  `dimension_problems()` asserts over the assembled `CELLS` that each declared value is represented
+  by at least one cell — and by at least one *negative* (BLOCKED or ERROR) cell where the value has a
+  verdict consequence — naming the missing value and dimension otherwise. Rounds 11 and 12 both
+  slipped through as a value of a declared dimension (a structured exit code) that no cell
+  represented; this turns that class into a loud failure. The matrix now runs 385 cells (378 verdict
+  + 3 stream + 1 sh-trim + 3 boundary) over 9 declared dimensions.
+
 - **Round-8 review finding: the subprocess boundary pins the repository it forwards.**
   Both boundary fakes accepted `cwd` and ignored it, and every `gh` argument was the same whichever
   directory was passed, so dropping `cwd=repo` at a call site — or replacing `cwd=cwd` inside
@@ -192,12 +213,16 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   table the zero-check state, which only `--allow-no-checks` forgives). Every cell drives `main()`
   with `subprocess.run()` mocked and compares
   the **complete** verdict line plus the printed `checks:` tally, so a failing read cannot pass as a
-  pending one (`verdict: BLOCKED: checks` is a prefix of `verdict: BLOCKED: checks pending`) — 375
-  verdict cells + 3 stream cells + 1 sh-trim cell + 3 boundary cells, plus the 10-entry golden call
-  log that pins every `subprocess.run()` invocation the gate issues. The captured live output in
+  pending one (`verdict: BLOCKED: checks` is a prefix of `verdict: BLOCKED: checks pending`) — 378
+  verdict cells + 3 stream cells + 1 sh-trim cell + 3 boundary cells over 9 declared dimensions, plus
+  the 10-entry golden call
+  log that pins every `subprocess.run()` invocation the gate issues. `dimension_problems()` asserts
+  that every value of every declared dimension is represented by at least one cell — and by at least
+  one negative cell where the value has a verdict consequence — so a future dimension value cannot be
+  silently unrepresented. The captured live output in
   `tests/gh_checks_fixtures.py` is a matrix input as well: a value gh prints that the declared
   vocabulary does not know fails the matrix instead of reaching the gate as an unknown token.
-  `tests/mutate_verdict_matrix.py` applies 75 in-memory mutations of the module — 43 anchored plus
+  `tests/mutate_verdict_matrix.py` applies 76 in-memory mutations of the module — 44 anchored plus
   two generated per declared vocabulary entry, reclassifying that token into every other
   classification — and requires each to flip at least one cell (or change the golden call log),
   naming the survivor loudly if one does not. Both run in CI. The paths the artefacts still do not
