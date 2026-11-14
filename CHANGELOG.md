@@ -7,6 +7,24 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
 
 ### Fixed
 
+- **Round-13 review finding: the exit-code domain is declared once, and both read surfaces carry it.**
+  The structured-exit dimension named `0, 1, 4, 8` while the table-exit one named `0, 1, 8, 2, 4,
+  -15, 127` — the same `gh pr checks` domain written twice, so one copy fell behind and a category
+  could be represented on one surface and missing from the other. Two mutants survived the whole
+  matrix through that gap: `if returncode == 0:` read as `if returncode <= 0:` (trusting a
+  signal-terminated read, exit -15) and as `if returncode in (0, 2):` (trusting a cancelled one,
+  exit 2), each turning a structured `(-15, <passing array>, "")` / `(2, <passing array>, "")` over
+  a non-green fallback from BLOCKED `checks pending` (2/1/1/0) into MERGE-OK (1/1/0/0). The domain
+  is now declared **once** (`CHECK_RESULT_EXITS` + `OPERATOR_FAILURE_EXITS` = `EXIT_CATEGORIES`) and
+  both the `structured-exit` and `table-exit` dimensions are driven from it, so a category cannot
+  appear on one surface only; six generated cells — one per declared non-zero exit — hand the
+  structured read a parseable **passing** array beside a parsing, pending fallback table, asserting
+  the exact verdict and tally. The completeness guard gains a **cross-surface** check
+  (`cross_surface_exit_problems()`) that fails by name on a category represented on one surface but
+  missing from the other, alongside the per-dimension `dimension_problems()`. Both mutations are
+  registered (76 -> 78 mutations, 44 -> 46 anchored); the matrix now runs 391 cells (384 verdict + 3
+  stream + 1 sh-trim + 3 boundary) over 9 declared dimensions.
+
 - **Round-11 review findings: the structured read's exit code is required, and the opt-in wording is
   corrected.** Every non-zero structured-read fixture paired its exit with *empty* stdout, so the
   cells could not tell "require exit 0" from "trust any parseable stdout": `if returncode == 0:` read
@@ -39,7 +57,7 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   by at least one cell — and by at least one *negative* (BLOCKED or ERROR) cell where the value has a
   verdict consequence — naming the missing value and dimension otherwise. Rounds 11 and 12 both
   slipped through as a value of a declared dimension (a structured exit code) that no cell
-  represented; this turns that class into a loud failure. The matrix now runs 385 cells (378 verdict
+  represented; this turns that class into a loud failure. The matrix then ran 385 cells (378 verdict
   + 3 stream + 1 sh-trim + 3 boundary) over 9 declared dimensions.
 
 - **Round-8 review finding: the subprocess boundary pins the repository it forwards.**
@@ -213,16 +231,18 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   table the zero-check state, which only `--allow-no-checks` forgives). Every cell drives `main()`
   with `subprocess.run()` mocked and compares
   the **complete** verdict line plus the printed `checks:` tally, so a failing read cannot pass as a
-  pending one (`verdict: BLOCKED: checks` is a prefix of `verdict: BLOCKED: checks pending`) — 378
+  pending one (`verdict: BLOCKED: checks` is a prefix of `verdict: BLOCKED: checks pending`) — 384
   verdict cells + 3 stream cells + 1 sh-trim cell + 3 boundary cells over 9 declared dimensions, plus
   the 10-entry golden call
   log that pins every `subprocess.run()` invocation the gate issues. `dimension_problems()` asserts
   that every value of every declared dimension is represented by at least one cell — and by at least
   one negative cell where the value has a verdict consequence — so a future dimension value cannot be
-  silently unrepresented. The captured live output in
+  silently unrepresented, and `cross_surface_exit_problems()` fails on an exit category the cells
+  exercise on one read surface but not the other (round 13's gap, now a hard failure). The captured
+  live output in
   `tests/gh_checks_fixtures.py` is a matrix input as well: a value gh prints that the declared
   vocabulary does not know fails the matrix instead of reaching the gate as an unknown token.
-  `tests/mutate_verdict_matrix.py` applies 76 in-memory mutations of the module — 44 anchored plus
+  `tests/mutate_verdict_matrix.py` applies 78 in-memory mutations of the module — 46 anchored plus
   two generated per declared vocabulary entry, reclassifying that token into every other
   classification — and requires each to flip at least one cell (or change the golden call log),
   naming the survivor loudly if one does not. Both run in CI. The paths the artefacts still do not

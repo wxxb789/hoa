@@ -26,7 +26,11 @@ combinations, the JSON and table shapes, the bucket and the raw state, and the f
 asserts that every declared value is represented by at least one cell — and by at least one
 *negative* cell where the value has a verdict consequence — naming the missing value and dimension
 otherwise. Rounds 11 and 12 both slipped through as a value of a declared dimension (a structured
-exit code) that no cell represented; this guard turns that class of gap into a loud failure.
+exit code) that no cell represented; this guard turns that class of gap into a loud failure. The two
+read surfaces share one exit domain (`EXIT_CATEGORIES`), so both exit dimensions are driven from
+that single declaration and `cross_surface_exit_problems()` fails on a category represented on one
+surface but missing from the other — round 13 slipped through as exactly that asymmetry (the
+structured dimension named four exits, the table one seven).
 
 Cells that cannot be expressed this way (the JSON shapes, the non-zero-exit fallback rules) are
 listed explicitly, each with its expected tally and its reason. `subprocess.run()` is mocked and
@@ -277,6 +281,24 @@ def cell(cid, json_result, table_result, allow_no_checks, exit_code, verdict, re
                 checks, why, allow_table_only, error_contains, comment_pages, thread_pages)
 
 
+# --- the exit-code domain, declared once for both read surfaces -------------
+# `gh pr checks` uses the same exit codes whichever surface the gate reads, so the domain is
+# written down *once* here and the structured-exit and table-exit dimensions are both driven from
+# it. Declaring the two surfaces separately is what let one copy fall behind (round 13: the
+# structured dimension named four exits, the table one seven), so a category could be represented
+# on one surface and missing from the other; `cross_surface_exit_problems()` below fails by name
+# on exactly that asymmetry.
+#
+# gh's check-result exits carry CI state; every other non-zero exit is an operator/transport
+# failure (see `fetch_checks()`) that the gate must treat as no read at all:
+#   0 all concluded · 1 a check failed · 8 a check is pending
+#   2 cancellation · 4 authentication · -15 signal termination · 127 binary not found
+CHECK_RESULT_EXITS = (0, 1, 8)
+OPERATOR_FAILURE_EXITS = (2, 4, -15, 127)
+EXIT_CATEGORIES = CHECK_RESULT_EXITS + OPERATOR_FAILURE_EXITS
+NON_ZERO_EXITS = tuple(code for code in EXIT_CATEGORIES if code != 0)
+
+
 # --- the matrix -------------------------------------------------------------
 
 CELLS = [
@@ -516,6 +538,24 @@ CELLS = [
          "checks unreadable", (7, 7, 0, 0),
          "a finished live table is still a table-only read, so it may not authorise a merge"),
 ]
+
+
+# --- every exit the domain names, on the structured surface too (round-13 F1) ----------------
+# Round 13 found the structured-exit dimension declaring `0, 1, 4, 8` while the table one declared
+# `0, 1, 8, 2, 4, -15, 127` — the same domain written twice, one copy behind. Two mutants survived
+# the whole matrix through that gap: `if returncode == 0:` read as `if returncode <= 0:` (trusting
+# a signal-terminated read, exit -15) and as `if returncode in (0, 2):` (trusting a cancelled one,
+# exit 2). Each turns a structured `(<non-zero>, <passing array>, "")` over a non-green fallback
+# from BLOCKED `checks pending` (2/1/1/0) into MERGE-OK (1/1/0/0). One cell per *declared* non-zero
+# exit hands the structured read a parseable **passing** array — the payload a trusting mutant
+# would report green — beside a parsing, pending fallback table, so the fallback verdict and its
+# exact tally are asserted for every exit the domain names, not only the four the old copy listed.
+for _exit in NON_ZERO_EXITS:
+    CELLS.append(cell(
+        "json-exit-%s-passing-array-falls-back" % _exit, (_exit, JSON_GREEN[1], ""),
+        (8, IN_FLIGHT_TABLE, ""), False, 1, "BLOCKED", "checks pending", (2, 1, 1, 0),
+        "structured exit %s is not a read whatever its stdout parses: the non-zero exit falls "
+        "back to the table, whose pending row blocks" % _exit))
 
 
 # --- a non-check-result exit is an operator error, not CI data (round-7 F1) --
@@ -943,9 +983,11 @@ Dimension = namedtuple("Dimension", "name values negative_values extract")
 # whose presence has a verdict consequence — an ok bucket need only appear, it has no negative.
 DIMENSIONS = (
     Dimension("source", ("structured", "table"), ("structured", "table"), _cell_source),
-    Dimension("structured-exit", (0, 1, 4, 8), (0, 1, 4, 8),
+    # Both read surfaces carry the same exit domain, so both dimensions are driven from the single
+    # `EXIT_CATEGORIES` declared above — a category cannot be represented on one surface only.
+    Dimension("structured-exit", EXIT_CATEGORIES, EXIT_CATEGORIES,
               lambda cell_: {cell_.json_result[0]}),
-    Dimension("table-exit", (0, 1, 8, 2, 4, -15, 127), (0, 1, 8, 2, 4, -15, 127),
+    Dimension("table-exit", EXIT_CATEGORIES, EXIT_CATEGORIES,
               lambda cell_: {cell_.table_result[0]}),
     Dimension("flags", ((False, False), (True, False), (False, True), (True, True)),
               ((False, False), (True, False), (False, True), (True, True)),
@@ -1004,6 +1046,36 @@ def dimension_problems(cells):
                     "dimension-%s" % dimension.name,
                     "the value %r of the %s dimension has no negative (BLOCKED or ERROR) cell"
                     % (value, dimension.name)))
+    return problems
+
+
+def cross_surface_exit_problems(cells):
+    """Exit categories represented on only one of the two read surfaces.
+
+    Both surfaces read the same `gh pr checks` exit domain (`EXIT_CATEGORIES`), so a category the
+    cells exercise on one surface and never on the other is the round-13 gap: a mutation that
+    special-cases that exit on the *unrepresented* surface has nothing to flip, and the
+    per-dimension assertion above only sees the surface it is asked about. This check is across the
+    two dimensions, naming the category and the surface that is missing it.
+    """
+    problems = []
+    seen = {"structured-exit": set(), "table-exit": set()}
+    for cell_ in cells:
+        seen["structured-exit"].add(cell_.json_result[0])
+        seen["table-exit"].add(cell_.table_result[0])
+    for code in EXIT_CATEGORIES:
+        missing = sorted(surface for surface, values in seen.items() if code not in values)
+        if not missing:
+            continue
+        if len(missing) == 2:
+            problems.append((
+                "cross-surface-exit",
+                "the exit category %r is represented by no cell on either read surface" % (code,)))
+        else:
+            problems.append((
+                "cross-surface-exit",
+                "the exit category %r is represented on one read surface but missing from the %s "
+                "surface" % (code, missing[0])))
     return problems
 
 
@@ -1480,6 +1552,7 @@ def main():
     start = time.monotonic()
     problems = fixture_problems()
     problems.extend(dimension_problems(CELLS))
+    problems.extend(cross_surface_exit_problems(CELLS))
     problems.extend(evaluate_with_calls(GATE))
     for cell_id, problem in problems:
         print("  FAIL  %s: %s" % (cell_id, problem))

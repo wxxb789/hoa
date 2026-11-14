@@ -307,6 +307,18 @@ MUTATIONS = [
      "non-zero structured fixture used exit 4, so this narrower shape survived the matrix until "
      "round 12 added a structured exit 1 and 8 carrying a parseable payload over a non-green "
      "fallback"),
+    ("structured-read-accepts-signal-exit",
+     "    if returncode == 0:",
+     "    if returncode <= 0:",
+     "the structured read trusts any exit at or below zero, so a signal-terminated read (exit -15) "
+     "whose stdout parses is taken as the read instead of falling back to the table; the old "
+     "structured-exit dimension named no negative exit, so nothing flipped"),
+    ("structured-read-accepts-cancellation",
+     "    if returncode == 0:",
+     "    if returncode in (0, 2):",
+     "the structured read trusts exit 2 (gh's cancellation), so a cancelled read whose stdout "
+     "parses is taken as the read instead of falling back to the table; the old structured-exit "
+     "dimension named no exit 2, so nothing flipped"),
 ]
 
 
