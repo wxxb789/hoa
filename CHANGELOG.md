@@ -3,6 +3,35 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## [0.1.59] — 2026-11-14
+
+### Added
+
+- An opt-in native Paseo launcher, `skills/gdd/scripts/adapters/paseo-run.py`, implements the GDD
+  launcher contract with daemon-backed agents and a detached artifact monitor. Runs retain
+  `backend: paseo`, `session_id` / `agent_id`, polled state, and answer artifacts. Missing state or
+  agents, an unreachable daemon, and unknown daemon states never count as success.
+- Optional `paseo-plugins/gdd-run-observer` source with clean-checkout install/test instructions,
+  trust boundaries, disable/removal instructions, and an HOA integration guide. The read-only
+  observer is not a launcher and is never auto-installed.
+
+### Changed
+
+- Documented explicit transport selection through `GDD_LAUNCHER`: bundled `omp-run.py` remains the
+  default; `paseo-run.py` requires a reachable daemon, with no reachability-driven substitution.
+  Native provider/thinking overrides leave daemon defaults intact when unset. CLI 0.15.4 answer
+  retrieval uses `paseo logs <id> --filter assistant_message --tail 1`, deliberately without
+  `--json` because logs returns rendered text, rather than inventing an inspect answer field.
+- Added deterministic JSON-argv `PASEO_BIN` configuration for Windows multiline prompts; batch
+  shims refuse unsafe prompts instead of truncating them. Native dispatch scrubs verified ambient
+  caller/workspace identity variables so the explicit stage cwd controls placement.
+- Native `kill` requires a confirmed hard-delete receipt, not a turn interrupt. It preserves
+  cached answer text and appends deletion evidence without changing finalized outcomes.
+- Recorded Windows/WSL aggregate verification (77 tests each) and a corrected Windows native
+  multiline daemon smoke, separate from inherited headless evidence. Documented WSL tmux's
+  native-filesystem temp-directory requirement after DrvFS rejected unsafe permissions.
+- Bumped the shared skill/catalog version from `0.1.58` to `0.1.59`.
+
 ## 2026-11-14 — the X engine's default names a model the proxy still serves
 
 An `x` search that passed no `--model` died with `HTTP 400 … the selected model could not
