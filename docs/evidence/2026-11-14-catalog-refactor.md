@@ -146,7 +146,7 @@ branch, so the durable form of that evidence is the detector each fault has here
 |---|---|
 | syntax error | `EndToEndTests.test_every_suite_settles_and_the_run_goes_red_for_the_broken_ones`: the injected `test_syntax.py` settles FAIL while every other suite reaches a terminal state |
 | failing assertion | the same test: `test_fail.py` settles FAIL, exit 1 |
-| hang | the same test, plus `test_timeout_tears_down_the_whole_process_group`: TIMEOUT and no process of the killed group survives |
+| hang | the same test, plus three teardown detectors: `test_timeout_tears_down_the_whole_process_group` (TIMEOUT and no process of the killed group survives), `test_timeout_escalates_while_a_group_member_ignores_sigterm` (the escalation outlives a leader that exits on SIGTERM, and the record says so) and `test_timeout_stops_detached_workers_before_the_scratch_goes` (a `start_new_session` worker is stopped before the records it polls are deleted) |
 | missing runtime | the same test: `canned:missing-runtime` settles ERROR (environment), never FAIL |
 | empty discovery set | `DiscoveryTests.test_empty_discovery_is_a_plan_error`, `test_unmet_floor_is_a_plan_error` and `EndToEndTests.test_an_untrustworthy_plan_exits_two_and_says_so` (exit 2, both problems named) |
-| zero-test unittest and zero-count custom adapters (separately required) | `SettleTests.test_unittest_suite_with_zero_collected_tests_is_error`, `test_counter_suite_with_zero_checks_is_error`, and the same end-to-end test's `test_zero.py` / `canned:empty-counter` |
+| zero-test unittest and zero-count custom adapters (separately required) | `SettleTests.test_unittest_suite_with_zero_collected_tests_is_error`, `test_unittest_suite_that_skips_every_test_is_error`, `test_counter_suite_with_zero_checks_is_error`, `test_covered_unittest_child_that_skips_every_test_is_error`, and the same end-to-end test's `test_zero.py`, `test_skipped.py` and `canned:empty-counter` |

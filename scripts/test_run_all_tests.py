@@ -15,6 +15,7 @@ import os
 import re
 import shutil
 import signal
+import subprocess
 import sys
 import tempfile
 import time
@@ -82,6 +83,88 @@ with open(os.environ["DUMP_FILE"], "w", encoding="utf-8") as handle:
     json.dump(dict(os.environ), handle)
 '''
 
+# A unittest module whose only test is skipped: unittest still prints `Ran 1 test` and exits 0,
+# so collection is positive while nothing executed.
+SKIP_SUITE = '''import unittest
+
+
+class Skipped(unittest.TestCase):
+    @unittest.skip("optional capability absent on this host")
+    def test_runs_nowhere(self):
+        self.fail("a skipped check must never execute")
+
+
+if __name__ == "__main__":
+    unittest.main()
+'''
+
+# The leader exits on SIGTERM, and the child it leaves behind ignores SIGTERM while holding nothing
+# the runner could sweep (empty environment, cwd `/`) — only group liveness can stop it.  The pid
+# file is written after the child reports readiness so SIGTERM cannot arrive before its handler is
+# installed, which would make the fixture discriminate nothing.
+STUBBORN_SUITE = '''import os
+import signal
+import subprocess
+import sys
+import time
+
+child = subprocess.Popen([sys.executable, os.environ["CHILD_FILE"], os.environ["READY"]],
+                         env={"READY": os.environ["READY"]}, cwd="/")
+while not os.path.exists(os.environ["READY"]):
+    time.sleep(0.01)
+with open(os.environ["PID_FILE"], "w", encoding="utf-8") as handle:
+    handle.write(f"{os.getpid()} {child.pid}\\n")
+signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+while True:
+    time.sleep(1)
+'''
+
+STUBBORN_CHILD = '''import os
+import signal
+import sys
+import time
+
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+open(sys.argv[1], "w", encoding="utf-8").close()
+while True:
+    time.sleep(1)
+'''
+
+# A worker that left the suite's process group (`start_new_session`, the way both launcher adapters
+# start theirs) and polls the suite's task-local scratch.  It records `beat.gone` if that tree
+# disappears while it is alive, and counts its heartbeats so a stopped worker is distinguishable
+# from a silent one.
+DETACHED_WORKER = '''import os
+import sys
+import time
+
+sentinel, beat = sys.argv[1], sys.argv[2]
+count = 0
+while True:
+    count += 1
+    with open(beat, "w", encoding="utf-8") as handle:
+        handle.write(str(count))
+    if not os.path.exists(sentinel):
+        with open(beat + ".gone", "w", encoding="utf-8") as handle:
+            handle.write("scratch-gone")
+        break
+    time.sleep(0.05)
+'''
+
+DETACHED_SUITE = '''import os
+import subprocess
+import sys
+import time
+
+sentinel = os.path.join(os.environ["TMPDIR"], "sentinel")
+open(sentinel, "w", encoding="utf-8").close()
+child = subprocess.Popen([sys.executable, os.environ["WORKER_FILE"], sentinel, os.environ["BEAT"]],
+                         start_new_session=True)
+with open(os.environ["PID_FILE"], "w", encoding="utf-8") as handle:
+    handle.write(f"{child.pid}\\n")
+time.sleep(120)
+'''
+
 
 def synthetic_tree(patterns: list[str], prune: list[str], floor: list[str], suites: str) -> Path:
     """Create a throwaway root with a manifest and return it."""
@@ -123,6 +206,24 @@ def write_suite(root: Path, relative: str, body: str) -> str:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(body, encoding="utf-8")
     return relative
+
+
+def process_running(pid: int) -> bool:
+    """Whether `pid` is still a *running* process, answered from `/proc` where there is one.
+
+    A zombie is not running: it is terminated, and the runner is not necessarily its parent.  The
+    runner reads liveness the same way (`_proc_state`), so a test that stopped a process the way the
+    runner reports it must agree with the runner's own rule.  Without `/proc` the probe is
+    `kill(pid, 0)`, which cannot tell a zombie from a live process.
+    """
+    if runner.PROC_ROOT.is_dir():
+        state = runner._proc_state(pid)
+        return state is not None and state != "Z"
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
 
 
 SHIM_TOOL_FIXTURE = '''import json
@@ -212,6 +313,33 @@ class SuiteEnvironmentTests(unittest.TestCase):
     def test_the_pinned_shim_state_is_exactly_two_named_directories(self):
         """What may reach every suite as operator state is pinned by name, not by count."""
         self.assertEqual(set(runner.SHIM_STATE_DEFAULTS), {"MISE_STATE_DIR", "MISE_DATA_DIR"})
+
+    @unittest.skipIf(os.name != "posix", "a POSIX virtual environment's interpreter is a symlink")
+    def test_a_virtual_environment_keeps_its_identity_on_path(self):
+        """PATH pins the interpreter that was selected, not the base one its symlink points at.
+
+        A POSIX virtual environment is `<venv>/bin/python3 -> <base>/python3` beside `pyvenv.cfg`,
+        and the interpreter decides it is inside that environment from the path it was started
+        with.  Resolving the symlink therefore hands a suite's own `python3` — and any
+        `#!/usr/bin/env python3` shebang — the base interpreter, silently discarding the
+        environment the repository dependencies are installed in (§4.3).
+        """
+        venv = ARTIFACTS / "venv"
+        created = subprocess.run([sys.executable, "-m", "venv", "--without-pip", str(venv)],
+                                 capture_output=True, text=True)
+        if created.returncode != 0:
+            self.skipTest(f"cannot create a virtual environment here: {created.stderr.strip()}")
+        python = venv / "bin" / "python3"
+        self.assertTrue(python.is_symlink(), f"{python} is not the symlinked shape this pins")
+        self.assertNotEqual(str(python.parent), os.path.dirname(os.path.realpath(python)),
+                            "the fixture does not exercise symlink resolution")
+        environment = runner.base_environment(self.document, str(python))
+        self.assertEqual(environment["PATH"].split(os.pathsep)[0], str(venv / "bin"))
+        found = shutil.which("python3", path=environment["PATH"])
+        self.assertEqual(found, str(python))
+        probe = subprocess.run([found, "-c", "import sys; print(sys.prefix)"],
+                               capture_output=True, text=True, env=environment)
+        self.assertEqual(probe.stdout.strip(), str(venv), probe.stderr)
 
     def test_a_shim_style_tool_finds_its_state_under_a_task_local_home(self):
         """End to end: the suite process runs the shim, not the operator's HOME."""
@@ -477,7 +605,10 @@ class RealTreePlanTests(unittest.TestCase):
         self.assertEqual(suite.commands, ((sys.executable, "-B", "scripts/test_version.py"),))
         self.assertEqual(suite.cwd, ROOT)
         environment = runner.base_environment(self.document, sys.executable)
-        self.assertTrue(environment["PATH"].startswith(str(Path(sys.executable).resolve().parent)))
+        # The interpreter's own directory, never the directory its symlink resolves to: what that
+        # costs is measured in `SuiteEnvironmentTests` against a real virtual environment.
+        prefix = Path(environment["PATH"].split(os.pathsep)[0])
+        self.assertEqual(prefix, Path(sys.executable).absolute().parent)
 
     def test_shell_suites_run_under_bash(self):
         suite = next(item for item in self.plan.scheduled
@@ -495,6 +626,23 @@ class RealTreePlanTests(unittest.TestCase):
             suite = next(item for item in self.plan.scheduled + self.plan.covered if item.id == path)
             self.assertEqual(suite.assertion, "counter")
             self.assertTrue(suite.count_regexes[0].startswith(marker), suite.count_regexes)
+
+    def test_python_launcher_suites_declare_their_detached_workers(self):
+        """Both launcher suites name the resource their own teardown stops (§4 item 4).
+
+        The runner sweeps a timed-out suite's scratch whatever the declaration says (the suite that
+        lost its cleanup callbacks is exactly the one that cannot clean up), so the declaration is
+        what keeps the resource, its mechanism and its owning teardown visible in the manifest.
+        """
+        for path, adapter, teardown in (
+            ("skills/gdd/scripts/tests/test_omp_run_python.py", "omp-run.py", "kill_hard"),
+            ("skills/gdd/scripts/tests/test_paseo_run_python.py", "paseo-run.py", "stop_monitors"),
+        ):
+            suite = next(item for item in self.plan.scheduled if item.id == path)
+            declaration = suite.detached or ""
+            self.assertIn(adapter, declaration, path)
+            self.assertIn("start_new_session", declaration, path)
+            self.assertIn(teardown, declaration, path)
 
     def test_pull_request_gates_skip_outside_a_pull_request(self):
         skipped = {suite.id: suite for suite in self.plan.skipped}
@@ -554,6 +702,15 @@ class SettleTests(unittest.TestCase):
             self.suite(assertion="unittest"), exit_code=0, timed_out=False,
             output="Ran 4 tests in 0.002s\n\nOK (skipped=1)\n")
         self.assertEqual((state, counts), ("PASS", {"executed": 4, "skipped": 1}))
+
+    def test_unittest_suite_that_skips_every_test_is_error(self):
+        """`Ran N tests` is collection, not execution: an all-skipped run executed nothing."""
+        state, counts, reason = runner.settle(
+            self.suite(assertion="unittest"), exit_code=0, timed_out=False,
+            output="Ran 2 tests in 0.002s\n\nOK (skipped=2)\n")
+        self.assertEqual(state, "ERROR")
+        self.assertEqual(counts, {"executed": 2, "skipped": 2})
+        self.assertIn("all skipped", reason)
 
     def test_counter_suite_with_zero_checks_is_error(self):
         suite = self.suite(assertion="counter", count_regexes=(r"^x: (?P<passed>\d+)/(?P<total>\d+) ok$",))
@@ -622,6 +779,12 @@ class SettleTests(unittest.TestCase):
                                      assertion="unittest", patterns=())
         self.assertEqual((outcome.state, outcome.counts), ("PASS", {"executed": 4}))
 
+    def test_covered_unittest_child_that_skips_every_test_is_error(self):
+        outcome = self.covered_child("Ran 2 tests in 0.002s\n\nOK (skipped=2)\n",
+                                     assertion="unittest", patterns=())
+        self.assertEqual(outcome.state, "ERROR")
+        self.assertIn("all skipped", outcome.reason)
+
     def test_covered_child_of_a_skipped_or_failed_parent_is_never_pass(self):
         skipped = self.covered_child("", parent_state="SKIP")
         self.assertEqual(skipped.state, "SKIP")
@@ -639,6 +802,21 @@ class SettleTests(unittest.TestCase):
                          "ERROR")
         self.assertEqual(runner.settle(self.suite(), exit_code=0, timed_out=False, output="",
                                        provisioned=False)[0], "ERROR")
+
+    def test_timeout_reason_reports_the_teardown_it_observed(self):
+        """The record says what teardown established, not what it hoped for."""
+        suite = self.suite()
+        clean = runner.settle(suite, exit_code=0, timed_out=True, output="",
+                              teardown=runner.Teardown())
+        self.assertEqual(clean[0], "TIMEOUT")
+        self.assertIn("detached processes terminated", clean[2])
+        survivor = runner.settle(suite, exit_code=0, timed_out=True, output="",
+                                 teardown=runner.Teardown(survivors=(4242,)))
+        self.assertIn("4242", survivor[2])
+        self.assertIn("survived SIGKILL", survivor[2])
+        unverified = runner.settle(suite, exit_code=0, timed_out=True, output="",
+                                   teardown=runner.Teardown(verified=False))
+        self.assertIn("unverified", unverified[2])
 
 
 class EndToEndTests(unittest.TestCase):
@@ -699,6 +877,7 @@ class EndToEndTests(unittest.TestCase):
         write_suite(root, "scripts/test_pass.py", PASS_SUITE)
         write_suite(root, "scripts/test_fail.py", FAIL_SUITE)
         write_suite(root, "scripts/test_zero.py", ZERO_TEST_SUITE)
+        write_suite(root, "scripts/test_skipped.py", SKIP_SUITE)
         write_suite(root, "scripts/test_syntax.py", "def broken(:\n    pass\n")
         write_suite(root, "scripts/test_env.py", ENV_SUITE)
         write_suite(root, "scripts/test_hang.py", HANG_SUITE)
@@ -726,6 +905,8 @@ class EndToEndTests(unittest.TestCase):
         self.assertEqual(states["scripts/test_syntax.py"]["state"], "FAIL")
         self.assertEqual(states["scripts/test_zero.py"]["state"], "ERROR")
         self.assertIn("Ran 0 tests", states["scripts/test_zero.py"]["reason"])
+        self.assertEqual(states["scripts/test_skipped.py"]["state"], "ERROR")
+        self.assertIn("all skipped", states["scripts/test_skipped.py"]["reason"])
         self.assertEqual(states["canned:missing-runtime"]["state"], "ERROR")
         self.assertEqual(states["canned:empty-counter"]["state"], "ERROR")
         self.assertEqual(states["scripts/test_hang.py"]["state"], "TIMEOUT")
@@ -843,7 +1024,8 @@ class EndToEndTests(unittest.TestCase):
         self.assertEqual(dump["PYTHONDONTWRITEBYTECODE"], "1")
         self.assertNotIn("GDD_LAUNCHER", dump)
         self.assertNotIn("OMP_RUN_ROOT", dump)
-        self.assertTrue(dump["PATH"].startswith(str(Path(sys.executable).resolve().parent)))
+        self.assertEqual(Path(dump["PATH"].split(os.pathsep)[0]),
+                         Path(sys.executable).absolute().parent)
 
     def test_default_scratch_lives_outside_the_checkout(self):
         scratch = runner.scratch_root_for()
@@ -964,6 +1146,92 @@ class EndToEndTests(unittest.TestCase):
                     with contextlib.suppress(ProcessLookupError):
                         os.kill(leftover, signal.SIGKILL)
                 self.fail(f"pid {pid} survived the suite timeout")
+
+    def assert_stopped(self, pids: list[int], message: str) -> None:
+        """Every pid stops running inside the grace window, or the failure names the survivor."""
+        deadline = time.monotonic() + 10
+        for pid in pids:
+            while time.monotonic() < deadline:
+                if not process_running(pid):
+                    break
+                time.sleep(0.1)
+            else:
+                for leftover in pids:
+                    with contextlib.suppress(ProcessLookupError):
+                        os.kill(leftover, signal.SIGKILL)
+                self.fail(f"{message}: pid {pid} is still running")
+
+    def test_timeout_escalates_while_a_group_member_ignores_sigterm(self):
+        """Escalation follows the group: the leader exiting on SIGTERM must not end it.
+
+        The leader here exits cleanly on SIGTERM while the child it leaves in the *same* group
+        ignores it, and that child holds nothing a scratch sweep could match (empty environment,
+        cwd `/`), so only group liveness can stop it.  The old leader-based loop broke out of its
+        escalation as soon as `process.wait()` returned and left this child running.
+        """
+        write_suite(ARTIFACTS, "stubborn-child.py", STUBBORN_CHILD)
+        root = synthetic_tree(patterns=["scripts/test_*.py"], prune=[], floor=[],
+                              suites="\n".join([
+                                  "[[suite]]",
+                                  'path = "scripts/test_stubborn.py"',
+                                  f'env = {{ PID_FILE = "{ARTIFACTS / "stubborn-pids.txt"}", '
+                                  f'READY = "{ARTIFACTS / "stubborn-ready"}", '
+                                  f'CHILD_FILE = "{ARTIFACTS / "stubborn-child.py"}" }}',
+                                  "",
+                              ]))
+        write_suite(root, "scripts/test_stubborn.py", STUBBORN_SUITE)
+        code, output, payload = self.run_main(root, "--timeout", "3")
+        entry = self.states(payload)["scripts/test_stubborn.py"]
+        self.assertEqual(entry["state"], "TIMEOUT", output)
+        self.assertEqual(code, 1)
+        self.assertEqual(entry["exit_code"], 0, "the fixture leader did not exit on SIGTERM")
+        self.assertIn("detached processes terminated", entry["reason"])
+        pids = [int(value) for value in (ARTIFACTS / "stubborn-pids.txt").read_text().split()]
+        self.assertEqual(len(pids), 2)
+        self.assert_stopped(pids, "the SIGTERM-resistant group member")
+        log = Path(entry["log"]).read_text(encoding="utf-8")
+        self.assertIn("teardown: SIGTERM", log)
+        self.assertIn("teardown: SIGKILL", log, "the escalation never reached SIGKILL")
+        self.assertEqual([item.name for item in self.scratch.iterdir()], [],
+                         "the per-suite scratch tree was not cleaned up")
+
+    def test_timeout_stops_detached_workers_before_the_scratch_goes(self):
+        """A worker that left the suite's group is stopped before the records it polls are deleted.
+
+        The fixture worker does what both launcher adapters do — `start_new_session`, then poll the
+        suite's task-local scratch — and records `beat.gone` if that tree disappears while it is
+        alive, which is what a naive `rmtree` after a timed-out suite leaves behind.
+        """
+        write_suite(ARTIFACTS, "detached-worker.py", DETACHED_WORKER)
+        beat = ARTIFACTS / "beat"
+        root = synthetic_tree(patterns=["scripts/test_*.py"], prune=[], floor=[],
+                              suites="\n".join([
+                                  "[[suite]]",
+                                  'path = "scripts/test_detached.py"',
+                                  f'env = {{ PID_FILE = "{ARTIFACTS / "detached-pids.txt"}", '
+                                  f'BEAT = "{beat}", '
+                                  f'WORKER_FILE = "{ARTIFACTS / "detached-worker.py"}" }}',
+                                  "",
+                              ]))
+        write_suite(root, "scripts/test_detached.py", DETACHED_SUITE)
+        code, output, payload = self.run_main(root, "--timeout", "5")
+        entry = self.states(payload)["scripts/test_detached.py"]
+        self.assertEqual(entry["state"], "TIMEOUT", output)
+        self.assertEqual(code, 1)
+        pids = [int(value) for value in (ARTIFACTS / "detached-pids.txt").read_text().split()]
+        self.assertEqual(len(pids), 1)
+        self.assert_stopped(pids, "the detached worker")
+        self.assertGreaterEqual(int(beat.read_text(encoding="utf-8")), 1,
+                                "the worker never wrote a heartbeat")
+        self.assertFalse((ARTIFACTS / "beat.gone").exists(),
+                         "the scratch tree was deleted while the worker still polled it")
+        beats = int(beat.read_text(encoding="utf-8"))
+        time.sleep(0.5)
+        self.assertEqual(int(beat.read_text(encoding="utf-8")), beats,
+                         "the worker kept polling after the run")
+        self.assertIn("teardown: SIGTERM", Path(entry["log"]).read_text(encoding="utf-8"))
+        self.assertEqual([item.name for item in self.scratch.iterdir()], [],
+                         "the per-suite scratch tree was not cleaned up")
 
 
 if __name__ == "__main__":

@@ -21,16 +21,19 @@ Every suite settles as PASS, FAIL, ERROR, TIMEOUT or SKIP (see `settle`), and th
 Each suite runs in its own process and process group, with a task-local TMPDIR/HOME/XDG root under a
 short `/tmp` directory of its own whenever `/tmp` can hold one — an inherited operator `TMPDIR` is
 consulted only where it cannot, through `tempfile`'s own chain; the default location is outside the
-checkout and `--scratch` names its own (`scratch_root_for`) — a per-suite timeout, and process-group
-teardown on timeout.  A scratch tree
+checkout and `--scratch` names its own (`scratch_root_for`) — a per-suite timeout, and a teardown
+that follows the process *group* rather than its leader (a leader that exits on SIGTERM must not end
+the escalation) and then sweeps every process still holding the suite's task-local scratch — a
+detached `start_new_session` worker — before that scratch is deleted.  A scratch tree
 too long to hold the toolkit's AF_UNIX socket — given the deepest `socket_tail` the scheduled suites
 declare in the manifest — is reported as that suite's ERROR before it runs (`socket_path_length`).
 Per-suite logs stay under `.tmp-artifacts/test-runs/<UTC stamp>-<pid>/logs/`, and the JSON result
 record is `result.json` in that same run directory (`--report` writes it elsewhere).  Suite processes also keep the shim
 toolchain's absolute state directories (`shim_state_environment`), because a task-local HOME otherwise
 makes a mise shim on PATH refuse to run.  A required suite that executed zero
-checks is never PASS: unittest suites must collect at least one test, and suites with a declared
-count adapter must report a positive executed-check count.
+checks is never PASS: a unittest suite must collect *and execute* at least one test (an all-skipped
+summary is ERROR), and a suite with a declared count adapter must report a positive executed-check
+count.
 """
 from __future__ import annotations
 
@@ -47,6 +50,7 @@ import sys
 import tempfile
 import time
 import tomllib
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -55,6 +59,10 @@ MANIFEST_RELATIVE = Path("scripts") / "test_manifest.toml"
 DEFAULT_TIMEOUT = 120.0
 LOG_TAIL_BYTES = 128 * 1024
 KILL_GRACE_SECONDS = 10.0
+TEARDOWN_POLL_SECONDS = 0.1
+# `/proc` is how teardown sees what a suite left behind: a detached worker
+# (`start_new_session`) leaves the suite's process group, so the group cannot show it.
+PROC_ROOT = Path("/proc")
 TERMINAL_STATES = ("PASS", "FAIL", "ERROR", "TIMEOUT", "SKIP")
 FAILING_STATES = ("FAIL", "ERROR", "TIMEOUT")
 RUNTIMES = ("python", "bash", "bun", "npm")
@@ -579,13 +587,18 @@ def base_environment(document: dict, python: str) -> dict[str, str]:
 
     Only the manifest's allowlist is kept: an operator's GDD_*, OMP_*, PASEO_* or
     profile variables must not reach a suite.  PATH gets the running interpreter's
-    directory prepended, so a suite's own `python3` is the interpreter that carries
-    the repository dependencies, and the shim toolchain's state directories are pinned
-    by absolute path (`shim_state_environment`) so a task-local HOME cannot move them.
+    directory — as selected, symlink and all — prepended, so a suite's own `python3` is
+    the interpreter that carries the repository dependencies, and the shim toolchain's
+    state directories are pinned by absolute path (`shim_state_environment`) so a
+    task-local HOME cannot move them.
     """
     allowed = list((document.get("env") or {}).get("passthrough") or ["PATH"])
     environment = {name: os.environ[name] for name in allowed if name in os.environ}
-    interpreter_dir = str(Path(python).resolve().parent)
+    # Lexical on purpose: `Path(python).resolve()` would follow a POSIX virtual environment's
+    # `bin/python3` symlink to the base interpreter and prepend *that* directory instead, so a
+    # suite's own `python3`, `env python3` shebang and PATH lookup would stop using the
+    # environment that carries the repository dependencies (§4.3).
+    interpreter_dir = os.path.dirname(os.path.abspath(python))
     existing = environment.get("PATH", "")
     environment["PATH"] = os.pathsep.join(
         part for part in (interpreter_dir, existing) if part
@@ -690,9 +703,155 @@ def _write_report(report_path: Path | None, payload: dict) -> None:
     report_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+@dataclass(frozen=True)
+class Teardown:
+    """What a timeout did and did not stop.
+
+    `survivors` are the pids still running after SIGKILL; `verified` is False where this platform
+    cannot enumerate processes at all, so the record reports that limit instead of claiming a
+    teardown nothing observed.
+    """
+
+    survivors: tuple[int, ...] = ()
+    verified: bool = True
+
+    def merge(self, other: "Teardown") -> "Teardown":
+        return Teardown(
+            survivors=tuple(sorted(set(self.survivors) | set(other.survivors))),
+            verified=self.verified and other.verified,
+        )
+
+    def describe(self) -> str:
+        """One clause naming what the teardown could establish, for the suite's record."""
+        if not self.verified:
+            return ("signalled, but this platform cannot enumerate processes, so teardown "
+                    "is unverified")
+        if self.survivors:
+            return ("teardown incomplete: pids " + ", ".join(str(pid) for pid in self.survivors)
+                    + " survived SIGKILL")
+        return "process group and detached processes terminated"
+
+
+def _proc_state(pid: int) -> str | None:
+    """The state letter of `pid` (`Z` for a zombie), or None when it is gone or unreadable."""
+    try:
+        with open(PROC_ROOT / str(pid) / "stat", "rb") as handle:
+            fields = handle.read().rsplit(b") ", 1)[-1].split()
+    except OSError:
+        return None
+    return fields[0].decode() if fields else None
+
+
+def _proc_pids() -> list[int] | None:
+    """Pids this platform can still see, or None when it cannot enumerate them.
+
+    Zombies are left out: a zombie is terminated, holds no scratch and cannot be signalled again —
+    only its parent's `wait` is outstanding, and that parent may not be the runner.
+    """
+    if not PROC_ROOT.is_dir():
+        return None
+    try:
+        names = os.listdir(PROC_ROOT)
+    except OSError:
+        return None
+    return [int(name) for name in names
+            if name.isdigit() and _proc_state(int(name)) not in (None, "Z")]
+
+
+def _group_members(group: int) -> list[int] | None:
+    """Live pids still in process group `group`, or None where nothing can be enumerated.
+
+    Group liveness is asked independently of the leader on purpose: `process.wait()` returning
+    says the leader exited, not that its group is empty.
+    """
+    pids = _proc_pids()
+    if pids is None:
+        return None
+    members: list[int] = []
+    for pid in pids:
+        with contextlib.suppress(ProcessLookupError, PermissionError):
+            if os.getpgid(pid) == group:
+                members.append(pid)
+    return members
+
+
+def _refers_to_scratch(pid: int, needle: bytes) -> bool:
+    for field in ("cwd", "environ"):
+        with contextlib.suppress(OSError):
+            if needle in (PROC_ROOT / str(pid) / field).read_bytes():
+                return True
+    return False
+
+
+def _scratch_processes(scratch: Path) -> list[int] | None:
+    """Live pids, other than the runner itself, that still point into `scratch`.
+
+    A detached worker (`start_new_session`) leaves the suite's process group, so no group signal can
+    reach it; it does keep the task-local paths it inherited, and that is what identifies it from
+    outside — the cwd it was started in, or the HOME/TMPDIR/XDG root the suite's environment put in
+    its environment.  None where nothing can be enumerated.
+    """
+    pids = _proc_pids()
+    if pids is None:
+        return None
+    needle = os.fsencode(str(scratch))
+    own = os.getpid()
+    return [pid for pid in pids if pid != own and _refers_to_scratch(pid, needle)]
+
+
+def _wait_until_gone(match: Callable[[], list[int] | None], deadline: float) -> list[int] | None:
+    """What `match` still finds at `deadline` (empty when nothing), or None when unenumerable."""
+    while True:
+        found = match()
+        if not found or time.monotonic() >= deadline:
+            return found
+        time.sleep(TEARDOWN_POLL_SECONDS)
+
+
+def _stop_matching(match: Callable[[], list[int] | None], log) -> Teardown:
+    """SIGTERM then SIGKILL every process `match` accepts, re-checking between the rounds.
+
+    The predicate is re-evaluated after each round, so a process that outlives its parent — a group
+    member whose leader already exited, or a detached worker's own child — is found and signalled
+    too.  A process that outlasts SIGKILL is recorded as a survivor, never assumed dead; a platform
+    that cannot enumerate processes returns `verified=False` rather than a clean teardown.
+    """
+    found = match()
+    if found is None:
+        return Teardown(verified=False)
+    for signum in (signal.SIGTERM, signal.SIGKILL):
+        if not found:
+            return Teardown()
+        log.write(f"[discoverer] teardown: {signal.Signals(signum).name} to "
+                  f"{len(found)} process(es) {sorted(found)}\n".encode())
+        log.flush()
+        for pid in found:
+            with contextlib.suppress(ProcessLookupError, PermissionError):
+                os.kill(pid, signum)
+        found = _wait_until_gone(match, time.monotonic() + KILL_GRACE_SECONDS)
+        if found is None:
+            return Teardown(verified=False)
+    if found:
+        log.write(f"[discoverer] teardown: pids {sorted(found)} survived SIGKILL\n".encode())
+        log.flush()
+    return Teardown(survivors=tuple(sorted(found)))
+
+
+def _sweep_scratch(scratch: Path, log_path: Path) -> Teardown:
+    """Stop the processes still holding `scratch`, before the runner deletes that tree.
+
+    On a timeout the suite's own cleanup callbacks went down with it, so nothing else stops what it
+    detached; deleting the tree first would leave a launcher's watcher polling records that no longer
+    exist.
+    """
+    with log_path.open("ab") as log:
+        return _stop_matching(lambda: _scratch_processes(scratch), log)
+
+
 def _run_commands(commands: tuple[tuple[str, ...], ...], *, cwd: Path, env: dict[str, str],
-                  timeout: float, log_path: Path, appending: bool = False) -> tuple[int | None, bool, float]:
-    """Run argv vectors in order into one log file; return (exit code, timed out, seconds)."""
+                  timeout: float, log_path: Path,
+                  appending: bool = False) -> tuple[int | None, bool, float, Teardown]:
+    """Run argv vectors in order into one log file; return code, timeout, seconds, teardown."""
     started = time.monotonic()
     last_code: int | None = 0
     with log_path.open("ab" if appending else "wb") as log:
@@ -711,56 +870,56 @@ def _run_commands(commands: tuple[tuple[str, ...], ...], *, cwd: Path, env: dict
                 )
             except OSError as exc:
                 log.write(f"\n[discoverer] cannot start {_display(argv)}: {exc}\n".encode())
-                return None, False, time.monotonic() - started
+                return None, False, time.monotonic() - started, Teardown()
             remaining = max(timeout - (time.monotonic() - started), 0.1)
             try:
                 last_code = process.wait(timeout=remaining)
             except subprocess.TimeoutExpired:
-                _terminate_group(process, log)
-                return process.poll(), True, time.monotonic() - started
+                teardown = _terminate_group(process, log)
+                return process.poll(), True, time.monotonic() - started, teardown
             if last_code != 0:
                 break
-    return last_code, False, time.monotonic() - started
+    return last_code, False, time.monotonic() - started, Teardown()
 
 
 def _display(argv: tuple[str, ...]) -> str:
     return " ".join(argv)
 
 
-def _terminate_group(process: subprocess.Popen, log) -> None:
-    """Terminate a suite's whole process group, escalating to SIGKILL."""
+def _terminate_group(process: subprocess.Popen, log) -> Teardown:
+    """Terminate a suite's whole process group, escalating to SIGKILL.
+
+    Liveness is the group's, never the leader's alone: a leader that exits on its SIGTERM while a
+    same-group descendant ignores it must not end the escalation, or the descendant keeps running
+    under a record that says the group was terminated.
+    """
     log.write(f"\n[discoverer] timeout: terminating process group {process.pid}\n".encode())
     log.flush()
     if not hasattr(os, "killpg"):
+        # No process groups to enumerate: the suite process itself is all that can be stopped.
         process.kill()
-        process.wait(timeout=KILL_GRACE_SECONDS)
-        return
+        with contextlib.suppress(subprocess.TimeoutExpired):
+            process.wait(timeout=KILL_GRACE_SECONDS)
+        if process.poll() is None:
+            return Teardown(survivors=(process.pid,), verified=False)
+        return Teardown(verified=False)
     try:
         group = os.getpgid(process.pid)
     except ProcessLookupError:
-        process.wait(timeout=KILL_GRACE_SECONDS)
-        return
-    for sig in (signal.SIGTERM, signal.SIGKILL):
-        try:
-            os.killpg(group, sig)
-        except ProcessLookupError:
-            break
-        try:
-            process.wait(timeout=KILL_GRACE_SECONDS)
-            break
-        except subprocess.TimeoutExpired:
-            continue
+        teardown = Teardown()
+    else:
+        teardown = _stop_matching(lambda: _group_members(group), log)
     if process.poll() is None:
         with contextlib.suppress(subprocess.TimeoutExpired):
             process.wait(timeout=KILL_GRACE_SECONDS)
     if process.poll() is None:
-        # SIGKILL was delivered; a group that still will not reap is recorded, not raised:
-        # teardown must never take the whole run down with it.
-        log.write(
-            f"[discoverer] process group {group} still not reaped "
-            f"{KILL_GRACE_SECONDS:g}s after SIGKILL\n".encode()
-        )
+        # A leader still unreaped after its group is gone is recorded, not raised: teardown must
+        # never take the whole run down with it.
+        log.write(f"[discoverer] suite process {process.pid} still not reaped "
+                  f"{KILL_GRACE_SECONDS:g}s after teardown\n".encode())
         log.flush()
+        teardown = teardown.merge(Teardown(survivors=(process.pid,)))
+    return teardown
 
 
 def _read_log(path: Path, limit: int | None = None) -> str:
@@ -836,12 +995,35 @@ def _counts_consistent(counts: dict) -> bool:
     return total == passed or passed + counts.get("skipped", 0) == total
 
 
+def _unittest_shortfall(counts: dict) -> str | None:
+    """Why a unittest summary cannot support PASS, or None when at least one check really ran.
+
+    `Ran N tests` is unittest's *collection* count: all N may be skipped, and an all-skipped summary
+    would otherwise pass with nothing executed (§4.5).  A suite that runs some checks and skips
+    others is still fine; zero non-skipped checks is not.
+    """
+    if not counts:
+        return "no unittest summary in the output (`Ran N tests` absent)"
+    collected = counts.get("executed", 0)
+    if collected < 1:
+        return "Ran 0 tests: the suite collected nothing"
+    if counts.get("skipped", 0) >= collected:
+        return f"Ran {collected} tests, all skipped: zero executed checks"
+    return None
+
+
+def _teardown_note(teardown: Teardown | None) -> str:
+    """What the caller observed about teardown; None keeps the bare timeout claim."""
+    return teardown.describe() if teardown is not None else "process group terminated"
+
+
 def settle(suite: Suite, *, exit_code: int | None, timed_out: bool, output: str,
-           provisioned: bool = True, timeout: float | None = None) -> tuple[str, dict, str]:
+           provisioned: bool = True, timeout: float | None = None,
+           teardown: Teardown | None = None) -> tuple[str, dict, str]:
     """Settle one scheduled suite as PASS, FAIL, ERROR or TIMEOUT."""
     if timed_out:
         effective = suite.timeout if timeout is None else timeout
-        return "TIMEOUT", {}, f"timeout after {effective:g}s; process group terminated"
+        return "TIMEOUT", {}, f"timeout after {effective:g}s; {_teardown_note(teardown)}"
     if not provisioned:
         return "ERROR", {}, "provisioning failed"
     if exit_code is None:
@@ -852,10 +1034,9 @@ def settle(suite: Suite, *, exit_code: int | None, timed_out: bool, output: str,
     counts: dict = {}
     if suite.assertion == "unittest":
         counts = parse_unittest_counts(output)
-        if not counts:
-            return "ERROR", {}, "no unittest summary in the output (`Ran N tests` absent)"
-        if counts.get("executed", 0) < 1:
-            return "ERROR", counts, "Ran 0 tests: the suite collected nothing"
+        shortfall = _unittest_shortfall(counts)
+        if shortfall:
+            return "ERROR", counts, shortfall
     elif suite.assertion == "counter":
         counts = parse_counter_counts(output, suite.count_regexes)
         if exit_code != 0:
@@ -934,24 +1115,31 @@ def run_suite(suite: Suite, *, root: Path, scratch_root: Path, log_root: Path,
     timeout = float(timeout_override or suite.timeout)
     provisioned = True
     if suite.provision:
-        code, timed_out, _ = _run_commands(suite.provision, cwd=suite.cwd, env=env,
-                                           timeout=timeout, log_path=log_path)
+        code, timed_out, _, teardown = _run_commands(suite.provision, cwd=suite.cwd, env=env,
+                                                     timeout=timeout, log_path=log_path)
         provisioned = not timed_out and code == 0
         if not provisioned:
+            reason = "provisioning failed: " + _display(suite.provision[0])
+            if timed_out:
+                reason += "; " + _sweep_scratch(suite_scratch, log_path).merge(teardown).describe()
             outcome = Outcome(
                 suite_id=suite.id, state="ERROR", duration=0.0, exit_code=code,
-                reason="provisioning failed: " + _display(suite.provision[0]),
+                reason=reason,
                 log=str(log_path), tail=_read_log(log_path, 25), covered_by=suite.covered_by,
             )
             shutil.rmtree(suite_scratch, ignore_errors=True)
             return outcome
 
-    code, timed_out, duration = _run_commands(suite.commands, cwd=suite.cwd, env=env,
-                                              timeout=timeout, log_path=log_path,
-                                              appending=bool(suite.provision))
+    code, timed_out, duration, teardown = _run_commands(suite.commands, cwd=suite.cwd, env=env,
+                                                       timeout=timeout, log_path=log_path,
+                                                       appending=bool(suite.provision))
+    if timed_out:
+        # The suite's own cleanup callbacks went down with it, so stop what it detached before the
+        # tree those workers poll is deleted (see `_scratch_processes`).
+        teardown = teardown.merge(_sweep_scratch(suite_scratch, log_path))
     output = _read_log(log_path)
     state, counts, reason = settle(suite, exit_code=code, timed_out=timed_out, output=output,
-                                   provisioned=provisioned, timeout=timeout)
+                                   provisioned=provisioned, timeout=timeout, teardown=teardown)
     outcome = Outcome(
         suite_id=suite.id, state=state, duration=round(duration, 3), exit_code=code,
         reason=reason, counts=counts, log=str(log_path),
@@ -995,10 +1183,11 @@ def settle_covered(child: Suite, parent: Suite, parent_outcome: Outcome,
             )
     elif child.assertion == "unittest":
         counts = parse_unittest_counts(output)
-        if counts.get("executed", 0) < 1:
+        shortfall = _unittest_shortfall(counts)
+        if shortfall:
             return Outcome(
                 suite_id=child.id, state="ERROR", counts=counts,
-                reason=f"parent {parent.id} shows no unittest summary for this suite",
+                reason=f"parent {parent.id}: {shortfall}",
                 log=str(parent_log), covered_by=parent.id,
             )
     return Outcome(

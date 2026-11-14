@@ -13,8 +13,9 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   TMPDIR/HOME/XDG roots and a timeout, and PASS/FAIL/ERROR/TIMEOUT/SKIP terminal states with a JSON
   result record.
 - Tested assertion adapters stop a required suite from passing with zero executed checks: declared
-  unittest suites reject `Ran 0 tests` and a missing summary, the custom-assertion suites must report
-  a positive count, and a covered child settles from the parent output that claims to run it.
+  unittest suites reject `Ran 0 tests`, a missing summary and an all-skipped summary (`Ran N tests` is
+  unittest's collection count, not execution), the custom-assertion suites must report a positive
+  count, and a covered child settles from the parent output that claims to run it.
 - The manifest declares the non-glob suites discovery cannot name: five static gates, three
   pull-request gates, the three Bun CDP packages, and the `paseo-plugins/gdd-run-observer` Vitest
   package with its own cwd, provisioning, typecheck and test commands.
@@ -38,6 +39,16 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
 - Suite processes keep the shim toolchain's absolute state directories (`MISE_STATE_DIR`,
   `MISE_DATA_DIR`), so a mise-managed `bun` on `PATH` runs under the task-local `HOME` instead of
   refusing with "Config files … are not trusted" or re-installing the tool into the scratch tree.
+- Timeout teardown is observed, not assumed. The escalation follows the process *group* rather than
+  its leader, so a leader that exits on SIGTERM no longer ends it while a same-group descendant keeps
+  running; the processes a suite detached with `start_new_session` — the launcher adapters' watchers
+  and runners — are swept before the task-local scratch they poll is deleted; and the TIMEOUT record
+  says which outcome happened instead of claiming a teardown nothing verified. Both launcher suites
+  declare that resource and its owning teardown in `scripts/test_manifest.toml`.
+- The suite `PATH` prepends the selected interpreter's own directory without resolving it: a POSIX
+  virtual environment's `bin/python3` is a symlink to the base interpreter, and resolving it handed a
+  suite's own `python3` the base interpreter instead of the environment that carries the repository
+  dependencies. `scripts/test_run_all_tests.py` measures that against a real virtual environment.
 - Bumped shared skill/catalog version from 0.1.61 to 0.1.62.
 
 ## [0.1.61] — 2026-11-14
