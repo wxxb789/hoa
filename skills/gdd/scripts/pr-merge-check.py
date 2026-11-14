@@ -257,8 +257,12 @@ def is_text_check_header(line):
 def parse_text_checks(text):
     checks = []
     for line in text.splitlines():
-        line = line.strip()
-        if not line or "\t" not in line or is_text_check_header(line):
+        # The header comparison and the field split both read the *original* line: stripping it
+        # first erased a field boundary, so a row with a leading empty field — and the five-column
+        # header with one extra trailing tab — collapsed onto the exact header and vanished,
+        # leaving an all-green remainder to report MERGE-OK. Only a whitespace-only line is
+        # detected through a strip; each data field is normalised on its own below.
+        if not line.strip() or "\t" not in line or is_text_check_header(line):
             continue
         cells = line.split("\t")
         name = cells[0].strip()
@@ -891,6 +895,19 @@ def selftest():
             "build\tpass\nname\tstatus\telapsed\turl\tdescription\n",
             [("build", "COMPLETED", "SUCCESS"), ("name", "COMPLETED", "FAILURE")],
         ),
+        # The edge empty fields a whole-line strip erased: the parser reads the original line, so
+        # a row with a leading empty field and the five-column header with one extra trailing tab
+        # are rows, not the header.
+        (
+            "leading-empty-field-row-is-not-the-header",
+            "build\tpass\n\tNAME\tSTATUS\tELAPSED\tURL\tDESCRIPTION\n",
+            [("build", "COMPLETED", "SUCCESS"), ("", "COMPLETED", "FAILURE")],
+        ),
+        (
+            "trailing-empty-field-row-is-not-the-header",
+            "build\tpass\nNAME\tSTATUS\tELAPSED\tURL\tDESCRIPTION\t\n",
+            [("build", "COMPLETED", "SUCCESS"), ("NAME", "COMPLETED", "FAILURE")],
+        ),
     ]
     bucket_cases = [
         ("bucket-pass", "SUCCESS", "pass", ("COMPLETED", "SUCCESS")),
@@ -913,9 +930,9 @@ def selftest():
         + len(bucket_cases)
         + len(text_cases)
         + len(TEXT_CONCLUSIONS)
-        # the bucket tally, the name-prefixed row tally, the unordered-header tally, the two
+        # the bucket tally, the name-prefixed row tally, the unordered-header tally, the four
         # header-shaped-row tallies and the table-vocabulary tally
-        + 6
+        + 8
     )
     passed = 0
 
@@ -1009,12 +1026,16 @@ def selftest():
     print(f"  {mark}  unordered-header-tally: total/ok/pending/failing/pass={actual}")
     passed += 1 if actual == expected else 0
 
-    # The two header-shaped *data* rows a normalising comparison dropped: an empty field and a
-    # lower-cased row. With the exact comparison each is a row counted as failing, so neither
-    # tally is all green — the fail-open these fixtures close.
+    # The header-shaped *data* rows a normalising comparison dropped: an empty field, a
+    # lower-cased row, and — after the whole-line strip was removed — a leading empty field and
+    # the header with a trailing empty field. Each is a row counted as failing, so no tally is all
+    # green — the fail-open these fixtures close.
     for name, text in [
         ("empty-field-header-tally", "build\tpass\nNAME\t\tSTATUS\tELAPSED\tURL\tDESCRIPTION\n"),
         ("lower-case-header-tally", "build\tpass\nname\tstatus\telapsed\turl\tdescription\n"),
+        ("leading-empty-field-tally", "build\tpass\n\tNAME\tSTATUS\tELAPSED\tURL\tDESCRIPTION\n"),
+        ("trailing-empty-field-tally",
+         "build\tpass\nNAME\tSTATUS\tELAPSED\tURL\tDESCRIPTION\t\n"),
     ]:
         facts = evaluate_checks(parse_text_checks(text))
         actual = (facts["total"], facts["ok"], facts["pending"], facts["failing"], facts["pass"])

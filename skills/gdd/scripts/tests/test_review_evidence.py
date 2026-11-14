@@ -880,25 +880,31 @@ class CheckFetchCliTests(unittest.TestCase):
 
     def test_empty_fallback_table_blocks_main_and_needs_both_flags_to_merge(self):
         # The table is reached with a zero exit and empty stdout: a table-only read, not a
-        # structured zero-check success. It blocks with or without --allow-no-checks, and merges
-        # only once the opt-in has made the table authoritative.
-        code, out, _ = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",
-                                      "--allow-no-machine-review",
-                                      json_result=JSON_FIELD_GONE, table_result=(0, "", ""))
-        self.assertEqual(code, 1)
-        self.assertIn("checks: 0 total, 0 ok, 0 pending, 0 failing (no checks)", out)
-        self.assertIn("verdict: BLOCKED: checks unreadable", out)
-        code, out, _ = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",
-                                      "--allow-no-machine-review", "--allow-no-checks",
-                                      json_result=JSON_FIELD_GONE, table_result=(0, "", ""))
-        self.assertEqual(code, 1)
-        self.assertIn("verdict: BLOCKED: checks unreadable", out)
-        code, out, _ = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",
-                                      "--allow-no-machine-review", "--allow-table-only-checks",
-                                      "--allow-no-checks",
-                                      json_result=JSON_FIELD_GONE, table_result=(0, "", ""))
-        self.assertEqual(code, 0)
-        self.assertIn("verdict: MERGE-OK", out)
+        # structured zero-check success. All four flag combinations are pinned, so the two opt-ins
+        # are independent and an exchange of one for the other — reading the table opt-in as
+        # --allow-no-checks, the conflation the harness mutates — cannot merge here: with neither
+        # flag the read is unverifiable, with --allow-no-checks alone it is still unverifiable,
+        # with the table opt-in alone the read is the zero-check state that only --allow-no-checks
+        # forgives, and only both flags merge. The complete verdict line is compared, so
+        # `BLOCKED: no checks` cannot pass as `BLOCKED: checks unreadable`.
+        for extra, expected_code, expected_verdict in [
+            ((), 1, "verdict: BLOCKED: checks unreadable"),
+            (("--allow-no-checks",), 1, "verdict: BLOCKED: checks unreadable"),
+            (("--allow-table-only-checks",), 1, "verdict: BLOCKED: no checks"),
+            (("--allow-table-only-checks", "--allow-no-checks"), 0, "verdict: MERGE-OK"),
+        ]:
+            with self.subTest(flags=extra):
+                code, out, _ = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",
+                                              "--allow-no-machine-review", *extra,
+                                              json_result=JSON_FIELD_GONE,
+                                              table_result=(0, "", ""))
+                self.assertEqual(code, expected_code)
+                self.assertEqual(
+                    [line for line in out.splitlines() if line.startswith("verdict: ")],
+                    [expected_verdict])
+                self.assertEqual(
+                    [line for line in out.splitlines() if line.startswith("checks: ")],
+                    ["checks: 0 total, 0 ok, 0 pending, 0 failing (no checks)"])
 
     def test_unparseable_gh_output_exits_2_instead_of_guessing(self):
         code, out, err = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",

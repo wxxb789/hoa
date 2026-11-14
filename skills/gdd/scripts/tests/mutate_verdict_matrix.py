@@ -14,9 +14,11 @@ Two catalogues make up the run:
   a name-based header drop, an unrecognized verdict passing, a command error read as zero checks),
   the five this round's earlier findings named, the three round-5 findings named (a normalising
   header comparison, a table-only read that authorises by default, and a two-token vocabulary
-  swap), and the ones the surface implies (a tab-less line parsed as a row, the header parsed as a
-  check, the cancel and skipping bucket mappings, the zero-check opt-out granted unconditionally,
-  an unordered header, a pending bucket read as failing);
+  swap), the two round-6 findings named (a flag conflation that lets the table-only opt-in grant the
+  zero-check opt-out, and a whole line normalised before the header comparison), and the ones the
+  surface implies (a tab-less line parsed as a row, the header parsed as a check, the cancel and
+  skipping bucket mappings, the zero-check opt-out granted unconditionally, an unordered header, a
+  pending bucket read as failing);
 * one generated mutation per declared `CHECK_VOCABULARY` entry, reclassifying that token into every
   other classification ("a failing verdict read as ok", "an ok verdict read as pending"). They are
   generated from the vocabulary, so a token added to the gate arrives with its own mutations and
@@ -129,13 +131,23 @@ MUTATIONS = [
      """    return line.upper().startswith("NAME") or fields == list(TEXT_CHECK_COLUMNS)""",
      "a NAME-prefixed row is dropped as a header"),
     ("tabless-line-becomes-a-row",
-     '        if not line or "\\t" not in line or is_text_check_header(line):',
-     "        if not line or is_text_check_header(line):",
+     '        if not line.strip() or "\\t" not in line or is_text_check_header(line):',
+     '        if not line.strip() or is_text_check_header(line):',
      "a truncated line is parsed as a pending check"),
     ("header-parsed-as-a-check",
-     '        if not line or "\\t" not in line or is_text_check_header(line):',
-     '        if not line or "\\t" not in line:',
+     '        if not line.strip() or "\\t" not in line or is_text_check_header(line):',
+     '        if not line.strip() or "\\t" not in line:',
      "the header row is parsed as a check"),
+    ("line-stripped-before-the-header-comparison",
+     """        if not line.strip() or "\\t" not in line or is_text_check_header(line):
+            continue
+        cells = line.split("\\t")""",
+     """        line = line.strip()
+        if not line or "\\t" not in line or is_text_check_header(line):
+            continue
+        cells = line.split("\\t")""",
+     "the whole line is normalised before the header comparison, so a row with an empty field "
+     "collapses onto the header and vanishes"),
     ("unknown-verdict-passes",
      '        conclusion = TEXT_CONCLUSIONS.get(verdict, "FAILURE")',
      '        conclusion = TEXT_CONCLUSIONS.get(verdict, "SUCCESS")',
@@ -183,6 +195,12 @@ MUTATIONS = [
      '    if table_only and (checks["total"] == 0 or checks["pass"]):',
      "    if False:",
      "a table-only read authorises a merge by default instead of blocking"),
+    ("table-opt-in-grants-the-zero-check-opt-out",
+     "    checks = evaluate_checks(checks_rows, allow_no_checks=allow_no_checks)",
+     "    checks = evaluate_checks(checks_rows, allow_no_checks=allow_no_checks"
+     "\n                                 or allow_table_only_checks)",
+     "--allow-table-only-checks is conflated with --allow-no-checks, so an empty table-only read "
+     "merges on one flag instead of requiring both"),
     ("vocabulary-swap-neutral-and-timed-out",
      """    "table/neutral": "NEUTRAL",
     "table/failing": "FAILURE",

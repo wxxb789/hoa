@@ -14,7 +14,8 @@ The oracle is a literal, test-side declaration — never the artefact it pins:
 * the class-closing rule is a dimension of its own: the structured read is authoritative, and a
   table-only read may never authorise a merge — an all-green or empty table blocks with
   `checks unreadable` unless the operator passes `--allow-table-only-checks`, which bypasses
-  neither the exact-header rule nor the unknown-verdict rule;
+  neither the exact-header rule nor the unknown-verdict rule; with that opt-in an *empty* table is
+  the zero-check state, which only `--allow-no-checks` forgives, so the two opt-ins are independent;
 * the comparison is exact — the whole verdict line plus the printed `checks:` tally — so a cell
   cannot accept one classification in place of another.
 
@@ -424,6 +425,10 @@ CELLS += [
          None, (0, 0, 0, 0),
          "with the table authoritative an empty read is the zero-check state --allow-no-checks "
          "forgives", allow_table_only=True),
+    cell("rule-table-only-opt-in-empty-needs-the-no-checks-flag", JSON_ABSENT, (0, "", ""), False,
+         1, "BLOCKED", "no checks", (0, 0, 0, 0),
+         "the two opt-ins are independent: the table opt-in makes an empty read the zero-check "
+         "state, which only --allow-no-checks forgives", allow_table_only=True),
     cell("rule-table-only-opt-in-still-blocks-failing", JSON_ABSENT, (1, MIXED_TABLE, ""), False,
          1, "BLOCKED", "checks", (3, 1, 1, 1),
          "the opt-in does not make a failing row green", allow_table_only=True),
@@ -459,6 +464,31 @@ for _label, _table in (("empty-field", EMPTY_FIELD_HEADER_ROW),
         cell("table-%s-header-row-opt-in" % _label, JSON_ABSENT, (0, _table, ""), False, 1,
              "BLOCKED", "checks", (2, 1, 0, 1),
              "the opt-in cannot bypass the exact-header rule for the %s row" % _label,
+             allow_table_only=True),
+    ]
+
+
+# --- the edge empty fields the whole-line strip erased (round-6 finding F1) --
+# Header recognition and the field split read the original line, so a field boundary at either edge
+# survives: a data row with a leading empty field — and the five-column header carrying one extra
+# trailing tab — are each counted, and each one's unknown verdict blocks. Stripping the line first
+# collapsed both onto the exact header, so the row vanished and an all-green remainder reported
+# MERGE-OK. Neither flag variant, including the opt-in, can forgive them.
+LEADING_EMPTY_FIELD_ROW = "build\tpass\n\tNAME\tSTATUS\tELAPSED\tURL\tDESCRIPTION\n"
+TRAILING_EMPTY_FIELD_ROW = "build\tpass\nNAME\tSTATUS\tELAPSED\tURL\tDESCRIPTION\t\n"
+for _label, _table in (("leading", LEADING_EMPTY_FIELD_ROW),
+                       ("trailing", TRAILING_EMPTY_FIELD_ROW)):
+    CELLS += [
+        cell("table-%s-empty-field-row" % _label, JSON_ABSENT, (0, _table, ""), False, 1,
+             "BLOCKED", "checks", (2, 1, 0, 1),
+             "the %s-empty-field header-shaped row is counted and its unknown verdict blocks"
+             % _label),
+        cell("table-%s-empty-field-row-allow-no-checks" % _label, JSON_ABSENT, (0, _table, ""),
+             True, 1, "BLOCKED", "checks", (2, 1, 0, 1),
+             "--allow-no-checks cannot forgive the %s-empty-field row" % _label),
+        cell("table-%s-empty-field-row-opt-in" % _label, JSON_ABSENT, (0, _table, ""), False, 1,
+             "BLOCKED", "checks", (2, 1, 0, 1),
+             "the opt-in cannot bypass the exact-header rule for the %s-empty-field row" % _label,
              allow_table_only=True),
     ]
 
@@ -565,8 +595,8 @@ for _label, _row in (("absent", {"name": "row", "bucket": "pass"}),
 
 # --- stream fidelity (invariant 7) ------------------------------------------
 # A verdict cell cannot express this: sh_raw's padding is invisible to every verdict because
-# parse_text_checks strips each line and json.loads tolerates surrounding whitespace. These cells
-# compare the exact bytes sh_raw hands back instead of dropping the invariant silently.
+# parse_text_checks strips each data field and json.loads tolerates surrounding whitespace. These
+# cells compare the exact bytes sh_raw hands back instead of dropping the invariant silently.
 STREAM_CELLS = [
     StreamCell("stream-padded-stdout", "  leading\nbody\n\n", "err", 7,
                "sh_raw must return stdout unchanged, padding and newlines included"),
