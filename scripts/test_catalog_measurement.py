@@ -28,13 +28,20 @@ class MeasurementTests(unittest.TestCase):
         row = MODULE.body_metrics(text('## Real\n```text\n## Hidden\n```\n~~~\n## Hidden too\n~~~\n   ## Real too'))
         self.assertEqual(row['h2'], 2)
 
-    def test_short_or_different_fence_does_not_close(self):
-        row = MODULE.body_metrics(text('````\n```\n## Hidden\n~~~\n## Also hidden\n````\n## Real'))
-        self.assertEqual(row['h2'], 1)
+    def test_shorter_fence_does_not_close(self):
+        row = MODULE.body_metrics(text('````\n```\n## Hidden'))
+        self.assertEqual(row['h2'], 0)
+        self.assertEqual(row['body_lines'], 3)
+
+    def test_different_fence_character_does_not_close(self):
+        row = MODULE.body_metrics(text('```\n~~~\n## Hidden'))
+        self.assertEqual(row['h2'], 0)
+        self.assertEqual(row['body_lines'], 3)
 
     def test_closing_fence_requires_blank_suffix(self):
-        row = MODULE.body_metrics(text('```\n```not a close\n## Hidden\n```\n## Real'))
-        self.assertEqual(row['h2'], 1)
+        row = MODULE.body_metrics(text('```\n```not a close\n## Hidden'))
+        self.assertEqual(row['h2'], 0)
+        self.assertEqual(row['body_lines'], 3)
 
     def test_distribution_uses_nearest_rank(self):
         self.assertEqual(MODULE.distribution(list(range(1, 11)))['p90'], 9)
