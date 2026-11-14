@@ -36,10 +36,14 @@ them, not re-derive them by trial.
    `running|done|killed|failed|unknown`.
 3. `start` exits 0 only after the run has actually started, and refuses a second `start` for a slug whose
    run is still running.
-4. Completion is decided as: `exit 0` **and** the last `final` event carries `reason.kind == "completed"`;
-   anything else is `failed` (exit −1 when the run died without finalizing) or `killed` (exit 143 after a
-   `kill`), and a dead unfinalized run is finalized by the next `status`/`result`/`list`/`answer` with
-   `stale_recovered: true` — idempotently, guarded by a `finalized` marker.
+4. Completion is decided as: `exit 0` **and** the last `final` event carries `reason.kind == "completed"`.
+   The exit→state mapping is stated once, in §3, and is the mapping `adapters/omp-run.py` already
+   documents, because these are two routes of one contract and must not disagree: `killed` covers this
+   adapter's own stop path (which records exit `143`) **and** an exit carrying a signal convention
+   (`130`/`137`/`143` and their raw POSIX forms `-2`/`-9`/`-15`); a non-signal, non-zero exit is
+   `failed`; a run whose process disappeared without finalizing is `failed` with exit `-1` and
+   `stale_recovered: true`, finalized by the next `status`/`result`/`list`/`answer` — idempotently,
+   guarded by a `finalized` marker.
 5. `kill` works without signals: it writes a control file the monitor observes, waits for the run's own
    finalizer, and only then escalates to a process-group TERM/KILL.
 6. The event log is bounded and reports `events_bytes`, `events_bytes_total`, `events_truncated`,
@@ -75,9 +79,23 @@ them, not re-derive them by trial.
 
 - Completion is two conditions, never one: `exit 0` **and** the last `final` event carries
   `reason.kind == "completed"`. A `tool_result` status of `completed` only means the tool returned.
-  Anything else is `failed` (exit −1 when the run died without finalizing, recovered by the next
-  `status`/`result`/`list`/`answer` with `stale_recovered: true`, idempotently and only while no
-  `finalized` marker exists) or `killed` with exit 143 after this adapter stopped it.
+  The exit→state mapping is stated here, once, and is the same mapping the sibling route implements
+  (`adapters/omp-run.py`, `KILLED_EXITS`), so two routes of one contract cannot disagree:
+
+  - `done` — `exit 0` **and** the last `final` event's `reason.kind == "completed"`.
+  - `killed` — this adapter stopped the run (its stop path, like `kill` and `--max-time`, records exit
+    `143`), **or** the process exited carrying a signal convention: `130`/`137`/`143` and their raw
+    POSIX forms `-2`/`-9`/`-15`, the `KILLED_EXITS` set the adapter shares with `omp-run.py`.
+    An externally signal-terminated run is therefore `killed`, not `failed`: `killed` names that a
+    signal or a stop ended the run, not that the work failed.
+  - `failed` — any other non-zero, non-signal exit (a runner-level `error` event, an aborted final, a
+    refused dispatch).
+  - `failed` with exit `-1` and `stale_recovered: true` — the process disappeared without finalizing;
+    the next `status`/`result`/`list`/`answer` writes it, idempotently and only while no `finalized`
+    marker exists.
+
+  A stop that cannot end every recorded process is not a stop: the run stays `running` with
+  `stopping: true` and the survivors named, so it is still live and still occupies its slug.
 - A composition row that fails to load degrades the run **while the process still exits 0**
   (`stderr.log`: `did not activate` / `pending (waiting for service: …)`), so a green exit code alone is
   not a gate result: the operator re-runs the repository's gates on the final tree.

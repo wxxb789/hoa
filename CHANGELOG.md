@@ -16,7 +16,13 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   `finalized` marker, and `kill` writes a `stop` control file the runner polls before escalating to a
   process-group TERM/KILL. `--max-time` is the runner's own stop path (`killed`/`143`,
   `deadline_exceeded: true`); `--model`/`--thinking` are refused before a run directory exists because
-  headless composes no agent presets. Every setting is environment-only: `DSH_BIN`,
+  headless composes no agent presets. Ownership and recovery are strict: `start`/`_run` refuse a slug
+  whose run is still live (a hand replay of `run.sh` cannot start a second agent), a `.`/`..` name or a
+  slug directory that resolves out of its date bucket is refused before any write, discovery and
+  recovery touch only runs whose `state.json` records `backend: dsh` (another route's run is listed
+  read-only), a stop that leaves processes alive stays `running`/`stopping` with the survivors named
+  instead of publishing `killed`, and no signal is sent to a group id whose leader is gone. Every
+  setting is environment-only: `DSH_BIN`,
   `DSH_RUN_ROOT`/`GDD_RUN_ROOT`, `DSH_RUN_PROFILE`, `DSH_PERMISSION_MODE`, `DSH_APPROVAL_POLICY`, the
   three timeouts and `DSH_RUN_EVENTS_MAX_BYTES`.
 - `skills/dsh-headless-gdd/SKILL.md` is the `kind: mechanism` operating method for that route:
@@ -25,9 +31,10 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   "the tool returned", and the file-only recovery substrate (worktree, harness session log, run
   artifacts).
 - `skills/gdd/scripts/tests/test_dsh_run_python.py` runs the adapter against a stub `dsh` on `PATH`
-  that emits canned headless NDJSON, with no network or model: 55 tests pin the completion rule, the
+  that emits canned headless NDJSON, with no network or model: 68 tests pin the completion rule, the
   `--max-time` deadline, the control-file kill and its forced escalation, stale recovery, the bounded
-  event accounting, argv/stdin passthrough, and the second-start refusal.
+  event accounting, argv/stdin passthrough, the second-start refusal, the slug/date-bucket and
+  live-replay refusals, route-scoped recovery, and the identity-gated stop paths.
 
 ### Changed
 

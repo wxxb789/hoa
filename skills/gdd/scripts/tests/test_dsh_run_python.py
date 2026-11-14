@@ -1355,6 +1355,279 @@ class DshLauncherTests(unittest.TestCase):
         self.assertFalse(view["alive"], view)
 
 
+    def test_30_a_special_slug_cannot_escape_its_date_bucket(self):
+        """`.` and `..` are path components, and a run dir may not resolve elsewhere (A1).
+
+        `sanitize` lets both through by its alphabet, and `start --name ..`
+        resolved to the run root itself, so the run wrote prompt.md, state.json,
+        run.json and the lock into the directory every run shares.
+        """
+        self.assertEqual(adapter.sanitize(".."), "")
+        self.assertEqual(adapter.sanitize("."), "")
+        self.assertEqual(adapter.sanitize("..."), "...")  # a name, not a component
+        root = self.tmp / "escape-30-runs"
+        env = self.env_for(DSH_RUN_ROOT=root)
+        for name in (".", ".."):
+            with self.subTest(name=name):
+                proc = self.adapter_run(
+                    "start", "--name", name, "--prompt", str(self.prompt), "--cwd", str(self.tmp),
+                    env=env,
+                )
+                self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+                self.assertIn("must not sanitize to nothing", proc.stderr)
+                self.assertNotIn("started:", proc.stdout)
+        # The clobber this finding describes would leave the run's artifacts in
+        # the shared root; refusing means nothing was written there at all.
+        for artifact in ("prompt.md", "state.json", "lock", "run.json", "answer.md", "events.ndjson"):
+            with self.subTest(artifact=artifact):
+                self.assertFalse((root / artifact).exists())
+        # A slug directory that resolves somewhere else through a symlink is
+        # refused before anything is written into the target either.
+        outside = self.tmp / "escape-30-outside"
+        outside.mkdir()
+        bucket = root / adapter.date_stamp()
+        bucket.mkdir(parents=True, exist_ok=True)
+        try:
+            (bucket / "sneaky").symlink_to(outside, target_is_directory=True)
+        except (OSError, NotImplementedError):  # a host without the privilege
+            (bucket / "sneaky").mkdir()
+        if (bucket / "sneaky").is_symlink():
+            proc = self.adapter_run(
+                "start", "--name", "sneaky", "--prompt", str(self.prompt), "--cwd", str(self.tmp),
+                env=env,
+            )
+            self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+            self.assertIn("refusing to write a run outside", proc.stderr)
+            self.assertEqual(list(outside.iterdir()), [])
+            self.assertFalse((outside / "state.json").exists())
+
+    def test_31_a_live_run_cannot_be_replayed(self):
+        """The recorded run.sh must not start a second agent for a running run (A4).
+
+        Only a finalized run went through the slug claim: replaying a live run
+        overwrote the runner pid, reopened the same artifacts and started a second
+        agent on the same cwd.
+        """
+        slug = "replay-live-31"
+        second_argv = self.tmp / "replay-live-31-second.json"
+        self.start(slug, env=self.env_for(STUB_MODE="sleep"))
+        live = self.wait_for_state(slug, {"running"}, timeout=START_TIMEOUT)
+        run_dir = self.run_dir(slug)
+        script = run_dir / ("run.cmd" if IS_WINDOWS else "run.sh")
+        command = (
+            [os.environ.get("COMSPEC", "cmd.exe"), "/c", str(script)]
+            if IS_WINDOWS else ["bash", str(script)]
+        )
+        try:
+            replay = subprocess.run(
+                command, cwd=str(self.bin),
+                env=self.env_for(
+                    STUB_MODE="error",  # a second agent would exit at once, after writing…
+                    STUB_ARGV_FILE=second_argv,  # …this file that proves it ran
+                    DSH_RUN_ROOT=str(self.run_root),
+                ),
+                capture_output=True, text=True, timeout=SETTLE_TIMEOUT,
+            )
+            self.assertNotEqual(replay.returncode, 0, replay.stdout + replay.stderr)
+            self.assertIn("still live", replay.stdout + replay.stderr)
+            self.assertFalse(second_argv.exists(), "a live run was replayed into a second agent")
+            self.assertFalse((run_dir / "finalized").exists())
+            state = self.state_of(slug)
+            self.assertEqual(state["state"], "running", state)
+            self.assertEqual(state["pid"], live["pid"])
+            self.assertEqual(state["agent_pid"], live["agent_pid"])
+            self.assertEqual(adapter.lock_of(str(run_dir))["pid"], live["pid"])
+            self.assertTrue(adapter.run_alive(str(run_dir)))
+        finally:
+            self.adapter_run("kill", slug)
+            self.wait_for_state(slug, {"killed"}, timeout=30.0)
+
+    def test_32_recovery_leaves_another_routes_run_alone(self):
+        """A shared run root: another backend's run is shown, never rewritten (A5).
+
+        `list`/`status`/`result`/`answer` used to recover any run whose pids were
+        gone, finalizing another adapter's run and emptying its `answer.md`.
+        """
+        root = self.tmp / "foreign-32-runs"
+        slug = "foreign-32"
+        run_dir = root / adapter.date_stamp() / slug
+        run_dir.mkdir(parents=True)
+        record = {
+            "name": slug, "state": "running", "exit": None, "cwd": str(self.tmp),
+            "backend": "omp",
+            "started": (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat(),
+        }
+        adapter.write_json(str(run_dir / "state.json"), record)
+        (run_dir / "answer.md").write_text("ANOTHER ROUTE'S ANSWER\n", encoding="utf-8")
+        (run_dir / "events.ndjson").write_text("", encoding="utf-8")
+        # A directory whose state names no backend is not provably this route's
+        # either: it is shown, and it stays exactly as it is.
+        unknown_dir = root / adapter.date_stamp() / "foreign-32-unknown"
+        unknown_dir.mkdir()
+        adapter.write_json(str(unknown_dir / "state.json"), {
+            "name": "foreign-32-unknown", "state": "running", "exit": None, "cwd": str(self.tmp),
+            "started": (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat(),
+        })
+        (unknown_dir / "answer.md").write_text("NO BACKEND RECORDED\n", encoding="utf-8")
+        before = {path.name: path.read_bytes() for path in run_dir.iterdir()}
+        before_unknown = {path.name: path.read_bytes() for path in unknown_dir.iterdir()}
+        env = self.env_for(DSH_RUN_ROOT=root)
+        listed = self.adapter_run("list", env=env)
+        self.assertEqual(listed.returncode, 0, listed.stderr)
+        self.assertIn("read-only(omp)", listed.stdout)
+        self.assertIn("read-only(unknown)", listed.stdout)
+        for reader in (("status", slug), ("result", slug), ("answer", slug)):
+            with self.subTest(reader=reader):
+                proc = self.adapter_run(*reader, env=env)
+                self.assertEqual(proc.returncode, 0, proc.stderr)
+        view = json.loads(self.adapter_run("status", slug, env=env).stdout)
+        self.assertEqual(view["backend"], "omp", view)
+        self.assertEqual(view["state"], "running", view)
+        self.assertEqual({path.name: path.read_bytes() for path in run_dir.iterdir()}, before)
+        self.assertEqual(
+            {path.name: path.read_bytes() for path in unknown_dir.iterdir()}, before_unknown
+        )
+        for directory in (run_dir, unknown_dir):
+            self.assertFalse((directory / "finalized").exists())
+            self.assertFalse((directory / "exit.code").exists())
+        # `kill` refuses a foreign run outright; it never signals one.
+        killed = self.adapter_run("kill", slug, env=env)
+        self.assertEqual(killed.returncode, 1, killed.stdout + killed.stderr)
+        self.assertIn("not this route's", killed.stderr)
+        self.assertEqual({path.name: path.read_bytes() for path in run_dir.iterdir()}, before)
+        # A live foreign run keeps its slug too: `--replace` refuses instead of
+        # stopping it, even though the recorded pid is right there.
+        sleeper = subprocess.Popen(
+            [sys.executable, "-c", "import time; time.sleep(300)"],
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        try:
+            live_record = dict(record, pid=sleeper.pid)
+            adapter.write_json(str(run_dir / "state.json"), live_record)
+            adapter.write_json(str(run_dir / "lock"), {
+                "pid": sleeper.pid, "agent_pid": None, "backend": "omp",
+            })
+            proc = self.adapter_run(
+                "start", "--name", slug, "--prompt", str(self.prompt), "--cwd", str(self.tmp),
+                "--replace", env=env,
+            )
+            self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+            self.assertIn("another adapter's run", proc.stderr)
+            self.assertIsNone(sleeper.poll(), "another route's run must not be signalled")
+            self.assertEqual(adapter.read_state_file(str(run_dir))["backend"], "omp")
+        finally:
+            sleeper.kill()
+            sleeper.wait(timeout=10)
+
+    def test_33_a_failed_stop_keeps_the_run_live_and_stoppable(self):
+        """A stop that leaves processes alive must not publish a terminal state (A3).
+
+        `terminate_agent` used to report exit 143 whether or not anything
+        survived, so the run was finalized `killed` while its agent still wrote to
+        the worktree: `kill` then refused to touch it and a new `start` no longer
+        saw the slug as occupied.
+        """
+        slug = "stopfail-33"
+        run_dir = self.run_root / adapter.date_stamp() / slug
+        run_dir.mkdir(parents=True)
+        (run_dir / "prompt.md").write_text("the agent is still working\n", encoding="utf-8")
+        adapter.write_json(str(run_dir / "state.json"), {
+            "name": slug, "state": "running", "exit": None, "cwd": str(self.tmp),
+            "started": adapter.now_iso(), "backend": "dsh",
+        })
+        adapter.write_json(str(run_dir / "lock"), {
+            "pid": None, "agent_pid": None, "backend": "dsh", "started_at": adapter.now_iso(),
+        })
+        (run_dir / "stop").write_text("{}", encoding="utf-8")  # what `kill` writes
+        # The agent that survives the stop: a real process of its own, so the later
+        # attempt can signal it through the identity read while it was observed.
+        victim = subprocess.Popen(
+            [sys.executable, "-c", "import time; time.sleep(300)"],
+            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        victim_identity = adapter.process_identity(victim.pid)
+        self.assertTrue(victim_identity, "the platform must supply a process identity")
+        args = adapter.build_parser().parse_args([
+            "_run", "--run-dir", str(run_dir), "--prompt", str(run_dir / "prompt.md"),
+            "--cwd", str(self.tmp), "--agent", str(self.dsh_bin()), "--name", slug,
+            "--profile", "headless", "--permission-mode", "workspace-write",
+            "--approval-policy", "never",
+        ])
+        # Driving the runner in-process must not record this interpreter as the
+        # run's runner: a pid beyond pid_max is what a detached runner that has
+        # exited looks like to every reader.
+        dead_pid = 1 << 22
+        self.assertFalse(adapter.pid_alive(dead_pid))
+
+        class NoSelfPid:
+            """The os module, with getpid answering a pid that is not this process's."""
+
+            def __getattr__(self, name):
+                return getattr(os, name)
+
+            def getpid(self):
+                return dead_pid
+
+        saved = {
+            name: signal.getsignal(getattr(signal, name)) for name in ("SIGTERM", "SIGINT")
+        }
+        try:
+            with mock.patch.dict(
+                os.environ, self.env_for(DSH_RUN_DRAIN_TIMEOUT_SECONDS=1), clear=False
+            ), mock.patch.object(adapter, "spawn_agent", lambda *a, **k: victim), \
+                    mock.patch.object(
+                        adapter, "terminate_agent",
+                        lambda process, identity="": (
+                            adapter.KILL_EXIT, [(victim.pid, victim_identity, victim.pid)]
+                        ),
+                    ), \
+                    mock.patch.object(adapter, "os", NoSelfPid()), \
+                    contextlib.redirect_stdout(io.StringIO()), \
+                    contextlib.redirect_stderr(io.StringIO()):
+                code = adapter.runner_main(args)
+            self.assertEqual(code, 1, "a stop that failed is not a finished run")
+            self.assertFalse((run_dir / "finalized").exists())
+            self.assertFalse((run_dir / "exit.code").exists())
+            state = adapter.read_state_file(str(run_dir))
+            self.assertEqual(state["state"], "running", state)
+            self.assertTrue(state["stopping"], state)
+            self.assertEqual([record["pid"] for record in state["survivors"]], [victim.pid],
+                             state["survivors"])
+            self.assertIn(str(victim.pid), state["note"])
+            self.assertTrue(adapter.run_alive(str(run_dir), state))
+            # Every reader keeps reporting it live/stopping and recovers nothing.
+            state_again, recovered = adapter.effective_state(str(run_dir))
+            self.assertFalse(recovered)
+            self.assertEqual(state_again["state"], "running")
+            self.assertTrue(adapter.events_view(str(run_dir), state)["alive"])
+            self.assertFalse((run_dir / "finalized").exists())
+            self.assertFalse((run_dir / "answer.md").exists())
+            # A later stop attempt resolves it: the survivor is signalled through
+            # its verified identity and the run settles killed/143.
+            reaper = threading.Thread(target=victim.wait, daemon=True)
+            reaper.start()
+            with mock.patch.object(adapter, "POLL_SECONDS", 0.01), \
+                    contextlib.redirect_stderr(io.StringIO()):
+                stopped = adapter.stop_run(str(run_dir), state, seconds=1)
+            self.assertTrue(stopped, "a later stop attempt must settle the run")
+            self.assertFalse(adapter.pid_alive(victim.pid), "the survivor must be stopped")
+            final = adapter.read_state_file(str(run_dir))
+            self.assertEqual((final["state"], final["exit"]), ("killed", adapter.KILL_EXIT), final)
+            self.assertNotIn("stopping", final)
+            self.assertEqual([victim.pid], final.get("survivors_stopped"), final)
+            self.assertEqual(
+                (run_dir / "finalized").read_text(encoding="utf-8"), str(adapter.KILL_EXIT)
+            )
+        finally:
+            for name, handler in saved.items():
+                signal.signal(getattr(signal, name), handler)
+            if adapter.pid_alive(victim.pid):
+                adapter.kill_tree(str(run_dir))
+            victim.kill()
+            victim.wait(timeout=10)
+
+
 class AdapterUnitTests(unittest.TestCase):
     """The pieces a run needs but a full dispatch does not exercise."""
 
@@ -1608,6 +1881,7 @@ class AdapterUnitTests(unittest.TestCase):
                 victim.kill()
                 victim.wait(timeout=10)
 
+    @unittest.skipIf(IS_WINDOWS, "process groups and killpg are POSIX-only")
     def test_signal_group_refuses_a_pid_it_cannot_prove(self):
         """No signal without a matching identity, and no getpgid fallback (A5)."""
         pid = os.getpid()
@@ -1629,6 +1903,204 @@ class AdapterUnitTests(unittest.TestCase):
             # the group it leads.
             self.assertTrue(adapter.signal_group(pid, signal.SIGTERM, identity))
         self.assertEqual(calls, [(pid, signal.SIGTERM)])
+
+    @unittest.skipIf(IS_WINDOWS, "process groups are POSIX-only")
+    def test_a_vanished_leader_is_never_signalled(self):
+        """A group id whose leader is gone proves nothing, so nothing is sent (A2)."""
+        pid = os.getpid()
+        identity = adapter.process_identity(pid)
+        self.assertTrue(identity, "the platform must supply a process identity")
+        calls = []
+        err = io.StringIO()
+        with mock.patch.object(adapter, "pid_alive", lambda target: False), \
+                mock.patch.object(
+                    adapter.os, "killpg", lambda pgid, signum: calls.append((pgid, signum))
+                ), contextlib.redirect_stderr(err):
+            self.assertFalse(adapter.signal_group(pid, signal.SIGTERM, identity))
+            # The member path is not a way around that either: a member that is
+            # gone cannot name the group.
+            self.assertFalse(adapter.signal_member_group(pid, signal.SIGTERM, identity, pid))
+        self.assertEqual(calls, [], "a bare group id must never be signalled")
+        self.assertIn("not signalling", err.getvalue())
+
+    @unittest.skipIf(IS_WINDOWS, "process groups are POSIX-only")
+    def test_a_verified_member_names_the_group_of_a_gone_leader(self):
+        """A survivor's own identity is what may aim a group signal (A2)."""
+        victim = subprocess.Popen(
+            [sys.executable, "-c", "import time; time.sleep(60)"],
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        identity = adapter.process_identity(victim.pid)
+        try:
+            calls = []
+            err = io.StringIO()
+            with mock.patch.object(
+                adapter.os, "killpg", lambda pgid, signum: calls.append((pgid, signum))
+            ), contextlib.redirect_stderr(err):
+                self.assertTrue(
+                    adapter.signal_member_group(victim.pid, signal.SIGTERM, identity, victim.pid)
+                )
+                # A member whose recorded identity is not its own is refused…
+                self.assertFalse(
+                    adapter.signal_member_group(victim.pid, signal.SIGTERM, "proc:0", victim.pid)
+                )
+                # …and so is a recorded group the member no longer belongs to.
+                self.assertFalse(
+                    adapter.signal_member_group(
+                        victim.pid, signal.SIGTERM, identity, victim.pid + 1
+                    )
+                )
+            self.assertEqual(calls, [(victim.pid, signal.SIGTERM)])
+            self.assertIn("not signalling the group", err.getvalue())
+        finally:
+            victim.kill()
+            victim.wait(timeout=10)
+
+    def test_a_failed_stop_records_survivors_without_finalizing(self):
+        """A failed stop stays live/stopping and a later stop settles it (A3)."""
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            victim = subprocess.Popen(
+                [sys.executable, "-c", "import time; time.sleep(60)"],
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            identity = adapter.process_identity(victim.pid)
+            try:
+                adapter.write_json(str(run_dir / "state.json"), {
+                    "name": "stopping", "state": "running", "exit": None, "cwd": tmp,
+                    "started": adapter.now_iso(), "backend": "dsh",
+                })
+                adapter.write_json(str(run_dir / "lock"), {
+                    "pid": None, "agent_pid": None, "backend": "dsh",
+                })
+                with contextlib.redirect_stdout(io.StringIO()), \
+                        contextlib.redirect_stderr(io.StringIO()):
+                    code = adapter.report_incomplete_stop(
+                        str(run_dir), [(victim.pid, identity, victim.pid)], "control-file"
+                    )
+                self.assertEqual(code, 1)
+                self.assertFalse((run_dir / "finalized").exists())
+                self.assertFalse((run_dir / "exit.code").exists())
+                state = adapter.read_state_file(str(run_dir))
+                self.assertEqual(state["state"], "running", state)
+                self.assertTrue(state["stopping"], state)
+                # The survivor is what keeps the run alive and its slug occupied…
+                self.assertTrue(adapter.run_alive(str(run_dir), state))
+                self.assertIn(victim.pid, adapter.recorded_pids(str(run_dir), state))
+                # …so no reader recovers it into failed/-1 while it is still there.
+                settled, recovered = adapter.effective_state(str(run_dir))
+                self.assertFalse(recovered)
+                self.assertEqual(settled["state"], "running")
+                self.assertFalse((run_dir / "finalized").exists())
+                # Once a terminal state is committed the transient flags are history.
+                final = adapter.finalize(str(run_dir), adapter.KILL_EXIT)
+                self.assertEqual(final["state"], "killed")
+                self.assertNotIn("stopping", final)
+                self.assertNotIn("survivors", final)
+                self.assertEqual(final.get("survivors_stopped"), [victim.pid])
+            finally:
+                victim.kill()
+                victim.wait(timeout=10)
+
+    def test_a_run_dir_must_be_a_direct_child_of_a_date_bucket(self):
+        """Any shape but `<root>/<date>/<slug>` is refused before a write (A1)."""
+        with tempfile.TemporaryDirectory() as tmp:
+            bucket = Path(tmp) / "2026-11-15"
+            bucket.mkdir()
+            self.assertEqual(adapter.checked_run_dir(str(bucket / "ok")), str(bucket / "ok"))
+            for bad in (tmp, str(bucket), str(bucket / ".."), str(bucket / "."), str(bucket / "")):
+                with self.subTest(path=bad):
+                    with self.assertRaises(ValueError):
+                        adapter.checked_run_dir(bad)
+
+    def test_the_ps_identity_probe_fixes_its_own_view(self):
+        """`ps -o lstart=` is timezone-shaped; the probe must not inherit TZ (A6)."""
+        seen = []
+
+        def fake_run(argv, **kwargs):
+            env = kwargs.get("env") or {}
+            seen.append((list(argv), env.get("TZ"), env.get("LC_ALL")))
+            # What `ps` prints for one process, rendered in two different zones.
+            text = (
+                "Mon Nov 17 10:00:00 2025"
+                if env.get("TZ") == "UTC" else "Mon Nov 17 23:00:00 2025"
+            )
+            return types.SimpleNamespace(returncode=0, stdout=text + "\n")
+
+        pid = os.getpid()
+        with mock.patch.object(adapter, "_proc_stat_identity", lambda target: ""), \
+                mock.patch.object(adapter.subprocess, "run", fake_run):
+            with mock.patch.dict(os.environ, {"TZ": "UTC", "LC_ALL": "C"}, clear=False):
+                first = adapter.process_identity(pid)
+            with mock.patch.dict(
+                os.environ, {"TZ": "Pacific/Kiritimati", "LC_ALL": "de_DE.UTF-8"}, clear=False
+            ):
+                second = adapter.process_identity(pid)
+                # The probe fixes its own view; the caller's environment is untouched.
+                self.assertEqual(os.environ.get("TZ"), "Pacific/Kiritimati")
+                self.assertEqual(os.environ.get("LC_ALL"), "de_DE.UTF-8")
+        self.assertTrue(first, "the probe must produce a token")
+        self.assertEqual(first, second, "one process must yield one token under any caller TZ")
+        self.assertEqual([entry[1:] for entry in seen], [("UTC", "C"), ("UTC", "C")])
+        self.assertIn("lstart=", seen[0][0])
+
+    def test_the_stop_escalation_branches_on_the_platform(self):
+        """Windows must not read `signal.SIGKILL`, which does not exist there (A7)."""
+        seen = []
+
+        class FakeSignal:  # a Windows-shaped signal module: SIGTERM and no SIGKILL at all
+            SIGTERM = 15
+
+        class StandInProcess:
+            pid = os.getpid()
+
+            def poll(self):
+                return None
+
+        alive = {"calls": 0}
+
+        def fake_tree_alive(pid):
+            alive["calls"] += 1
+            # Alive through the TERM wait and the pause, gone after the escalation.
+            return alive["calls"] <= 61
+
+        def run_case(windows, signum_module):
+            seen.clear()
+            alive["calls"] = 0
+            with mock.patch.object(adapter, "IS_WINDOWS", windows), \
+                    mock.patch.object(adapter, "signal", signum_module), \
+                    mock.patch.object(adapter, "terminate_tree", lambda pid, signum, identity="":
+                                       seen.append(signum) or True), \
+                    mock.patch.object(adapter, "tree_alive", fake_tree_alive), \
+                    mock.patch.object(adapter, "POLL_SECONDS", 0), \
+                    contextlib.redirect_stderr(io.StringIO()):
+                return adapter.terminate_agent(StandInProcess(), "fake:1"), seen[:]
+
+        (code, survivors), signals = run_case(True, FakeSignal)
+        self.assertEqual((code, survivors), (adapter.KILL_EXIT, []))
+        self.assertEqual(signals, [None, None], "Windows sends no POSIX signal number")
+        (code, survivors), signals = run_case(
+            False, types.SimpleNamespace(SIGTERM=15, SIGKILL=9)
+        )
+        self.assertEqual((code, survivors), (adapter.KILL_EXIT, []))
+        self.assertEqual(signals, [15, 9])
+
+    def test_a_failing_taskkill_is_reported_not_assumed(self):
+        """A taskkill that failed is a stop that did not happen (A7)."""
+        commands = []
+        err = io.StringIO()
+        with mock.patch.object(adapter, "IS_WINDOWS", True), \
+                mock.patch.object(adapter, "pid_alive", lambda pid: True), \
+                mock.patch.object(adapter, "identity_ok", lambda pid, identity: True), \
+                mock.patch.object(adapter, "run_quiet",
+                                  lambda argv: commands.append(argv) or 1), \
+                contextlib.redirect_stderr(err):
+            self.assertFalse(adapter.terminate_tree(4321, 0, "win:1"))
+        self.assertEqual(commands, [["taskkill", "/T", "/F", "/PID", "4321"]])
+        self.assertIn("taskkill", err.getvalue())
+        self.assertIn("may still be alive", err.getvalue())
 
     def test_kill_tree_leaves_an_unverified_pid_alone(self):
         """The forced-kill path fails closed instead of signalling a stranger (A5)."""
@@ -1789,6 +2261,7 @@ class AdapterUnitTests(unittest.TestCase):
             )
             (run_dir / "state.json").write_text(
                 json.dumps({"name": "stale", "state": "running", "exit": None, "cwd": tmp,
+                            "backend": "dsh",
                             "started": (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()}),
                 encoding="utf-8",
             )
@@ -1808,6 +2281,7 @@ class AdapterUnitTests(unittest.TestCase):
             (run_dir / "events.ndjson").write_text("", encoding="utf-8")
             (run_dir / "state.json").write_text(
                 json.dumps({"name": "repaired", "state": "killed", "exit": 143, "cwd": tmp,
+                            "backend": "dsh",
                             "started": (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()}),
                 encoding="utf-8",
             )

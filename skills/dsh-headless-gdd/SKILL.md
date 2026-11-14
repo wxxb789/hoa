@@ -19,9 +19,13 @@ metadata:
 # DSH headless as a GDD worker
 
 A second headless route for goal-driven delivery: `dsh --profile headless` answers one task per
-invocation, streams NDJSON events, resumes a persisted session, and confines writes to the run's working
-directory (`--cwd`, the stage worktree). The protocol stays in `gdd`; this skill is the operating method
-for that route, invoked from the DSH route row of [`../gdd/references/transport.md`](../gdd/references/transport.md).
+invocation, streams NDJSON events, and resumes a persisted session. Model tool writes are constrained by
+the permission policy, not by the working directory: with the default `workspace-write` policy, on a host
+whose harness enforces a sandbox, writes inside the policy's boundary succeed and writes outside it are
+denied; `--cwd` only selects the run's working directory. Changing the profile or `DSH_PERMISSION_MODE`
+changes that boundary, so re-confirm it before dispatching (see "Harness facts that bite"). The protocol
+stays in `gdd`; this skill is the operating method for that route, invoked from the DSH route row of
+[`../gdd/references/transport.md`](../gdd/references/transport.md).
 
 ## When to Use
 
@@ -125,9 +129,12 @@ a detached run never notifies.
 - **Compaction:** `retainRatio` must stay below `thresholdRatio` or the plugin is rejected at load (and
   the run then exits 0 with no compaction service); too small a `maxTokens` produces
   `summarization truncated at the token cap (incomplete checkpoint)` in `compaction/end`. Read both.
-- **The sandbox is real** where the harness provides one: writes inside the run's working directory
-  (`--cwd`, the stage worktree) succeed, writes outside are denied even where Unix modes allow them, reads
-  outside are permitted. Do not reach for a full-access mode to "unblock" a task.
+- **The sandbox is real** where the harness provides one: with the default `workspace-write` policy,
+  writes inside the policy's boundary (the run's workspace, selected by `--cwd`) succeed and writes
+  outside it are denied even where Unix modes allow them; reads outside are permitted. `--cwd` selects
+  the workspace, the permission mode sets the boundary — a profile or `DSH_PERMISSION_MODE` that widens
+  it widens what the worker can write, so re-confirm the boundary rather than assume the working
+  directory alone confines it. Do not reach for a full-access mode to "unblock" a task.
 - **A plugin can exist twice** (a globally installed copy and the profile's copy) and the loader
   validates the version it resolves. After upgrading the harness runtime, upgrade both, or the profile
   silently drops the bundle with an incompatibility warning.

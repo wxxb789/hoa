@@ -96,10 +96,20 @@ matches it (see "Process identity" below).
 `kill` works without signals: it writes a `stop` control file the runner polls,
 waits for the run's own finalizer, and only then escalates to a process-group
 TERM/KILL (POSIX) or `taskkill /T /F` (Windows). A run stopped this way ends as
-`killed` with exit 143. A run that died without finalizing is finalized as
-`failed` with exit -1 by the next `status`/`result`/`list`/`answer`, which sets
-`stale_recovered: true` — and only while no `finalized` marker exists, so
-recovery stays idempotent.
+`killed` with exit 143. A stop that *fails* is not a stop: when processes are
+still alive after the escalation the runner publishes no terminal state, keeps
+the run `running` with `stopping: true` and the survivors named (and recorded in
+`lock`), so the run is still alive to `run_alive`, still occupies its slug, and a
+later `kill` can finish the job through the survivors' recorded identities. A run
+that died without finalizing is finalized as `failed` with exit -1 by the next
+`status`/`result`/`list`/`answer`, which sets `stale_recovered: true` — and only
+while no `finalized` marker exists, so recovery stays idempotent.
+
+A run root can be shared — `GDD_RUN_ROOT` is one tree for every route — so
+discovery and recovery are route-scoped: a run is this route's only when the
+`state.json` this adapter writes identifies it (`"backend": "dsh"`). `list` shows
+any other recorded run as it records itself and every reader leaves it alone: a
+run of another backend is never finalized, rewritten, moved aside or signalled.
 
 Process identity
 ----------------
@@ -113,8 +123,14 @@ verifies a live process against that token before signalling it. An unverifiable
 identity — missing token, or a token that changed — fails closed: the signal is
 not sent, the refusal is reported, and a run whose tree cannot be proven is left
 to the recovery path rather than killed by guesswork. The `os.getpgid(pid)`
-fallback is gone for the same reason; a group is signalled only as `killpg(pid)`
-on a pid this adapter created as a session leader.
+fallback is gone for the same reason; a leader is signalled only as `killpg(pid)`
+while it is alive and carries its recorded identity, and a group whose leader is
+gone is signalled only through a *verified surviving member* (a pid recorded when
+the failed stop observed it, re-checked against the identity read then) — never
+through the bare group id, which after pid reuse may name a stranger's group.
+`ps -o lstart=` renders a localized, timezone-shaped string, so that one probe
+runs with its own fixed view (`TZ=UTC`, `LC_ALL=C` for that call only); the
+worker's environment is never changed by the probe.
 
 Configuration (nothing about one install is baked in)
 ----------------------------------------------------
@@ -184,9 +200,11 @@ events.ndjson, events.stats.json, stderr.log (dsh's own stderr), runner.log (the
 runner's output), exit.code, session.id, answer.md, finalized, stop (the kill
 request, below), plus run.json and run.sh (POSIX) or run.cmd (Windows) — the exact
 invocation, replayable by hand. `lock` holds {"pid","agent_pid","backend",
-"started_at","pid_identity","agent_pid_identity"}: `pid` is the detached runner,
-`agent_pid` the dsh process it started, and the two identity tokens are what makes
-a pid still this run's process (see "Process identity" above). `start` writes the
+"started_at","pid_identity","agent_pid_identity"} — plus `survivors` (pid,
+identity and group of each process a failed stop left alive) when a stop did not
+complete: `pid` is the detached runner, `agent_pid` the dsh process it started,
+and the two identity tokens are what makes a pid still this run's process (see
+"Process identity" above). `start` writes the
 lock before spawning and the runner only ever adds `pid`, `agent_pid` and their
 identities, so a read-modify-write cannot drop a field.
 `start.lock` guards the pidless window of one run directory and is released by the
@@ -202,7 +220,11 @@ Replaying a finished invocation goes through the same fresh-start path: the old
 directory is preserved as `<SLUG>.prev-<time>`, then the recorded runner command
 starts in a new directory at the original path, with the same prompt, cwd, agent,
 profile, mode, policy and flags. The old finalized artifacts are never
-overwritten by the replay.
+overwritten by the replay. A replay of a run that is *still live* is refused
+before anything is written: the ownership a fresh start recorded (the run's
+pids and identity tokens, and the absence of a `finalized` marker) is checked by
+`_run` too, so replaying a running run cannot overwrite its runner pid or start a
+second agent on the same cwd.
 
 Exit codes: 0 success, 1 refusal or error — the reference adapter's convention.
 """
@@ -277,6 +299,9 @@ DEFAULT_EVENTS_MAX_BYTES = 8 * 1024 * 1024
 DEFAULT_PROFILE = "headless"
 DEFAULT_PERMISSION_MODE = "workspace-write"
 DEFAULT_APPROVAL_POLICY = "never"
+# The one word that identifies a run as this route's, in state.json and in lock:
+# discovery, recovery and every signal are scoped to it (see `is_this_route`).
+BACKEND = "dsh"
 # DeepSeek Harness reserves these in the shell environment it hands to every model
 # shell call. A stage dispatched from inside a live `dsh` session inherits its
 # caller's identity, so they are removed from every child this adapter spawns; the
@@ -505,6 +530,24 @@ def read_state_file(run_dir) -> dict:
     return state if isinstance(state, dict) else {}
 
 
+def route_of(state) -> str:
+    """The backend a run's state records, or "" when it records none."""
+    backend = (state or {}).get("backend")
+    return backend if isinstance(backend, str) else ""
+
+
+def is_this_route(state) -> bool:
+    """Is this run provably this route's?
+
+    One run root can hold the runs of several adapters, and the only thing that
+    identifies the route that wrote a run is the `backend` this adapter records
+    in `state.json`. Anything else — another adapter's backend, or no recorded
+    backend at all — is not proof, and a run that is not provably this route's is
+    never finalized, rewritten, moved aside or signalled by it.
+    """
+    return route_of(state) == BACKEND
+
+
 def json_temp_path(path) -> str:
     """A temp name unique per call, not merely per process.
 
@@ -569,8 +612,44 @@ def read_sidecar(run_dir, name) -> str:
 
 
 def sanitize(value) -> str:
-    """The reference adapter's slug rule: lower-case, [a-z0-9._-], 48 characters."""
-    return SANITIZE_RE.sub("-", str(value or "").lower()).strip("-")[:48]
+    """The reference adapter's slug rule: lower-case, [a-z0-9._-], 48 characters.
+
+    `.` and `..` are the one output of that rule which is not a name: they are
+    path components, and a run directory built from one of them is the date
+    bucket or the run root itself. They are refused here (the empty string is
+    this adapter's word for "no usable slug"), so no caller can address a run
+    with one, and `start` refuses such a name before it writes anything.
+    """
+    slug = SANITIZE_RE.sub("-", str(value or "").lower()).strip("-")[:48]
+    return "" if slug in (".", "..") else slug
+
+
+def checked_run_dir(run_dir) -> str:
+    """The run directory, proven to be a direct child of its own date bucket.
+
+    `start` (and a replay) writes prompt.md, state.json, the lock and every other
+    artifact into this directory, so the shape is verified before any write: a
+    slug that resolves anywhere but a date bucket's direct child is refused, not
+    sanitized into shape. Two cases are caught — a directory that is not
+    `<run root>/<YYYY-MM-DD>/<slug>` at all (which is what `start --name ..`
+    resolves to), and a slug directory that resolves elsewhere through a symlink.
+    Raises ValueError, which the callers turn into the adapter's refusal.
+    """
+    run_dir = os.path.abspath(str(run_dir))
+    bucket = os.path.dirname(run_dir)
+    slug = os.path.basename(run_dir)
+    if slug in ("", ".", "..") or not DATE_RE.match(os.path.basename(bucket)):
+        raise ValueError(
+            f"run directory {run_dir} is not <run root>/<YYYY-MM-DD>/<slug>; refusing to "
+            "write a run outside its own date bucket"
+        )
+    resolved = os.path.realpath(run_dir)
+    if os.path.dirname(resolved) != os.path.realpath(bucket):
+        raise ValueError(
+            f"run directory {run_dir} resolves to {resolved}, which is not a direct child of "
+            f"its date bucket {bucket}; refusing to write a run outside its own bucket"
+        )
+    return run_dir
 
 
 def mtime_of(path) -> float:
@@ -677,13 +756,25 @@ def _proc_stat_identity(pid) -> str:
 
 
 def _ps_identity(pid) -> str:
-    """`ps` start time, for POSIX systems without procfs (macOS, BSD)."""
+    """`ps` start time, for POSIX systems without procfs (macOS, BSD).
+
+    `ps -o lstart=` renders a localized, timezone-shaped string, so the caller's
+    `TZ` and locale would otherwise be part of the token: the same live process
+    would read as a different one from a different shell, and `status` would call
+    a running run failed. The probe therefore gets its own fixed view (`TZ=UTC`,
+    `LC_ALL=C`, for this call only) instead of inheriting the display
+    environment; the worker's environment is untouched.
+    """
+    env = dict(os.environ)
+    env["TZ"] = "UTC"
+    env["LC_ALL"] = "C"
     try:
         proc = subprocess.run(
             ["ps", "-o", "lstart=", "-p", str(pid)],
             stdin=subprocess.DEVNULL,
             capture_output=True,
             text=True,
+            env=env,
             creationflags=hidden_flags(),
         )
     except OSError:
@@ -758,6 +849,116 @@ def identity_changed(pid, identity) -> bool:
     return bool(current) and current != str(identity)
 
 
+def process_group(pid) -> int:
+    """The process group `pid` currently belongs to, or 0 (POSIX only).
+
+    Used only on a process whose identity has already been proven to be this
+    run's, so the group it names is this run's group too — the opposite of the
+    removed `os.getpgid` fallback, which named a group from a bare pid.
+    """
+    if IS_WINDOWS or isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0:
+        return 0
+    try:
+        return int(os.getpgid(pid))
+    except (OSError, ValueError):
+        return 0
+
+
+def group_member_pids(pgid) -> list:
+    """Every pid currently in this process group (POSIX), best effort.
+
+    `ps -e -o pid=,pgid=` answers on Linux, macOS and the BSDs alike; a failure
+    to read the table yields no members, and the caller then reports a stop it
+    could not complete rather than assuming one.
+    """
+    if IS_WINDOWS or isinstance(pgid, bool) or not isinstance(pgid, int) or pgid <= 0:
+        return []
+    try:
+        proc = subprocess.run(
+            ["ps", "-e", "-o", "pid=,pgid="],
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            creationflags=hidden_flags(),
+        )
+    except OSError:
+        return []
+    if proc.returncode != 0:
+        return []
+    pids = []
+    for line in (proc.stdout or "").splitlines():
+        fields = line.split()
+        if len(fields) != 2:
+            continue
+        try:
+            pid, group = int(fields[0]), int(fields[1])
+        except ValueError:
+            continue
+        if group == pgid and pid > 0:
+            pids.append(pid)
+    return pids
+
+
+def surviving_members(pgid) -> list:
+    """[(pid, identity, group)] for the live members of a group whose leader is gone.
+
+    Read while the runner is still inside the stop it attempted, so the group is
+    provably this run's and each identity is the evidence a later attempt
+    verifies that member against. Empty when the group table cannot be read, or
+    on Windows, where a tree is addressed by pid rather than by group.
+    """
+    if IS_WINDOWS or isinstance(pgid, bool) or not isinstance(pgid, int) or pgid <= 0:
+        return []
+    members = []
+    for pid in sorted(group_member_pids(pgid)):
+        if not pid_alive(pid):
+            continue
+        identity = process_identity(pid)
+        if not identity:
+            continue
+        members.append((pid, identity, pgid))
+    return members
+
+
+def survivor_records(*sources) -> list:
+    """[(pid, identity, group)] for the processes a failed stop recorded alive.
+
+    Written by the runner when its stop could not complete, and by nothing else.
+    A record is never trusted on its own: the caller re-verifies the pid against
+    the identity recorded beside it before anything is signalled, so a doctored
+    or stale record can never aim a signal by itself.
+    """
+    found, seen = [], set()
+    for source in sources:
+        if not isinstance(source, dict):
+            continue
+        records = source.get("survivors")
+        if not isinstance(records, list):
+            continue
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            pid = record.get("pid")
+            if isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0 or pid in seen:
+                continue
+            seen.add(pid)
+            group = record.get("group")
+            if isinstance(group, bool) or not isinstance(group, int) or group <= 0:
+                group = 0
+            identity = record.get("identity")
+            found.append((pid, identity if isinstance(identity, str) else "", group))
+    return found
+
+
+def recorded_survivors(run_dir, state=None, lock=None) -> list:
+    """The survivors a failed stop recorded in this run's lock and state, lock first."""
+    if state is None:
+        state = read_state_file(run_dir)
+    if lock is None:
+        lock = lock_of(run_dir)
+    return survivor_records(lock, state)
+
+
 def lock_of(run_dir) -> dict:
     lock = read_json(os.path.join(run_dir, "lock"), {})
     return lock if isinstance(lock, dict) else {}
@@ -775,7 +976,10 @@ def recorded_processes(run_dir, state=None) -> list:
 
     Identity comes from the field the runner recorded at spawn
     (`pid_identity`/`agent_pid_identity`), and a lock entry is preferred over a
-    state entry for the same pid only when it carries more information.
+    state entry for the same pid only when it carries more information. The
+    processes a failed stop recorded as still alive are appended: they are live
+    members of the agent's group, and they are what keeps a run whose leader is
+    gone visibly alive until a later stop ends them.
     """
     if state is None:
         state = read_state_file(run_dir)
@@ -794,6 +998,9 @@ def recorded_processes(run_dir, state=None) -> list:
                     break
             else:
                 found.append((pid, identity))
+    for pid, identity, _group in recorded_survivors(run_dir, state, lock=lock):
+        if not any(known == pid for known, _ in found):
+            found.append((pid, identity))
     return found
 
 
@@ -812,7 +1019,9 @@ def run_alive(run_dir, state=None) -> bool:
     finalize work that is still being written. Signalling makes the opposite
     choice, because a wrong signal cannot be taken back (see `signal_group`).
     Only a token that was read and differs marks a reused pid; a read that failed
-    leaves the question open and the run alive.
+    leaves the question open and the run alive. The processes a failed stop
+    recorded count too, so a run whose surviving tools outlived their agent is
+    still live and still occupies its slug.
     """
     if state is None:
         state = read_state_file(run_dir)
@@ -1067,33 +1276,77 @@ def signal_group(pid, signum, identity="") -> bool:
     — is a reused or unverifiable pid, and it is never signalled. The
     `os.getpgid(pid)` fallback is gone on purpose: it would signal whatever group
     the pid *now* belongs to, which is exactly the unrelated job this guard keeps
-    safe. A pid that is already gone is different: any process group still bearing
-    that id can only be the one it created, so its surviving members are still
-    signalled.
+    safe. A pid that is already gone is refused for the same reason: a process
+    group id is a pid, and once its leader is gone the id alone proves nothing —
+    after reuse the group bearing it may be a stranger's. A group whose leader has
+    died is signalled only through a verified surviving member
+    (`signal_member_group`), never through the bare id.
     """
     if IS_WINDOWS:
         return False
-    if pid_alive(pid):
-        if not identity_ok(pid, identity):
-            warn(
-                f"not signalling pid {pid}: it is no longer the process this run recorded "
-                f"(identity {'missing' if not identity else 'changed'}); refusing to guess"
-            )
-            return False
-        try:
-            os.killpg(pid, signum)
-            return True
-        except OSError:
-            try:
-                os.kill(pid, signum)
-                return True
-            except OSError:
-                return False
+    if not pid_alive(pid):
+        warn(
+            f"not signalling process group {pid}: the process this run recorded is gone, so "
+            "the group id does not prove the group is this run's; refusing to guess"
+        )
+        return False
+    if not identity_ok(pid, identity):
+        warn(
+            f"not signalling pid {pid}: it is no longer the process this run recorded "
+            f"(identity {'missing' if not identity else 'changed'}); refusing to guess"
+        )
+        return False
     try:
         os.killpg(pid, signum)
         return True
     except OSError:
+        try:
+            os.kill(pid, signum)
+            return True
+        except OSError:
+            return False
+
+
+def signal_member_group(pid, signum, identity="", group=0) -> bool:
+    """Signal a group named by a recorded *member*, never by a bare group id.
+
+    A stop that failed records the members it left alive, each with the identity
+    read while the group was provably this run's. A later attempt may signal that
+    group only through such a member: the member must still be alive and still
+    carry its recorded identity, and the group signalled is the one the member is
+    in now (or the recorded group, which must agree when both are known). Nothing
+    is sent when the member cannot be proven (POSIX only).
+    """
+    if IS_WINDOWS:
         return False
+    if not pid_alive(pid):
+        return False
+    if not identity_ok(pid, identity):
+        warn(
+            f"not signalling the group of pid {pid}: it is no longer the process this run "
+            f"recorded (identity {'missing' if not identity else 'changed'}); refusing to guess"
+        )
+        return False
+    current = process_group(pid)
+    if group and current and current != group:
+        warn(
+            f"not signalling the group of pid {pid}: it now belongs to process group {current}, "
+            f"not the recorded {group}; refusing to guess"
+        )
+        return False
+    target = group or current
+    if target <= 0:
+        warn(f"not signalling the group of pid {pid}: its process group could not be read")
+        return False
+    try:
+        os.killpg(target, signum)
+        return True
+    except OSError:
+        try:
+            os.kill(pid, signum)
+            return True
+        except OSError:
+            return False
 
 
 def group_alive(pgid) -> bool:
@@ -1120,7 +1373,8 @@ def terminate_tree(pid, signum, identity="") -> bool:
     """Stop one recorded process tree, and only when it is provably this run's.
 
     Windows has no groups: `taskkill /T /F` stops a tree by pid, and the same
-    identity gate applies before it runs.
+    identity gate applies before it runs. A `taskkill` that fails is reported and
+    returns False — a stop that did not happen is never reported as one.
     """
     if IS_WINDOWS:
         if not pid_alive(pid):
@@ -1131,13 +1385,27 @@ def terminate_tree(pid, signum, identity="") -> bool:
                 f"(identity {'missing' if not identity else 'changed'}); refusing to guess"
             )
             return False
-        run_quiet(["taskkill", "/T", "/F", "/PID", str(pid)])
+        code = run_quiet(["taskkill", "/T", "/F", "/PID", str(pid)])
+        if code != 0:
+            warn(
+                f"taskkill /T /F /PID {pid} exited {code}: the process tree may still be alive"
+            )
+            return False
         return True
     return signal_group(pid, signum, identity)
 
 
 def terminate_agent(process, agent_identity="") -> tuple:
-    """Stop the agent and the tools under it; return (exit code, surviving pids)."""
+    """Stop the agent and the tools under it; (KILL_EXIT, survivors).
+
+    `survivors` is empty when the stop completed and otherwise names what was
+    still alive after TERM and KILL, as (pid, identity, group) triples read while
+    the group was provably this run's. The caller must not publish a terminal
+    state for a run with survivors (see `report_incomplete_stop`). The escalation
+    branches on the platform: Windows has no `signal.SIGKILL` attribute at all
+    and stops a tree with `taskkill /T /F`, so a POSIX signal number is read only
+    on the branch that uses one (`stop_signal`).
+    """
     agent = process.pid
 
     def settled() -> bool:
@@ -1145,7 +1413,7 @@ def terminate_agent(process, agent_identity="") -> tuple:
         return not tree_alive(agent)
 
     if process.poll() is None:
-        terminate_tree(agent, signal.SIGTERM, agent_identity)
+        terminate_tree(agent, stop_signal(escalate=False), agent_identity)
         for _ in range(20):
             if settled():
                 break
@@ -1155,20 +1423,36 @@ def terminate_agent(process, agent_identity="") -> tuple:
             break
         time.sleep(POLL_SECONDS)
     if not settled():
-        terminate_tree(agent, signal.SIGKILL, agent_identity)
+        terminate_tree(agent, stop_signal(escalate=True), agent_identity)
         for _ in range(20):
             if settled():
                 break
             time.sleep(POLL_SECONDS)
-    return KILL_EXIT, ([] if settled() else [agent])
+    if settled():
+        return KILL_EXIT, []
+    return KILL_EXIT, surviving_members(agent)
+
+
+def stop_signal(escalate: bool):
+    """The signal number for one stop step, or None where signals do not apply.
+
+    Windows has no process groups and no `signal.SIGKILL` attribute at all: its
+    stop is `taskkill /T /F` (`terminate_tree`), which takes no signal number, so
+    the POSIX constants are read only on the branch that actually signals.
+    """
+    if IS_WINDOWS:
+        return None
+    return signal.SIGKILL if escalate else signal.SIGTERM
 
 
 def kill_tree(run_dir, state=None) -> bool:
     """Force an unresponsive run to stop: its groups (POSIX) or its trees (Windows).
 
-    Every signal is gated on the identity recorded at spawn; a recorded pid whose
-    live identity no longer matches is reported and left alone. Returns True once
-    nothing recorded is still alive.
+    Every signal is gated on the identity recorded when the process was seen; a
+    recorded pid whose live identity no longer matches is reported and left
+    alone. A recorded survivor is signalled through its own verified identity
+    (`signal_member_group`) rather than through the bare group id its dead leader
+    left behind. Returns True once nothing recorded is still alive.
     """
     processes = recorded_processes(run_dir, state)
     if not processes:
@@ -1177,16 +1461,33 @@ def kill_tree(run_dir, state=None) -> bool:
         for pid, identity in processes:
             terminate_tree(pid, 0, identity)
         return not any(pid_alive(pid) for pid, _ in processes)
-    for pid, identity in processes:
-        signal_group(pid, signal.SIGTERM, identity)
+    survivors = {
+        pid: (identity, group) for pid, identity, group in recorded_survivors(run_dir, state)
+    }
+
+    def alive(pid) -> bool:
+        record = survivors.get(pid)
+        if record:
+            identity, group = record
+            return pid_alive(pid) or (bool(group) and group_alive(group))
+        return tree_alive(pid)
+
+    def signal_all(signum) -> None:
+        for pid, identity in processes:
+            record = survivors.get(pid)
+            if record:
+                signal_member_group(pid, signum, record[0], record[1])
+            else:
+                signal_group(pid, signum, identity)
+
+    signal_all(signal.SIGTERM)
     for _ in range(20):
-        if not any(tree_alive(pid) for pid, _ in processes):
+        if not any(alive(pid) for pid, _ in processes):
             return True
         time.sleep(POLL_SECONDS)
-    for pid, identity in processes:
-        signal_group(pid, signal.SIGKILL, identity)
+    signal_all(signal.SIGKILL)
     for _ in range(20):
-        if not any(tree_alive(pid) for pid, _ in processes):
+        if not any(alive(pid) for pid, _ in processes):
             return True
         time.sleep(POLL_SECONDS)
     return False
@@ -1559,11 +1860,18 @@ def _finalize_locked(run_dir, exit_code, recovered, note, extra) -> dict:
         pids = "/".join(str(pid) for pid in recorded_pids(run_dir, state)) or "-"
         state["stale_recovered"] = True
         state["note"] = (
-            f"process disappeared without finalizing (backend dsh; runner/agent pids {pids} "
+            f"process disappeared without finalizing (backend {BACKEND}; runner/agent pids {pids} "
             "are gone); finalized with exit -1"
         )
     elif note:
         state["note"] = note
+    # A failed stop publishes `stopping`/`survivors` so the run stays visibly
+    # alive; once a terminal state is committed they are history, not liveness.
+    leftover = survivor_records(state, lock_of(run_dir))
+    state.pop("stopping", None)
+    if leftover:
+        state.pop("survivors", None)
+        state["survivors_stopped"] = [pid for pid, _identity, _group in leftover]
     if extra:
         state.update(extra)
     with open(os.path.join(run_dir, "answer.md"), "w", encoding="utf-8") as handle:
@@ -1587,10 +1895,17 @@ def effective_state(run_dir):
     `running` with nothing alive is a crash (finalized `failed`, exit -1,
     `stale_recovered`), and a run whose state is already terminal but whose
     `finalized` marker is missing died between publishing the state and writing
-    the marker (finalized again from the exit code it recorded).
+    the marker (finalized again from the exit code it recorded). Only a run that
+    is provably this route's is settled (`is_this_route`): a run root can hold
+    other adapters' runs, and finalizing one of those would rewrite artifacts
+    this adapter never wrote — including emptying an existing `answer.md`.
     """
     state = read_state_file(run_dir)
     if os.path.exists(os.path.join(run_dir, "finalized")):
+        return state, False
+    if not is_this_route(state):
+        # Another adapter's run, or a directory whose state names no backend:
+        # shown as it records itself, never recovered and never rewritten.
         return state, False
     recorded = state.get("state")
     if recorded not in ("running", "done", "killed", "failed"):
@@ -1641,7 +1956,9 @@ def events_view(run_dir, state) -> dict:
         truncated = bool(state.get("events_truncated")) or dropped > 0
     return {
         **reported_state(state),
-        "backend": state.get("backend") or "dsh",
+        # Never claim this route for a run whose state does not record it: the
+        # view of another adapter's run says what that run records, or `unknown`.
+        "backend": route_of(state) or "unknown",
         "alive": run_alive(run_dir, state),
         "events_bytes": retained,
         "events_bytes_total": total,
@@ -1877,7 +2194,18 @@ def start_run(args, run_dir, agent, replace, profile, mode, policy) -> int:
     """Initialize and dispatch a fresh run, for `start` or a completed replay."""
     slug = sanitize(args.name)
     if not slug:
-        die("start: --name is required (and must not sanitize to nothing)")
+        die(
+            "start: --name is required (and must not sanitize to nothing; '.' and '..' are "
+            "path components, not run names)"
+        )
+    # Before anything is claimed or written: the directory this run would own has
+    # to be a date bucket's direct child. `--name ..` (and a slug directory that
+    # resolves elsewhere through a symlink) is refused here, never sanitized into
+    # a run that writes its artifacts into the run root or another directory.
+    try:
+        run_dir = checked_run_dir(run_dir)
+    except ValueError as exc:
+        die(f"start: {exc}")
     if getattr(args, "model", None):
         die(
             "start: --model is not supported on the DSH route: the headless app has no model "
@@ -1949,12 +2277,29 @@ def _start_run_claimed(
         if not replace:
             pids = "/".join(str(pid) for pid in recorded_pids(occupant, occupant_state)) or "-"
             die(f"start: run '{slug}' is still running (pid {pids}; use --replace to restart)")
+        if not is_this_route(occupant_state):
+            # Another adapter's run may own this slug; this route neither stops it
+            # nor replaces it, whatever `--replace` asks for.
+            die(
+                f"start: run '{slug}' in {occupant} belongs to backend "
+                f"{route_of(occupant_state) or 'unknown'}, not this route; refusing to stop or "
+                "replace another adapter's run"
+            )
         if not stop_run(occupant, occupant_state):
             die(f"start: could not stop run '{slug}' (see {occupant})")
-    if os.path.isdir(run_dir) and not move_aside(run_dir):
-        # Refuse rather than mix two runs in one directory: the previous run's
-        # `finalized` marker would make the new one look finished.
-        die(f"start: cannot move {run_dir} aside for the new run")
+    if os.path.isdir(run_dir):
+        recorded = read_state_file(run_dir)
+        if recorded and not is_this_route(recorded):
+            # Moving it aside is touching it; a run another route recorded stays
+            # where it is, and this start refuses instead of mixing two routes.
+            die(
+                f"start: {run_dir} holds a run of backend {route_of(recorded) or 'unknown'}, "
+                "not this route; refusing to move another adapter's run aside"
+            )
+        if not move_aside(run_dir):
+            # Refuse rather than mix two runs in one directory: the previous run's
+            # `finalized` marker would make the new one look finished.
+            die(f"start: cannot move {run_dir} aside for the new run")
 
     os.makedirs(run_dir, exist_ok=True)
     if not claim_start(run_dir):
@@ -1973,7 +2318,7 @@ def _start_run_claimed(
         "model": None,
         "thinking": None,
         "max_time": max_time,
-        "backend": "dsh",
+        "backend": BACKEND,
         "profile": profile,
         "permission_mode": mode,
         "approval_policy": policy,
@@ -2002,7 +2347,7 @@ def _start_run_claimed(
         {
             "pid": None,
             "agent_pid": None,
-            "backend": "dsh",
+            "backend": BACKEND,
             "started_at": state["started"],
         },
     )
@@ -2057,7 +2402,7 @@ def _start_run_claimed(
     # polls the state file for how the run ended.
     pids = recorded_pids(run_dir, started)
     print(f"started: {slug}")
-    print("  backend   : dsh")
+    print(f"  backend   : {BACKEND}")
     print(f"  pid       : {pids[0] if pids else '-'}")
     print(f"  run dir   : {run_dir}")
     print(f"  session id: {started.get('session_id') or '(pending)'}")
@@ -2110,6 +2455,10 @@ def wait_for_start(run_dir) -> tuple:
 
 def state_word(run_dir, state, recovered) -> str:
     """The one-word verdict `list` prints, including the resume hint."""
+    if not is_this_route(state):
+        # Another adapter's run (or one that names no backend): listed as it
+        # records itself, and never recovered or rewritten by this route.
+        return f"read-only({route_of(state) or 'unknown'})"
     session = state.get("session_id") or "?"
     if recovered:
         # Just finalized by the recovery path: report what was observed, not the
@@ -2119,6 +2468,8 @@ def state_word(run_dir, state, recovered) -> str:
         run_dir, state
     ):
         return f"GONE (resume with --session-id {session})"
+    if state.get("stopping"):
+        return "stopping"
     if state.get("stale_recovered") and state.get("state") == "failed":
         return "failed(stale)"
     return str(state.get("state"))
@@ -2233,6 +2584,11 @@ def stop_run(run_dir, state=None, seconds=STOP_WAIT_SECONDS) -> bool:
 def cmd_kill(args) -> int:
     run_dir = require_run("kill", args.name)
     state, _ = effective_state(run_dir)
+    if not is_this_route(state):
+        die(
+            f"kill: run '{args.name}' is not this route's (backend "
+            f"{route_of(state) or 'unknown'}); refusing to signal another adapter's run"
+        )
     if os.path.exists(os.path.join(run_dir, "finalized")):
         die(f"kill: run '{args.name}' is already finished (state {state.get('state')})")
     if not run_alive(run_dir, state) and not is_starting(run_dir, state):
@@ -2354,8 +2710,9 @@ def make_tracker(run_dir, state, state_path):
 def wait_for_agent(process, run_dir, requested: threading.Event, deadline, agent_identity="") -> tuple:
     """Wait for dsh, honouring the stop control file, a signal, and the deadline.
 
-    Returns (exit code, surviving pids, stopped_by): the second is non-empty when
-    a process below dsh outlived the signal, and the third names what ended the
+    Returns (exit code, survivors, stopped_by): the second is non-empty when a
+    process below dsh outlived the signal, naming each survivor as (pid,
+    identity, group), and the third names what ended the
     run ("control-file", "signal", "deadline") or "" when dsh ended by itself.
     `agent_identity` is the token read when dsh was spawned; it gates every signal
     so a reused pid is never signalled.
@@ -2375,6 +2732,51 @@ def wait_for_agent(process, run_dir, requested: threading.Event, deadline, agent
         time.sleep(POLL_SECONDS)
 
 
+def report_incomplete_stop(run_dir, survivors, stopped_by="") -> int:
+    """Publish a stop that failed: the run stays live/stopping, never finalized.
+
+    A `killed`+`finalized` run whose processes are still alive tells every reader
+    the slot is free — `kill` refuses to touch it and `start` no longer sees the
+    slug as occupied — while the survivors keep writing to the worktree. This is
+    the opposite record: the run stays `running` with `stopping: true`, and the
+    survivors are named (pid, identity, group) in `state.json` and `lock`, so
+    `run_alive` still finds them, the slug stays occupied, and a later `kill`
+    signals their group through a verified member and settles the run.
+    """
+    records = [
+        {"pid": pid, "identity": identity, "group": group}
+        for pid, identity, group in survivors
+    ]
+    state = read_state_file(run_dir)
+    state.update(
+        {
+            "state": "running",
+            "stopping": True,
+            "survivors": records,
+            "note": (
+                "stop incomplete: "
+                + ", ".join(str(pid) for pid, _identity, _group in survivors)
+                + " still alive after TERM and KILL; the run is not finalized and a later "
+                "`kill` can still stop it"
+            ),
+        }
+    )
+    if stopped_by:
+        state["stopped_by"] = stopped_by
+    write_json(os.path.join(run_dir, "state.json"), state)
+    update_lock(run_dir, survivors=records)
+    print(
+        f"[stop-incomplete] {state.get('name')} state=running "
+        f"survivors={','.join(str(pid) for pid, _identity, _group in survivors)}",
+        flush=True,
+    )
+    warn(
+        f"run in {run_dir} still has live processes after the stop; left running/stopping, "
+        "not finalized"
+    )
+    return 1
+
+
 def runner_main(args) -> int:
     """Run one dsh task in the foreground of the detached process `start` spawned."""
     run_dir = args.run_dir
@@ -2387,6 +2789,17 @@ def runner_main(args) -> int:
             args, run_dir, args.agent, False, args.profile, args.permission_mode,
             args.approval_policy,
         )
+    if run_alive(run_dir, state):
+        # A hand replay of `run.sh`/`run.cmd` arrives here too, and `start`'s
+        # ownership of a live slug must hold for this entry as well: replaying a
+        # run that is still live would overwrite its runner pid, reopen its
+        # artifacts and start a second agent on the same cwd.
+        pids = "/".join(str(pid) for pid in recorded_pids(run_dir, state)) or "-"
+        warn(
+            f"refusing to run {run_dir}: this run is still live (pids {pids}); stop it with "
+            "`kill` before replaying, so two agents never share one cwd"
+        )
+        return 1
     if (args.approval_policy or DEFAULT_APPROVAL_POLICY) != DEFAULT_APPROVAL_POLICY:
         # A replay of an older run may carry a policy this route can no longer
         # honour. Refuse it where the run's own finalizer can record why.
@@ -2467,14 +2880,6 @@ def runner_main(args) -> int:
             extra["stopped_by"] = stopped_by
         if stopped_by == "deadline":
             extra["deadline_exceeded"] = True
-        if survivors:
-            state["survivors"] = survivors
-            state["note"] = (
-                "stopped with processes still alive: "
-                + " ".join(str(pid) for pid in survivors)
-                + "; they were signalled but did not exit"
-            )
-            write_json(state_path, state)
         reader.join(timeout=drain_timeout_seconds())
         # Publication ends before the terminal state is committed. The reader may
         # still be alive (a descendant holds the stream open) and would otherwise
@@ -2492,6 +2897,10 @@ def runner_main(args) -> int:
             write_json(state_path, state)
             extra["stream_incomplete"] = True
         log.finish()
+
+    if survivors:
+        # The stop did not complete: publish that, not a terminal state.
+        return report_incomplete_stop(run_dir, survivors, stopped_by)
 
     note = None
     if stopped_by == "control-file":

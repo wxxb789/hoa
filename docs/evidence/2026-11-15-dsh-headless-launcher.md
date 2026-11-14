@@ -8,19 +8,28 @@ Deliverables: `skills/gdd/scripts/adapters/dsh-run.py`,
 `index.md` / `index.zh-CN.md`, this record; the closeout round added `VERSION` 0.1.62, its `CHANGELOG.md`
 entry and the mirrored `metadata.version` fields of every skill.
 
-Every command below ran from the worktree root. Exit codes are process exit codes. The adapter never
-reads, logs or stores a key, and no credential value appears in this record. The scratch profile the
-smoke used is a copy of the operator's own profile patch (it carries the local provider's
-`Authorization` header); it was copied unread and never printed. The facts the adapter encodes come
-from the measured handoff note given to the implementer (`dsh-headless-facts.md`, outside this
-repository; `@deepseek-ai/dsh` 0.2.2-rc.1).
+Every command below ran from the worktree root. Exit codes are process exit codes. The **adapter** never
+reads, logs or stores a key: apart from removing the three harness-reserved identity names it passes the
+launch environment through to the runner and to the agent, and no credential value appears in this record.
+The recommended shape of a dispatch is therefore environment-only — the profile's `apiKeyEnv` supplies the
+provider key from the launch environment, so no credential has to be copied anywhere. That is how the
+operator's canonical dispatch ran (§ appendix); the author's smoke could not use it from inside this nested
+`workspace-write` sandbox (the default route's key is not exposed there) and used a scratch `DSH_HOME`
+instead, created with the exact command in §5. That scratch copy existed only under `/tmp/dsh-adapter-smoke`
+(a scratch directory owned by the operator's user, outside this repository, the run root and every skill),
+was never the live `$DSH_HOME`, and was never printed or read back into this record. Its cleanup is
+`rm -rf /tmp/dsh-adapter-smoke`, not yet run: on the authoring host the directory is still present at the
+time of this round, as scratch data outside the repository. The
+facts the adapter encodes come from the measured handoff note given to the implementer
+(`dsh-headless-facts.md`, outside this repository; `@deepseek-ai/dsh` 0.2.2-rc.1).
 
-Four correction rounds ran on this increment, plus a closeout round for the repository's own gates:
+Five correction rounds ran on this increment, plus a closeout round for the repository's own gates:
 round 1 (adapter and tests), round 2 (documentation), round 3 (the adapter review findings A1–A8 and
 their tests), the closeout round (`VERSION` 0.1.62, its `CHANGELOG.md` entry and the regenerated
-mirrors), and round 4 (the start-handshake race round 3 introduced, plus this record's re-derived
-numbers). §7 lists each round's files and what it changed; the scope claim in §1 is re-derived from
-`git status --porcelain` on the final tree.
+mirrors), round 4 (the start-handshake race round 3 introduced), and round 5 (the second independent
+machine-review cycle: the adapter findings A1–A7, the test findings B1–B2, the documentation findings
+C1–C4, and this record's numbers re-derived once more on the round-5 tree). §7 lists each round's files
+and what it changed; the scope claim in §1 is re-derived from `git status --porcelain` on the final tree.
 
 ## 1. Contract clause audit
 
@@ -28,11 +37,11 @@ numbers). §7 lists each round's files and what it changed; the scope claim in �
 |---|---|---|
 | 1. stdlib-only adapter, `start/list/status/result/answer/tail/kill`, fixed argument shapes | met | `dsh-run.py` imports the standard library only; `build_parser()` declares all seven commands plus the internal `_run`; `start` takes `--name --prompt [--cwd] [--session-id] [--model] [--thinking] [--max-time] [--resume] [--replace]` |
 | 2. `<run root>/<YYYY-MM-DD>/<SLUG>/` with prompt.md, run.json, events log, stderr.log, exit.code, answer.md, state.json; `state.json` current with the contract fields and the five states | met | `_start_run_claimed()` creates the directory and the first `state.json`; `runner_main()` republishes counters every `STATE_REFRESH_SECONDS`; the real run's directory lists all thirteen artifacts (§5); `state` ∈ `running\|done\|killed\|failed\|unknown` |
-| 3. `start` exits 0 only once the run started; a second `start` for a live slug is refused | met | `wait_for_start()` + `agent_recorded()` and the terminal-startup refusal in `_start_run_claimed()`; `test_28`/`test_29` (an agent that writes `error` and exits at once is a started run: exit 0, finalized `failed` with the error recorded); `test_16` (refusal when the agent cannot spawn, exit 127 recorded); `test_start_fails_when_only_the_runner_recorded_a_pid` (a live runner alone is not a started run); `test_12` (exit 1, `still running`, recorded pid unchanged) |
-| 4. completion = exit 0 **and** last `final` `reason.kind == completed`; otherwise `failed`, `-1` when it died without finalizing, `killed`/143 after a kill; recovery idempotent behind the `finalized` marker | met | verdict ladder in `_finalize_locked()`; `effective_state()` recovery; `test_05` (exit 0 + `aborted` → `failed`), `test_04`, `test_07`, `test_22` (round 1: the **last** of several `final` events decides), and `test_completion_mapping_is_exhaustive` (the real finalizer, eight cases) |
-| 5. `kill` without signals: control file the monitor observes, the run's own finalizer, then escalation | met | `request_stop()`/`wait_for_agent()`/`stop_run()`; `test_08` pins `stopped_by: control-file` from the runner's own finalizer; `test_09` pins the forced escalation when nothing observes the file; the real kill run in §5 shows `stopped_by: control-file` against real `dsh` |
+| 3. `start` exits 0 only once the run started; a second `start` for a live slug is refused | met | `wait_for_start()` + `agent_recorded()` and the terminal-startup refusal in `_start_run_claimed()`; `test_28`/`test_29` (an agent that writes `error` and exits at once is a started run: exit 0, finalized `failed` with the error recorded); `test_16` (refusal when the agent cannot spawn, exit 127 recorded); `test_start_fails_when_only_the_runner_recorded_a_pid` (a live runner alone is not a started run); `test_12` (exit 1, `still running`, recorded pid unchanged); round 5's `test_30` (a `.`/`..` name — or a slug directory that resolves out of its date bucket — is refused before any write) and `test_31` (the recorded `run.sh` refuses a live run rather than starting a second agent on the same cwd) |
+| 4. completion = exit 0 **and** last `final` `reason.kind == completed`; otherwise `failed`, `-1` when it died without finalizing, `killed`/143 after a kill; recovery idempotent behind the `finalized` marker | met | verdict ladder in `_finalize_locked()`; `effective_state()` recovery; `test_05` (exit 0 + `aborted` → `failed`), `test_04`, `test_07`, `test_22` (round 1: the **last** of several `final` events decides), and `test_completion_mapping_is_exhaustive` (the real finalizer, eight cases); the mapping is stated once in the contract's §3 and shared with `omp-run.py`; round 5's `test_32` shows recovery leaves a run another backend recorded untouched, and only runs whose state records `backend: dsh` are finalized |
+| 5. `kill` without signals: control file the monitor observes, the run's own finalizer, then escalation | met | `request_stop()`/`wait_for_agent()`/`stop_run()`; `test_08` pins `stopped_by: control-file` from the runner's own finalizer; `test_09` pins the forced escalation when nothing observes the file; the real kill run in §5 shows `stopped_by: control-file` against real `dsh`; round 5's `test_a_vanished_leader_is_never_signalled` / `test_a_verified_member_names_the_group_of_a_gone_leader` pin the identity gate on group signals, and `test_33` / `test_a_failed_stop_records_survivors_without_finalizing` pin that a stop which cannot end every process stays `running`/`stopping` instead of publishing `killed` |
 | 6. bounded event log reporting `events_bytes`, `events_bytes_total`, `events_truncated`, `events_dropped_bytes`, counters marked `*_partial` | met | `EventLog` reuses `adapters/events-writer.py` with the bound resolved from `DSH_RUN_EVENTS_MAX_BYTES`; `summarize()`/`events_view()` expose the four fields; `turns_partial`, `tool_calls_partial`, `usage_partial`; `test_10` drives a non-zero `events_dropped_bytes` |
-| 7. stub-`dsh` unittest suite covering settled run + exit mapping, stale recovery, control-file kill, event accounting, argv passthrough, second-start refusal | met — green in every round-4 run (twelve runs, six under four-way CPU load), §2 | `test_dsh_run_python.py`, **57 tests**, `OK` (§2): `test_01`/`test_04`, `test_07`, `test_08`, `test_10`, `test_11`, `test_12`, plus round 1's `test_21` (recovery triggered by `result`/`list`/`answer`), `test_22` (last `final` decides), `test_23`, the reserved-identity property tests, and round 4's `test_28`/`test_29` (a fast-failing agent is a started run) |
+| 7. stub-`dsh` unittest suite covering settled run + exit mapping, stale recovery, control-file kill, event accounting, argv passthrough, second-start refusal | met — green in every round-5 run (twelve runs, six under four-way CPU load), §2 | `test_dsh_run_python.py`, **68 tests**, `OK` (§2): `test_01`/`test_04`, `test_07`, `test_08`, `test_10`, `test_11`, `test_12`, plus round 1's `test_21` (recovery triggered by `result`/`list`/`answer`), `test_22` (last `final` decides), `test_23`, the reserved-identity property tests, round 4's `test_28`/`test_29` (a fast-failing agent is a started run), and round 5's `test_30`–`test_33` (bucket escape, live replay, foreign-run recovery, failed stop) with their unit-level pins |
 | 8. transport.md gains the DSH row, the configuration table and the two DSH-specific rules | met | `transport.md` route table row (which also names `dsh-headless-gdd` as this route's operating method); `## DSH headless adapter` + `### DSH configuration`; the cwd rule and `--approval-policy never` rule are the numbered pair in that section; the config table names `DSH_RUN_PROFILE` and states the run-root precedence and the reserved names |
 | 9. goal README row + one real end-to-end dispatch with exit code and artifact paths | met | `docs/goals/README.md` lists this goal as `archived 2026-11-15` with a link to the archived contract; §5 records the author's real `start` → `status` → `answer` (exit 0, `ADAPTER_SMOKE_OK`), and the appendix records the operator's canonical dispatch (`exit.code` 0, `OPERATOR_DISPATCH_OK`) |
 | 10. `skills/dsh-headless-gdd/SKILL.md` exists, declares `kind: mechanism`, and is referenced by the DSH route documentation | met | the skill's frontmatter carries `kind: "mechanism"`; `transport.md`'s DSH route row and the paragraph below the invocation call it this route's operating method; `check_contract_graph.py` passes on the final tree (60 skills, `ok` — a mechanism that no trigger case `must_pick`s), §2 |
@@ -45,15 +54,15 @@ rest are the repository gates.
 
 | Command | Output | Exit |
 |---|---|---|
-| `python3 -B -m unittest discover -s skills/gdd/scripts/tests -p 'test_dsh_run_python.py'` | `Ran 57 tests in 51.230s` → `OK` (tail below; all twelve round-4 runs below) | 0 |
-| `python3 -B -m unittest discover -s scripts -p 'test_*.py'` (repo harness suite) | `Ran 189 tests in 9.537s` → `OK` | 0 |
+| `python3 -B -m unittest discover -s skills/gdd/scripts/tests -p 'test_dsh_run_python.py'` | `Ran 68 tests in 62.266s` → `OK` (tail below; all twelve round-5 runs below) | 0 |
+| `python3 -B -m unittest discover -s scripts -p 'test_*.py'` (repo harness suite) | `Ran 189 tests in 8.836s` → `OK` | 0 |
 | `python3 scripts/check_frontmatter.py` | `check_frontmatter: 60 skills OK` | 0 |
 | `python3 scripts/check_contract_graph.py` | `contract graph: 60 skills, 11 artifacts, ok` | 0 |
 | `python3 scripts/generate_index.py --check` | index current (no output) | 0 |
-| `python3 scripts/check_changelog.py` | `check_changelog: VERSION and CHANGELOG.md both changed` | 0 |
+| `python3 scripts/check_changelog.py --base origin/main` | `check_changelog: VERSION and CHANGELOG.md both changed` | 0 |
 | `cat VERSION` + `python3 scripts/version.py check` | `0.1.62`; check silent (every mirror agrees) | 0 |
 | `python3 -m compileall -q skills/gdd/scripts/adapters/dsh-run.py` | no output | 0 |
-| `python3 skills/gdd/scripts/adapters/dsh-run.py --help` | usage + the contract/config/completion epilog | 0 |
+| `python3 skills/gdd/scripts/adapters/dsh-run.py --help` | `usage: dsh-run.py [-h] {start,_run,status,result,answer,tail,kill,list} ...` + the contract/config/completion epilog | 0 |
 
 Every subcommand's help also ran clean — `start`, `list`, `status`, `result`, `answer`, `tail`,
 `kill`: `--help` → exit 0 each, e.g.
@@ -62,7 +71,7 @@ Every subcommand's help also ran clean — `start`, `list`, `status`, `result`, 
 
 ```text
 ----------------------------------------------------------------------
-Ran 57 tests in 51.230s
+Ran 68 tests in 62.266s
 
 OK
 ```
@@ -72,25 +81,26 @@ The suite drives a stub `dsh` on `PATH` that emits canned headless NDJSON (`sess
 cover settle, a non-zero exit, a wrong `final.reason`, a runner-level `error`, a bare signal, a long
 run for kill/deadline, and a 660 KB flood for the event bound. `setUpClass` prepends a temp `bin/` to
 `PATH` and points `DSH_RUN_ROOT` at a temp tree, so no installed `dsh` and no real run root is touched.
-Suite sha256: `f2c37b5eede0b49789382cb2fe926f37bcc60d62e5bb335c2122b70383b1c04b`.
+Suite sha256 on the round-5 tree: `693e0ccbcdf2fd8c10fb99c437de31c62c56538622728dfe937985e9e66309b7` (adapter sha256: `92e5fe60deed04d60563147ed49a7c2509f98f94b36376aad99e1d7cfe5dc9c0`).
 
-**Stability, re-derived on the final tree.** The suite was run twelve times on this revision (the sha256
-above): six times alone and six times with four busy-loop processes saturating this host's four CPUs.
-All twelve exited 0 with `Ran 57 tests` and `OK`. Every run's summary line:
+**Stability, re-derived on the round-5 tree.** The suite was run twelve times on this revision (the sha256
+above): six times alone and six times with four busy-loop processes saturating this host's four CPUs
+(`nproc` = 4). All twelve exited 0 with `Ran 68 tests` and `OK` — no failure, no error, no skip on this
+Linux host. Every run's summary line:
 
 ```text
-plain-1  exit 0  Ran 57 tests in 51.230s  OK
-plain-2  exit 0  Ran 57 tests in 50.987s  OK
-plain-3  exit 0  Ran 57 tests in 50.695s  OK
-plain-4  exit 0  Ran 57 tests in 50.927s  OK
-plain-5  exit 0  Ran 57 tests in 50.817s  OK
-plain-6  exit 0  Ran 57 tests in 50.489s  OK
-load-1   exit 0  Ran 57 tests in 63.687s  OK
-load-2   exit 0  Ran 57 tests in 92.431s  OK
-load-3   exit 0  Ran 57 tests in 66.723s  OK
-load-4   exit 0  Ran 57 tests in 62.514s  OK
-load-5   exit 0  Ran 57 tests in 62.820s  OK
-load-6   exit 0  Ran 57 tests in 66.194s  OK
+plain-1  exit 0  Ran 68 tests in 62.266s  OK
+plain-2  exit 0  Ran 68 tests in 62.705s  OK
+plain-3  exit 0  Ran 68 tests in 62.288s  OK
+plain-4  exit 0  Ran 68 tests in 61.965s  OK
+plain-5  exit 0  Ran 68 tests in 62.135s  OK
+plain-6  exit 0  Ran 68 tests in 62.221s  OK
+load-1   exit 0  Ran 68 tests in 71.567s  OK
+load-2   exit 0  Ran 68 tests in 71.544s  OK
+load-3   exit 0  Ran 68 tests in 71.815s  OK
+load-4   exit 0  Ran 68 tests in 71.905s  OK
+load-5   exit 0  Ran 68 tests in 71.757s  OK
+load-6   exit 0  Ran 68 tests in 72.020s  OK
 ```
 
 The round-2 note recorded one unidentified failure in fifteen runs. Round 4 identified it as the `start`
@@ -105,16 +115,28 @@ launcher suite; §6 records the command and the failure.
 
 Each mutant was applied to a **copy** of `skills/gdd/scripts` under `/tmp` (the worktree adapter was never
 written), the full suite was run from that copy, and the copy was removed. The worktree adapter's sha256
-on the final tree is `67beb532118d5a0d66eda477bc63a13584da6ac7a543b1980f22a1aaf8a69339`. A mutant that
-survived would mean the suite does not pin the clause.
+on the round-5 tree is `92e5fe60deed04d60563147ed49a7c2509f98f94b36376aad99e1d7cfe5dc9c0`. A mutant that
+survived would mean the suite does not pin the clause. The four mutants below were re-run on the round-5
+tree (68 tests each, ~62 s each, all measured):
 
-| Removed behaviour | Suite result (57 tests) |
+| Removed behaviour | Suite result (68 tests) |
 |---|---|
 | completion no longer checks `final_reason` (`exit 0` alone is `done`) | `FAILED (failures=5)` |
 | the runner no longer records `stopped_by` | `FAILED (failures=1, errors=1)` |
 | the resolved `DSH_RUN_EVENTS_MAX_BYTES` is not handed to the bounded writer | `FAILED (failures=1)` |
-| stale recovery finalizes nothing | `FAILED (failures=7)` |
-| unmutated tree | `Ran 57 tests ... OK` (§2) |
+| stale recovery finalizes nothing | `FAILED (failures=6)` |
+| unmutated tree | `Ran 68 tests in 62.734s` → `OK` (§2) |
+
+**Round 5's own pins, verified the same way.** Thirteen further mutants were applied one at a time to a
+copy, each reverting exactly one round-5 fix, and only that fix's new test(s) were run against the copy
+(a pinned test must fail there). All thirteen were pinned: the `.`/`..` guard in `sanitize`; the date-bucket
+proof in `checked_run_dir`; the leader-gone refusal in `signal_group`; the identity gate in
+`signal_member_group`; the survivors branch in the runner and the survivors in `recorded_processes`; the
+live-run refusal in `_run`; the `backend: dsh` gate in `effective_state`, in `cmd_kill` and in
+`start --replace`; the `TZ`/`LC_ALL` view of the `ps` identity probe; the platform branch in
+`stop_signal`; and the `taskkill` failure check. Each mutant's targeted run reported `FAILED`/`ERROR`
+(the `signal.SIGKILL`-on-Windows mutant errors with `AttributeError`); the copy was restored from the
+worktree adapter before each mutant, so every mutation started from the pristine file.
 
 ## 4. Stub-suite coverage map
 
@@ -124,7 +146,11 @@ survived would mean the suite does not pin the clause.
 | exit-code and completion mapping | `test_04`, `test_05`, `test_06`, `test_22`, `test_completion_mapping_is_exhaustive`, `test_a_final_with_a_null_reason_is_not_completion`, `test_killed_exit_codes_are_the_documented_set`, `test_the_killed_mapping_documents_both_routes` |
 | `start` dispatch confirmation: the recorded agent is the proof, alive or gone | `test_28`, `test_29`, `test_16`, `test_start_fails_when_only_the_runner_recorded_a_pid` |
 | stale recovery, idempotence, marker repair, claim exclusivity | `test_07`, `test_21`, `test_stale_recovery_is_the_only_path_to_exit_minus_one`, `test_a_terminal_state_without_a_marker_is_repaired_from_its_exit_code`, `test_the_tracker_stops_publishing_before_the_verdict_is_committed`, `test_a_held_finalize_claim_stops_a_reader_from_finalizing`, `test_write_json_temp_names_are_unique_per_call` |
-| kill through the control file + forced escalation, identity-gated signals | `test_08`, `test_09`, `test_12b`, `test_19`, `test_a_recycled_pid_is_not_alive_for_this_run`, `test_signal_group_refuses_a_pid_it_cannot_prove`, `test_kill_tree_leaves_an_unverified_pid_alone` |
+| kill through the control file + forced escalation, identity-gated signals | `test_08`, `test_09`, `test_12b`, `test_19`, `test_a_recycled_pid_is_not_alive_for_this_run`, `test_signal_group_refuses_a_pid_it_cannot_prove`, `test_kill_tree_leaves_an_unverified_pid_alone`, `test_a_vanished_leader_is_never_signalled`, `test_a_verified_member_names_the_group_of_a_gone_leader`, `test_the_stop_escalation_branches_on_the_platform`, `test_a_failing_taskkill_is_reported_not_assumed` |
+| a stop that cannot end every process stays live/stopping until a later attempt | `test_33`, `test_a_failed_stop_records_survivors_without_finalizing`, `test_a_recycled_pid_is_not_alive_for_this_run` |
+| slug/date-bucket escape and live-run replay refused before any write | `test_30`, `test_31`, `test_a_run_dir_must_be_a_direct_child_of_a_date_bucket` |
+| route-scoped discovery, recovery and signalling (`backend: dsh` only) | `test_32` |
+| identity probe's own view (`TZ`/locale fixed) | `test_the_ps_identity_probe_fixes_its_own_view` |
 | event-bound accounting | `test_10`, `test_events_bound_is_configuration_with_a_honest_default`, `test_the_adapter_reuses_the_shared_bounded_writer` |
 | argv/stdin passthrough, `--session-id`/`--resume`, `gdd.py` launch shape, Windows dispatch spelling | `test_11`, `test_summarize_reads_the_dsh_session_and_usage_shape`, `test_option_like_values_survive_argparse`, `test_gdd_launch_shape_is_accepted`, `test_cmd_arguments_that_cmd_would_split_are_refused`, `test_a_generated_replay_script_quotes_what_cmd_would_parse` |
 | second-`start` refusal, `--replace`, refusals, parser edges, cross-date occupancy | `test_12`, `test_12b`, `test_14`, `test_25`, `test_26`, `test_27`, `test_parser_edge_cases`, `test_sanitize_matches_the_reference_slug_rule` |
@@ -140,8 +166,8 @@ Scratch directory `/tmp/dsh-adapter-smoke/` with `work/` (the run's cwd), `home/
 ```bash
 mkdir -p /tmp/dsh-adapter-smoke/{work,home,runs}
 cp -a <HOME>/.dsh/profiles /tmp/dsh-adapter-smoke/home/profiles   # scratch DSH_HOME; never the live one
-# then point the scratch copy's headless/cordis.patch.yml at a provider route reachable from this
-# sandbox (see the deviation note below)
+# the profile is used as it is: the route resolves its provider key from the launch environment
+# (the profile's apiKeyEnv), which is the recommended shape; see the deviation note below
 cd <worktree>
 export DSH_HOME=/tmp/dsh-adapter-smoke/home
 export DSH_BIN=$(command -v dsh)          # resolved on this host to <HOME>/.npm-global/bin/dsh, 0.2.2-rc.1
@@ -149,6 +175,10 @@ export GDD_RUN_ROOT=/tmp/dsh-adapter-smoke/runs
 unset DSH_PROFILE DSH_PROFILE_DIR DSH_SESSION_ID   # the harness's own identity; reserved names, never the adapter's
 printf 'Reply with exactly: ADAPTER_SMOKE_OK\n' > /tmp/dsh-adapter-smoke/prompt.md
 ```
+
+The scratch copy's cleanup is `rm -rf /tmp/dsh-adapter-smoke` (not yet run: it is still present on the
+authoring host, owned by the operator's user). Nothing in it was printed, read back into this record or
+committed, and it is not the live `$DSH_HOME`.
 
 Then, in this order:
 
@@ -161,7 +191,7 @@ python3 skills/gdd/scripts/adapters/dsh-run.py answer adapter-smoke
 
 This dispatch ran before round 1 renamed the adapter's profile key: the environment above unsets the
 three harness-reserved names, so the same block selects profile `headless` under the final adapter; it
-was not re-run in rounds 2–4.
+was not re-run in rounds 2–5.
 
 `start` exited **0**:
 
@@ -261,14 +291,20 @@ a model run.
 This authoring session runs inside a `workspace-write` file sandbox. `dsh` writes
 `$DSH_HOME/profiles/headless/cordis.yml` on every boot, and the default `$DSH_HOME` (`<HOME>/.dsh`) is
 outside that sandbox, so a direct `dsh --profile headless …` from here fails with
-`EACCES: permission denied, open '<HOME>/.dsh/profiles/headless/cordis.yml'`. The smoke
-therefore used a scratch `DSH_HOME` (a copy of `<HOME>/.dsh/profiles`, 2 MB of symlinks into the installed
-CLI) with the model route of its `cordis.patch.yml` pointed at this host's local provider
-(`<PROVIDER>` → `<PROVIDER_ENDPOINT>`, model `<MODEL>`, `reasoningEffort: low`), because the
-default route resolves its key through the launch environment
-(`<PROVIDER_API_KEY>`, the profile's `apiKeyEnv`) and this sandbox does not expose it. The CLI,
-the profile composition, the model call, the NDJSON stream and the exit codes are real; only the
-scratch home and the provider route differ from a canonical dispatch.
+`EACCES: permission denied, open '<HOME>/.dsh/profiles/headless/cordis.yml'`. The smoke therefore used a
+scratch `DSH_HOME`: exactly the `mkdir -p` + `cp -a` block above, a copy of `<HOME>/.dsh/profiles`
+(2 MB of `node_modules` symlinks into the installed CLI plus the per-profile trees; the profile this route
+composes, `headless/`, is 24 KB of configuration). That copy matched the live tree with no differences
+outside the installed `node_modules` — including the profile's patch layer, which is the empty list `[]`
+in both — so the provider route and its key were the profile's own configuration read from the launch
+environment (`<PROVIDER_API_KEY>`, the profile's `apiKeyEnv`), not something written into a copied file.
+The recommended shape, and the one the operator's canonical dispatch used (§ appendix), is exactly that
+environment-only form with the live `$DSH_HOME`, so no profile file is ever copied; the author's nested
+sandbox could not write the live profile directory and took the scratch route instead. The copy lived only
+under `/tmp/dsh-adapter-smoke/home` (a scratch directory owned by the operator's user, outside this
+repository), was never printed, and its cleanup is `rm -rf /tmp/dsh-adapter-smoke`. The CLI, the profile
+composition, the model call, the NDJSON stream and the exit codes are real; only the scratch home differs
+from a canonical dispatch.
 
 `dsh`'s own stderr in the run is diagnostics, as the facts note says, and carried one sandbox
 artifact — the `spill-local` plugin could not create its scratch directory outside the workspace:
@@ -282,9 +318,12 @@ adapter reads nothing from stderr.
   not that any stage's answer is correct. The intermittent red run the round-2 note recorded is
   identified and fixed in round 4: the `start` handshake refused a run whose agent emitted `error` and
   exited before the confirmation read, and `test_28`/`test_29` pin the fixed behaviour. The suite was
-  green in all twelve round-4 runs, six of them under four-way CPU load (§2).
-- The author's real dispatch used the scratch profile described above; rounds 2–4 did not re-run it. No
-  run was made here against the operator's live `<HOME>/.dsh`, and no credential was read or stored.
+  green in all twelve round-5 runs, six of them under four-way CPU load (§2).
+- The author's real dispatch used the scratch `DSH_HOME` described in §5; rounds 2–5 did not re-run it. No
+  run was made here against the operator's live `<HOME>/.dsh`. The adapter neither reads nor stores a
+  credential: it passes the launch environment through, and the scratch copy — described in §5 with its
+  exact `mkdir -p`/`cp -a` command and its `rm -rf` cleanup — was never printed or committed. Rounds 2–5
+  re-ran the stub suite, not a real model dispatch.
 - The operator's canonical dispatch (§ appendix) is the run on the default profile route; its numbers
   come from the run directory itself.
 - The Windows branch (hidden console, `taskkill /T /F`, `%COMSPEC%` shim handling) is implemented by
@@ -299,14 +338,22 @@ adapter reads nothing from stderr.
 - `usage` is the last `status` event's token accounting as DSH reported it (`total_tokens` includes
   cache reads); the adapter neither sums nor re-derives it, and marks it `usage_partial` when the
   event log was truncated.
-- **Environment note — the one pull-request CI step that cannot go green here.** CI runs the frozen OMP
+- **Environment note — the one CI step that cannot go green *on this host*.** CI runs the frozen OMP
   launcher suite, `python3 skills/gdd/scripts/tests/test_omp_run_python.py` (both of its files are
   untouched by this increment). On this host it reports `Ran 45 tests in 85.129s` →
   `FAILED (failures=1, skipped=3)`; the one failure is `test_18_tmux_backend_owns_its_session`, whose
   `start --backend tmux` cannot create a session: `omp-run: start: tmux new-session failed for
   omp-tmux-18`, and a direct probe gives the reason — `create window failed: fork failed: Permission
-  denied`. This sandbox cannot fork for tmux; CI's `ubuntu-latest` can, so the step passes there. Nothing
-  was edited to make it pass.
+  denied`. This sandbox cannot fork for tmux, so the failure is environment-caused; nothing was edited to
+  make it pass.
+- **The pull request's own CI result at the reviewed head (a measured fact, not an expectation).** Run
+  [43650076593](https://github.com/wxxb789/hoa/actions/runs/43650076593) (`event: pull_request`, head
+  `db557b340723da83674b30eec26bb3ff3d58a386`, conclusion `success`): the `test` job — the one that runs the
+  OMP launcher suite above — succeeded (job
+  [132616353053](https://github.com/wxxb789/hoa/actions/runs/43650076593/job/132616353053)), and the
+  `release` job is `skipped` on pull requests (job
+  [132616970103](https://github.com/wxxb789/hoa/actions/runs/43650076593/job/132616970103)). The tmux
+  failure recorded here is therefore this sandbox's, not the branch's.
 
 ## 7. Correction rounds and the final-tree scope
 
@@ -353,16 +400,55 @@ spawned an agent still fails `start` and an occupied slug is still refused. `tes
 deterministically (the runner is driven to completion before confirmation, so no sleep or timeout is
 involved) and `test_29` pins the same through the real detached CLI; the suite grew from 55 to 57 tests.
 
+Round 5 (`fix-5-second-review.md`) answered the second independent machine-review cycle on the committed
+head (`db557b3`); every finding below was accepted and fixed:
+
+- **Adapter (A1–A7).** `start` refuses `.` and `..` and any run directory that is not a date bucket's
+  direct child (`checked_run_dir`), before any write (A1); a process group whose leader is gone is never
+  signalled by its bare id — only through a recorded member whose live identity still matches
+  (`signal_member_group`), or not at all (A2); a stop that leaves processes alive publishes no terminal
+  state — the run stays `running` with `stopping: true` and the survivors (pid, identity, group) recorded
+  in `state.json` and `lock`, so it stays live for `run_alive`, stays occupied for `start`, and a later
+  `kill` settles it through the survivors' identities (A3); `_run` refuses a run that is still live, so
+  replaying a running run's `run.sh` cannot overwrite its runner pid or start a second agent on the same
+  cwd (A4); discovery, recovery and signalling are scoped to runs whose `state.json` records
+  `backend: dsh` — another route's run is listed `read-only(<backend>)` and is never finalized, rewritten,
+  moved aside or signalled (A5); the `ps -o lstart=` identity probe runs with `TZ=UTC` and `LC_ALL=C` for
+  that call only, so the caller's timezone is no longer part of the token (A6); the stop escalation
+  branches on the platform — Windows never reads `signal.SIGKILL` (`stop_signal`), and a failing
+  `taskkill` is reported instead of assumed (A7).
+- **Tests (B1, B2).** The POSIX-only signal test is skipped on Windows (B1); the two hand-written recovery
+  fixtures now record `backend: dsh`, like every run the adapter writes, so the A5 gate is exercised
+  against this route's own runs. New pins: `test_30`–`test_33` (bucket escape, live replay, foreign-run
+  recovery, failed stop) plus `test_a_vanished_leader_is_never_signalled`,
+  `test_a_verified_member_names_the_group_of_a_gone_leader`,
+  `test_a_failed_stop_records_survivors_without_finalizing`,
+  `test_a_run_dir_must_be_a_direct_child_of_a_date_bucket`,
+  `test_the_ps_identity_probe_fixes_its_own_view`,
+  `test_the_stop_escalation_branches_on_the_platform` and
+  `test_a_failing_taskkill_is_reported_not_assumed`; the suite grew from 57 to 68 tests. The archived
+  goal's failure-control clause now states the exit→state mapping once — `killed` for the adapter's own
+  stop and for a signal-convention exit (`KILLED_EXITS`), `failed` for any other non-signal non-zero
+  exit, `failed`/`-1` with `stale_recovered` for an unfinalized death — matching `omp-run.py` rather than
+  changing either adapter's mapping (B2).
+- **Documentation (C1–C4).** The credential claim is precise: the adapter never reads, logs or stores a
+  key and passes the environment through; the environment-only dispatch (the profile's `apiKeyEnv` in the
+  launch environment) is the recommended and canonical shape; the smoke's scratch copy is described with
+  its exact `mkdir -p`/`cp -a` command and its `rm -rf` cleanup, and the unsupported "carries the
+  Authorization header" / "no credential was stored" pair is gone (C1). The skill's opening no longer
+  promises a write boundary the working directory cannot give: the permission policy sets the boundary,
+  `--cwd` selects the workspace, and changing either requires re-confirming it (C2). The CI claim cites
+  the measured run — [43650076593](https://github.com/wxxb789/hoa/actions/runs/43650076593), `test`
+  success, `release` skipped on pull requests — instead of predicting `ubuntu-latest` (C3). The
+  changelog's exact count is re-derived from the final tree (68 tests), not the stale 55 (C4).
+
 The contract file was moved with a plain filesystem move (`mv`): it was untracked, and this session's
 sandbox cannot write the git index (`.git/worktrees/hoa-wt/index.lock` resolves outside the workspace),
 so `git mv` was not available. The worktree is left dirty for the operator to commit; no commit, push or
 branch switch was made.
 
-Final-tree scope, `git status --porcelain` re-derived on the final tree. The increment's own files are the
-five untracked entries and `docs/goals/README.md` / `index.md` / `index.zh-CN.md` /
-`skills/gdd/references/transport.md`; the other sixty-one modified entries are the closeout round's
-mechanical bookkeeping (`VERSION`, `CHANGELOG.md` and the `metadata.version` mirror in every existing
-`SKILL.md`):
+Round-4 tree scope, kept as it was recorded then (the increment was still uncommitted, and the closeout
+round's mirror bookkeeping sat in the same working tree):
 
 ```text
  M CHANGELOG.md
@@ -436,6 +522,22 @@ mechanical bookkeeping (`VERSION`, `CHANGELOG.md` and the `metadata.version` mir
 ?? skills/gdd/scripts/adapters/dsh-run.py
 ?? skills/gdd/scripts/tests/test_dsh_run_python.py
 ```
+
+Round-5 final-tree scope, `git status --porcelain` re-derived on the round-5 tree. The increment is
+committed as `db557b3`, and round 5 modifies exactly the six files this second review cycle was allowed to
+change and nothing else — no `VERSION`, no version mirror, no index, no other adapter, no new dependency:
+
+```text
+ M CHANGELOG.md
+ M docs/evidence/2026-11-15-dsh-headless-launcher.md
+ M docs/goals/archive/2026-11-15-dsh-headless-launcher.md
+ M skills/dsh-headless-gdd/SKILL.md
+ M skills/gdd/scripts/adapters/dsh-run.py
+ M skills/gdd/scripts/tests/test_dsh_run_python.py
+```
+
+The round-5 scope block above is the command's real output and was re-derived once more after the last
+edit of the cycle.
 
 ## Appendix — the operator's canonical dispatch
 
