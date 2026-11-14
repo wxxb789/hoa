@@ -15,7 +15,8 @@ Chat Completions route. Validate that transport in the operator-selected configu
 run; do not infer compatibility from a model name or hard-code an endpoint/port here.
 
 Set `PR`, `GDD_SKILL`, `REVIEW_PROVIDER`, `REVIEW_MODEL`, `REVIEW_PROMPT`, `REVIEW_DIFF`,
-`REVIEW_REPORT`, `REVIEW_LOG`, `REVIEW_COMMENT`, `REVIEW_RECEIPT`, and a freshly fetched `BASE_REF`
+`REVIEW_REPORT`, `REVIEW_LOG`, `REVIEW_COMMENT`, `REVIEW_RECEIPT`, `REVIEW_SESSION_DIR`,
+`REVIEW_REGISTRY`, and a freshly fetched `BASE_REF`
 from the project profile or operator input. Identifiers have **no fallback**. Paths belong to the
 task's evidence directory, not a runtime configuration directory. Prepare the prompt with the full
 head, acceptance contract, review scope, and instructions to report concrete findings (severity,
@@ -29,18 +30,53 @@ REVIEW_HEAD=$(git rev-parse HEAD)
 test "$REVIEW_HEAD" = "$(gh pr view "$PR" --json headRefOid --jq .headRefOid)" || exit 2
 test -z "$(git status --porcelain)" || exit 2  # review only the committed PR tree
 git diff "$BASE_REF...$REVIEW_HEAD" > "$REVIEW_DIFF" || exit 2
+# Pi accepts fuzzy patterns. Require an exact provider/id registry row first.
+pi --offline --list-models > "$REVIEW_REGISTRY" || exit 2
+python - "$REVIEW_REGISTRY" "$REVIEW_PROVIDER" "$REVIEW_MODEL" <<'PY'
+import sys
+from pathlib import Path
+rows = [line.split() for line in Path(sys.argv[1]).read_text().splitlines()]
+if not any(row[:2] == sys.argv[2:4] for row in rows):
+    raise SystemExit("requested provider/model is not an exact registry entry")
+PY
+test "$?" -eq 0 || exit 2
+# Use a fresh per-round directory so old receipts cannot satisfy this run.
+test ! -e "$REVIEW_SESSION_DIR" || exit 2
 if pi -p --provider "$REVIEW_PROVIDER" --model "$REVIEW_MODEL" \
+    --session-dir "$REVIEW_SESSION_DIR" \
     "@$REVIEW_PROMPT" "@$REVIEW_DIFF" > "$REVIEW_REPORT" 2> "$REVIEW_LOG"; then
   test -s "$REVIEW_REPORT" || exit 2
 else
   exit 2  # preserve failed-run artifacts; do not label them completed evidence
 fi
+python - "$REVIEW_SESSION_DIR" "$REVIEW_PROVIDER" "$REVIEW_MODEL" <<'PY'
+import json, sys
+from pathlib import Path
+files = list(Path(sys.argv[1]).rglob("*.jsonl"))
+if len(files) != 1:
+    raise SystemExit("expected exactly one current-run session receipt")
+records = [json.loads(line) for line in files[0].read_text().splitlines()]
+requested = tuple(sys.argv[2:4])
+selected = [(r.get("provider"), r.get("modelId")) for r in records
+            if r.get("type") == "model_change"]
+answers = [r["message"] for r in records if r.get("type") == "message"
+           and r.get("message", {}).get("role") == "assistant"]
+if not selected or any(pair != requested for pair in selected) or not answers:
+    raise SystemExit("resolved model receipt missing or differs from requested exact ID")
+if any((m.get("provider"), m.get("model")) != requested for m in answers):
+    raise SystemExit("assistant runtime provider/model differs from requested exact ID")
+if sys.argv[3].startswith("gpt-") and any(m.get("api") != "openai-responses" for m in answers):
+    raise SystemExit("GPT review did not use the Responses transport")
+print("runtime provider/model receipt verified")
+PY
+test "$?" -eq 0 || exit 2
 test "$REVIEW_HEAD" = "$(git rev-parse HEAD)" || exit 2
 test -z "$(git status --porcelain)" || exit 2
 test "$REVIEW_HEAD" = "$(gh pr view "$PR" --json headRefOid --jq .headRefOid)" || exit 2
 ```
 
-Keep the invocation, prompt, exact diff, stderr/exit result, and **unabridged actual report** as the
+Keep the exact registry row, session receipt with actual provider/model/API, invocation, prompt,
+exact diff, stderr/exit result, and **unabridged actual report** as the
 review provenance. A push/rebase invalidates the old review; repeat the entire run on the new head.
 Do not assume a push triggers a hosted bot, or use an unpinned hosted verdict as this lane's evidence.
 
@@ -57,15 +93,16 @@ python "$GDD_SKILL/scripts/review-evidence.py" \
   --findings "$REVIEW_FINDINGS" --output "$REVIEW_COMMENT" || exit 2
 ```
 
-The generated comment contains one HTML marker and JSON with this required schema:
+The generated comment starts with a plain marker token and JSON (the gate also accepts an HTML-comment
+envelope). No preamble or HTML delimiter precedes the token, avoiding custom-token collisions:
 
 ```text
-<!-- machine-review-state:v1 {"code_review":{
+machine-review-state:v1 {"code_review":{
   "status":"completed","has_any_findings":false,
   "commit_sha":"<exact full 40-hex PR head>",
   "model":"<operator-selected model>","provider":"<configured provider>",
   "report":"<entire exact UTF-8 report>","report_sha256":"<lowercase SHA256>"
-}} -->
+}}
 ```
 
 JSON escapes are lossless: the hash is over the report string re-encoded as UTF-8, identical to the
@@ -74,7 +111,8 @@ Whitespace-only reports, invalid UTF-8, missing/blank model/provider, abbreviate
 wrong types, duplicate JSON keys, and hash mismatches block. Do not truncate a report to fit a comment;
 if GitHub refuses its size, retain the report and report a blocker or scope a new complete review.
 The digest proves integrity, not reviewer identity, invocation provenance, or the truth of a verdict;
-the operator remains responsible for matching the flags to the actual configured run and report.
+the operator must verify registry/runtime receipts before stamping the flags. Another adapter must
+expose the actual resolved provider/model receipt too; a requested CLI pattern is insufficient.
 
 `--marker TOKEN` is available on both generator and merge gate for another installation, but it
 changes **only the token**, never the schema or validation. The default is

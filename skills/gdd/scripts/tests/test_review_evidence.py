@@ -63,7 +63,7 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual(report.encode("utf-8"), REPORT.encode("utf-8"))
         self.assertEqual(evidence["code_review"]["report_sha256"],
                          hashlib.sha256(REPORT.encode("utf-8")).hexdigest())
-        self.assertEqual(body.count("-->"), 1)
+        self.assertEqual(body.count("-->"), 0)
         self.assertNotEqual(report_digest(REPORT), report_digest(REPORT.replace("\r\n", "\n")))
         self.assertNotEqual(report_digest("é"), report_digest("e\u0301"))
 
@@ -270,6 +270,15 @@ class GeneratorCLITests(unittest.TestCase):
         review = gate.evaluate_review([{"body": body}], HEAD, "operator:v2")
         self.assertFalse(review["pass"])
         self.assertEqual(review["reason"], "findings")
+
+    def test_custom_tokens_cannot_collide_with_generated_preamble(self):
+        for marker in ["review", "evidence", "Machine", "JSON", "-", "--", "v1"]:
+            with self.subTest(marker=marker):
+                result = self.run_cli(self.args + ["--marker=" + marker])
+                self.assertEqual(result.returncode, 0, result.stderr)
+                body = result.stdout.decode("utf-8")
+                self.assertTrue(body.startswith(marker + " "))
+                self.assertTrue(gate.evaluate_review([{"body": body}], HEAD, marker)["pass"])
 
     def test_each_required_flag_is_required(self):
         for index in range(0, len(self.args), 2):

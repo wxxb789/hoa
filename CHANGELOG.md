@@ -27,6 +27,9 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   headless review lane, configured Responses-route requirements for GPT-family endpoints,
   full-report evidence generation, exact PR-comment readback, head rechecks, and finding/thread
   dispositions. No login, credentials, services, runtime configuration, or model defaults are changed.
+- Custom-token evidence starts directly with the token, avoiding heading/delimiter collisions.
+  The reference lane rejects fuzzy-only registry matches and verifies actual resolved model/provider
+  and Responses transport from a fresh runtime session receipt before stamping provenance.
 - Bumped the shared skill/catalog version from `0.1.59` to `0.1.60`.
 
 ## [0.1.59] — 2026-11-14

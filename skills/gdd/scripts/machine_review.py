@@ -170,4 +170,5 @@ def evidence_comment(evidence, marker=DEFAULT_MARKER):
     payload = json.dumps(evidence, ensure_ascii=True, separators=(",", ":"), allow_nan=False)
     for char in "<>&":
         payload = payload.replace(char, f"\\u{ord(char):04x}")
-    return f"Machine review evidence (full report embedded in JSON).\n\n<!-- {marker} {payload} -->\n"
+    # Preambles and HTML delimiters can collide with supported custom tokens.
+    return f"{marker} {payload}\n"
