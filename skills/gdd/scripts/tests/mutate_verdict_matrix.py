@@ -215,6 +215,22 @@ MUTATIONS = [
     "table/canceled": "CANCELLED",
     "table/timed_out": "NEUTRAL",""",
      "two token meanings are exchanged in memory: neutral now blocks and timed_out is ok"),
+    ("fallback-accepts-any-nonzero-exit",
+     "        if returncode not in (1, 8):",
+     "        if False:",
+     "every non-zero fallback exit is accepted as CI data, so an operator error (gh's 2 "
+     "cancellation, 4 authentication, a signal's negative code) reads as `checks pending`"),
+    ("both-opt-ins-suppress-a-non-green-verdict",
+     '    elif not checks["pass"]:',
+     '    elif not checks["pass"] and not (allow_no_checks and allow_table_only_checks):',
+     "the two opt-ins together suppress a non-green checks verdict, though each covers only its "
+     "own read and neither forgives a reported pending or failing check"),
+    ("json-rows-deduplicated-by-name",
+     '            return [bucket_check(entry) for entry in data], "json"',
+     '            return list({entry.get("name"): bucket_check(entry) for entry in data}.values()),'
+     ' "json"',
+     "structured rows are indexed by name, so a repeated check name collapses two rows into one "
+     "and a failing row vanishes"),
 ]
 
 

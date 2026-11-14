@@ -312,12 +312,25 @@ def fetch_checks(pr, repo):
                         + type(entry).__name__
                     )
             return [bucket_check(entry) for entry in data], "json"
-    # Fallback: the human table. `gh pr checks` exits 8 while any check is pending and 1 when one
-    # failed — with a table that parses, that is the CI state, not a CLI failure.
+    # Fallback: the human table. `gh pr checks` exits 1 when a check failed and 8 while one is
+    # pending; with a table that parses, those two are the CI state, not a CLI failure.
     returncode, stdout, stderr = sh_raw(["gh", "pr", "checks", str(pr)], cwd=repo)
     checks = parse_text_checks(stdout)
     if returncode != 0:
         message = (stderr or stdout).strip()
+        # Only the documented check-result exits carry CI state. Any other non-zero exit — gh's 2
+        # (cancellation), 4 (authentication), a signal's negative code — is an operator error, and
+        # a pending or failing table beside it must not launder it into a `checks pending`/`checks`
+        # verdict (exit 1) while the diagnostic is discarded. Raise it as an operator error (exit
+        # 2), preserving the exit code and the message.
+        if returncode not in (1, 8):
+            detail = message.splitlines()[0] if message else ""
+            raise GateError(
+                "gh pr checks: exit {} is not a check result (1 failing, 8 pending)".format(
+                    returncode
+                )
+                + (": " + detail if detail else "")
+            )
         if not checks:
             # `gh pr checks` exits 1 with "no checks reported" when nothing registered yet (or ever,
             # for a repo with no CI). That is an empty read, not a CLI failure — otherwise the

@@ -27,7 +27,11 @@ field count, emptiness, case and row set are not a contract, and every parse of 
 another way to lose a row. An operator whose gh cannot do `--json` restores the table's authority
 explicitly with `--allow-table-only-checks` (named in `pr-merge-check.py`'s docstring as well); the
 default fails closed, and the opt-in bypasses neither the exact-header rule nor the unknown-verdict
-rule.
+rule. In that fallback only gh's check-result exits carry CI state — 1 (a check failed) and 8 (a
+check is pending). Any other non-zero exit is an operator error: it exits 2 with its own exit code
+and message preserved, so an interrupted (2) or unauthorised (4) read cannot become a `checks
+pending` verdict. `--allow-no-checks` forgives only a *structured* zero-check read, and neither
+opt-in forgives a reported pending or failing check, with or without the other.
 
 `--marker TEXT` changes only the token, not the required evidence schema. The newest malformed,
 incomplete, stale, or hash-invalid marker blocks older clean evidence and cannot be overridden by

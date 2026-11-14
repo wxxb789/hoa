@@ -7,6 +7,23 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
 
 ### Fixed
 
+- **Round-7 review findings: only a check-result exit is CI data, and both opt-ins together still
+  cannot forgive a non-green read.** `gh pr checks` reports CI state through exactly two exit codes —
+  1 (a check failed) and 8 (a check is pending). The table fallback accepted *every* non-zero exit as
+  data once the parsed table was not all green, so an operator error — gh's documented 2
+  (cancellation) and 4 (authentication), or a signal's negative code — was laundered into
+  `verdict: BLOCKED: checks pending` (exit 1) with stderr discarded, hiding an interrupted or
+  unauthorised read behind the gate's own exit-2 operator-error contract. `fetch_checks()` now
+  accepts only `1`/`8` as table data and raises `GateError` (exit 2) for any other non-zero exit,
+  preserving that exit code and the diagnostic in the one-line message. `--allow-table-only-checks`
+  together with `--allow-no-checks` is still two narrow opt-ins, not a bypass: the matrix now pins
+  both flags against non-green JSON **and** non-green table evidence, where a mutant that skipped the
+  non-green branch when both flags were set previously reported MERGE-OK over a pending run. And
+  because `gh` check names are not unique identifiers, the matrix pins row retention as a family —
+  two rows that differ only by verdict, under a repeated name, an empty name, a whitespace-only name
+  and a printed column name, in both orders and on both surfaces — where a mutant that indexed
+  structured rows by name previously collapsed two rows into one and reported MERGE-OK over a failing
+  run. All three mutations are registered in the catalogue.
 - **The merge gate could not be run while CI was in flight.** `pr-merge-check.py` asked `gh pr
   checks --json name,state,conclusion`; gh 2.103 removed `conclusion` (`Unknown JSON field:
   "conclusion"`), so it failed and fell back to the table, whose non-zero exits — 8 while a check is
@@ -87,11 +104,11 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   pending and failing block; a table-only read may never authorise; the opt-out forgives only a
   structured zero-check read). Every cell drives `main()` with `subprocess.run()` mocked and compares
   the **complete** verdict line plus the printed `checks:` tally, so a failing read cannot pass as a
-  pending one (`verdict: BLOCKED: checks` is a prefix of `verdict: BLOCKED: checks pending`) — 320
+  pending one (`verdict: BLOCKED: checks` is a prefix of `verdict: BLOCKED: checks pending`) — 370
   verdict cells + 3 stream cells. The captured live output in `tests/gh_checks_fixtures.py` is a
   matrix input as well: a value gh prints that the declared vocabulary does not know fails the matrix
-  instead of reaching the gate as an unknown token. `tests/mutate_verdict_matrix.py` applies 60
-  in-memory mutations of the module — 28 anchored plus two generated per declared vocabulary entry,
+  instead of reaching the gate as an unknown token. `tests/mutate_verdict_matrix.py` applies 63
+  in-memory mutations of the module — 31 anchored plus two generated per declared vocabulary entry,
   reclassifying that token into every other classification — and requires each to flip at least one
   cell, naming the survivor loudly if one does not. Both run in CI.
 

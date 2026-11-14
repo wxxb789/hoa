@@ -193,15 +193,19 @@ JSON_PASS_PENDING = _json([{"name": "build", "state": "SUCCESS", "bucket": "pass
                            {"name": "gates", "state": "PENDING", "bucket": "pending"}])
 
 Cell = namedtuple("Cell", "id json_result table_result allow_no_checks exit_code verdict reason "
-                          "checks why allow_table_only")
+                          "checks why allow_table_only error_contains", defaults=(None,))
 StreamCell = namedtuple("StreamCell", "id stdout stderr exit_code why")
 
 
 def cell(cid, json_result, table_result, allow_no_checks, exit_code, verdict, reason, checks, why,
-         allow_table_only=False):
-    """One verdict cell. `checks` is the expected `checks:` tally, or None when there is no read."""
+         allow_table_only=False, error_contains=None):
+    """One verdict cell. `checks` is the expected `checks:` tally, or None when there is no read.
+
+    `error_contains` is the fragments the one-line stderr of an ERROR cell must carry — so an
+    operator error's own exit code and diagnostic are pinned, not merely its exit status.
+    """
     return Cell(cid, json_result, table_result, allow_no_checks, exit_code, verdict, reason,
-                checks, why, allow_table_only)
+                checks, why, allow_table_only, error_contains)
 
 
 # --- the matrix -------------------------------------------------------------
@@ -401,6 +405,35 @@ CELLS = [
 ]
 
 
+# --- a non-check-result exit is an operator error, not CI data (round-7 F1) --
+# gh exits 1 when a check failed and 8 while one is pending; only those two carry check state.
+# Every other non-zero exit is an operator error — gh documents 2 as cancellation and 4 as an
+# authentication failure, and a signal's status is negative — so a parseable pending or failing
+# table beside it must not launder it into `BLOCKED: checks pending`/`checks` (exit 1) while stderr
+# is discarded. It is exit 2, and the operator error keeps its own exit code and message.
+for _exit in (2, 4, -15, 127):
+    CELLS += [
+        cell("table-operator-error-exit-%s" % _exit, JSON_ABSENT,
+             (_exit, IN_FLIGHT_TABLE, "operation cancelled"), False, 2, "ERROR", None, None,
+             "exit %s is not a check result (1 failing, 8 pending), so a pending table beside it "
+             "is an operator error, not CI data" % _exit,
+             error_contains=("exit %s" % _exit, "operation cancelled")),
+        cell("table-operator-error-exit-%s-allow-no-checks" % _exit, JSON_ABSENT,
+             (_exit, IN_FLIGHT_TABLE, "operation cancelled"), True, 2, "ERROR", None, None,
+             "--allow-no-checks cannot turn an operator error into CI data",
+             error_contains=("exit %s" % _exit,)),
+        cell("table-operator-error-exit-%s-opt-in" % _exit, JSON_ABSENT,
+             (_exit, IN_FLIGHT_TABLE, "operation cancelled"), False, 2, "ERROR", None, None,
+             "the table opt-in cannot turn an operator error into CI data",
+             allow_table_only=True, error_contains=("exit %s" % _exit,)),
+    ]
+CELLS.append(cell(
+    "table-operator-error-exit-4-with-failing-rows", JSON_ABSENT,
+    (4, MIXED_TABLE, "authentication failed"), False, 2, "ERROR", None, None,
+    "a failing table beside an operator-error exit is still the operator error, not `checks`",
+    error_contains=("exit 4", "authentication failed")))
+
+
 # --- the class-closing rule: a table-only read may never authorise ----------
 # The structured read is authoritative; the human table is advisory. These cells pin both paths —
 # the default (a table-only read blocks) and the documented opt-in that restores the table's
@@ -442,6 +475,32 @@ CELLS += [
     cell("rule-table-only-opt-in-cannot-bypass-header", JSON_ABSENT, (0, "STATUS\tNAME\n", ""),
          False, 1, "BLOCKED", "checks", (1, 0, 0, 1),
          "the opt-in cannot bypass the exact-header rule: `STATUS\\tNAME` is a row, not a header",
+         allow_table_only=True),
+]
+
+# --- both opt-ins together, against non-green evidence (round-7 F2) ---------
+# The two opt-ins each cover one read: --allow-table-only-checks makes the parsed table
+# authoritative, --allow-no-checks forgives a *structured* zero-check read. Neither forgives a
+# reported pending or failing check, and the two together are still two narrow opt-ins, not a
+# general bypass — so a pending or failing verdict must survive both. The single cell that used
+# both flags only exercised an *empty* table, so `not (allow_no_checks and allow_table_only_checks)`
+# guarding the non-green branch survived every cell and reported MERGE-OK over a pending run.
+CELLS += [
+    cell("rule-both-flags-json-pending", JSON_PENDING, TABLE_UNUSED, True, 1, "BLOCKED",
+         "checks pending", (1, 0, 1, 0),
+         "with both opt-ins a reported pending check still blocks and the reason names it",
+         allow_table_only=True),
+    cell("rule-both-flags-json-fail", JSON_FAIL, TABLE_UNUSED, True, 1, "BLOCKED", "checks",
+         (1, 0, 0, 1), "with both opt-ins a reported failure still blocks", allow_table_only=True),
+    cell("rule-both-flags-json-pass-plus-pending", JSON_PASS_PENDING, TABLE_UNUSED, True, 1,
+         "BLOCKED", "checks pending", (2, 1, 1, 0),
+         "with both opt-ins a passing neighbour does not make the pending row forgivable",
+         allow_table_only=True),
+    cell("rule-both-flags-table-pending", JSON_ABSENT, (8, IN_FLIGHT_TABLE, ""), True, 1,
+         "BLOCKED", "checks pending", (2, 1, 1, 0),
+         "both opt-ins do not forgive a pending table row", allow_table_only=True),
+    cell("rule-both-flags-table-failing", JSON_ABSENT, (1, MIXED_TABLE, ""), True, 1, "BLOCKED",
+         "checks", (3, 1, 1, 1), "both opt-ins do not forgive a failing table row",
          allow_table_only=True),
 ]
 
@@ -513,6 +572,39 @@ for _name, _verdict, _exit_code, _reason in (("STATUS", "pending", 8, "checks pe
         False, 1, "BLOCKED", _reason,
         (1, 0, 1 if _verdict == "pending" else 0, 0 if _verdict == "pending" else 1),
         "the two-column form of a reserved column name is still a row"))
+
+
+# --- row retention, as a family rather than case by case (round-7 note) -----
+# Three consecutive rounds each found a *row-retention* hole: a row dropped (a NAME prefix, an
+# unordered header), a row normalised (an empty field, lower case), a row collapsed onto another.
+# `gh` check names are not unique identifiers, so a generator that indexes rows by name — the
+# round-7 dedup mutation, `{entry["name"]: bucket_check(entry)}` — silently loses a row and can
+# report MERGE-OK over a failing run. Pin the family by construction: two rows that differ only by
+# verdict, under a name that collides with the other row's name (the repeated name), is empty, is
+# whitespace-only, or equals a printed column name; in both orders; on both the structured and the
+# table surface. Every row must survive into the tally, and any non-green row must block.
+_ROW_RETENTION_NAMES = (("colliding", "build"), ("empty", ""), ("padded", "  "),
+                        ("column-name", "NAME"))
+_ROW_RETENTION_PAIRS = (("fail-pass", "fail", "pass", 1, 0, 1, "checks"),
+                        ("pass-fail", "pass", "fail", 1, 0, 1, "checks"),
+                        ("pending-pass", "pending", "pass", 1, 1, 0, "checks pending"),
+                        ("pass-pending", "pass", "pending", 1, 1, 0, "checks pending"))
+_RETENTION_BUCKET_STATE = {"pass": "SUCCESS", "fail": "FAILURE", "pending": "PENDING"}
+for _name_label, _name in _ROW_RETENTION_NAMES:
+    for _label, _first, _second, _ok, _pending, _failing, _reason in _ROW_RETENTION_PAIRS:
+        CELLS.append(cell(
+            "json-row-retention-%s-%s" % (_name_label, _label),
+            _json([{"name": _name, "state": _RETENTION_BUCKET_STATE[_first], "bucket": _first},
+                   {"name": _name, "state": _RETENTION_BUCKET_STATE[_second], "bucket": _second}]),
+            TABLE_UNUSED, False, 1, "BLOCKED", _reason, (2, _ok, _pending, _failing),
+            "two structured rows named %r differing only by verdict are two rows, and the "
+            "non-green one blocks" % _name))
+        CELLS.append(cell(
+            "table-row-retention-%s-%s" % (_name_label, _label), JSON_ABSENT,
+            (0, "%s\t%s\n%s\t%s\n" % (_name, _first, _name, _second), ""), False, 1, "BLOCKED",
+            _reason, (2, _ok, _pending, _failing),
+            "two table rows named %r differing only by verdict are two rows, and the non-green "
+            "one blocks" % _name))
 
 
 # --- the declared vocabulary, one cell per declared entry (both surfaces) ---
@@ -712,6 +804,9 @@ def check_cell(module, cell_):
             return "expected no verdict on stdout, got %r" % (out.strip(),)
         if not err.startswith("pr-merge-check:"):
             return "expected a one-line stderr error, got %r" % (err.strip(),)
+        for fragment in cell_.error_contains or ():
+            if fragment not in err:
+                return "expected the error to carry %r, got %r" % (fragment, err.strip())
         return None
     if code != cell_.exit_code:
         return ("expected exit %s, got %s (stdout=%r stderr=%r)"
