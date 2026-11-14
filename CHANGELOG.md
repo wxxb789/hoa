@@ -7,7 +7,7 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
 
 ### Added
 
-- A portable pinned-snapshot catalog measurement helper and six regression tests distinguish
+- A portable pinned-snapshot catalog measurement helper and regression tests distinguish
   trimmed SKILL.md bodies from complete files and exclude fenced pseudoheadings. The baseline
   split predicate selects 13 skills; sanitized evidence records input/report hashes and all findings.
 

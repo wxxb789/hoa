@@ -190,6 +190,14 @@ class FenceTests(unittest.TestCase):
         self.assertEqual(row['body_lines'], 2)
         self.assertEqual(row['h2'], 0)
 
+    def test_fenced_body_words_count_markers_info_strings_and_interior_text(self):
+        # Fenced lines stay in body_words: the opener (marker + info string), the
+        # interior line and the closing marker are all whitespace-split tokens.
+        row = MODULE.body_metrics(doc(['## Visible', '```python is fine', '## Hidden', '```', 'after fence']))
+        self.assertEqual(row['body_lines'], 5)
+        self.assertEqual(row['h2'], 1)
+        self.assertEqual(row['body_words'], 10)
+
     def test_equal_length_fence_closes(self):
         self.assertEqual(MODULE.body_metrics(doc(['```', '## Hidden', '```', '## Visible']))['h2'], 1)
 
