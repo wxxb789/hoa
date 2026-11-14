@@ -155,10 +155,12 @@ floor = [
 # directories (MISE_STATE_DIR / MISE_DATA_DIR: a mise shim on PATH resolves its trust
 # database and installed tools through them, so a task-local HOME would otherwise make
 # `bun` refuse to run — pinned from the operator's own setting, or from the operator HOME
-# when that location exists; this is not an allowlist widening).  The task-local scratch root is created
-# under /tmp — never under an inherited operator TMPDIR, and outside the checkout the way
-# CI's TMPDIR is; a root too long to hold a tmux AF_UNIX socket is reported as that
-# suite's ERROR before it runs.
+# when that location exists; this is not an allowlist widening).  The task-local scratch root
+# is created under /tmp whenever /tmp can hold a directory, and only otherwise through
+# tempfile's own TMPDIR/TEMP/TMP chain, so an inherited operator TMPDIR is consulted only
+# where /tmp is unusable; the default is outside the checkout, `--scratch` names its own
+# location (checkout included), and a root too long to hold a tmux AF_UNIX socket is reported
+# as that suite's ERROR before it runs.
 passthrough = [
   "PATH",
   "LANG",
@@ -367,10 +369,12 @@ detached = "setsid process groups and, when tmux is present, tmux sessions. The 
 notes = "replaces the CI step 'GDD launcher setsid backend tests'; tmux cases are an optional subcase, not an optional suite"
 
 # The AF_UNIX bound of §4 item 4: tmux builds its socket at
-# `<TMUX_TMPDIR or TMPDIR>/tmux-<uid>/default`, and this suite points TMUX_TMPDIR at
-# `<TMPDIR>/omp-run-py.XXXXXXXX/tmux-tmp`, the deepest tree any scheduled suite builds
-# below its task-local TMPDIR.  Declared here, not in the runner, so the bound can never
-# describe a tree the manifest no longer schedules.
+# `<TMUX_TMPDIR or /tmp>/tmux-<uid>/default` (tmux ignores TMPDIR), and this suite points
+# TMUX_TMPDIR at `<TMPDIR>/omp-run-py.XXXXXXXX/tmux-tmp`, the deepest tree any scheduled
+# suite builds below its task-local TMPDIR.  Declared here, not in the runner, so the bound
+# can never describe a tree the manifest no longer schedules.  The setsid suite's tmux cases
+# set no TMUX_TMPDIR, so they use the shared `/tmp/tmux-<uid>/default` socket — outside any
+# task-local scratch and far too short to need a declaration.
 [[suite]]
 path = "skills/gdd/scripts/tests/test_omp_run_python.py"
 timeout = 300
@@ -384,8 +388,10 @@ notes = "previously unwired (§1: exists but not in baseline CI); ~45s of launch
 
 [[suite]]
 path = "skills/gdd/scripts/tests/test-omp-run-stale.sh"
+assertion = "counter"
+count_regexes = ['^stale-test: (?P<passed>\d+)/(?P<total>\d+) ok$']
 timeout = 300
-notes = "replaces the CI step 'GDD launcher forwarder tests'"
+notes = "replaces the CI step 'GDD launcher forwarder tests'; a zero-check run is ERROR, not PASS"
 
 # ── refinements: positive-evidence markers ──────────────────────────────────
 # Eval runners and validators whose contract is an exit status plus a marker; the

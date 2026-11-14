@@ -12,6 +12,7 @@ import importlib.util
 import io
 import json
 import os
+import re
 import shutil
 import signal
 import sys
@@ -200,6 +201,14 @@ class SuiteEnvironmentTests(unittest.TestCase):
         self.assertLessEqual(set(environment), allowed)
         self.assertNotIn("MISE_VERBOSE", environment)
 
+    def test_the_passthrough_allowlist_is_pinned_by_name(self):
+        """The reviewed allowlist is an oracle in its own right, not a mirror of the data."""
+        self.assertEqual(tuple(self.document["env"]["passthrough"]), (
+            "PATH", "LANG", "LC_ALL", "LC_CTYPE", "LC_MESSAGES", "TERM", "TZ",
+            "CI", "GITHUB_ACTIONS", "GITHUB_EVENT_NAME", "GITHUB_REF", "GITHUB_SHA",
+            "GITHUB_HEAD_REF", "GITHUB_BASE_REF",
+        ))
+
     def test_the_pinned_shim_state_is_exactly_two_named_directories(self):
         """What may reach every suite as operator state is pinned by name, not by count."""
         self.assertEqual(set(runner.SHIM_STATE_DEFAULTS), {"MISE_STATE_DIR", "MISE_DATA_DIR"})
@@ -302,6 +311,21 @@ class DiscoveryTests(unittest.TestCase):
         self.assertEqual(plan.unpinned, ["scripts/test_new.py"])
         self.assertEqual([suite.id for suite in plan.scheduled], ["scripts/test_new.py"])
 
+    def test_a_filtered_plan_is_not_a_floor_check(self):
+        root = synthetic_tree(patterns=["scripts/test_*.py"], prune=[],
+                              floor=["scripts/test_gone.py"], suites="")
+        write_suite(root, "scripts/test_present.py", PASS_SUITE)
+        document = runner.load_manifest(root / "scripts/test_manifest.toml")
+        full = runner.build_plan(root, document, event="local")
+        self.assertEqual(full.floor_missing, ["scripts/test_gone.py"])
+        self.assertTrue(any("floor unmet" in problem for problem in full.problems))
+        filtered = runner.build_plan(root, document, event="local",
+                                     only=["scripts/test_present.py"])
+        self.assertEqual(filtered.problems, [])
+        self.assertEqual(filtered.floor_missing, [])
+        self.assertEqual([suite.id for suite in filtered.scheduled],
+                         ["scripts/test_present.py"])
+
 
 class ManifestValidationTests(unittest.TestCase):
     """Manifest contradictions surface as plan problems, never as silent skips."""
@@ -334,6 +358,12 @@ class ManifestValidationTests(unittest.TestCase):
     def test_stale_refinement_is_rejected(self):
         plan = self.plan('[[suite]]\npath = "scripts/test_missing.py"\nassertion = "exit"\n')
         self.assertTrue(any("matches no discovered suite" in problem for problem in plan.problems))
+
+    def test_declared_command_naming_a_missing_entry_point_is_rejected(self):
+        plan = self.plan('[[suite]]\nid = "declared:missing"\n'
+                         'command = [["{python}", "scripts/not_there.py"]]\n')
+        self.assertTrue(any("entry point does not exist: scripts/not_there.py" in problem
+                            for problem in plan.problems))
 
     def test_duplicate_suite_id_is_rejected(self):
         plan = self.plan(
@@ -460,6 +490,7 @@ class RealTreePlanTests(unittest.TestCase):
             ("skills/hermes-models/scripts/tests/test-routing-inventory.py", "^routing-inventory:"),
             ("skills/hermes-models/scripts/tests/test-provider-metadata.py", "^provider-metadata:"),
             ("skills/gdd/scripts/tests/test-dispatch-guards.py", "^dispatch-guards:"),
+            ("skills/gdd/scripts/tests/test-omp-run-stale.sh", "^stale-test:"),
         ):
             suite = next(item for item in self.plan.scheduled + self.plan.covered if item.id == path)
             self.assertEqual(suite.assertion, "counter")
@@ -562,6 +593,42 @@ class SettleTests(unittest.TestCase):
                          "ERROR")
         self.assertEqual(runner.settle(suite, exit_code=0, timed_out=False,
                                        output="PASS: validated\n")[0], "PASS")
+
+    def covered_child(self, parent_log: str, *, assertion: str = "counter",
+                      patterns: tuple[str, ...] = (r"^child: (?P<passed>\d+)/(?P<total>\d+) ok$",),
+                      parent_state: str = "PASS") -> runner.Outcome:
+        """Settle a covered child whose parent's whole log is written for one test."""
+        directory = Path(tempfile.mkdtemp(prefix="covered-"))
+        self.addCleanup(shutil.rmtree, directory, ignore_errors=True)
+        log = directory / "parent.log"
+        log.write_text(parent_log, encoding="utf-8")
+        child = self.suite(id="child", assertion=assertion, count_regexes=patterns)
+        parent = self.suite(id="parent")
+        parent_outcome = runner.Outcome(suite_id=parent.id, state=parent_state, log=str(log))
+        return runner.settle_covered(child, parent, parent_outcome, log)
+
+    def test_covered_counter_child_with_zero_checks_is_error(self):
+        outcome = self.covered_child("child: 0/0 ok\n")
+        self.assertEqual(outcome.state, "ERROR")
+        self.assertIn("zero executed checks", outcome.reason)
+        self.assertEqual(outcome.counts, {"passed": 0, "executed": 0, "total": 0})
+
+    def test_covered_unittest_child_needs_a_summary_in_the_parent_log(self):
+        outcome = self.covered_child("the parent ran the child without a summary\n",
+                                     assertion="unittest", patterns=())
+        self.assertEqual(outcome.state, "ERROR")
+        self.assertIn("no unittest summary", outcome.reason)
+        outcome = self.covered_child("Ran 4 tests in 0.002s\n\nOK\n",
+                                     assertion="unittest", patterns=())
+        self.assertEqual((outcome.state, outcome.counts), ("PASS", {"executed": 4}))
+
+    def test_covered_child_of_a_skipped_or_failed_parent_is_never_pass(self):
+        skipped = self.covered_child("", parent_state="SKIP")
+        self.assertEqual(skipped.state, "SKIP")
+        self.assertIn("parent parent skipped", skipped.reason)
+        failed = self.covered_child("", parent_state="FAIL")
+        self.assertEqual(failed.state, "ERROR")
+        self.assertIn("parent parent settled FAIL", failed.reason)
 
     def test_timeout_signal_and_spawn_failures(self):
         self.assertEqual(runner.settle(self.suite(), exit_code=None, timed_out=True, output="")[0],
@@ -690,6 +757,57 @@ class EndToEndTests(unittest.TestCase):
         self.assertIn("no evidence", child["reason"])
         self.assertEqual(code, 1)
 
+    def test_covered_child_with_zero_checks_is_error(self):
+        root = self.build()
+        (root / "scripts/tests/parent.py").write_text(
+            "# executes scripts/tests/test-counter-child.py in production\n"
+            "print('parent-counter: 2/2 ok')\n"
+            "print('child-counter: 0/0 ok')\n", encoding="utf-8")
+        code, _, payload = self.run_main(root, "--suite", "parent")
+        child = self.states(payload)["scripts/tests/test-counter-child.py"]
+        self.assertEqual(child["state"], "ERROR")
+        self.assertIn("zero executed checks", child["reason"])
+        self.assertEqual(code, 1)
+
+    def test_an_untrustworthy_plan_exits_two_and_says_so(self):
+        """An empty discovery set or an unmet floor is a red job, not a printed note."""
+        root = synthetic_tree(patterns=["scripts/test_*.py"], prune=[],
+                              floor=["scripts/test_gone.py"], suites="")
+        code, output, payload = self.run_main(root)
+        self.assertEqual(code, 2, output)
+        self.assertEqual(payload["exit_code"], 2)
+        problems = " ".join(payload["problems"])
+        self.assertIn("produced no suites", problems)
+        self.assertIn("floor unmet", problems)
+
+    def test_a_condition_skipped_suite_is_recorded_not_dropped(self):
+        """A whole-suite SKIP stays in the run record, with its declared reason."""
+        root = synthetic_tree(
+            patterns=["scripts/test_*.py"], prune=[], floor=[],
+            suites="\n".join([
+                "[[suite]]",
+                'id = "gate:pr-only"',
+                'command = [["{python}", "-c", "pass"]]',
+                'condition = "pull_request"',
+                'skip_reason = "pull-request guard: a push to main has nothing to do"',
+                "",
+            ]),
+        )
+        code, output, payload = self.run_main(root)
+        self.assertEqual(code, 0, output)
+        self.assertEqual(payload["planned"], {"scheduled": 0, "covered": 0,
+                                              "condition_skipped": 1})
+        self.assertEqual(payload["settled"], 1)
+        self.assertEqual((payload["summary"]["PASS"], payload["summary"]["SKIP"]), (0, 1))
+        skipped = self.states(payload)["gate:pr-only"]
+        self.assertEqual(skipped["state"], "SKIP")
+        self.assertEqual(skipped["reason"],
+                         "pull-request guard: a push to main has nothing to do")
+        code, output, payload = self.run_main(root, "--event", "pull_request")
+        self.assertEqual(code, 0, output)
+        self.assertEqual(payload["planned"]["condition_skipped"], 0)
+        self.assertEqual(payload["summary"]["PASS"], 1)
+
     def test_suites_run_with_task_local_scratch_and_a_stripped_environment(self):
         root = self.build()
         os.environ["GDD_LAUNCHER"] = "must-not-leak"
@@ -779,10 +897,52 @@ class EndToEndTests(unittest.TestCase):
                                    environment=runner.base_environment({}, sys.executable))
         self.assertEqual(outcome.state, "ERROR")
         self.assertIn("AF_UNIX", outcome.reason)
-        self.assertIn(str(runner.AF_UNIX_PATH_LIMIT), outcome.reason)
+        reported = re.search(r"worst case (\d+) bytes", outcome.reason)
+        self.assertIsNotNone(reported, outcome.reason)
+        self.assertGreaterEqual(int(reported.group(1)), runner.AF_UNIX_PATH_LIMIT)
         self.assertFalse(marker.exists(), "the suite ran despite an unusable scratch root")
         self.assertEqual([entry.name for entry in deep.iterdir()], [],
                          "the unusable per-suite scratch tree was not cleaned up")
+
+    @unittest.skipUnless(runner.SHORT_TEMP_ROOT.is_dir(), "no short temp root on this platform")
+    @unittest.skipIf(os.name != "posix", "AF_UNIX path limits do not apply")
+    def test_a_declared_socket_tail_turns_a_usable_root_into_an_error(self):
+        """The bound uses the manifest's declared tail, not just the scratch root length."""
+        marker = ARTIFACTS / "tail-marker.txt"
+        marker.unlink(missing_ok=True)
+        plan = runner.build_plan(ROOT, runner.load_manifest(ROOT / runner.MANIFEST_RELATIVE),
+                                 event="local")
+        self.assertTrue(plan.socket_tail, "no suite declares the socket tree this bound models")
+        padded = Path(tempfile.mkdtemp(prefix="hoa-tail-", dir=runner.SHORT_TEMP_ROOT)) / ("p" * 40)
+        self.addCleanup(shutil.rmtree, padded.parent, ignore_errors=True)
+        padded.mkdir()
+        probe = Path(tempfile.mkdtemp(prefix="scripts-test-", dir=padded))
+        probe_plain = runner.socket_path_length(probe, "")
+        probe_tailed = runner.socket_path_length(probe, plan.socket_tail)
+        shutil.rmtree(probe, ignore_errors=True)
+        self.assertLess(probe_plain, runner.AF_UNIX_PATH_LIMIT,
+                        "the probe root is already too long to control this bound")
+        self.assertGreaterEqual(probe_tailed, runner.AF_UNIX_PATH_LIMIT,
+                                "the declared tail is too short to model the bound")
+        suite = runner.Suite(
+            id="scripts/test_marker.py", origin="declared", cwd=ROOT, runtime="python",
+            commands=((sys.executable, "-c", f"open({str(marker)!r}, 'w').close()"),),
+        )
+        log_root = ARTIFACTS / "logs"
+        log_root.mkdir(parents=True, exist_ok=True)
+        environment = runner.base_environment({}, sys.executable)
+        usable = runner.run_suite(suite, root=ROOT, scratch_root=padded, log_root=log_root,
+                                  environment=environment)
+        self.assertEqual(usable.state, "PASS", usable.reason)
+        self.assertTrue(marker.exists(), "the suite did not run under the usable root")
+        marker.unlink()
+        bounded = runner.run_suite(suite, root=ROOT, scratch_root=padded, log_root=log_root,
+                                   environment=environment, socket_tail=plan.socket_tail)
+        self.assertEqual(bounded.state, "ERROR")
+        self.assertIn("AF_UNIX", bounded.reason)
+        self.assertFalse(marker.exists(), "the suite ran although its declared tail cannot fit")
+        self.assertEqual([entry.name for entry in padded.iterdir()], [],
+                         "the bounded-out per-suite scratch tree was not cleaned up")
 
     def test_timeout_tears_down_the_whole_process_group(self):
         root = self.build()

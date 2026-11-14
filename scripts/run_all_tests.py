@@ -12,14 +12,17 @@ uses the interpreter running it (`sys.executable`) for every Python suite, never
 
 Every suite settles as PASS, FAIL, ERROR, TIMEOUT or SKIP (see `settle`), and the run exits:
 
-  0  every scheduled suite settled PASS (declared condition SKIPs are not failures)
+  0  no required suite settled FAIL, ERROR or TIMEOUT (declared condition SKIPs and non-required
+     suites do not fail the run)
   1  at least one required suite settled FAIL, ERROR or TIMEOUT
   2  the plan itself is not trustworthy: manifest or schema error, an unmet discovery floor, an
      unknown or duplicate suite id, a stale refinement, or nothing left to run
 
 Each suite runs in its own process and process group, with a task-local TMPDIR/HOME/XDG root under a
-short `/tmp` directory of its own — never the checkout, and never an inherited operator `TMPDIR`
-(`scratch_root_for`) — a per-suite timeout, and process-group teardown on timeout.  A scratch tree
+short `/tmp` directory of its own whenever `/tmp` can hold one — an inherited operator `TMPDIR` is
+consulted only where it cannot, through `tempfile`'s own chain; the default location is outside the
+checkout and `--scratch` names its own (`scratch_root_for`) — a per-suite timeout, and process-group
+teardown on timeout.  A scratch tree
 too long to hold the toolkit's AF_UNIX socket — given the deepest `socket_tail` the scheduled suites
 declare in the manifest — is reported as that suite's ERROR before it runs (`socket_path_length`).
 Per-suite logs stay under `.tmp-artifacts/test-runs/<UTC stamp>-<pid>/logs/`, and the JSON result
@@ -622,13 +625,15 @@ def shim_state_environment(operator_home: str | None = None) -> dict[str, str]:
 
 
 def scratch_root_for(override: str | None = None) -> Path:
-    """Task-local scratch root for one run, short and outside the checkout.
+    """Task-local scratch root for one run: short, and outside the checkout by default.
 
-    `/tmp` is preferred over `tempfile`'s default chain on purpose: the default honours an
-    inherited `TMPDIR`, and an operator `TMPDIR` long enough pushes the suites' tmux sockets
-    past the AF_UNIX `sun_path` limit (see `socket_path_length`).  Platforms without a
-    writable `/tmp` keep the standard chain — `TMPDIR`, `TEMP`, `TMP`, then the OS default —
-    and any root that cannot hold a socket is reported per suite before it runs.
+    An explicit `--scratch` override is honoured as given, checkout included; only the default
+    is placed outside it.  `/tmp` is preferred over `tempfile`'s default chain on purpose: the
+    default honours an inherited `TMPDIR`, and an operator `TMPDIR` long enough pushes the
+    suites' tmux sockets past the AF_UNIX `sun_path` limit (see `socket_path_length`).
+    Platforms without a writable `/tmp` keep the standard chain — `TMPDIR`, `TEMP`, `TMP`,
+    then the OS default — and any root that cannot hold a socket is reported per suite before
+    it runs.
     """
     if override:
         path = Path(override).resolve()
@@ -663,9 +668,10 @@ def socket_path_length(scratch: Path, tail: str = "") -> int | None:
 
     The bound comes from `sun_path` in `struct sockaddr_un`: 108 bytes on Linux *including*
     the terminating NUL, i.e. a 107-byte path.  tmux is the toolkit in this repository that
-    needs it — its socket is `<TMUX_TMPDIR or TMPDIR>/tmux-<uid>/default` — and the deepest
-    tree a suite builds below its task-local TMPDIR is that suite's own `socket_tail`
-    declaration in `scripts/test_manifest.toml`, where `{uid}` is the running user's id.
+    needs it — its socket is `<TMUX_TMPDIR or /tmp>/tmux-<uid>/default` (tmux ignores `TMPDIR`)
+    — and the deepest tree a suite builds below its task-local TMPDIR is that suite's own
+    `socket_tail` declaration in `scripts/test_manifest.toml`, where `{uid}` is the running
+    user's id.
     Returns None where AF_UNIX does not apply.
     """
     if os.name != "posix":
@@ -1027,8 +1033,11 @@ def _print_plan(plan: Plan) -> None:
 def _print_declarations(suite: Suite) -> None:
     """Print the manifest declarations of one planned suite.
 
-    `detached` and `socket_tail` state boundaries (teardown, AF_UNIX room) that nothing
-    else in a run reads, so printing them is what keeps them from drifting unseen.
+    `detached` and `socket_tail` are declarative boundaries (teardown, AF_UNIX room); both are
+    also carried per suite in the JSON record, and printing them here is what keeps them from
+    drifting unseen.  `socket_tail` additionally bounds the run: `build_plan` carries the
+    deepest declared tail and `run_suite` settles a suite ERROR before spawning it when that
+    tail cannot fit below its scratch root.
     """
     if suite.detached:
         print(f"      detached: {suite.detached}")

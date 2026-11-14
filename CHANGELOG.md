@@ -25,12 +25,16 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
 
 ### Changed
 
-- The CI test job installs the runtimes and dependencies, then calls the discoverer. The hand-written
-  per-suite commands it replaces are reconciled one by one in `scripts/test_manifest.toml`, and were
-  deleted only after that reconciliation and the five injected faults produced their evidence.
-- Per-suite scratch trees are created under `/tmp`, never under an inherited operator `TMPDIR`, and a
-  root whose worst-case tmux socket would exceed the 108-byte `sun_path` limit is reported as that
-  suite's ERROR before it runs instead of failing later as a tmux mystery.
+- The CI test job installs the runtimes and dependencies, then calls the discoverer. The 34 hand-written
+  test-job commands it replaces are reconciled entry by entry in `scripts/test_manifest.toml`, and were
+  deleted only once `scripts/test_run_all_tests.py` reproduced every fault plan §4 item 8 requires red —
+  a syntax error, a failing assertion, a hang, a missing runtime and an empty discovery set; the
+  fault-to-detector mapping is in `docs/evidence/2026-11-14-catalog-refactor.md`.
+- Per-suite scratch trees are created under `/tmp` whenever it can hold a directory (an inherited
+  operator `TMPDIR` is consulted only where it cannot, and `--scratch` overrides the location); the
+  default is outside the checkout, and a root whose worst-case tmux socket would exceed the 108-byte
+  `sun_path` limit is reported as that suite's ERROR before it runs instead of failing later as a tmux
+  mystery.
 - Suite processes keep the shim toolchain's absolute state directories (`MISE_STATE_DIR`,
   `MISE_DATA_DIR`), so a mise-managed `bun` on `PATH` runs under the task-local `HOME` instead of
   refusing with "Config files … are not trusted" or re-installing the tool into the scratch tree.

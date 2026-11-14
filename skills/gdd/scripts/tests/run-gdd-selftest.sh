@@ -1163,7 +1163,7 @@ check $? "a report-only stage keeps the dispatched head in its completion row (g
 # --- dispatch guards ---------------------------------------------------------
 # The coverage manifest accounts for test-dispatch-guards.py through this suite
 # (covered_by in scripts/test_manifest.toml) and reads its positive count back out
-# of this log, so echo the child's own summary line after asserting it.
+# of this log, so echo the child's own summary line before asserting it.
 GUARD_OUT="$(python3 "$HERE/test-dispatch-guards.py" 2>&1)"
 GUARD_RC=$?
 printf '%s\n' "$GUARD_OUT" | tail -n 1
