@@ -41,7 +41,7 @@ import json
 import os
 import subprocess
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 
 STAGES = [
     "contract",
@@ -229,23 +229,53 @@ def read_lock(run_dir):
             except ValueError:
                 return None, True
             if isinstance(data, dict):
-                return {"pid": data.get("pid"), "tmux": data.get("tmux")}, True
+                return (
+                    {
+                        "pid": data.get("pid"),
+                        "agent_pid": data.get("agent_pid"),
+                        "tmux": data.get("tmux"),
+                    },
+                    True,
+                )
             return None, True
         try:
-            return {"pid": int(raw.split()[0]), "tmux": None}, True
+            return {"pid": int(raw.split()[0]), "agent_pid": None, "tmux": None}, True
         except (ValueError, IndexError):
             return None, True
     return None, False
 
 
 def pid_alive(pid):
-    """True/False, or None when the pid is unusable."""
+    """True/False, or None when the pid is unusable.
+
+    Windows needs a process query rather than os.kill(pid, 0): measured on Windows 11,
+    os.kill on a live console process raises (a live run read as `stale lock`) and on
+    an exited one whose handle is still open it succeeds (a dead run read as live).
+    Keep in step with gdd.py and adapters/omp-run.py.
+    """
     try:
         pid = int(pid)
     except (TypeError, ValueError):
         return None
     if pid <= 0:
         return None
+    if os.name == "nt":
+        import ctypes
+
+        SYNCHRONIZE = 0x00100000
+        QUERY_LIMITED = 0x1000
+        STILL_ACTIVE = 259
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.OpenProcess(SYNCHRONIZE | QUERY_LIMITED, False, pid)
+        if not handle:
+            return False
+        try:
+            code = ctypes.c_ulong()
+            if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
+                return None
+            return code.value == STILL_ACTIVE
+        finally:
+            kernel32.CloseHandle(handle)
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
@@ -276,16 +306,21 @@ def recorded_lock(state):
 
     omp-run.sh records `pid` (null under tmux) and `tmux` in state.json but writes no lock, so
     `read_lock` found nothing and a run that died kept reading as "running" until the 6h deadline.
+    Both adapters also record the agent's own pid, and the agent can outlive its runner.
     """
     text = state or {}
-    pid, tmux = text.get("pid"), text.get("tmux")
-    if not pid and not tmux:
+    pid, agent_pid, tmux = text.get("pid"), text.get("agent_pid"), text.get("tmux")
+    if not pid and not agent_pid and not tmux:
         return None, False
-    return {"pid": pid, "tmux": tmux}, True
+    return {"pid": pid, "agent_pid": agent_pid, "tmux": tmux}, True
 
 
 def effective_state(run_dir, state):
-    """Recorded run state, with `stale lock` for a lock whose process is gone."""
+    """Recorded run state, with `stale lock` for a lock whose processes are gone.
+
+    Same rule as gdd.py: live while either the runner or the agent is alive, and
+    "starting" rather than stale while a pidless run is inside the grace window.
+    """
     recorded = str((state or {}).get("state") or "?")
     if recorded != "running":
         return recorded
@@ -296,10 +331,38 @@ def effective_state(run_dir, state):
         return recorded
     if not lock:
         return "stale lock"
-    alive = pid_alive(lock.get("pid"))
-    if alive is None:
+    verdicts = [pid_alive(lock.get("pid")), pid_alive(lock.get("agent_pid"))]
+    if any(verdict is True for verdict in verdicts):
+        return "running"
+    if all(verdict is None for verdict in verdicts):
         alive = tmux_alive(lock.get("tmux"))
-    return "running" if alive else "stale lock"
+        if alive is None:
+            return "running" if run_is_young(state) else "stale lock"
+        return "running" if alive else "stale lock"
+    return "stale lock"
+
+
+def startup_grace_seconds():
+    """The launcher's OMP_RUN_START_GRACE_SECONDS, so both sides agree on "starting"."""
+    try:
+        value = float((os.environ.get("OMP_RUN_START_GRACE_SECONDS") or "").strip())
+    except ValueError:
+        return 60.0
+    return value if value > 0 else 60.0
+
+
+def run_is_young(state):
+    """Was this run started inside the grace window (so it may still be claiming a pid)?"""
+    started = (state or {}).get("started")
+    if not started:
+        return False
+    try:
+        age = (
+            datetime.now(timezone.utc) - datetime.fromisoformat(str(started))
+        ).total_seconds()
+    except ValueError:
+        return False
+    return age < startup_grace_seconds()
 
 
 def run_state_paths(task_root, run_root):

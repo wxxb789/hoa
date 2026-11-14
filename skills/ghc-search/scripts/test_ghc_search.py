@@ -33,7 +33,7 @@ class T(unittest.TestCase):
         self.assertEqual(gpt["reasoning"], {"effort": "high"})
 
         x = self.capture_request(["x", "q"])
-        self.assertEqual(x["model"], "grok-4.5")
+        self.assertEqual(x["model"], "grok-4.7")
         self.assertEqual(x["reasoning"], {"effort": "medium"})
 
     def test_cli_preserves_explicit_model_and_effort_overrides(self):

@@ -6,7 +6,7 @@ description: >-
   option is closest, or for a shortlist of nearby places. Not for route planning or for
   reviewing a place in depth.
 metadata:
-  version: "0.1.57"
+  version: "0.1.59"
   areas: "self-management"
   targets: "runtime-agnostic"
   summary: "find places near a location with the bundled script: category search, distance sort"

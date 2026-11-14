@@ -1,0 +1,12 @@
+node_modules/
+
+# Local caches and generated plugin artifacts.
+.npm/
+.npm-cache/
+.cache/
+.vite/
+.vitest/
+coverage/
+dist/
+build/
+*.tsbuildinfo

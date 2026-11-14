@@ -7,7 +7,7 @@ description: >-
   end, including the merge. Do not use for one-line fixes, exploration with no acceptance criteria, or
   work no machine can check (that is a conversation, not a delivery).
 metadata:
-  version: "0.1.57"
+  version: "0.1.59"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "goal contract → agent-authored stages → operator-run gates → scripted merge gate → resumable ledger; ships `gdd.py`, `delivery-state.py`, `pr-merge-check.py`"
@@ -102,7 +102,7 @@ matching the current stage directly — do not create per-phase skills.
 | `GDD_STATE_FILE` | ledger path | `${XDG_STATE_HOME:-$HOME/.local/state}/gdd/ledger.tsv` |
 | `GDD_TASK_ROOT` | task/state root | `${XDG_STATE_HOME:-$HOME/.local/state}/gdd/tasks` |
 | `GDD_RUN_ROOT` | launcher run root | `${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs` |
-| `GDD_LAUNCHER` | launcher command | the bundled `scripts/adapters/omp-run.sh` |
+| `GDD_LAUNCHER` | explicit launcher selection | bundled `scripts/adapters/omp-run.py`; opt in to native Paseo with `scripts/adapters/paseo-run.py` |
 | `GDD_TEMPLATES` | stage-template root | the bundled `references/stage-templates` |
 | `GDD_GOAL_GLOB` | goal-contract glob | `docs/goals/*<goal>*.md` |
 | round caps | `implement` / `simplify` / `review` run at most **2x** — enforced by `gdd.py stage`, override with `--over-budget` | `scripts/gdd.py` |
@@ -113,3 +113,8 @@ Resolution order and the config-file path are defined once in
 `gdd.py` implements it through the vendored `scripts/skill_config.py`; the config-file keys are the
 six names in the table. Nothing about one install lives in the protocol: a profile may point at its own
 files, but no path is inlined.
+
+Read [`references/transport.md`](references/transport.md) before selecting or dispatching a launcher:
+it defines both routes, model/thinking mapping, artifact polling, and platform-specific evidence.
+Native stages are Paseo agents and require a reachable daemon; never substitute routes by reachability.
+Missing state/agents and an unreachable daemon are unknown, never success; headless evidence is not native evidence.

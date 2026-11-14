@@ -15,7 +15,7 @@ it, with what credentials) is a chezmoi concern, not this file.
 | Endpoint | `http://127.0.0.1:4141/v1/responses` (env: `GHC_SEARCH_ENDPOINT`) |
 | Health check | `GET /v1/models` returns `200` |
 | Tools | web search (`gpt` engine), X/Twitter search (`x` engine) |
-| Default models | `gpt-5.6-luna` (web), `grok-4.5` (X) — env-overridable |
+| Default models | `gpt-5.6-luna` (web), `grok-4.7` (X) — env-overridable |
 | Consumers | `skills/ghc-search/` (CLI script, not MCP-wired) |
 
 ## Usage contract

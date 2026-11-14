@@ -98,7 +98,8 @@ Every call must print `true`; a silent `null` is a wrong id format (the id is th
   `pending|queued|in_progress`, and if the settled output contains a `fail`, extract the run id
   (`grep -oE 'runs/[0-9]+' | cut -d/ -f2`) and rerun `--failed` once or twice, logging the reason.
   Bound it — an unbounded rerun loop turns a broken job green-adjacent by attrition.
-  Ready-made: `scripts/watch-pr-checks.sh <PR>` does exactly this (fast-fail threshold 60 s, two
-  reruns, exit 0/1/2/3) and logs every poll to `ci-watch-<head7>.log`.
+  Ready-made: `scripts/watch-pr-checks.py <PR>` does exactly this (fast-fail threshold 60 s, two
+  reruns, exit 0/1/2/3) and logs every poll to `ci-watch-<head7>.log`; `watch-pr-checks.sh` is the
+  POSIX twin with the same semantics, for a host whose skill directory is bash-only.
 - Re-run the *same* commit's job: a new commit does not repair a mirror outage and it invalidates
   the review verdict you already paid for.

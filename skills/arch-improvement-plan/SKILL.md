@@ -4,7 +4,7 @@ description: >-
   Guided workflow for incremental architecture improvements: identify boundaries, propose migration
   plans, and produce PRD + tasks.
 metadata:
-  version: "0.1.57"
+  version: "0.1.59"
   areas: "software-development"
   targets: "runtime-agnostic"
   summary: "incremental architecture improvement: find boundaries, plan the migration, emit PRD plus tasks"

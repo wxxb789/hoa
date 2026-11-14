@@ -6,7 +6,7 @@ description: >-
   follow a blog, or watch a source for new posts. Not for scraping pages that publish no feed,
   and not a substitute for a search engine.
 metadata:
-  version: "0.1.57"
+  version: "0.1.59"
   areas: "self-management"
   targets: "runtime-agnostic"
   summary: "read RSS/Atom and Reddit feeds with the bundled reader, deduped by published time"

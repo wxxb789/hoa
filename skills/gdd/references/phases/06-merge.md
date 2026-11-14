@@ -48,10 +48,11 @@ A PR that reads `MERGED` while `origin/main` still shows the old head means main
 not that the merge failed. **Done** is merged *and* the next goal branched off the merged head — an
 open PR is not done.
 
-Bounded CI watching: `scripts/watch-pr-checks.sh <PR> [max_reruns] [max_polls] [logfile]` waits for a
-settled verdict, reruns only jobs that died on an infra step (<60 s fail), and logs every poll. A
-download step failing in under a minute is infra — `gh run rerun <run-id> --failed` first, then look
-at the code.
+Bounded CI watching: `scripts/watch-pr-checks.py <PR> [max_reruns] [max_polls] [logfile]` waits for a
+settled verdict — checks done *and* the PR `MERGEABLE CLEAN` at the head it started on — reruns only
+jobs that died on an infra step (<60 s fail), and logs every poll. A download step failing in under a
+minute is infra — `gh run rerun <run-id> --failed` first, then look at the code.
+`watch-pr-checks.sh` is the POSIX twin with the same exit codes.
 
 A review bot typically posts minutes AFTER CI turns green; a merge fired at "checks pass" skips it
 every time. A push does not trigger a re-review — request one and match the marker's `commit_sha` to

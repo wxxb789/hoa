@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # omp-run.sh — reference launcher adapter for an OMP-style headless agent CLI.
 #
+# `gdd.py`'s bundled default is `omp-run.py` (same contract, stdlib Python, no bash,
+# setsid or tmux). This file stays as the POSIX reference, and it is the one that
+# offers the attachable `tmux` backend; its behaviour is pinned by the bash suites in
+# scripts/tests/.
+#
 # The goal-driven delivery tools (gdd.py, delivery-state.py) never start an
 # agent themselves. They render a prompt and call a launcher that implements
 # this contract:

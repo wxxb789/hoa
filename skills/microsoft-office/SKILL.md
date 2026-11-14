@@ -5,7 +5,7 @@ description: >-
   CLIs. Use for reports, letters, decks, workbooks, tracked changes, comments, and CSV conversion.
   Not for legacy binary formats (.doc/.ppt/.xls), ODF files, or WYSIWYG layout work.
 metadata:
-  version: "0.1.57"
+  version: "0.1.59"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
   summary: "create, read, edit and template Word, PowerPoint and Excel files offline with Python CLIs"

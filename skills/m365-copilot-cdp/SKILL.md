@@ -7,7 +7,7 @@ description: >-
   desktop app's Chat or actual Code surface, not a browser PWA, Teams, Cowork, or
   a chat request that merely asks for code.
 metadata:
-  version: "0.1.57"
+  version: "0.1.59"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "operate desktop Copilot Chat and Code through CDP with model selection and reply reads"

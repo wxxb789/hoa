@@ -7,7 +7,7 @@ description: >-
   recovering a run that was killed mid-turn. Do not use for a two-minute command (run it inline) or for
   work that needs live steering (that is a TUI session).
 metadata:
-  version: "0.1.57"
+  version: "0.1.59"
   areas: "software-development,work-management"
   targets: "pi"
   summary: "detached tmux launcher for long `omp -p` runs; polled completion, session-id recovery"
@@ -32,7 +32,8 @@ terminal goes down.
 
 A background child of the orchestrating session receives SIGTERM when that session ends, and `omp -p`
 prints only at exit — a run killed at minute 37 leaves a 0-byte output file. Always launch through the
-tmux wrapper shipped with this skill:
+launcher shipped with this skill (a detached process: own session on POSIX, one hidden console on
+Windows; `--backend tmux` when you want a session you can attach to):
 
 ```bash
 scripts/omp-run.sh start --name <slug> --prompt <file> --cwd <repo> \
@@ -40,12 +41,14 @@ scripts/omp-run.sh start --name <slug> --prompt <file> --cwd <repo> \
 scripts/omp-run.sh list | status <slug> | tail <slug> 20 | result <slug> | answer <slug> | kill <slug>
 ```
 
-A detached tmux session hangs off the tmux server (init), not off your session, so it survives session
-and gateway restarts. Verify with the ancestor chain of the omp pid, not by assumption.
+A detached run hangs off init (POSIX) or off the process tree Windows keeps alive on its own, not off
+your session, so it survives session and gateway restarts. Verify with the ancestor chain of the omp
+pid, not by assumption.
 
-The implementation is maintained once, with skill `gdd`
-(`scripts/adapters/omp-run.sh`), because that skill's `gdd.py` defaults to it; the copy here
-(`scripts/omp-run.sh`) is a forwarder, so manual and dispatched runs share one code path.
+The implementation is maintained once, with skill `gdd` (`scripts/adapters/omp-run.py`, cross-platform,
+with `adapters/omp-run.sh` beside it as the POSIX reference), because that skill's `gdd.py` defaults to
+it; the copy here (`scripts/omp-run.sh`) is a forwarder, so manual and dispatched runs share one code
+path.
 
 ## Why headless (not TUI)
 
