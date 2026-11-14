@@ -10,7 +10,9 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -1023,12 +1025,14 @@ class RealSubprocessBoundaryTests(unittest.TestCase):
     THREADS = json.dumps({"data": {"repository": {"pullRequest": {"reviewThreads": {
         "pageInfo": {"hasNextPage": False, "endCursor": None}, "nodes": []}}}}})
 
-    def run_boundary(self, *, json_result, table_result, extra=()):
+    def run_boundary(self, *, json_result, table_result, extra=(), repo=".", record=None):
         calls = []
         view = {"state": "OPEN", "isDraft": False, "headRefOid": HEAD, "headRefName": "feature"}
 
         def fake_run(cmd, cwd=None, capture_output=False, text=False):
             calls.append(list(cmd))
+            if record is not None:
+                record.append((list(cmd), cwd))
             if cmd[:1] == ["git"]:
                 branch = "--abbrev-ref" in cmd
                 return subprocess.CompletedProcess(cmd, 0, "feature" if branch else HEAD, "")
@@ -1046,7 +1050,7 @@ class RealSubprocessBoundaryTests(unittest.TestCase):
             raise AssertionError(f"unexpected command: {cmd}")
 
         out, err = io.StringIO(), io.StringIO()
-        argv = ["pr-merge-check.py", "7", "--repo", ".", *extra]
+        argv = ["pr-merge-check.py", "7", "--repo", repo, *extra]
         with patch.object(gate.subprocess, "run", side_effect=fake_run), \
              patch.object(sys, "argv", argv), redirect_stdout(out), redirect_stderr(err):
             code = gate.main()
@@ -1152,6 +1156,45 @@ class RealSubprocessBoundaryTests(unittest.TestCase):
         with patch.object(gate.subprocess, "run", side_effect=fake_run):
             self.assertEqual(gate.sh_raw(["gh", "pr", "checks", "7"]),
                              (7, stdout, stderr))
+
+    def test_the_repository_the_operator_named_reaches_every_child(self):
+        # The fake above accepts `cwd`; this is the test that notices it being dropped. The
+        # repository is deliberately distinct from the runner's directory, so a `cwd` the gate
+        # failed to forward cannot coincide with the expected value. Every `gh` call must run in
+        # that directory and every `git` call must carry it as `-C <path>` — each surface
+        # forwards the repository a different way, and `gh` inspecting the caller's repository
+        # instead of the one under test silently invalidates the gate's whole evidence base.
+        repo = os.path.realpath(tempfile.mkdtemp(prefix="gdd-boundary-repo-"))
+        self.addCleanup(shutil.rmtree, repo, ignore_errors=True)
+        self.assertNotEqual(repo, os.path.realpath(os.getcwd()))
+        record = []
+        code, out, err, _ = self.run_boundary(
+            json_result=(0, "[]", ""), table_result=(0, "", ""), repo=repo,
+            extra=("--verified-head", HEAD, "--gates-rc", "0", "--allow-no-machine-review",
+                   "--allow-no-checks"), record=record)
+        self.assertEqual(err, "")
+        self.assertEqual(code, 0)
+        gh_calls = [(cmd, cwd) for cmd, cwd in record if cmd[:1] == ["gh"]]
+        self.assertTrue(gh_calls)
+        for cmd, cwd in gh_calls:
+            self.assertEqual(cwd, repo, f"gh ran outside the repository under test: {cmd}")
+        git_calls = [cmd for cmd, _ in record if cmd[:1] == ["git"]]
+        self.assertTrue(git_calls)
+        for cmd in git_calls:
+            self.assertIn(repo, cmd, f"git did not carry the repository under test: {cmd}")
+
+    def test_forwarding_of_directory_text_and_capture_at_a_real_child(self):
+        # No fake at all: sh_raw() runs a real child, and the child reports the directory it ran
+        # in. That is the honest boundary probe — one assertion covers three forwards at once:
+        # the working directory (the child's getcwd()), text mode (bytes would not equal the
+        # string) and captured output (an inherited stdio would hand back nothing).
+        repo = os.path.realpath(tempfile.mkdtemp(prefix="gdd-boundary-probe-"))
+        self.addCleanup(shutil.rmtree, repo, ignore_errors=True)
+        self.assertNotEqual(repo, os.path.realpath(os.getcwd()))
+        code, stdout, stderr = gate.sh_raw(
+            [sys.executable, "-c", "import os; print(os.getcwd())"], cwd=repo)
+        self.assertEqual((code, stderr), (0, ""))
+        self.assertEqual(stdout.strip(), repo)
 
 
 if __name__ == "__main__":

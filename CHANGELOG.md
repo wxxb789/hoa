@@ -7,6 +7,23 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
 
 ### Fixed
 
+- **Round-8 review finding: the subprocess boundary pins the repository it forwards.**
+  Both boundary fakes accepted `cwd` and ignored it, and every `gh` argument was the same whichever
+  directory was passed, so dropping `cwd=repo` at a call site — or replacing `cwd=cwd` inside
+  `sh_raw()` with `cwd=None` — left all 373 cells, the 92 review-evidence tests and the 68-fixture
+  selftest green while the child inspected the caller's repository instead of the one `--repo`
+  named, invalidating the evidence the gate exists to collect. The matrix gains a **boundary
+  dimension** — `boundary-repo-gh-cwd` (`gh` must run in the working directory `--repo` names) and
+  `boundary-repo-git-flag` (`git` must carry the same directory in argv as `-C <path>`), each driven
+  from a directory distinct from the runner's against a fake that records what `subprocess.run()`
+  actually received, and the fingerprint of the hole is that only the *boundary* cells flip.
+  `RealSubprocessBoundaryTests` gains a recording run over the whole gate and a probe that runs a
+  **real** child and asserts the directory it reports — one assertion that covers the forwarded
+  directory, text mode and captured output at once. Both surviving mutations are registered in the
+  catalogue (63 -> 65 mutations, 31 -> 33 anchored). This is the only relied-on obligation of that
+  shape besides the repository: the gate passes no `env=` (its docstring states "Environment:
+  none"), so no test pins an environment the gate does not use, and the `gh` argv is already pinned
+  by the verdict cells, which dispatch on it.
 - **Round-7 review findings: only a check-result exit is CI data, and both opt-ins together still
   cannot forgive a non-green read.** `gh pr checks` reports CI state through exactly two exit codes —
   1 (a check failed) and 8 (a check is pending). The table fallback accepted *every* non-zero exit as
@@ -105,12 +122,13 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   structured zero-check read). Every cell drives `main()` with `subprocess.run()` mocked and compares
   the **complete** verdict line plus the printed `checks:` tally, so a failing read cannot pass as a
   pending one (`verdict: BLOCKED: checks` is a prefix of `verdict: BLOCKED: checks pending`) — 370
-  verdict cells + 3 stream cells. The captured live output in `tests/gh_checks_fixtures.py` is a
-  matrix input as well: a value gh prints that the declared vocabulary does not know fails the matrix
-  instead of reaching the gate as an unknown token. `tests/mutate_verdict_matrix.py` applies 63
-  in-memory mutations of the module — 31 anchored plus two generated per declared vocabulary entry,
-  reclassifying that token into every other classification — and requires each to flip at least one
-  cell, naming the survivor loudly if one does not. Both run in CI.
+  verdict cells + 3 stream cells + 2 boundary cells. The captured live output in
+  `tests/gh_checks_fixtures.py` is a matrix input as well: a value gh prints that the declared
+  vocabulary does not know fails the matrix instead of reaching the gate as an unknown token.
+  `tests/mutate_verdict_matrix.py` applies 65 in-memory mutations of the module — 33 anchored plus
+  two generated per declared vocabulary entry, reclassifying that token into every other
+  classification — and requires each to flip at least one cell, naming the survivor loudly if one
+  does not. Both run in CI.
 
 ## [0.1.61] — 2026-11-14
 

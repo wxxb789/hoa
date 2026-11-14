@@ -31,8 +31,11 @@ from __future__ import annotations
 import importlib.util
 import io
 import json
+import os
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from collections import namedtuple
 from contextlib import redirect_stderr, redirect_stdout
@@ -699,6 +702,27 @@ STREAM_CELLS = [
 ]
 
 
+# --- the subprocess boundary: the repository actually reaches the child ------
+# No verdict cell can express this: the fake that drives them accepts `cwd` and ignores it, so
+# replacing `cwd=repo` at any call site — or `cwd=cwd` inside sh_raw with `cwd=None` — left all of
+# them green while the child inspected the caller's repository instead of the one `--repo` names,
+# silently invalidating the evidence the gate exists to collect. The repository is the one input
+# the gate forwards to *both* surfaces, and each surface forwards it a different way: `gh` through
+# the working directory, `git` through `-C <path>` in argv. Each cell runs the gate from a
+# repository directory distinct from the runner's and reads back what the fake actually handed to
+# subprocess.run(), so a dropped directory is a failure and not an invisible rename.
+BoundaryCell = namedtuple("BoundaryCell", "id surface why")
+
+BOUNDARY_CELLS = [
+    BoundaryCell("boundary-repo-gh-cwd", "gh",
+                 "gh takes the repository as the child's working directory, so the directory "
+                 "--repo names must reach subprocess.run() unchanged"),
+    BoundaryCell("boundary-repo-git-flag", "git",
+                 "git takes the repository as `-C <path>` in argv, so the same directory must "
+                 "reach the child that way"),
+]
+
+
 # --- the captured vocabulary ------------------------------------------------
 
 def fixture_problems():
@@ -735,12 +759,14 @@ def fixture_problems():
 
 # --- the harness ------------------------------------------------------------
 
-def _fake_run_for(cell_):
+def _fake_run_for(cell_, records=None):
     view = {"state": "OPEN", "isDraft": False, "headRefOid": HEAD, "headRefName": "feature"}
     threads = json.dumps({"data": {"repository": {"pullRequest": {"reviewThreads": {
         "pageInfo": {"hasNextPage": False, "endCursor": None}, "nodes": []}}}}})
 
     def fake_run(cmd, cwd=None, capture_output=False, text=False):
+        if records is not None:
+            records.append((list(cmd), cwd))
         if cmd[:1] == ["git"]:
             branch = "--abbrev-ref" in cmd
             return subprocess.CompletedProcess(cmd, 0, "feature" if branch else HEAD, "")
@@ -847,6 +873,51 @@ def check_stream_cell(module, stream_cell):
     return None
 
 
+def run_boundary_cell(module, repo, records):
+    """Drive main() from `repo` over a green structured read, recording every (cmd, cwd)."""
+    baseline = cell("boundary-baseline", JSON_GREEN, TABLE_UNUSED, False, 0, "MERGE-OK", None,
+                    (1, 1, 0, 0), "the recording run only needs a read that completes")
+    argv = ["pr-merge-check.py", "7", "--repo", repo, "--verified-head", HEAD,
+            "--gates-rc", "0", "--allow-no-machine-review"]
+    out, err = io.StringIO(), io.StringIO()
+    with patch.object(module.subprocess, "run", side_effect=_fake_run_for(baseline, records)), \
+            patch.object(sys, "argv", argv), redirect_stdout(out), redirect_stderr(err):
+        module.main()
+
+
+def check_boundary_cell(module, boundary_cell):
+    """The repository the operator named must reach the child on its surface, unchanged.
+
+    The run happens in a directory distinct from the runner's, so a dropped directory cannot pass
+    by coincidence, and only the calls on the cell's own surface are judged.
+    """
+    repo = os.path.realpath(tempfile.mkdtemp(prefix="gdd-boundary-repo-"))
+    try:
+        if repo == os.path.realpath(os.getcwd()):
+            return "the boundary repository must differ from the runner's directory"
+        records = []
+        try:
+            run_boundary_cell(module, repo, records)
+        except Exception as exc:  # a mutant may crash where the gate must run
+            return "raised %s: %s" % (type(exc).__name__, exc)
+        calls = [(cmd, cwd) for cmd, cwd in records if cmd[:1] == [boundary_cell.surface]]
+        if not calls:
+            return "the gate issued no %s call to inspect" % boundary_cell.surface
+        if boundary_cell.surface == "gh":
+            wrong = [(cmd, cwd) for cmd, cwd in calls if cwd != repo]
+            if wrong:
+                return ("%d gh call(s) ran outside the repository: cwd=%r, expected %r "
+                        "(first: %r)" % (len(wrong), wrong[0][1], repo, wrong[0][0]))
+        else:
+            wrong = [cmd for cmd, _ in calls if repo not in cmd]
+            if wrong:
+                return ("%d git call(s) did not carry the repository in argv (first: %r)"
+                        % (len(wrong), wrong[0]))
+        return None
+    finally:
+        shutil.rmtree(repo, ignore_errors=True)
+
+
 def evaluate(module):
     """Every cell that the module under test violates, as (id, problem)."""
     problems = declaration_problems(module)
@@ -858,6 +929,10 @@ def evaluate(module):
         problem = check_stream_cell(module, stream_cell)
         if problem is not None:
             problems.append((stream_cell.id, problem))
+    for boundary_cell in BOUNDARY_CELLS:
+        problem = check_boundary_cell(module, boundary_cell)
+        if problem is not None:
+            problems.append((boundary_cell.id, problem))
     return problems
 
 
@@ -868,9 +943,10 @@ def main():
     for cell_id, problem in problems:
         print("  FAIL  %s: %s" % (cell_id, problem))
     elapsed = time.monotonic() - start
-    total = len(CELLS) + len(STREAM_CELLS)
-    print("verdict-matrix: %d verdict cells + %d stream cells = %d cells, %d failed, %.2fs"
-          % (len(CELLS), len(STREAM_CELLS), total, len(problems), elapsed))
+    total = len(CELLS) + len(STREAM_CELLS) + len(BOUNDARY_CELLS)
+    print("verdict-matrix: %d verdict cells + %d stream cells + %d boundary cells = %d cells, "
+          "%d failed, %.2fs" % (len(CELLS), len(STREAM_CELLS), len(BOUNDARY_CELLS), total,
+                                len(problems), elapsed))
     return 1 if problems else 0
 
 

@@ -15,10 +15,12 @@ Two catalogues make up the run:
   the five this round's earlier findings named, the three round-5 findings named (a normalising
   header comparison, a table-only read that authorises by default, and a two-token vocabulary
   swap), the two round-6 findings named (a flag conflation that lets the table-only opt-in grant the
-  zero-check opt-out, and a whole line normalised before the header comparison), and the ones the
-  surface implies (a tab-less line parsed as a row, the header parsed as a check, the cancel and
-  skipping bucket mappings, the zero-check opt-out granted unconditionally, an unordered header, a
-  pending bucket read as failing);
+  zero-check opt-out, and a whole line normalised before the header comparison), the two the round-8
+  finding named (the working directory dropped inside `sh_raw`, so `gh` inspects the caller's
+  repository instead of the one `--repo` names, and a `git` call that drops its repository), and the
+  ones the surface implies (a tab-less line parsed as a row, the header parsed as a check, the cancel
+  and skipping bucket mappings, the zero-check opt-out granted unconditionally, an unordered header,
+  a pending bucket read as failing);
 * one generated mutation per declared `CHECK_VOCABULARY` entry, reclassifying that token into every
   other classification ("a failing verdict read as ok", "an ok verdict read as pending"). They are
   generated from the vocabulary, so a token added to the gate arrives with its own mutations and
@@ -231,6 +233,15 @@ MUTATIONS = [
      ' "json"',
      "structured rows are indexed by name, so a repeated check name collapses two rows into one "
      "and a failing row vanishes"),
+    ("subprocess-cwd-dropped",
+     "        proc = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)",
+     "        proc = subprocess.run(cmd, cwd=None, capture_output=True, text=True)",
+     "the working directory the call forwarded is dropped at subprocess.run(), so gh inspects the "
+     "caller's repository instead of the one --repo named"),
+    ("git-repository-flag-dropped",
+     'sh(["git", "-C", repo, "rev-parse", "HEAD"])',
+     'sh(["git", "rev-parse", "HEAD"])',
+     "a git call drops its repository, so the local head is read from the caller's repository"),
 ]
 
 
@@ -302,7 +313,7 @@ def main():
                   % (mutation_id, note, len(flipped), flipped[0]))
 
     elapsed = time.monotonic() - start
-    cells = len(matrix.CELLS) + len(matrix.STREAM_CELLS)
+    cells = len(matrix.CELLS) + len(matrix.STREAM_CELLS) + len(matrix.BOUNDARY_CELLS)
     print("mutation-harness: %d mutations over %d cells, %d survived, %.2fs"
           % (len(MUTATIONS), cells, len(survivors), elapsed))
     return 1 if survivors else 0
