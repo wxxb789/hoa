@@ -144,7 +144,11 @@ floor = [
 # PYTHONDONTWRITEBYTECODE, GIT_TERMINAL_PROMPT, NO_COLOR (captured logs are parsed,
 # so no tool may colour them), and PATH with the discoverer's own interpreter
 # directory prepended so a suite's internal `python3` is the interpreter that
-# carries the repository dependencies (§4.3).  The task-local scratch root is created
+# carries the repository dependencies (§4.3), and the shim toolchain's absolute state
+# directories (MISE_STATE_DIR / MISE_DATA_DIR: a mise shim on PATH resolves its trust
+# database and installed tools through them, so a task-local HOME would otherwise make
+# `bun` refuse to run — pinned from the operator's own setting, or from the operator HOME
+# when that location exists; this is not an allowlist widening).  The task-local scratch root is created
 # under /tmp — never under an inherited operator TMPDIR, and outside the checkout the way
 # CI's TMPDIR is; a root too long to hold a tmux AF_UNIX socket is reported as that
 # suite's ERROR before it runs.

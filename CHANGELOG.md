@@ -31,6 +31,9 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
 - Per-suite scratch trees are created under `/tmp`, never under an inherited operator `TMPDIR`, and a
   root whose worst-case tmux socket would exceed the 108-byte `sun_path` limit is reported as that
   suite's ERROR before it runs instead of failing later as a tmux mystery.
+- Suite processes keep the shim toolchain's absolute state directories (`MISE_STATE_DIR`,
+  `MISE_DATA_DIR`), so a mise-managed `bun` on `PATH` runs under the task-local `HOME` instead of
+  refusing with "Config files … are not trusted" or re-installing the tool into the scratch tree.
 - Bumped shared skill/catalog version from 0.1.61 to 0.1.62.
 
 ## [0.1.61] — 2026-11-14

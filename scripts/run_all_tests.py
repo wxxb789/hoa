@@ -22,7 +22,9 @@ short `/tmp` directory of its own — never the checkout, and never an inherited
 (`scratch_root_for`) — a per-suite timeout, and process-group teardown on timeout.  A scratch tree
 too long to hold the toolkit's AF_UNIX socket is reported as that suite's ERROR before it runs
 (`socket_path_length`).  Per-suite logs and the JSON result record stay under
-`.tmp-artifacts/test-runs/<UTC stamp>-<pid>/` in the checkout.  A required suite that executed zero
+`.tmp-artifacts/test-runs/<UTC stamp>-<pid>/` in the checkout.  Suite processes also keep the shim
+toolchain's absolute state directories (`shim_state_environment`), because a task-local HOME otherwise
+makes a mise shim on PATH refuse to run.  A required suite that executed zero
 checks is never PASS: unittest suites must collect at least one test, and suites with a declared
 count adapter must report a positive executed-check count.
 """
@@ -61,6 +63,14 @@ CONDITIONS = ("always", "pull_request")
 SHORT_TEMP_ROOT = Path("/tmp")
 SCRATCH_PREFIX = "hoa-t-"
 AF_UNIX_PATH_LIMIT = 108
+
+# Shim toolchain state, pinned by absolute path for suite processes: a shim-managed tool
+# on PATH resolves its trust database and installed tools through these, and suites run
+# with a task-local HOME (see `shim_state_environment`).
+SHIM_STATE_DEFAULTS = {
+    "MISE_STATE_DIR": Path(".local") / "state" / "mise",
+    "MISE_DATA_DIR": Path(".local") / "share" / "mise",
+}
 
 UNITTEST_SUMMARY = re.compile(r"^Ran (\d+) tests? in (?:\d|\.)", re.MULTILINE)
 UNITTEST_SKIPPED = re.compile(r"skipped=(\d+)")
@@ -548,7 +558,8 @@ def base_environment(document: dict, python: str) -> dict[str, str]:
     Only the manifest's allowlist is kept: an operator's GDD_*, OMP_*, PASEO_* or
     profile variables must not reach a suite.  PATH gets the running interpreter's
     directory prepended, so a suite's own `python3` is the interpreter that carries
-    the repository dependencies.
+    the repository dependencies, and the shim toolchain's state directories are pinned
+    by absolute path (`shim_state_environment`) so a task-local HOME cannot move them.
     """
     allowed = list((document.get("env") or {}).get("passthrough") or ["PATH"])
     environment = {name: os.environ[name] for name in allowed if name in os.environ}
@@ -557,8 +568,37 @@ def base_environment(document: dict, python: str) -> dict[str, str]:
     environment["PATH"] = os.pathsep.join(
         part for part in (interpreter_dir, existing) if part
     )
+    environment.update(shim_state_environment(os.environ.get("HOME")))
     # Deterministic logs: no tool should colour a captured stream.
     environment.setdefault("NO_COLOR", "1")
+    return environment
+
+
+def shim_state_environment(operator_home: str | None = None) -> dict[str, str]:
+    """Absolute state/data directories a PATH shim needs under a task-local HOME.
+
+    mise is the shim manager here: `bun` on PATH resolves to `~/.local/share/mise/shims/bun`,
+    and mise resolves its trust database and its installed tools through `MISE_STATE_DIR`
+    (default `$HOME/.local/state/mise`) and `MISE_DATA_DIR` (default
+    `$HOME/.local/share/mise`).  Suites run with a task-local HOME, so an un-pinned shim
+    refuses to exec ("Config files in … are not trusted") or, with only the state directory
+    pinned, silently re-installs the tool inside the scratch tree — measured on this host:
+    with `MISE_STATE_DIR` alone mise downloaded bun again (7.6 s), with both it ran the
+    existing 1.4.4 immediately.  Each variable comes from the operator's own setting when
+    present, otherwise from the operator's HOME when that location exists.  This is
+    deliberately *not* a general `MISE_*` passthrough, and the task-local HOME stays.
+    """
+    environment: dict[str, str] = {}
+    for name, default in SHIM_STATE_DEFAULTS.items():
+        configured = os.environ.get(name)
+        if configured:
+            environment[name] = str(Path(configured).expanduser().resolve())
+            continue
+        if not operator_home:
+            continue
+        candidate = Path(operator_home) / default
+        if candidate.is_dir():
+            environment[name] = str(candidate)
     return environment
 
 
@@ -966,7 +1006,7 @@ def _print_plan(plan: Plan) -> None:
 
 def _payload(plan: Plan, outcomes: list[Outcome], *, event: str, root: Path, python: str,
              started: str, duration: float, exit_code: int, log_root: Path,
-             scratch_root: Path) -> dict:
+             scratch_root: Path, shim_state: dict[str, str]) -> dict:
     summary = {state: 0 for state in TERMINAL_STATES}
     for outcome in outcomes:
         summary[outcome.state] = summary.get(outcome.state, 0) + 1
@@ -981,6 +1021,7 @@ def _payload(plan: Plan, outcomes: list[Outcome], *, event: str, root: Path, pyt
         "filtered": plan.filtered,
         "logs": str(log_root),
         "scratch_root": str(scratch_root),
+        "shim_state": shim_state,
         "discovery": {
             "pattern_matches": len(plan.discovered),
             "floor_missing": plan.floor_missing,
@@ -1053,6 +1094,7 @@ def main(argv: list[str] | None = None) -> int:
     log_root = run_root / "logs"
     log_root.mkdir(parents=True, exist_ok=True)
     environment = base_environment(document, python)
+    shim_state = {name: environment[name] for name in SHIM_STATE_DEFAULTS if name in environment}
 
     outcomes: list[Outcome] = []
     by_id: dict[str, Outcome] = {}
@@ -1121,7 +1163,8 @@ def main(argv: list[str] | None = None) -> int:
     _write_report(Path(args.report).resolve() if args.report else None,
                   _payload(plan, outcomes, event=event, root=root, python=python,
                            started=started, duration=duration, exit_code=exit_code,
-                           log_root=log_root, scratch_root=scratch_root))
+                           log_root=log_root, scratch_root=scratch_root,
+                           shim_state=shim_state))
     print(f"exit {exit_code}")
     return exit_code
 

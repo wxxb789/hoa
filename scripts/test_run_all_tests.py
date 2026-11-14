@@ -102,11 +102,128 @@ def synthetic_tree(patterns: list[str], prune: list[str], floor: list[str], suit
     return root
 
 
+def run_synthetic(root: Path, scratch: Path, report: Path, *extra: str) -> tuple[int, str, dict]:
+    """Run the discoverer in-process against a synthetic root; return code, stdout, report."""
+    buffer = io.StringIO()
+    # 20s, not 5s: these suites start real interpreters and the machine may be loaded; only
+    # an injected hang suite is meant to hit the timeout.
+    argv = ["--root", str(root), "--event", "local", "--timeout", "20",
+            "--scratch", str(scratch), "--report", str(report), *extra]
+    with contextlib.redirect_stdout(buffer):
+        code = runner.main(argv)
+    return code, buffer.getvalue(), json.loads(report.read_text(encoding="utf-8"))
+
+
+def states_of(payload: dict) -> dict:
+    """The report's per-suite entries keyed by id."""
+    return {entry["id"]: entry for entry in payload["suites"]}
+
+
 def write_suite(root: Path, relative: str, body: str) -> str:
     path = root / relative
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(body, encoding="utf-8")
     return relative
+
+
+SHIM_TOOL_FIXTURE = '''import json
+import os
+import pathlib
+import sys
+
+state = os.environ.get("MISE_STATE_DIR")
+if not state or not pathlib.Path(state).is_dir():
+    print(f"shim cannot run: MISE_STATE_DIR={state!r}", file=sys.stderr)
+    raise SystemExit(1)
+pathlib.Path(os.environ["SHIM_STATE_FILE"]).write_text(json.dumps(state), encoding="utf-8")
+'''
+
+
+class SuiteEnvironmentTests(unittest.TestCase):
+    """The suite environment: the manifest allowlist plus pinned interpreter and shim state."""
+
+    def setUp(self):
+        ARTIFACTS.mkdir(parents=True, exist_ok=True)
+        self.addCleanup(shutil.rmtree, ARTIFACTS, ignore_errors=True)
+        self.document = runner.load_manifest(ROOT / runner.MANIFEST_RELATIVE)
+        self.scratch = runner.scratch_root_for()
+        self.addCleanup(shutil.rmtree, self.scratch, ignore_errors=True)
+        self.report = ARTIFACTS / "report.json"
+
+    @contextlib.contextmanager
+    def operator(self, home: Path | None = None, **variables):
+        """Temporarily set the runner's own HOME/MISE_* as an operator would."""
+        saved = {name: os.environ.get(name) for name in ("HOME", *runner.SHIM_STATE_DEFAULTS)}
+        for name in runner.SHIM_STATE_DEFAULTS:
+            os.environ.pop(name, None)
+        if home is not None:
+            os.environ["HOME"] = str(home)
+        for name, value in variables.items():
+            os.environ[name] = value
+        try:
+            yield
+        finally:
+            for name, value in saved.items():
+                if value is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = value
+
+    def test_shim_state_directories_are_pinned_from_the_operator_home(self):
+        home = ARTIFACTS / "operator-home"
+        (home / ".local" / "state" / "mise").mkdir(parents=True)
+        (home / ".local" / "share" / "mise").mkdir(parents=True)
+        with self.operator(home=home):
+            environment = runner.base_environment(self.document, sys.executable)
+        self.assertEqual(environment["MISE_STATE_DIR"], str(home / ".local" / "state" / "mise"))
+        self.assertEqual(environment["MISE_DATA_DIR"], str(home / ".local" / "share" / "mise"))
+        for name in runner.SHIM_STATE_DEFAULTS:
+            self.assertTrue(Path(environment[name]).is_absolute(), environment[name])
+
+    def test_operator_shim_settings_win_and_are_made_absolute(self):
+        home = ARTIFACTS / "operator-home"
+        home.mkdir(parents=True, exist_ok=True)
+        with self.operator(home=home, MISE_STATE_DIR="./relative-state"):
+            environment = runner.base_environment(self.document, sys.executable)
+        self.assertEqual(environment["MISE_STATE_DIR"], str(Path("./relative-state").resolve()))
+        self.assertNotIn("MISE_DATA_DIR", environment)
+
+    def test_suites_gain_nothing_outside_the_declared_allowlist(self):
+        home = ARTIFACTS / "operator-home"
+        (home / ".local" / "state" / "mise").mkdir(parents=True, exist_ok=True)
+        with self.operator(home=home, MISE_VERBOSE="1", GDD_LAUNCHER="must-not-leak",
+                           OMP_RUN_ROOT="must-not-leak"):
+            environment = runner.base_environment(self.document, sys.executable)
+        allowed = set((self.document.get("env") or {}).get("passthrough") or [])
+        allowed |= {"PATH", "NO_COLOR"} | set(runner.SHIM_STATE_DEFAULTS)
+        self.assertLessEqual(set(environment), allowed)
+        self.assertNotIn("MISE_VERBOSE", environment)
+
+    def test_a_shim_style_tool_finds_its_state_under_a_task_local_home(self):
+        """End to end: the suite process runs the shim, not the operator's HOME."""
+        home = ARTIFACTS / "operator-home"
+        (home / ".local" / "state" / "mise").mkdir(parents=True, exist_ok=True)
+        state_file = ARTIFACTS / "shim-state.json"
+        root = synthetic_tree(
+            patterns=["scripts/test_*.py"], prune=[], floor=[],
+            suites="\n".join([
+                "[[suite]]",
+                'id = "canned:shim-tool"',
+                'command = [["{python}", "scripts/tests/shim_tool.py"]]',
+                f'env = {{ SHIM_STATE_FILE = "{state_file}" }}',
+                "",
+            ]),
+        )
+        write_suite(root, "scripts/tests/shim_tool.py", SHIM_TOOL_FIXTURE)
+        with self.operator(home=home):
+            code, output, payload = run_synthetic(root, self.scratch, self.report,
+                                                  "--suite", "canned:shim-tool")
+        self.assertEqual(payload["shim_state"]["MISE_STATE_DIR"],
+                         str(home / ".local" / "state" / "mise"))
+        self.assertEqual(states_of(payload)["canned:shim-tool"]["state"], "PASS", output)
+        self.assertEqual(json.loads(state_file.read_text(encoding="utf-8")),
+                         str(home / ".local" / "state" / "mise"))
+        self.assertEqual(code, 0)
 
 
 class DiscoveryTests(unittest.TestCase):
@@ -515,18 +632,10 @@ class EndToEndTests(unittest.TestCase):
         return root
 
     def run_main(self, root: Path, *extra: str) -> tuple[int, str, dict]:
-        buffer = io.StringIO()
-        # 20s, not 5s: these suites start real interpreters and the machine may be
-        # loaded; only the injected hang suite is meant to hit the timeout.
-        argv = ["--root", str(root), "--event", "local", "--timeout", "20",
-                "--scratch", str(self.scratch), "--report", str(self.report), *extra]
-        with contextlib.redirect_stdout(buffer):
-            code = runner.main(argv)
-        payload = json.loads(self.report.read_text(encoding="utf-8"))
-        return code, buffer.getvalue(), payload
+        return run_synthetic(root, self.scratch, self.report, *extra)
 
     def states(self, payload: dict) -> dict:
-        return {entry["id"]: entry for entry in payload["suites"]}
+        return states_of(payload)
 
     def test_every_suite_settles_and_the_run_goes_red_for_the_broken_ones(self):
         root = self.build()
