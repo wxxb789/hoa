@@ -3,6 +3,16 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## [0.1.62] — 2026-11-15
+
+### Changed
+
+- GDD phase 6 states when its CI clause is inapplicable: a repository that declares **no workflow at
+  all** *and* a PR carrying zero checks/statuses reads the merge script's `BLOCKED: no checks` verdict
+  as not-applicable for that head and merges on the remaining clauses, with the zero-workflow evidence
+  recorded in the verdict line and the PR body. Red or pending checks in a repository that *has*
+  workflows stay blocking.
+
 ## [0.1.61] — 2026-11-14
 
 ### Added
