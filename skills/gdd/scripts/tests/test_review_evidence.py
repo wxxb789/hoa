@@ -21,7 +21,7 @@ SCRIPTS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SCRIPTS))
 from machine_review import (  # noqa: E402
     DEFAULT_MARKER, EvidenceError, evidence_comment, make_evidence, parse_marker,
-    report_digest, review_facts,
+    report_digest, review_facts, validate_runtime_receipt, RESPONSES_APIS,
 )
 
 spec = importlib.util.spec_from_file_location("pr_merge_check", SCRIPTS / "pr-merge-check.py")
@@ -321,6 +321,68 @@ class GeneratorCLITests(unittest.TestCase):
     def test_missing_output_directory_is_a_file_error(self):
         result = self.run_cli(self.args + ["--output", str(self.root / "absent" / "comment")])
         self.assertEqual(result.returncode, 2)
+
+
+class RuntimeReceiptTests(unittest.TestCase):
+    def records(self, model=MODEL, api="openai-responses"):
+        return [{"type": "model_change", "provider": PROVIDER, "modelId": model},
+                {"type": "message", "message": {"role": "assistant", "provider": PROVIDER,
+                 "model": model, "api": api, "stopReason": "stop"}}]
+
+    def test_all_supported_responses_transports_and_namespaced_ids(self):
+        for model in [MODEL, "namespace/fixture-model"]:
+            for api in RESPONSES_APIS:
+                with self.subTest(model=model, api=api):
+                    value = validate_runtime_receipt(self.records(model, api), PROVIDER, model,
+                                                     "responses", [api])
+                    self.assertEqual(value["apis"], [api])
+
+    def test_explicit_responses_lane_rejects_chat_regardless_of_model_name(self):
+        for model in [MODEL, "namespace/fixture-model"]:
+            with self.subTest(model=model), self.assertRaises(EvidenceError):
+                validate_runtime_receipt(self.records(model, "openai-completions"), PROVIDER,
+                                         model, "responses", ["openai-completions"])
+
+    def test_model_provider_and_actual_api_mismatches_block(self):
+        for field in ["model", "provider", "api"]:
+            records = self.records()
+            records[1]["message"][field] = "mismatch"
+            with self.subTest(field=field), self.assertRaises(EvidenceError):
+                validate_runtime_receipt(records, PROVIDER, MODEL, "responses", ["openai-responses"])
+        with self.assertRaises(EvidenceError):
+            validate_runtime_receipt([], PROVIDER, MODEL, "responses", ["openai-responses"])
+
+    def test_transport_and_api_inputs_have_no_implicit_defaults(self):
+        for transport, apis in [(None, []), ("responses", []), ("responses", ["unknown"]),
+                                ("responses", "openai-responses"), ("other", [""])]:
+            with self.subTest(transport=transport, apis=apis), self.assertRaises(EvidenceError):
+                validate_runtime_receipt(self.records(), PROVIDER, MODEL, transport, apis)
+        self.assertEqual(validate_runtime_receipt(self.records(api="fixture-api"), PROVIDER,
+                         MODEL, "other", ["fixture-api"])["apis"], ["fixture-api"])
+
+    def test_failed_aborted_or_truncated_output_blocks(self):
+        for reason in ["error", "aborted", "length"]:
+            records = self.records()
+            records[1]["message"]["stopReason"] = reason
+            with self.subTest(reason=reason), self.assertRaises(EvidenceError):
+                validate_runtime_receipt(records, PROVIDER, MODEL, "responses", ["openai-responses"])
+
+    def test_real_receipt_cli_and_missing_multiple_receipts(self):
+        with tempfile.TemporaryDirectory(prefix="review-receipt-") as folder:
+            root = Path(folder)
+            receipt = root / "session.jsonl"
+            receipt.write_text("\n".join(json.dumps(r) for r in self.records()) + "\n")
+            args = [sys.executable, str(SCRIPTS / "review-receipt.py"), "--session-dir", folder,
+                    "--provider", PROVIDER, "--model", MODEL, "--transport", "responses",
+                    "--api-id", "openai-responses"]
+            good = subprocess.run(args, capture_output=True, text=True)
+            self.assertEqual(good.returncode, 0, good.stderr)
+            self.assertEqual(json.loads(good.stdout)["model"], MODEL)
+            (root / "second.jsonl").write_bytes(receipt.read_bytes())
+            self.assertEqual(subprocess.run(args, capture_output=True).returncode, 2)
+            receipt.unlink()
+            (root / "second.jsonl").unlink()
+            self.assertEqual(subprocess.run(args, capture_output=True).returncode, 2)
 
 
 class MergeGateIntegrationTests(unittest.TestCase):

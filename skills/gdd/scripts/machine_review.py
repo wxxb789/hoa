@@ -11,6 +11,7 @@ import re
 DEFAULT_MARKER = "machine-review-state:v1"
 FULL_SHA = re.compile(r"[0-9a-fA-F]{40}\Z")
 REPORT_SHA256 = re.compile(r"[0-9a-f]{64}\Z")
+RESPONSES_APIS = {"openai-responses", "azure-openai-responses", "openai-codex-responses"}
 
 
 class EvidenceError(ValueError):
@@ -172,3 +173,33 @@ def evidence_comment(evidence, marker=DEFAULT_MARKER):
         payload = payload.replace(char, f"\\u{ord(char):04x}")
     # Preambles and HTML delimiters can collide with supported custom tokens.
     return f"{marker} {payload}\n"
+
+
+def validate_runtime_receipt(records, provider, model, transport, api_ids):
+    """Verify actual pi identity and explicit lane transport; never infer from model spelling."""
+    if not nonempty_text(provider) or not nonempty_text(model):
+        raise EvidenceError("provider/model must be explicit nonempty IDs")
+    if not isinstance(transport, str) or transport not in {"responses", "other"}:
+        raise EvidenceError("transport must be explicitly responses or other")
+    if not isinstance(api_ids, (list, tuple)) or not api_ids or not all(nonempty_text(api) for api in api_ids):
+        raise EvidenceError("actual API IDs must be explicitly allowed")
+    allowed = set(api_ids)
+    if transport == "responses" and not allowed <= RESPONSES_APIS:
+        raise EvidenceError("Responses lane API IDs must be supported Responses transports")
+    if not isinstance(records, list) or not all(isinstance(r, dict) for r in records):
+        raise EvidenceError("session records must be objects")
+    selected = [(r.get("provider"), r.get("modelId")) for r in records
+                if r.get("type") == "model_change"]
+    answers = [r["message"] for r in records if r.get("type") == "message"
+               and isinstance(r.get("message"), dict) and r["message"].get("role") == "assistant"]
+    requested = (provider, model)
+    if not selected or any(pair != requested for pair in selected) or not answers:
+        raise EvidenceError("resolved provider/model receipt missing or mismatched")
+    if any((m.get("provider"), m.get("model")) != requested for m in answers):
+        raise EvidenceError("assistant runtime provider/model mismatched")
+    if any(not nonempty_text(m.get("api")) or m["api"] not in allowed for m in answers):
+        raise EvidenceError("assistant runtime API is not allowed for this lane")
+    if any(m.get("stopReason") in ("error", "aborted", "length") for m in answers):
+        raise EvidenceError("review contains failed/aborted assistant output")
+    return {"provider": provider, "model": model, "transport": transport,
+            "apis": sorted({m["api"] for m in answers})}
