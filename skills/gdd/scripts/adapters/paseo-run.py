@@ -136,8 +136,15 @@ def cli(state, argv):
         # caller/session readers found in that CLI; preserve unrelated config.
         for key in ("PASEO_AGENT_ID", "PASEO_WORKSPACE_ID"):
             environment.pop(key, None)
+    # Dispatch runs in the requested worktree: provenance verification compares the
+    # CLI's reported cwd with it, so a removed worktree must fail loudly there.
+    # Lifecycle and readback commands only need a live working directory and must
+    # still reach the CLI after normal worktree cleanup.
+    cwd = state["cwd"]
+    if argv[0] != "run" and not os.path.isdir(cwd):
+        cwd = state["run_dir"]
     try:
-        result = subprocess.run(command, cwd=state["cwd"], capture_output=True,
+        result = subprocess.run(command, cwd=cwd, capture_output=True,
                                 text=True, encoding="utf-8", errors="replace", timeout=CLI_TIMEOUT_SECONDS,
                                 creationflags=support.hidden_flags(), env=environment)
         code, stdout, stderr = result.returncode, result.stdout, result.stderr

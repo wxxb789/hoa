@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -536,6 +537,26 @@ class PaseoLauncherTests(unittest.TestCase):
         for key in ("agent_deleted", "termination_verb", "terminated_at"):
             state.pop(key)
         self.assertEqual(state, before)
+        self.assertEqual((self.run_dir() / "finalized").read_bytes(), marker)
+
+    def test_lifecycle_commands_survive_worktree_removal(self):
+        worktree = self.home / "worktree"
+        worktree.mkdir()
+        self.save_fixture(status="idle")
+        self.start("--cwd", str(worktree))
+        before = self.status()
+        self.assertEqual(before["state"], "done")
+        self.assertEqual(before["cwd"], str(worktree))
+        marker = (self.run_dir() / "finalized").read_bytes()
+        # Normal worktree cleanup removes the recorded dispatch directory; the
+        # already-finalized agent must still be deletable afterwards.
+        shutil.rmtree(worktree)
+        result = self.run_adapter("kill", "stage")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(["delete", self.fixture["id"], "--json"], self.calls())
+        state = self.status()
+        self.assertTrue(state["agent_deleted"])
+        self.assertEqual(state["state"], "done")
         self.assertEqual((self.run_dir() / "finalized").read_bytes(), marker)
 
     def test_list_and_result_show_agent_identity(self):
