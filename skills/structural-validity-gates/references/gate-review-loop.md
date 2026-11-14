@@ -100,11 +100,12 @@ one token. Three rules, all on the same axis:
 
 ## Three verdict shapes that look like new findings
 
-- **`has_any_findings: true` with no inline comment newer than your review request.** The marker counts
-  *unresolved threads*, so a round whose findings you already fixed and answered still reads `true`.
-  List threads with `isResolved` + `createdAt`, compare against your request timestamp; when nothing is
-  new, reply on each with the fixing sha and the measured table, resolve them, re-request. Editing code
-  here buys a round and leaves the same thread open.
+- **`has_any_findings: true` with no new inline comment.** The machine-review marker describes the
+  full report, not the thread count. Read that exact report first: a headless reviewer may post no
+  inline comments at all. Reproduce each finding, record its disposition, and request a new complete
+  review after fixes or justified dismissals. Separately list threads with `isResolved` + `createdAt`;
+  old threads need a reply with the fixing SHA and measured table, then resolution. Editing code to
+  close a stale thread buys a round and leaves the same thread open.
 - **A verbatim duplicate of an answered finding**, typically carrying a link to an older commit: the
   reviewer re-anchored an old thread onto the new head. Re-run your probe on the current head; if the
   case passes, answer with the table, name the fixing commit, resolve — do not dispatch.
@@ -234,29 +235,36 @@ not broken.
   Keep `poll_round.py` in the task dir, append one timestamped line per poll with `status` and sha, and
   read that log once after launch: a log with one line and no growth is a broken poller, not "still
   waiting".
-- **Post the review request from a file.** `gh pr comment <n> --body "<multi-line text>"` mis-parses the
-  newlines and dies with `accepts at most 1 arg(s), received 3`, which reads like an API failure; write
-  the body (ending in `@codex review`) with the file tool and pass `--body-file`.
-- **The reviewer runs on the provider's side, not from your local harness config.** A hosted review
-  bot's model is chosen server-side and is not exposed in its output, so editing `~/.codex/config.toml`
-  or any other local model setting changes nothing about the review you get; the review marker carries
-  only a status and a sha. If the review model has to be pinned, the lane must be self-built — a CI
-  step invoking the CLI headless with `--model` and your own schema — and the bot's inline findings and
-  thread state are then yours to reproduce.
-- **Reply and resolve in one GraphQL pass, then re-read the count.** A thread resolved with "done" is
+- **Run an explicitly model-pinned reviewer through the configured provider.** Use a headless adapter
+  such as `pi -p --provider <selected-provider> --model <selected-model> @<prompt-file> @<diff-file>`.
+  The project profile supplies those identifiers, not this protocol. GPT-family endpoints require
+  the configured Responses API route, not Chat Completions. Do not change runtime settings, log in,
+  start services, or substitute another model when that route fails. Capture the actual complete
+  report and exit result; a failed run is a blocker, not review evidence.
+- **Generate and post the evidence from a file.** GDD's `review-evidence.py` embeds the exact UTF-8
+  report and SHA256 under `machine-review-state:v1`, with explicit full head, model, provider, and
+  findings flags. Post via `gh pr comment <n> --body-file <comment-file>`, retain the returned id,
+  and read back that exact comment body. `pr-merge-check.py` requires completed, clean evidence on
+  the exact full 40-hex current head with a matching report digest; custom markers use the same
+  schema, and malformed newest evidence cannot fall back to an older clean comment. Recheck the
+  head before/after review, after readback, and before merge. See
+  [`gdd/references/bot-review-loop.md`](../../gdd/references/bot-review-loop.md) for the complete
+  reference commands and finding-disposition contract. The hash binds report bytes, not reviewer
+  identity or the truth of the verdict; keep the invocation provenance too.
+- **Reply, resolve, then read back the exact thread and paginated count.** A thread resolved with "done" is
   indistinguishable from one closed to satisfy the gate, so the reply carries the fixing sha and the
   measured table:
 
   ```bash
   gh api graphql -f query='mutation{addPullRequestReviewThreadReply(
-    input:{pullRequestReviewThreadId:"PRRT_…", body:"Fixed in <sha>: <table>"}){comment{id}}}'
-  gh api graphql -f query='mutation{resolveReviewThread(input:{threadId:"PRRT_…"}){thread{isResolved}}}'
-  gh api graphql -f query='{repository(owner:"<o>",name:"<r>"){pullRequest(number:<n>){
-    reviewThreads(first:50){nodes{isResolved}}}}}' \
-    --jq '.data.repository.pullRequest.reviewThreads.nodes | "total=\(length) unresolved=\([.[]|select(.isResolved==false)]|length)"'
+    input:{pullRequestReviewThreadId:"<thread-id>", body:"Fixed in <full-sha>: <table>"}){comment{id body}}}'
+  gh api graphql -f query='mutation{resolveReviewThread(input:{threadId:"<thread-id>"}){thread{isResolved}}}'
+  gh api graphql -f query='query{node(id:"<thread-id>"){... on PullRequestReviewThread{
+    id isResolved comments(last:1){nodes{id body}}}}}'
   ```
 
-  The id is the opaque `PRRT_…` string, not the numeric comment id; a `null` back means a wrong id.
+  The id is opaque, not the numeric comment id; a `null` back means a wrong id. Verify the expected
+  reply and `isResolved: true`, then let the merge gate recount all pages of review threads.
 - **A clean verdict is not a closed PR.** `has_any_findings: false` still ships with open threads, and
   the merge gate counts them — resolve every thread you answered before reading the verdict as final,
   because the next round otherwise re-reports work you already landed.
@@ -269,12 +277,12 @@ not broken.
   green decision to both facts in the same read: `gh pr view <n> --json headRefOid` equals the sha you
   pushed, and no line contains `pending|queued|in_progress`. Re-poll instead of trusting the first
   settled output.
-- **`has_any_findings: true` may contain no new findings.** The marker counts unresolved threads, so a
-  round you already fixed reads `true` until the threads are closed. Enumerate before dispatching:
-  `reviewThreads(first:50){nodes{id isResolved path comments(first:1){nodes{createdAt body}}}}`, then
-  split "thread older than my review request" (reply with the fixing sha and the measured table, then
-  `resolveReviewThread`) from "new inline comment". A finding whose body links an older commit sha is
-  the pre-fix text re-anchored: re-probe the current head, answer, resolve, spend nothing.
+- **Thread state is not report evidence.** A completed report with `has_any_findings: true` blocks
+  even if every thread is resolved; a clean report does not close threads. Read the full report and
+  enumerate `reviewThreads(first:100,after:$cursor)` with `pageInfo` until every page is read. Split
+  "thread older than my review request" (re-probe, reply with the fixing SHA and measured table,
+  then resolve) from "new report finding" (reproduce and disposition before re-review). An older
+  linked commit can be pre-fix text re-anchored; never dispatch it without probing the current head.
 
 ## Reporting the table
 

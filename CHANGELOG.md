@@ -3,18 +3,61 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
-## [0.1.60] — 2026-11-14
+## [0.1.61] — 2026-11-14
+
+### Added
+
+- A portable pinned-snapshot catalog measurement helper and six regression tests distinguish
+  trimmed SKILL.md bodies from complete files and exclude fenced pseudoheadings. The baseline
+  split predicate selects 13 skills; sanitized evidence records input/report hashes and all findings.
 
 ### Changed
 
-- `docs/plans/2026-11-14-catalog-refactor-plan.md` is rewritten as the revised plan: the catalog
-  re-measured on `cabf8c6`, the two independent audits' verdict absorbed (the test discoverer stays one
-  mechanical PR behind a name-based discovery contract, the static checks are split from the script
-  tests, and oversized entries are split by progressive disclosure rather than rewritten as
-  `controller`s), and the two claims the audits refused — `kind` as a dead field, `hermes`/`pi` as enum
-  drift — withdrawn along with the code that refutes them. The plan also records what version 1 missed:
-  four stub skills, three orphan references, five unresolvable local paths, and a routing blind spot that
-  no static check can see.
+- Revised the catalog plan after simplify/code-review findings: withdraw the five false dead-path
+  claims and retain them as scoped positive fixtures; correct test-presence, targets, registry,
+  code-size and body-size measurements. Claims that kind is dead or runtime targets are enum drift
+  are withdrawn; the plan cites the checker code that refutes them, without removing that code.
+- Keep explicit kind/R2/R7 and role-aware routing, including the mechanism must_pick prohibition.
+  Discovery uses named shell patterns, covered-child accounting, explicit Paseo/Vitest package
+  reconciliation, tested result/skip protocols and complete fault evidence before deleting CI commands.
+- Separate universal static syntax from safe bounded CLI-help remediation and dependency-tier
+  behavior tests; preserve every split migration/refusal/install/rule-removal evidence requirement.
+  Attribute audit conclusions instead of claiming unverified independence or host automation.
+- Bumped shared skill/catalog version from 0.1.60 to 0.1.61 after integrating the machine-review PR.
+  This is a corrected implementation plan, not execution of its future refactor phases.
+
+## [0.1.60] — 2026-11-14
+
+### Added
+
+- GDD's `review-evidence.py` generates a PR comment from the exact completed UTF-8 report file,
+  with explicit full head, model, provider, and findings flags. Shared `machine_review.py` embeds
+  the entire report and hashes its original bytes without newline or Unicode normalization.
+- Offline schema/mutation, Unicode/CRLF, hash-tamper, malformed JSON/type, newest-evidence,
+  custom-marker, real CLI file roundtrip, and full merge-gate integration regressions run in CI.
+
+### Changed
+
+- `pr-merge-check.py` defaults to provider-independent `machine-review-state:v1` and requires
+  completed, clean evidence with an exact full 40-hex current head, nonempty model/provider,
+  nonempty UTF-8 report, and matching SHA256. Abbreviated SHAs and status/SHA-only evidence no
+  longer pass. Custom markers retain the same schema; malformed newest evidence blocks older
+  clean evidence, and the explicit no-review opt-out applies only when no selected marker exists.
+- Restored the documented local-gates clause: absent `--gates-rc` now blocks instead of merely
+  displaying `UNKNOWN` while allowing an otherwise green PR. CI, PR-state, verified-head, and
+  unresolved-thread clauses remain independent of the machine-review verdict.
+- Replaced stale hosted-bot request instructions with an explicitly provider/model-pinned
+  headless review lane, configured Responses-route requirements for GPT-family endpoints,
+  full-report evidence generation, exact PR-comment readback, head rechecks, and finding/thread
+  dispositions. No login, credentials, services, runtime configuration, or model defaults are changed.
+- Custom-token evidence starts directly with the token, avoiding heading/delimiter collisions.
+  The reference lane rejects fuzzy-only registry matches and verifies actual resolved model/provider
+  and Responses transport from a fresh runtime session receipt before stamping provenance.
+- `review-receipt.py` validates explicit lane API IDs and transport independently of model spelling;
+  all supported Responses adapters are accepted when declared, while namespaced models cannot bypass
+  that requirement. Failed, aborted, truncated or incomplete final assistant receipts block the lane;
+  Unicode separators inside JSON strings are preserved by LF-delimited receipt reading.
+- Bumped the shared skill/catalog version from `0.1.59` to `0.1.60`.
 
 ## [0.1.59] — 2026-11-14
 

@@ -40,6 +40,9 @@ jobs:
       - name: GDD loop selftest
         run: bash skills/gdd/scripts/tests/run-gdd-selftest.sh
 
+      - name: GDD machine-review evidence tests
+        run: python skills/gdd/scripts/tests/test_review_evidence.py
+
       - name: GDD launcher forwarder tests
         run: bash skills/gdd/scripts/tests/test-omp-run-stale.sh
 

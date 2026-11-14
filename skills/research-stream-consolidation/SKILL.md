@@ -7,7 +7,7 @@ description: >-
   research and the deliverable must become one tree without losing provenance. Not for copying
   files between projects or for reconciling divergent code branches.
 metadata:
-  version: "0.1.60"
+  version: "0.1.61"
   areas: "work-management"
   targets: "runtime-agnostic"
   summary: "merge overlapping research streams into one project and repair the records that bound the old paths"

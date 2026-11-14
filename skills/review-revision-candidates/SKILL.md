@@ -7,7 +7,7 @@ description: >-
   page edit as REJECTED with items to fix. Not for open-ended rewrites or for reviewing someone
   else's work.
 metadata:
-  version: "0.1.60"
+  version: "0.1.61"
   areas: "work-management"
   targets: "runtime-agnostic"
   summary: "run a rejected candidate's revision round: the numbered list is the whole change set"
