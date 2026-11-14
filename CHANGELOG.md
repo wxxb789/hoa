@@ -17,6 +17,11 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
 
 ### Changed
 
+- Unresolved native Paseo runs keep reserving their worktree through offline status refreshes
+  and monitor loss without disguising `unknown` as `running`; confirmed terminal outcomes or
+  deletion release the reservation. Headless run-state handling is unchanged.
+- Observer metrics stay unavailable for lifecycle-only event streams instead of displaying
+  invented zero turns, tool calls, and cost; the counter source reflects actual measurements.
 - Observer counters recount retained events in the same list, follow, or detail scan after the
   launcher atomically replaces `events.ndjson`, instead of briefly returning null metrics.
 - Preserved native Paseo cwd provenance failures across refreshes until inspect verifies the

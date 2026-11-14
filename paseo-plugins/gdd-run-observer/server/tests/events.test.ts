@@ -6,6 +6,22 @@ function line(event: unknown): string {
 }
 
 describe("applyEventLine", () => {
+  it("requires recognized instrumentation before declaring event counters available", () => {
+    const counters = createCounters();
+    for (const type of ["paseo_status", "truncated", "future_lifecycle"]) {
+      applyEventLine(counters, line({ type }));
+      expect(snapshotCounters(counters).hasCounters).toBe(false);
+    }
+    applyEventLine(counters, line({ type: "session", id: "s1" }));
+    const snapshot = snapshotCounters(counters);
+    expect(snapshot.hasCounters).toBe(true);
+    expect(snapshot.turns).toBe(0);
+    expect(snapshot.toolCalls).toBe(0);
+    expect(snapshot.costUsd).toBe(0);
+    applyEventLine(counters, line({ type: "paseo_status", state: "done" }));
+    expect(snapshotCounters(counters).hasCounters).toBe(true);
+  });
+
   it("counts turns, tool calls, and assistant cost the way the launcher finalizer does", () => {
     const counters = createCounters();
     applyEventLine(counters, line({ type: "session", id: "s1", timestamp: "2026-11-14T00:00:00.000Z" }));

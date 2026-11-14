@@ -59,7 +59,10 @@ Derived per run:
 - **counters**: `turns` counts `turn_end`, `tool_calls` counts every `*tool*start*` event, `cost`
   sums assistant `message_end` usage. Running runs are counted from the retained event log while
   tailing (only appended bytes are read); once a run finalized, the launcher's own `state.json`
-  counters win. The UI labels which source it used and marks spliced logs partial.
+  counters win. A lifecycle-only stream (such as the native adapter's `paseo_status` transitions)
+  supplies no measurements: metrics remain unavailable (`null`, source `none`) unless the
+  launcher records counters. Recognized agent instrumentation establishes event counters,
+  including measured zeros. The UI labels which source it used and marks spliced logs partial.
 - **current tool**: the last `tool_execution_start` without a matching `tool_execution_end`.
 - **loss accounting**: `eventsTruncated` and `eventsDroppedBytes` take the largest value reported by
   `state.json`, `events.stats.json`, and the splice marker.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { mapRun, type RunFiles } from "../state";
-import type { CounterSnapshot } from "../events";
+import { applyEventLine, createCounters, snapshotCounters, type CounterSnapshot } from "../events";
 import type { PidVerdict } from "../liveness";
 
 const NOW = Date.parse("2026-11-14T00:30:00.000Z");
@@ -37,6 +37,7 @@ function files(overrides: Partial<RunFiles> = {}): RunFiles {
 
 function counters(overrides: Partial<CounterSnapshot> = {}): CounterSnapshot {
   return {
+    hasCounters: true,
     turns: 3,
     toolCalls: 7,
     costUsd: 0.25,
@@ -57,6 +58,31 @@ function verdicts(alive: number[]): Map<number, PidVerdict> {
 }
 
 describe("mapRun", () => {
+  it("keeps metrics unavailable for an adapter-shaped lifecycle-only event stream", () => {
+    const parsed = createCounters();
+    applyEventLine(parsed, JSON.stringify({
+      type: "paseo_status",
+      at: "2026-11-14T00:29:30.000Z",
+      state: "running",
+      status: "running",
+    }));
+    const summary = mapRun({
+      files: files({
+        state: { present: true, readable: true, values: { backend: "paseo", state: "running" } },
+        lock: null,
+      }),
+      counters: snapshotCounters(parsed),
+      verdicts: new Map(),
+    }, NOW);
+    expect(summary.eventLines).toBe(1);
+    expect({
+      turns: summary.turns,
+      toolCalls: summary.toolCalls,
+      costUsd: summary.costUsd,
+      countersFrom: summary.countersFrom,
+    }).toEqual({ turns: null, toolCalls: null, costUsd: null, countersFrom: "none" });
+  });
+
   it("reports a live process as running with counters derived from the event log", () => {
     const summary = mapRun({ files: files(), counters: counters(), verdicts: verdicts([222]) }, NOW);
     expect(summary.state).toBe("running");
@@ -68,6 +94,32 @@ describe("mapRun", () => {
     expect(summary.costUsd).toBe(0.25);
     expect(summary.elapsedS).toBe(1800);
     expect(summary.warnings).toEqual([]);
+  });
+
+  it("uses launcher measurements instead of lifecycle-only event counters", () => {
+    const parsed = createCounters();
+    applyEventLine(parsed, JSON.stringify({ type: "paseo_status", state: "running", status: "running" }));
+    const summary = mapRun({
+      files: files({
+        state: { present: true, readable: true, values: { turns: 2, tool_calls: 4, cost_usd: 0.1 } },
+      }),
+      counters: snapshotCounters(parsed),
+      verdicts: new Map(),
+    }, NOW);
+    expect(summary.countersFrom).toBe("state");
+    expect(summary.turns).toBe(2);
+    expect(summary.toolCalls).toBe(4);
+    expect(summary.costUsd).toBe(0.1);
+  });
+
+  it("reports measured zeros once a recognized agent event stream is available", () => {
+    const parsed = createCounters();
+    applyEventLine(parsed, JSON.stringify({ type: "session", id: "s1" }));
+    const summary = mapRun({ files: files(), counters: snapshotCounters(parsed), verdicts: new Map() }, NOW);
+    expect(summary.countersFrom).toBe("events");
+    expect(summary.turns).toBe(0);
+    expect(summary.toolCalls).toBe(0);
+    expect(summary.costUsd).toBe(0);
   });
 
   it("prefers launcher counters once the run finalized", () => {

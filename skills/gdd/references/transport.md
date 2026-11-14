@@ -225,6 +225,11 @@ turn has settled**; an agent that is merely idle before dispatch is not a comple
 | `closed` | `killed`, never successful completion |
 | Missing agent, unreachable daemon, or unrecognized state | `unknown`, never success |
 
+An unresolved native run (`running` or `unknown`) reserves its recorded worktree even if the
+local monitor is gone. The stage-dispatch guard releases that reservation only after a terminal
+state or `finalized` marker is recorded; restored reachability alone does not release it. This
+reservation does not relabel an `unknown` status as `running` or change headless run states.
+
 `kill` maps to **`paseo delete <id> --json`**, not `paseo stop`. CLI 0.15.4's `stop` only interrupts
 a turn; it leaves a resumable idle agent and is not termination evidence. The installed `delete.js`
 awaits cancellation when running, then hard-deletes the agent. Its receipt must contain

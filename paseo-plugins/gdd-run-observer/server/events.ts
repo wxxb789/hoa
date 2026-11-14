@@ -8,6 +8,7 @@ import type { RunEvent } from "../shared/runs";
 export type OpenTool = { name: string; intent: string | null };
 
 export type RunCounters = {
+  hasCounters: boolean;
   turns: number;
   toolCalls: number;
   costUsd: number;
@@ -23,6 +24,7 @@ export type RunCounters = {
 };
 
 export type CounterSnapshot = {
+  hasCounters: boolean;
   turns: number;
   toolCalls: number;
   costUsd: number;
@@ -53,6 +55,7 @@ const SUPPRESSED_KEYS: Record<string, true> = {
 
 export function createCounters(): RunCounters {
   return {
+    hasCounters: false,
     turns: 0,
     toolCalls: 0,
     costUsd: 0,
@@ -70,6 +73,7 @@ export function createCounters(): RunCounters {
 
 export function snapshotCounters(counters: RunCounters): CounterSnapshot {
   return {
+    hasCounters: counters.hasCounters,
     turns: counters.turns,
     toolCalls: counters.toolCalls,
     costUsd: counters.costUsd,
@@ -115,6 +119,13 @@ export function applyEventLine(counters: RunCounters, line: string): RunEvent | 
     return null;
   }
   counters.lines += 1;
+
+  // Lifecycle transitions and splice markers do not establish a measured event stream.
+  if (type === "session" || type === "turn_start" || type === "turn_end" ||
+      type === "message_start" || type === "message_update" || type === "message_end" ||
+      type.includes("tool")) {
+    counters.hasCounters = true;
+  }
 
   const at = timestampOf(event.timestamp);
   if (at) counters.lastEventAt = at;

@@ -2,6 +2,7 @@
 """Portable native-launcher contract tests with a stub paseo binary on PATH."""
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import subprocess
@@ -12,6 +13,7 @@ import unittest
 import uuid
 from datetime import datetime
 from pathlib import Path
+from unittest import mock
 
 ADAPTER = Path(__file__).resolve().parents[1] / "adapters" / "paseo-run.py"
 STUB = '''#!/usr/bin/env python3
@@ -287,6 +289,87 @@ class PaseoLauncherTests(unittest.TestCase):
                 self.assertEqual(state["state"], "unknown")
                 self.assertIsNone(state["exit"])
                 self.assertFalse((self.run_dir() / "finalized").exists())
+
+    def test_unknown_native_run_reserves_worktree_until_confirmed_termination(self):
+        spec = importlib.util.spec_from_file_location("gdd_under_test", ADAPTER.parent.parent / "gdd.py")
+        gdd = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(gdd)
+        env = dict(self.env, GDD_TASK_ROOT=str(self.home / "tasks"))
+        repo = os.path.realpath(self.home)
+        for termination in ("delete", "idle", "error", "closed"):
+            with self.subTest(termination=termination), mock.patch.dict(os.environ, env, clear=True):
+                # The daemon owns this run; no local monitor is needed for status refreshes.
+                name = "reservation-" + termination
+                run_dir = self.run_dir(name)
+                run_dir.mkdir(parents=True)
+                state = {"name": name, "backend": "paseo", "state": "running", "exit": None,
+                         "cwd": str(self.home), "cwd_verified": True, "pid": None,
+                         "started": datetime.now().astimezone().isoformat(),
+                         "run_dir": str(run_dir), "agent_id": self.fixture["id"],
+                         "paseo_argv": [sys.executable, str(self.bin / "paseo.py")],
+                         "ledger": str(self.root / "ledger.tsv")}
+                (run_dir / "state.json").write_text(json.dumps(state), encoding="utf-8")
+                expected = [(name, str(run_dir))]
+                self.assertEqual(gdd.active_runs(repo), expected)
+
+                self.save_fixture(offline=True)
+                refreshed = self.status(name)
+                self.assertEqual(refreshed["state"], "unknown")
+                self.assertIsNone(refreshed["exit"])
+                self.assertFalse((run_dir / "finalized").exists())
+                self.assertEqual(gdd.effective_state(str(run_dir), refreshed), "unknown")
+                self.assertEqual(gdd.active_runs(repo), expected,
+                                 "offline inspect must not release the native worktree reservation")
+
+                self.save_fixture(offline=False, status="future-state", missing=False)
+                self.assertEqual(gdd.active_runs(repo), expected,
+                                 "reachability alone must not release an unresolved native run")
+                self.assertEqual(json.loads((run_dir / "state.json").read_text())["state"], "unknown")
+                if termination == "delete":
+                    self.save_fixture(delete_failed=True)
+                    rejected = self.run_adapter("kill", name)
+                    self.assertEqual(rejected.returncode, 1, rejected.stdout + rejected.stderr)
+                    self.assertEqual(self.status(name)["state"], "unknown")
+                    self.assertEqual(gdd.active_runs(repo), expected)
+                    self.save_fixture(delete_failed=False)
+                    result = self.run_adapter("kill", name)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    settled = json.loads(result.stdout)
+                    self.assertTrue(settled["agent_deleted"])
+                    self.assertEqual(settled["state"], "killed")
+                else:
+                    self.save_fixture(status=termination)
+                    settled = self.status(name)
+                    self.assertIn(settled["state"], ("done", "failed", "killed"))
+                self.assertTrue((run_dir / "finalized").exists())
+                self.assertEqual(gdd.active_runs(repo), [])
+
+    def test_native_reservation_ignores_dead_monitor_and_preserves_headless_states(self):
+        spec = importlib.util.spec_from_file_location("gdd_under_test", ADAPTER.parent.parent / "gdd.py")
+        gdd = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(gdd)
+        run_dir = self.run_dir()
+        run_dir.mkdir(parents=True)
+        state = {"name": "stage", "backend": "paseo", "state": "running",
+                 "cwd": str(self.home), "pid": 999999999}
+        env = dict(self.env, GDD_TASK_ROOT=str(self.home / "tasks"))
+        expected = [("stage", str(run_dir))]
+        with mock.patch.dict(os.environ, env, clear=True):
+            (run_dir / "state.json").write_text(json.dumps(state), encoding="utf-8")
+            self.assertEqual(gdd.effective_state(str(run_dir), state), "stale lock")
+            self.assertEqual(gdd.active_runs(os.path.realpath(self.home)), expected)
+            (run_dir / "finalized").write_text("143\n", encoding="utf-8")
+            self.assertEqual(gdd.active_runs(os.path.realpath(self.home)), [])
+            (run_dir / "finalized").unlink()
+
+            state.update(backend="windows", pid=None)
+            for word in ("running", "done", "failed", "killed"):
+                with self.subTest(headless_state=word):
+                    state["state"] = word
+                    (run_dir / "state.json").write_text(json.dumps(state), encoding="utf-8")
+                    self.assertEqual(gdd.effective_state(str(run_dir), state), word)
+                    self.assertEqual(gdd.active_runs(os.path.realpath(self.home)),
+                                     expected if word == "running" else [])
 
     def test_idle_waiting_for_permission_is_not_done(self):
         self.save_fixture(status="idle", permissions=[{"tool": "write"}])

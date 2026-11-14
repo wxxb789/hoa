@@ -48,6 +48,7 @@ export function mapRun(inputs: RunInputs, nowMs: number): RunSummary {
   const liveness = livenessOf(files.finalized, pids, verdicts);
   const state = stateOf(values, files.finalized);
   const countersFrom = counterSource(files, counters);
+  const eventCounters = countersFrom === "events" ? counters : null;
   const truncated =
     values.events_truncated === true ||
     files.stats?.truncated === true ||
@@ -88,9 +89,9 @@ export function mapRun(inputs: RunInputs, nowMs: number): RunSummary {
     thinking: asString(values.thinking),
     maxTime: asString(values.max_time),
     sessionId: asString(values.session_id) ?? files.sessionIdFromFile,
-    turns: countersFrom === "state" ? asNumber(values.turns) : (counters?.turns ?? null),
-    toolCalls: countersFrom === "state" ? asNumber(values.tool_calls) : (counters?.toolCalls ?? null),
-    costUsd: countersFrom === "state" ? asNumber(values.cost_usd) : (counters?.costUsd ?? null),
+    turns: countersFrom === "state" ? asNumber(values.turns) : (eventCounters?.turns ?? null),
+    toolCalls: countersFrom === "state" ? asNumber(values.tool_calls) : (eventCounters?.toolCalls ?? null),
+    costUsd: countersFrom === "state" ? asNumber(values.cost_usd) : (eventCounters?.costUsd ?? null),
     countersFrom,
     countersPartial:
       truncated ||
@@ -166,7 +167,7 @@ function counterSource(
     asNumber(files.state.values.turns) !== null ||
     asNumber(files.state.values.tool_calls) !== null ||
     asNumber(files.state.values.cost_usd) !== null;
-  const eventsHaveCounters = counters !== null && counters.lines > 0;
+  const eventsHaveCounters = counters?.hasCounters === true;
   if (files.finalized.present && stateHasCounters) return "state";
   if (eventsHaveCounters) return "events";
   return stateHasCounters ? "state" : "none";

@@ -40,8 +40,10 @@ reference adapters/omp-run.sh adds the attachable tmux backend):
 
 The launcher owns <run_root>/<date>/<SLUG>/state.json with at least
 {"name","state","exit","cwd","started","ended","duration_s"} (state is one of
-running|done|killed|failed) and answer.md holding the final assistant text.
+running|done|killed|failed|unknown) and answer.md holding the final assistant text.
 This tool polls that file and treats a missing file as unknown, never success.
+Native Paseo runs reserve their worktree while running or unknown, regardless
+of local monitor liveness, until a terminal state or finalized marker is recorded.
 """
 
 import argparse
@@ -368,7 +370,7 @@ def run_state_paths(task_root_dir, run_root_dir):
 
 
 def active_runs(repo_path):
-    """(name, run_dir) for runs still alive whose cwd is repo_path."""
+    """(name, run_dir) for runs reserving repo_path, including unresolved native runs."""
     active = []
     for state_path in run_state_paths(task_root(), run_root()):
         try:
@@ -377,7 +379,12 @@ def active_runs(repo_path):
         except (OSError, ValueError):
             continue
         run_dir = os.path.dirname(state_path)
-        if effective_state(run_dir, state) != "running":
+        if state.get("backend") == "paseo":
+            # The daemon owns execution; a dead/offline monitor cannot release its worktree.
+            if (state.get("state") not in ("running", "unknown") or
+                    os.path.exists(os.path.join(run_dir, "finalized"))):
+                continue
+        elif effective_state(run_dir, state) != "running":
             continue
         cwd = state.get("cwd")
         if not cwd:
