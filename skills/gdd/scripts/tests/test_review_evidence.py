@@ -550,6 +550,20 @@ class CheckFetchTests(unittest.TestCase):
         # ... and an empty table with a zero exit stays an empty list.
         self.assertEqual(self.fetch((0, "[]", ""), (0, "", ""))[0], [])
 
+    def test_valid_non_list_json_stdout_falls_back_to_the_table(self):
+        # json.loads succeeds but the payload is not a list: the same fallback as invalid JSON.
+        checks, calls = self.fetch((0, '{"message": "not a list"}', ""), (0, GREEN_TABLE, ""))
+        self.assertEqual([check["conclusion"] for check in checks], ["SKIPPED", "SUCCESS"])
+        self.assertEqual(calls[1][:3], ["gh", "pr", "checks"])
+
+    def test_missing_binary_raises_gate_error_not_oserror(self):
+        # A missing gh/git must reach the exit-2 path (GateError), never an OSError traceback.
+        with patch.object(gate.subprocess, "run",
+                          side_effect=FileNotFoundError("No such file or directory: 'gh'")):
+            with self.assertRaises(gate.GateError) as raised:
+                gate.sh_raw(["gh", "pr", "checks", "7"])
+        self.assertIn("No such file or directory", str(raised.exception))
+
 
 class CheckFetchCliTests(unittest.TestCase):
     """main() end to end: the exit code, the checks line and the verdict, without a real gh."""
@@ -616,6 +630,19 @@ class CheckFetchCliTests(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertEqual(out, "")
         self.assertIn("pr-merge-check: checks pending", err)
+
+    def test_missing_gh_binary_exits_2_with_one_stderr_line(self):
+        # No gh on PATH is a tool error: exit 2 with one line, not a traceback and not a verdict.
+        out, err = io.StringIO(), io.StringIO()
+        argv = ["pr-merge-check.py", "7", "--repo", ".", "--verified-head", HEAD, "--gates-rc", "0"]
+        missing = FileNotFoundError("[Errno 2] No such file or directory: 'gh'")
+        with patch.object(gate.subprocess, "run", side_effect=missing), \
+             patch.object(sys, "argv", argv), redirect_stdout(out), redirect_stderr(err):
+            code = gate.main()
+        self.assertEqual(code, 2)
+        self.assertEqual(out.getvalue(), "")
+        self.assertEqual(err.getvalue().splitlines(),
+                         ["pr-merge-check: [Errno 2] No such file or directory: 'gh'"])
 
 
 if __name__ == "__main__":
