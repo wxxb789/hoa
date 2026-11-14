@@ -6,7 +6,7 @@ description: >-
   non-Latin result. Use when audio must become text or English. Not for speech synthesis or for
   real-time meeting capture.
 metadata:
-  version: "0.1.61"
+  version: "0.1.62"
   areas: "software-development"
   targets: "runtime-agnostic"
   summary: "transcribe and translate audio with Whisper: model choice, batching, language notes"

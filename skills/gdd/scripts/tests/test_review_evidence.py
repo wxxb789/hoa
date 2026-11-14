@@ -4,7 +4,7 @@
 Run: python skills/gdd/scripts/tests/test_review_evidence.py
 """
 
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 import copy
 import hashlib
 import importlib.util
@@ -440,7 +440,9 @@ class MergeGateIntegrationTests(unittest.TestCase):
 
     def test_evidence_does_not_bypass_checks_threads_local_gates_or_head(self):
         cases = [({"checks": []}, "no checks"),
-                 ({"checks": [{"state": "PENDING"}]}, "checks"),
+                 ({"checks": [{"state": "PENDING"}]}, "checks pending"),
+                 ({"checks": [{"state": "PENDING"},
+                              {"state": "COMPLETED", "conclusion": "FAILURE"}]}, "checks"),
                  ({"checks": [{"state": "COMPLETED", "conclusion": "FAILURE"}]}, "checks"),
                  ({"threads": [{"isResolved": False}]}, "threads"),
                  ({"gates_rc": 1}, "gates unverified"),
@@ -463,6 +465,252 @@ class MergeGateIntegrationTests(unittest.TestCase):
         facts, reasons = self.evaluate(evidence=evidence)
         self.assertFalse(facts["review"]["pass"])
         self.assertEqual(reasons, ["review"])
+
+
+# gh >= 2.103 removed `--json conclusion` from `gh pr checks`; the surviving per-check verdict is
+# `bucket`, and the human table exits 8 while a check is pending and 1 when one failed. These
+# fixtures pin the mapping and the exit codes: pending is a reported state, not a crash.
+MIXED_TABLE = ("verify\tfail\t4m9s\thttps://example/1\t\n"
+                 "foreign-notes\tpass\t20s\thttps://example/2\t\n"
+                 "docs\tpending\t1m2s\thttps://example/3\t\n")
+GREEN_TABLE = ("lint\tskipping\t8s\thttps://example/1\t\n"
+               "unit\tpass\t1m0s\thttps://example/2\t\n")
+# What a run in flight looks like: nothing has failed yet, one check still running.
+IN_FLIGHT_TABLE = ("foreign-notes\tpass\t20s\thttps://example/2\t\n"
+                   "docs\tpending\t1m2s\thttps://example/3\t\n")
+JSON_FIELD_GONE = (1, "", 'Unknown JSON field: "conclusion"')
+BUCKET_ROW = {"name": "gates", "state": "PENDING", "bucket": "pending"}
+
+
+class CheckFetchTests(unittest.TestCase):
+    def fetch(self, json_result, table_result):
+        calls = []
+
+        def fake_sh_raw(cmd, cwd=None):
+            calls.append(list(cmd))
+            return json_result if "--json" in cmd else table_result
+
+        with patch.object(gate, "sh_raw", side_effect=fake_sh_raw):
+            checks = gate.fetch_checks(7, ".")
+        return checks, calls
+
+    def test_json_asks_for_the_bucket_not_the_removed_conclusion(self):
+        rows = [{"name": "build", "state": "SUCCESS", "bucket": "pass"}]
+        checks, calls = self.fetch((0, json.dumps(rows), ""), (0, "", ""))
+        self.assertEqual(calls[0][-2:], ["--json", "name,state,bucket"])
+        self.assertNotIn("conclusion", " ".join(calls[0]))
+        self.assertEqual(checks, [{"name": "build", "state": "COMPLETED", "conclusion": "SUCCESS"}])
+
+    def test_bucket_vocabulary_maps_ok_fail_and_pending(self):
+        rows = [{"name": "unit", "state": "SUCCESS", "bucket": "pass"},
+                {"name": "lint", "state": "SKIPPED", "bucket": "skipping"},
+                {"name": "optional", "state": "NEUTRAL", "bucket": "neutral"},
+                {"name": "e2e", "state": "FAILURE", "bucket": "fail"},
+                {"name": "deploy", "state": "CANCELLED", "bucket": "cancel"},
+                {"name": "gates", "state": "PENDING", "bucket": "pending"},
+                {"name": "future", "state": "MYSTERY", "bucket": "unreleased-bucket"}]
+        checks, _ = self.fetch((0, json.dumps(rows), ""), (0, "", ""))
+        facts = gate.evaluate_checks(checks)
+        self.assertEqual((facts["ok"], facts["pending"], facts["failing"]), (3, 2, 2))
+        self.assertFalse(facts["pass"])
+        # A bucket this version has not learned yet is never ok, and never a claimed failure.
+        self.assertEqual(checks[6], {"name": "future", "state": "PENDING", "conclusion": None})
+
+    def test_pending_table_on_nonzero_exit_is_data_not_a_crash(self):
+        for returncode in (8, 1):
+            with self.subTest(returncode=returncode):
+                checks, calls = self.fetch(JSON_FIELD_GONE, (returncode, MIXED_TABLE, ""))
+                self.assertEqual([check["name"] for check in checks],
+                                 ["verify", "foreign-notes", "docs"])
+                facts = gate.evaluate_checks(checks)
+                self.assertEqual((facts["total"], facts["ok"], facts["pending"], facts["failing"]),
+                                 (3, 1, 1, 1))
+                self.assertEqual(calls[1][:3], ["gh", "pr", "checks"])
+
+    def test_unparseable_output_still_raises(self):
+        for name, table in [("blank pending run", (8, "", "checks pending")),
+                            ("cli error text", (1, "gh: Not Found (HTTP 404)\n", "")),
+                            ("stderr only", (1, "", "HTTP 401: Bad credentials"))]:
+            with self.subTest(case=name), self.assertRaises(gate.GateError):
+                self.fetch(JSON_FIELD_GONE, table)
+
+    def test_non_json_stdout_falls_back_to_the_table(self):
+        checks, _ = self.fetch((0, "<html>proxy</html>", ""), (0, GREEN_TABLE, ""))
+        self.assertEqual([check["conclusion"] for check in checks], ["SKIPPED", "SUCCESS"])
+
+    def test_zero_check_runs_rule_is_unchanged(self):
+        # gh exits 1 with "no checks reported" when nothing registered (or ever, without CI).
+        checks, _ = self.fetch(JSON_FIELD_GONE,
+                               (1, "", "no checks reported on the 'feature' branch"))
+        self.assertEqual(checks, [])
+        facts = gate.evaluate_checks(checks)
+        self.assertFalse(facts["pass"])
+        self.assertEqual(facts["reason"], "no checks")
+        self.assertTrue(gate.evaluate_checks(checks, allow_no_checks=True)["pass"])
+        # ... and an empty table with a zero exit stays an empty list.
+        self.assertEqual(self.fetch((0, "[]", ""), (0, "", ""))[0], [])
+
+    def test_valid_non_list_json_stdout_falls_back_to_the_table(self):
+        # json.loads succeeds but the payload is not a list: the same fallback as invalid JSON.
+        checks, calls = self.fetch((0, '{"message": "not a list"}', ""), (0, GREEN_TABLE, ""))
+        self.assertEqual([check["conclusion"] for check in checks], ["SKIPPED", "SUCCESS"])
+        self.assertEqual(calls[1][:3], ["gh", "pr", "checks"])
+
+    def test_non_object_check_row_raises_instead_of_being_dropped(self):
+        # Dropping a malformed row would turn incomplete evidence into permission: a valid row
+        # beside a null would read as an all-green list.
+        for payload in [[{"name": "build", "state": "SUCCESS", "bucket": "pass"}, None],
+                        [None], ["pass"]]:
+            with self.subTest(payload=payload), self.assertRaises(gate.GateError) as raised:
+                self.fetch((0, json.dumps(payload), ""), (0, GREEN_TABLE, ""))
+            self.assertIn("object per check", str(raised.exception))
+
+    def test_unknown_bucket_with_success_state_is_pending_not_ok(self):
+        # gh's bucket — not the removed/raw `state` — is the per-check verdict (gh >= 2.103).
+        rows = [{"name": "future", "state": "SUCCESS", "bucket": "unreleased-bucket"}]
+        checks, _ = self.fetch((0, json.dumps(rows), ""), (0, "", ""))
+        self.assertEqual(checks, [{"name": "future", "state": "PENDING", "conclusion": None}])
+        facts = gate.evaluate_checks(checks)
+        self.assertFalse(facts["pass"])
+        self.assertEqual((facts["ok"], facts["pending"], facts["failing"]), (0, 1, 0))
+
+    def test_empty_fallback_table_blocks_and_only_the_flag_passes_it(self):
+        # JSON is unusable (removed field), so the table is the only source. An empty table is
+        # zero check runs, not a green PR — this path returns before any JSON result is seen.
+        checks, calls = self.fetch(JSON_FIELD_GONE, (0, "", ""))
+        self.assertEqual(checks, [])
+        self.assertEqual(calls[1][:3], ["gh", "pr", "checks"])
+        facts = gate.evaluate_checks(checks)
+        self.assertFalse(facts["pass"])
+        self.assertEqual(facts["reason"], "no checks")
+        allowed = gate.evaluate_checks(checks, allow_no_checks=True)
+        self.assertTrue(allowed["pass"])
+        self.assertEqual(allowed["reason"], "no checks (allowed by flag)")
+
+    def test_missing_binary_raises_gate_error_not_oserror(self):
+        # A missing gh/git must reach the exit-2 path (GateError), never an OSError traceback.
+        with patch.object(gate.subprocess, "run",
+                          side_effect=FileNotFoundError("No such file or directory: 'gh'")):
+            with self.assertRaises(gate.GateError) as raised:
+                gate.sh_raw(["gh", "pr", "checks", "7"])
+        self.assertIn("No such file or directory", str(raised.exception))
+
+
+class CheckFetchCliTests(unittest.TestCase):
+    """main() end to end: the exit code, the checks line and the verdict, without a real gh."""
+
+    def gate_main(self, *extra, table_result, json_result=JSON_FIELD_GONE):
+        view = {"state": "OPEN", "isDraft": False, "headRefOid": HEAD, "headRefName": "feature"}
+        responses = [HEAD, "feature", json.dumps(view), "fixture-owner/fixture-repo"]
+
+        def fake_sh_raw(cmd, cwd=None):
+            return json_result if "--json" in cmd else table_result
+
+        out, err = io.StringIO(), io.StringIO()
+        argv = ["pr-merge-check.py", "7", "--repo", ".", *extra]
+        with patch.object(gate, "sh", side_effect=responses), \
+             patch.object(gate, "sh_raw", side_effect=fake_sh_raw), \
+             patch.object(gate, "fetch_issue_comments", return_value=[]), \
+             patch.object(gate, "fetch_review_threads", return_value=[]), \
+             patch.object(sys, "argv", argv), redirect_stdout(out), redirect_stderr(err):
+            code = gate.main()
+        return code, out.getvalue(), err.getvalue()
+
+    def test_pending_run_blocks_with_a_pending_reason_and_exit_1(self):
+        code, out, err = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",
+                                        "--allow-no-machine-review",
+                                        table_result=(8, IN_FLIGHT_TABLE, ""))
+        self.assertEqual(code, 1)
+        self.assertIn("checks: 2 total, 1 ok, 1 pending, 0 failing", out)
+        self.assertIn("verdict: BLOCKED: checks pending", out)
+        self.assertEqual(err, "")
+
+    def test_pending_bucket_json_blocks_identically(self):
+        code, out, _ = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",
+                                      "--allow-no-machine-review",
+                                      json_result=(0, json.dumps([BUCKET_ROW]), ""),
+                                      table_result=(0, "", ""))
+        self.assertEqual(code, 1)
+        self.assertIn("checks: 1 total, 0 ok, 1 pending, 0 failing", out)
+        self.assertIn("verdict: BLOCKED: checks pending", out)
+
+    def test_mixed_valid_and_malformed_check_rows_exit_2_without_a_verdict(self):
+        # One valid row beside a null must not read as all-green, and the table must not rescue it.
+        payload = [{"name": "build", "state": "SUCCESS", "bucket": "pass"}, None]
+        code, out, err = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",
+                                        "--allow-no-machine-review",
+                                        json_result=(0, json.dumps(payload), ""),
+                                        table_result=(0, GREEN_TABLE, ""))
+        self.assertEqual(code, 2)
+        self.assertEqual(out, "")
+        self.assertIn("object per check", err)
+
+    def test_malformed_only_check_rows_exit_2_even_with_allow_no_checks(self):
+        # --allow-no-checks forgives a PR with zero check runs, never a malformed list.
+        for extra in [(), ("--allow-no-checks",)]:
+            with self.subTest(extra=extra):
+                code, out, err = self.gate_main(
+                    "--verified-head", HEAD, "--gates-rc", "0", "--allow-no-machine-review",
+                    *extra, json_result=(0, json.dumps([None]), ""),
+                    table_result=(0, GREEN_TABLE, ""))
+                self.assertEqual(code, 2)
+                self.assertEqual(out, "")
+                self.assertIn("object per check", err)
+
+    def test_skipping_and_passing_table_is_merge_ok(self):
+        code, out, _ = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",
+                                      "--allow-no-machine-review",
+                                      table_result=(0, GREEN_TABLE, ""))
+        self.assertEqual(code, 0)
+        self.assertIn("checks: 2 total, 2 ok, 0 pending, 0 failing", out)
+        self.assertIn("verdict: MERGE-OK", out)
+
+    def test_zero_check_runs_block_unless_the_flag_forgives_them(self):
+        no_checks = (1, "", "no checks reported on the 'feature' branch")
+        code, out, _ = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",
+                                     "--allow-no-machine-review", table_result=no_checks)
+        self.assertEqual(code, 1)
+        self.assertIn("checks: 0 total, 0 ok, 0 pending, 0 failing (no checks)", out)
+        self.assertIn("verdict: BLOCKED: no checks", out)
+        code, out, _ = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",
+                                     "--allow-no-machine-review", "--allow-no-checks",
+                                     table_result=no_checks)
+        self.assertEqual(code, 0)
+        self.assertIn("verdict: MERGE-OK", out)
+
+    def test_empty_fallback_table_blocks_main_and_only_the_flag_merges(self):
+        # The table is reached with a zero exit and empty stdout: zero check runs, not green.
+        code, out, _ = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",
+                                      "--allow-no-machine-review",
+                                      json_result=JSON_FIELD_GONE, table_result=(0, "", ""))
+        self.assertEqual(code, 1)
+        self.assertIn("checks: 0 total, 0 ok, 0 pending, 0 failing (no checks)", out)
+        self.assertIn("verdict: BLOCKED: no checks", out)
+        code, out, _ = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",
+                                      "--allow-no-machine-review", "--allow-no-checks",
+                                      json_result=JSON_FIELD_GONE, table_result=(0, "", ""))
+        self.assertEqual(code, 0)
+        self.assertIn("verdict: MERGE-OK", out)
+
+    def test_unparseable_gh_output_exits_2_instead_of_guessing(self):
+        code, out, err = self.gate_main("--verified-head", HEAD, "--gates-rc", "0",
+                                        table_result=(8, "", "checks pending"))
+        self.assertEqual(code, 2)
+        self.assertEqual(out, "")
+        self.assertIn("pr-merge-check: checks pending", err)
+
+    def test_missing_gh_binary_exits_2_with_one_stderr_line(self):
+        # No gh on PATH is a tool error: exit 2 with one line, not a traceback and not a verdict.
+        out, err = io.StringIO(), io.StringIO()
+        argv = ["pr-merge-check.py", "7", "--repo", ".", "--verified-head", HEAD, "--gates-rc", "0"]
+        missing = FileNotFoundError("[Errno 2] No such file or directory: 'gh'")
+        with patch.object(gate.subprocess, "run", side_effect=missing), \
+             patch.object(sys, "argv", argv), redirect_stdout(out), redirect_stderr(err):
+            code = gate.main()
+        self.assertEqual(code, 2)
+        self.assertEqual(out.getvalue(), "")
+        self.assertEqual(err.getvalue().splitlines(),
+                         ["pr-merge-check: [Errno 2] No such file or directory: 'gh'"])
 
 
 if __name__ == "__main__":

@@ -3,6 +3,35 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## [0.1.62] — 2026-11-14
+
+### Fixed
+
+- **The merge gate could not be run while CI was in flight.** `pr-merge-check.py` asked `gh pr
+  checks --json name,state,conclusion`; gh 2.103 removed `conclusion` (`Unknown JSON field:
+  "conclusion"`), so it failed and fell back to the table, whose non-zero exits — 8 while a check is
+  pending, 1 when one failed — reached `sh()` and ended the gate at **exit 2**. `fetch_checks()` now
+  reads `--json name,state,bucket`, mapping gh's grouping to the tool's vocabulary:
+  `pass`/`skipping`/`neutral` ok, `fail`/`cancel` failures, anything else — including `pending` —
+  pending. With `--json` gh exits 0, an unfinished run as a `"bucket":"pending"` row, so the bucket
+  mapping is the mechanism for a pending run. The non-zero table branch is the `gh < 2.103`
+  fallback, where a parsed table is data too: an unfinished run reports `checks: N total, M ok, P
+  pending, F failing` and verdict `BLOCKED: checks pending`, so the operator re-runs. Unparseable
+  output raises and exits 2. A malformed `--json` array — a non-object row beside a passing one, or
+  only non-objects — also exits 2 rather than dropping the bad row: `--allow-no-checks` forgives a
+  PR with zero check runs, never an unreadable list. The zero-check-runs block, `--allow-no-checks`,
+  the marker schema and the `--gates-rc`/`--verified-head` clauses are untouched: pending is never
+  green.
+- **Tests**: `tests/test_review_evidence.py` gains `CheckFetchTests` and `CheckFetchCliTests` — the
+  requested JSON fields, the bucket mapping (including an unknown bucket, which must stay pending
+  even when the raw `state` reads `SUCCESS`), a pending table at exit 8 and at exit 1, unparseable
+  output, malformed check rows at exit 2 with and without `--allow-no-checks`, the empty fallback
+  table with a zero exit (zero checks, not green), a missing gh binary at exit 2, the non-JSON and
+  non-list-JSON fallbacks, zero checks with and without `--allow-no-checks`, and `main()`'s exit
+  code plus verdict for each — 42 -> 62 test methods. The shipped `--selftest` gains the bucket
+  vocabulary (a recognized raw state under an unknown bucket stays pending) and its tally
+  (30 -> 39 fixtures).
+
 ## [0.1.61] — 2026-11-14
 
 ### Added

@@ -14,7 +14,10 @@ Usage:
 Exit codes: 0 MERGE-OK, 1 BLOCKED, 2 usage/gh/git error.
 
 Checks:
-  1. every CI check completed with SUCCESS/SKIPPED/NEUTRAL
+  1. every CI check completed with SUCCESS/SKIPPED/NEUTRAL — read from gh's `bucket` field
+     (`pass`/`skipping`/`neutral`); `fail`/`cancel` are failures, anything else (including
+     `pending`) is pending. A run still in flight is reported as
+     `checks: N total, M ok, P pending, F failing` with verdict reason `checks pending`.
   2. newest --marker comment: completed, has_any_findings false, full 40-hex
      commit_sha exactly equal to the PR head, nonempty model/provider and full
      UTF-8 report with a matching SHA256. Custom markers use the same schema.
@@ -48,6 +51,16 @@ from machine_review import (
 )
 
 GOOD_CONCLUSIONS = {"SUCCESS", "SKIPPED", "NEUTRAL"}
+# `gh pr checks --json bucket` is gh's own grouping of `state`; `conclusion` was removed in
+# gh 2.103, so the bucket is the only per-check verdict the CLI still reports. A bucket that is
+# not listed here — including `pending` itself — counts as pending, which blocks.
+BUCKET_CONCLUSIONS = {
+    "pass": "SUCCESS",
+    "skipping": "SKIPPED",
+    "neutral": "NEUTRAL",
+    "fail": "FAILURE",
+    "cancel": "CANCELLED",
+}
 GRAPHQL = (
     "query($owner:String!,$repo:String!,$pr:Int!,$cursor:String){"
     "repository(owner:$owner,name:$repo){pullRequest(number:$pr){"
@@ -72,15 +85,21 @@ class GateError(Exception):
     pass
 
 
-def sh(cmd, cwd=None):
+def sh_raw(cmd, cwd=None):
+    """Run cmd and hand back (returncode, stdout, stderr); a non-zero exit is data, not an error."""
     try:
         proc = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
     except OSError as exc:
         raise GateError(str(exc)) from exc
-    if proc.returncode != 0:
-        reason = (proc.stderr or proc.stdout or f"exit {proc.returncode}").strip()
-        raise GateError(reason.splitlines()[0] if reason else f"exit {proc.returncode}")
-    return proc.stdout.strip()
+    return proc.returncode, proc.stdout or "", proc.stderr or ""
+
+
+def sh(cmd, cwd=None):
+    returncode, stdout, stderr = sh_raw(cmd, cwd)
+    if returncode != 0:
+        reason = (stderr or stdout or f"exit {returncode}").strip()
+        raise GateError(reason.splitlines()[0] if reason else f"exit {returncode}")
+    return stdout.strip()
 
 
 def extract_marker(body, marker=DEFAULT_MARKER):
@@ -185,28 +204,50 @@ def parse_text_checks(text):
     return checks
 
 
+def bucket_check(entry):
+    """One `--json name,state,bucket` row, in the state/conclusion vocabulary evaluate_checks reads."""
+    bucket = str(entry.get("bucket") or "").lower()
+    conclusion = BUCKET_CONCLUSIONS.get(bucket)
+    return {
+        "name": entry.get("name"),
+        "state": "COMPLETED" if conclusion else "PENDING",
+        "conclusion": conclusion,
+    }
+
+
 def fetch_checks(pr, repo):
-    try:
-        out = sh(
-            ["gh", "pr", "checks", str(pr), "--json", "name,state,conclusion"],
-            cwd=repo,
-        )
-        data = json.loads(out or "[]")
+    returncode, stdout, _ = sh_raw(
+        ["gh", "pr", "checks", str(pr), "--json", "name,state,bucket"], cwd=repo
+    )
+    if returncode == 0:
+        try:
+            data = json.loads(stdout or "[]")
+        except ValueError:
+            data = None
         if isinstance(data, list):
-            return data
-    except (GateError, ValueError):
-        pass
-    try:
-        text = sh(["gh", "pr", "checks", str(pr)], cwd=repo)
-    except GateError as exc:
+            # A malformed row is not permission: dropping non-objects would turn an incomplete
+            # response into a green check list. Fail closed instead (exit 2).
+            for entry in data:
+                if not isinstance(entry, dict):
+                    raise GateError(
+                        "gh pr checks --json: expected an object per check, got "
+                        + type(entry).__name__
+                    )
+            return [bucket_check(entry) for entry in data]
+    # Fallback: the human table. `gh pr checks` exits 8 while any check is pending and 1 when one
+    # failed — with a table that parses, that is the CI state, not a CLI failure.
+    returncode, stdout, stderr = sh_raw(["gh", "pr", "checks", str(pr)], cwd=repo)
+    checks = parse_text_checks(stdout)
+    if returncode != 0 and not checks:
         # `gh pr checks` exits 1 with "no checks reported" when nothing registered yet (or ever,
         # for a repo with no CI). That is an empty list, not a CLI failure — otherwise the
         # --allow-no-checks opt-out could never be reached. Genuine errors still raise.
-        message = str(exc).lower()
-        if "no checks reported" in message or "no check runs found" in message:
+        message = (stderr or stdout).strip()
+        lowered = message.lower()
+        if "no checks reported" in lowered or "no check runs found" in lowered:
             return []
-        raise
-    return parse_text_checks(text)
+        raise GateError(message.splitlines()[0] if message else f"exit {returncode}")
+    return checks
 
 
 def fetch_review_threads(owner, name, pr, repo):
@@ -410,7 +451,13 @@ def evaluate(
     checks = evaluate_checks(fetch_checks(pr, repo), allow_no_checks=allow_no_checks)
     facts["checks"] = checks
     if not checks["pass"]:
-        reasons.append("no checks" if checks["total"] == 0 else "checks")
+        if checks["total"] == 0:
+            reasons.append("no checks")
+        elif checks["pending"] and not checks["failing"]:
+            # A run still in flight is not a failure; the verdict must say which it is.
+            reasons.append("checks pending")
+        else:
+            reasons.append("checks")
 
     name_with_owner = sh(
         ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
@@ -689,6 +736,17 @@ def selftest():
         ("same-sha-short-prefix-rejected", ("abc1234def", "abc"), False),
         ("same-sha-empty", ("abc1234def", ""), False),
     ]
+    bucket_cases = [
+        ("bucket-pass", "SUCCESS", "pass", ("COMPLETED", "SUCCESS")),
+        ("bucket-skipping", "SKIPPED", "skipping", ("COMPLETED", "SKIPPED")),
+        ("bucket-neutral", "NEUTRAL", "neutral", ("COMPLETED", "NEUTRAL")),
+        ("bucket-fail", "FAILURE", "fail", ("COMPLETED", "FAILURE")),
+        ("bucket-cancel", "CANCELLED", "cancel", ("COMPLETED", "CANCELLED")),
+        ("bucket-pending", "PENDING", "pending", ("PENDING", None)),
+        ("bucket-unreleased", "MYSTERY", "unreleased-bucket", ("PENDING", None)),
+        # The bucket is the authority: a recognized raw state under an unknown bucket is pending.
+        ("bucket-unknown-with-success-state", "SUCCESS", "unreleased-bucket", ("PENDING", None)),
+    ]
     total = (
         len(marker_cases)
         + len(head_cases)
@@ -696,6 +754,8 @@ def selftest():
         + len(state_cases)
         + len(check_cases)
         + len(sha_cases)
+        + len(bucket_cases)
+        + 1  # the bucket tally
     )
     passed = 0
 
@@ -740,6 +800,25 @@ def selftest():
         mark = "ok" if actual == expected else "FAIL"
         print(f"  {mark}  {name}: {args[0][:8]}~{args[1][:8]} -> {actual}")
         passed += 1 if actual == expected else 0
+
+    for name, state, bucket, expected in bucket_cases:
+        row = bucket_check({"name": name, "state": state, "bucket": bucket})
+        actual = (row["state"], row["conclusion"])
+        mark = "ok" if actual == expected else "FAIL"
+        print(f"  {mark}  {name}: state={actual[0]} conclusion={actual[1]}")
+        passed += 1 if actual == expected else 0
+
+    tally = evaluate_checks(
+        [
+            bucket_check({"name": name, "state": state, "bucket": bucket})
+            for name, state, bucket, _ in bucket_cases
+        ]
+    )
+    actual = (tally["total"], tally["ok"], tally["pending"], tally["failing"], tally["pass"])
+    expected = (8, 3, 3, 2, False)
+    mark = "ok" if actual == expected else "FAIL"
+    print(f"  {mark}  bucket-tally: total/ok/pending/failing/pass={actual}")
+    passed += 1 if actual == expected else 0
 
     for name, args, expected_line, expected_reasons in state_cases:
         pr_state, reasons = evaluate_pr_state(*args)
