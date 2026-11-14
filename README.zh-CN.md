@@ -69,6 +69,7 @@ hoa/
 ├── VERSION        # 全部自定义 skill 共用的权威版本
 ├── CHANGELOG.md   # 重要变更；旧条目保留历史上的各 skill 版本
 ├── skills/        # 唯一部署面 —— 用 `npx skills` 安装的 SKILL.md 包
+├── paseo-plugins/ # 可选 Paseo 插件源码；显式安装，不自动下发
 ├── agents/        # 可移植、runtime 无关的 role / persona / authority / I-O 契约
 ├── orchestration/ # 调度、handoff、retry、continuation、termination、聚合(循环、crew、fan-out/in、best-of-N)
 ├── mcps/          # 可移植的 MCP server 定义与清单
@@ -124,6 +125,7 @@ category 取该 skill 的第一个 `metadata.areas` 值，可用 `--category` �
 | 目录 | 内容 | 是否下发 |
 |---|---|---|
 | `skills/` | `SKILL.md` 包：唯一自动下发的 artifact。`npx skills add wxxb789/hoa` 安装它们。 | 是 |
+| `paseo-plugins/` | 可选 Paseo 插件源码，包括只读的 GDD run observer。 | 仅手动选择安装 |
 | `agents/` | 1 个 role / authority / I-O 契约（`skill-scout`）。 | 否——库 |
 | `mcps/` | 1 个可移植 MCP 定义（`ghc-proxy`）。 | 否——库 |
 | `orchestration/` | 1 个调度/handoff/termination 模式（`typed-verification-gates`）。 | 否——库 |
@@ -282,6 +284,7 @@ git clone https://github.com/wxxb789/hoa   # 用 skill / 跑测试都不需要�
 | 目录 | 属于这里 | 不属于这里 |
 |---|---|---|
 | `skills/` | 通过 skill / command 名直接调用的完整能力，可用 `npx skills` 下发 | 仅供别的 artifact 拼装的 prompt 或 role |
+| `paseo-plugins/` | 显式安装为 Paseo 插件的可移植源码包 | 机器专属插件注册或 runtime 设置（→ chezmoi） |
 | `agents/` | 多个 runtime 都能实现的单 agent role 契约 | vendor 专属 runtime 设置(→ chezmoi);crew 调度(→ `orchestration/`) |
 | `orchestration/` | 决定谁何时运行、结果如何流转、是否 retry / 停止 | 具体业务 recipe(→ `workflows/`) |
 | `mcps/` | 可移植的 MCP endpoint / tool 定义 | `settings.json` 里的 vendor 专属注册(→ chezmoi) |
@@ -319,6 +322,22 @@ npx skills remove <skill>
 - 默认 **symlink**（单一权威副本，好更新）或 `--copy`（Windows / 不支持 symlink 时）。
 - `hoa` 里其它东西都是**库 / 知识**——不自动下发。拼进某个 skill，或手动取用。
 - runtime **设置**由 `chezmoi apply` 另行下发。
+
+### GDD transport 与可选 Paseo observer
+
+[`gdd`](./skills/gdd/SKILL.md) 默认仍使用随附的 `omp-run.py` headless launcher。
+显式把 `GDD_LAUNCHER` 指向随附的 `paseo-run.py`，才会让 stage 成为原生 Paseo agent；
+这条路要求 daemon 可达。可达性绝不触发 launcher 自动替换。
+[Transport 契约](./skills/gdd/references/transport.md) 说明配置、答案读取、完成判定，
+以及相互独立的 headless / native 平台证据。
+
+[`paseo-plugins/gdd-run-observer`](./paseo-plugins/gdd-run-observer/README.md) 是可选的
+只读 observer 源码，**不是 launcher**。`npx skills` 不会自动安装它，它也不会改变
+所选 transport。[README](./paseo-plugins/gdd-run-observer/README.md) 提供从干净克隆
+安装依赖、typecheck / 测试、信任边界、禁用和移除说明；
+[HOA-INTEGRATION.md](./paseo-plugins/gdd-run-observer/HOA-INTEGRATION.md) 说明共享
+`GDD_RUN_ROOT` 与两条路径的集成。安装前先审查：插件会在 Paseo daemon / client 中
+执行受信任、无沙箱的代码。Runtime 注册与设置仍由本机管理。
 
 ## 处理 skill
 

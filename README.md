@@ -76,6 +76,7 @@ hoa/
 ├── VERSION        # canonical version shared by every custom skill
 ├── CHANGELOG.md   # notable changes; older entries retain historical per-skill versions
 ├── skills/        # THE deploy surface — SKILL.md packages installed via `npx skills`
+├── paseo-plugins/ # optional Paseo plugin source; explicitly installed, never auto-deployed
 ├── agents/        # portable, runtime-agnostic role / persona / authority / I-O contracts
 ├── orchestration/ # scheduling, handoff, retry, continuation, termination, aggregation (loops, crews, fan-out/in, best-of-N)
 ├── mcps/          # portable MCP server definitions & catalogs
@@ -135,6 +136,7 @@ the layer is a fact about the tree, not a label someone remembers to add.
 | Folder | What lives there | Deployed? |
 |---|---|---|
 | `skills/` | `SKILL.md` packages: the only auto-deployed artifact. `npx skills add wxxb789/hoa` installs them. | yes |
+| `paseo-plugins/` | Optional Paseo plugin source, including the read-only GDD run observer. | manual opt-in only |
 | `agents/` | 1 role / authority / I-O contract (`skill-scout`). | no — library |
 | `mcps/` | 1 portable MCP definition (`ghc-proxy`). | no — library |
 | `orchestration/` | 1 scheduling/handoff/termination pattern (`typed-verification-gates`). | no — library |
@@ -310,6 +312,7 @@ internally.
 | Folder | Belongs here | Not here |
 |---|---|---|
 | `skills/` | a whole capability invoked by skill / command name; deployable via `npx skills` | a prompt or role meant only to be assembled by something else |
+| `paseo-plugins/` | portable source packages explicitly installed as Paseo plugins | machine-specific plugin registration or runtime settings (→ chezmoi) |
 | `agents/` | a single-agent role contract many runtimes could implement | vendor-specific runtime settings (→ chezmoi); crew scheduling (→ `orchestration/`) |
 | `orchestration/` | decides who runs when, how results flow, whether to retry / stop | a concrete business recipe (→ `workflows/`) |
 | `mcps/` | portable MCP endpoint / tool definition | vendor-specific registration in `settings.json` (→ chezmoi) |
@@ -351,6 +354,22 @@ npx skills remove <skill>
 - Everything else in `hoa` is **library / knowledge** — not auto-deployed. Fold
   it into a skill, or reference it by hand.
 - Runtime **settings** deploy separately via `chezmoi apply`.
+
+### GDD transport and optional Paseo observer
+
+[`gdd`](./skills/gdd/SKILL.md) keeps the bundled `omp-run.py` headless launcher as its default.
+Explicitly set `GDD_LAUNCHER` to the bundled `paseo-run.py` to make stages native Paseo agents;
+that route requires a reachable daemon. Reachability never switches launchers automatically.
+Read the [transport contract](./skills/gdd/references/transport.md) for configuration, answer
+retrieval, completion rules, and the separate headless/native platform evidence.
+
+[`paseo-plugins/gdd-run-observer`](./paseo-plugins/gdd-run-observer/README.md) is optional,
+read-only observer source, **not a launcher**. It is not auto-installed by `npx skills` and does
+not change the selected transport. Its [README](./paseo-plugins/gdd-run-observer/README.md)
+documents clean-checkout dependency installation, typecheck/tests, trust, disable, and removal;
+[HOA-INTEGRATION.md](./paseo-plugins/gdd-run-observer/HOA-INTEGRATION.md) documents the shared
+`GDD_RUN_ROOT` and route integration. Review it before installing: plugins execute trusted,
+unsandboxed code in the Paseo daemon/client. Runtime registration and settings remain local.
 
 ## Work on skills
 
