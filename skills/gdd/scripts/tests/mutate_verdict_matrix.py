@@ -345,6 +345,13 @@ MUTATIONS = [
      "    if unresolved and not allow_table_only_checks:",
      "the table opt-in drops the unresolved-thread blocker, though it decides only whether the "
      "table read is authoritative"),
+
+    # --- round-16 findings --------------------------------------------------
+    ("ignored-line-diagnostic-truncated-to-the-first",
+     "    for line in lines:",
+     "    for line in lines[:1]:",
+     "the ignored-line report stops after the first line, so every further tab-less line the table "
+     "parser skipped disappears from stderr while the verdict stays unchanged"),
 ]
 
 

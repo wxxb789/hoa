@@ -164,6 +164,26 @@ sees what the gate *invokes*, never what it does with the answer.
 
 ---
 
+## Closed — round 16 F1: the ignored-line report is pinned to the whole list
+
+- **Path**: `report_ignored_table_lines()` — the `for line in lines:` loop, one stderr diagnostic
+  per ignored tab-less line, and the two cells that drive a truncated table through `main()`.
+- **The gap**: both cells used a one-line fixture and asserted the diagnostic as substrings
+  ("carries … 'required'"), so narrowing the report to `lines[:1]` — or de-duplicating the list —
+  survived the whole matrix, the golden call log, the evidence tests and the selftest. The
+  reviewer's reproduction: fallback `(0, "build\tpass\nrequired-a\nrequired-b\n", "")` with
+  `--allow-table-only-checks` prints two diagnostics under the shipped gate and one under the
+  mutant, both MERGE-OK with tally `1/1/0/0`, so the second truncated row was swallowed silently.
+- **Now pinned**: `TRUNCATED_TABLE` carries three ignored tab-less lines — two distinct, one
+  repeated — and both cells (the opt-in path and the default path) assert the **exact stderr line
+  list**: every expected line, in order, repeats included, and no other line beside them (a
+  non-ERROR cell that names none must print none). A report that stops at the first line fails on
+  the missing lines and a de-duplicating one fails on the repeat. The mutation
+  `ignored-line-diagnostic-truncated-to-the-first` is registered and is caught by these two cells,
+  since each one's expected list holds all three lines.
+
+---
+
 ## How to work an entry
 
 1. Add the fixture to `test_verdict_matrix.py` (a `Cell` with `comment_pages` / `thread_pages`, or a

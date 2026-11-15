@@ -7,6 +7,23 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
 
 ### Fixed
 
+- **Round-16 review finding: the ignored-line report is pinned to the whole list.** Both cells that
+  drove a tab-less line through `main()` used a *one-line* fixture and asserted the diagnostic as
+  substrings, so the reporting loop in `report_ignored_table_lines()` could stop at the first line —
+  `for line in lines[:1]:`, or a de-duplicating rewrite — and survive the whole matrix: through
+  `main()` on the opt-in path the fallback `(0, "build\tpass\nrequired-a\nrequired-b\n", "")`
+  printed two diagnostics under the shipped gate and one under the mutant, both MERGE-OK with tally
+  `1/1/0/0`, the second truncated row swallowed silently. The truncated fixture now carries three
+  ignored tab-less lines — two distinct, one repeated — and both cells (the opt-in path and the
+  default path) assert the **exact stderr line list**: every expected line, in order, repeats
+  included, and no other line beside them (a non-ERROR cell that names none must print none), so a
+  report that stops at the first line or de-duplicates fails. The mutation
+  `ignored-line-diagnostic-truncated-to-the-first` is registered and
+  is caught by these two cells (82 -> 83 mutations, 50 -> 51 anchored); the class of gap is
+  recorded under *Closed* in `tests/COVERAGE_BACKLOG.md`. The matrix stays at its 397 cells (390
+  verdict + 3 stream + 1 sh-trim + 3 boundary) over 9 declared dimensions, and
+  `test_review_evidence.py` stays at its 94 tests.
+
 - **Round-15 review findings: the row-retention contract is qualified, the ignored line is named, and
   the table opt-in is pinned against the evidence blockers.** `pr-merge-check.py` stated "only the
   exact header is skipped: every other line is a row", but the shipped parser also ignored a nonblank
@@ -274,8 +291,8 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   zero-check read, and the two opt-ins are independent — the table opt-in alone makes an empty
   table the zero-check state, which only `--allow-no-checks` forgives). Every cell drives `main()`
   with `subprocess.run()` mocked and compares
-  the **complete** verdict line plus the printed `checks:` tally — and, where a cell names it, the
-  stderr diagnostic — so a failing read cannot pass as a
+  the **complete** verdict line plus the printed `checks:` tally — and, where a cell names them,
+  its exact stderr line list, no line beside them — so a failing read cannot pass as a
   pending one (`verdict: BLOCKED: checks` is a prefix of `verdict: BLOCKED: checks pending`) — 390
   verdict cells + 3 stream cells + 1 sh-trim cell + 3 boundary cells (397 cells) over 9 declared
   dimensions, plus
@@ -288,7 +305,7 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   live output in
   `tests/gh_checks_fixtures.py` is a matrix input as well: a value gh prints that the declared
   vocabulary does not know fails the matrix instead of reaching the gate as an unknown token.
-  `tests/mutate_verdict_matrix.py` applies 82 in-memory mutations of the module — 50 anchored plus
+  `tests/mutate_verdict_matrix.py` applies 83 in-memory mutations of the module — 51 anchored plus
   two generated per declared vocabulary entry, reclassifying that token into every other
   classification — and requires each to flip at least one cell (or change the golden call log),
   naming the survivor loudly if one does not. Both run in CI. The paths the artefacts still do not
