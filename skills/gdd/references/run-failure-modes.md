@@ -66,3 +66,49 @@ stored pass flags; then the recorder happily overwrote a good baseline with one 
 - Resolve a setting once, pass it by value in `env` to child processes, and shell-quote any command you
   print; after writing a record, self-check it with a validator that recomputes the values, or the
   stored record cannot be falsified.
+
+## 6. A tool may resolve path arguments against a base of its own choosing and silently review missing inputs
+
+A review runner resolves the prompt and diff arguments against its `--repo` directory (its own cwd), so
+a relative path typed from the orchestrator's directory silently read a different file — or nothing —
+while the run still exited 0 and reported a review of the increment. A tool may resolve a path argument
+against a base of its own choosing — its repo root, its own cwd, or the caller's cwd — and it is the
+tool's documented resolution rule, not whether the tool is out-of-tree, that decides: the launcher
+bundled with skill `omp-headless-orchestration` resolves `--prompt` against the caller's cwd, not the
+run's own `--cwd`.
+
+- Resolve each intended input against that documented base yourself and verify it exists and is
+  non-empty (`test -s`) before launch: the tool may review an empty attachment and still exit 0.
+- Pass absolute paths for arguments that accept filesystem paths.
+- Any wrapper you ship must exit non-zero before launching the tool when an input is missing or empty.
+
+## 7. Running gates under a bare or shim runtime causes missing-dependency failures and skipped gates
+
+A gate command executed outside the project's dependency-bearing runtime — under a toolchain shim or a
+system interpreter — can die on a missing import before it checks anything (for example, checkers that
+import a YAML parser fail with `ModuleNotFoundError: No module named 'yaml'`). That reads like a
+repository failure when it is an environment one, and it invites the next reader to skip the gate.
+
+- Run each gate command through an interpreter that has its dependencies, and record **which
+  interpreter** the run used.
+- Treat that error class as an environment failure to be fixed: never as a pass, and never as grounds
+  for skipping or waiving the gate.
+
+## 8. A gate must finish before its stage returns, or live outside the stage's teardown boundary
+
+Whether teardown kills what the stage leaves behind is the launcher's cleanup contract, not a universal
+law: a launcher that terminates its cleanup group at finalize — a transient `systemd-run` unit, any
+unit with `KillMode=control-group`, and the like — takes every process still in that cgroup, so a gate
+started with `&` / `nohup` and left behind dies with the unit and no exit code exists anywhere. A
+launcher that merely returns may leave that child running, and a killed tmux session can leave a
+`nohup` child alive; assuming the gate necessarily died only buys a duplicate gate run.
+
+- Background execution itself is not the hazard; leaving unfinished verification behind is. Run the gate
+  in the **foreground** of the stage, or start it in the background and await its completion before the
+  stage returns.
+- A gate that must outlive the stage needs a lifetime outside the stage's teardown boundary — a new
+  session or process group is **not** that boundary: a runner detached with `start_new_session` stays in
+  the launcher's cgroup and still dies when a `KillMode=control-group` unit finalizes. Hand the gate
+  **and whatever records its result** to a separate detached unit/job whose id the operator can poll.
+- Record the result as an exit code; until one exists, treat "I started the verification in the
+  background" in a stage report as **unverified**.
