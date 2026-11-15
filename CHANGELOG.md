@@ -7,6 +7,31 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
 
 ### Fixed
 
+- **Round-17 review findings: the ignored-line report's order is pinned, and the diagnostic surface
+  gets the one-shot systematic pass.** The round-16 fixture carried the ignored lines `required-a,
+  required-b, required-a` — a palindrome — so a report that reverses its iteration order
+  (`for line in reversed(lines):`) survived all 397 cells, the golden call log, the 94 evidence
+  tests and the 68 selftest fixtures, with the same MERGE-OK and tally `1/1/0/0`. The fixture is now
+  `required-a, required-b, required-a, required-c` — non-palindromic, the repeat kept — and both
+  cells assert the exact four-line stderr list in order. Per the standing rule the one-round patch
+  stopped there: the whole ignored-line diagnostic surface and the cell assertion mechanism that
+  pins it were enumerated as eight properties and each is pinned by its own mutation —
+  completeness (`ignored-line-diagnostic-truncated-to-the-first`, from round 16), ordering
+  (`ignored-line-diagnostic-reversed`), duplicates (`ignored-line-diagnostic-deduplicated`),
+  exactness (`ignored-line-diagnostic-extra-note`), no false positives
+  (`ignored-lines-include-recognised-rows`), both paths
+  (`ignored-line-diagnostic-only-under-the-opt-in`, `ignored-line-opt-in-warning-dropped`), silence
+  when clean (`ignored-line-diagnostic-prints-when-clean`) and the comparison itself (below). The
+  comparison is test-side, so no gate mutation can pin its strictness: the comparison is factored
+  into one `stderr_problems()` and `comparator_self_check()` runs the de-duplicated, re-ordered and
+  extra-line witness of every pinned stderr list through `main()`'s guards — a comparator weakened
+  to set equality or containment, or a fixture that stops discriminating (no repeat, a palindrome),
+  fails the guard by name while the matrix passes everything else, so neither can land silently.
+  The catalogue grows to 90 mutations (58 anchored plus the 32 generated from the 16 declared
+  vocabulary entries) and all 90 are caught; the class of gap is recorded under *Closed* in
+  `tests/COVERAGE_BACKLOG.md` with the property-to-pin table. The matrix stays at its 397 cells (390
+  verdict + 3 stream + 1 sh-trim + 3 boundary) over 9 declared dimensions,
+  `test_review_evidence.py` stays at its 94 tests, and the selftest at its 68 fixtures.
 - **Round-16 review finding: the ignored-line report is pinned to the whole list.** Both cells that
   drove a tab-less line through `main()` used a *one-line* fixture and asserted the diagnostic as
   substrings, so the reporting loop in `report_ignored_table_lines()` could stop at the first line —
@@ -305,10 +330,10 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   live output in
   `tests/gh_checks_fixtures.py` is a matrix input as well: a value gh prints that the declared
   vocabulary does not know fails the matrix instead of reaching the gate as an unknown token.
-  `tests/mutate_verdict_matrix.py` applies 83 in-memory mutations of the module — 51 anchored plus
+  `tests/mutate_verdict_matrix.py` applies 90 in-memory mutations of the module — 58 anchored plus
   two generated per declared vocabulary entry, reclassifying that token into every other
   classification — and requires each to flip at least one cell (or change the golden call log),
-  naming the survivor loudly if one does not. Both run in CI. The paths the artefacts still do not
+  naming the survivor loudly if one does. Both run in CI. The paths the artefacts still do not
   pin are queued, by consequence, in `tests/COVERAGE_BACKLOG.md`, which also keeps the gaps already
   found and closed.
 

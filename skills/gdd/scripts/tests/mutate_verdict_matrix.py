@@ -352,6 +352,66 @@ MUTATIONS = [
      "    for line in lines[:1]:",
      "the ignored-line report stops after the first line, so every further tab-less line the table "
      "parser skipped disappears from stderr while the verdict stays unchanged"),
+
+    # --- round-17 findings: the diagnostic surface, one mutation per property --------------------
+    # Round 17 C1 was the *fixture* (a palindromic ignored-line sequence, so a reversed report
+    # survived); F2 was the request to enumerate the whole surface once and pin every property
+    # with a mutation of its own, so the next round cannot find a fourth variant. The properties
+    # and their pins (the matrix's `comparator_self_check()` covers the comparison itself, which
+    # is test-side and no gate mutation can pin):
+    #   completeness `ignored-line-diagnostic-truncated-to-the-first` (round 16) ·
+    #   ordering     `ignored-line-diagnostic-reversed` ·
+    #   duplicates   `ignored-line-diagnostic-deduplicated` ·
+    #   exactness    `ignored-line-diagnostic-extra-note` ·
+    #   no false positives `ignored-lines-include-recognised-rows` ·
+    #   both paths   `ignored-line-diagnostic-only-under-the-opt-in` and
+    #                `ignored-line-opt-in-warning-dropped` ·
+    #   silence      `ignored-line-diagnostic-prints-when-clean`.
+    ("ignored-line-diagnostic-reversed",
+     "    for line in lines:",
+     "    for line in reversed(lines):",
+     "the ignored-line report iterates its lines backwards, so the diagnostics arrive in reverse "
+     "order; the fixture is non-palindromic (`a, b, a, c`), so the exact list order catches it "
+     "(round-17 C1)"),
+    ("ignored-line-diagnostic-deduplicated",
+     "    for line in lines:",
+     "    for line in dict.fromkeys(lines):",
+     "the ignored-line report collapses repeated lines, so a repeated truncated row gets one "
+     "diagnostic fewer than it occurred"),
+    ("ignored-line-diagnostic-extra-note",
+     '        message = f"pr-merge-check: ignored table line without a tab (not a row): {line!r}"',
+     '        message = f"pr-merge-check: ignored table line without a tab (not a row): {line!r}"\n'
+     '        print("pr-merge-check: note: an ignored line is not a row", file=sys.stderr)',
+     "the ignored-line report emits one extra note per ignored line that no cell expects, so the "
+     "exact list rejects a report that adds lines beside the diagnostics"),
+    ("ignored-lines-include-recognised-rows",
+     '    return [line for line in text.splitlines() if line.strip() and "\\t" not in line]',
+     '    return [line for line in text.splitlines() if line.strip()]',
+     "the ignored-line collector hands every nonblank line to the report, including the valid "
+     "tab-delimited rows and the exact header that were never ignored — a false positive on every "
+     "table read"),
+    ("ignored-line-diagnostic-only-under-the-opt-in",
+     "    for line in lines:",
+     "    for line in (lines if allow_table_only else []):",
+     "the diagnostic is emitted only on the opt-in path, so the default path's ignored lines go "
+     "unnamed — the zero-flag read is the one an operator hits without asking"),
+    ("ignored-line-opt-in-warning-dropped",
+     """            message += (
+                "; --allow-table-only-checks accepts the table as authoritative, so this ignored "
+                "line could conceal a check"
+            )""",
+     '            message += ""',
+     "the opt-in path's diagnostic loses its extra clause — that the ignored line could conceal a "
+     "check — so only the opt-in cell's exact list pins what the operator is told there"),
+    ("ignored-line-diagnostic-prints-when-clean",
+     """    for line in lines:
+        message = f"pr-merge-check: ignored table line without a tab (not a row): {line!r}\"""",
+     """    if not lines:
+        print("pr-merge-check: table read carries no ignored lines", file=sys.stderr)
+    for line in lines:
+        message = f"pr-merge-check: ignored table line without a tab (not a row): {line!r}\"""",
+     "a table read with nothing ignored emits a line anyway, so silence is no longer the reported "
+     "state of a clean read — every clean-table cell's empty-list expectation catches it"),
 ]
 
 

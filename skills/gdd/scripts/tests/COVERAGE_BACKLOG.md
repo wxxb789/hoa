@@ -174,13 +174,49 @@ sees what the gate *invokes*, never what it does with the answer.
   reviewer's reproduction: fallback `(0, "build\tpass\nrequired-a\nrequired-b\n", "")` with
   `--allow-table-only-checks` prints two diagnostics under the shipped gate and one under the
   mutant, both MERGE-OK with tally `1/1/0/0`, so the second truncated row was swallowed silently.
-- **Now pinned**: `TRUNCATED_TABLE` carries three ignored tab-less lines — two distinct, one
-  repeated — and both cells (the opt-in path and the default path) assert the **exact stderr line
-  list**: every expected line, in order, repeats included, and no other line beside them (a
-  non-ERROR cell that names none must print none). A report that stops at the first line fails on
-  the missing lines and a de-duplicating one fails on the repeat. The mutation
-  `ignored-line-diagnostic-truncated-to-the-first` is registered and is caught by these two cells,
-  since each one's expected list holds all three lines.
+- **Now pinned** (strengthened in round 17, below): `TRUNCATED_TABLE` carries four ignored tab-less
+  lines — three distinct, one repeated, in a non-palindromic order — and both cells (the opt-in path
+  and the default path) assert the **exact stderr line list**: every expected line, in order,
+  repeats included, and no other line beside them (a non-ERROR cell that names none must print
+  none). A report that stops at the first line fails on the missing lines and a de-duplicating one
+  fails on the repeat. The mutation `ignored-line-diagnostic-truncated-to-the-first` is registered
+  and is caught by these two cells, since each one's expected list holds all four lines.
+
+---
+
+## Closed — round 17 C1 + F2: the ignored-line diagnostic surface, systematically
+
+- **Path**: `report_ignored_table_lines()` — the reporting loop, its per-line diagnostic and its
+  opt-in clause — `ignored_table_lines()`, the collector that feeds it, and the exact-list stderr
+  comparison in `test_verdict_matrix.py` that pins them.
+- **C1 (the recorded finding)**: the round-16 fixture's ignored-line sequence, `required-a,
+  required-b, required-a`, is a palindrome, so `for line in reversed(lines):` reproduced the
+  expected list exactly and survived all 397 cells, the golden call log, the 94 evidence tests and
+  the 68 selftest fixtures — a `main()` probe printed `a,b` vs `b,a` with the same MERGE-OK and
+  tally `1/1/0/0`. **Fixed**: the fixture is now `required-a, required-b, required-a, required-c`
+  — non-palindromic, the repeat kept — both cells assert the exact four-line list, and the reversal
+  mutation is registered and caught.
+- **F2 (the systematic pass)**: the whole surface is enumerated as eight properties, each proved by
+  one in-memory mutation of the gate, run through the matrix; the comparison itself is test-side,
+  so it is pinned by a guard instead. Every registered mutation is caught (the harness exits 0).
+
+  | Property | Mutation / guard | Caught by |
+  |---|---|---|
+  | Completeness — truncating the report to the first line | `ignored-line-diagnostic-truncated-to-the-first` (`lines[:1]`, round 16) | both truncated cells (four-line lists) |
+  | Ordering — reversed iteration | `ignored-line-diagnostic-reversed` (`reversed(lines)`) | both truncated cells (non-palindromic list) |
+  | Duplicates — de-duplicating | `ignored-line-diagnostic-deduplicated` (`dict.fromkeys(lines)`) | both truncated cells (repeat present) |
+  | Exactness — an extra line no cell expects | `ignored-line-diagnostic-extra-note` (a note printed per ignored line) | both truncated cells (the exact list has no note) |
+  | No false positives — reporting a line that was not ignored | `ignored-lines-include-recognised-rows` (the collector drops the tab test, so valid rows and the exact header are reported) | 116 cells in all (first flip `json-nonlist-green-table`), the two truncated cells among them — the valid data row of the fixture is reported |
+  | Both paths — the default read as well as the opt-in | `ignored-line-diagnostic-only-under-the-opt-in` (the report gated on the flag) | the default-path cell (its ignored lines go unnamed) |
+  | Both paths — the opt-in's own wording | `ignored-line-opt-in-warning-dropped` (the "could conceal a check" clause removed) | the opt-in-path cell (its exact list pins the clause) |
+  | Silence when clean — a clean read asserts empty stderr | `ignored-line-diagnostic-prints-when-clean` (a line printed when nothing was ignored) | 124 cells in all (first flip `json-nonlist-empty-table`), each expecting no stderr — the empty-list expectation is the load bearing assertion, and property 8 keeps it exact |
+  | The comparator itself — exact equality, not subset/set | `comparator_self_check()` in `test_verdict_matrix.py`; the comparison is factored into `stderr_problems()` | the matrix's own `main()`: weakening `stderr_problems()` in memory to set equality leaves 4 guard problems (the de-duplicated and re-ordered witnesses accepted), to containment 6 (plus the extra-line witness); a fixture that loses its repeat or becomes a palindrome is named by the same guard (one problem each) |
+
+  The guard is the reason a *fourth* variant is no longer silent: `reversed(lines)` and
+  `dict.fromkeys(lines)` are ordinary rewrites of the loop, and the property they violate lives in
+  the cell assertion, not the gate — the guard tests the assertion mechanism itself, on the
+  witnesses, so the comparison cannot be weakened and the fixture cannot stop discriminating
+  without a named failure.
 
 ---
 
@@ -194,4 +230,7 @@ sees what the gate *invokes*, never what it does with the answer.
    gate source exactly once, and re-run
    `python3 skills/gdd/scripts/tests/test_verdict_matrix.py` and
    `python3 skills/gdd/scripts/tests/mutate_verdict_matrix.py`.
-4. Refresh the counts in `CHANGELOG.md` from the matrix's own summary lines.
+4. A cell that pins a stderr line list must carry a repeat and must not be a palindrome
+   (`comparator_self_check()` fails by name otherwise): a list that `dict.fromkeys()` or
+   `reversed()` reproduces cannot pin de-duplication or order against a rewrite.
+5. Refresh the counts in `CHANGELOG.md` from the matrix's own summary lines.

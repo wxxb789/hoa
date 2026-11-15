@@ -19,7 +19,8 @@ The oracle is a literal, test-side declaration — never the artefact it pins:
   the zero-check state, which only `--allow-no-checks` forgives, so the two opt-ins are independent;
 * the comparison is exact — the whole verdict line plus the printed `checks:` tally, and, where a
   cell names it, its exact stderr line list with no other line beside it — so a cell cannot accept
-  one classification in place of another, and a report that truncates or de-duplicates fails;
+  one classification in place of another, and a report that truncates, de-duplicates or re-orders
+  fails;
 
 Every dimension the cells vary over (the read source, the structured and table exit codes, the flag
 combinations, the JSON and table shapes, the bucket and the raw state, and the fixed
@@ -36,7 +37,9 @@ structured dimension named four exits, the table one seven). Both exit dimension
 `TABLE_UNUSED` fixture cannot stand in for a table that ran (round 14). Two cells drive the table
 opt-in beside a mismatched verified head and a failing local gate, so the opt-in cannot silently
 override a blocker decided before the checks read; `guard_self_check()` proves the guards fire when
-a consumed table exit disappears, the reproduction that round 14 found them blind to.
+a consumed table exit disappears, the reproduction that round 14 found them blind to, and
+`comparator_self_check()` runs the weakened forms of the exact-list stderr comparison over every
+pinned list, so neither the comparison nor a fixture can silently stop discriminating (round 17).
 
 Cells that cannot be expressed this way (the JSON shapes, the non-zero-exit fallback rules) are
 listed explicitly, each with its expected tally and its reason. `subprocess.run()` is mocked and
@@ -246,12 +249,16 @@ REAL_GH_TABLE = ("release\tskipping\t0\thttps://example/runs/1/job/2\t\n"
                  "test\tpass\t1m52s\thttps://example/runs/1/job/3\t\n")
 # Truncated rows: the trailing lines carry no tab, so they are not rows — they are ignored, and
 # `report_ignored_table_lines()` names each on stderr, which is the only trace a truncated row
-# leaves. Two distinct lines plus a repeat: both a report that stops at the first line and one that
-# de-duplicates collapse this list, and the cells below pin the exact one (round-16 F1).
+# leaves. Three distinct lines with one repeat (`a, b, a, c`) and *not* a palindrome: a report that
+# stops at the first line, de-duplicates, or reverses its iteration order collapses or re-orders
+# this list, and the cells below pin the exact one, in order (round-16 F1, round-17 C1). The
+# order-sensitivity is load bearing twice over: `comparator_self_check()` fails by name if this
+# list ever becomes a palindrome or loses its repeat again.
 TRUNCATED_TABLE = ("build\tpass\t1s\thttps://example/1\t\n"
                    "required-a\n"
                    "required-b\n"
-                   "required-a\n")
+                   "required-a\n"
+                   "required-c\n")
 # The unordered-header shape that used to vanish: `STATUS\tNAME` is a row, not the header.
 UNORDERED_HEADER_TABLE = "build\tpass\nSTATUS\tNAME\n"
 
@@ -293,8 +300,10 @@ def cell(cid, json_result, table_result, allow_no_checks, exit_code, verdict, re
     `stderr_lines` is the *exact* stderr a non-ERROR cell must print: the whole line list, in
     order, with no other line beside them — the observability the gate prints beside a verdict,
     which a mutant could otherwise drop silently (round-15 F1). The default is the empty list, so
-    a cell that names none must print none, and a report that truncates, de-duplicates or adds
-    lines fails (round-16 F1).
+    a cell that names none must print none, and a report that truncates, de-duplicates, re-orders
+    or adds lines fails (round-16 F1, round-17 C1). A non-empty list must carry a repeat and must
+    not be a palindrome, or `comparator_self_check()` fails by name — a list that
+    de-duplication or reversal reproduces cannot pin either against a rewrite.
     `comment_pages` and `thread_pages` are the multi-page evidence the fake serves: a list of
     comment batches (page 1 first) and a list of `(nodes, hasNextPage, endCursor)` thread pages.
     `None` keeps the single terminal page every other cell uses, so only a cell that names them
@@ -444,11 +453,13 @@ CELLS = [
     # decision is unchanged, but the skip is no longer silent: the diagnostic names the line, and
     # with the table opt-in it adds that the ignored line could conceal a check.
     #
-    # The fixture carries three ignored lines (two distinct, one repeated) and each cell names the
-    # *exact* line list it expects (round-16 F1): with a one-line fixture the report could stop at
-    # the first line — `for line in lines[:1]:` — and with distinct lines only, a de-duplicating
-    # rewrite survived too, each keeping every artefact green while a truncated row vanished. The
-    # whole list is asserted, in order, repeats included, and nothing else beside it.
+    # The fixture carries four ignored lines (three distinct, one repeated) and each cell names
+    # the *exact* line list it expects, in order (round-16 F1): with a one-line fixture the report
+    # could stop at the first line — `for line in lines[:1]:` — and with distinct lines only, a
+    # de-duplicating rewrite survived too, each keeping every artefact green while a truncated row
+    # vanished; a palindromic list (`a, b, a`) left the reversed order surviving as well, because
+    # `reversed(lines)` reproduced it exactly (round-17 C1). The whole list is asserted, in order,
+    # repeats included, and nothing else beside it.
     cell("table-truncated-line-opt-in", JSON_ABSENT, (0, TRUNCATED_TABLE, ""), False, 0,
          "MERGE-OK", None, (1, 1, 0, 0),
          "with --allow-table-only-checks the truncated tab-less lines are still ignored and the "
@@ -463,6 +474,9 @@ CELLS = [
              "could conceal a check",
              "pr-merge-check: ignored table line without a tab (not a row): 'required-a'; "
              "--allow-table-only-checks accepts the table as authoritative, so this ignored line "
+             "could conceal a check",
+             "pr-merge-check: ignored table line without a tab (not a row): 'required-c'; "
+             "--allow-table-only-checks accepts the table as authoritative, so this ignored line "
              "could conceal a check")),
     cell("table-truncated-line", JSON_ABSENT, (0, TRUNCATED_TABLE, ""), False, 1, "BLOCKED",
          "checks unreadable", (1, 1, 0, 0),
@@ -472,7 +486,8 @@ CELLS = [
          stderr_lines=(
              "pr-merge-check: ignored table line without a tab (not a row): 'required-a'",
              "pr-merge-check: ignored table line without a tab (not a row): 'required-b'",
-             "pr-merge-check: ignored table line without a tab (not a row): 'required-a'")),
+             "pr-merge-check: ignored table line without a tab (not a row): 'required-a'",
+             "pr-merge-check: ignored table line without a tab (not a row): 'required-c'")),
 
     # --- table path: reported CI state (invariants 4, 6) -------------------
     cell("table-mixed-exit-8", JSON_ABSENT, (8, MIXED_TABLE, ""), False, 1, "BLOCKED", "checks",
@@ -1241,6 +1256,74 @@ def guard_self_check():
     return problems
 
 
+# --- the stderr line list: one comparison, and the guard that it is exact ----
+# The comparison is test-side, so no gate mutation can pin its strictness (round-17 F2 property
+# 8). `stderr_problems()` is the whole rule in one function, and `comparator_self_check()` runs
+# the weakened forms of it against the cells' own pinned lists, so a careless edit to either the
+# comparison or a fixture fails by name instead of silently dropping a catch.
+STDERR_WITNESS_EXTRA = "pr-merge-check: <extra line produced by no run>"
+
+
+def stderr_problems(expected, observed):
+    """The exact-list stderr rule: the whole line list, in order, repeats included, no extras.
+
+    Nothing weaker: set equality accepts a de-duplicated or a re-ordered report, containment
+    (`set(expected) <= set(observed)`) accepts one that appends a line no cell expects, and each
+    collapse drops the multiplicity and the order the round-16 and round-17 findings turned on. A
+    cell names its list in `stderr_lines`; a cell that names none must print none.
+    """
+    if observed != expected:
+        return "expected stderr lines %r, got %r" % (expected, observed)
+    return None
+
+
+def comparator_self_check():
+    """Every pinned stderr list must discriminate, and the shipped comparison must reject each
+    witness of it.
+
+    For every cell that pins a stderr list, the shipped comparison must reject the de-duplicated,
+    the re-ordered and the extra-line witness of that list:
+
+    * the de-duplicated witness (`dict.fromkeys(lines)`) is rejected only when the list carries a
+      repeat — without one that witness *is* the list, and a de-duplicating report would pass;
+    * the re-ordered witness (`reversed(lines)`) is rejected only when the list is not a
+      palindrome — `required-a, required-b, required-a` is its own reversal, which is how the
+      `reversed(lines)` mutation survived every round-16 cell (round-17 C1);
+    * the extra-line witness is rejected by exact equality alone: set equality accepts the first
+      two witnesses, containment accepts all three, so each weakening of `stderr_problems()` fails
+      here on the witness it lets through — the comparison cannot be weakened without a check
+      failing.
+
+    A fixture that stops discriminating and a comparison that stops being exact are the two ways
+    this class reopened in rounds 16 and 17; each now names itself here.
+    """
+    problems = []
+    for cell_ in CELLS:
+        expected = list(cell_.stderr_lines or ())
+        if not expected:
+            continue
+        witnesses = (
+            ("de-duplicated", list(dict.fromkeys(expected)),
+             "the list carries no repeat, so a de-duplicating report would pass"),
+            ("re-ordered", list(reversed(expected)),
+             "the list is a palindrome, so a reversing report would pass"),
+            ("extra-line", expected + [STDERR_WITNESS_EXTRA],
+             "an appended line is never part of the pinned list"),
+        )
+        for label, witness, degeneracy in witnesses:
+            if witness == expected:
+                problems.append((
+                    "comparator-self-check",
+                    "cell %s: the %s witness is the pinned list itself (%s)"
+                    % (cell_.id, label, degeneracy)))
+            elif stderr_problems(expected, witness) is None:
+                problems.append((
+                    "comparator-self-check",
+                    "cell %s: the exact-list comparison accepts the %s witness, so it is weaker "
+                    "than exact" % (cell_.id, label)))
+    return problems
+
+
 # --- stream fidelity (invariant 7) ------------------------------------------
 # A verdict cell cannot express this: sh_raw's padding is invisible to every verdict because
 # parse_text_checks strips each data field and json.loads tolerates surrounding whitespace. These
@@ -1471,13 +1554,11 @@ def check_cell(module, cell_):
     if observed_checks != [expected_checks]:
         return "expected checks line %r, got %r" % (expected_checks, observed_checks)
     # The stderr of a non-ERROR run, exactly: the whole line list a cell names, in order, and no
-    # other line beside it. A substring count accepted a truncating report (one of two diagnostics
-    # still contains the fragment) and a de-duplicating one (round-16 F1).
-    expected_stderr = list(cell_.stderr_lines or ())
-    observed_stderr = err.splitlines()
-    if observed_stderr != expected_stderr:
-        return "expected stderr lines %r, got %r" % (expected_stderr, observed_stderr)
-    return None
+    # other line beside it, through the one comparison `stderr_problems()` states. A substring
+    # count accepted a truncating report (one of two diagnostics still contains the fragment) and a
+    # de-duplicating one (round-16 F1); a subset/set comparison accepted the reversed and extra-line
+    # reports (round-17 F2 property 8, guarded by `comparator_self_check()`).
+    return stderr_problems(list(cell_.stderr_lines or ()), err.splitlines())
 
 
 def run_stream_cell(module, stream_cell):
@@ -1723,6 +1804,7 @@ def main():
     problems.extend(dimension_problems(CELLS))
     problems.extend(cross_surface_exit_problems(CELLS))
     problems.extend(guard_self_check())
+    problems.extend(comparator_self_check())
     problems.extend(evaluate_with_calls(GATE))
     for cell_id, problem in problems:
         print("  FAIL  %s: %s" % (cell_id, problem))
