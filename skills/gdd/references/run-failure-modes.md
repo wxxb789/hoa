@@ -66,3 +66,24 @@ stored pass flags; then the recorder happily overwrote a good baseline with one 
 - Resolve a setting once, pass it by value in `env` to child processes, and shell-quote any command you
   print; after writing a record, self-check it with a validator that recomputes the values, or the
   stored record cannot be falsified.
+
+## 6. A path argument resolves against the tool's root, not yours
+
+A review runner resolves the prompt and diff arguments against its `--repo` directory (its own cwd), so
+a relative path typed from the orchestrator's directory silently read a different file — or nothing —
+while the run still exited 0 and reported a review of the increment.
+
+- Pass absolute paths for every path argument of an out-of-tree tool; the tool's root is not your cwd.
+- Require the tool to fail loudly when a resolved input does not exist, instead of reviewing an empty
+  attachment.
+
+## 7. A checker that needs a dependency the shim interpreter lacks fails as an environment error
+
+The repository's checker scripts (composition graph, frontmatter, version, changelog) import a YAML
+parser, and an interpreter reached through a toolchain shim may not have it: the gate dies with
+`ModuleNotFoundError: No module named 'yaml'` — which reads like a repository failure when it is an
+environment one, and which invites the next reader to skip the gate.
+
+- Run the checkers through an interpreter that has the dependency, and record **which interpreter** the
+  run used.
+- Treat that error class as an environment failure to be fixed, never as a pass.

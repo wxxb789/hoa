@@ -3,6 +3,28 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## [0.1.63] — 2026-11-15
+
+### Added
+
+- **Three PR-closeout failure modes the catalog was missing.** (1) `omp-headless-orchestration` gains
+  pitfall 15: a stage must not background its own verification inside its own launcher unit. A transient
+  `systemd-run` unit — or any unit with `KillMode=control-group` — kills every process still in its
+  cgroup when the unit finalizes, so a gate started with `&` / `nohup` / a background terminal job is
+  killed the moment the stage exits while the report still says the verification was launched, and no
+  exit code exists anywhere. Run the gate in the foreground of the stage, or hand it to a separate
+  detached unit/job whose id the operator can poll; treat "I started the verification in the
+  background" as unverified until an exit code exists. (2) `gdd/references/run-failure-modes.md` gains
+  §6: a path argument of an out-of-tree tool resolves against that tool's root, not the caller's cwd, so
+  a relative prompt/diff path can review a different file — or nothing — while the run exits 0 and
+  reports a review; pass absolute paths and require the tool to fail loudly on a missing resolved input.
+  (3) §7: a checker that needs a dependency the toolchain-shim interpreter lacks (the repository
+  checkers import a YAML parser) dies with `ModuleNotFoundError`, which reads like a repository failure
+  when it is an environment one and invites the next reader to skip the gate; run the checkers through
+  an interpreter that has the dependency, record which interpreter was used, and never treat that error
+  class as a pass. Documentation only: no script, test or CI change, no existing rule renumbered or
+  removed.
+
 ## [0.1.62] — 2026-11-14
 
 ### Fixed

@@ -7,7 +7,7 @@ description: >-
   recovering a run that was killed mid-turn. Do not use for a two-minute command (run it inline) or for
   work that needs live steering (that is a TUI session).
 metadata:
-  version: "0.1.62"
+  version: "0.1.63"
   areas: "software-development,work-management"
   targets: "pi"
   summary: "detached tmux launcher for long `omp -p` runs; polled completion, session-id recovery"
@@ -112,6 +112,14 @@ path.
     `Invalid --max-time value`, leaving a 0-byte `answer.md` and an empty event log — which reads like
     an instant crash, not a rejected flag. Use `90m`, `2h` or plain seconds. The wrapper does not
     validate this, so read `stderr.log` before blaming the prompt or the repo.
+
+15. **A stage must not background its own verification inside its own launcher unit.** A transient
+    systemd unit — `systemd-run`, or any unit with `KillMode=control-group` — kills every process
+    still in its cgroup when the unit finalizes, so a gate started with `&` / `nohup` / a background
+    terminal job is killed the moment the stage exits: the run then reports "verification launched"
+    and no exit code ever exists. Run the gate in the **foreground** of the stage, or hand it to a
+    **separate detached unit/job whose id the operator can poll**; and treat "I started the
+    verification in the background" in any stage report as **unverified** until an exit code exists.
 
 ## Recovery after a session restart
 
