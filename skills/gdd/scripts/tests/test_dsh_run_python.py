@@ -3962,21 +3962,37 @@ class AdapterUnitTests(ProcessFixtures):
     def test_the_lifecycle_words_are_the_documented_vocabulary(self):
         """R5: one vocabulary — every word distinct — and `list`'s column uses all of it.
 
-        `LIFECYCLE_GONE` is part of the vocabulary, not an afterthought: the
-        single-word renderer is invoked directly for every value (a source-text
-        grep would pass while the mapping rotted), and `cmd_list` is run over a
-        real staged run to prove the column formatter is the renderer.
+        `LIFECYCLE_GONE` is part of the vocabulary, not an afterthought: each of
+        the seven constants is asserted against its exact documented word (the
+        value `status`/`result` print as `lifecycle:`), the single-word renderer
+        is invoked directly for every value (a source-text grep would pass while
+        the mapping rotted), and `cmd_list` is run over a real staged run to prove
+        the column formatter is the renderer.
         """
-        vocabulary = {
-            adapter.LIFECYCLE_TERMINAL: "terminal",
-            adapter.LIFECYCLE_LIVE: "live",
-            adapter.LIFECYCLE_STOPPING_KNOWN: "stopping (survivors known)",
-            adapter.LIFECYCLE_STOPPING_UNKNOWN: "stopping (enumeration failed)",
-            adapter.LIFECYCLE_UNKNOWN: "unknown (no state)",
-            adapter.LIFECYCLE_GONE: "gone (unfinalized)",
-            adapter.LIFECYCLE_FOREIGN: "read-only",
-        }
-        self.assertEqual(len(set(vocabulary)), len(vocabulary), "one word per lifecycle")
+        # (constant, documented word) pairs: the words are asserted below, one
+        # assertion per constant. A mapping whose values are never read would pass
+        # while any of them rotted — the constants are the `lifecycle:` value
+        # `status`/`result` report.
+        vocabulary = (
+            (adapter.LIFECYCLE_TERMINAL, "terminal"),
+            (adapter.LIFECYCLE_LIVE, "live"),
+            (adapter.LIFECYCLE_STOPPING_KNOWN, "stopping (survivors known)"),
+            (adapter.LIFECYCLE_STOPPING_UNKNOWN, "stopping (enumeration failed)"),
+            (adapter.LIFECYCLE_UNKNOWN, "unknown (no state)"),
+            (adapter.LIFECYCLE_GONE, "gone (unfinalized)"),
+            (adapter.LIFECYCLE_FOREIGN, "read-only"),
+        )
+        for constant, word in vocabulary:
+            with self.subTest(word=word):
+                self.assertEqual(constant, word, "the constant must be the documented word")
+        # Distinct as *values*: the tuple keeps a collided pair while the set
+        # comprehension collapses it, so the two lengths disagree on a collision.
+        # (`len(set(vocabulary)) == len(vocabulary)` over a dict could never: its
+        # keys arrive unique, and a colliding pair vanishes in the literal.)
+        self.assertEqual(
+            len({constant for constant, _word in vocabulary}), len(vocabulary),
+            "one word per lifecycle: two lifecycles must not share a word",
+        )
         with tempfile.TemporaryDirectory() as tmp:
             run_dir = self.staged_run_dir(tmp, "vocabulary")
             base = {"name": "vocabulary", "state": "running", "session_id": "session-v",
@@ -4010,7 +4026,8 @@ class AdapterUnitTests(ProcessFixtures):
                 "read-only(omp)",
             )
             # `list`'s column is that renderer: a dead unfinalized run prints its
-            # GONE word, and a live one its live word.
+            # GONE word (a live run's live word is pinned by
+            # `test_43_lifecycle_live_over_the_real_artifacts`).
             adapter.write_json(str(run_dir / "state.json"), {
                 **base, "state": "running",
                 "started": (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat(),
@@ -5533,10 +5550,21 @@ class HardeningRuleTests(ProcessFixtures):
         def bomb(*args, **kwargs):
             raise AssertionError("a bare pid or group was signalled")
 
+        def killpg_patch():
+            """Patch `os.killpg` so entering the patch works where the attribute is absent.
+
+            Windows' `os` has no `killpg`; this unit half runs there too, so the
+            patch must create the target when it is missing (`create=True`)
+            instead of raising `AttributeError` before any assertion is reached.
+            The patched path is a `bomb` either way: delivery goes through the
+            handle, never through the raw group id.
+            """
+            return mock.patch.object(adapter.os, "killpg", bomb, create=True)
+
         with mock.patch.object(adapter, "ProcessHandle", InjectedHandle), \
                 mock.patch.object(adapter, "process_identity", lambda probe: synthetic), \
                 mock.patch.object(adapter.os, "kill", bomb), \
-                mock.patch.object(adapter.os, "killpg", bomb):
+                killpg_patch():
             self.assertTrue(adapter.signal_instance(pid, synthetic, signal.SIGTERM))
         self.assertEqual(delivered, [(pid, synthetic, signal.SIGTERM)])
         # The identity is re-read while the handle is open: a token that no longer
@@ -5546,9 +5574,28 @@ class HardeningRuleTests(ProcessFixtures):
                 mock.patch.object(adapter, "process_identity",
                                   lambda probe: "linux:v2:elsewhere:elsewhere:9:9"), \
                 mock.patch.object(adapter.os, "kill", bomb), \
-                mock.patch.object(adapter.os, "killpg", bomb):
+                killpg_patch():
             self.assertFalse(adapter.signal_instance(pid, synthetic, signal.SIGTERM))
         self.assertEqual(delivered, [], "a signal was delivered to a reused pid")
+        # The same unit half with `killpg` absent — the Windows shape. Swapping in
+        # a copy of the module without the attribute must not change the answer,
+        # and the `create=True` in `killpg_patch` is what makes that true: a
+        # `create=False` patch raises `AttributeError` *here*, exactly as it would
+        # on Windows, before any assertion.
+        without_killpg = types.ModuleType("os-without-killpg")
+        without_killpg.__dict__.update(os.__dict__)
+        without_killpg.__dict__.pop("killpg", None)
+        delivered.clear()
+        with mock.patch.object(adapter, "os", without_killpg):
+            self.assertFalse(hasattr(adapter.os, "killpg"),
+                             "the probe must run where the attribute is absent")
+            with mock.patch.object(adapter, "ProcessHandle", InjectedHandle), \
+                    mock.patch.object(adapter, "process_identity",
+                                      lambda probe: synthetic), \
+                    mock.patch.object(adapter.os, "kill", bomb), \
+                    killpg_patch():
+                self.assertTrue(adapter.signal_instance(pid, synthetic, signal.SIGTERM))
+        self.assertEqual(delivered, [(pid, synthetic, signal.SIGTERM)])
         # Native capability, where it exists: checked *before* spawning anything,
         # so a platform without a verified handle never leaves a process behind.
         if not adapter.platform_can_force_stop() or not adapter.identity_is_strong(
