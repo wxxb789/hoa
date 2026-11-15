@@ -12,7 +12,15 @@ a merged or draft PR reports `pr not open` / `pr is draft`. A repo with no machi
 case it prints `marker: none`. That opt-out applies only when no selected marker exists. Never merge
 on any other basis:
 
-1. every CI check green **on the head SHA**;
+1. every CI check green **on the head SHA** — unless the PR head tree has no
+   `.github/workflows/*.yml|*.yaml` **and** zero registered workflows/check runs/statuses on that
+   head SHA. The CI clause is **not applicable** only on the script's exact `verdict: BLOCKED: no
+   checks` (sole blocking reason; items 2–4 pass in the same output). The operator's closeout note
+   and PR body record `workflows: 0`, `checks: 0` beside the script's literal `checks: 0 total, 0 ok,
+   0 pending, 0 failing (no checks)` line. Not `--allow-no-checks`: red or pending checks, or a repo
+   that *has* workflows but shows none on this head, stay blocked. A table-only read reports
+   `checks unreadable`, not `no checks`; `--allow-table-only-checks` stays the operator's own
+   opt-in.
 2. newest `machine-review-state:v1` evidence: `status: completed`, `has_any_findings: false`,
    **full 40-hex `commit_sha` exactly equal to that head**, nonempty operator-selected `model` and
    configured `provider`, full UTF-8 `report`, and matching `report_sha256`;

@@ -3,6 +3,16 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## [0.1.64] — 2026-11-15
+
+### Changed
+
+- GDD phase 6 names when its CI clause is inapplicable: no `.github/workflows/*.yml|*.yaml` in the PR
+  head tree and zero registered workflows, check runs or statuses on the head SHA, with the merge
+  script's verdict exactly `verdict: BLOCKED: no checks`; the operator records `workflows: 0`,
+  `checks: 0` beside the script's literal output. Red or pending checks, or workflows present but
+  unreported, still block.
+
 ## [0.1.63] — 2026-11-15
 
 ### Added
