@@ -119,7 +119,9 @@ counter derived from a truncated stream is marked partial (the OMP adapters set
 Stopping a headless run is the launcher's business, and it has to work where signals do not: `omp-run.py`
 writes a `stop` control file the run polls, waits for the run's own finalizer, and only then escalates
 to a process-group TERM/KILL (POSIX) or `taskkill /T /F` (Windows). A run stopped this way ends as
-`killed` with exit `143`; a run that died without finalizing is finalized as `failed` with exit `-1`
+`killed` with exit `143`; `killed` also covers an exit carrying a signal convention (`130`/`137`/`143`
+and their raw POSIX forms `-2`/`-9`/`-15`), which keeps its own raw code rather than being rewritten to
+`143`. A run that died without finalizing is finalized as `failed` with exit `-1`
 by the next `status`/`result`/`list`/`answer`, which sets `stale_recovered: true` — and only while no
 `finalized` marker exists, so recovery stays idempotent.
 
@@ -175,17 +177,36 @@ Two rules are specific to this route:
    when the stored session was recorded in another directory, and a stage dispatched into a different
    tree is worse than a refusal. The adapter resolves `--cwd`, records it in `state.json` and never
    rewrites it; a resume must name the same directory.
-2. **`--approval-policy never` is required for unattended runs.** Headless has no live approval
-   channel, so a call that needs approval is rejected and the turn ends without completing. That is
-   this adapter's documented default (`DSH_APPROVAL_POLICY`), and `workspace-write`
-   (`DSH_PERMISSION_MODE`) keeps the sandbox at the stage's worktree rather than reaching for
-   `danger-full-access`.
+2. **`--approval-policy never` is required for unattended runs, and the write boundary is the
+   permission policy, not the working directory.** Headless has no live approval channel, so a call
+   that needs approval is rejected and the turn ends without completing; `never` is this adapter's
+   documented default (`DSH_APPROVAL_POLICY`). The permission policy constrains model tool writes
+   **only where the host's harness enforces a sandbox**: with the default `workspace-write`
+   (`DSH_PERMISSION_MODE`), writes inside the policy's boundary succeed and writes outside it are
+   denied on such a host, while `--cwd` only selects the run's working directory and is not itself a
+   boundary. Changing the profile or `DSH_PERMISSION_MODE` changes that boundary, so re-confirm it on
+   the target host before dispatching rather than assuming the working directory alone confines the
+   worker, and do not reach for `danger-full-access` to "unblock" a task. The operating method states
+   the same precondition ([`dsh-headless-gdd`](../../dsh-headless-gdd/SKILL.md), "Harness facts that
+   bite").
 
 Completion is `exit 0` **and** the last `final` event carrying `reason.kind == "completed"`; a
-`tool_result` status of `completed` only means the tool returned. Anything else is `failed` (with its
-own exit code, or `-1` when the process disappeared without finalizing and the next
-`status`/`result`/`list`/`answer` recovered it with `stale_recovered: true`), or `killed` with exit
-`143` when this adapter stopped it. A run with no `final` event keeps the last committed `text` event
+`tool_result` status of `completed` only means the tool returned. The exit→state mapping is the one the
+archived goal's failure clause states, and the same one `omp-run.py` implements, so two routes of one
+contract cannot disagree:
+
+- `done` — `exit 0` **and** the last `final` event's `reason.kind == "completed"`.
+- `killed` — this adapter stopped the run (its stop path, like `kill` and `--max-time`, records exit
+  `143`), **or** the process exited carrying a signal convention: `130`/`137`/`143` and their raw
+  POSIX forms `-2`/`-9`/`-15`, the `KILLED_EXITS` set the adapter shares with `omp-run.py`. A
+  signal-convention exit keeps its raw code — it is not rewritten to `143`.
+- `failed` — any other non-zero, non-signal exit, recorded with its own exit code (a runner-level
+  `error` event, an aborted final, a refused dispatch).
+- `failed` with exit `-1` and `stale_recovered: true` — the process disappeared without finalizing;
+  the next `status`/`result`/`list`/`answer` writes it, idempotently and only while no `finalized`
+  marker exists.
+
+A run with no `final` event keeps the last committed `text` event
 as a partial `answer.md`. `--max-time` has no DSH equivalent, so it is the adapter's own deadline: the
 runner stops the run through the same path `kill` uses and records `killed`/`143` with
 `deadline_exceeded: true`; it is never silently dropped. `--model` and `--thinking` are **refused**:

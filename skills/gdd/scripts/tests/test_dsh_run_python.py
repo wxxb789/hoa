@@ -42,6 +42,7 @@ from unittest import mock
 HERE = Path(__file__).resolve().parent
 SCRIPTS = HERE.parent
 ADAPTER = SCRIPTS / "adapters" / "dsh-run.py"
+REPO = HERE.parents[3]
 IS_WINDOWS = os.name == "nt"
 START_TIMEOUT = 30.0
 SETTLE_TIMEOUT = 60.0
@@ -66,6 +67,12 @@ def emit(event):
 
 def main():
     argv = sys.argv[1:]
+    # Every agent start is appended here: a race that produces two agents leaves
+    # two lines, whichever run directory the second one wrote into.
+    append_file = os.environ.get("STUB_APPEND_FILE")
+    if append_file:
+        with open(append_file, "a", encoding="utf-8") as handle:
+            handle.write(f"{os.getpid()}\\n")
     argv_file = os.environ.get("STUB_ARGV_FILE")
     if argv_file:
         with open(argv_file, "w", encoding="utf-8") as handle:
@@ -106,6 +113,13 @@ def main():
                           "cacheReadTokens": 0},
             })
             time.sleep(0.2)
+    if mode == "quiet":
+        # One committed text, then silence: no further event makes the runner
+        # republish state.json, so a test can treat the run directory as stable
+        # while it checks that a stale reader wrote nothing.
+        emit({"type": "text", "text": "quarter report"})
+        time.sleep(300)
+        return 0
     if mode == "flood":
         filler = "x" * 2000
         for index in range(300):
@@ -194,7 +208,7 @@ class DshLauncherTests(unittest.TestCase):
             "DSH_PROFILE_DIR", "DSH_SESSION_ID", "DSH_RUN_PROFILE",
             "DSH_PERMISSION_MODE", "DSH_APPROVAL_POLICY", "STUB_MODE", "STUB_EXIT",
             "STUB_ARGV_FILE", "STUB_STDIN_FILE", "STUB_ENV_FILE", "STUB_FINALS",
-            "STUB_TEXT", "STUB_REASON", "STUB_SESSION",
+            "STUB_TEXT", "STUB_REASON", "STUB_SESSION", "STUB_APPEND_FILE",
         ):
             cls.env.pop(key, None)
 
@@ -1311,8 +1325,15 @@ class DshLauncherTests(unittest.TestCase):
         env = self.env_for(STUB_MODE="error")
 
         def run_runner_to_completion(argv, cwd, log_path):
+            # The real `spawn_runner` hands the runner the single-use token from
+            # `spawn.token`; this synchronous stand-in must present it too, or the
+            # runner takes the slug claim its parent (this call) already holds.
+            env = adapter.child_env()
+            token = adapter.read_sidecar(str(Path(log_path).parent), adapter.SPAWN_TOKEN_FILE)
+            if token:
+                env[adapter.RUNNER_TOKEN_ENV] = token
             done = subprocess.run(
-                argv, cwd=cwd, env=adapter.child_env(), stdin=subprocess.DEVNULL,
+                argv, cwd=cwd, env=env, stdin=subprocess.DEVNULL,
                 capture_output=True, text=True, timeout=60.0,
             )
             Path(log_path).write_text(done.stdout + done.stderr, encoding="utf-8")
@@ -1627,6 +1648,568 @@ class DshLauncherTests(unittest.TestCase):
             victim.kill()
             victim.wait(timeout=10)
 
+
+    # -- round-6 pins: the run-lifecycle class -------------------------------
+
+    def ignoring_agent(self):
+        """A real agent process that ignores SIGTERM, in its own process group."""
+        code = (
+            "import signal, time\n"
+            "signal.signal(signal.SIGTERM, signal.SIG_IGN)\n"
+            "signal.signal(signal.SIGINT, signal.SIG_IGN)\n"
+            "time.sleep(300)\n"
+        )
+        return subprocess.Popen(
+            [sys.executable, "-c", code],
+            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+
+    def reap(self, victim):
+        if victim.poll() is None:
+            victim.kill()
+            victim.wait(timeout=10)
+
+    def failed_stop_run(self, slug, mode="known"):
+        """A run whose runner loses a stop against an agent that ignores SIGTERM.
+
+        The runner is driven in-process (the shape `test_33` uses), so the failure
+        is deterministic; the TERM reaches a real process and is really ignored,
+        and the runner is then told the escalation could not name a completion.
+        `mode="unknown"` is the same stop with a failed enumeration instead of a
+        survivor list.
+        """
+        victim = self.ignoring_agent()
+        identity = adapter.process_identity(victim.pid)
+        self.assertTrue(identity, "the platform must supply a process identity")
+        run_dir = self.run_root / adapter.date_stamp() / slug
+        run_dir.mkdir(parents=True)
+        (run_dir / "prompt.md").write_text("the agent is still working\n", encoding="utf-8")
+        adapter.write_json(str(run_dir / "state.json"), {
+            "name": slug, "state": "running", "exit": None, "cwd": str(self.tmp),
+            "started": adapter.now_iso(), "backend": "dsh",
+        })
+        adapter.write_json(str(run_dir / "lock"), {
+            "pid": None, "agent_pid": None, "backend": "dsh", "started_at": adapter.now_iso(),
+        })
+        (run_dir / "stop").write_text("{}", encoding="utf-8")  # what `kill` writes
+        args = adapter.build_parser().parse_args([
+            "_run", "--run-dir", str(run_dir), "--prompt", str(run_dir / "prompt.md"),
+            "--cwd", str(self.tmp), "--agent", str(self.dsh_bin()), "--name", slug,
+            "--profile", "headless", "--permission-mode", "workspace-write",
+            "--approval-policy", "never",
+        ])
+        survivors = None if mode == "unknown" else [(victim.pid, identity, victim.pid)]
+
+        def stop_did_not_complete(process, agent_identity=""):
+            # One real TERM, delivered to the group and ignored by the agent; the
+            # escalation then reports the outcome it could prove.
+            adapter.signal_group(process.pid, signal.SIGTERM, agent_identity)
+            return adapter.KILL_EXIT, survivors
+
+        dead_pid = 1 << 22
+
+        class NoSelfPid:
+            """The os module, with getpid answering a pid this process is not."""
+
+            def __getattr__(self, name):
+                return getattr(os, name)
+
+            def getpid(self):
+                return dead_pid
+
+        saved = {
+            name: signal.getsignal(getattr(signal, name)) for name in ("SIGTERM", "SIGINT")
+        }
+        try:
+            with mock.patch.dict(
+                os.environ, self.env_for(DSH_RUN_DRAIN_TIMEOUT_SECONDS=1), clear=False
+            ), mock.patch.object(adapter, "spawn_agent", lambda *a, **k: victim), \
+                    mock.patch.object(adapter, "terminate_agent", stop_did_not_complete), \
+                    mock.patch.object(adapter, "os", NoSelfPid()), \
+                    contextlib.redirect_stdout(io.StringIO()), \
+                    contextlib.redirect_stderr(io.StringIO()):
+                code = adapter.runner_main(args)
+        finally:
+            for name, handler in saved.items():
+                signal.signal(getattr(signal, name), handler)
+        self.assertEqual(code, 1, "a stop that did not complete is not a finished run")
+        return run_dir, victim, identity
+
+    def stable_snapshot(self, run_dir, timeout=20.0, quiet=0.6):
+        """A byte snapshot of the run directory's files, once they stop changing."""
+        deadline = time.monotonic() + timeout
+        previous, stable_since = None, None
+        while time.monotonic() < deadline:
+            current = {
+                path.name: path.read_bytes() for path in run_dir.iterdir() if path.is_file()
+            }
+            now = time.monotonic()
+            if current == previous:
+                if now - stable_since >= quiet:
+                    return current
+            else:
+                previous, stable_since = current, now
+            time.sleep(0.1)
+        self.fail(f"{run_dir} never settled into a stable snapshot")
+
+    def reap_runner_async(self, run_dir, timeout=30.0):
+        """Reap the runner an in-process start spawned, as soon as it is recorded.
+
+        `spawn_runner` in this process leaves the detached runner as a child; an
+        unreaped zombie still answers a liveness probe, so the run would look
+        alive forever. A recorded pid that is not this process's child (the run
+        directory may still hold the previous run's state) is skipped, not
+        waited on.
+        """
+        def wait_for_runner():
+            deadline = time.monotonic() + timeout
+            while time.monotonic() < deadline:
+                pid = adapter.read_state_file(str(run_dir)).get("pid")
+                if isinstance(pid, int) and pid > 0:
+                    try:
+                        os.waitpid(pid, 0)
+                        return
+                    except ChildProcessError:
+                        pass  # the previous run's runner; keep looking
+                    except OSError:
+                        return
+                time.sleep(0.05)
+
+        thread = threading.Thread(target=wait_for_runner, daemon=True)
+        thread.start()
+        return thread
+
+    def list_line(self, slug):
+        listed = self.adapter_run("list")
+        self.assertEqual(listed.returncode, 0, listed.stderr)
+        rows = [row for row in listed.stdout.splitlines() if slug in row]
+        self.assertEqual(len(rows), 1, listed.stdout)
+        return rows[0]
+
+    def result_view(self, slug):
+        result = self.adapter_run("result", slug)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout.split("\n--- answer")[0])
+
+    def test_34_a_stop_that_cannot_enumerate_never_finalizes(self):
+        """R1: "no survivors reported" is never "the stop is confirmed".
+
+        Enumeration can fail (Windows has no group table; `ps` can error), and
+        that used to look exactly like a confirmed stop: `surviving_members`
+        returned `[]`, so the runner published `killed` while the tools were
+        still alive. The three outcomes are distinct now — proven gone, survivors
+        known, enumeration failed — and only the first reaches a terminal state.
+        """
+        with mock.patch.object(adapter, "IS_WINDOWS", True), \
+                mock.patch.object(adapter, "tree_alive", lambda pid: True), \
+                mock.patch.object(
+                    adapter, "terminate_tree", lambda pid, signum, identity="": False
+                ), \
+                mock.patch.object(adapter, "POLL_SECONDS", 0), \
+                contextlib.redirect_stderr(io.StringIO()):
+            code, survivors = adapter.terminate_agent(
+                types.SimpleNamespace(pid=os.getpid(), poll=lambda: None), "fake:1"
+            )
+        self.assertEqual(code, adapter.KILL_EXIT)
+        self.assertIsNone(
+            survivors, "an enumeration that never ran is not an empty survivor list"
+        )
+
+        slug = "stop-unknown-34"
+        run_dir, victim, _identity = self.failed_stop_run(slug, mode="unknown")
+        try:
+            self.assertFalse((run_dir / "finalized").exists())
+            self.assertFalse((run_dir / "exit.code").exists())
+            state = adapter.read_state_file(str(run_dir))
+            self.assertEqual(state["state"], "running", state)
+            self.assertTrue(state["stopping"])
+            self.assertIs(state["survivors_complete"], False, state)
+            self.assertEqual(
+                adapter.lifecycle_of(str(run_dir), state),
+                adapter.LIFECYCLE_STOPPING_UNKNOWN,
+            )
+            self.assertIn("could not be enumerated", state["note"])
+            # Even a failed enumeration names what it still knows is alive, so a
+            # later attempt has a real identity to verify.
+            self.assertIn(victim.pid, adapter.recorded_pids(str(run_dir), state))
+            # The hole this pins: liveness says "gone" while the enumeration
+            # cannot confirm it. No reader may finalize anything from that.
+            with mock.patch.object(adapter, "run_alive", lambda run, state=None: False):
+                settled, recovered = adapter.effective_state(str(run_dir))
+            self.assertFalse(recovered)
+            self.assertEqual(settled["state"], "running", settled)
+            self.assertFalse((run_dir / "finalized").exists())
+            # Windows-shaped / inspection failed: the group table cannot be read
+            # at all, so the same "nothing recorded alive" is not proof.
+            with mock.patch.object(adapter, "group_member_pids", lambda pgid: None), \
+                    mock.patch.object(adapter, "run_alive", lambda run, state=None: False):
+                settled, recovered = adapter.effective_state(str(run_dir))
+            self.assertFalse(recovered)
+            self.assertEqual(settled["state"], "running", settled)
+            self.assertFalse((run_dir / "finalized").exists())
+            # Whatever liveness says, the slug stays occupied: a probe that found
+            # nothing is not a probe that proved nothing is there.
+            with mock.patch.object(adapter, "run_alive", lambda run, state=None: False):
+                occupant, _occupant_state = adapter.occupying_run(str(self.run_root), slug)
+            self.assertEqual(occupant, str(run_dir))
+            # Once the agent is really gone, a *complete* enumeration proves the
+            # stop and the run settles killed/143 — never failed/-1.
+            victim.kill()
+            victim.wait(timeout=10)
+            settled, recovered = adapter.effective_state(str(run_dir))
+            self.assertTrue(recovered, settled)
+            self.assertEqual(
+                (settled["state"], settled["exit"]), ("killed", adapter.KILL_EXIT)
+            )
+        finally:
+            self.reap(victim)
+
+    def test_35_an_unconfirmed_stop_is_non_terminal_and_records_survivors(self):
+        """R2: a stop that did not complete is not a result, and says what survived."""
+        slug = "stopfail-35"
+        run_dir, victim, identity = self.failed_stop_run(slug)
+        try:
+            self.assertFalse((run_dir / "finalized").exists())
+            self.assertFalse((run_dir / "exit.code").exists())
+            self.assertFalse((run_dir / "answer.md").exists())
+            state = adapter.read_state_file(str(run_dir))
+            self.assertEqual(state["state"], "running", state)
+            self.assertTrue(state["stopping"])
+            self.assertIs(state["survivors_complete"], True)
+            self.assertEqual([record["pid"] for record in state["survivors"]], [victim.pid])
+            self.assertEqual(state["survivors"][0]["identity"], identity)
+            self.assertEqual(state["survivors"][0]["group"], victim.pid)
+            lock = adapter.lock_of(str(run_dir))
+            self.assertEqual([record["pid"] for record in lock["survivors"]], [victim.pid])
+            self.assertTrue(adapter.run_alive(str(run_dir), state))
+            self.assertEqual(
+                adapter.lifecycle_of(str(run_dir), state),
+                adapter.LIFECYCLE_STOPPING_KNOWN,
+            )
+        finally:
+            self.reap(victim)
+
+    def test_36_an_unconfirmed_stop_is_still_reported_as_live(self):
+        """R2: `status`/`list` keep showing the run and its stop as unfinished."""
+        slug = "stopfail-36"
+        run_dir, victim, _identity = self.failed_stop_run(slug)
+        try:
+            view, _output = self.status_view(slug)
+            self.assertTrue(view["alive"], view)
+            self.assertTrue(view["stopping"], view)
+            self.assertEqual(view["lifecycle"], "stopping (survivors known)")
+            self.assertIn("stopping(survivors-known)", self.list_line(slug))
+            self.assertEqual(self.result_view(slug)["lifecycle"], "stopping (survivors known)")
+            answer = self.adapter_run("answer", slug)
+            self.assertEqual(answer.returncode, 1)
+            self.assertIn("stopping (survivors known)", answer.stderr)
+        finally:
+            self.reap(victim)
+
+    def test_37_an_unconfirmed_stop_blocks_a_new_start_for_the_slug(self):
+        """R2: the slug stays occupied, and the refusal leaves the run untouched."""
+        slug = "stopfail-37"
+        run_dir, victim, _identity = self.failed_stop_run(slug)
+        try:
+            before = self.stable_snapshot(run_dir)
+            proc = self.adapter_run(
+                "start", "--name", slug, "--prompt", str(self.prompt), "--cwd", str(self.tmp)
+            )
+            self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+            self.assertIn("still running", proc.stderr)
+            self.assertEqual(self.stable_snapshot(run_dir), before)
+            self.assertFalse((run_dir / "finalized").exists())
+            self.assertTrue(adapter.run_alive(str(run_dir)))
+        finally:
+            self.reap(victim)
+
+    def test_38_an_unconfirmed_stop_stays_killable_by_a_later_attempt(self):
+        """R2: a later `kill` finishes the job through the recorded survivors."""
+        slug = "stopfail-38"
+        run_dir, victim, _identity = self.failed_stop_run(slug)
+        try:
+            # Reap the survivor as soon as it dies: an unreaped zombie still
+            # answers a liveness probe, and the run would rightly stay stopping
+            # until the process is really gone.
+            reaper = threading.Thread(target=victim.wait, daemon=True)
+            reaper.start()
+            killed = self.adapter_run(
+                "kill", slug, env=self.env_for(DSH_RUN_STOP_WAIT_SECONDS=1)
+            )
+            self.assertEqual(killed.returncode, 0, killed.stdout + killed.stderr)
+            final = self.wait_for_state(slug, {"killed"}, timeout=30.0)
+            self.assertEqual((final["state"], final["exit"]), ("killed", adapter.KILL_EXIT))
+            self.assertEqual(final["stopped_by"], "control-file-forced")
+            self.assertFalse(adapter.pid_alive(victim.pid), "the survivor must be stopped")
+            self.assertEqual(
+                (run_dir / "finalized").read_text(encoding="utf-8"), str(adapter.KILL_EXIT)
+            )
+        finally:
+            self.reap(victim)
+
+    def test_39_a_stale_reader_never_finalizes_a_replaced_run(self):
+        """R3: a terminal write is bound to the run generation it decided about.
+
+        The reader decides the old run at this path is dead; a starter then
+        recovers that run, moves it aside and builds a new, live run at the same
+        path; the reader resumes inside its finalize. It must write nothing —
+        byte for byte — and say why.
+        """
+        slug = "generation-39"
+        run_dir = self.dead_run(slug)
+        old_state = adapter.read_state_file(str(run_dir))
+        old_generation = adapter.generation_of(str(run_dir), old_state)
+        self.assertTrue(old_generation)
+        held = {}
+        real_finalize = adapter.finalize
+
+        def replace_before_finalize(*args, **kwargs):
+            if "before" not in held:
+                held["proc"] = self.start(slug, env=self.env_for(STUB_MODE="quiet"))
+                deadline = time.monotonic() + START_TIMEOUT
+                while time.monotonic() < deadline:
+                    if adapter.read_state_file(str(run_dir)).get("session_id"):
+                        break
+                    time.sleep(adapter.POLL_SECONDS)
+                held["before"] = self.stable_snapshot(run_dir)
+            return real_finalize(*args, **kwargs)
+
+        err = io.StringIO()
+        with mock.patch.object(adapter, "finalize", replace_before_finalize), \
+                contextlib.redirect_stderr(err):
+            state, recovered = adapter.effective_state(str(run_dir))
+        self.assertFalse(recovered, state)
+        self.assertIn("different run", err.getvalue())
+        self.assertNotEqual(
+            adapter.generation_of(str(run_dir), state), old_generation
+        )
+        self.assertEqual(state["state"], "running", state)
+        self.assertTrue(adapter.run_alive(str(run_dir), state))
+        self.assertFalse((run_dir / "finalized").exists())
+        self.assertFalse((run_dir / "answer.md").exists())
+        self.assertFalse((run_dir / "exit.code").exists())
+        self.assertEqual(self.stable_snapshot(run_dir), held["before"])
+        # The starter preserved the old run, and settled it as the crash it was.
+        previous = sorted(run_dir.parent.glob(f"{slug}.prev-*"))
+        self.assertTrue(previous, "the replaced run must be preserved, not deleted")
+        old_final = json.loads((previous[0] / "state.json").read_text(encoding="utf-8"))
+        self.assertEqual(old_final["state"], "failed")
+        self.assertTrue(old_final["stale_recovered"])
+        # And the new run is unharmed: it is live, un-finalized, and still settles.
+        self.adapter_run("kill", slug)
+        final = self.wait_for_state(slug, {"killed"}, timeout=30.0)
+        self.assertEqual(final["exit"], adapter.KILL_EXIT)
+
+    def test_40_two_concurrent_starts_produce_exactly_one_agent(self):
+        """R4: the slug claim is atomic for every start, so a race has one winner."""
+        slug = "race-40"
+        run_dir = self.run_root / adapter.date_stamp() / slug
+        agent_log = self.tmp / "race-40.agents"
+        entered = self.tmp / "race-40.entered"
+        release = self.tmp / "race-40.release"
+        env = self.env_for(STUB_APPEND_FILE=agent_log, STUB_MODE="settle")
+        args = adapter.build_parser().parse_args([
+            "start", "--name", slug, "--prompt", str(self.prompt), "--cwd", str(self.tmp)])
+        real = adapter._start_run_claimed
+        outcome = {}
+
+        def hold_inside(*call_args, **call_kwargs):
+            # The file the test controls holds the winner inside the critical
+            # section, so the loser meets a held claim, not a scheduling accident.
+            entered.write_text("in\n", encoding="utf-8")
+            deadline = time.monotonic() + 60.0
+            while not release.exists() and time.monotonic() < deadline:
+                time.sleep(0.05)
+            return real(*call_args, **call_kwargs)
+
+        def racer():
+            try:
+                outcome["code"] = adapter.start_run(
+                    args, run_dir, str(self.dsh_bin()), False, "headless",
+                    "workspace-write", "never",
+                )
+            except SystemExit as exc:
+                outcome["code"] = exc.code
+
+        with mock.patch.object(adapter, "_start_run_claimed", hold_inside), \
+                mock.patch.dict(os.environ, env, clear=False):
+            winner = threading.Thread(target=racer, daemon=True)
+            winner.start()
+            deadline = time.monotonic() + 30.0
+            while not entered.exists() and time.monotonic() < deadline:
+                time.sleep(0.05)
+            self.assertTrue(entered.exists(), "the winner never entered the critical section")
+            loser = self.adapter_run(
+                "start", "--name", slug, "--prompt", str(self.prompt), "--cwd", str(self.tmp),
+                env=env,
+            )
+            self.assertEqual(loser.returncode, 1, loser.stdout + loser.stderr)
+            self.assertIn("another start is claiming", loser.stderr)
+            self.assertFalse(run_dir.exists(), "the loser wrote a run directory")
+            self.assertFalse(agent_log.exists(), "the loser started an agent")
+            release.write_text("go\n", encoding="utf-8")
+            reaper = self.reap_runner_async(run_dir)
+            winner.join(timeout=START_TIMEOUT + 30.0)
+        self.assertFalse(winner.is_alive())
+        self.assertEqual(outcome.get("code"), 0, outcome)
+        state = self.wait_for_state(slug, {"done", "killed", "failed"})
+        self.assertTrue(state.get("agent_pid"), state)
+        self.assertEqual(
+            agent_log.read_text(encoding="utf-8").split(), [str(state["agent_pid"])],
+            "two racers must produce exactly one agent",
+        )
+
+    def test_41_a_start_concurrent_with_a_replay_produces_exactly_one_agent(self):
+        """R4: the recorded `run.sh` takes the same claim, so a replay cannot race it."""
+        slug = "race-41"
+        self.settle(slug, STUB_TEXT="first answer")
+        run_dir = self.run_dir(slug)
+        agent_log = self.tmp / "race-41.agents"
+        entered = self.tmp / "race-41.entered"
+        release = self.tmp / "race-41.release"
+        env = self.env_for(STUB_APPEND_FILE=agent_log, STUB_MODE="settle")
+        args = adapter.build_parser().parse_args([
+            "start", "--name", slug, "--prompt", str(self.prompt), "--cwd", str(self.tmp)])
+        real = adapter._start_run_claimed
+        outcome = {}
+
+        def hold_inside(*call_args, **call_kwargs):
+            entered.write_text("in\n", encoding="utf-8")
+            deadline = time.monotonic() + 60.0
+            while not release.exists() and time.monotonic() < deadline:
+                time.sleep(0.05)
+            return real(*call_args, **call_kwargs)
+
+        def racer():
+            try:
+                outcome["code"] = adapter.start_run(
+                    args, run_dir, str(self.dsh_bin()), False, "headless",
+                    "workspace-write", "never",
+                )
+            except SystemExit as exc:
+                outcome["code"] = exc.code
+
+        with mock.patch.object(adapter, "_start_run_claimed", hold_inside), \
+                mock.patch.dict(os.environ, env, clear=False):
+            winner = threading.Thread(target=racer, daemon=True)
+            winner.start()
+            deadline = time.monotonic() + 30.0
+            while not entered.exists() and time.monotonic() < deadline:
+                time.sleep(0.05)
+            self.assertTrue(entered.exists(), "the winner never entered the critical section")
+            before = self.stable_snapshot(run_dir)
+            if IS_WINDOWS:
+                command = [os.environ.get("COMSPEC") or "cmd.exe", "/d", "/c",
+                           str(run_dir / "run.cmd")]
+            else:
+                command = [str(run_dir / "run.sh")]
+            replay = subprocess.run(
+                command, capture_output=True, text=True, env=self.env, timeout=SETTLE_TIMEOUT
+            )
+            self.assertNotEqual(replay.returncode, 0, replay.stdout + replay.stderr)
+            self.assertIn("another start owns", replay.stdout + replay.stderr)
+            self.assertEqual(self.stable_snapshot(run_dir), before)
+            self.assertFalse(agent_log.exists(), "the replay started a second agent")
+            release.write_text("go\n", encoding="utf-8")
+            reaper = self.reap_runner_async(run_dir)
+            winner.join(timeout=START_TIMEOUT + 30.0)
+        self.assertFalse(winner.is_alive())
+        self.assertEqual(outcome.get("code"), 0, outcome)
+        final = self.wait_for_state(slug, {"done", "killed", "failed"})
+        self.assertTrue(final.get("agent_pid"), final)
+        self.assertEqual(
+            agent_log.read_text(encoding="utf-8").split(), [str(final["agent_pid"])],
+            "a start and a replay must produce exactly one agent",
+        )
+        previous = sorted(run_dir.parent.glob(f"{slug}.prev-*"))
+        self.assertTrue(previous, "the replay's previous run must be preserved")
+        self.assertIn("first answer",
+                      (previous[0] / "answer.md").read_text(encoding="utf-8"))
+
+    def test_42_lifecycle_terminal_over_the_real_artifacts(self):
+        """R5: a finished run says `terminal` in every answer."""
+        slug = "life-42"
+        self.settle(slug, STUB_TEXT="terminal answer")
+        view, output = self.status_view(slug)
+        self.assertEqual(view["lifecycle"], "terminal")
+        self.assertEqual(view["state"], "done")
+        self.assertNotIn("not finished", output)
+        self.assertIn("done exit=0", self.list_line(slug))
+        self.assertEqual(self.result_view(slug)["lifecycle"], "terminal")
+        answer = self.adapter_run("answer", slug)
+        self.assertEqual(answer.returncode, 0, answer.stderr)
+        self.assertEqual(answer.stdout, "terminal answer")
+
+    def test_43_lifecycle_live_over_the_real_artifacts(self):
+        """R5: a working run says `live`, and its answer is refused as such."""
+        slug = "life-43"
+        self.start(slug, env=self.env_for(STUB_MODE="sleep"))
+        self.wait_for_state(slug, {"running"}, timeout=START_TIMEOUT)
+        try:
+            view, _output = self.status_view(slug)
+            self.assertEqual(view["lifecycle"], "live")
+            self.assertTrue(view["alive"])
+            self.assertIn("running(live)", self.list_line(slug))
+            self.assertEqual(self.result_view(slug)["lifecycle"], "live")
+            answer = self.adapter_run("answer", slug)
+            self.assertEqual(answer.returncode, 1)
+            self.assertIn("not finished yet (live", answer.stderr)
+        finally:
+            self.adapter_run("kill", slug)
+            self.wait_for_state(slug, {"killed"}, timeout=30.0)
+
+    def test_44_lifecycle_stopping_with_survivors_over_the_real_artifacts(self):
+        """R5: `stopping (survivors known)` is not a terminal state anywhere."""
+        slug = "life-44"
+        run_dir, victim, _identity = self.failed_stop_run(slug)
+        try:
+            view, _output = self.status_view(slug)
+            self.assertEqual(view["lifecycle"], "stopping (survivors known)")
+            self.assertIs(view["survivors_complete"], True)
+            self.assertTrue(view["alive"])
+            self.assertIn("stopping(survivors-known)", self.list_line(slug))
+            self.assertEqual(
+                self.result_view(slug)["lifecycle"], "stopping (survivors known)"
+            )
+            answer = self.adapter_run("answer", slug)
+            self.assertEqual(answer.returncode, 1)
+            self.assertIn("stopping (survivors known)", answer.stderr)
+        finally:
+            self.reap(victim)
+
+    def test_45_lifecycle_stopping_without_enumeration_over_the_real_artifacts(self):
+        """R5: `stopping (enumeration failed)` is a state of its own, not `running`."""
+        slug = "life-45"
+        run_dir, victim, _identity = self.failed_stop_run(slug, mode="unknown")
+        try:
+            view, _output = self.status_view(slug)
+            self.assertEqual(view["lifecycle"], "stopping (enumeration failed)")
+            self.assertIs(view["survivors_complete"], False)
+            self.assertIn("stopping(enumeration-failed)", self.list_line(slug))
+            self.assertEqual(
+                self.result_view(slug)["lifecycle"], "stopping (enumeration failed)"
+            )
+            answer = self.adapter_run("answer", slug)
+            self.assertEqual(answer.returncode, 1)
+            self.assertIn("stopping (enumeration failed)", answer.stderr)
+        finally:
+            self.reap(victim)
+
+    def test_46_lifecycle_unknown_without_a_state_over_the_real_artifacts(self):
+        """R5: a directory that never recorded a state is `unknown (no state)`."""
+        slug = "life-46"
+        run_dir = self.run_dir(slug)
+        run_dir.mkdir(parents=True, exist_ok=True)
+        (run_dir / "prompt.md").write_text("no state was ever written\n", encoding="utf-8")
+        view, _output = self.status_view(slug)
+        self.assertEqual(view["lifecycle"], "unknown (no state)")
+        self.assertEqual(view["state"], "unknown")
+        self.assertIn("unknown(no-state)", self.list_line(slug))
+        self.assertEqual(self.result_view(slug)["lifecycle"], "unknown (no state)")
+        answer = self.adapter_run("answer", slug)
+        self.assertEqual(answer.returncode, 1)
+        self.assertIn("unknown (no state)", answer.stderr)
 
 class AdapterUnitTests(unittest.TestCase):
     """The pieces a run needs but a full dispatch does not exercise."""
@@ -2363,6 +2946,174 @@ class AdapterUnitTests(unittest.TestCase):
         self.assertEqual(parser.parse_args(["answer", "slug"]).func, adapter.cmd_answer)
         self.assertEqual(parser.parse_args(["tail", "slug", "5"]).func, adapter.cmd_tail)
         self.assertEqual(parser.parse_args(["kill", "slug"]).func, adapter.cmd_kill)
+
+    # -- round-6 pins, unit level -------------------------------------------
+
+    def test_the_stop_outcome_has_three_distinct_values(self):
+        """R1: proven gone, survivors known and enumeration failed are never equal."""
+
+        class StandIn:
+            pid = os.getpid()
+
+            def poll(self):
+                return None
+
+        def run_case(windows, settled, terminated, members):
+            with mock.patch.object(adapter, "IS_WINDOWS", windows), \
+                    mock.patch.object(adapter, "tree_alive", lambda pid: not settled), \
+                    mock.patch.object(
+                        adapter, "terminate_tree", lambda pid, signum, identity="": terminated
+                    ), \
+                    mock.patch.object(adapter, "surviving_members", lambda pgid: members), \
+                    mock.patch.object(adapter, "POLL_SECONDS", 0), \
+                    contextlib.redirect_stderr(io.StringIO()):
+                return adapter.terminate_agent(StandIn(), "fake:1")
+
+        # POSIX proof: the group is empty, whether or not a command ran.
+        self.assertEqual(run_case(False, True, False, None), (adapter.KILL_EXIT, []))
+        # Windows proof needs the tree command's receipt.
+        self.assertEqual(run_case(True, True, True, None), (adapter.KILL_EXIT, []))
+        self.assertEqual(run_case(True, True, False, None), (adapter.KILL_EXIT, None))
+        # Not stopped: the survivors are named when they can be read…
+        named = [(4242, "proc:1", 4242)]
+        self.assertEqual(run_case(False, False, False, named), (adapter.KILL_EXIT, named))
+        # …and `None`, never `[]`, when the enumeration failed or came back empty
+        # while nothing was proven gone.
+        self.assertEqual(run_case(False, False, False, None), (adapter.KILL_EXIT, None))
+        self.assertEqual(run_case(False, False, False, []), (adapter.KILL_EXIT, None))
+
+    def test_a_run_that_stopped_without_enumeration_is_never_recovered_as_failed(self):
+        """R1: a failed enumeration is not evidence, so a reader leaves it stopping."""
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            (run_dir / "events.ndjson").write_text("", encoding="utf-8")
+            adapter.write_json(str(run_dir / "state.json"), {
+                "name": "unproven", "state": "running", "exit": None, "cwd": tmp,
+                "started": (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat(),
+                "backend": "dsh", "stopping": True, "survivors_complete": False,
+                "survivors": [],
+            })
+            for windows in (False, True):
+                with self.subTest(windows=windows), \
+                        mock.patch.object(adapter, "IS_WINDOWS", windows):
+                    state, recovered = adapter.effective_state(str(run_dir))
+                    self.assertFalse(recovered, state)
+                    self.assertEqual(state["state"], "running", state)
+                    self.assertFalse((run_dir / "finalized").exists())
+                    self.assertFalse((run_dir / "exit.code").exists())
+
+    def test_a_terminal_write_is_bound_to_the_run_generation(self):
+        """R3: `finalize` refuses a run that replaced the one the caller decided about."""
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            (run_dir / "events.ndjson").write_text("", encoding="utf-8")
+            adapter.write_json(str(run_dir / "state.json"), {
+                "name": "generation", "state": "running", "exit": None, "cwd": tmp,
+                "started": adapter.now_iso(), "backend": "dsh", "generation": "one",
+            })
+            decided = adapter.generation_of(str(run_dir))
+            self.assertEqual(decided, "one")
+            # A starter replaces the path with a new, live generation.
+            adapter.write_json(str(run_dir / "state.json"), {
+                "name": "generation", "state": "running", "exit": None, "cwd": tmp,
+                "started": adapter.now_iso(), "backend": "dsh", "generation": "two",
+            })
+            before = (run_dir / "state.json").read_bytes()
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                returned = adapter.finalize(
+                    str(run_dir), -1, recovered=True, expect_generation=decided
+                )
+            self.assertEqual(returned.get("generation"), "two", returned)
+            self.assertIn("different run", err.getvalue())
+            self.assertFalse((run_dir / "finalized").exists())
+            self.assertFalse((run_dir / "answer.md").exists())
+            self.assertFalse((run_dir / "exit.code").exists())
+            # Not even the lock file: the refusal is before any write at all.
+            self.assertFalse((run_dir / "finalize.lock").exists())
+            self.assertEqual(before, (run_dir / "state.json").read_bytes())
+            # Unbound finalization still works, so the pin is the binding.
+            returned = adapter.finalize(str(run_dir), -1, recovered=True)
+            self.assertEqual(returned["state"], "failed")
+            self.assertTrue((run_dir / "finalized").exists())
+
+    def test_the_runner_handshake_is_single_use(self):
+        """R4: only the runner `start` spawned can present the spawn token."""
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            token = adapter.new_nonce()
+            (run_dir / adapter.SPAWN_TOKEN_FILE).write_text(token + "\n", encoding="utf-8")
+            with mock.patch.dict(os.environ, {adapter.RUNNER_TOKEN_ENV: token}, clear=False):
+                self.assertTrue(adapter.runner_token_ok(str(run_dir)))
+            with mock.patch.dict(os.environ, {adapter.RUNNER_TOKEN_ENV: "other"}, clear=False):
+                self.assertFalse(adapter.runner_token_ok(str(run_dir)))
+            # Consumed: a replay of run.sh carries no environment token either,
+            # and the file is gone.
+            adapter.remove_quietly(str(run_dir / adapter.SPAWN_TOKEN_FILE))
+            with mock.patch.dict(os.environ, {adapter.RUNNER_TOKEN_ENV: token}, clear=False):
+                self.assertFalse(adapter.runner_token_ok(str(run_dir)))
+            # The agent's environment never carries it.
+            with mock.patch.dict(os.environ, {adapter.RUNNER_TOKEN_ENV: "leak"}, clear=False):
+                self.assertNotIn(adapter.RUNNER_TOKEN_ENV, adapter.child_env())
+
+    def test_the_lifecycle_words_are_the_documented_five(self):
+        """R5: one vocabulary, and `list`'s single word uses all of it."""
+        self.assertEqual(adapter.LIFECYCLE_TERMINAL, "terminal")
+        self.assertEqual(adapter.LIFECYCLE_LIVE, "live")
+        self.assertEqual(adapter.LIFECYCLE_STOPPING_KNOWN, "stopping (survivors known)")
+        self.assertEqual(adapter.LIFECYCLE_STOPPING_UNKNOWN, "stopping (enumeration failed)")
+        self.assertEqual(adapter.LIFECYCLE_UNKNOWN, "unknown (no state)")
+        source = ADAPTER.read_text(encoding="utf-8")
+        self.assertIn('"stopping(survivors-known)"', source)
+        self.assertIn('"stopping(enumeration-failed)"', source)
+        self.assertIn('"unknown(no-state)"', source)
+
+    def test_the_documents_state_the_same_exit_mapping(self):
+        """R6: goal, transport and the record state the full exit→state mapping.
+
+        The operating-method skill (`skills/dsh-headless-gdd/SKILL.md`) states the
+        two endings an operator meets there — `killed`/143 for the adapter's own
+        stop and `failed`/−1 with `stale_recovered` for an unfinalized death — and
+        does not contradict the full mapping; it is outside this round's four-file
+        scope, so the signal-convention clause is pinned where the round can write.
+        """
+        documents = {
+            "goal": REPO / "docs/goals/archive/2026-11-15-dsh-headless-launcher.md",
+            "transport": REPO / "skills/gdd/references/transport.md",
+            "record": REPO / "docs/evidence/2026-11-15-dsh-headless-launcher.md",
+        }
+        for name, path in documents.items():
+            with self.subTest(document=name):
+                text = path.read_text(encoding="utf-8")
+                self.assertIn("`130`/`137`/`143`", text)
+                self.assertIn("`-2`/`-9`/`-15`", text)
+                self.assertIn("stale_recovered", text)
+                self.assertIn("`killed`", text)
+        skill = (REPO / "skills/dsh-headless-gdd/SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("A stopped run is `killed` with exit 143", skill)
+        self.assertIn("`failed` with exit −1 and `stale_recovered: true`", skill)
+
+    def test_transport_and_the_skill_state_the_same_isolation_precondition(self):
+        """R6: the write boundary is the permission policy, not the cwd."""
+        transport = (REPO / "skills/gdd/references/transport.md").read_text(encoding="utf-8")
+        skill = (REPO / "skills/dsh-headless-gdd/SKILL.md").read_text(encoding="utf-8")
+        for name, text in (("transport.md", transport), ("SKILL.md", skill)):
+            with self.subTest(document=name):
+                self.assertIn("enforces a sandbox", text)
+                self.assertIn("re-confirm", text)
+                self.assertIn("working directory", text)
+        self.assertNotIn("keeps the sandbox at the stage's worktree", transport)
+
+    def test_the_record_does_not_claim_a_substituted_provider_route(self):
+        """R6: the record says what the smoke's artifacts support, and no more."""
+        record = (REPO / "docs/evidence/2026-11-15-dsh-headless-launcher.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("substitute provider route", record)
+        self.assertIn("profile's own configuration", record)
+        # The record must not describe the smoke with the withdrawn substitution
+        # claim; the profile copy and the key are stated as what they were.
+        self.assertNotIn("default route's key is not exposed", record)
 
 
 if __name__ == "__main__":
