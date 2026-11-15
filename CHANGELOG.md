@@ -7,11 +7,11 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
 
 ### Changed
 
-- GDD phase 6 states when its CI clause is inapplicable: a repository that declares **no workflow at
-  all** *and* a PR carrying zero checks/statuses reads the merge script's `BLOCKED: no checks` verdict
-  as not-applicable for that head and merges on the remaining clauses, with the zero-workflow evidence
-  recorded in the verdict line and the PR body. Red or pending checks in a repository that *has*
-  workflows stay blocking.
+- GDD phase 6 names when its CI clause is inapplicable: no `.github/workflows/*.yml|*.yaml` in the PR
+  head tree and zero registered workflows, check runs or statuses on the head SHA, with the merge
+  script's verdict exactly `verdict: BLOCKED: no checks`; the operator records `workflows: 0`,
+  `checks: 0` beside the script's literal output. Red or pending checks, or workflows present but
+  unreported, still block.
 
 ## [0.1.63] — 2026-11-15
 
