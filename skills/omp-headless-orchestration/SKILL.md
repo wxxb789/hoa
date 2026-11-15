@@ -113,13 +113,11 @@ path.
     an instant crash, not a rejected flag. Use `90m`, `2h` or plain seconds. The wrapper does not
     validate this, so read `stderr.log` before blaming the prompt or the repo.
 
-15. **A stage must not background its own verification inside its own launcher unit.** A transient
-    systemd unit — `systemd-run`, or any unit with `KillMode=control-group` — kills every process
-    still in its cgroup when the unit finalizes, so a gate started with `&` / `nohup` / a background
-    terminal job is killed the moment the stage exits: the run then reports "verification launched"
-    and no exit code ever exists. Run the gate in the **foreground** of the stage, or hand it to a
-    **separate detached unit/job whose id the operator can poll**; and treat "I started the
-    verification in the background" in any stage report as **unverified** until an exit code exists.
+15. **A run that says it "launched" its verification is not evidence.** Teardown at the end of a run —
+    cgroup/process-group kill (`systemd-run` and the like) or a killed tmux session — takes
+    backgrounded children with it, so a gate left running under `&` / `nohup` dies with no exit code
+    anywhere: require the exit code before treating the verification as done. The stage-side rule lives
+    in skill `gdd` → `references/run-failure-modes.md` §8.
 
 ## Recovery after a session restart
 

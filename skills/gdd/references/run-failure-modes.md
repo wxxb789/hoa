@@ -67,23 +67,38 @@ stored pass flags; then the recorder happily overwrote a good baseline with one 
   print; after writing a record, self-check it with a validator that recomputes the values, or the
   stored record cannot be falsified.
 
-## 6. A path argument resolves against the tool's root, not yours
+## 6. Out-of-tree tools resolve paths against their own root and can silently review missing inputs
 
 A review runner resolves the prompt and diff arguments against its `--repo` directory (its own cwd), so
 a relative path typed from the orchestrator's directory silently read a different file — or nothing —
 while the run still exited 0 and reported a review of the increment.
 
-- Pass absolute paths for every path argument of an out-of-tree tool; the tool's root is not your cwd.
-- Require the tool to fail loudly when a resolved input does not exist, instead of reviewing an empty
-  attachment.
+- Pass absolute paths for every path argument of an out-of-tree tool.
+- Before invoking the tool, check every resolved input path yourself: it must exist and be non-empty
+  (`test -s`), or the tool may review an empty attachment and still exit 0.
+- Any wrapper you ship must exit non-zero before launching the tool when an input is missing or empty.
 
-## 7. A checker that needs a dependency the shim interpreter lacks fails as an environment error
+## 7. Running gates under a bare or shim runtime causes missing-dependency failures and skipped gates
 
-The repository's checker scripts (composition graph, frontmatter, version, changelog) import a YAML
-parser, and an interpreter reached through a toolchain shim may not have it: the gate dies with
-`ModuleNotFoundError: No module named 'yaml'` — which reads like a repository failure when it is an
-environment one, and which invites the next reader to skip the gate.
+A gate command executed outside the project's dependency-bearing runtime — under a toolchain shim or a
+system interpreter — can die on a missing import before it checks anything (for example, checkers that
+import a YAML parser fail with `ModuleNotFoundError: No module named 'yaml'`). That reads like a
+repository failure when it is an environment one, and it invites the next reader to skip the gate.
 
-- Run the checkers through an interpreter that has the dependency, and record **which interpreter** the
-  run used.
-- Treat that error class as an environment failure to be fixed, never as a pass.
+- Run each gate command through an interpreter that has its dependencies, and record **which
+  interpreter** the run used.
+- Treat that error class as an environment failure to be fixed: never as a pass, and never as grounds
+  for skipping or waiving the gate.
+
+## 8. A stage must not background its own gate inside its own launcher unit
+
+Teardown kills what the stage leaves behind: when the launcher unit finalizes, it takes every process
+still in its cgroup or process group — a transient `systemd-run` unit, any unit with
+`KillMode=control-group`, a killed tmux session — so a gate started with `&` / `nohup` / a background
+terminal job dies with the unit while the stage's report still claims the verification was launched, and
+no exit code exists anywhere.
+
+- Run the gate in the **foreground** of the stage, or hand it to a **separate detached unit/job whose id
+  the operator can poll**.
+- Treat "I started the verification in the background" in a stage report as **unverified** until an exit
+  code exists.

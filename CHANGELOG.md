@@ -7,23 +7,11 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
 
 ### Added
 
-- **Three PR-closeout failure modes the catalog was missing.** (1) `omp-headless-orchestration` gains
-  pitfall 15: a stage must not background its own verification inside its own launcher unit. A transient
-  `systemd-run` unit — or any unit with `KillMode=control-group` — kills every process still in its
-  cgroup when the unit finalizes, so a gate started with `&` / `nohup` / a background terminal job is
-  killed the moment the stage exits while the report still says the verification was launched, and no
-  exit code exists anywhere. Run the gate in the foreground of the stage, or hand it to a separate
-  detached unit/job whose id the operator can poll; treat "I started the verification in the
-  background" as unverified until an exit code exists. (2) `gdd/references/run-failure-modes.md` gains
-  §6: a path argument of an out-of-tree tool resolves against that tool's root, not the caller's cwd, so
-  a relative prompt/diff path can review a different file — or nothing — while the run exits 0 and
-  reports a review; pass absolute paths and require the tool to fail loudly on a missing resolved input.
-  (3) §7: a checker that needs a dependency the toolchain-shim interpreter lacks (the repository
-  checkers import a YAML parser) dies with `ModuleNotFoundError`, which reads like a repository failure
-  when it is an environment one and invites the next reader to skip the gate; run the checkers through
-  an interpreter that has the dependency, record which interpreter was used, and never treat that error
-  class as a pass. Documentation only: no script, test or CI change, no existing rule renumbered or
-  removed.
+- **Three PR-closeout failure modes the catalog was missing.** `gdd/references/run-failure-modes.md`: §6
+  out-of-tree tools can silently review missing inputs; §7 gates run under a bare runtime die on a
+  missing import and then get skipped; §8 a stage's backgrounded verification dies with its launcher
+  unit. `omp-headless-orchestration/SKILL.md` pitfall 15: a "launched" verification is not evidence
+  without an exit code.
 
 ## [0.1.62] — 2026-11-14
 
