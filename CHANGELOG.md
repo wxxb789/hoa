@@ -11,30 +11,69 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   launcher contract on `dsh --profile headless`. `start` spawns a detached runner that pipes the
   `--json` NDJSON stream through the shared `adapters/events-writer.py` bound, keeps `state.json`
   current, and refuses a second `start` for a live slug. Completion is `exit 0` **and** the last
-  `final` event carrying `reason.kind == "completed"`; a runner-level `error` or a missing `final` is
-  `failed`, an unfinalized death is recovered as `failed`/`-1` with `stale_recovered: true` behind the
-  `finalized` marker, and `kill` writes a `stop` control file the runner polls before escalating to a
-  process-group TERM/KILL. `--max-time` is the runner's own stop path (`killed`/`143`,
-  `deadline_exceeded: true`); `--model`/`--thinking` are refused before a run directory exists because
-  headless composes no agent presets. Ownership and recovery are strict: `start`/`_run` refuse a slug
-  whose run is still live (a hand replay of `run.sh` cannot start a second agent), a `.`/`..` name or a
-  slug directory that resolves out of its date bucket is refused before any write, discovery and
-  recovery touch only runs whose `state.json` records `backend: dsh` (another route's run is listed
-  read-only), a stop that leaves processes alive stays `running`/`stopping` with the survivors named
-  instead of publishing `killed`, and no signal is sent to a group id whose leader is gone. Every
-  setting is environment-only: `DSH_BIN`,
+  `final` event carrying `reason.kind == "completed"`; an `exit 0` whose last `final` is missing or not
+  `completed`, a runner-level `error` and any other non-signal non-zero exit are `failed`, an
+  unfinalized death is recovered as `failed`/`-1` with `stale_recovered: true`, and `kill` writes a
+  `stop` control file the runner polls before escalating to a process-group TERM/KILL. `--max-time` is
+  the runner's own stop path (`killed`/`143`, `deadline_exceeded: true`); `--model`/`--thinking` are
+  refused before a run directory exists because headless composes no agent presets. Ownership and
+  recovery are strict: `start`/`_run` refuse a slug whose run is still live (a hand replay of `run.sh`
+  cannot start a second agent), a `.`/`..` name or a slug directory that resolves out of its date bucket
+  is refused before any write, discovery and recovery touch only runs whose `state.json` records
+  `backend: dsh` (another route's run is listed read-only), a stop that leaves processes alive stays
+  `running`/`stopping` with the survivors named instead of publishing `killed`, and no signal is sent to
+  a group id whose leader is gone. Every setting is environment-only: `DSH_BIN`,
   `DSH_RUN_ROOT`/`GDD_RUN_ROOT`, `DSH_RUN_PROFILE`, `DSH_PERMISSION_MODE`, `DSH_APPROVAL_POLICY`, the
   three timeouts and `DSH_RUN_EVENTS_MAX_BYTES`.
+- The launcher's ownership and lifecycle are *provable*, not documented: two stable OS locks outside
+  every replaceable run directory (a slug claim for starting, a per-slug lifecycle mutex for mutating)
+  carry ownership, kernel-held and never taken by age or by a recorded pid; every mutation is bound to
+  the immutable operation context (root, slug, run path, generation) and re-validated under the mutex
+  immediately before it writes or signals, so a run that replaced the one an operation decided about
+  refuses the write; the terminal verdict is one atomic `state.json` replacement written last (the
+  `finalized` marker stays for the observer plugin and is never an authority); a stop request names the
+  generation and a runner acts only on its own; and escalation signals only through a validated process
+  handle (`pidfd`) with the group enumerated under a continuously verified anchor — a platform without
+  that primitive (Linux without pidfds, macOS, Windows) refuses to escalate, `kill` exits 1 saying so,
+  and the operator ends the tree by hand before re-running `kill` or `status`.
 - `skills/dsh-headless-gdd/SKILL.md` is the `kind: mechanism` operating method for that route:
-  launcher flags before app flags, one worktree per recorded session, resume of the same increment in
-  the same cwd, the two-condition completion rule with `tool_result.status == "completed"` read as
-  "the tool returned", and the file-only recovery substrate (worktree, harness session log, run
-  artifacts).
+  launcher flags before app flags, one worktree per recorded session (the isolation unit is the
+  worktree/session, so the *same* worktree never has two writers while several goals of one repository
+  run in parallel in their own), resume of the same increment in the same cwd, the exit→state mapping
+  restated with its conditions (including `exit 0` whose last `final` is not `completed` → `failed`),
+  the two-condition completion rule with `tool_result.status == "completed"` read as "the tool
+  returned", and the file-only recovery substrate (worktree, harness session log, run artifacts).
 - `skills/gdd/scripts/tests/test_dsh_run_python.py` runs the adapter against a stub `dsh` on `PATH`
-  that emits canned headless NDJSON, with no network or model: 68 tests pin the completion rule, the
+  that emits canned headless NDJSON, with no network or model: 120 tests pin the completion rule, the
   `--max-time` deadline, the control-file kill and its forced escalation, stale recovery, the bounded
   event accounting, argv/stdin passthrough, the second-start refusal, the slug/date-bucket and
-  live-replay refusals, route-scoped recovery, and the identity-gated stop paths.
+  live-replay refusals, route-scoped recovery, and the identity-gated stop paths. The hardening round
+  adds the ownership and lifecycle rules, each with the interleaving that would break it: the mutex
+  covering a whole terminal publication (a child process cannot pass it mid-write), kernel ownership
+  against a backdated lock, one lock object per slug across date buckets, the under-mutex target
+  re-check that refuses a creation whose path changed, the generation-bound stop request and per-step
+  escalation authorization, publisher and incomplete-stop reports that write nothing into a replaced or
+  settled run, recovery that re-reads its liveness predicate under the mutex, the single-commit order
+  under injected death at each publication boundary, atomic-write failure without truncation, the
+  boot-id/namespace process token with no weak fallback, handle-only signal delivery, group membership
+  that must be readable and matching, an anchor verified throughout its enumeration, inspection failure
+  read as unknown, finite configured waits, and document checks that pin the exit mapping's
+  *associations* rather than its keywords. A mutation that must land — a start
+  (including `--replace`), a stop request, the runner's spawn registration, a publisher, an escalation
+  step, a survivor report — waits a bounded time (`MUTEX_WAIT_SECONDS`) for the lifecycle mutex instead
+  of reading a momentary hold as a refusal, so a run's own publisher can no longer make `start --replace`
+  or `kill` fail spuriously; `test_12c_a_momentary_mutation_never_fails_a_start_or_a_stop` pins it with a
+  child process that holds the mutex for 1.5 s. A *committed* stop is likewise not yet a settled tree: the
+  runner that wrote the verdict is still one of the run's recorded processes until it exits and is reaped,
+  and an enumeration that anchors on it answers "unknown" — never "nobody" — while it leaves.
+  `start --replace` therefore re-asks the settle question on freshly read state — bounded
+  (`SETTLE_WAIT_SECONDS`, 10 s, overridable with `DSH_RUN_SETTLE_WAIT_SECONDS`) and holding no mutex —
+  until it is conclusive (`run_alive` false and `stop_survivors() == []`), and the existing refusal stands
+  whenever the bound expires. Two tests pin the rule:
+  `test_l3_a_replace_waits_out_a_stop_that_is_not_settled_yet` (a child commits the verdict through the
+  adapter's own finalizer and then stays alive: the replacement must wait, not refuse) and
+  `test_l3_the_settle_wait_is_bounded_and_the_refusal_stands_at_the_bound` (a tree that stays unproven is
+  refused at the knob's bound instead of holding `start --replace` open).
 
 ### Changed
 

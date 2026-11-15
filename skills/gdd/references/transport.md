@@ -200,11 +200,13 @@ contract cannot disagree:
   `143`), **or** the process exited carrying a signal convention: `130`/`137`/`143` and their raw
   POSIX forms `-2`/`-9`/`-15`, the `KILLED_EXITS` set the adapter shares with `omp-run.py`. A
   signal-convention exit keeps its raw code — it is not rewritten to `143`.
-- `failed` — any other non-zero, non-signal exit, recorded with its own exit code (a runner-level
-  `error` event, an aborted final, a refused dispatch).
+- `failed` — every other settled outcome: an `exit 0` whose last `final` event is missing or does not
+  carry `reason.kind == "completed"` (the run stopped early or was aborted, and the exit code is
+  recorded unchanged), any other non-signal, non-zero exit (a runner-level `error` event, a refused
+  dispatch), and the disappeared-process case below.
 - `failed` with exit `-1` and `stale_recovered: true` — the process disappeared without finalizing;
-  the next `status`/`result`/`list`/`answer` writes it, idempotently and only while no `finalized`
-  marker exists.
+  the next `status`/`result`/`list`/`answer` writes it, idempotently and only while no terminal record
+  is committed.
 
 A run with no `final` event keeps the last committed `text` event
 as a partial `answer.md`. `--max-time` has no DSH equivalent, so it is the adapter's own deadline: the
@@ -213,12 +215,52 @@ runner stops the run through the same path `kill` uses and records `killed`/`143
 headless composes no presets and has no such flags, so the provider route and model are the profile's
 own configuration.
 
-Stopping needs no signals: `kill` writes the `stop` control file the runner polls, waits for the
-runner's own finalizer, and only then escalates to a process-group TERM/KILL (POSIX) or
-`taskkill /T /F` (Windows). A runner-level `error` event means no `final` event was written; the
-adapter records `failed` with dsh's own exit code and keeps the message. Token accounting is DSH's
-own: the last `status` event carrying `usage` is recorded as `usage` (`input_tokens`,
-`output_tokens`, `total_tokens`, `cache_read_tokens`), never inferred from anything else.
+**What a verdict is.** The authoritative terminal record is one atomic `state.json` replacement
+(`terminal_record{version, generation, commit_id, answer, session_id, exit}`, written last, after the
+compatibility artifacts); the `finalized` marker keeps its historical exit-code-text form and is
+written *after* the commit, for the observer plugin and older readers only. Every reader decides
+"finished" from that record, never from marker existence; a state that looks terminal without a valid
+commit is uncommitted data and is neither trusted nor rewritten. Until the commit, an `answer` refuses
+("not finished yet") even if a prepared `answer.md` already exists.
+
+**Ownership and mutation.** Two stable OS locks carry ownership, both keyed by the slug and both outside
+every replaceable run directory: `<run root>/<slug>.start.lock` serializes every entry that can start an
+agent, and `<run root>/.dsh-locks/<slug>.lifecycle.lock` is the mutex every mutation is taken under. A
+mutation is bound to the immutable operation context (canonical root, slug, run path, expected
+generation): start (including `--replace`), the stop request, each escalation step, finalization,
+recovery, incomplete-stop reporting, tracker/session/event publication and the spawn handshake all
+re-establish the route, the generation and the absence of a committed verdict under that mutex before
+they act, and a changed generation means no write, no signal and no enumeration against whoever holds
+the path now. Kernel ownership is authoritative: a lock file that exists is not a held lock, and neither
+its age nor a recorded pid transfers it.
+
+Stopping is a request plus a capability. `kill` writes a `stop` request carrying
+`{generation, request_id, requested_at, by}` and waits for the run's own finalizer to commit; a runner
+acts only on its own generation's request, and a request that arrives before the agent is spawned is
+honoured as a stop. Escalation exists only where a process *instance* can be proven: on Linux each
+member is signalled through a verified `pidfd` handle (open the handle, re-read the identity, confirm
+the handle has not reported exit, signal through that same handle — never a bare pid, never `killpg`),
+and group breadth comes from enumerating the group under a continuously verified anchor member. Where
+that capability does not exist — Linux without `pidfd_open`/`pidfd_send_signal`, macOS, Windows — no
+destructive call is made: the stop stays a request, the run stays `running`/`stopping`, and `kill` exits
+`1` saying it cannot confirm. The operator then ends the process tree by hand and runs `kill` (or
+`status`) again: once every recorded process is conclusively gone the run settles `killed`/`143`.
+**A committed verdict is not yet a settled tree.** The runner that wrote the verdict is still one of the
+run's recorded processes until it returns and is reaped, and an enumeration that anchors on it answers
+"unknown" (`stop_survivors()` returns `None`, never `[]`) while it leaves — so `start --replace`
+re-asks the settle question on freshly read state, bounded (`SETTLE_WAIT_SECONDS`, 10 s, overridable
+with `DSH_RUN_SETTLE_WAIT_SECONDS`) and holding no mutex, until it is conclusive: no recorded process
+live and a complete enumeration that found nobody.
+Where the bound expires — a genuinely live survivor, or a table that cannot be read at all — the
+existing refusal stands and the run is not moved aside; a momentary absence of proof is never read as a
+refusal and a genuine one is never waited away.
+
+**Residual limits, stated as limits.** The macOS and Windows strong-identity and tree-termination
+capability is **UNCONFIRMED** here, so those platforms refuse destructive escalation; Linux without
+pidfds refuses too; power-loss durability across platforms and filesystems is **UNCONFIRMED**
+(`os.replace` is atomic, not durable); descendants that deliberately leave the recorded process groups
+are not guaranteed to be found; and no atomic arbitration is promised against a foreign starter that
+does not follow this protocol (this route still leaves another backend's run bytes untouched).
 
 ### DSH configuration
 
@@ -232,6 +274,7 @@ own: the last `status` event carrying `usage` is recorded as `usage` (`input_tok
 | `DSH_RUN_EVENTS_MAX_BYTES` | bound for the retained event log, handed to the shared writer | `8388608` |
 | `DSH_RUN_START_GRACE_SECONDS` | how long a run that has recorded no pid is *starting*, not dead | `60` |
 | `DSH_RUN_STOP_WAIT_SECONDS` | how long `kill` waits for the run's own finalizer before forcing its tree | `20` |
+| `DSH_RUN_SETTLE_WAIT_SECONDS` | how long `start --replace` waits for a committed stop's tree to be conclusively gone before its refusal stands | `10` |
 | `DSH_RUN_DRAIN_TIMEOUT_SECONDS` | how long the runner waits for dsh's stdout to reach EOF after dsh exits | `30` |
 
 Every setting above is environment-only: of the contract's flags, this adapter accepts exactly

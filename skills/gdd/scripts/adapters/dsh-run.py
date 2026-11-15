@@ -94,8 +94,9 @@ creation time — and no signal is ever sent to a pid whose live identity no lon
 matches it (see "Process identity" below).
 
 `kill` works without signals: it writes a `stop` control file the runner polls,
-waits for the run's own finalizer, and only then escalates to a process-group
-TERM/KILL (POSIX) or `taskkill /T /F` (Windows). A run stopped this way ends as
+waits for the run's own finalizer, and only then escalates to a process-instance
+TERM/KILL. The request names the run generation it was issued for, and the runner
+acts only on its own generation's request. A run stopped this way ends as
 `killed` with exit 143. Every stop path ends in exactly one of three outcomes and
 never confuses them: *stopped* (proven gone), *not stopped, survivors known*, or
 *not stopped, survivors could not be enumerated* (Windows has no group table, and
@@ -107,13 +108,29 @@ recorded in `state.json` and `lock` (`survivors_complete: false` when the
 enumeration itself failed) — so the run is still alive to `run_alive`, still
 occupies its slug (a new `start` refuses it, `status`/`list` report it as
 stopping, not finished), and a later `kill` can finish the job through the
-survivors' recorded identities or its own new enumeration. A run that died
-without finalizing is finalized as `failed` with exit -1 by the next
+survivors' recorded identities or its own new enumeration; when the stop still
+cannot be confirmed, `kill` exits 1 and says so rather than guessing. A run that
+died without finalizing is finalized as `failed` with exit -1 by the next
 `status`/`result`/`list`/`answer`, which sets `stale_recovered: true` — and only
-while no `finalized` marker exists, so recovery stays idempotent. A run whose stop
-was requested is never recovered that way: if every enumerated process is gone it
-settles as `killed` with exit 143, and while the enumeration is incomplete it
-stays non-terminal.
+while no terminal record is committed, so recovery stays idempotent. A run whose
+stop was requested is never recovered that way: once every recorded process is
+conclusively gone it settles as `killed` with exit 143, and while anything is
+unproven it stays non-terminal.
+
+Forced stopping is a capability, not an assumption. On Linux the adapter signals
+only through a `pidfd` process handle — open the handle, re-read the process's
+identity, verify it against the record, confirm the handle has not reported exit,
+signal through that same handle — never through a bare pid and never through
+`killpg`. Group breadth comes from enumerating the group under a continuously
+verified anchor member and signalling each member through its own handle; the
+group id itself is never signalled (a negative group-existence probe may say a
+formerly tracked group is gone, but it never attributes members). Where that
+capability does not exist — Linux without `pidfd_open`/`pidfd_send_signal`,
+macOS (`ps` gives a display timestamp, not a reuse-proof identity), Windows (no
+reuse-proof tree-termination primitive) — no destructive call is made at all: the
+stop stays a request, the run stays `running`/`stopping`, `kill` exits 1 with an
+explicit "cannot confirm", and the operator ends the tree and settles the run
+afterwards. This is a documented limit, not a fallback to hope.
 
 A run root can be shared — `GDD_RUN_ROOT` is one tree for every route — so
 discovery and recovery are route-scoped: a run is this route's only when the
@@ -127,20 +144,21 @@ A recorded pid is not a process: the OS reuses pids, so `kill` (or `start
 --replace`) long after a run died could otherwise signal whatever now owns that
 pid — on the reference adapter's `os.getpgid` fallback, an entire unrelated
 process group. This adapter therefore records `pid_identity`/`agent_pid_identity`
-next to the runner and agent pids (the POSIX `/proc/<pid>/stat` start-time field,
-`ps -o lstart=` where there is no procfs, `GetProcessTimes` on Windows) and
-verifies a live process against that token before signalling it. An unverifiable
-identity — missing token, or a token that changed — fails closed: the signal is
-not sent, the refusal is reported, and a run whose tree cannot be proven is left
-to the recovery path rather than killed by guesswork. The `os.getpgid(pid)`
-fallback is gone for the same reason; a leader is signalled only as `killpg(pid)`
-while it is alive and carries its recorded identity, and a group whose leader is
-gone is signalled only through a *verified surviving member* (a pid recorded when
-the failed stop observed it, re-checked against the identity read then) — never
-through the bare group id, which after pid reuse may name a stranger's group.
-`ps -o lstart=` renders a localized, timezone-shaped string, so that one probe
-runs with its own fixed view (`TZ=UTC`, `LC_ALL=C` for that call only); the
-worker's environment is never changed by the probe.
+next to the runner and agent pids. On Linux the token is
+`linux:v2:<boot-id>:<pid-namespace>:<pid>:<start-ticks>`: the pid alone is not
+enough across a reboot (the tick counter restarts with the boot) and not enough
+across a shared run root (the same pid number names different processes in
+different pid namespaces). Boot id and pid-namespace identity are read and
+validated, and if any component cannot be read the adapter has **no** strong
+identity — it does not fall back to the display-timestamp probe. On Windows the
+token is `win:v1:<creation FILETIME>:<pid>`; on macOS `ps -o lstart=` is kept
+only as diagnostic evidence and never authorizes a signal. An unverifiable
+identity — missing token, a token that changed, a legacy `proc:<ticks>` token —
+fails closed: no signal is sent, the refusal is reported. The `os.getpgid(pid)`
+fallback is gone for the same reason. Liveness itself is three-valued: `LIVE`,
+`GONE` and `UNKNOWN` (access denial or a failed inspection is never conclusive
+death), so recovery requires a conclusive `GONE` and an enumeration that cannot
+be read returns "unknown", never "nobody".
 
 Configuration (nothing about one install is baked in)
 ----------------------------------------------------
@@ -214,39 +232,67 @@ invocation, replayable by hand. `lock` holds {"pid","agent_pid","backend",
 identity and group of each process a failed stop left alive) when a stop did not
 complete: `pid` is the detached runner, `agent_pid` the dsh process it started,
 and the two identity tokens are what makes a pid still this run's process (see
-"Process identity" above). `start` writes the
-lock before spawning and the runner only ever adds `pid`, `agent_pid` and their
-identities, so a read-modify-write cannot drop a field.
-`start.lock` guards the pidless window of one run directory and is released by the
-runner once it owns the run. Starting a slug is serialized *across date buckets*
-by `<run_root>/<SLUG>.start.lock`, a stable OS lock: a run started before midnight
-still occupies its slug after the date rolls over, and `start` treats a live run
-of that slug in any date directory as occupying it. That same stable lock is taken
-by every entry point that can start an agent — `start`, and the `_run` a generated
-`run.sh`/`run.cmd` replays — so two concurrent starts, or a start concurrent with a
-replay, produce exactly one agent; the loser writes nothing and says why. A
-directory replacement cannot move the lock (`<root>/<slug>.start.lock` is a
-sibling of every date bucket), and the runner `start` spawned proves it owns its
-directory with the single-use `spawn.token`/`DSH_RUN_SPAWN_TOKEN` pair instead of
-taking the claim its parent already holds. `finalize.lock` is held under
-a stable OS lock for the duration of finalization — a competitor cannot unlink it
-out from under its holder — so two readers seeing the same dead run write one
-final state, and a reader that cannot take the lock never finalizes.
-Every run this adapter starts records a `generation` token. A terminal write is
-bound to it: the reader takes the token of the run it decided about, and re-reads
-it inside the finalize claim before writing anything. A path rebuilt into a new,
-live run is a different generation, so a stale reader writes nothing there and
-says so.
+"Process identity" above). `start` writes the lock and the identity tokens of a
+spawned process are recorded by the runner as it spawns it.
+
+`start.lock` files and the `lock` record are process metadata, not mutexes: a
+pidless window and a recorded generation are not ownership. Ownership is two
+stable OS locks, both keyed by the sanitized slug and both outside every
+replaceable run directory, so moving a run aside cannot move a lock:
+`<run root>/<slug>.start.lock` (S) serializes every entry point that can start an
+agent across every date bucket, and `<run root>/.dsh-locks/<slug>.lifecycle.lock`
+(M) is the one authority for mutation: a terminal write, a stop request, an
+escalation step, a recovery, a publication and the spawn handshake all revalidate
+ownership under M and hold it through the action. Kernel ownership is
+authoritative — a remaining lock file is not a stale lock, and neither mtime nor
+a recorded pid transfers it; contention and I/O failure both deny the mutation.
+The nesting order is fixed (S local → S OS → M local → M OS → EventLog.lock →
+TEMP_LOCK); M is released before any wait (a runner, a child, a marker, a reader
+thread), and finalization never acquires S. The files are never unlinked and
+their inodes are never replaced.
+
+Every mutation is bound to an immutable operation context — canonical root, slug,
+logical run path, expected generation. Under M the guard re-reads `state.json`,
+checks the route, checks the generation against that context (and against the
+process metadata the operation relies on), checks whether a terminal record is
+already committed, and only then authorizes the action; a changed generation
+means no run-directory write, no further signal and no enumeration against
+whoever occupies the path now. A record with no generation — a legacy run — stays
+readable but authorizes no mutation: the adapter says it cannot confirm the run
+generation instead of manufacturing one.
+
+Terminal publication is one atomic file replacement. The authoritative terminal
+record lives in `state.json` as `terminal_record{version, generation, commit_id,
+answer, session_id, exit}`, written by an atomic `os.replace` **last**, after the
+compatibility artifacts (`answer.md`, `exit.code`, `session.id`) are materialized;
+the `finalized` marker keeps its historical exit-code-text form and is written
+**after** the commit, for the observer plugin and for older readers only. Every
+terminal decision in the adapter goes through the validator that reads that
+record, never through the marker's existence or content: a crash before the
+commit publishes nothing, a crash after it leaves the whole verdict in one file,
+and a state that looks terminal without a valid commit is uncommitted data that
+no reader trusts or rewrites. Readers take the answer from the record — before
+the commit, a prepared `answer.md` is not a result, and `answer` still says "not
+finished".
 
 Replaying a finished invocation goes through the same fresh-start path: the old
 directory is preserved as `<SLUG>.prev-<time>`, then the recorded runner command
 starts in a new directory at the original path, with the same prompt, cwd, agent,
 profile, mode, policy and flags. The old finalized artifacts are never
 overwritten by the replay. A replay of a run that is *still live* is refused
-before anything is written: the ownership a fresh start recorded (the run's
-pids and identity tokens, and the absence of a `finalized` marker) is checked by
-`_run` too, so replaying a running run cannot overwrite its runner pid or start a
+before anything is written: the ownership a fresh start recorded (the run's pids
+and identity tokens, and the absence of a terminal commit) is checked by `_run`
+too, so replaying a running run cannot overwrite its runner pid or start a
 second agent on the same cwd.
+
+Residual limits, stated as limits and never as guarantees: the macOS and Windows
+strong-identity and tree-termination capability is **UNCONFIRMED**, so those
+platforms refuse destructive escalation; Linux without `pidfd` refuses it too;
+power-loss durability across platforms and filesystems is **UNCONFIRMED**
+(`os.replace` is atomic, not durable); "every possible escaped descendant is
+gone" is not guaranteed for descendants that deliberately leave the recorded
+groups; and no atomic arbitration is promised against a foreign starter that does
+not follow this protocol.
 
 Exit codes: 0 success, 1 refusal or error — the reference adapter's convention.
 """
@@ -254,11 +300,15 @@ Exit codes: 0 success, 1 refusal or error — the reference adapter's convention
 from __future__ import annotations
 
 import argparse
+import atexit
+import errno
 import glob
 import itertools
 import json
+import math
 import os
 import re
+import select
 import shlex
 import shutil
 import signal
@@ -266,6 +316,7 @@ import subprocess
 import sys
 import threading
 import time
+from collections import namedtuple
 from contextlib import ExitStack, contextmanager
 from datetime import datetime, timezone
 
@@ -303,6 +354,39 @@ LIFECYCLE_FOREIGN = "read-only"
 # the slug claim like any other starter (see `runner_main`).
 RUNNER_TOKEN_ENV = "DSH_RUN_SPAWN_TOKEN"
 SPAWN_TOKEN_FILE = "spawn.token"
+LIFECYCLE_LOCK_DIR = ".dsh-locks"
+# The operation-context guard's verdicts. Only GUARD_OK authorizes the action the
+# caller holds the lifecycle mutex for; every other verdict must produce no
+# run-directory write and no signal.
+GUARD_OK = "OK"
+GUARD_GENERATION_CHANGED = "GENERATION_CHANGED"
+GUARD_UNCONFIRMED = "UNCONFIRMED"
+GUARD_FOREIGN = "FOREIGN"
+GUARD_TERMINAL = "TERMINAL"
+GUARD_BUSY = "BUSY"
+# The authoritative terminal record's own schema version, beside the state.json it
+# is embedded in (see `terminal_snapshot_locked`).
+TERMINAL_RECORD_VERSION = 1
+# Distinct return values of a generation-bound wait. `wait_for_terminal` never
+# returns marker text, and a generation change is not a timeout.
+WAIT_TERMINAL = "terminal"
+WAIT_GENERATION_CHANGED = "generation-changed"
+WAIT_TIMEOUT = "timeout"
+# Liveness is three-valued: an inspection that failed is not a death.
+LIVE = "live"
+GONE = "gone"
+UNKNOWN = "unknown"
+# Process-identity token versions. Linux needs the boot cycle (the tick counter
+# restarts with it) and the pid namespace (the same pid number is a different
+# process in another namespace); Windows pairs the creation FILETIME with the pid.
+LINUX_IDENTITY_VERSION = "linux:v2:"
+WINDOWS_IDENTITY_VERSION = "win:v1:"
+PS_IDENTITY_PREFIX = "ps:"
+BOOT_ID_PATH = "/proc/sys/kernel/random/boot_id"
+SELF_PIDNS_PATH = "/proc/self/ns/pid"
+# Startup grace remains a conservative liveness rule (a young run that has
+# recorded no pid is *starting*, not dead). It is not a lock: no ownership is
+# ever taken over by age.
 # Creation-flag values as documented by Microsoft, repeated here because
 # subprocess only exposes them on Windows.
 NO_WINDOW_MASK = 0x08000000
@@ -329,8 +413,27 @@ TEMP_LOCK = threading.Lock()
 POLL_SECONDS = 0.25
 START_WAIT_SECONDS = 20.0
 STOP_WAIT_SECONDS = 20.0
+# Committing a terminal verdict and the stopped tree being *gone* are two events:
+# the runner that wrote the verdict is still one of the run's recorded processes
+# until it returns and is reaped, and an enumeration that anchors on it answers
+# "unknown" (never "nobody") while it leaves. `start --replace` therefore asks the
+# settle question again until the evidence is conclusive, bounded by this — see
+# `await_settled_stop`. A stop that is genuinely unresolved (a live survivor, or a
+# table that cannot be read at all) still ends in the existing refusal; the bound
+# only keeps a momentary one from being read as the operator's problem.
+SETTLE_WAIT_SECONDS = 10.0
 GRACE_SECONDS = 60.0
 DRAIN_TIMEOUT_SECONDS = 30.0
+# How long a mutation that must land (a start, a stop request, a publisher, a
+# spawn registration, an escalation step, a survivor report) waits for the
+# lifecycle mutex. M is only ever held for a short critical section, so a bound of
+# a few seconds converts a momentary hold — another process publishing a tracker
+# update while `start --replace` is entering — into waiting instead of a spurious
+# refusal, while a mutex that is genuinely held still ends in a refusal quickly
+# enough for the operator to be told about it. The bound is deliberately small: a
+# *contended* acquisition is not a *broken* one, and only contention waits (see
+# `_lock_contention`).
+MUTEX_WAIT_SECONDS = 5.0
 # How often the runner republishes counters while the agent works. state.json is
 # polled by gdd.py and by operators, so it must stay current without turning a
 # long run into a write storm.
@@ -451,12 +554,18 @@ def run_root() -> str:
 
 
 def env_seconds(name, default) -> float:
-    """A positive number of seconds from the environment, else the default."""
+    """A finite, positive number of seconds from the environment, else the default.
+
+    `float()` accepts `inf`, `-inf` and `nan`, and a non-finite deadline is not a
+    deadline: a stop wait of `inf` would never escalate and a drain timeout of
+    `nan` compares false against every elapsed time. Anything that is not finite
+    and positive falls back to the finite default.
+    """
     try:
         value = float((os.environ.get(name) or "").strip())
     except ValueError:
         return default
-    return value if value > 0 else default
+    return value if math.isfinite(value) and value > 0 else default
 
 
 def start_grace_seconds() -> float:
@@ -465,6 +574,10 @@ def start_grace_seconds() -> float:
 
 def stop_wait_seconds() -> float:
     return env_seconds("DSH_RUN_STOP_WAIT_SECONDS", STOP_WAIT_SECONDS)
+
+
+def settle_wait_seconds() -> float:
+    return env_seconds("DSH_RUN_SETTLE_WAIT_SECONDS", SETTLE_WAIT_SECONDS)
 
 
 def drain_timeout_seconds() -> float:
@@ -537,7 +650,7 @@ def approval_policy() -> str:
 
 
 def parse_max_time(value):
-    """Positive seconds, or None. Raises ValueError for anything else."""
+    """A finite, positive number of seconds, or None. Raises ValueError otherwise."""
     if value is None or str(value).strip() == "":
         return None
     text = str(value).strip()
@@ -548,9 +661,376 @@ def parse_max_time(value):
             f"--max-time must be a positive number of seconds (got {text!r}); DSH has no "
             "task-deadline flag, so this adapter enforces its own"
         ) from None
-    if not seconds > 0 or seconds == float("inf"):
+    if not math.isfinite(seconds) or seconds <= 0:
         raise ValueError(f"--max-time must be a positive number of seconds (got {text!r})")
     return seconds
+
+
+# -- stable locks and the operation context ----------------------------------
+#
+# Two lock objects carry ownership, and both live outside every replaceable run
+# directory (a run directory is moved aside by `start --replace`, so a lock
+# inside it would move with the generation it protects):
+#
+#   S  <run root>/<slug>.start.lock                  the right to start a slug
+#   M  <run root>/.dsh-locks/<slug>.lifecycle.lock   the right to mutate a slug
+#
+# Both are keyed by the sanitized slug, across every date bucket, and both are
+# held as `fcntl.flock` (POSIX) or `msvcrt.locking` (Windows) on a file that is
+# never unlinked and whose inode is never replaced. Kernel ownership is
+# authoritative: a file that exists is not a held lock, and neither its mtime nor
+# a pid it records transfers ownership. The complete nesting order is
+# S local → S OS → M local → M OS → EventLog.lock → TEMP_LOCK; a caller may take
+# a suffix of that order, never a reversed pair. M is released across every wait,
+# and a mutation that must land (a start, a stop request, a spawn registration, a
+# publisher, an escalation step, a survivor report) waits a bounded time for M
+# (`MUTEX_WAIT_SECONDS`) instead of reading a momentary hold as a refusal.
+
+
+def canonical_root(root) -> str:
+    """The one canonical key of a run root: realpath, plus normcase on Windows.
+
+    Two spellings of the same directory must name the same lock object, or two
+    starters could hold "the" slug claim at once through different paths.
+    """
+    text = os.path.realpath(os.path.abspath(os.path.expanduser(str(root))))
+    return os.path.normcase(text) if IS_WINDOWS else text
+
+
+def start_lock_path(root, slug) -> str:
+    """S: the slug claim, a stable sibling of every date bucket."""
+    return os.path.join(canonical_root(root), f"{slug}.start.lock")
+
+
+def lifecycle_lock_path(root, slug) -> str:
+    """M: the lifecycle mutex, in this route's own namespace under the run root."""
+    return os.path.join(canonical_root(root), LIFECYCLE_LOCK_DIR, f"{slug}.lifecycle.lock")
+
+
+LOCAL_LOCKS = {}
+LOCAL_LOCKS_GUARD = threading.Lock()
+LOCK_HANDLES = {}
+
+
+def local_lock_for(key) -> threading.Lock:
+    """The in-process mutex for one lock object.
+
+    Platforms differ in how re-locking one file from the same process behaves, so
+    threads of one interpreter are serialized by this mutex *before* the OS lock;
+    it is held only around the acquisition and the critical section. The registry
+    guard is held just long enough to fetch the reference, never across a
+    lifecycle resource.
+    """
+    with LOCAL_LOCKS_GUARD:
+        lock = LOCAL_LOCKS.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            LOCAL_LOCKS[key] = lock
+        return lock
+
+
+def close_lock_handles() -> None:
+    """Close every cached lock descriptor at interpreter exit.
+
+    The handles are cached for the process's lifetime on purpose (one descriptor
+    per lock object, so a lock can never be re-created on a different inode), and
+    the kernel releases the locks when they close. Closing them explicitly at exit
+    keeps the process's own bookkeeping honest — an unclosed descriptor is not
+    ownership, it is just a leak a reader has to reason about.
+    """
+    for handle in list(LOCK_HANDLES.values()):
+        close_quietly(handle)
+    LOCK_HANDLES.clear()
+
+
+atexit.register(close_lock_handles)
+
+
+def lock_handle_for(path):
+    """One cached descriptor per lock object, opened once and never unlinked.
+
+    Re-opening the lock file per acquisition is not needed — and caching it keeps
+    the inode the lock lives on alive for this process's lifetime, so a lock can
+    never be "replaced" by a concurrent creator.
+    """
+    handle = LOCK_HANDLES.get(path)
+    if handle is None:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        handle = open(path, "a+b")
+        LOCK_HANDLES[path] = handle
+    return handle
+
+
+def _lock_handle(handle) -> None:
+    # Dispatched on the *real* platform, not on the module's test-patchable
+    # `IS_WINDOWS`: the lock primitive is a property of the running interpreter,
+    # so a test that pretends to be Windows elsewhere does not change how this
+    # process locks.
+    if os.name == "nt":
+        import msvcrt
+
+        handle.seek(0, os.SEEK_END)
+        if handle.tell() == 0:
+            # msvcrt.locking locks a byte range; an empty file has none.
+            handle.write(b"\0")
+            handle.flush()
+        handle.seek(0)
+        msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+    else:
+        import fcntl
+
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+
+def _lock_contention(exc) -> bool:
+    """Is this acquisition failure "someone else holds it" rather than "broken"?
+
+    `fcntl.flock(LOCK_NB)` raises `BlockingIOError` for a held lock (EAGAIN), and
+    `msvcrt.locking` reports EACCES/EDEADLK for one; a read-only directory, a
+    failing filesystem and an exhausted descriptor table are different events. Only
+    contention is worth waiting for — everything else is refused immediately, and
+    `stable_lock` uses this to tell the two apart.
+    """
+    if isinstance(exc, BlockingIOError):
+        return True
+    if isinstance(exc, PermissionError) and os.name == "nt":
+        return True
+    return getattr(exc, "errno", None) in (errno.EACCES, errno.EAGAIN, errno.EWOULDBLOCK,
+                                           errno.EDEADLK)
+
+
+def _unlock_handle(handle) -> None:
+    if os.name == "nt":
+        import msvcrt
+
+        handle.seek(0)
+        msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+    else:
+        import fcntl
+
+        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+@contextmanager
+def stable_lock(path, wait=0.0):
+    """Hold one stable lock object, or report that it could not be held.
+
+    Yields True only when both the in-process mutex and the kernel lock are held.
+    Contention, an I/O failure and an unsupported lock all yield False and every
+    caller must read that as "deny the mutation" — there is no takeover path, no
+    age rule and no pid-file rule. `wait` bounds acquisition in seconds for
+    callers that can afford to wait a little (0 means "do not wait at all");
+    `wait=None` waits without bound, which is only used for the append-only event
+    stream, whose writer must never silently drop a line because a reader held M
+    for a moment.
+    """
+    local = local_lock_for(path)
+    if wait is None:
+        local_held = local.acquire()
+    else:
+        local_held = local.acquire(True, max(0.0, wait) or 0.000001) if wait > 0 else local.acquire(False)
+    if not local_held:
+        yield False
+        return
+    handle = None
+    locked = False
+    try:
+        try:
+            handle = lock_handle_for(path)
+        except OSError:
+            yield False
+            return
+        deadline = None if wait is None else time.monotonic() + max(0.0, wait)
+        while True:
+            try:
+                _lock_handle(handle)
+                locked = True
+                break
+            except OSError as exc:
+                if not _lock_contention(exc):
+                    # A broken acquisition (a read-only lock directory, a failing
+                    # filesystem, an exhausted descriptor table) is not contention:
+                    # waiting cannot turn it into a lock, so it is refused at once.
+                    break
+                if deadline is not None and time.monotonic() >= deadline:
+                    break
+                time.sleep(POLL_SECONDS)
+        yield locked
+    finally:
+        if locked:
+            try:
+                _unlock_handle(handle)
+            except OSError:
+                pass
+        local.release()
+
+
+@contextmanager
+def slug_start_claim(root, slug, wait=0.0):
+    """Hold S: the exclusive right to start one slug, across every date bucket.
+
+    A run started before midnight still occupies its slug after the date rolls
+    over, so the claim cannot live in a date directory. The kernel releases the
+    claim when this process's handles close, even if the starter dies; its file
+    is never unlinked, so a competitor can never lock a fresh inode at the same
+    path, and its age is never ownership.
+    """
+    with stable_lock(start_lock_path(root, slug), wait) as held:
+        yield held
+
+
+@contextmanager
+def lifecycle_claim(root, slug, wait=0.0):
+    """Hold M: the exclusive right to mutate one slug's run, in any date bucket."""
+    with stable_lock(lifecycle_lock_path(root, slug), wait) as held:
+        yield held
+
+
+Operation = namedtuple("Operation", "root slug run_dir generation")
+
+
+def operation_of(run_dir, state=None, generation=None) -> Operation:
+    """The immutable operation context of a run: (root, slug, run path, generation).
+
+    The generation is the strict one — a record with no generation (a legacy run)
+    yields "", and every mutation is refused for it — unless the caller passes the
+    generation it holds (a terminal write binding itself to the run it decided
+    about). The context is captured once and never refreshed: an operation may
+    only act on the generation it captured.
+    """
+    run_dir = os.path.abspath(str(run_dir))
+    if state is None:
+        state = read_state_file(run_dir)
+    slug = sanitize(state.get("name") or os.path.basename(run_dir))
+    return Operation(
+        canonical_root(bucket_root(run_dir)),
+        slug,
+        run_dir,
+        strict_generation(state) if generation is None else generation,
+    )
+
+
+def mutex_of(op: Operation, wait=0.0):
+    """M for one operation's slug."""
+    return lifecycle_claim(op.root, op.slug, wait)
+
+
+def strict_generation(state) -> str:
+    """The run's generation token, or "" when the record has none.
+
+    The `name|started` fallback `generation_of` keeps for *reading* is not an
+    authorization token: mutating a record that cannot name its own generation
+    is refused (see `guard_locked`).
+    """
+    generation = (state or {}).get("generation")
+    return generation if isinstance(generation, str) and generation else ""
+
+
+def terminal_snapshot_locked(state):
+    """The committed terminal record in one state snapshot, or None.
+
+    This is the only terminal authority in the adapter. A terminal commit exists
+    only when the snapshot identifies this route, names a nonempty generation,
+    carries a terminal `state`, and embeds a structurally valid `terminal_record`
+    that agrees with it — the same generation, the same exit code, a nonempty
+    commit id. `finalized` is deliberately not consulted: it is the compatibility
+    marker written *after* the commit, and a crash between the two leaves a valid
+    commit with no marker, never the reverse. Reading one atomically replaced file
+    needs no mutex; every decision made from the result is taken under M.
+    """
+    state = state or {}
+    if route_of(state) != BACKEND:
+        return None
+    if state.get("state") not in ("done", "killed", "failed"):
+        return None
+    if not strict_generation(state):
+        return None
+    record = state.get("terminal_record")
+    if not isinstance(record, dict):
+        return None
+    if record.get("version") != TERMINAL_RECORD_VERSION:
+        return None
+    if record.get("generation") != state.get("generation"):
+        return None
+    if record.get("exit") != state.get("exit"):
+        return None
+    commit_id = record.get("commit_id")
+    if not isinstance(commit_id, str) or not commit_id:
+        return None
+    for field in ("answer", "session_id"):
+        if not isinstance(record.get(field), str):
+            return None
+    return record
+
+
+def terminal_commit(run_dir, state=None):
+    """The committed terminal record of a run directory, or None."""
+    return terminal_snapshot_locked(read_state_file(run_dir) if state is None else state)
+
+
+def guard_locked(op: Operation, require_lock_generation=False):
+    """Revalidate everything a mutation needs, under M, immediately before it.
+
+    Returns `(verdict, state, detail)`. The steps are: re-read `state.json`; check
+    the route; check the captured generation; check the generation the process
+    metadata used by the operation carries; check whether a terminal record is
+    already committed. Only `GUARD_OK` authorizes the action the caller is holding
+    M for — every other verdict is a refusal that must write nothing, signal
+    nothing and enumerate nothing.
+    """
+    state = read_state_file(op.run_dir)
+    if not is_this_route(state):
+        return (
+            GUARD_FOREIGN,
+            state,
+            f"it records backend {route_of(state) or 'unknown'}, not this route",
+        )
+    recorded = strict_generation(state)
+    if not op.generation or not recorded:
+        return (
+            GUARD_UNCONFIRMED,
+            state,
+            "I cannot confirm the run generation (the record names none; a legacy run is "
+            "not an authorization token)",
+        )
+    if recorded != op.generation:
+        return (
+            GUARD_GENERATION_CHANGED,
+            state,
+            f"the path now holds generation {recorded}, not {op.generation}",
+        )
+    if require_lock_generation:
+        metadata = lock_of(op.run_dir)
+        metadata_generation = metadata.get("generation")
+        if metadata_generation != op.generation:
+            return (
+                GUARD_UNCONFIRMED if not metadata_generation else GUARD_GENERATION_CHANGED,
+                state,
+                "the process metadata does not carry the generation this operation holds "
+                f"(it names {metadata_generation or 'none'})",
+            )
+    if terminal_snapshot_locked(state) is not None:
+        return (GUARD_TERMINAL, state, "a terminal verdict is already committed")
+    return (GUARD_OK, state, "")
+
+
+def guard_refusal(op: Operation, verdict: str, detail: str) -> str:
+    """The one sentence a refused mutation says."""
+    if verdict == GUARD_GENERATION_CHANGED:
+        return (
+            f"not acting on {op.run_dir}: it now holds a different run ({detail}); a run "
+            "created after the decision is not the one it was made about, so nothing was "
+            "written and nothing was signalled"
+        )
+    if verdict == GUARD_UNCONFIRMED:
+        return f"not acting on {op.run_dir}: {detail}"
+    if verdict == GUARD_FOREIGN:
+        return f"not acting on {op.run_dir}: {detail}"
+    if verdict == GUARD_TERMINAL:
+        return f"not acting on {op.run_dir}: {detail}"
+    if verdict == GUARD_BUSY:
+        return f"{op.run_dir} is being mutated by another process; not proceeding"
+    return f"not acting on {op.run_dir}: {detail}"
 
 
 # -- small helpers -----------------------------------------------------------
@@ -629,31 +1109,41 @@ def json_temp_path(path) -> str:
     return f"{path}.{os.getpid()}.{threading.get_ident()}.{serial}.tmp"
 
 
-def write_json(path, payload) -> None:
-    """Replace atomically: gdd.py polls state.json and must never read half of it.
+def write_text_atomic(path, text) -> None:
+    """Materialize `text` at `path` by an atomic replacement of a temp file.
 
-    On Windows the replace needs retries: `os.replace` is MoveFileEx, which fails
-    with WinError 5 while any process holds the destination open. Retry briefly,
-    then degrade to an in-place write with a note on stderr: a torn read is bad, a
-    lost run is worse.
+    A unique temp file in the destination directory, flushed and closed, then
+    `os.replace` with bounded retries (on Windows `MoveFileEx` fails while another
+    process holds the destination open). There is deliberately no in-place
+    fallback: truncating the destination to "make progress" turns one failed write
+    into a torn artifact, and a torn `state.json` is a lost run. If the replacement
+    never succeeds the failure is raised and the previous bytes stay intact.
     """
     tmp = json_temp_path(path)
-    text = json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
     with open(tmp, "w", encoding="utf-8") as handle:
         handle.write(text)
+        handle.flush()
+    last = None
     for attempt in range(40):
         try:
             os.replace(tmp, path)
             return
-        except PermissionError:
+        except PermissionError as exc:
+            last = exc
             time.sleep(0.05 + 0.05 * (attempt % 5))
         except OSError:
             remove_quietly(tmp)
             raise
-    warn(f"{path} stayed locked; written in place")
-    with open(path, "w", encoding="utf-8") as handle:
-        handle.write(text)
     remove_quietly(tmp)
+    raise OSError(
+        f"could not atomically replace {path} after 40 attempts ({last}); the previous "
+        "bytes are intact and no partial file was published"
+    )
+
+
+def write_json(path, payload) -> None:
+    """Replace atomically: gdd.py polls state.json and must never read half of it."""
+    write_text_atomic(path, json.dumps(payload, indent=2, ensure_ascii=False) + "\n")
 
 
 def remove_quietly(path) -> None:
@@ -763,46 +1253,131 @@ def hidden_flags() -> int:
     return NO_WINDOW_MASK if IS_WINDOWS else 0
 
 
-def pid_alive(pid) -> bool:
-    """Is this pid a live process?
+def _proc_stat_state(pid) -> str:
+    """The Linux process state letter from `/proc/<pid>/stat`, or "".
 
-    os.kill(pid, 0) is not a liveness check on Windows for a process in another
-    session: it raises AccessDenied. OpenProcess + GetExitCodeProcess answers the
-    same question for a process this user cannot fully open.
+    `os.kill(pid, 0)` succeeds for a zombie, but a zombie has exited: it runs no
+    code, holds no pipe and can write nothing, so every liveness question this
+    adapter asks must read it as gone. A process the adapter itself spawned is
+    reaped with `poll()`; one it did not cannot be reaped at all, which is
+    exactly the case this probe exists for.
+    """
+    try:
+        with open(f"/proc/{pid}/stat", "rb") as handle:
+            raw = handle.read()
+    except OSError:
+        return ""
+    closing = raw.rfind(b")")
+    if closing < 0:
+        return ""
+    fields = raw[closing + 1 :].split()
+    if len(fields) < 1:
+        return ""
+    try:
+        return fields[0].decode("ascii", "replace")
+    except AttributeError:  # pragma: no cover - bytes always decode here
+        return ""
+
+
+def liveness_of(pid) -> str:
+    """LIVE / GONE / UNKNOWN for one pid. A failed inspection is never GONE.
+
+    `os.kill(pid, 0)` is not a liveness check on Windows for a process in another
+    session: it raises AccessDenied for a process that exists. OpenProcess +
+    GetExitCodeProcess answers the same question there, and its two failure modes
+    are distinguished: an invalid parameter means there is no such process, while
+    access denial, a failed query or any other error leaves the question open.
+    Recovery requires a conclusive GONE; an UNKNOWN keeps the run conservative.
+    On Linux a zombie is GONE: it has exited.
     """
     if isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0:
-        return False
+        return GONE
     if IS_WINDOWS:
+        ERROR_INVALID_PARAMETER = 87
         SYNCHRONIZE = 0x00100000
         QUERY_LIMITED = 0x1000
         STILL_ACTIVE = 259
         kernel32 = ctypes.windll.kernel32
+        kernel32.SetLastError(0)
         handle = kernel32.OpenProcess(SYNCHRONIZE | QUERY_LIMITED, False, int(pid))
         if not handle:
-            return False
+            error = kernel32.GetLastError()
+            return GONE if error == ERROR_INVALID_PARAMETER else UNKNOWN
         try:
             code = ctypes.c_ulong()
             if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
-                return False
-            return code.value == STILL_ACTIVE
+                return UNKNOWN
+            return LIVE if code.value == STILL_ACTIVE else GONE
         finally:
             kernel32.CloseHandle(handle)
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
-        return False
+        return GONE
     except PermissionError:
-        return True
+        return UNKNOWN
     except OSError:
-        return False
-    return True
+        return UNKNOWN
+    if _proc_stat_state(pid) in ("Z", "X", "x"):
+        # An exited process that has not been reaped: dead for every purpose this
+        # adapter has, including "can this still be signalled about a group".
+        return GONE
+    return LIVE
+
+
+def pid_alive(pid) -> bool:
+    """Is this pid a live process? UNKNOWN answers False here, and never `GONE`.
+
+    Used where "is it really alive right now" decides an assertion or a report;
+    code whose correctness depends on a *conclusive* disappearance reads
+    `liveness_of` directly, because UNKNOWN must not be read as either.
+    """
+    return liveness_of(pid) == LIVE
+
+
+def _boot_id() -> str:
+    """The kernel's boot id, validated as a nonempty UUID, or "".
+
+    The Linux start-tick counter restarts with every boot, so a persisted token
+    without the boot cycle cannot tell one boot's pid instance from another's.
+    """
+    try:
+        with open(BOOT_ID_PATH, encoding="utf-8") as handle:
+            text = handle.read().strip().lower()
+    except OSError:
+        return ""
+    parts = text.split("-")
+    if len(parts) != 5 or [len(part) for part in parts] != [8, 4, 4, 4, 12]:
+        return ""
+    if any(ch not in "0123456789abcdef" for part in parts for ch in part):
+        return ""
+    return text
+
+
+def _pid_namespace_identity() -> str:
+    """This observer's pid-namespace identity (`pid:[…]`), or "".
+
+    The same pid number names different processes in different pid namespaces, so
+    a shared run root could otherwise treat a stranger's process as the recorded
+    one. The observer's own namespace is the domain a `/proc` reading is valid in.
+    """
+    try:
+        link = os.readlink(SELF_PIDNS_PATH)
+    except OSError:
+        return ""
+    link = str(link).strip()
+    return link if link.startswith("pid:[") and link.endswith("]") and len(link) > 6 else ""
 
 
 def _proc_stat_identity(pid) -> str:
-    """The Linux `/proc/<pid>/stat` start-time stamp (field 22), or "".
+    """`linux:v2:<boot-id>:<pid-namespace>:<pid>:<start-ticks>`, or "".
 
-    Field 22 is the process's start time in clock ticks since boot; it is stable
-    for the process's lifetime and different for a recycled pid.
+    Field 22 of `/proc/<pid>/stat` is the process's start time in clock ticks
+    since boot: stable for the process's lifetime, and — paired with the boot id
+    and the pid namespace — a token that a recycled pid, a later boot or another
+    namespace cannot reproduce. If any component cannot be read or validated the
+    answer is "" (no strong identity), never a weaker token: a persisted
+    `proc:<ticks>` token from an older revision does not authorize a signal.
     """
     try:
         with open(f"/proc/{pid}/stat", "rb") as handle:
@@ -818,20 +1393,26 @@ def _proc_stat_identity(pid) -> str:
     if len(fields) < 20:
         return ""
     try:
-        return f"proc:{int(fields[19])}"
+        ticks = int(fields[19])
     except ValueError:
         return ""
+    boot = _boot_id()
+    namespace = _pid_namespace_identity()
+    if not boot or not namespace:
+        return ""
+    return f"{LINUX_IDENTITY_VERSION}{boot}:{namespace}:{int(pid)}:{ticks}"
 
 
 def _ps_identity(pid) -> str:
-    """`ps` start time, for POSIX systems without procfs (macOS, BSD).
+    """`ps` start time: diagnostic evidence on POSIX systems without procfs.
 
-    `ps -o lstart=` renders a localized, timezone-shaped string, so the caller's
-    `TZ` and locale would otherwise be part of the token: the same live process
-    would read as a different one from a different shell, and `status` would call
-    a running run failed. The probe therefore gets its own fixed view (`TZ=UTC`,
-    `LC_ALL=C`, for this call only) instead of inheriting the display
-    environment; the worker's environment is untouched.
+    `ps -o lstart=` renders a localized, timezone-shaped *display* timestamp, so
+    the probe fixes its own view (`TZ=UTC`, `LC_ALL=C`, for this call only) — the
+    worker's environment is untouched. Two processes can nevertheless share a
+    timestamp, and a timestamp is not a process-instance handle, so this token is
+    **never** allowed to authorize a destructive signal (`identity_is_strong`
+    rejects it); it is recorded as evidence an operator can read and used for
+    conservative liveness only.
     """
     env = dict(os.environ)
     env["TZ"] = "UTC"
@@ -848,13 +1429,23 @@ def _ps_identity(pid) -> str:
     except OSError:
         return ""
     text = (proc.stdout or "").strip()
-    return f"ps:{text}" if proc.returncode == 0 and text else ""
+    return f"{PS_IDENTITY_PREFIX}{text}" if proc.returncode == 0 and text else ""
 
 
 def _windows_identity(pid) -> str:
-    """The Windows process creation time (FILETIME), or ""."""
+    """`win:v1:<creation FILETIME>:<pid>` — creation time paired with the pid.
+
+    The handle and query calls are typed explicitly (`c_void_p` for the handle,
+    `c_ulonglong` for the FILETIMEs): a native handle must not be truncated to a
+    default C `int`. The token is identity *evidence*; the destructive operation
+    is still refused on Windows, because nothing here binds the eventual
+    termination of a whole tree to that process object.
+    """
     QUERY_LIMITED = 0x1000
     kernel32 = ctypes.windll.kernel32
+    kernel32.OpenProcess.restype = ctypes.c_void_p
+    kernel32.OpenProcess.argtypes = [ctypes.c_ulong, ctypes.c_int, ctypes.c_ulong]
+    kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
     handle = kernel32.OpenProcess(QUERY_LIMITED, False, int(pid))
     if not handle:
         return ""
@@ -871,7 +1462,7 @@ def _windows_identity(pid) -> str:
             ctypes.byref(user),
         ):
             return ""
-        return f"win:{created.value}"
+        return f"{WINDOWS_IDENTITY_VERSION}{created.value}:{int(pid)}"
     finally:
         kernel32.CloseHandle(handle)
 
@@ -881,22 +1472,35 @@ def process_identity(pid) -> str:
 
     Recorded next to every pid this adapter spawns and re-read before any signal
     is sent: a pid whose identity changed was reused, and belongs to someone else.
-    The platform order — procfs, `ps`, Windows creation time — is what makes the
-    token available on every route; where none of them answers, "" is returned and
-    signalling fails closed rather than guessing.
+    Linux answers with the versioned boot/namespace/tick token or nothing at all —
+    there is deliberately no fallback to a weaker probe there, because the weak
+    token would authorize exactly the signal the strong one exists to gate.
     """
     if isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0:
         return ""
     if IS_WINDOWS:
         return _windows_identity(pid)
-    return _proc_stat_identity(pid) or _ps_identity(pid)
+    if os.path.exists("/proc"):
+        return _proc_stat_identity(pid)
+    return _ps_identity(pid)
+
+
+def identity_is_strong(identity) -> bool:
+    """Is this token an admissible authorization for a destructive signal?
+
+    Only the versioned platform tokens are: Linux's boot/namespace/tick token and
+    Windows' creation time paired with the pid. A legacy `proc:<ticks>` token, a
+    `ps:` display timestamp and an empty value are evidence at most.
+    """
+    text = str(identity or "")
+    return text.startswith(LINUX_IDENTITY_VERSION) or text.startswith(WINDOWS_IDENTITY_VERSION)
 
 
 def identity_ok(pid, identity) -> bool:
     """Is the live process behind `pid` still the one `identity` names?
 
-    Used before any signal: a missing recorded token, or an unreadable current
-    one, is *not* proof and fails closed.
+    Used before any signal: a missing recorded token, an unreadable current one,
+    or one that does not match, is *not* proof and fails closed.
     """
     if not identity:
         return False
@@ -918,11 +1522,13 @@ def identity_changed(pid, identity) -> bool:
 
 
 def process_group(pid) -> int:
-    """The process group `pid` currently belongs to, or 0 (POSIX only).
+    """The process group `pid` currently belongs to, or 0 when it cannot be read.
 
-    Used only on a process whose identity has already been proven to be this
-    run's, so the group it names is this run's group too — the opposite of the
-    removed `os.getpgid` fallback, which named a group from a bare pid.
+    `0` is "unknown", never "no group" and never permission to use a historical
+    group id: every caller must treat a non-positive answer as a refusal. Read
+    only on a process whose identity has already been proven to be this run's, so
+    the group it names is this run's group too — the opposite of the removed
+    `os.getpgid` fallback, which named a group from a bare pid.
     """
     if IS_WINDOWS or isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0:
         return 0
@@ -967,28 +1573,154 @@ def group_member_pids(pgid):
     return pids
 
 
-def surviving_members(pgid):
-    """[(pid, identity, group)] for this group's live members, or None.
+def pidfd_available() -> bool:
+    """Can this interpreter/kernel signal through a pidfd process handle?"""
+    if IS_WINDOWS or not sys.platform.startswith("linux"):
+        return False
+    return hasattr(os, "pidfd_open") and hasattr(signal, "pidfd_send_signal")
 
-    Read while the run is still inside the stop it attempted, so the group is
-    provably this run's and each identity is the evidence a later attempt verifies
-    that member against. `None` — not `[]` — when the enumeration itself failed:
-    Windows has no group table, `ps` can fail, and a live member whose identity
-    cannot be read cannot be recorded for a verified signal, so the set would be
-    incomplete. An empty list means the group was read and holds nobody alive.
+
+def platform_can_force_stop() -> bool:
+    """Is there a verified way to force this platform's processes to stop?
+
+    Only the pidfd path is accepted: it binds the signal to the process instance
+    that was validated. macOS (`ps` is a display timestamp), Windows (no
+    reuse-proof tree-termination primitive) and Linux without pidfds answer False,
+    and every caller must then refuse destructive escalation rather than fall back
+    to a bare pid, a group id or `taskkill`.
     """
-    members = group_member_pids(pgid)
-    if members is None:
+    return pidfd_available()
+
+
+class ProcessHandle:
+    """A pidfd for one process instance: the only thing this adapter signals.
+
+    `open()` acquires the handle; `exited()` asks the kernel whether the process
+    behind it has already reported exit; `signal()` delivers through that same
+    handle, so nothing an OS-level reuse could do between validation and delivery
+    can retarget it. `close()` is safe on every path.
+    """
+
+    def __init__(self, pid, identity=""):
+        self.pid = pid
+        self.identity = identity
+        self.fd = None
+
+    def open(self) -> bool:
+        try:
+            self.fd = os.pidfd_open(self.pid, 0)
+        except OSError:
+            self.fd = None
+        return self.fd is not None
+
+    def exited(self) -> bool:
+        """Has the process behind this handle exited (or is the handle unusable)?"""
+        if self.fd is None:
+            return True
+        try:
+            readable, _, _ = select.select([self.fd], [], [], 0)
+        except (OSError, ValueError):
+            return True
+        return bool(readable)
+
+    def signal(self, signum) -> bool:
+        if self.fd is None:
+            return False
+        try:
+            signal.pidfd_send_signal(self.fd, signum, None, 0)
+            return True
+        except (OSError, AttributeError, ValueError):
+            return False
+
+    def close(self) -> None:
+        fd, self.fd = self.fd, None
+        if fd is not None:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+
+
+def signal_instance(pid, identity, signum) -> bool:
+    """Signal one verified process instance through its own pidfd handle.
+
+    The order is the contract: open the handle, re-read the identity and require
+    it to match the recorded one, confirm the handle has not reported exit, then
+    signal through that same handle and close it on every path. A missing or weak
+    identity, a mismatch, an unreadable process or an unavailable handle all
+    return False without a signal — a bare pid is never signalled.
+    """
+    if not identity_is_strong(identity):
+        return False
+    handle = ProcessHandle(pid, identity)
+    try:
+        if not handle.open():
+            return False
+        if not identity_ok(pid, identity):
+            return False
+        if handle.exited():
+            return False
+        return handle.signal(signum)
+    finally:
+        handle.close()
+
+
+def anchored_members(anchor_pid, anchor_identity, group):
+    """[(pid, identity, group)] of a group's verified live members, or None.
+
+    The group is enumerated only while a member whose identity this run recorded
+    is *continuously* verified as the live anchor: the anchor is checked before
+    the enumeration and again after it (through its own pidfd handle, which also
+    tells us whether it exited mid-way), and if it did not stay the same live
+    process the whole enumeration is discarded. Every member discovered in the
+    table is revalidated — its identity read now, its current group required to
+    equal the group — before it is recorded, so a reused group id cannot mint new
+    ownership out of a stale `ps` row. `None` means ownership or enumeration could
+    not be established (including "the table was read but nothing in it proved
+    live"): it is never `[]`, which would read as "nobody is alive".
+    """
+    if not identity_is_strong(anchor_identity):
         return None
-    found = []
-    for pid in sorted(members):
-        if not pid_alive(pid):
-            continue
-        identity = process_identity(pid)
-        if not identity:
+    if process_group(anchor_pid) != group:
+        return None
+    handle = ProcessHandle(anchor_pid, anchor_identity)
+    try:
+        if not handle.open():
             return None
-        found.append((pid, identity, pgid))
-    return found
+        if not identity_ok(anchor_pid, anchor_identity):
+            return None
+        if handle.exited():
+            return None
+        table = group_member_pids(group)
+        if table is None:
+            return None
+        found = []
+        for pid in sorted(table):
+            state = liveness_of(pid)
+            if state == GONE:
+                continue
+            if state == UNKNOWN:
+                return None
+            identity = anchor_identity if pid == anchor_pid else process_identity(pid)
+            if not identity:
+                return None
+            if not identity_is_strong(identity):
+                return None
+            if pid != anchor_pid and not identity_ok(pid, identity):
+                return None
+            if process_group(pid) != group:
+                return None
+            found.append((pid, identity, group))
+        if handle.exited() or not identity_ok(anchor_pid, anchor_identity):
+            return None
+        return found or None
+    finally:
+        handle.close()
+
+
+def surviving_members(anchor_pid, anchor_identity, group):
+    """Alias of `anchored_members`: the survivor set a stop observed, or None."""
+    return anchored_members(anchor_pid, anchor_identity, group)
 
 
 def survivor_records(*sources) -> list:
@@ -1035,11 +1767,65 @@ def lock_of(run_dir) -> dict:
     return lock if isinstance(lock, dict) else {}
 
 
-def update_lock(run_dir, **fields) -> dict:
-    lock = lock_of(run_dir)
+def merge_state_locked(op: Operation, fields, state=None) -> dict:
+    """Merge `fields` into state.json for one generation, with M held.
+
+    The base is the state re-read here (or the state the caller just read under
+    the same lock), never a snapshot captured at process start: a publisher may
+    not republish a whole `running` state over a concurrent `stopping` update, and
+    the merge keeps both halves.
+    """
+    base = read_state_file(op.run_dir) if state is None else dict(state)
+    base.update(fields)
+    write_json(os.path.join(op.run_dir, "state.json"), base)
+    return base
+
+
+def write_state_op(op: Operation, fields) -> dict:
+    """Acquire M and merge `fields` into the current generation's state.json.
+
+    Returns {} when the mutation is refused — no mutex, a changed generation, a
+    foreign run or an already-committed verdict — and writes nothing in that case.
+    """
+    with mutex_of(op, MUTEX_WAIT_SECONDS) as held:
+        if not held:
+            warn(guard_refusal(op, GUARD_BUSY, ""))
+            return {}
+        verdict, state, detail = guard_locked(op)
+        if verdict != GUARD_OK:
+            warn(guard_refusal(op, verdict, detail))
+            return {}
+        return merge_state_locked(op, fields, state)
+
+
+def merge_lock_locked(op: Operation, **fields) -> dict:
+    """Merge fields into the lock record with M already held (see `update_lock`)."""
+    lock = lock_of(op.run_dir)
     lock.update(fields)
-    write_json(os.path.join(run_dir, "lock"), lock)
+    lock.setdefault("generation", op.generation)
+    write_json(os.path.join(op.run_dir, "lock"), lock)
     return lock
+
+
+def update_lock(run_dir, **fields) -> dict:
+    """Merge fields into the lock record, under M, for the run's own generation.
+
+    `lock` is process metadata, never a mutex, and it carries the generation of
+    the run it describes: a merge that would write into a different generation is
+    refused instead. A record with no generation cannot be mutated (see
+    `guard_locked`).
+    """
+    op = operation_of(run_dir)
+    with mutex_of(op, MUTEX_WAIT_SECONDS) as held:
+        if not held:
+            warn(guard_refusal(op, GUARD_BUSY, ""))
+            return {}
+        verdict, state, detail = guard_locked(op)
+        if verdict != GUARD_OK:
+            warn(guard_refusal(op, verdict, detail))
+            return {}
+        del state
+        return merge_lock_locked(op, **fields)
 
 
 def recorded_processes(run_dir, state=None) -> list:
@@ -1081,23 +1867,23 @@ def recorded_pids(run_dir, state=None) -> list:
 
 
 def run_alive(run_dir, state=None) -> bool:
-    """Is a recorded process still alive *and* still the one that was recorded?
+    """Is a recorded process possibly alive *and* still the one that was recorded?
 
     A pid whose recorded identity no longer matches is a reused pid, not this
-    run's. When no identity was recorded at all — an older run, or a platform
-    with no usable token — liveness is the only evidence there is and it is
-    trusted here: declaring a possibly-live run dead is what lets a reader
-    finalize work that is still being written. Signalling makes the opposite
-    choice, because a wrong signal cannot be taken back (see `signal_group`).
-    Only a token that was read and differs marks a reused pid; a read that failed
-    leaves the question open and the run alive. The processes a failed stop
-    recorded count too, so a run whose surviving tools outlived their agent is
-    still live and still occupies its slug.
+    run's — but only a token that was actually read and differs proves that; a
+    read that failed leaves the run alive. When no identity was recorded at all —
+    an older run, or a platform with no usable token — liveness is the only
+    evidence there is and it is trusted here: declaring a possibly-live run dead
+    is what lets a reader settle work that is still being written. An `UNKNOWN`
+    (access denial, failed inspection) counts as possibly alive for the same
+    reason; signalling makes the opposite, fail-closed choice. The processes a
+    failed stop recorded count too, so a run whose surviving tools outlived their
+    agent is still live and still occupies its slug.
     """
     if state is None:
         state = read_state_file(run_dir)
     for pid, identity in recorded_processes(run_dir, state):
-        if not pid_alive(pid):
+        if liveness_of(pid) == GONE:
             continue
         if identity_changed(pid, identity):
             continue
@@ -1119,43 +1905,76 @@ def stop_unconfirmed(state) -> bool:
 
 
 def stop_survivors(run_dir, state=None):
-    """Every live member of this run's recorded groups, or None when unreadable.
+    """Every live member of the groups this run can *prove* it owns, or None.
 
-    The groups come from the processes the run recorded — the runner, the agent,
-    and the survivors a failed stop named — because a group whose leader is gone
-    is still this run's through the survivor's recorded identity. `[]` means the
-    enumeration ran to completion and found nobody alive; `None` means it did not
-    run to completion, and "nobody alive" must not be inferred from it.
+    Ownership comes from a currently verified recorded process whose group is
+    readable now — the runner, the agent, or a survivor a failed stop observed —
+    never from a historical group number: a positive `group` in a record is not a
+    candidate by itself, because after pid reuse that number may name a stranger's
+    group. Each group is enumerated under such an anchor (`anchored_members`).
+
+    Three answers, and the callers must keep them apart:
+      * a list — the enumeration completed and these members are alive;
+      * `[]`   — every recorded process is conclusively `GONE` *and* no group it
+                 led still exists, so nothing this run owns is alive;
+      * `None` — ownership or enumeration could not be established, a recorded
+                 process could not be inspected (`UNKNOWN`), or a recorded group
+                 still exists with no live member to anchor it (its id may have
+                 been reused, and members of this run it never observed could be
+                 in it), so "nobody alive" must not be inferred.
     """
     if state is None:
         state = read_state_file(run_dir)
-    candidates = []
+    recorded_groups = {
+        pid: group for pid, _identity, group in recorded_survivors(run_dir, state)
+    }
+    anchors, examined, vanished_groups = [], 0, []
     for pid, identity in recorded_processes(run_dir, state):
-        if not pid_alive(pid) or identity_changed(pid, identity):
+        examined += 1
+        state_of_pid = liveness_of(pid)
+        if state_of_pid == GONE:
+            # Gone processes cannot anchor, but a group they led may still hold
+            # members this run never recorded: a group that still exists is not
+            # evidence of absence.
+            vanished_groups.append(recorded_groups.get(pid) or pid)
             continue
+        if state_of_pid == UNKNOWN:
+            return None
+        if identity_changed(pid, identity):
+            continue
+        if not identity_is_strong(identity):
+            # A live process whose token cannot authorize anything: we can see it
+            # and we cannot prove what it is, so the answer is unknown.
+            return None
         group = process_group(pid)
         if group <= 0:
             return None
-        candidates.append((pid, identity, group))
-    for pid, identity, group in recorded_survivors(run_dir, state):
-        if group > 0:
-            candidates.append((pid, identity, group))
-    groups, seen, members = [], set(), []
-    for _pid, _identity, group in candidates:
+        anchors.append((pid, identity, group))
+    if examined == 0:
+        # Nothing was ever recorded: there is nothing to prove anything with, and
+        # "nobody alive" would be a guess.
+        return None
+    if not anchors:
+        for group in vanished_groups:
+            if not group:
+                continue
+            if group_live(group) is not False:
+                # True (a live member this run never recorded may be in it) or
+                # None (the table could not be read): both stay unknown.
+                return None
+        return []
+    groups, seen, members = set(), set(), []
+    for pid, identity, group in anchors:
         if group in groups:
             continue
-        groups.append(group)
-        found = surviving_members(group)
+        groups.add(group)
+        found = anchored_members(pid, identity, group)
         if found is None:
             return None
         for member in found:
             if member[0] not in seen:
                 seen.add(member[0])
                 members.append(member)
-    if not groups:
-        # Nothing this run recorded is live and no group was ever recorded: there
-        # is nothing to enumerate, and "nobody alive" would be a guess.
-        return None
     return members
 
 
@@ -1175,129 +1994,6 @@ def is_starting(run_dir, state) -> bool:
     if recorded_pids(run_dir, state):
         return False
     return state_age_seconds(state) < start_grace_seconds()
-
-
-def starting_claim(run_dir) -> bool:
-    """Is another `start` still writing this run directory?"""
-    path = os.path.join(run_dir, "start.lock")
-    if not os.path.exists(path):
-        return False
-    return time.time() - mtime_of(path) < start_grace_seconds()
-
-
-def claim_start(run_dir) -> bool:
-    """Take the exclusive right to start this slug; False when another start holds it."""
-    path = os.path.join(run_dir, "start.lock")
-    for attempt in range(2):
-        try:
-            os.close(os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600))
-            return True
-        except FileExistsError:
-            if attempt or not starting_claim(run_dir):
-                remove_quietly(path)
-                continue
-            return False
-        except OSError:
-            return True  # a claim this process cannot take must not block starting
-    return False
-
-
-@contextmanager
-def slug_start_claim(root, slug):
-    """Hold the OS lock that claims one slug across every date bucket.
-
-    The lock file is a stable sibling of the date directories
-    (`<root>/<slug>.start.lock`), never inside one: the in-directory `start.lock`
-    guards only the pidless window of a single directory, while this claim is
-    what stops a run started before midnight from being started again after it.
-    Keep the file: unlinking a locked inode would let a competitor lock a fresh
-    inode at the same path. The kernel releases the claim when the handle closes,
-    even if the starter dies; unlike an age-based file, its age is not ownership.
-    """
-    handle = None
-    try:
-        os.makedirs(root, exist_ok=True)
-        handle = open(os.path.join(root, f"{slug}.start.lock"), "a+b")
-        if IS_WINDOWS:
-            import msvcrt
-
-            handle.seek(0)
-            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
-        else:
-            import fcntl
-
-            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError:
-        close_quietly(handle)
-        yield False
-        return
-    try:
-        yield True
-    finally:
-        close_quietly(handle)
-
-
-@contextmanager
-def finalize_claim(run_dir, wait=0.0):
-    """Hold the OS lock that is the exclusive right to finalize one run.
-
-    Two readers can see the same stale `running` state at once; without a claim
-    both would write final artifacts. This is a stable OS lock on `finalize.lock`
-    rather than an exclusively-created file: a competitor cannot delete a lock out
-    from under its holder (unlinking a locked inode would let a third process lock
-    a fresh one at the same path), and the kernel releases it if the holder dies,
-    so an abandoned claim never strands a run. There is no stale-takeover path:
-    what cannot be taken is waited for (`wait` seconds) or reported, never
-    ignored. Yields True while the claim is held, False otherwise.
-    """
-    path = os.path.join(run_dir, "finalize.lock")
-    handle = None
-    try:
-        handle = open(path, "a+b")
-    except OSError:
-        close_quietly(handle)
-        yield False
-        return
-    if IS_WINDOWS:
-        import msvcrt
-
-        def try_lock():
-            handle.seek(0)
-            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
-
-        def unlock():
-            handle.seek(0)
-            msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
-
-    else:
-        import fcntl
-
-        def try_lock():
-            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-
-        def unlock():
-            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
-
-    locked = False
-    deadline = time.monotonic() + max(0.0, wait)
-    try:
-        while True:
-            try:
-                try_lock()
-                locked = True
-                break
-            except OSError:
-                if time.monotonic() >= deadline:
-                    break
-                time.sleep(POLL_SECONDS)
-        yield locked
-    finally:
-        if locked:
-            try:
-                unlock()
-            except OSError:
-                pass
-        close_quietly(handle)
 
 
 def observe_detachment() -> dict:
@@ -1340,29 +2036,51 @@ def install_stop_handler(requested: threading.Event) -> None:
             continue
 
 
+def spawn_credentials(op: Operation) -> tuple:
+    """(generation, token) from the handshake file, or ("", "").
+
+    The file is written by `start` for exactly one runner and names the run
+    generation: a credential that does not name the generation of the run it is
+    presented to authorizes nothing.
+    """
+    payload = read_json(os.path.join(op.run_dir, SPAWN_TOKEN_FILE), None)
+    if not isinstance(payload, dict):
+        return "", ""
+    generation = payload.get("generation")
+    token = payload.get("token")
+    if not isinstance(generation, str) or not isinstance(token, str):
+        return "", ""
+    return generation, token
+
+
 def spawn_runner(argv, cwd, log_path) -> subprocess.Popen:
     """Start the detached runner: POSIX own session, Windows hidden console.
 
     The child environment is scrubbed of the harness's reserved identity keys
     (`child_env`), so a caller inside a live `dsh` session cannot shape the run.
-    `spawn.token`, beside the `runner.log` this call is handed, is the single-use
-    handshake `start` wrote: it is passed only in this child's environment, so the
-    runner can prove it is the process that start spawned, and every child below
-    the runner sees the name removed again (`child_env`).
+    The generation-stamped handshake `start` wrote is read here and its credential
+    — generation and token — travels only in this child's environment, so the
+    runner can prove both that it is the process `start` spawned and which
+    generation it was spawned for; every child below the runner sees the name
+    removed again (`child_env`).
     """
-    token = ""
+    credentials = ""
     try:
         with open(
             os.path.join(os.path.dirname(os.path.abspath(log_path)), SPAWN_TOKEN_FILE),
             encoding="utf-8",
         ) as handle:
-            token = handle.read().strip()
-    except OSError:
-        token = ""
+            payload = json.load(handle)
+        generation = payload.get("generation") or ""
+        token = payload.get("token") or ""
+        if generation and token:
+            credentials = f"{generation}:{token}"
+    except (OSError, ValueError, AttributeError):
+        credentials = ""
     with open(log_path, "ab") as log:
         env = child_env()
-        if token:
-            env[RUNNER_TOKEN_ENV] = token
+        if credentials:
+            env[RUNNER_TOKEN_ENV] = credentials
         kwargs = {
             "cwd": cwd,
             "stdin": subprocess.DEVNULL,
@@ -1407,29 +2125,37 @@ def spawn_agent(argv, cwd, stderr, prompt_path):
 
 
 def signal_group(pid, signum, identity="") -> bool:
-    """Signal the process group this pid leads, only when it is provably ours.
+    """Signal the group this pid leads — by verified members, never by the group id.
 
-    POSIX only; returns True when a signal was sent. `pid` is a group leader by
-    construction (`start_new_session` / `CREATE_NEW_PROCESS_GROUP`), so `killpg`
-    with that pid reaches the tools the agent started without reaching the runner.
-    The identity recorded when this pid was spawned must still match the live
-    process: a mismatch — or a missing token, when the platform cannot supply one
-    — is a reused or unverifiable pid, and it is never signalled. The
-    `os.getpgid(pid)` fallback is gone on purpose: it would signal whatever group
-    the pid *now* belongs to, which is exactly the unrelated job this guard keeps
-    safe. A pid that is already gone is refused for the same reason: a process
-    group id is a pid, and once its leader is gone the id alone proves nothing —
-    after reuse the group bearing it may be a stranger's. A group whose leader has
-    died is signalled only through a verified surviving member
-    (`signal_member_group`), never through the bare id.
+    `pid` is a group leader by construction (`start_new_session` /
+    `CREATE_NEW_PROCESS_GROUP`), but the group id is a pid: once that leader is
+    gone the number alone proves nothing, and even while it is alive a bare
+    `killpg` has an exit/reuse window that no mutex can close. So the group is
+    enumerated under the leader as a continuously verified anchor
+    (`anchored_members`) and every member — the leader included — is signalled
+    through its own validated process handle (`signal_instance`). Return value
+    means "signals were sent", never "the stop completed". A leader whose
+    identity is missing, weak or changed is refused outright; if the enumeration
+    cannot be established only the verified anchor itself is signalled, and the
+    caller's own enumeration decides whether the stop is complete.
     """
     if IS_WINDOWS:
         return False
-    if not pid_alive(pid):
+    if not identity_is_strong(identity):
+        warn(
+            f"not signalling the group of pid {pid}: the recorded identity is "
+            f"{'missing' if not identity else 'not admissible'}; refusing to guess"
+        )
+        return False
+    pid_state = liveness_of(pid)
+    if pid_state == GONE:
         warn(
             f"not signalling process group {pid}: the process this run recorded is gone, so "
             "the group id does not prove the group is this run's; refusing to guess"
         )
+        return False
+    if pid_state == UNKNOWN:
+        warn(f"not signalling the group of pid {pid}: the process could not be inspected")
         return False
     if not identity_ok(pid, identity):
         warn(
@@ -1437,30 +2163,62 @@ def signal_group(pid, signum, identity="") -> bool:
             f"(identity {'missing' if not identity else 'changed'}); refusing to guess"
         )
         return False
-    try:
-        os.killpg(pid, signum)
-        return True
-    except OSError:
-        try:
-            os.kill(pid, signum)
-            return True
-        except OSError:
-            return False
+    group = process_group(pid)
+    if group <= 0:
+        warn(f"not signalling the group of pid {pid}: its process group could not be read")
+        return False
+    if group != pid:
+        warn(
+            f"not signalling the group of pid {pid}: it now belongs to process group {group} "
+            "rather than leading its own; refusing to guess"
+        )
+        return False
+    if not platform_can_force_stop():
+        warn(
+            f"not signalling the group of pid {pid}: this platform has no verified process "
+            "handle primitive (a pidfd); refusing to fall back to a bare pid or group id"
+        )
+        return False
+    members = anchored_members(pid, identity, group)
+    if members is None:
+        # Ownership of the group could not be established; the anchor itself is
+        # verified, so it may be signalled, and nothing else may.
+        warn(
+            f"the group of pid {pid} could not be enumerated under a verified anchor; "
+            "signalling only the verified process itself"
+        )
+        members = [(pid, identity, group)]
+    sent = False
+    for member_pid, member_identity, _member_group in members:
+        if signal_instance(member_pid, member_identity, signum):
+            sent = True
+    return sent
 
 
 def signal_member_group(pid, signum, identity="", group=0) -> bool:
-    """Signal a group named by a recorded *member*, never by a bare group id.
+    """Signal the group through a recorded *member*, by verified handles only.
 
-    A stop that failed records the members it left alive, each with the identity
-    read while the group was provably this run's. A later attempt may signal that
-    group only through such a member: the member must still be alive and still
-    carry its recorded identity, and the group signalled is the one the member is
-    in now (or the recorded group, which must agree when both are known). Nothing
-    is sent when the member cannot be proven (POSIX only).
+    Used for the survivors a failed stop named: the member must be alive, carry
+    an admissible recorded identity that still matches, and belong to a group
+    that can be read *now* — a historical group number is never a fallback, even
+    when the current one cannot be read. When a group was recorded it must equal
+    the current one. The member then anchors an enumeration of that group and
+    every verified member is signalled through its own handle; if the enumeration
+    fails, only the verified member itself is signalled.
     """
     if IS_WINDOWS:
         return False
-    if not pid_alive(pid):
+    if not identity_is_strong(identity):
+        warn(
+            f"not signalling the group of pid {pid}: the recorded identity is "
+            f"{'missing' if not identity else 'not admissible'}; refusing to guess"
+        )
+        return False
+    pid_state = liveness_of(pid)
+    if pid_state == GONE:
+        return False
+    if pid_state == UNKNOWN:
+        warn(f"not signalling the group of pid {pid}: the process could not be inspected")
         return False
     if not identity_ok(pid, identity):
         warn(
@@ -1469,100 +2227,135 @@ def signal_member_group(pid, signum, identity="", group=0) -> bool:
         )
         return False
     current = process_group(pid)
-    if group and current and current != group:
+    if current <= 0:
+        warn(
+            f"not signalling the group of pid {pid}: its current process group could not be "
+            "read; a recorded group number is not a fallback"
+        )
+        return False
+    if group and current != group:
         warn(
             f"not signalling the group of pid {pid}: it now belongs to process group {current}, "
             f"not the recorded {group}; refusing to guess"
         )
         return False
-    target = group or current
-    if target <= 0:
-        warn(f"not signalling the group of pid {pid}: its process group could not be read")
+    if not platform_can_force_stop():
+        warn(
+            f"not signalling the group of pid {pid}: this platform has no verified process "
+            "handle primitive (a pidfd); refusing to fall back to a bare pid or group id"
+        )
         return False
-    try:
-        os.killpg(target, signum)
-        return True
-    except OSError:
-        try:
-            os.kill(pid, signum)
+    members = anchored_members(pid, identity, current)
+    if members is None:
+        warn(
+            f"the group of pid {pid} could not be enumerated under a verified anchor; "
+            "signalling only the verified process itself"
+        )
+        members = [(pid, identity, current)]
+    sent = False
+    for member_pid, member_identity, _member_group in members:
+        if signal_instance(member_pid, member_identity, signum):
+            sent = True
+    return sent
+
+
+def group_live(pgid):
+    """Does this group still hold a *live* (non-zombie) process? True/False/None.
+
+    `killpg(pgid, 0)` alone is not the answer: an unreaped zombie — a child of the
+    observer that nobody has waited for — keeps answering that the group exists
+    while running no code, holding no pipe and writing nothing. So the group is
+    read out and each member's liveness is asked for; `False` means the table was
+    read and holds no live member, `True` means one is alive, and `None` means the
+    table could not be read (Windows has no group table at all), which must never
+    be read as "nobody".
+    """
+    if IS_WINDOWS or isinstance(pgid, bool) or not isinstance(pgid, int) or pgid <= 0:
+        return None
+    table = group_member_pids(pgid)
+    if table is None:
+        return None
+    for pid in sorted(table):
+        if liveness_of(pid) == LIVE:
             return True
-        except OSError:
-            return False
-
-
-def group_alive(pgid) -> bool:
-    """Is any process still in this process group? POSIX only; False on Windows."""
-    if IS_WINDOWS or not isinstance(pgid, int) or pgid <= 0:
-        return False
-    try:
-        os.killpg(pgid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    except OSError:
-        return False
-    return True
+    return False
 
 
 def tree_alive(pid) -> bool:
-    """The process itself, or on POSIX any surviving member of the group it leads."""
-    return pid_alive(pid) or group_alive(pid)
+    """The process itself, or on POSIX any live member of the group it leads."""
+    if liveness_of(pid) != GONE:
+        return True
+    return group_live(pid) is not False
 
 
 def terminate_tree(pid, signum, identity="") -> bool:
-    """Stop one recorded process tree, and only when it is provably this run's.
+    """Refuse the unverifiable platform paths; signal a verified group nowhere else.
 
-    Windows has no groups: `taskkill /T /F` stops a tree by pid, and the same
-    identity gate applies before it runs. A `taskkill` that fails is reported and
-    returns False — a stop that did not happen is never reported as one.
+    Windows has no verified tree-termination primitive — `OpenProcess →
+    GetProcessTimes → CloseHandle → taskkill /PID` never binds the destructive
+    operation to the process object it validated — so `taskkill` is disabled as
+    an authorized stop path there. Everywhere else this is `signal_group`.
     """
     if IS_WINDOWS:
-        if not pid_alive(pid):
-            return False
-        if not identity_ok(pid, identity):
-            warn(
-                f"not stopping pid {pid}: it is no longer the process this run recorded "
-                f"(identity {'missing' if not identity else 'changed'}); refusing to guess"
-            )
-            return False
-        code = run_quiet(["taskkill", "/T", "/F", "/PID", str(pid)])
-        if code != 0:
-            warn(
-                f"taskkill /T /F /PID {pid} exited {code}: the process tree may still be alive"
-            )
-            return False
-        return True
+        warn(
+            f"not stopping pid {pid}: this platform has no verified process-instance "
+            "termination primitive, so no destructive call is made; the run stays "
+            "non-terminal until its process is gone"
+        )
+        return False
     return signal_group(pid, signum, identity)
 
 
-def terminate_agent(process, agent_identity="") -> tuple:
+def terminate_agent(process, op: Operation, agent_identity="") -> tuple:
     """Stop the agent and the tools under it; (KILL_EXIT, survivors).
 
     `survivors` is the stop's outcome and never an empty hole:
-      * `[]` — the stop is *proven*: the tree is settled and either the POSIX
-        group table says it holds nobody, or a platform tree-termination command
-        returned success for it;
+      * `[]` — the stop is *proven*: the agent is reaped or conclusively gone and
+        the group id it led no longer names a group;
       * a list — the stop did not complete, and these (pid, identity, group)
         members were still alive when it gave up;
       * `None` — the stop did not complete and the survivors could not be
-        enumerated (Windows has no group table, an inspection command failed, or
-        a live member had no readable identity).
+        enumerated (no group table, a failed inspection, a member whose identity
+        cannot be read, or a platform with no verified handle primitive at all).
     Only `[]` may reach a terminal state; the caller must not publish one for a
-    list or for `None` (see `report_incomplete_stop`). The escalation branches on
-    the platform: Windows has no `signal.SIGKILL` attribute at all and stops a
-    tree with `taskkill /T /F`, so a POSIX signal number is read only on the
-    branch that uses one (`stop_signal`).
+    list or for `None` (see `report_incomplete_stop`).
+
+    Every escalation step is re-authorized first: M is taken, the operation's
+    generation and terminal status are re-checked, and only then is a signal sent
+    — and M is released again before the next bounded wait. A generation change
+    stops the escalation where it stands. Windows has no `signal.SIGKILL`
+    attribute at all, so the POSIX signal numbers are only read on the branch that
+    uses one (`stop_signal`).
     """
     agent = process.pid
+    group = process_group(agent) or agent
 
     def settled() -> bool:
         process.poll()  # reap a zombie before judging the group
-        return not tree_alive(agent)
+        return liveness_of(agent) == GONE and group_live(group) is False
 
-    terminated = False
-    if process.poll() is None:
-        terminated = terminate_tree(agent, stop_signal(escalate=False), agent_identity)
+    def authorize() -> bool:
+        """Revalidate the generation under M; True when a signal may be sent."""
+        with mutex_of(op, MUTEX_WAIT_SECONDS) as held:
+            if not held:
+                warn(guard_refusal(op, GUARD_BUSY, ""))
+                return False
+            verdict, _state, detail = guard_locked(op, require_lock_generation=True)
+            if verdict != GUARD_OK:
+                warn(guard_refusal(op, verdict, detail))
+                return False
+            return True
+
+    if not platform_can_force_stop():
+        # No verified handle primitive: no destructive call exists, so the stop
+        # is reported as unconfirmed instead of pretending a signal was "safe".
+        warn(
+            "this platform has no verified process-instance signalling primitive "
+            "(a pidfd); the stop stays a request and the run is not finalized"
+        )
+        return KILL_EXIT, None
+    if process.poll() is None and authorize():
+        terminate_tree(agent, stop_signal(escalate=False), agent_identity)
         for _ in range(20):
             if settled():
                 break
@@ -1571,21 +2364,15 @@ def terminate_agent(process, agent_identity="") -> tuple:
         if settled():
             break
         time.sleep(POLL_SECONDS)
-    if not settled():
-        if terminate_tree(agent, stop_signal(escalate=True), agent_identity):
-            terminated = True
+    if not settled() and authorize():
+        terminate_tree(agent, stop_signal(escalate=True), agent_identity)
         for _ in range(20):
             if settled():
                 break
             time.sleep(POLL_SECONDS)
     if settled():
-        # POSIX proves the whole group empty; Windows can prove the tree only
-        # through the tree-termination command that stopped it. A root pid that
-        # merely died says nothing about the descendants there.
-        if terminated or not IS_WINDOWS:
-            return KILL_EXIT, []
-        return KILL_EXIT, None
-    members = surviving_members(agent)
+        return KILL_EXIT, []
+    members = surviving_members(agent, agent_identity, group)
     if members:
         return KILL_EXIT, members
     return KILL_EXIT, None
@@ -1594,8 +2381,7 @@ def terminate_agent(process, agent_identity="") -> tuple:
 def stop_signal(escalate: bool):
     """The signal number for one stop step, or None where signals do not apply.
 
-    Windows has no process groups and no `signal.SIGKILL` attribute at all: its
-    stop is `taskkill /T /F` (`terminate_tree`), which takes no signal number, so
+    Windows has no process groups and no `signal.SIGKILL` attribute at all, so
     the POSIX constants are read only on the branch that actually signals.
     """
     if IS_WINDOWS:
@@ -1603,84 +2389,207 @@ def stop_signal(escalate: bool):
     return signal.SIGKILL if escalate else signal.SIGTERM
 
 
-def kill_tree(run_dir, state=None) -> bool:
-    """Force an unresponsive run to stop: its groups (POSIX) or its trees (Windows).
+def kill_tree(op: Operation, state=None) -> bool:
+    """Force an unresponsive run to stop, one authorized step at a time.
 
-    Every signal is gated on the identity recorded when the process was seen; a
-    recorded pid whose live identity no longer matches is reported and left
-    alone. A recorded survivor is signalled through its own verified identity
-    (`signal_member_group`) rather than through the bare group id its dead leader
-    left behind. Returns True once nothing recorded is still alive.
+    Every signal decision is revalidated under M for the generation the caller
+    captured: the guard re-reads the route, the generation and the terminal
+    commit, the recorded process evidence is refreshed from *that* generation, and
+    the permitted signal action is performed before M is released. A generation
+    change therefore stops the escalation where it stands — no further signal, no
+    enumeration of the replacement, no write. A platform with no verified handle
+    primitive refuses outright (`platform_can_force_stop`). Returns True when the
+    caller's operation generation is the one that was acted on and no recorded
+    process of it is still alive.
     """
-    processes = recorded_processes(run_dir, state)
+    processes = recorded_processes(op.run_dir, state)
     if not processes:
         return False
-    if IS_WINDOWS:
-        # A tree command's receipt is the only proof Windows offers: a recorded
-        # pid that was already gone proves nothing about its descendants, and a
-        # `taskkill` that failed proves less. True only when every process that
-        # was alive was stopped by a command that said so, and none is alive now.
-        attempted, ok = 0, True
-        for pid, identity in processes:
-            if not pid_alive(pid):
-                continue
-            attempted += 1
-            if not terminate_tree(pid, 0, identity):
-                ok = False
-        return ok and attempted > 0 and not any(pid_alive(pid) for pid, _ in processes)
+    if not platform_can_force_stop():
+        warn(
+            "this platform has no verified process-instance signalling primitive (a pidfd); "
+            "refusing to force any stop"
+        )
+        return False
     survivors = {
-        pid: (identity, group) for pid, identity, group in recorded_survivors(run_dir, state)
+        pid: (identity, group)
+        for pid, identity, group in recorded_survivors(op.run_dir, state)
     }
 
     def alive(pid) -> bool:
         record = survivors.get(pid)
         if record:
-            identity, group = record
-            return pid_alive(pid) or (bool(group) and group_alive(group))
+            _identity, group = record
+            return tree_alive(pid) or (bool(group) and group_live(group) is not False)
         return tree_alive(pid)
 
-    def signal_all(signum) -> None:
+    def authorize() -> bool:
+        """Revalidate the operation generation under M; True when it may act."""
+        with mutex_of(op, MUTEX_WAIT_SECONDS) as held:
+            if not held:
+                warn(guard_refusal(op, GUARD_BUSY, ""))
+                return False
+            verdict, fresh, detail = guard_locked(op, require_lock_generation=True)
+            if verdict != GUARD_OK:
+                warn(guard_refusal(op, verdict, detail))
+                return False
+            del fresh
+            return True
+
+    def signal_all(signum) -> bool:
+        acted, refused = False, False
         for pid, identity in processes:
+            if not authorize():
+                refused = True
+                break
+            if liveness_of(pid) == GONE:
+                continue
             record = survivors.get(pid)
             if record:
-                signal_member_group(pid, signum, record[0], record[1])
-            else:
-                signal_group(pid, signum, identity)
+                record_identity, group = record
+                if group <= 0:
+                    record_identity, group = identity, process_group(pid)
+                if signal_member_group(pid, signum, record_identity or identity, group):
+                    acted = True
+            elif signal_group(pid, signum, identity):
+                acted = True
+        return acted and not refused
 
-    signal_all(signal.SIGTERM)
+    if not signal_all(signal.SIGTERM):
+        return False
     for _ in range(20):
         if not any(alive(pid) for pid, _ in processes):
             return True
         time.sleep(POLL_SECONDS)
-    signal_all(signal.SIGKILL)
+    if not signal_all(signal.SIGKILL):
+        return False
     for _ in range(20):
         if not any(alive(pid) for pid, _ in processes):
             return True
         time.sleep(POLL_SECONDS)
     return False
+def request_stop(op: Operation) -> bool:
+    """Publish the stop request the runner polls, bound to one generation.
+
+    Written under M and only after the guard accepted this operation, so a stop
+    request issued against one generation can never land in the run that
+    replaced it. The request names the generation, a fresh request id, the
+    timestamp and the requesting pid; a runner acts only on its own generation's
+    request.
+    """
+    with mutex_of(op, MUTEX_WAIT_SECONDS) as held:
+        if not held:
+            warn(guard_refusal(op, GUARD_BUSY, ""))
+            return False
+        verdict, state, detail = guard_locked(op)
+        if verdict != GUARD_OK:
+            warn(guard_refusal(op, verdict, detail))
+            return False
+        del state
+        write_json(
+            os.path.join(op.run_dir, "stop"),
+            {
+                "generation": op.generation,
+                "request_id": new_nonce(),
+                "requested_at": now_iso(),
+                "by": os.getpid(),
+            },
+        )
+        return True
 
 
-def request_stop(run_dir) -> None:
-    """The kill request the runner polls (see the module docstring)."""
-    write_json(os.path.join(run_dir, "stop"), {"requested_at": now_iso(), "by": os.getpid()})
+def stop_request_for(run_dir, generation) -> dict:
+    """The stop request that is actionable for this runner generation, or {}.
+
+    A request is actionable only when its generation equals both the runner's
+    captured generation and the generation the current state records; file
+    existence is not a request, and a malformed or foreign-generation request is
+    never acted on (and never deleted — it belongs to whoever wrote it).
+    """
+    request = read_json(os.path.join(run_dir, "stop"), None)
+    if not isinstance(request, dict):
+        return {}
+    if request.get("generation") != generation or not generation:
+        return {}
+    if strict_generation(read_state_file(run_dir)) != generation:
+        return {}
+    return request
 
 
-def wait_for_marker(run_dir, seconds) -> str:
-    """Wait for the `finalized` marker; return its content, or "" on timeout."""
-    path = os.path.join(run_dir, "finalized")
-    deadline = time.monotonic() + seconds
+def wait_for_terminal(op: Operation, seconds) -> str:
+    """Wait for a *validated* terminal snapshot of this generation.
+
+    Returns `WAIT_TERMINAL`, `WAIT_GENERATION_CHANGED` or `WAIT_TIMEOUT`. The
+    marker is not consulted and its contents are never returned: a run is
+    terminal when its committed record says so, which is exactly the moment every
+    reader may act on it. A generation change is reported as such rather than as
+    a timeout, so the caller can say the run it waited for is gone.
+    """
+    deadline = time.monotonic() + max(0.0, seconds)
     while True:
-        try:
-            with open(path, encoding="utf-8") as handle:
-                return handle.read().strip()
-        except OSError:
-            pass
+        state = read_state_file(op.run_dir)
+        if terminal_snapshot_locked(state) is not None:
+            return WAIT_TERMINAL
+        if op.generation and strict_generation(state) not in ("", op.generation):
+            return WAIT_GENERATION_CHANGED
         if time.monotonic() >= deadline:
-            return ""
+            return WAIT_TIMEOUT
         time.sleep(POLL_SECONDS)
 
 
 # -- run discovery -----------------------------------------------------------
+
+
+def await_settled_stop(run_dir, generation, seconds=None) -> bool:
+    """Wait, bounded, for a *committed* stop to be conclusively settled.
+
+    A committed terminal verdict and the tree being gone are two events. The
+    runner that wrote the verdict is still one of the run's recorded processes
+    until it returns and the kernel reaps it, and while it exits the same evidence
+    the replacement check reads can be momentarily unproven in two ways: a
+    recorded process is still live, or the enumeration cannot be established at
+    all — `stop_survivors` returns `None`, never an empty list, when its anchor
+    leaves mid-enumeration. Sampling that instant *once* refuses the very run that
+    was just stopped, so the question is asked again on freshly read state, until
+    it is conclusive (`run_alive` false and `stop_survivors() == []`) or `seconds`
+    expires.
+
+    This is re-asked evidence, not a sleep: every iteration re-reads state.json
+    and re-runs the same predicate the refusal below uses, and the mutation mutex
+    is *not* held while waiting (the same discipline as `stop_run` and the start
+    handshake). `False` means the evidence was still unproven at the bound — a
+    genuinely live survivor, or a table that cannot be read — so the caller's
+    refusal stands unchanged. A generation change ends the wait immediately:
+    whoever holds the path now is not what this stop decided about, and the
+    caller's generation check reports that instead.
+
+    `seconds` is the bound and is resolved at call time — `settle_wait_seconds()`
+    when omitted, i.e. the `DSH_RUN_SETTLE_WAIT_SECONDS` knob over
+    `SETTLE_WAIT_SECONDS` — so a caller can shorten a wait it is prepared to
+    answer for, and the environment can bound it per install.
+    """
+    if not generation:
+        return False
+    if seconds is None:
+        seconds = settle_wait_seconds()
+    deadline = time.monotonic() + max(0.0, seconds)
+    announced = False
+    while True:
+        state = read_state_file(run_dir)
+        if strict_generation(state) != generation:
+            return False
+        if not run_alive(run_dir, state) and stop_survivors(run_dir, state) == []:
+            return True
+        if not announced:
+            warn(
+                f"the stop of {run_dir} is not settled yet: a recorded process is still live, or "
+                f"its groups cannot be enumerated; waiting up to {seconds:g}s for a conclusive "
+                "answer (the replacement refusal stands if it does not come)"
+            )
+            announced = True
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(POLL_SECONDS)
 
 
 def date_of(path) -> str:
@@ -1772,31 +2681,42 @@ def find_run(name):
     return candidates[0] if candidates else None
 
 
-def occupying_run(root, slug):
-    """(run_dir, state): this slug's unfinished run, in any date bucket, or (None, {}).
-
-    A run directory is unfinished while its `finalized` marker is missing, and it
-    occupies its slug wherever it is dated: `start` must not create a second run
-    for the same slug just because midnight moved the date bucket. Dead
-    unfinished runs are settled first by `effective_state`, so what remains — and
-    what this returns — is work that is still live, still inside its startup
-    grace, still claimed by a starting process, or a stop that was never proven
-    complete. That last case occupies the slug even when nothing recorded is
-    alive: the enumeration that would have shown there is nobody left is exactly
-    the one that failed.
-    """
+def _occupying_run_locked(root, slug):
+    """`occupying_run` with M held: the scan itself may settle dead runs."""
     for candidate in slug_run_dirs(root, slug):
-        state, _ = effective_state(candidate)
-        if os.path.exists(os.path.join(candidate, "finalized")):
+        state, _ = _effective_state_locked(operation_of(candidate))
+        if terminal_snapshot_locked(state) is not None:
             continue
         if (
             run_alive(candidate, state)
             or is_starting(candidate, state)
-            or starting_claim(candidate)
             or stop_unconfirmed(state)
         ):
             return candidate, state
     return None, {}
+
+
+def occupying_run(root, slug):
+    """(run_dir, state): this slug's unfinished run, in any date bucket, or (None, {}).
+
+    A run directory is unfinished while no terminal record is committed, and it
+    occupies its slug wherever it is dated: `start` must not create a second run
+    for the same slug just because midnight moved the date bucket. Dead
+    unfinished runs are settled first by the recovery path, so what remains — and
+    what this returns — is work that is still live, still inside its startup
+    grace, or a stop that was never proven complete. That last case occupies the
+    slug even when nothing recorded is alive: the enumeration that would have
+    shown there is nobody left is exactly the one that failed. The scan runs
+    under M, because settling a dead run is a mutation.
+    """
+    with lifecycle_claim(root, slug) as held:
+        if not held:
+            warn(
+                f"not scanning {root} for run '{slug}': its lifecycle mutex is held by "
+                "another process"
+            )
+            return None, {}
+        return _occupying_run_locked(root, slug)
 
 
 def require_run(command, name):
@@ -1830,9 +2750,19 @@ def load_writer():
 
 
 class EventLog:
-    """This run's bounded NDJSON log: the shared writer plus its stats sidecar."""
+    """This run's bounded NDJSON log: the shared writer plus its stats sidecar.
 
-    def __init__(self, run_dir):
+    Every append and the final sidecar write happen inside the lifecycle mutex of
+    the generation this log belongs to, after the guard accepted that generation:
+    the event files are part of the run directory, and a late append from a
+    generation that a starter has already replaced would land in the new run's
+    stream. The mutex is taken without a bound — dropping an event line because a
+    reader held M for a moment would silently corrupt the accounting, and the
+    drain thread is never joined by a thread that is holding M.
+    """
+
+    def __init__(self, op: Operation):
+        self.op = op
         cap, warning = events_max_bytes()
         if warning:
             warn(warning)
@@ -1840,28 +2770,45 @@ class EventLog:
         # the shared writer's constructor, so the DSH key is the only knob this
         # route needs and no OMP-named default warning lands in runner.log.
         writer_class = load_writer()
-        self.path = os.path.join(run_dir, "events.ndjson")
+        self.path = os.path.join(op.run_dir, "events.ndjson")
         # passthrough=False: this adapter's own stdout is runner.log, and the
         # writer's terminal passthrough would copy the whole stream there
         # unbounded, so the event bound would bound nothing.
-        self.writer = writer_class(run_dir, cap, defaulted=warning is not None, passthrough=False)
+        self.writer = writer_class(op.run_dir, cap, defaulted=warning is not None, passthrough=False)
         self.finished = False
         self.lock = threading.Lock()
 
     def feed(self, raw) -> None:
-        with self.lock:
-            if self.finished:
-                # A reader thread can still be draining a stream a descendant kept
-                # open. After `finish()` its remaining lines are dropped on purpose:
-                # the run records `stream_incomplete` rather than pretending to have
-                # them.
+        with mutex_of(self.op, wait=None) as held:
+            if not held:
                 return
-            self.writer.feed(raw)
+            with self.lock:
+                if self.finished:
+                    # A reader thread can still be draining a stream a descendant kept
+                    # open. After `finish()` its remaining lines are dropped on purpose:
+                    # the run records `stream_incomplete` rather than pretending to have
+                    # them.
+                    return
+                verdict, _state, _detail = guard_locked(self.op)
+                if verdict != GUARD_OK:
+                    return
+                self.writer.feed(raw)
 
     def finish(self) -> None:
-        with self.lock:
-            self.finished = True
-            self.writer.finish()
+        with mutex_of(self.op, wait=None) as held:
+            if not held:
+                return
+            with self.lock:
+                if self.finished:
+                    return
+                verdict, _state, _detail = guard_locked(self.op)
+                if verdict != GUARD_OK:
+                    # A committed verdict or a replaced run: the sidecar must not be
+                    # (re)written for this generation.
+                    self.finished = True
+                    return
+                self.finished = True
+                self.writer.finish()
 
 
 def usage_of(event) -> dict:
@@ -1969,57 +2916,51 @@ def summarize(run_dir, events_path) -> dict:
     }
 
 
-def finalize(run_dir, exit_code, recovered=False, note=None, extra=None, claim_wait=0.0,
-             expect_generation=None) -> dict:
-    """Write state.json, answer.md, exit.code, the `finalized` marker.
+def survivors_blocking_commit(state, run_dir, stop_proven=False) -> str:
+    """Why a terminal commit must wait, or "" when the stop evidence allows one.
 
-    `claim_wait` is how long to wait for the finalize claim: the runner passes a
-    positive value because its own finalization must land, a reader passes 0 and
-    reports whatever is on disk when another process is already finalizing. The
-    claim is an OS lock (`finalize_claim`), never taken over by age, and a caller
-    that cannot take it never continues into finalization. Recheck the marker
-    under the claim: another reader may have finished between the caller's marker
-    check and this process acquiring the claim.
-
-    `expect_generation` binds this terminal write to the run generation the caller
-    decided about. It is re-read inside the claim, immediately before any write:
-    when the path now holds a different run (a reader decided an old run was dead,
-    a starter replaced the directory), nothing is written and the caller is told.
-    The cheap check before the claim keeps a stale reader from even creating the
-    lock file in someone else's run directory; the check inside the claim is the
-    one that closes the race.
+    A terminal verdict claims the run is over. That claim needs the stop to be
+    proven: an enumeration that could not be established (`survivors_complete:
+    false`) is not proof that nobody is alive, and a recorded survivor that is
+    still the process it was when it was recorded is a live process whatever the
+    caller's exit code says — including a direct `finalize(..., KILL_EXIT)` call.
+    `stop_proven` is the caller saying it has established completion *now*: a
+    fresh, complete enumeration that found nobody, or a verified process-instance
+    stop that left nobody behind. Fresh evidence resolves an older `unknown`
+    record; it never overrides a survivor that is alive right now.
     """
-    if expect_generation is not None:
-        current = generation_of(run_dir)
-        if current != expect_generation:
-            warn(_generation_refusal(run_dir, current, expect_generation))
-            return read_state_file(run_dir)
-    with finalize_claim(run_dir, claim_wait) as claimed:
-        if not claimed:
-            warn(f"{run_dir} is being finalized by another process")
-            return read_state_file(run_dir)
-        if os.path.exists(os.path.join(run_dir, "finalized")):
-            return read_state_file(run_dir)
-        if expect_generation is not None:
-            current = generation_of(run_dir)
-            if current != expect_generation:
-                warn(_generation_refusal(run_dir, current, expect_generation))
-                return read_state_file(run_dir)
-        return _finalize_locked(run_dir, exit_code, recovered, note, extra)
+    state = state or {}
+    if (
+        state.get("stopping")
+        and state.get("survivors_complete") is False
+        and not stop_proven
+    ):
+        return "the stop's survivor enumeration could not be established"
+    for pid, identity, _group in recorded_survivors(run_dir, state):
+        if liveness_of(pid) == GONE:
+            continue
+        if identity_changed(pid, identity):
+            continue
+        return f"recorded survivor pid {pid} is still the process it was recorded as"
+    return ""
 
 
-def _generation_refusal(run_dir, current, expected) -> str:
-    return (
-        f"not finalizing {run_dir}: it now holds a different run (generation "
-        f"{current or 'unknown'} != {expected}); a run that was created after the decision "
-        "is not the one it was made about, so nothing was written"
-    )
+def _publish_terminal_locked(op: Operation, state, exit_code, recovered, note, extra) -> dict:
+    """Publish one terminal record, in one order, with M held throughout.
 
+    1. The compatibility artifacts are materialized atomically: `answer.md`,
+       `exit.code`, and `session.id` when there is a session.
+    2. `state.json` is replaced atomically, carrying the complete terminal record
+       — this replacement is the linearization point: before it, no reader
+       reports a verdict; after it, state, answer, session and exit all come from
+       one snapshot.
+    3. The `finalized` marker is written for compatibility only (the exit code as
+       its historical text form). A failure to write it is reported, never turned
+       into a failed finalization, because the authority is already committed.
 
-def _finalize_locked(run_dir, exit_code, recovered, note, extra) -> dict:
-    """The finalization itself, with the claim already held."""
-    state_path = os.path.join(run_dir, "state.json")
-    state = read_state_file(run_dir)
+    No generation artifact is written after step 2.
+    """
+    run_dir = op.run_dir
     summary = summarize(run_dir, os.path.join(run_dir, "events.ndjson"))
     if recovered:
         # The process disappeared without finalizing: -1 is the adapter's word for
@@ -2030,6 +2971,8 @@ def _finalize_locked(run_dir, exit_code, recovered, note, extra) -> dict:
     elif exit_code in KILLED_EXITS:
         verdict = "killed"
     else:
+        # Everything else, including an exit 0 whose last `final` is missing or
+        # not `completed`.
         verdict = "failed"
     duration = None
     if state.get("started"):
@@ -2083,40 +3026,136 @@ def _finalize_locked(run_dir, exit_code, recovered, note, extra) -> dict:
         state["survivors_stopped"] = [pid for pid, _identity, _group in leftover]
     if extra:
         state.update(extra)
-    with open(os.path.join(run_dir, "answer.md"), "w", encoding="utf-8") as handle:
-        handle.write(summary["answer"])
-    with open(os.path.join(run_dir, "exit.code"), "w", encoding="utf-8") as handle:
-        handle.write(f"{exit_code}\n")
+    # (1) compatibility artifacts, atomically and before the commit
+    write_text_atomic(os.path.join(run_dir, "answer.md"), summary["answer"])
+    write_text_atomic(os.path.join(run_dir, "exit.code"), f"{exit_code}\n")
     if state.get("session_id"):
-        with open(os.path.join(run_dir, "session.id"), "w", encoding="utf-8") as handle:
-            handle.write(f"{state['session_id']}\n")
-    write_json(state_path, state)
-    # Finished, not to be mistaken for a live run: the marker holds the exit code.
-    with open(os.path.join(run_dir, "finalized"), "w", encoding="utf-8") as handle:
-        handle.write(str(exit_code))
+        write_text_atomic(os.path.join(run_dir, "session.id"), f"{state['session_id']}\n")
+    # (2) the commit itself: one atomic replacement, holding everything
+    state["terminal_record"] = {
+        "version": TERMINAL_RECORD_VERSION,
+        "generation": op.generation,
+        "commit_id": new_nonce(),
+        "answer": summary["answer"],
+        "session_id": state.get("session_id") or "",
+        "exit": exit_code,
+    }
+    write_json(os.path.join(run_dir, "state.json"), state)
+    # (3) the compatibility marker, after the commit and never an authority
+    write_marker(os.path.join(run_dir, "finalized"), str(exit_code))
     return state
 
 
-def effective_state(run_dir):
+def write_marker(path, text) -> None:
+    """Write the compatibility marker, best effort, after a committed verdict."""
+    try:
+        write_text_atomic(path, text)
+    except OSError as exc:
+        warn(
+            f"the terminal record is committed but its compatibility marker {path} could not "
+            f"be written ({exc}); the record in state.json is the authority"
+        )
+
+
+def marker_text(path) -> str:
+    try:
+        with open(path, encoding="utf-8") as handle:
+            return handle.read().strip()
+    except OSError:
+        return ""
+
+
+def commit_terminal(op: Operation, state, exit_code, *, recovered=False, note=None, extra=None,
+                    stop_proven=False) -> dict:
+    """Guard, check the stop evidence, and publish — with M held by the caller.
+
+    Returns the state as it now stands. A refused commit writes nothing at all:
+    not an answer, not an exit code, not a session sidecar, not the state, not
+    the marker.
+    """
+    verdict, fresh, detail = guard_locked(op)
+    if verdict == GUARD_TERMINAL:
+        return fresh
+    if verdict != GUARD_OK:
+        warn(guard_refusal(op, verdict, detail))
+        return fresh
+    blocked = survivors_blocking_commit(fresh, op.run_dir, stop_proven=stop_proven)
+    if blocked:
+        warn(
+            f"not committing a terminal verdict for {op.run_dir}: {blocked}; a stop that is "
+            "not proven complete cannot end a run"
+        )
+        return fresh
+    return _publish_terminal_locked(op, fresh, exit_code, recovered, note, extra)
+
+
+def finalize(run_dir, exit_code, *, expect_generation, recovered=False, note=None, extra=None,
+             claim_wait=0.0, stop_proven=False) -> dict:
+    """Commit one terminal record for one run generation.
+
+    `expect_generation` is mandatory and is the whole binding: the caller passes
+    the generation it decided about, the guard re-reads it under M immediately
+    before any write, and when the path now holds a different run (a stale reader
+    after a replacement, a starter that rebuilt the directory) nothing is written
+    and nothing is reported as settled. `claim_wait` is how long to wait for M: the
+    runner passes a positive value because its own finalization must land, a
+    reader passes 0 and reports whatever the run records when another lifecycle
+    operation is already in progress. An already committed verdict is returned
+    as-is — a commit is never rewritten. `stop_proven` is the caller's fresh
+    evidence that the stop completed (see `survivors_blocking_commit`).
+    """
+    run_dir = os.path.abspath(str(run_dir))
+    op = operation_of(run_dir, generation=str(expect_generation or ""))
+    with mutex_of(op, claim_wait) as held:
+        if not held:
+            warn(guard_refusal(op, GUARD_BUSY, ""))
+            return read_state_file(run_dir)
+        return commit_terminal(op, read_state_file(run_dir), exit_code, recovered=recovered,
+                               note=note, extra=extra, stop_proven=stop_proven)
+
+
+def repair_marker_locked(op: Operation, state=None) -> bool:
+    """Write the compatibility marker for an already committed record, M held.
+
+    This is the only repair a committed run needs: the authority is in
+    `state.json`, and a crash between the commit and the marker leaves a settled
+    run whose marker is missing. Nothing else is written — the committed bytes
+    stay exactly as they are.
+    """
+    record = terminal_snapshot_locked(read_state_file(op.run_dir) if state is None else state)
+    if record is None:
+        return False
+    marker = os.path.join(op.run_dir, "finalized")
+    if marker_text(marker) == str(record.get("exit")):
+        return False
+    write_marker(marker, str(record.get("exit")))
+    return True
+
+
+def _effective_state_locked(op: Operation):
     """(state, recovered): settle a run whose own finalizer did not get that far.
 
-    Two cases, both idempotent and both guarded by the marker: a run still
-    `running` with nothing alive is a crash (finalized `failed`, exit -1,
-    `stale_recovered`), and a run whose state is already terminal but whose
-    `finalized` marker is missing died between publishing the state and writing
-    the marker (finalized again from the exit code it recorded). Only a run that
-    is provably this route's is settled (`is_this_route`): a run root can hold
-    other adapters' runs, and finalizing one of those would rewrite artifacts
-    this adapter never wrote — including emptying an existing `answer.md`.
+    Called with M held (see `effective_state`). A valid terminal commit is
+    returned without rewriting anything except a missing compatibility marker. A
+    state that looks terminal without a valid commit is **uncommitted data**: the
+    adapter does not trust its stored exit code and does not manufacture a
+    verdict — it reports what is there and writes nothing. A run still `running`
+    with nothing alive is a crash and settles as `failed`/`-1` with
+    `stale_recovered`.
 
-    A run whose stop was requested is never settled as a crash: with every
-    enumerated process gone it settles as `killed`/143 (the stop did happen), and
-    while the enumeration is incomplete it stays non-terminal — "the survivors
-    could not be enumerated" is not evidence that there are none. The terminal
-    write is bound to the generation this call decided about.
+    A run whose stop was requested is never settled as a crash: once every
+    recorded process is conclusively gone it settles as `killed`/`143` (the stop
+    did happen), and while the enumeration is incomplete it stays non-terminal —
+    "the survivors could not be enumerated" is not evidence that there are none.
+    A record with no generation authorizes nothing at all.
     """
+    run_dir = op.run_dir
     state = read_state_file(run_dir)
-    if os.path.exists(os.path.join(run_dir, "finalized")):
+    record = terminal_snapshot_locked(state)
+    if record is not None:
+        marker = os.path.join(run_dir, "finalized")
+        if marker_text(marker) != str(record.get("exit")):
+            return state, repair_marker_locked(op, state)
         return state, False
     if not is_this_route(state):
         # Another adapter's run, or a directory whose state names no backend:
@@ -2125,55 +3164,44 @@ def effective_state(run_dir):
     recorded = state.get("state")
     if recorded not in ("running", "done", "killed", "failed"):
         return state, False
-    generation = generation_of(run_dir, state)
+    if not op.generation:
+        # A legacy record: readable, but it cannot authorize a mutation and the
+        # adapter will not invent a generation to manufacture one.
+        return state, False
     if run_alive(run_dir, state) or is_starting(run_dir, state):
         return state, False
     if state.get("stopping"):
-        if stop_unconfirmed(state):
-            # A failed enumeration is never evidence that nobody is alive; a
-            # fresh, complete one is. Only `[]` resolves the stop here.
-            if stop_survivors(run_dir, state) != []:
-                return state, False
-        stopped = finalize(
-            run_dir,
+        if stop_unconfirmed(state) and stop_survivors(run_dir, state) != []:
+            return state, False
+        settled = commit_terminal(
+            op,
+            state,
             KILL_EXIT,
             note=(
                 "stop completed: every process the failed stop recorded is gone; finalized "
                 "from the stop request"
             ),
             extra={"stopped_by": state.get("stopped_by") or "stop-completed"},
-            claim_wait=0.0,
-            expect_generation=generation,
+            stop_proven=True,
         )
-        if not os.path.exists(os.path.join(run_dir, "finalized")):
-            return stopped, False
-        return stopped, True
+        return settled, terminal_snapshot_locked(settled) is not None
     if recorded == "running":
-        recovered_state = finalize(
-            run_dir, -1, recovered=True, claim_wait=0.0, expect_generation=generation
-        )
-        if not os.path.exists(os.path.join(run_dir, "finalized")):
-            # Another finalizer holds the claim, or this path was meanwhile
-            # replaced: nothing was written here, so nothing was recovered.
-            return recovered_state, False
-        return recovered_state, True
-    exit_code = state.get("exit")
-    if not isinstance(exit_code, int) or isinstance(exit_code, bool):
-        exit_code = -1
-    repaired = finalize(
-        run_dir,
-        exit_code,
-        note=(
-            f"state.json was published as {recorded} without the finalized marker (the "
-            "finalizer died between the two); finalized again from the recorded exit code"
-        ),
-        extra={"finalize_repaired": True},
-        claim_wait=0.0,
-        expect_generation=generation,
-    )
-    if not os.path.exists(os.path.join(run_dir, "finalized")):
-        return repaired, False
-    return repaired, True
+        recovered = commit_terminal(op, state, -1, recovered=True)
+        return recovered, terminal_snapshot_locked(recovered) is not None
+    return state, False
+
+
+def effective_state(run_dir):
+    """Acquire M and settle a run whose own finalizer did not get that far.
+
+    A reader that cannot take M writes nothing and reports the run as it is on
+    disk — never a finalization it did not perform.
+    """
+    op = operation_of(run_dir)
+    with mutex_of(op) as held:
+        if not held:
+            return read_state_file(run_dir), False
+        return _effective_state_locked(op)
 
 
 def reported_state(state) -> dict:
@@ -2183,26 +3211,28 @@ def reported_state(state) -> dict:
 def lifecycle_of(run_dir, state) -> str:
     """The one lifecycle word every reader reports, out of the shared vocabulary.
 
-    `terminal` needs the `finalized` marker — a state word alone is not proof of
-    anything. `live` needs a recorded process that is still that process (or a run
+    `terminal` needs a *validated terminal commit* — a state word is not proof of
+    anything, and neither is the compatibility marker, which is written after the
+    commit. `live` needs a recorded process that is still that process (or a run
     still inside its startup grace). The two `stopping` answers keep "survivors
     known" apart from "the enumeration failed", so a failed stop can never be
     read as a finished one; `unknown (no state)` is the honest answer for a
     directory that never recorded a state, and `read-only` is another backend's
-    run, which this route reports but never judges.
+    run, which this route reports but never judges. A state that looks terminal
+    without a valid commit is uncommitted data and is reported as unfinished.
     """
     state = state or {}
     if not state.get("state"):
         return LIFECYCLE_UNKNOWN
     if not is_this_route(state):
         return LIFECYCLE_FOREIGN
-    if os.path.exists(os.path.join(run_dir, "finalized")):
+    if terminal_snapshot_locked(state) is not None:
         return LIFECYCLE_TERMINAL
     if state.get("stopping"):
         if stop_unconfirmed(state):
             return LIFECYCLE_STOPPING_UNKNOWN
         return LIFECYCLE_STOPPING_KNOWN
-    if run_alive(run_dir, state) or is_starting(run_dir, state) or starting_claim(run_dir):
+    if run_alive(run_dir, state) or is_starting(run_dir, state):
         return LIFECYCLE_LIVE
     return LIFECYCLE_GONE
 
@@ -2438,8 +3468,58 @@ def write_replay(run_dir, payload) -> None:
     os.chmod(path, 0o755)
 
 
+def target_expectation(run_dir):
+    """What the target path holds right now: (kind, generation-or-route).
+
+    Kinds: `absent` (nothing there), `empty` (a directory with no run markers),
+    `this-route` (a recorded run of this route, with its generation), `other`
+    (another backend's run, with that backend) and `unproven` (run markers but no
+    readable state, so the route cannot be established). `start` captures this
+    under M and re-checks it under M immediately before it initializes anything: a
+    path that changed in between is refused, never written.
+    """
+    if not os.path.isdir(run_dir):
+        return ("absent", "")
+    state = read_state_file(run_dir)
+    if not state or not state.get("state"):
+        markers = ("state.json", "lock", "prompt.md")
+        if not any(os.path.exists(os.path.join(run_dir, marker)) for marker in markers):
+            return ("empty", "")
+        return ("unproven", "")
+    if not is_this_route(state):
+        return ("other", route_of(state))
+    return ("this-route", strict_generation(state))
+
+
+def describe_expectation(expectation) -> str:
+    kind, detail = expectation
+    if kind == "absent":
+        return "nothing"
+    if kind == "empty":
+        return "no recorded run"
+    if kind == "this-route":
+        return f"this route's generation {detail or 'unknown'}"
+    if kind == "other":
+        return f"backend {detail or 'unknown'}"
+    return "a directory whose route cannot be established"
+
+
 def move_aside(run_dir) -> str:
-    """Keep the previous run of a slug instead of deleting it."""
+    """Keep the previous run of a slug instead of deleting it.
+
+    Only a directory that is provably this route's — it records `backend: dsh` —
+    or one that holds no run markers at all is moved aside. A directory whose
+    ownership cannot be established is not permission to move it: doing so would
+    mix two routes' artifacts under one slug, and the foreign run's own readers
+    would follow it into the archive.
+    """
+    kind, detail = target_expectation(run_dir)
+    if kind in ("other", "unproven"):
+        warn(
+            f"not moving {run_dir} aside: it holds {describe_expectation((kind, detail))}, "
+            "which is not provably this route's"
+        )
+        return ""
     for attempt in range(20):
         suffix = datetime.now().strftime("%H%M%S") + (f"-{attempt}" if attempt else "")
         candidate = f"{run_dir}.prev-{suffix}"
@@ -2556,8 +3636,37 @@ def _start_run_claimed(
     args, run_dir, agent, agent_argv, replace, slug, cwd, prompt_bytes, session_id, max_time,
     profile, mode, policy,
 ):
-    """Check occupancy and initialize only while the stable slug claim is held."""
-    occupant, occupant_state = occupying_run(bucket_root(run_dir), slug)
+    """Capture, re-check and initialize, each step under the lifecycle mutex.
+
+    Three phases, with M released in between so the waits (`stop_run`, the bounded
+    settle wait for a committed stop in `await_settled_stop`, the handshake in
+    `wait_for_start`) hold no lock:
+
+    1. under M: discover any occupant of the slug and capture what the target path
+       holds — an explicit expectation, generation included;
+    2. `--replace` only: stop the captured occupant generation, through the same
+       generation-bound protocol `kill` uses, then wait — bounded, and holding no
+       lock — until the stopped tree is conclusively settled (no recorded process
+       alive and nothing left to enumerate), because the verdict's commit and the
+       tree's disappearance are two events (see `await_settled_stop`);
+    3. under M: re-check the target expectation and the occupant's termination,
+       then move the old run aside and initialize the new generation, still under
+       M, and spawn the runner.
+
+    Any check that does not hold refuses with no move, no spawn and no write into
+    the run directory.
+    """
+    root = bucket_root(run_dir)
+
+    with lifecycle_claim(root, slug, MUTEX_WAIT_SECONDS) as held:
+        if not held:
+            die(
+                f"start: run '{slug}' has a lifecycle operation in progress or its mutex is "
+                f"unavailable (see {lifecycle_lock_path(root, slug)})"
+            )
+        occupant, occupant_state = _occupying_run_locked(root, slug)
+        expected = target_expectation(run_dir)
+
     if occupant:
         if not replace:
             pids = "/".join(str(pid) for pid in recorded_pids(occupant, occupant_state)) or "-"
@@ -2570,107 +3679,147 @@ def _start_run_claimed(
                 f"{route_of(occupant_state) or 'unknown'}, not this route; refusing to stop or "
                 "replace another adapter's run"
             )
-        if not stop_run(occupant, occupant_state):
+        occupant_op = operation_of(occupant, occupant_state)
+        if not stop_run(occupant_op, occupant_state):
             die(f"start: could not stop run '{slug}' (see {occupant})")
-    if os.path.isdir(run_dir):
-        recorded = read_state_file(run_dir)
-        if recorded and not is_this_route(recorded):
-            # Moving it aside is touching it; a run another route recorded stays
-            # where it is, and this start refuses instead of mixing two routes.
+        # The verdict is committed; the tree it describes may still be visibly
+        # present for a moment (the runner that wrote it is exiting, and an
+        # enumeration can answer "unknown" while it does). Wait that moment out —
+        # bounded, holding no lock — before the under-M re-check decides, so the
+        # first momentarily-unproven sample is never read as an unresolved stop.
+        # The refusal below is unchanged: it stands whenever the evidence is still
+        # unproven at the bound.
+        await_settled_stop(occupant, strict_generation(occupant_state))
+
+    with lifecycle_claim(root, slug, MUTEX_WAIT_SECONDS) as held:
+        if not held:
+            die(f"start: run '{slug}' has a lifecycle operation in progress; nothing was written")
+        current = target_expectation(run_dir)
+        if current != expected:
             die(
-                f"start: {run_dir} holds a run of backend {route_of(recorded) or 'unknown'}, "
-                "not this route; refusing to move another adapter's run aside"
+                f"start: {run_dir} changed while run '{slug}' was being prepared "
+                f"({describe_expectation(expected)} → {describe_expectation(current)}); "
+                "nothing was written"
             )
-        if not move_aside(run_dir):
-            # Refuse rather than mix two runs in one directory: the previous run's
-            # `finalized` marker would make the new one look finished.
-            die(f"start: cannot move {run_dir} aside for the new run")
+        if current[0] in ("other", "unproven"):
+            die(
+                f"start: {run_dir} holds {describe_expectation(current)}, not provably this "
+                "route's; refusing to move or writes into it"
+            )
+        if occupant:
+            # A successful stop of one generation is not permission to replace
+            # whatever occupies the path now: recheck the captured generation's
+            # committed verdict and that no owned work is still unproven.
+            stopped_state, _ = _effective_state_locked(operation_of(occupant))
+            if strict_generation(stopped_state) != strict_generation(occupant_state):
+                die(
+                    f"start: run '{slug}' in {occupant} is no longer the generation that was "
+                    "stopped; nothing was written"
+                )
+            if terminal_snapshot_locked(stopped_state) is None:
+                die(
+                    f"start: run '{slug}' in {occupant} has no committed terminal verdict after "
+                    "the stop; refusing to replace it (stop it again, or stop it by hand)"
+                )
+            if run_alive(occupant, stopped_state) or stop_survivors(occupant, stopped_state) != []:
+                die(
+                    f"start: run '{slug}' in {occupant} still has unproven processes; refusing "
+                    "to replace it while a stop is unresolved"
+                )
+        if os.path.isdir(run_dir):
+            if not move_aside(run_dir):
+                # Refuse rather than mix two runs in one directory: the previous
+                # run's committed verdict would make the new one look finished.
+                die(f"start: cannot move {run_dir} aside for the new run")
 
-    os.makedirs(run_dir, exist_ok=True)
-    if not claim_start(run_dir):
-        die(f"start: another start is claiming run '{slug}' (see {run_dir})")
-    with open(os.path.join(run_dir, "prompt.md"), "wb") as handle:
-        handle.write(prompt_bytes)
+        os.makedirs(run_dir, exist_ok=True)
+        with open(os.path.join(run_dir, "prompt.md"), "wb") as handle:
+            handle.write(prompt_bytes)
 
-    state = {
-        "name": slug,
-        "state": "running",
-        "exit": None,
-        "cwd": cwd,
-        "started": now_iso(),
-        # This run generation: the token a terminal write is bound to, so a reader
-        # that decided about the previous run at this path can never finalize this
-        # one (see `finalize`).
-        "generation": new_nonce(),
-        "ended": None,
-        "duration_s": None,
-        "model": None,
-        "thinking": None,
-        "max_time": max_time,
-        "backend": BACKEND,
-        "profile": profile,
-        "permission_mode": mode,
-        "approval_policy": policy,
-        "run_dir": run_dir,
-        "session_id": session_id,
-        "resumed_from": session_id or None,
-        "events_bytes": 0,
-        "events_bytes_total": 0,
-        "events_truncated": False,
-        "events_dropped_bytes": 0,
-        "launcher": ADAPTER,
-        "agent": agent,
-        # What was requested; the runner records what it observed as `detach`.
-        "spawn": {
-            "mode": "hidden-console" if IS_WINDOWS else "new-session",
-            "creationflags": detach_flags(),
-            "platform": sys.platform,
-        },
-    }
-    write_json(os.path.join(run_dir, "state.json"), state)
-    # Written before the spawn so the runner's own update cannot race this one:
-    # `pid` and `agent_pid` (and their identities) belong to the runner,
-    # everything here belongs to `start`.
-    write_json(
-        os.path.join(run_dir, "lock"),
-        {
-            "pid": None,
-            "agent_pid": None,
+        state = {
+            "name": slug,
+            "state": "running",
+            "exit": None,
+            "cwd": cwd,
+            "started": now_iso(),
+            # This run generation: the token every mutation is bound to, so a
+            # reader that decided about the previous run at this path can never
+            # finalize, signal or write into this one (see `guard_locked`).
+            "generation": new_nonce(),
+            "ended": None,
+            "duration_s": None,
+            "model": None,
+            "thinking": None,
+            "max_time": max_time,
             "backend": BACKEND,
-            "started_at": state["started"],
-        },
-    )
-    command = runner_argv(
-        run_dir, os.path.join(run_dir, "prompt.md"), cwd, agent, args, slug, profile, mode, policy
-    )
-    try:
-        write_replay(
-            run_dir,
+            "profile": profile,
+            "permission_mode": mode,
+            "approval_policy": policy,
+            "run_dir": run_dir,
+            "session_id": session_id,
+            "resumed_from": session_id or None,
+            "events_bytes": 0,
+            "events_bytes_total": 0,
+            "events_truncated": False,
+            "events_dropped_bytes": 0,
+            "launcher": ADAPTER,
+            "agent": agent,
+            # What was requested; the runner records what it observed as `detach`.
+            "spawn": {
+                "mode": "hidden-console" if IS_WINDOWS else "new-session",
+                "creationflags": detach_flags(),
+                "platform": sys.platform,
+            },
+        }
+        write_json(os.path.join(run_dir, "state.json"), state)
+        # Written before the spawn so the runner's own update cannot race this one:
+        # `pid` and `agent_pid` (and their identities) belong to the runner,
+        # everything here belongs to `start`. The lock carries the generation, so
+        # a signalling path can require the process metadata to be this run's.
+        write_json(
+            os.path.join(run_dir, "lock"),
             {
-                "name": slug,
-                "argv": command,
-                "agent_argv": agent_argv,
-                "cwd": cwd,
-                "agent": agent,
-                "profile": profile,
-                "permission_mode": mode,
-                "approval_policy": policy,
-                "prompt": os.path.join(run_dir, "prompt.md"),
-                "note": "the exact runner command; a completed replay preserves the previous run",
+                "pid": None,
+                "agent_pid": None,
+                "backend": BACKEND,
+                "generation": state["generation"],
+                "started_at": state["started"],
             },
         )
-    except ValueError as exc:
-        die(f"start: {exc}")
-    # The single-use handshake with the runner this call spawns: the file is read
-    # once and consumed by that runner, and its token travels only in the runner's
-    # own environment. A replay of the recorded run.sh carries neither, so it
-    # takes the slug claim like any other starter (see `runner_main`).
-    with open(os.path.join(run_dir, SPAWN_TOKEN_FILE), "w", encoding="utf-8") as handle:
-        handle.write(new_nonce() + "\n")
-    try:
-        spawn_runner(command, cwd, os.path.join(run_dir, "runner.log"))
-    except OSError as exc:
-        die(f"start: could not start the run: {exc}")
+        command = runner_argv(
+            run_dir, os.path.join(run_dir, "prompt.md"), cwd, agent, args, slug, profile, mode, policy
+        )
+        try:
+            write_replay(
+                run_dir,
+                {
+                    "name": slug,
+                    "argv": command,
+                    "agent_argv": agent_argv,
+                    "cwd": cwd,
+                    "agent": agent,
+                    "profile": profile,
+                    "permission_mode": mode,
+                    "approval_policy": policy,
+                    "prompt": os.path.join(run_dir, "prompt.md"),
+                    "note": "the exact runner command; a completed replay preserves the previous run",
+                },
+            )
+        except ValueError as exc:
+            die(f"start: {exc}")
+        # The single-use handshake with the runner this call spawns: the file
+        # names the generation and a token, the credential travels only in the
+        # runner's own environment, and the runner consumes both. A replay of the
+        # recorded run.sh carries neither, so it takes the slug claim like any
+        # other starter (see `runner_main`).
+        write_json(
+            os.path.join(run_dir, SPAWN_TOKEN_FILE),
+            {"generation": state["generation"], "token": new_nonce()},
+        )
+        try:
+            spawn_runner(command, cwd, os.path.join(run_dir, "runner.log"))
+        except OSError as exc:
+            die(f"start: could not start the run: {exc}")
 
     started, agent_confirmed = wait_for_start(run_dir)
     if not agent_confirmed:
@@ -2738,7 +3887,7 @@ def wait_for_start(run_dir) -> tuple:
         state = read_state_file(run_dir)
         if agent_recorded(state, lock_of(run_dir)):
             return reported_state(state), True
-        if state.get("state") not in (None, "running"):
+        if terminal_snapshot_locked(state) is not None:
             return reported_state(state), False
         if time.monotonic() >= deadline:
             return reported_state(state), False
@@ -2808,7 +3957,7 @@ def cmd_status(args) -> int:
     run_dir = require_run("status", args.name)
     state, recovered = effective_state(run_dir)
     print(json.dumps(events_view(run_dir, state), indent=2, ensure_ascii=False))
-    if recovered:
+    if recovered and state.get("stale_recovered"):
         print("stale_recovered: true")
     return 0
 
@@ -2824,31 +3973,51 @@ def cmd_result(args) -> int:
         "alive": run_alive(run_dir, state),
     }
     print(json.dumps(view, indent=2, ensure_ascii=False))
-    if recovered:
+    if recovered and state.get("stale_recovered"):
         print("stale_recovered: true")
-    answer = os.path.join(run_dir, "answer.md")
-    if os.path.exists(answer):
-        with open(answer, encoding="utf-8", errors="replace") as handle:
-            text = handle.read()
+    record = terminal_snapshot_locked(state)
+    if record is not None:
+        # The committed record is the authority: the answer it carries, not an
+        # independently reopened sidecar.
         print("\n--- answer (first 1500 chars) ---")
-        print(text[:1500])
+        print(str(record.get("answer") or "")[:1500])
+        return 0
+    if not is_this_route(state):
+        # Another route's run: this adapter never judges it and never rewrites it,
+        # so its sidecar is passed through exactly as that route left it.
+        print("\n--- answer (first 1500 chars) ---")
+        print(answer_sidecar(run_dir)[:1500])
     return 0
+
+
+def answer_sidecar(run_dir) -> str:
+    """The `answer.md` of a run as it is on disk, read-only (foreign runs only)."""
+    path = os.path.join(run_dir, "answer.md")
+    if not os.path.exists(path):
+        return ""
+    with open(path, encoding="utf-8", errors="replace") as handle:
+        return handle.read()
 
 
 def cmd_answer(args) -> int:
     run_dir = require_run("answer", args.name)
     state, _recovered = effective_state(run_dir)
-    path = os.path.join(run_dir, "answer.md")
-    if not os.path.exists(path):
-        # The refusal names the lifecycle: "not finished" is a different answer
-        # for a live run, a failed stop and a directory that never had a state.
-        die(
-            f"answer: not finished yet ({lifecycle_of(run_dir, state)}; "
-            f"state {state.get('state') or 'unknown'})"
-        )
-    with open(path, encoding="utf-8", errors="replace") as handle:
-        sys.stdout.write(handle.read())
-    return 0
+    record = terminal_snapshot_locked(state)
+    if record is not None:
+        sys.stdout.write(str(record.get("answer") or ""))
+        return 0
+    if not is_this_route(state) and os.path.exists(os.path.join(run_dir, "answer.md")):
+        # Another route's run, read-only: its file is shown as that route left it.
+        sys.stdout.write(answer_sidecar(run_dir))
+        return 0
+    # Before the commit an `answer.md` may physically exist as a prepared
+    # compatibility artifact; it is not a result, so this refuses — and the
+    # refusal names the lifecycle, because "not finished" is a different answer
+    # for a live run, a failed stop and a directory that never had a state.
+    die(
+        f"answer: not finished yet ({lifecycle_of(run_dir, state)}; "
+        f"state {state.get('state') or 'unknown'})"
+    )
 
 
 def cmd_tail(args) -> int:
@@ -2863,51 +4032,64 @@ def cmd_tail(args) -> int:
     return 0
 
 
-def stop_run(run_dir, state=None, seconds=STOP_WAIT_SECONDS) -> bool:
-    """Ask the run to stop, then force it: True once its finalized marker exists.
+def stop_run(op: Operation, state=None, seconds=STOP_WAIT_SECONDS) -> bool:
+    """Ask the run to stop, then force it: True once a verdict is committed.
+
+    The request is written under M and names this operation's generation, so a
+    stop issued against one generation can never land in the run that replaced
+    it. The wait for the run's own finalizer holds no lock, and is a wait for a
+    *validated terminal snapshot*: a generation change is reported as such, not as
+    a timeout.
 
     A run whose runner is gone cannot execute its own finalizer, so the forced
-    path finalizes the stop itself — as `killed`, exit 143, because that is what
+    path commits the stop itself — as `killed`, exit 143, because that is what
     happened. Recording it as a stale crash (failed, exit -1) would contradict
     both the operator's request and the contract in references/transport.md. A
     stop that is *not* proven complete never finalizes: the run is left (or put)
     in the `stopping` state with what is known, and the caller reports failure.
-    The terminal write is bound to the generation this call decided about.
     """
-    if os.path.exists(os.path.join(run_dir, "finalized")):
+    if terminal_snapshot_locked(read_state_file(op.run_dir)) is not None:
         return True
     if state is None:
-        state = read_state_file(run_dir)
-    generation = generation_of(run_dir, state)
-    request_stop(run_dir)
-    if wait_for_marker(run_dir, seconds):
+        state = read_state_file(op.run_dir)
+    if not request_stop(op):
+        return False
+    waited = wait_for_terminal(op, seconds)
+    if waited == WAIT_TERMINAL:
         return True
+    if waited == WAIT_GENERATION_CHANGED:
+        warn(
+            f"not waiting for {op.run_dir}: it now holds a different generation than the one "
+            "this stop was issued for"
+        )
+        return False
     forced = False
-    if run_alive(run_dir, state):
-        forced = kill_tree(run_dir, state)
-        if forced and wait_for_marker(run_dir, 2.0):
+    if run_alive(op.run_dir, state):
+        forced = kill_tree(op, state)
+        if forced and wait_for_terminal(op, 2.0) == WAIT_TERMINAL:
             # The run's own finalizer observed the force and committed its verdict.
             return True
-    state = read_state_file(run_dir)
-    survivors = stop_survivors(run_dir, state)
+    state = read_state_file(op.run_dir)
+    survivors = stop_survivors(op.run_dir, state)
     if forced or survivors == []:
-        # A platform command proved every recorded tree gone, or a complete
-        # enumeration found nobody alive: the stop did happen, so it is recorded
-        # as `killed`/143 rather than left for the crash-recovery path.
+        # A verified process-instance stop proved every recorded process gone, or
+        # a complete enumeration found nobody alive: the stop did happen, so it is
+        # recorded as `killed`/143 rather than left for the crash-recovery path.
         finalize(
-            run_dir,
+            op.run_dir,
             KILL_EXIT,
             note=(
                 "stopped on request: the run's own finalizer did not complete after the stop "
                 "request, so the stop was recorded here"
             ),
             extra={"stopped_by": "control-file-forced"},
-            expect_generation=generation,
+            expect_generation=op.generation,
+            stop_proven=True,
         )
-        return os.path.exists(os.path.join(run_dir, "finalized"))
+        return terminal_snapshot_locked(read_state_file(op.run_dir)) is not None
     # The tree survived, or nothing could be proven gone: leave the run to the
     # recovery path rather than claiming a stop that did not happen.
-    report_incomplete_stop(run_dir, survivors, "control-file-forced")
+    report_incomplete_stop(op, survivors, "control-file-forced")
     return False
 
 
@@ -2919,7 +4101,7 @@ def cmd_kill(args) -> int:
             f"kill: run '{args.name}' is not this route's (backend "
             f"{route_of(state) or 'unknown'}); refusing to signal another adapter's run"
         )
-    if os.path.exists(os.path.join(run_dir, "finalized")):
+    if terminal_snapshot_locked(state) is not None:
         die(f"kill: run '{args.name}' is already finished (state {state.get('state')})")
     if (
         not run_alive(run_dir, state)
@@ -2927,13 +4109,20 @@ def cmd_kill(args) -> int:
         and not state.get("stopping")
     ):
         die(f"kill: no live process recorded for '{args.name}' (state {state.get('state')})")
-    pids = "/".join(str(pid) for pid in recorded_pids(run_dir, state)) or "-"
-    stop_run(run_dir, state, seconds=stop_wait_seconds())
-    final = reported_state(read_state_file(run_dir))
-    if not os.path.exists(os.path.join(run_dir, "finalized")):
+    op = operation_of(run_dir, state)
+    if not op.generation:
         die(
-            f"kill: run '{args.name}' did not settle ({lifecycle_of(run_dir, final)}); "
-            f"nothing left to finalize it yet — see {run_dir}"
+            f"kill: cannot confirm the run generation of '{args.name}' (its record names none, "
+            "and a legacy run is not an authorization token); no stop request was written"
+        )
+    pids = "/".join(str(pid) for pid in recorded_pids(run_dir, state)) or "-"
+    stop_run(op, state, seconds=stop_wait_seconds())
+    final = reported_state(read_state_file(run_dir))
+    if terminal_snapshot_locked(final) is None:
+        die(
+            f"kill: cannot confirm the stop of '{args.name}' ({lifecycle_of(run_dir, final)}); "
+            f"no terminal verdict is committed and nothing further will be signalled — "
+            f"see {run_dir}"
         )
     print(f"killed: {args.name} (pid {pids}) state={final.get('state')} exit={final.get('exit')}")
     return 0
@@ -2956,49 +4145,51 @@ def drain(stream, log, track) -> None:
             pass
 
 
-def make_tracker(run_dir, state, state_path):
+def make_tracker(op: Operation, state) -> tuple:
     """A per-line hook that keeps session.id and the live counters current.
 
     dsh's opening `session` event carries `sessionId` (not the `id` the shared
     writer looks for), so the runner persists session.id itself; the counters let
     `status` describe a live run without re-reading the retained log.
 
-    Returns `(track, stop)`. `stop()` ends publication for good and waits for any
-    in-flight write; the runner calls it before finalizing, because a reader
-    thread still draining a stream a descendant kept open must never publish its
-    stale `running` snapshot over the committed verdict. `publish` itself refuses
-    to run once a `finalized` marker exists and holds the same lock throughout,
-    so publication and finalization are serialized, not merely reordered.
+    Returns `(track, stop)`. Publication happens inside M for the generation this
+    tracker was created for, after the guard accepted it: the state is re-read and
+    the tracker's fields merged into it, never a whole `running` snapshot
+    republished over a concurrent `stopping` update, and a committed verdict or a
+    replaced generation ends publication for good. M is also the stop barrier —
+    `stop()` marks publication finished and then takes M, so once it returns no
+    write this tracker started can still land, without a second mutex of its own.
     """
     seen = {"session_id": state.get("session_id") or "", "turns": 0, "tool_calls": 0}
     last = {"at": 0.0}
-    session_path = os.path.join(run_dir, "session.id")
-    finalized_path = os.path.join(run_dir, "finalized")
-    lock = threading.Lock()
     stopped = threading.Event()
+
+    def publish_locked(session_id=None):
+        verdict, current, _detail = guard_locked(op)
+        if verdict != GUARD_OK:
+            # A committed verdict (or a replaced generation, or a foreign route):
+            # nothing this tracker has to say may be published any more.
+            stopped.set()
+            return False
+        fields = {
+            "session_id": seen["session_id"],
+            "turns": seen["turns"],
+            "tool_calls": seen["tool_calls"],
+        }
+        if session_id is not None:
+            write_text_atomic(os.path.join(op.run_dir, "session.id"), session_id + "\n")
+        merge_state_locked(op, fields, current)
+        return True
 
     def publish(force=False):
         now = time.monotonic()
         if not force and now - last["at"] < STATE_REFRESH_SECONDS:
             return
-        with lock:
-            if stopped.is_set():
+        with mutex_of(op, wait=None) as held:
+            if not held or stopped.is_set():
                 return
             last["at"] = now
-            if os.path.exists(finalized_path):
-                # The terminal state is already committed (by this run's own
-                # finalizer or by a reader that settled it): never rewrite it.
-                stopped.set()
-                return
-            write_json(
-                state_path,
-                {
-                    **state,
-                    "session_id": seen["session_id"],
-                    "turns": seen["turns"],
-                    "tool_calls": seen["tool_calls"],
-                },
-            )
+            publish_locked()
 
     def track(raw):
         try:
@@ -3009,18 +4200,12 @@ def make_tracker(run_dir, state, state_path):
             return
         kind = event.get("type")
         changed = False
+        session_id = None
         if kind == "session":
-            session_id = event.get("sessionId")
-            if isinstance(session_id, str) and session_id and session_id != seen["session_id"]:
-                seen["session_id"] = session_id
-                with lock:
-                    if stopped.is_set():
-                        return
-                    try:
-                        with open(session_path, "w", encoding="utf-8") as handle:
-                            handle.write(session_id + "\n")
-                    except OSError:
-                        pass
+            found = event.get("sessionId")
+            if isinstance(found, str) and found and found != seen["session_id"]:
+                seen["session_id"] = found
+                session_id = found
                 changed = True
         elif kind == "status" and event.get("phase") == "turn_end":
             seen["turns"] += 1
@@ -3028,41 +4213,59 @@ def make_tracker(run_dir, state, state_path):
         elif kind == "tool_call":
             seen["tool_calls"] += 1
             changed = True
-        if changed:
-            publish(force=kind == "session")
+        if not changed:
+            return
+        if kind == "session":
+            with mutex_of(op, wait=None) as held:
+                if not held or stopped.is_set():
+                    return
+                publish_locked(session_id=session_id)
+            return
+        publish()
 
     def stop():
         stopped.set()
-        # Serialize with a write already in flight: once this returns, nothing
-        # this tracker publishes can land after it.
-        with lock:
+        # The publication barrier: any write in flight holds M, so taking it here
+        # means it has finished before this returns.
+        with mutex_of(op, wait=None):
             pass
 
     return track, stop
 
 
-def wait_for_agent(process, run_dir, requested: threading.Event, deadline, agent_identity="") -> tuple:
-    """Wait for dsh, honouring the stop control file, a signal, and the deadline.
+def wait_for_agent(process, op, generation, requested: threading.Event, deadline,
+                   agent_identity="") -> tuple:
+    """Wait for dsh, honouring its own generation's stop request, a signal, a deadline.
 
     Returns (exit code, survivors, stopped_by): the second is the stop's outcome
     (`terminate_agent`): `[]` when the stop is proven complete, a list naming each
     survivor as (pid, identity, group) when it is not, `None` when it is not and
     the survivors could not be enumerated. The third names what ended the run
     ("control-file", "signal", "deadline") or "" when dsh ended by itself.
-    `agent_identity` is the token read when dsh was spawned; it gates every signal
-    so a reused pid is never signalled.
+
+    The control-file branch is generation-bound: a request is read under M and is
+    actionable only when its generation equals this runner's captured generation
+    *and* the generation the current state records. A different generation's
+    request is not this runner's to act on — and is never deleted, because it
+    belongs to whoever wrote it. A signal delivered to this runner's own handler
+    belongs to this runner instance; every publication it leads to is still bound
+    to the captured generation. `agent_identity` is the token read when dsh was
+    spawned; it gates every signal so a reused pid is never signalled.
     """
-    stop_path = os.path.join(run_dir, "stop")
     while True:
         exit_code = process.poll()
         if exit_code is not None:
             return exit_code, [], ""
-        if requested.is_set() or os.path.exists(stop_path):
-            reason = "control-file" if os.path.exists(stop_path) else "signal"
-            code, survivors = terminate_agent(process, agent_identity)
+        requested_stop = False
+        with mutex_of(op, wait=None) as held:
+            if held:
+                requested_stop = bool(stop_request_for(op.run_dir, generation))
+        if requested.is_set() or requested_stop:
+            reason = "control-file" if requested_stop else "signal"
+            code, survivors = terminate_agent(process, op, agent_identity)
             return code, survivors, reason
         if deadline is not None and time.monotonic() >= deadline:
-            code, survivors = terminate_agent(process, agent_identity)
+            code, survivors = terminate_agent(process, op, agent_identity)
             return code, survivors, "deadline"
         time.sleep(POLL_SECONDS)
 
@@ -3084,89 +4287,118 @@ def stop_note(records, complete) -> str:
     )
 
 
-def report_incomplete_stop(run_dir, survivors, stopped_by="") -> int:
+def report_incomplete_stop(op: Operation, survivors, stopped_by="") -> int:
     """Publish a stop that failed: the run stays live/stopping, never finalized.
 
-    A `killed`+`finalized` run whose processes are still alive tells every reader
-    the slot is free — `kill` refuses to touch it and `start` no longer sees the
-    slug as occupied — while the survivors keep writing to the worktree. This is
-    the opposite record: the run stays `running` with `stopping: true`, and the
+    A committed `killed` verdict with processes still alive tells every reader the
+    slot is free — `kill` refuses to touch it and `start` no longer sees the slug
+    as occupied — while the survivors keep writing to the worktree. This is the
+    opposite record: the run stays `running` with `stopping: true`, and the
     survivors are named (pid, identity, group) in `state.json` and `lock`, so
     `run_alive` still finds them, the slug stays occupied, and a later `kill`
     signals their group through a verified member and settles the run.
 
-    `survivors` is `terminate_agent`'s second outcome: a list of what was still
-    alive, or `None` when the enumeration itself failed. The difference is
-    recorded as `survivors_complete`, and it is not cosmetic: a run whose
-    enumeration failed is never finalized on the strength of "nothing was found
-    alive", on this platform or any other. Survivors named by an earlier failed
-    stop are kept, so a later attempt still has their identities to verify.
+    The report is generation-bound and guarded under M: a generation that changed,
+    a foreign run, or an already committed verdict makes it write neither the
+    state nor the lock — a late report from an old operation may not revive a run
+    that has since been replaced or settled. `survivors` is `terminate_agent`'s
+    second outcome: a list of what was still alive, or `None` when the enumeration
+    itself failed (recorded as `survivors_complete: false`, which no reader may
+    read as "nobody is alive"). Survivors named by an earlier failed stop are kept,
+    so a later attempt still has their identities to verify.
     """
-    state = read_state_file(run_dir)
-    merged = {
-        pid: {"pid": pid, "identity": identity, "group": group}
-        for pid, identity, group in recorded_survivors(run_dir, state)
-    }
-    for pid, identity, group in survivors or []:
-        merged[pid] = {"pid": pid, "identity": identity, "group": group}
-    if survivors is None:
-        # Even a failed enumeration knows which recorded processes are still
-        # alive, and their group ids: record them, so a later attempt has real
-        # identities to verify instead of starting from nothing.
-        for pid, identity in recorded_processes(run_dir, state):
-            if not pid_alive(pid) or identity_changed(pid, identity) or pid in merged:
-                continue
-            group = process_group(pid)
-            merged[pid] = {
-                "pid": pid,
-                "identity": identity,
-                "group": group if group > 0 else 0,
-            }
-    records = list(merged.values())
-    complete = survivors is not None
-    state.update(
-        {
+    with mutex_of(op, MUTEX_WAIT_SECONDS) as held:
+        if not held:
+            warn(guard_refusal(op, GUARD_BUSY, ""))
+            return 1
+        verdict, state, detail = guard_locked(op)
+        if verdict == GUARD_TERMINAL:
+            warn(
+                f"not reporting an incomplete stop for {op.run_dir}: a terminal verdict is "
+                "already committed"
+            )
+            return 1
+        if verdict != GUARD_OK:
+            warn(guard_refusal(op, verdict, detail))
+            return 1
+        merged = {
+            pid: {"pid": pid, "identity": identity, "group": group}
+            for pid, identity, group in recorded_survivors(op.run_dir, state)
+        }
+        for pid, identity, group in survivors or []:
+            merged[pid] = {"pid": pid, "identity": identity, "group": group}
+        if survivors is None:
+            # Even a failed enumeration knows which recorded processes are still
+            # alive, and their group ids: record them, so a later attempt has real
+            # identities to verify instead of starting from nothing.
+            for pid, identity in recorded_processes(op.run_dir, state):
+                if liveness_of(pid) == GONE or identity_changed(pid, identity) or pid in merged:
+                    continue
+                group = process_group(pid)
+                merged[pid] = {
+                    "pid": pid,
+                    "identity": identity,
+                    "group": group if group > 0 else 0,
+                }
+        records = list(merged.values())
+        complete = survivors is not None
+        fields = {
             "state": "running",
             "stopping": True,
             "survivors": records,
             "survivors_complete": complete,
             "note": stop_note(records, complete),
         }
-    )
-    if stopped_by:
-        state["stopped_by"] = stopped_by
-    write_json(os.path.join(run_dir, "state.json"), state)
-    update_lock(run_dir, survivors=records)
+        if stopped_by:
+            fields["stopped_by"] = stopped_by
+        state = merge_state_locked(op, fields, state)
+        merge_lock_locked(op, survivors=records)
     listed = ",".join(str(record["pid"]) for record in records) if complete else "unknown"
     print(
         f"[stop-incomplete] {state.get('name')} state=running survivors={listed}",
         flush=True,
     )
     warn(
-        f"run in {run_dir} still has live processes after the stop; left running/stopping, "
+        f"run in {op.run_dir} still has live processes after the stop; left running/stopping, "
         "not finalized"
     )
     return 1
 
 
-def runner_token_ok(run_dir) -> bool:
-    """Was this process spawned by the `start` that owns this run directory?
+def consume_spawn_credential_locked(op: Operation) -> str:
+    """Consume the single-use handshake for this run, with M held.
 
-    `start` writes a single-use token into `spawn.token` and passes the same token
-    in `DSH_RUN_SPAWN_TOKEN` to the one runner it spawns. The file is consumed
-    here, so a hand replay of the recorded `run.sh`/`run.cmd` — which carries no
-    environment token — can never present it and must take the slug claim like
-    every other entry point that can start an agent.
+    The credential in the environment carries both the generation and the token;
+    the handshake file carries the same pair. Both halves must match *and* the
+    generation must be the one the run records, or nothing is consumed and the
+    caller is not the runner `start` spawned. On success the file and the
+    environment variable are consumed together, so a hand replay of the recorded
+    `run.sh`/`run.cmd` — which carries no credential — cannot present it, and a
+    credential minted for another generation cannot adopt this run. Returns the
+    generation the credential proves, or "".
     """
-    token = os.environ.get(RUNNER_TOKEN_ENV) or ""
-    if not token:
-        return False
-    try:
-        with open(os.path.join(run_dir, SPAWN_TOKEN_FILE), encoding="utf-8") as handle:
-            recorded = handle.read().strip()
-    except OSError:
-        return False
-    return bool(recorded) and recorded == token
+    raw = os.environ.get(RUNNER_TOKEN_ENV) or ""
+    if ":" not in raw:
+        return ""
+    generation, token = raw.split(":", 1)
+    recorded_generation, recorded_token = spawn_credentials(op)
+    if not generation or not token or not recorded_token:
+        return ""
+    if generation != recorded_generation or token != recorded_token:
+        warn(
+            f"refusing to run {op.run_dir}: the spawn credential does not match the handshake "
+            "recorded for this run"
+        )
+        return ""
+    if strict_generation(read_state_file(op.run_dir)) != generation:
+        warn(
+            f"refusing to run {op.run_dir}: the spawn credential names generation {generation}, "
+            "which is not the generation the run records"
+        )
+        return ""
+    remove_quietly(os.path.join(op.run_dir, SPAWN_TOKEN_FILE))
+    os.environ.pop(RUNNER_TOKEN_ENV, None)
+    return generation
 
 
 def runner_main(args) -> int:
@@ -3174,21 +4406,18 @@ def runner_main(args) -> int:
 
     Two entries reach this function, and only one of them already has an owner:
     the runner `start` spawned while holding the slug claim (proved by the
-    single-use token), and a replay of a recorded `run.sh`/`run.cmd` — of a
-    finished run, or a takeover of a run that died unfinished. The replay must
-    take the stable slug claim itself, so two replays, or a replay racing a
-    `start`, still produce exactly one agent; the loser writes nothing and says
-    why. The claim is `<run root>/<slug>.start.lock`, a sibling of every date
-    bucket, so replacing the run directory does not move it.
+    generation-stamped, single-use credential it alone was given), and a replay of
+    a recorded `run.sh`/`run.cmd` — of a finished run, or a takeover of a run that
+    died unfinished. The replay must take the stable slug claim itself, so two
+    replays, or a replay racing a `start`, still produce exactly one agent; the
+    loser writes nothing and says why. The claim is
+    `<run root>/<slug>.start.lock`, a sibling of every date bucket, so replacing
+    the run directory does not move it. The authenticated branch takes no claim:
+    its parent holds it until this process has recorded that it owns the run.
     """
-    run_dir = args.run_dir
-    state = read_state_file(run_dir)
-    if runner_token_ok(run_dir):
-        # `start` owns this directory and still holds the slug claim: take over
-        # without claiming it again, and consume the handshake so a replay cannot.
-        remove_quietly(os.path.join(run_dir, SPAWN_TOKEN_FILE))
-        os.environ.pop(RUNNER_TOKEN_ENV, None)
-        return _runner_main(args, run_dir, state, claim_held=False, release_claim=None)
+    run_dir = os.path.abspath(str(args.run_dir))
+    if os.environ.get(RUNNER_TOKEN_ENV):
+        return _runner_main(args, run_dir, claim_held=False, release_claim=None)
     slug = sanitize(args.name) or sanitize(os.path.basename(run_dir))
     if not slug:
         warn(f"refusing to run {run_dir}: no run name is recorded for it")
@@ -3201,89 +4430,98 @@ def runner_main(args) -> int:
                 f"(see {os.path.join(root, slug + '.start.lock')}); one run, one agent"
             )
             return 1
-        return _runner_main(
-            args, run_dir, read_state_file(run_dir), claim_held=True,
-            release_claim=stack.close,
-        )
+        return _runner_main(args, run_dir, claim_held=True, release_claim=stack.close)
 
 
-def _runner_main(args, run_dir, state, claim_held, release_claim) -> int:
+def _runner_main(args, run_dir, claim_held, release_claim) -> int:
     """One dsh task, with the slug claim's state made explicit.
 
     `claim_held` is True only when this process holds the slug claim itself, and
-    therefore may run the fresh-start path (`_start_run_claimed`) that assumes
-    the claim is held. The runner `start` spawned does not hold it (its parent
-    does), and a finished run appearing there is a refusal, never a replay.
-    `release_claim` gives the claim up as soon as this process has recorded that
-    it owns the run: after that every other entry sees a live run and refuses, and
-    holding the claim for the agent's whole life would block `start --replace`.
+    therefore may run the fresh-start path (`start_run`) that assumes the claim is
+    held. The runner `start` spawned does not hold it (its parent does), and a
+    finished run appearing here is a refusal, never a replay.
+
+    All of the ownership work happens in one M scope — credential consumption,
+    generation revalidation, the liveness refusal, agent spawn and the recording
+    of the runner's and the agent's pid/identity — and M is released before any
+    wait. `release_claim` gives the claim up as soon as this process has recorded
+    that it owns the run: after that every other entry sees a live run and
+    refuses, and holding the claim for the agent's whole life would block
+    `start --replace`.
     """
-    state_path = os.path.join(run_dir, "state.json")
-    if os.path.exists(os.path.join(run_dir, "finalized")):
+    state = read_state_file(run_dir)
+    if terminal_snapshot_locked(state) is not None:
         if not claim_held:
             warn(
                 f"refusing to run {run_dir}: the run is finished and this invocation does not "
                 "hold its slug claim; replay it through the recorded script so the claim is taken"
             )
             return 1
-        # Replay must initialize before touching any finished artifact. Keep the
-        # recorded command's paths and agent, not the caller's current defaults.
+        # A replay initializes a fresh generation before touching any finished
+        # artifact, and keeps the recorded command's paths and agent rather than
+        # the caller's current defaults.
         return start_run(
             args, run_dir, args.agent, False, args.profile, args.permission_mode,
             args.approval_policy, claim_held=True,
         )
-    if run_alive(run_dir, state):
-        # A hand replay of `run.sh`/`run.cmd` arrives here too, and `start`'s
-        # ownership of a live slug must hold for this entry as well: replaying a
-        # run that is still live would overwrite its runner pid, reopen its
-        # artifacts and start a second agent on the same cwd.
-        pids = "/".join(str(pid) for pid in recorded_pids(run_dir, state)) or "-"
+    if claim_held and state.get("state") in ("done", "killed", "failed"):
         warn(
-            f"refusing to run {run_dir}: this run is still live (pids {pids}); stop it with "
-            "`kill` before replaying, so two agents never share one cwd"
+            f"refusing to run {run_dir}: its state records {state.get('state')} without a "
+            "committed terminal record (uncommitted data); clear the directory or record a "
+            "verdict before replaying"
         )
         return 1
-    generation = state.get("generation") or None
-    if (args.approval_policy or DEFAULT_APPROVAL_POLICY) != DEFAULT_APPROVAL_POLICY:
-        # A replay of an older run may carry a policy this route can no longer
-        # honour. Refuse it where the run's own finalizer can record why.
-        note = (
-            f"refused approval policy {args.approval_policy!r}: a detached run has no live "
-            f"approval channel, so only {DEFAULT_APPROVAL_POLICY!r} can be honoured"
-        )
-        finalize(run_dir, 127, note=note, expect_generation=generation)
-        warn(note)
-        return 1
-    # Claim the lock `start` wrote before the spawn: the runner owns pid and
-    # agent_pid, `start` owns everything else, so no read-modify-write can drop a
-    # field that raced it. The identity is read now, at spawn, and never guessed
-    # from a pid later.
-    self_identity = process_identity(os.getpid())
-    update_lock(run_dir, pid=os.getpid(), pid_identity=self_identity)
-    # The run owns itself now: the start claim exists only for the window before
-    # this process recorded a pid.
-    remove_quietly(os.path.join(run_dir, "start.lock"))
-    state["pid"] = os.getpid()
-    state["pid_identity"] = self_identity
-    state["detach"] = observe_detachment()
-    state["interpreter"] = interpreter()
-    write_json(state_path, state)
-    if release_claim is not None:
-        # Ownership is recorded (this pid, this identity): the run is live to
-        # every other entry now, so the claim has done its job.
-        release_claim()
-
-    if not os.path.isfile(args.prompt):
-        finalize(run_dir, 127, note=f"prompt missing: {args.prompt}",
-                 expect_generation=generation)
-        return 1
-
-    with open(os.path.join(run_dir, "stderr.log"), "ab") as stderr:
+    generation = strict_generation(state)
+    op = operation_of(run_dir, state, generation)
+    log = None
+    process = None
+    agent_identity = ""
+    argv = []
+    outcome = None
+    with mutex_of(op, MUTEX_WAIT_SECONDS) as held:
+        if not held:
+            warn(guard_refusal(op, GUARD_BUSY, ""))
+            return 1
+        if not claim_held and not consume_spawn_credential_locked(op):
+            warn(
+                f"refusing to run {run_dir}: this invocation holds no valid spawn credential "
+                "for the run generation it would take over"
+            )
+            return 1
+        verdict, fresh, detail = guard_locked(op)
+        if verdict != GUARD_OK:
+            warn(guard_refusal(op, verdict, detail))
+            return 1
+        if run_alive(run_dir, fresh):
+            # A hand replay of `run.sh`/`run.cmd` arrives here too, and `start`'s
+            # ownership of a live slug must hold for this entry as well: replaying
+            # a run that is still live would overwrite its runner pid, reopen its
+            # artifacts and start a second agent on the same cwd.
+            pids = "/".join(str(pid) for pid in recorded_pids(run_dir, fresh)) or "-"
+            warn(
+                f"refusing to run {run_dir}: this run is still live (pids {pids}); stop it "
+                "with `kill` before replaying, so two agents never share one cwd"
+            )
+            return 1
+        if (args.approval_policy or DEFAULT_APPROVAL_POLICY) != DEFAULT_APPROVAL_POLICY:
+            # A replay of an older run may carry a policy this route can no longer
+            # honour. Refuse it where the run's own finalizer can record why.
+            note = (
+                f"refused approval policy {args.approval_policy!r}: a detached run has no live "
+                f"approval channel, so only {DEFAULT_APPROVAL_POLICY!r} can be honoured"
+            )
+            commit_terminal(op, fresh, 127, note=note)
+            warn(note)
+            return 1
+        if not os.path.isfile(args.prompt):
+            commit_terminal(op, fresh, 127, note=f"prompt missing: {args.prompt}")
+            warn(f"prompt missing: {args.prompt}")
+            return 1
         try:
-            log = EventLog(run_dir)
+            log = EventLog(op)
         except (RuntimeError, OSError, KeyError) as exc:
-            finalize(run_dir, 127, note=f"event writer unavailable: {exc}",
-                     expect_generation=generation)
+            commit_terminal(op, fresh, 127, note=f"event writer unavailable: {exc}")
+            warn(f"event writer unavailable: {exc}")
             return 1
         session_id = args.session_id or args.resume or ""
         try:
@@ -3292,40 +4530,70 @@ def _runner_main(args, run_dir, state, claim_held, release_claim) -> int:
                 agent_args(session_id, args.profile, args.permission_mode, args.approval_policy),
             )
         except ValueError as exc:
-            log.finish()
-            finalize(
-                run_dir, 127, note=f"cannot dispatch the agent: {exc}",
-                extra={"error": str(exc)}, expect_generation=generation,
+            outcome = (127, f"cannot dispatch the agent: {exc}", {"error": str(exc)})
+        else:
+            self_identity = process_identity(os.getpid())
+            # A stop that arrived before the agent was spawned is honoured here:
+            # the run was stopped, so no agent is started for it.
+            requested_before_spawn = bool(stop_request_for(run_dir, generation))
+            if not requested_before_spawn:
+                with open(os.path.join(run_dir, "stderr.log"), "ab") as stderr:
+                    try:
+                        process = spawn_agent(argv, args.cwd, stderr, args.prompt)
+                    except OSError as exc:
+                        outcome = (127, f"agent did not start: {exc}", {"error": str(exc)})
+                if process is not None:
+                    agent_identity = process_identity(process.pid)
+            merge_state_locked(
+                op,
+                {
+                    "pid": os.getpid(),
+                    "pid_identity": self_identity,
+                    "detach": observe_detachment(),
+                    "interpreter": interpreter(),
+                    "agent_pid": process.pid if process is not None else None,
+                    "agent_pid_identity": agent_identity or None,
+                    "agent_argv": argv if process is not None else None,
+                    "stopped_before_agent_spawn": requested_before_spawn or None,
+                },
+                fresh,
             )
-            warn(f"cannot dispatch the agent: {exc}")
-            return 1
-        try:
-            process = spawn_agent(argv, args.cwd, stderr, args.prompt)
-        except OSError as exc:
-            log.finish()
-            finalize(
-                run_dir, 127, note=f"agent did not start: {exc}",
-                extra={"error": str(exc)}, expect_generation=generation,
+            merge_lock_locked(
+                op,
+                pid=os.getpid(),
+                pid_identity=self_identity,
+                agent_pid=process.pid if process is not None else None,
+                agent_pid_identity=agent_identity or None,
             )
-            warn(f"agent did not start: {exc}")
-            return 1
-        agent_identity = process_identity(process.pid)
-        state["agent_pid"] = process.pid
-        state["agent_pid_identity"] = agent_identity
-        state["agent_argv"] = argv
-        write_json(state_path, state)
-        update_lock(run_dir, agent_pid=process.pid, agent_pid_identity=agent_identity)
-
+    if release_claim is not None:
+        # Ownership is recorded (this pid, this identity): the run is live to
+        # every other entry now, so the claim has done its job.
+        release_claim()
+    if outcome is not None:
+        if log is not None:
+            log.finish()
+        finalize(
+            run_dir, outcome[0], note=outcome[1], extra=outcome[2],
+            expect_generation=generation,
+        )
+        warn(outcome[1])
+        return 1
+    if process is None:
+        # The stop arrived before the agent was spawned: the run was stopped, and
+        # its own finalizer records that rather than reporting a dispatch.
+        exit_code, survivors, stopped_by = KILL_EXIT, [], "control-file"
+        extra = {}
+    else:
         requested = threading.Event()
         install_stop_handler(requested)
-        tracker, stop_tracker = make_tracker(run_dir, state, state_path)
+        tracker, stop_tracker = make_tracker(op, read_state_file(run_dir))
         reader = threading.Thread(target=drain, args=(process.stdout, log, tracker), daemon=True)
         reader.start()
         deadline = None
         if args.max_time:
             deadline = time.monotonic() + float(args.max_time)
         exit_code, survivors, stopped_by = wait_for_agent(
-            process, run_dir, requested, deadline, agent_identity
+            process, op, generation, requested, deadline, agent_identity
         )
         extra = {}
         if stopped_by:
@@ -3335,25 +4603,28 @@ def _runner_main(args, run_dir, state, claim_held, release_claim) -> int:
         reader.join(timeout=drain_timeout_seconds())
         # Publication ends before the terminal state is committed. The reader may
         # still be alive (a descendant holds the stream open) and would otherwise
-        # publish its `running` snapshot over the verdict after the marker exists.
+        # publish its `running` state over the verdict after the commit.
         stop_tracker()
         if reader.is_alive():
             # A descendant of dsh still holds the write end of its stdout. Stop
             # waiting and say in state.json that the tail is missing rather than late.
             warn("the event stream was still open at exit; recording the truncation")
-            state["stream_incomplete"] = True
-            state["note"] = (
-                "finalized while the event stream was still open: a process below dsh held "
-                "its stdout, so the events after this point are missing from the log"
+            write_state_op(
+                op,
+                {
+                    "stream_incomplete": True,
+                    "note": (
+                        "finalized while the event stream was still open: a process below dsh "
+                        "held its stdout, so the events after this point are missing from the log"
+                    ),
+                },
             )
-            write_json(state_path, state)
             extra["stream_incomplete"] = True
         log.finish()
-
     if survivors is None or survivors:
         # The stop did not complete — survivors known, or not enumerable at all:
         # publish that, never a terminal state.
-        return report_incomplete_stop(run_dir, survivors, stopped_by)
+        return report_incomplete_stop(op, survivors, stopped_by)
 
     note = None
     if stopped_by == "control-file":
@@ -3370,7 +4641,7 @@ def _runner_main(args, run_dir, state, claim_held, release_claim) -> int:
         expect_generation=generation,
     )
     print(
-        f"[finalize] {final.get('name')} state={final['state']} exit={exit_code} "
+        f"[finalize] {final.get('name')} state={final.get('state')} exit={exit_code} "
         f"dur={final.get('duration_s')}s turns={final.get('turns')} "
         f"tools={final.get('tool_calls')} session={final.get('session_id') or '-'}",
         flush=True,

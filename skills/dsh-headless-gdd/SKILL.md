@@ -75,7 +75,11 @@ dsh-run.py answer <slug>     # the final assistant text
   `--permission-mode` / `--approval-policy` repeated and `--add-dir` for extra writable paths. The prompt
   must say the run was interrupted, that the tree is mid-flight, and that this continues rather than
   restarts.
-- Parallel goals: different worktrees, different sessions. The same repository never has two writers.
+- Parallel goals: different worktrees, different sessions. **The isolation unit is the worktree/session,
+  not the repository**: several goals of one repository run in parallel in their own worktrees, while the
+  *same* worktree (and the same session) never has two writers — a second concurrent writer to one
+  worktree is refused (`already owned by an active write handle`). Two writers in one worktree would
+  interleave edits, gates and `git status` in exactly the tree a reviewer is inspecting.
 
 A task prompt that keeps a worker inside its lane: repository context **by file path** (never re-narrated),
 an observable done-when, the rules (no commits/pushes, which paths are writable, tests are
@@ -87,6 +91,16 @@ criteria. A resumed round adds the interruption point.
 ```
 success = exit_code == 0, and the last `final` event carries reason.kind == "completed"
 ```
+
+The adapter's exit→state mapping, which is also what `gdd.py` and the observer plugin read:
+
+- `done` — `exit 0` **and** the last `final` event's `reason.kind == "completed"`.
+- `killed` — the adapter stopped the run (its own stop path records exit `143`), **or** the process exited
+  on a signal convention: `130`/`137`/`143` and their raw POSIX forms `-2`/`-9`/`-15`. A signal-convention
+  exit keeps its raw code.
+- `failed` — every other settled outcome: an `exit 0` whose last `final` is missing or not `completed`,
+  any other non-signal, non-zero exit, and the stale-recovery case below.
+- `failed` with exit `-1` and `stale_recovered: true` — the process disappeared without finalizing.
 
 - A runner-level failure emits an `error` event **instead of** `final`; a killed run has no `final`.
 - `tool_result.status == "completed"` means the tool returned — a shell command inside it can exit non-zero.
@@ -104,13 +118,31 @@ a detached run never notifies.
 
 - Stop through the adapter: `dsh-run.py kill <slug>`. It writes the `stop` control file inside the run
   directory (`<run_dir>/stop`), the runner polls it, the run's own finalizer settles it, and only then does
-  the adapter escalate to a process-group TERM/KILL. A stopped run is `killed` with exit 143; a run that
+  the adapter escalate — through a validated process handle, never a bare pid or group id (see the
+  capability bullet below). A stopped run is `killed` with exit 143; a run that
   died unfinalized is finalized `failed` with exit −1 and `stale_recovered: true` by the next
-  `status`/`result`/`list`/`answer` — idempotently, behind a `finalized` marker. The raw CLI has none of
+  `status`/`result`/`list`/`answer` — idempotently, behind a `finalized` marker. Starting a replacement
+  (`start --replace`) stops the live run first and then waits that last moment out: once the verdict is
+  committed it re-checks — bounded, and holding no lock — that no recorded process is live and nothing is
+  left to enumerate, before it moves the old run aside; only a stop still unresolved at that bound is
+  refused. The raw CLI has none of
   this: there is no control file to write and no finalizer of yours to wait for.
 - The recovery substrate is only: the worktree, the harness's session log
   (`$DSH_HOME/sessions/<cwd-slug>/session-<id>/session.v4.jsonl.zstd`, append-only zstd frames), and the
   run artifacts. No task database, no checkpoint framework, no WAL.
+- **Cooperative stop is the main path; escalation exists only where a process instance can be proven.**
+  Before any destructive call the adapter opens a `pidfd` handle on the recorded process, re-reads the
+  process identity and signals through that same handle; group breadth comes from enumerating the group
+  under a continuously verified member. Where that primitive is missing — Linux without
+  `pidfd_open`/`pidfd_send_signal`, macOS, Windows — **no destructive call is made at all**: the stop
+  stays a request, the run stays `running`/`stopping` with its survivors named, and `kill` exits **1**
+  saying it cannot confirm the stop. That is not a bug to work around: the operator then ends the
+  process tree by hand and runs `kill` (or `status`) again — once every recorded process is conclusively
+  gone the run settles `killed`/`143`. Residual limits, stated as limits and not as guarantees: the
+  macOS/Windows strong-identity and tree-termination capability is unconfirmed here; `os.replace` is
+  atomic but not durable across power loss; a descendant that deliberately leaves the recorded process
+  groups may not be found; and nothing arbitrates atomically against an external starter that does not
+  follow this protocol.
 - A corrupt session log is refused loudly with the byte offset; restore from a copy, or truncate to the
   last complete frame.
 - Budget: two corrective rounds per stage, then stop and escalate (different model, narrower contract,

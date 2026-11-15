@@ -88,11 +88,15 @@ them, not re-derive them by trial.
     POSIX forms `-2`/`-9`/`-15`, the `KILLED_EXITS` set the adapter shares with `omp-run.py`.
     An externally signal-terminated run is therefore `killed`, not `failed`: `killed` names that a
     signal or a stop ended the run, not that the work failed.
-  - `failed` — any other non-zero, non-signal exit (a runner-level `error` event, an aborted final, a
-    refused dispatch).
+  - `failed` — every other settled outcome: an `exit 0` whose last `final` event is missing or does not
+    carry `reason.kind == "completed"` (the run stopped early or was aborted, and the exit code is
+    recorded unchanged), any other non-signal, non-zero exit (a runner-level `error` event, a refused
+    dispatch).
   - `failed` with exit `-1` and `stale_recovered: true` — the process disappeared without finalizing;
-    the next `status`/`result`/`list`/`answer` writes it, idempotently and only while no `finalized`
-    marker exists.
+    the next `status`/`result`/`list`/`answer` writes it, idempotently and only while no terminal record
+    is committed. The authority for "finished" is that record in `state.json`; the `finalized` marker is
+    written after the commit, for the observer plugin and older readers, and a state that looks terminal
+    without a committed record is uncommitted data — reported, never rewritten.
 
   A stop that cannot end every recorded process is not a stop: the run stays `running` with
   `stopping: true` and the survivors named, so it is still live and still occupies its slug.
