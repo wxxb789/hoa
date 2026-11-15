@@ -221,7 +221,11 @@ compatibility artifacts); the `finalized` marker keeps its historical exit-code-
 written *after* the commit, for the observer plugin and older readers only. Every reader decides
 "finished" from that record, never from marker existence; a state that looks terminal without a valid
 commit is uncommitted data and is neither trusted nor rewritten. Until the commit, an `answer` refuses
-("not finished yet") even if a prepared `answer.md` already exists.
+("not finished yet") even if a prepared `answer.md` already exists. `status`/`result` carry one
+lifecycle vocabulary beside the state word — `terminal`, `live`, `stopping (survivors known)`,
+`stopping (enumeration failed)`, `unknown (no state)`, `gone (unfinalized)` for a recorded run that
+died without committing a verdict (whose `list` line reads `GONE (resume with --session-id …)`), and
+`read-only` for another backend's run.
 
 **Ownership and mutation.** Two stable OS locks carry ownership, both keyed by the slug and both outside
 every replaceable run directory: `<run root>/<slug>.start.lock` serializes every entry that can start an

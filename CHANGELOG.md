@@ -14,17 +14,23 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   `final` event carrying `reason.kind == "completed"`; an `exit 0` whose last `final` is missing or not
   `completed`, a runner-level `error` and any other non-signal non-zero exit are `failed`, an
   unfinalized death is recovered as `failed`/`-1` with `stale_recovered: true`, and `kill` writes a
-  `stop` control file the runner polls before escalating to a process-group TERM/KILL. `--max-time` is
+  generation-bound `stop` request the runner polls. A run whose runner is gone is ended by signalling
+  each validated process instance through its own `pidfd` handle (TERM, then KILL) — never a bare pid or
+  group id — and a platform without that primitive (macOS, Windows, Linux without pidfds) refuses to
+  escalate: `kill` exits 1, the run stays `running`/`stopping`, and an operator ends the tree by hand.
+  `--max-time` is
   the runner's own stop path (`killed`/`143`, `deadline_exceeded: true`); `--model`/`--thinking` are
   refused before a run directory exists because headless composes no agent presets. Ownership and
   recovery are strict: `start`/`_run` refuse a slug whose run is still live (a hand replay of `run.sh`
   cannot start a second agent), a `.`/`..` name or a slug directory that resolves out of its date bucket
   is refused before any write, discovery and recovery touch only runs whose `state.json` records
   `backend: dsh` (another route's run is listed read-only), a stop that leaves processes alive stays
-  `running`/`stopping` with the survivors named instead of publishing `killed`, and no signal is sent to
-  a group id whose leader is gone. Every setting is environment-only: `DSH_BIN`,
+  `running`/`stopping` with the survivors named instead of publishing `killed`, and a process group is
+  only ever signalled per member, enumerated under a continuously verified live anchor — including when
+  the group's leader has already exited. Every setting is environment-only: `DSH_BIN`,
   `DSH_RUN_ROOT`/`GDD_RUN_ROOT`, `DSH_RUN_PROFILE`, `DSH_PERMISSION_MODE`, `DSH_APPROVAL_POLICY`, the
-  three timeouts and `DSH_RUN_EVENTS_MAX_BYTES`.
+  four timeouts (`DSH_RUN_START_GRACE_SECONDS`, `DSH_RUN_STOP_WAIT_SECONDS`,
+  `DSH_RUN_SETTLE_WAIT_SECONDS`, `DSH_RUN_DRAIN_TIMEOUT_SECONDS`) and `DSH_RUN_EVENTS_MAX_BYTES`.
 - The launcher's ownership and lifecycle are *provable*, not documented: two stable OS locks outside
   every replaceable run directory (a slug claim for starting, a per-slug lifecycle mutex for mutating)
   carry ownership, kernel-held and never taken by age or by a recorded pid; every mutation is bound to
@@ -44,36 +50,18 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   the two-condition completion rule with `tool_result.status == "completed"` read as "the tool
   returned", and the file-only recovery substrate (worktree, harness session log, run artifacts).
 - `skills/gdd/scripts/tests/test_dsh_run_python.py` runs the adapter against a stub `dsh` on `PATH`
-  that emits canned headless NDJSON, with no network or model: 120 tests pin the completion rule, the
-  `--max-time` deadline, the control-file kill and its forced escalation, stale recovery, the bounded
-  event accounting, argv/stdin passthrough, the second-start refusal, the slug/date-bucket and
-  live-replay refusals, route-scoped recovery, and the identity-gated stop paths. The hardening round
-  adds the ownership and lifecycle rules, each with the interleaving that would break it: the mutex
-  covering a whole terminal publication (a child process cannot pass it mid-write), kernel ownership
-  against a backdated lock, one lock object per slug across date buckets, the under-mutex target
-  re-check that refuses a creation whose path changed, the generation-bound stop request and per-step
-  escalation authorization, publisher and incomplete-stop reports that write nothing into a replaced or
-  settled run, recovery that re-reads its liveness predicate under the mutex, the single-commit order
-  under injected death at each publication boundary, atomic-write failure without truncation, the
-  boot-id/namespace process token with no weak fallback, handle-only signal delivery, group membership
-  that must be readable and matching, an anchor verified throughout its enumeration, inspection failure
-  read as unknown, finite configured waits, and document checks that pin the exit mapping's
-  *associations* rather than its keywords. A mutation that must land — a start
-  (including `--replace`), a stop request, the runner's spawn registration, a publisher, an escalation
-  step, a survivor report — waits a bounded time (`MUTEX_WAIT_SECONDS`) for the lifecycle mutex instead
-  of reading a momentary hold as a refusal, so a run's own publisher can no longer make `start --replace`
-  or `kill` fail spuriously; `test_12c_a_momentary_mutation_never_fails_a_start_or_a_stop` pins it with a
-  child process that holds the mutex for 1.5 s. A *committed* stop is likewise not yet a settled tree: the
-  runner that wrote the verdict is still one of the run's recorded processes until it exits and is reaped,
-  and an enumeration that anchors on it answers "unknown" — never "nobody" — while it leaves.
-  `start --replace` therefore re-asks the settle question on freshly read state — bounded
-  (`SETTLE_WAIT_SECONDS`, 10 s, overridable with `DSH_RUN_SETTLE_WAIT_SECONDS`) and holding no mutex —
-  until it is conclusive (`run_alive` false and `stop_survivors() == []`), and the existing refusal stands
-  whenever the bound expires. Two tests pin the rule:
-  `test_l3_a_replace_waits_out_a_stop_that_is_not_settled_yet` (a child commits the verdict through the
-  adapter's own finalizer and then stays alive: the replacement must wait, not refuse) and
-  `test_l3_the_settle_wait_is_bounded_and_the_refusal_stands_at_the_bound` (a tree that stays unproven is
-  refused at the knob's bound instead of holding `start --replace` open).
+  that emits canned headless NDJSON, with no network or model: **123 tests** pin the completion rule, the
+  exit mapping (including `exit 0` whose last `final` is not `completed` → `failed`), the `--max-time`
+  deadline, the stop request and its identity-gated escalation, stale recovery, the bounded event
+  accounting, argv/stdin passthrough, and every refusal (second start, live replay, bucket escape,
+  foreign runs). The hardening rounds add the ownership and lifecycle rules — the mutex spanning a whole
+  terminal publication, one lock object per slug across date buckets, generation-bound stops and
+  publications, the single-commit order under injected death, fail-closed process identity and
+  capability handling, the forced stop holding its mutex through the signal — each with a
+  revert-the-rule mutation that fails the suite (the mutation rows, the fifteen-run stability series and
+  the counts are recorded in `docs/evidence/2026-11-15-dsh-headless-launcher.md`). A momentary hold of
+  the lifecycle mutex is waited out, not read as a refusal, and a committed stop whose tree has not
+  vanished yet is waited out within a bound (`DSH_RUN_SETTLE_WAIT_SECONDS`); both are pinned by name.
 
 ### Changed
 

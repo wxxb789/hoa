@@ -27,8 +27,8 @@ import io
 import json
 import math
 import os
+import queue
 import re
-import select
 import signal
 import shutil
 import subprocess
@@ -144,6 +144,7 @@ def main():
     emit({"type": "tool_result", "callId": "c1", "status": "completed", "result": "hi"})
     emit({"type": "thinking", "text": "considering", "truncated": False})
     text = os.environ.get("STUB_TEXT") or "STUB ANSWER: the stage finished."
+    final_text = os.environ.get("STUB_FINAL_TEXT") or text
     reason = os.environ.get("STUB_REASON") or "completed"
     emit({"type": "text", "text": text})
     emit({"type": "status", "turn": 1, "step": 1, "phase": "turn_end",
@@ -156,7 +157,8 @@ def main():
                   "reason": None if kind is None else {"kind": kind},
                   "text": f"{text} (final {index + 1}: {kind})"})
     else:
-        emit({"type": "final", "sessionId": session, "reason": {"kind": reason}, "text": text})
+        emit({"type": "final", "sessionId": session, "reason": {"kind": reason},
+              "text": final_text})
     return int(os.environ.get("STUB_EXIT") or "0")
 
 
@@ -174,6 +176,35 @@ def load_adapter() -> types.ModuleType:
 
 
 adapter = load_adapter()
+
+
+def kill_pid_tree_best_effort(pid):
+    """Kill one pid's process tree with OS primitives, on every platform.
+
+    Test-owned cleanup must not route through the adapter's verified-handle path
+    (`ProcessHandle` / `kill_tree`): that path deliberately refuses to signal
+    without a pidfd, and inside a `signal_spy` block its signals would be
+    intercepted. SIGKILL (`taskkill /F` on Windows) against the fixture's own new
+    session is what guarantees a failing assertion cannot leak a `sleep(300)`
+    stub. A pid sharing this interpreter's own process group is killed directly,
+    never as a group, so the suite can never signal itself.
+    """
+    if isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0:
+        return
+    if IS_WINDOWS:
+        adapter.run_quiet(["taskkill", "/T", "/F", "/PID", str(pid)])
+        return
+    try:
+        group = os.getpgid(pid)
+    except OSError:
+        return
+    try:
+        if group != os.getpgid(0):
+            os.killpg(group, signal.SIGKILL)
+        else:
+            os.kill(pid, signal.SIGKILL)
+    except OSError:
+        pass
 
 
 class ProcessFixtures(unittest.TestCase):
@@ -209,19 +240,42 @@ class ProcessFixtures(unittest.TestCase):
                 pass
 
     def read_line(self, process, timeout=30.0):
-        """One line of a spawned process's stdout, with a finite timeout."""
+        """One line of a spawned process's stdout, with a finite timeout.
+
+        The read happens on a daemon thread feeding a queue: `select` only waits
+        on sockets on Windows (a pipe raises `OSError` there), and a blocking read
+        would make the timeout unenforceable. The pump is per process and shared
+        across calls, so a second `read_line` consumes the *next* line instead of
+        competing with the first pump for the same pipe.
+        """
+        reader = getattr(process, "_test_reader", None)
+        if reader is None:
+            lines = queue.Queue()
+
+            def pump():
+                try:
+                    for line in iter(process.stdout.readline, b""):
+                        lines.put(line)
+                except (OSError, ValueError):
+                    pass
+                lines.put(None)
+
+            thread = threading.Thread(target=pump, daemon=True)
+            thread.start()
+            reader = (lines, thread)
+            try:
+                process._test_reader = reader
+            except AttributeError:  # a stand-in without settable attributes
+                pass
+        lines = reader[0]
         deadline = time.monotonic() + timeout
         buffer = b""
-        fd = process.stdout.fileno()
         while time.monotonic() < deadline:
-            ready, _, _ = select.select([fd], [], [], 0.1)
-            if not ready:
-                continue
             try:
-                chunk = os.read(fd, 4096)
-            except OSError:
-                break
-            if not chunk:
+                chunk = lines.get(timeout=0.1)
+            except queue.Empty:
+                continue
+            if chunk is None:
                 break
             buffer += chunk
             if b"\n" in buffer:
@@ -284,26 +338,37 @@ class ProcessFixtures(unittest.TestCase):
             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
             start_new_session=True,
         )
+        # The member is the leader's child in the leader's own session, so killing
+        # the leader's group kills the member too: register that cleanup *before*
+        # the handshake, so a failed handshake cannot orphan a `sleep(300)` child.
+        self.addCleanup(self.reap_pids, [leader.pid])
         line = self.read_line(leader)
         self.assertTrue(line.startswith("member "), line)
         member_pid = int(line.split()[1])
         self.addCleanup(self.reap_pids, [member_pid])
         return leader, member_pid
 
+    def staged_run_dir(self, tmp, slug):
+        """A run directory under its own interior root, beside a date bucket.
+
+        `operation_of`/`bucket_root` derive the lock namespace from the run
+        directory: a run staged directly at `Path(tmp)` resolves `op.root` to
+        `/tmp` (or `$TMPDIR`) itself, so `.dsh-locks` lands in the shared, sticky
+        system temp directory — a second user cannot open the lock there, and two
+        test processes race on the same lock names. Staging at
+        `<tmp>/runs/<date>/<slug>` keeps every lock inside the test's own tree,
+        exactly as a real run does.
+        """
+        run_dir = Path(tmp) / "runs" / adapter.date_stamp() / slug
+        run_dir.mkdir(parents=True, exist_ok=True)
+        return run_dir
+
     def reap_pids(self, pids):
         """Kill a set of pids this test no longer owns (best effort, always safe)."""
         for pid in pids:
             if adapter.liveness_of(pid) == adapter.GONE:
                 continue
-            try:
-                info = adapter.ProcessHandle(pid, adapter.process_identity(pid))
-                if info.open():
-                    try:
-                        info.signal(signal.SIGKILL)
-                    finally:
-                        info.close()
-            except OSError:
-                pass
+            kill_pid_tree_best_effort(pid)
         deadline = time.monotonic() + 5.0
         while time.monotonic() < deadline and any(
             adapter.liveness_of(pid) != adapter.GONE for pid in pids
@@ -311,16 +376,25 @@ class ProcessFixtures(unittest.TestCase):
             time.sleep(0.02)
 
     def signal_spy(self):
-        """Record every signal the adapter *delivers*, and forbid the group path.
+        """Record every signal the adapter *delivers*, and forbid the raw paths.
 
         Delivery is observed on the validated handle itself
         (`ProcessHandle.signal`), so the assertion is about which process instance
         was targeted, not about what the target does with the signal. Any
-        `os.killpg` carrying a real signal is an error; signal 0 is the existence
-        probe the adapter is allowed to make.
+        `os.kill` / `os.killpg` carrying a real signal is an error — the same rule
+        C-2 states as "never fall back to a bare pid or group id" — because on
+        POSIX `os.kill(-pgid, signum)` also signals a group without touching
+        `os.killpg`. Signal 0 is the existence probe the adapter is allowed to
+        make.
         """
         delivered = []
-        real_killpg = adapter.os.killpg
+        real_kill = adapter.os.kill
+        real_killpg = getattr(adapter.os, "killpg", None)
+
+        def kill(pid, signum):
+            if signum != 0:
+                raise AssertionError("a bare pid must never be signalled")
+            return real_kill(pid, signum)
 
         def killpg(pgid, signum):
             if signum != 0:
@@ -331,10 +405,11 @@ class ProcessFixtures(unittest.TestCase):
             delivered.append((handle.pid, signum))
             return True
 
-        return delivered, [
-            mock.patch.object(adapter.os, "killpg", killpg),
-            mock.patch.object(adapter.ProcessHandle, "signal", handle_signal),
-        ]
+        patches = [mock.patch.object(adapter.os, "kill", kill)]
+        if real_killpg is not None:
+            patches.append(mock.patch.object(adapter.os, "killpg", killpg))
+        patches.append(mock.patch.object(adapter.ProcessHandle, "signal", handle_signal))
+        return delivered, patches
 
 
 class DshLauncherTests(ProcessFixtures):
@@ -372,17 +447,36 @@ class DshLauncherTests(ProcessFixtures):
             "DSH_PROFILE_DIR", "DSH_SESSION_ID", "DSH_RUN_PROFILE",
             "DSH_PERMISSION_MODE", "DSH_APPROVAL_POLICY", "STUB_MODE", "STUB_EXIT",
             "STUB_ARGV_FILE", "STUB_STDIN_FILE", "STUB_ENV_FILE", "STUB_FINALS",
-            "STUB_TEXT", "STUB_REASON", "STUB_SESSION", "STUB_APPEND_FILE",
+            "STUB_TEXT", "STUB_REASON", "STUB_SESSION", "STUB_APPEND_FILE", "STUB_FINAL_TEXT",
         ):
             cls.env.pop(key, None)
 
     @classmethod
     def tearDownClass(cls):
-        for run_dir in adapter.run_dirs(str(cls.run_root)):
-            state = adapter.read_state_file(str(run_dir))
-            if adapter.run_alive(str(run_dir), state):
-                adapter.kill_tree(adapter.operation_of(str(run_dir), state), state)
+        cls.reap_remaining_runs()
         shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    @classmethod
+    def reap_remaining_runs(cls):
+        """Kill and reap every live run any test under this class left behind.
+
+        OS primitives, not `kill_tree`: the adapter's verified path refuses to
+        signal without a pidfd, so class teardown on such a platform (or for a
+        custom `DSH_RUN_ROOT` a test used) would leak a detached stub. A pid is
+        skipped when liveness is conclusively gone — never signalled on a stale
+        record — and when its recorded identity no longer matches.
+        """
+        roots = [cls.tmp]
+        roots.extend(child for child in cls.tmp.iterdir() if child.is_dir())
+        for root in roots:
+            for run_dir in adapter.run_dirs(str(root)):
+                state = adapter.read_state_file(str(run_dir))
+                for pid, identity in adapter.recorded_processes(str(run_dir), state):
+                    if adapter.liveness_of(pid) == adapter.GONE:
+                        continue
+                    if identity and adapter.identity_changed(pid, identity):
+                        continue
+                    kill_pid_tree_best_effort(pid)
 
     # -- helpers ------------------------------------------------------------
 
@@ -468,7 +562,7 @@ class DshLauncherTests(ProcessFixtures):
                 if terminal:
                     if self.settled(slug, state):
                         return state
-                elif state.get("pid") or state.get("agent_pid"):
+                elif state.get("pid") and state.get("agent_pid"):
                     return state
             time.sleep(adapter.POLL_SECONDS)
         self.fail(f"{slug} never reached {states}: last state {state}")
@@ -507,16 +601,7 @@ class DshLauncherTests(ProcessFixtures):
 
     def kill_pid_tree(self, pid):
         """Kill one pid and its tree abruptly: SIGKILL (POSIX) or taskkill /F."""
-        if IS_WINDOWS:
-            adapter.run_quiet(["taskkill", "/T", "/F", "/PID", str(pid)])
-            return
-        try:
-            os.killpg(os.getpgid(pid), signal.SIGKILL)
-        except OSError:
-            try:
-                os.kill(pid, signal.SIGKILL)
-            except OSError:
-                pass
+        kill_pid_tree_best_effort(pid)
 
     def kill_hard(self, run_dir):
         """Kill a run and its agent with no chance to finalize.
@@ -524,22 +609,12 @@ class DshLauncherTests(ProcessFixtures):
         `kill_tree` is not enough for the stale path: on POSIX it sends SIGTERM,
         which the runner handles by finalizing the run — deliberately, that is
         what makes `kill` deterministic there. The stale path is for a run that
-        died abruptly, so this uses SIGKILL (POSIX) or taskkill /F (Windows). On
-        Windows the runner goes first, so it cannot finalize the run in between.
+        died abruptly, so this uses SIGKILL (POSIX) or taskkill /F (Windows). The
+        runner goes first on *every* platform: `recorded_pids` records it first,
+        and killing the agent before the runner would let a live runner observe
+        the agent's exit and finalize the run in between — the same race window on
+        POSIX as on Windows.
         """
-        if IS_WINDOWS:
-            lock = adapter.lock_of(str(run_dir))
-            state = adapter.read_state_file(str(run_dir))
-            ordered, seen = [], []
-            for pid in (lock.get("pid"), lock.get("agent_pid"),
-                        state.get("pid"), state.get("agent_pid")):
-                if (isinstance(pid, int) and not isinstance(pid, bool) and pid > 0
-                        and pid not in seen):
-                    seen.append(pid)
-                    ordered.append(pid)
-            for pid in ordered:
-                self.kill_pid_tree(pid)
-            return
         for pid in adapter.recorded_pids(str(run_dir)):
             self.kill_pid_tree(pid)
 
@@ -595,10 +670,24 @@ class DshLauncherTests(ProcessFixtures):
                      "finalized", "run.json"):
             self.assertTrue((run_dir / name).exists(), f"missing artifact {name}")
         # The identity of each process, recorded at spawn: what a later signal is
-        # verified against, so a reused pid can never be signalled.
+        # verified against, so a reused pid can never be signalled. The token's
+        # strength is a property of the platform (C-2): a host whose own identity
+        # probe yields an admissible token must have recorded admissible tokens;
+        # a platform without one records its weaker evidence (and the adapter
+        # refuses to signal from it).
         lock = json.loads((run_dir / "lock").read_text(encoding="utf-8"))
-        self.assertTrue(lock.get("pid_identity"), lock)
-        self.assertTrue(lock.get("agent_pid_identity"), lock)
+        platform_identity = adapter.process_identity(os.getpid())
+        if platform_identity:
+            self.assertTrue(lock.get("pid_identity"), lock)
+            self.assertTrue(lock.get("agent_pid_identity"), lock)
+        else:
+            # A platform whose own probe yields nothing records nothing; it must
+            # not fabricate a token either.
+            self.assertEqual(lock.get("pid_identity"), "", lock)
+            self.assertEqual(lock.get("agent_pid_identity"), "", lock)
+        if adapter.identity_is_strong(platform_identity):
+            self.assertTrue(adapter.identity_is_strong(lock.get("pid_identity")), lock)
+            self.assertTrue(adapter.identity_is_strong(lock.get("agent_pid_identity")), lock)
         self.assertEqual(lock["pid_identity"], state["pid_identity"])
         self.assertEqual(lock["agent_pid_identity"], state["agent_pid_identity"])
         self.assertTrue((run_dir / ("run.cmd" if IS_WINDOWS else "run.sh")).exists())
@@ -668,11 +757,18 @@ class DshLauncherTests(ProcessFixtures):
 
     def test_02_answer_comes_from_the_final_event(self):
         slug = "answer-02"
-        state = self.settle(slug, STUB_TEXT="final report")
+        state = self.settle(
+            slug, STUB_TEXT="an interim text the matching never emitted",
+            STUB_FINAL_TEXT="final report",
+        )
         self.assertEqual(state["state"], "done")
         self.assertEqual((self.run_dir(slug) / "answer.md").read_text(encoding="utf-8"),
                          "final report")
         self.assertEqual(state["answer_source"], "final")
+        # The distinction that makes this test its own: the committed answer is the
+        # final event's text, not the last `{"type": "text"}` payload.
+        self.assertNotEqual(state["answer_chars"],
+                            len("an interim text the matching never emitted"))
 
     def test_03_live_run_reports_running_then_settles(self):
         slug = "live-03"
@@ -816,35 +912,40 @@ class DshLauncherTests(ProcessFixtures):
         self.assertIn("no run", missing.stderr)
 
     def test_09_kill_escalates_when_nothing_observes_the_control_file(self):
-        """A live process tree with no runner is stopped by the escalation.
+        """A runnerless tree: escalated where a verified handle exists, refused where it does not.
 
         On POSIX the tree ignores TERM — its readiness is acknowledged only after
         the handlers are installed — and it holds a child in its own process
         group, so neither a plain TERM nor a signal to the leader alone could stop
-        it: only the TERM->KILL escalation behind `kill` can.
+        it: only the TERM->KILL escalation behind `kill` can, and only where the
+        adapter's own capability probe says a verified process handle exists (an
+        admissible identity and `platform_can_force_stop`). Where it does not
+        (C-2: macOS, Windows, Linux without pidfd) the same call must *refuse*:
+        exit 1, the run left `running`/`stopping`, nothing signalled.
         """
         slug = "kill-forced-09"
+        generation = adapter.new_nonce()
         run_dir = self.run_dir(slug)
         run_dir.mkdir(parents=True)
         (run_dir / "prompt.md").write_text("dispatched, runner lost\n", encoding="utf-8")
         (run_dir / "events.ndjson").write_text("", encoding="utf-8")
-        (run_dir / "state.json").write_text(
-            json.dumps({"name": slug, "state": "running", "exit": None, "cwd": str(self.tmp),
-                        "started": adapter.now_iso(), "backend": "dsh",
-                        "generation": adapter.new_nonce()}),
-            encoding="utf-8",
-        )
         leader, child_pid = self.group_with_ready_member()
         pid = leader.pid
         try:
-            # The identity a real run records at spawn: without it the adapter
-            # refuses to signal, so the escalation this test exercises needs it.
+            # The identity a real run records at spawn; the escalation decision is
+            # the same probe `kill` performs, not a second platform guess.
             leader_identity = adapter.process_identity(pid)
-            self.assertTrue(leader_identity, "the platform must supply a process identity")
-            generation = adapter.new_nonce()
-            state = adapter.read_state_file(str(run_dir))
-            state["generation"] = generation
-            adapter.write_json(str(run_dir / "state.json"), state)
+            capable = (
+                bool(leader_identity)
+                and adapter.identity_is_strong(leader_identity)
+                and adapter.platform_can_force_stop()
+            )
+            (run_dir / "state.json").write_text(
+                json.dumps({"name": slug, "state": "running", "exit": None, "cwd": str(self.tmp),
+                            "started": adapter.now_iso(), "backend": "dsh",
+                            "generation": generation}),
+                encoding="utf-8",
+            )
             (run_dir / "lock").write_text(
                 json.dumps({"pid": pid, "agent_pid": None, "pid_identity": leader_identity,
                             "backend": "dsh", "started_at": adapter.now_iso(),
@@ -852,23 +953,29 @@ class DshLauncherTests(ProcessFixtures):
                 encoding="utf-8",
             )
             if not IS_WINDOWS:
-                # Proof the escalation is real and reaches the group: a plain TERM
-                # to the group leaves both processes running. Wait up to a bounded
-                # time for a death that must not happen, rather than sleeping a
-                # fixed length and hoping it was enough.
+                # The TERM meets a SIG_IGN handler installed before readiness, so
+                # the kernel drops it inside the signal syscall itself: survival is
+                # decidable immediately, no fixed sleep required.
                 adapter.signal_group(pid, signal.SIGTERM, leader_identity)
-                deadline = time.monotonic() + 2.0
-                while time.monotonic() < deadline and adapter.pid_alive(pid):
-                    time.sleep(adapter.POLL_SECONDS)
                 self.assertTrue(adapter.pid_alive(pid), "the leader should ignore SIGTERM")
                 self.assertTrue(adapter.pid_alive(child_pid), "the child should ignore SIGTERM")
             killed = self.adapter_run("kill", slug, env=self.env_for(DSH_RUN_STOP_WAIT_SECONDS=1))
-            self.assertEqual(killed.returncode, 0, killed.stderr)
             state = self.state_of(slug)
-            self.assertEqual((state["state"], state["exit"]), ("killed", 143), state)
-            self.assertEqual(state.get("stopped_by"), "control-file-forced")
-            self.assertIn("did not complete after the stop request", state["note"])
-            self.wait_for_pids_gone([pid, child_pid])
+            if capable:
+                self.assertEqual(killed.returncode, 0, killed.stderr)
+                self.assertEqual((state["state"], state["exit"]), ("killed", 143), state)
+                self.assertEqual(state.get("stopped_by"), "control-file-forced")
+                self.assertIn("did not complete after the stop request", state["note"])
+                self.wait_for_pids_gone([pid, child_pid])
+            else:
+                # C-2's refuse path, asserted for real: no verified handle on this
+                # host, so the adapter must not signal — the run stays live and the
+                # refusal is visible as exit 1.
+                self.assertEqual(killed.returncode, 1, killed.stdout + killed.stderr)
+                self.assertEqual(state["state"], "running", state)
+                self.assertTrue(state.get("stopping"), state)
+                self.assertEqual(adapter.liveness_of(pid), adapter.LIVE)
+                self.assertFalse((run_dir / "finalized").exists())
         finally:
             self.reap_pids([pid, child_pid])
 
@@ -1022,12 +1129,14 @@ class DshLauncherTests(ProcessFixtures):
         self.assertEqual((archived["state"], archived["exit"]), ("killed", 143), archived)
         self.wait_for_pids_gone(first_pids)
 
-    def hold_mutex_for(self, lock_path, seconds):
-        """A child process that holds one lock object for `seconds`, then releases it.
+    def hold_mutex_for(self, lock_path, seconds=None):
+        """A child process that holds one lock object until this test releases it.
 
-        Readiness is the child's own acknowledgement after it holds the lock, so the
-        caller knows a real hold exists before it acts; the child exits (and the
-        kernel releases the lock) when the delay is over.
+        Readiness is the child's own acknowledgement after it holds the lock, so
+        the caller knows a real hold exists before it acts. With `seconds` the
+        child releases itself after that delay; by default it holds until a line
+        arrives on its stdin, so the release is decided by the caller — never
+        raced against a sleep that may end before the contender even starts.
         """
         code = (
             "import importlib.util, sys, time\n"
@@ -1037,44 +1146,96 @@ class DshLauncherTests(ProcessFixtures):
             "with mod.stable_lock(sys.argv[2], None) as held:\n"
             "    sys.stdout.write('held\\n' if held else 'refused\\n')\n"
             "    sys.stdout.flush()\n"
-            "    time.sleep(float(sys.argv[3]))\n"
+            "    if sys.argv[3] == 'hold':\n"
+            "        sys.stdin.readline()\n"
+            "    else:\n"
+            "        time.sleep(float(sys.argv[3]))\n"
         )
         process = self.spawn(
-            [sys.executable, "-c", code, str(ADAPTER), str(lock_path), str(seconds)],
-            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            [sys.executable, "-c", code, str(ADAPTER), str(lock_path),
+             "hold" if seconds is None else str(seconds)],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
         )
         self.assertEqual(self.read_line(process), "held")
         return process
+
+    def release_holder(self, holder):
+        """Let a `hold_mutex_for` child exit (idempotent, always safe)."""
+        if holder is None:
+            return
+        try:
+            if holder.poll() is None and holder.stdin is not None:
+                holder.stdin.write(b"go\n")
+                holder.stdin.flush()
+        except (OSError, ValueError):
+            pass
 
     def test_12c_a_momentary_mutation_never_fails_a_start_or_a_stop(self):
         """L3/M: a momentary hold of M must not fail a replacement or a stop.
 
         A live run's own runner holds M for a moment per publication. A `start
-        --replace` that read the first refusal as a verdict would fail against the
-        very run it is about to stop, and a `kill` would report a stop it never
-        issued. A child process holds M for 1.5 s; both commands must wait it out
-        and succeed.
+        --replace` that read the first refusal as a verdict would fail against
+        the very run it is about to stop, and a `kill` would report a stop it
+        never issued. A child process holds M until this test releases it, the
+        hold is proven before the command runs, and the release lands while the
+        command is blocked on M — never a sleep's hope that they overlapped.
         """
         slug = "momentary-12c"
+        self.addCleanup(self.stop_live_run, slug)
         self.start(slug, env=self.env_for(STUB_MODE="sleep", STUB_SESSION="session-12c-first"))
         self.wait_for_state(slug, {"running"}, timeout=START_TIMEOUT)
         run_dir = self.run_dir(slug)
         lock_path = adapter.lifecycle_lock_path(adapter.bucket_root(str(run_dir)), slug)
-        holder = self.hold_mutex_for(lock_path, 1.5)
-        replaced = self.start(
-            slug, "--replace", env=self.env_for(STUB_TEXT="replaced", STUB_SESSION="session-12c-second"),
-            assert_started=False,
-        )
-        self.assertEqual(replaced.returncode, 0, f"start --replace failed: {replaced.stderr}")
-        self.wait_for_state(slug, {"done"}, timeout=START_TIMEOUT)
-        self.reap(holder)
+        holder = self.hold_mutex_for(lock_path)
+        try:
+            with adapter.stable_lock(str(lock_path), 0.0) as free:
+                self.assertFalse(free, "the holder really holds M")
+            saw = {}
+
+            def release():
+                saw["alive"] = holder.poll() is None
+                self.release_holder(holder)
+
+            timer = threading.Timer(1.0, release)
+            timer.start()
+            try:
+                replaced = self.start(
+                    slug, "--replace",
+                    env=self.env_for(STUB_TEXT="replaced", STUB_SESSION="session-12c-second"),
+                    assert_started=False,
+                )
+            finally:
+                timer.cancel()
+            self.assertEqual(replaced.returncode, 0, f"start --replace failed: {replaced.stderr}")
+            self.assertTrue(saw.get("alive"), "the hold must still be live while start waits on M")
+            self.wait_for_state(slug, {"done"}, timeout=START_TIMEOUT)
+        finally:
+            self.release_holder(holder)
+            self.reap(holder)
         # And a stop issued while M is momentarily held is issued, not refused.
         self.start(slug, env=self.env_for(STUB_MODE="sleep"))
         self.wait_for_state(slug, {"running"}, timeout=START_TIMEOUT)
-        holder = self.hold_mutex_for(lock_path, 1.5)
-        killed = self.adapter_run("kill", slug)
-        self.reap(holder)
-        self.assertEqual(killed.returncode, 0, f"kill failed: {killed.stderr}")
+        holder = self.hold_mutex_for(lock_path)
+        try:
+            with adapter.stable_lock(str(lock_path), 0.0) as free:
+                self.assertFalse(free, "the holder really holds M")
+            saw = {}
+
+            def release_stop():
+                saw["alive"] = holder.poll() is None
+                self.release_holder(holder)
+
+            timer = threading.Timer(1.0, release_stop)
+            timer.start()
+            try:
+                killed = self.adapter_run("kill", slug)
+            finally:
+                timer.cancel()
+            self.assertTrue(saw.get("alive"), "the hold must still be live while kill waits on M")
+            self.assertEqual(killed.returncode, 0, f"kill failed: {killed.stderr}")
+        finally:
+            self.release_holder(holder)
+            self.reap(holder)
         self.assertEqual(self.wait_for_state(slug, {"killed"})["exit"], adapter.KILL_EXIT)
 
     def test_13_missing_state_is_unknown_never_success(self):
@@ -1232,6 +1393,7 @@ class DshLauncherTests(ProcessFixtures):
 
     def test_19_a_killed_run_keeps_the_last_committed_text(self):
         slug = "partial-19"
+        self.addCleanup(self.stop_live_run, slug)
         self.start(slug, env=self.env_for(STUB_MODE="sleep"))
         self.wait_for_state(slug, {"running"}, timeout=START_TIMEOUT)
         # The live counters are published while dsh works, not only at finalize.
@@ -1346,12 +1508,15 @@ class DshLauncherTests(ProcessFixtures):
                     self.assertIn("half a report", proc.stdout)
                 state = self.state_of(slug)
                 self.assertTrue(state["stale_recovered"], state)
+                self.assertIsNotNone(adapter.terminal_snapshot_locked(state), state)
                 self.assertEqual((state["state"], state["exit"]), ("failed", -1), state)
                 self.assertEqual(state["session_id"], "session-dead")
                 self.assertEqual((run_dir / "finalized").read_text(encoding="utf-8"), "-1")
                 self.assertEqual((run_dir / "answer.md").read_text(encoding="utf-8"),
                                  "half a report")
-                # The marker is the guard: every other reader sees a settled run.
+                # The committed terminal record is the guard: every other reader
+                # sees a settled run (C-1: the `finalized` marker is never the
+                # authority, and is written after the record, not before).
                 before = (run_dir / "state.json").read_bytes()
                 for reader, target in (("status", [slug]), ("result", [slug]),
                                        ("answer", [slug]), ("list", [])):
@@ -1452,7 +1617,7 @@ class DshLauncherTests(ProcessFixtures):
         old = root / "2001-02-03" / slug
         old.mkdir(parents=True)
         (old / "prompt.md").write_text("started before the date rolled over\n", encoding="utf-8")
-        sleeper = subprocess.Popen(
+        sleeper = self.spawn(
             [sys.executable, "-c", "import time; time.sleep(120)"],
             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
@@ -1552,6 +1717,7 @@ class DshLauncherTests(ProcessFixtures):
             self.assertTrue(generation and token, "start must write a generation-stamped handshake")
             seen["credential"] = (generation, token)
             process = real_spawn(argv, cwd, log_path)
+            seen["process"] = process
             self.addCleanup(self.reap, process)
             return process
 
@@ -1560,9 +1726,11 @@ class DshLauncherTests(ProcessFixtures):
             adapter, "spawn_runner", spawn_like_start
         ), contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
             code = adapter.cmd_start(args)
-        # The runner is a child of this process: reap it, or a zombie would keep
-        # answering the liveness probe and the run would look live forever.
-        reaper = self.reap_runner_async(self.run_root / adapter.date_stamp() / slug)
+        # The runner is a child of this process, and the test holds its `Popen`:
+        # reap *that*, not a raw pid, or a zombie would keep answering the
+        # liveness probe and the run would look live forever.
+        reaper = threading.Thread(target=seen["process"].wait, daemon=True)
+        reaper.start()
         self.assertEqual(code, 0, err.getvalue())
         self.assertIn(f"started: {slug}", out.getvalue())
         state = self.wait_for_state(slug, {"failed"})
@@ -1635,8 +1803,11 @@ class DshLauncherTests(ProcessFixtures):
         bucket.mkdir(parents=True, exist_ok=True)
         try:
             (bucket / "sneaky").symlink_to(outside, target_is_directory=True)
-        except (OSError, NotImplementedError):  # a host without the privilege
-            (bucket / "sneaky").mkdir()
+        except (OSError, NotImplementedError):
+            # A host without the privilege cannot stage the symlink case at all:
+            # creating a plain directory here would prove nothing (nothing reads
+            # it), so the staging is simply skipped.
+            pass
         if (bucket / "sneaky").is_symlink():
             proc = self.adapter_run(
                 "start", "--name", "sneaky", "--prompt", str(self.prompt), "--cwd", str(self.tmp),
@@ -1718,6 +1889,29 @@ class DshLauncherTests(ProcessFixtures):
         before = {path.name: path.read_bytes() for path in run_dir.iterdir()}
         before_unknown = {path.name: path.read_bytes() for path in unknown_dir.iterdir()}
         env = self.env_for(DSH_RUN_ROOT=root)
+        # C-3 requires the byte-identity proof across `list`, `kill` *and*
+        # `replace`: `start` / `start --replace` against the unlive foreign run and
+        # the no-backend directory, and `kill` on the no-backend directory, must
+        # all refuse while leaving every byte and creating no `.prev-*` archive.
+        for argv in (
+            ("start", "--name", slug, "--prompt", str(self.prompt), "--cwd", str(self.tmp)),
+            ("start", "--name", slug, "--prompt", str(self.prompt), "--cwd", str(self.tmp),
+             "--replace"),
+            ("start", "--name", "foreign-32-unknown", "--prompt", str(self.prompt),
+             "--cwd", str(self.tmp)),
+            ("start", "--name", "foreign-32-unknown", "--prompt", str(self.prompt),
+             "--cwd", str(self.tmp), "--replace"),
+            ("kill", "foreign-32-unknown"),
+        ):
+            with self.subTest(argv=argv):
+                proc = self.adapter_run(*argv, env=env)
+                self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+        self.assertEqual({path.name: path.read_bytes() for path in run_dir.iterdir()}, before)
+        self.assertEqual(
+            {path.name: path.read_bytes() for path in unknown_dir.iterdir()}, before_unknown
+        )
+        self.assertEqual(list(run_dir.parent.glob(f"{slug}.prev-*")), [])
+        self.assertEqual(list(unknown_dir.parent.glob("foreign-32-unknown.prev-*")), [])
         listed = self.adapter_run("list", env=env)
         self.assertEqual(listed.returncode, 0, listed.stderr)
         self.assertIn("read-only(omp)", listed.stdout)
@@ -1743,7 +1937,7 @@ class DshLauncherTests(ProcessFixtures):
         self.assertEqual({path.name: path.read_bytes() for path in run_dir.iterdir()}, before)
         # A live foreign run keeps its slug too: `--replace` refuses instead of
         # stopping it, even though the recorded pid is right there.
-        sleeper = subprocess.Popen(
+        sleeper = self.spawn(
             [sys.executable, "-c", "import time; time.sleep(300)"],
             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
@@ -1753,6 +1947,7 @@ class DshLauncherTests(ProcessFixtures):
             adapter.write_json(str(run_dir / "lock"), {
                 "pid": sleeper.pid, "agent_pid": None, "backend": "omp",
             })
+            before_live = {path.name: path.read_bytes() for path in run_dir.iterdir()}
             proc = self.adapter_run(
                 "start", "--name", slug, "--prompt", str(self.prompt), "--cwd", str(self.tmp),
                 "--replace", env=env,
@@ -1761,6 +1956,10 @@ class DshLauncherTests(ProcessFixtures):
             self.assertIn("another adapter's run", proc.stderr)
             self.assertIsNone(sleeper.poll(), "another route's run must not be signalled")
             self.assertEqual(adapter.read_state_file(str(run_dir))["backend"], "omp")
+            self.assertEqual(
+                {path.name: path.read_bytes() for path in run_dir.iterdir()}, before_live
+            )
+            self.assertEqual(list(run_dir.parent.glob(f"{slug}.prev-*")), [])
         finally:
             sleeper.kill()
             sleeper.wait(timeout=10)
@@ -1805,25 +2004,41 @@ class DshLauncherTests(ProcessFixtures):
         self.assertEqual(refused["state"], "running", refused)
         self.assertFalse((run_dir / "finalized").exists())
         self.assertEqual(before, (run_dir / "state.json").read_bytes())
-        # A later stop attempt resolves it: the survivor is signalled through its
-        # verified identity, and the victim has really exited and been reaped
-        # before the `killed` verdict and its receipt are accepted.
+        # A later stop attempt resolves it *where a verified handle exists*: the
+        # survivor is signalled through its verified identity, and the victim has
+        # really exited and been reaped before the `killed` verdict and its
+        # receipt are accepted. Where C-2 refuses escalation (no pidfd, or no
+        # admissible identity) the same call must stay non-terminal instead.
         reaper = threading.Thread(target=victim.wait, daemon=True)
         reaper.start()
+        capable = (
+            adapter.identity_is_strong(_identity) and adapter.platform_can_force_stop()
+        )
         with mock.patch.object(adapter, "POLL_SECONDS", 0.01), \
                 contextlib.redirect_stderr(io.StringIO()):
             stopped = adapter.stop_run(op, state, seconds=1)
-        self.assertTrue(stopped, "a later stop attempt must settle the run")
-        self.assertFalse(adapter.pid_alive(victim.pid), "the survivor must be stopped")
-        self.assertIsNotNone(victim.poll(), "the survivor must have exited, not merely vanished")
-        final = adapter.read_state_file(str(run_dir))
-        self.assertEqual((final["state"], final["exit"]), ("killed", adapter.KILL_EXIT), final)
-        self.assertNotIn("stopping", final)
-        self.assertEqual([victim.pid], final.get("survivors_stopped"), final)
-        self.assertEqual(
-            (run_dir / "finalized").read_text(encoding="utf-8"), str(adapter.KILL_EXIT)
-        )
-        self.assertEqual(adapter.lifecycle_of(str(run_dir), final), adapter.LIFECYCLE_TERMINAL)
+        if capable:
+            self.assertTrue(stopped, "a later stop attempt must settle the run")
+            self.assertFalse(adapter.pid_alive(victim.pid), "the survivor must be stopped")
+            self.assertIsNotNone(victim.poll(), "the survivor must have exited, not merely vanished")
+            final = adapter.read_state_file(str(run_dir))
+            self.assertEqual((final["state"], final["exit"]), ("killed", adapter.KILL_EXIT), final)
+            self.assertNotIn("stopping", final)
+            self.assertEqual([victim.pid], final.get("survivors_stopped"), final)
+            self.assertEqual(
+                (run_dir / "finalized").read_text(encoding="utf-8"), str(adapter.KILL_EXIT)
+            )
+            self.assertEqual(adapter.lifecycle_of(str(run_dir), final), adapter.LIFECYCLE_TERMINAL)
+        else:
+            # The refuse path is asserted for real: no terminal verdict, the run
+            # stays live/stopping, and nothing was signalled.
+            self.assertFalse(stopped, "without a verified handle the stop cannot complete")
+            final = adapter.read_state_file(str(run_dir))
+            self.assertEqual(final["state"], "running", final)
+            self.assertTrue(final.get("stopping"), final)
+            self.assertIsNone(adapter.terminal_snapshot_locked(final))
+            self.assertFalse((run_dir / "finalized").exists())
+            self.assertTrue(victim.poll() is None, "the survivor must not have been signalled")
 
 
     # -- round-6 pins: the run-lifecycle class -------------------------------
@@ -1839,7 +2054,11 @@ class DshLauncherTests(ProcessFixtures):
         """
         victim = self.ignoring_agent()
         identity = adapter.process_identity(victim.pid)
-        self.assertTrue(identity, "the platform must supply a process identity")
+        if adapter.identity_is_strong(adapter.process_identity(os.getpid())):
+            # A strong-identity platform must be able to name a live pid it just
+            # spawned; where C-2 defines none (macOS, a host with no probe), an
+            # empty token is the honest record and the stop tests branch on it.
+            self.assertTrue(identity, "a strong-identity platform must supply a process identity")
         run_dir = self.run_root / adapter.date_stamp() / slug
         run_dir.mkdir(parents=True)
         (run_dir / "prompt.md").write_text("the agent is still working\n", encoding="utf-8")
@@ -1914,14 +2133,43 @@ class DshLauncherTests(ProcessFixtures):
         self.assertEqual(code, 1, "a stop that did not complete is not a finished run")
         return run_dir, victim, identity
 
+    def stop_live_run(self, slug):
+        """Best-effort end of one live run: failure-path cleanup registered by name.
+
+        Called via `addCleanup` by tests that leave a detached `sleep` run behind,
+        so an assertion failure can neither leak the run nor mask the original
+        failure with a cleanup error.
+        """
+        try:
+            run_dir = self.run_dir(slug)
+            if not run_dir.exists():
+                return
+            state = adapter.read_state_file(str(run_dir))
+            if (adapter.terminal_snapshot_locked(state) is None
+                    and adapter.run_alive(str(run_dir), state)):
+                self.adapter_run("kill", slug, timeout=60)
+        except Exception:
+            pass
+
     def stable_snapshot(self, run_dir, timeout=20.0, quiet=0.6):
-        """A byte snapshot of the run directory's files, once they stop changing."""
+        """A byte snapshot of the run directory's files, once they stop changing.
+
+        A run directory may still be publishing while this polls (atomic
+        `os.replace`, unlinked token/stop files), so an iteration that catches a
+        rename or a removal between the listing and the read is "not settled" and
+        is retried, rather than raising out of a concurrency helper.
+        """
         deadline = time.monotonic() + timeout
         previous, stable_since = None, None
         while time.monotonic() < deadline:
-            current = {
-                path.name: path.read_bytes() for path in run_dir.iterdir() if path.is_file()
-            }
+            try:
+                current = {
+                    path.name: path.read_bytes() for path in run_dir.iterdir() if path.is_file()
+                }
+            except OSError:
+                previous, stable_since = None, None
+                time.sleep(0.1)
+                continue
             now = time.monotonic()
             if current == previous:
                 if now - stable_since >= quiet:
@@ -1937,9 +2185,14 @@ class DshLauncherTests(ProcessFixtures):
         `spawn_runner` in this process leaves the detached runner as a child; an
         unreaped zombie still answers a liveness probe, so the run would look
         alive forever. A recorded pid that is not this process's child (the run
-        directory may still hold the previous run's state) is skipped, not
-        waited on.
+        directory may still hold the previous run's state) is skipped, not waited
+        on. Windows returns `None` without doing anything: `os.waitpid` there
+        expects an OS process handle, not a pid, so a numeric argument is not a
+        reaping call (`test_28` waits on its captured `Popen` instead).
         """
+        if IS_WINDOWS:
+            return None
+
         def wait_for_runner():
             deadline = time.monotonic() + timeout
             while time.monotonic() < deadline:
@@ -2032,14 +2285,21 @@ class DshLauncherTests(ProcessFixtures):
                 occupant, _occupant_state = adapter.occupying_run(str(self.run_root), slug)
             self.assertEqual(occupant, str(run_dir))
             # Once the agent is really gone, a *complete* enumeration proves the
-            # stop and the run settles killed/143 — never failed/-1.
+            # stop and the run settles killed/143 — never failed/-1. On a platform
+            # with no group table (Windows) the enumeration can never complete, so
+            # the run rightly stays stopping; the mocked shapes above carry the
+            # platform-independent half of the rule.
             victim.kill()
             victim.wait(timeout=10)
             settled, recovered = adapter.effective_state(str(run_dir))
-            self.assertTrue(recovered, settled)
-            self.assertEqual(
-                (settled["state"], settled["exit"]), ("killed", adapter.KILL_EXIT)
-            )
+            if IS_WINDOWS:
+                self.assertFalse(recovered, settled)
+                self.assertEqual(settled["state"], "running", settled)
+            else:
+                self.assertTrue(recovered, settled)
+                self.assertEqual(
+                    (settled["state"], settled["exit"]), ("killed", adapter.KILL_EXIT)
+                )
         finally:
             self.reap(victim)
 
@@ -2068,23 +2328,6 @@ class DshLauncherTests(ProcessFixtures):
         finally:
             self.reap(victim)
 
-    def test_36_an_unconfirmed_stop_is_still_reported_as_live(self):
-        """R2: `status`/`list` keep showing the run and its stop as unfinished."""
-        slug = "stopfail-36"
-        run_dir, victim, _identity = self.failed_stop_run(slug)
-        try:
-            view, _output = self.status_view(slug)
-            self.assertTrue(view["alive"], view)
-            self.assertTrue(view["stopping"], view)
-            self.assertEqual(view["lifecycle"], "stopping (survivors known)")
-            self.assertIn("stopping(survivors-known)", self.list_line(slug))
-            self.assertEqual(self.result_view(slug)["lifecycle"], "stopping (survivors known)")
-            answer = self.adapter_run("answer", slug)
-            self.assertEqual(answer.returncode, 1)
-            self.assertIn("stopping (survivors known)", answer.stderr)
-        finally:
-            self.reap(victim)
-
     def test_37_an_unconfirmed_stop_blocks_a_new_start_for_the_slug(self):
         """R2: the slug stays occupied, and the refusal leaves the run untouched."""
         slug = "stopfail-37"
@@ -2102,6 +2345,11 @@ class DshLauncherTests(ProcessFixtures):
         finally:
             self.reap(victim)
 
+    @unittest.skipUnless(
+        adapter.platform_can_force_stop()
+        and adapter.identity_is_strong(adapter.process_identity(os.getpid())),
+        "requires a verified process-instance primitive (pidfd) and an admissible identity",
+    )
     def test_38_an_unconfirmed_stop_stays_killable_by_a_later_attempt(self):
         """R2: a later `kill` finishes the job through the recorded survivors."""
         slug = "stopfail-38"
@@ -2220,27 +2468,37 @@ class DshLauncherTests(ProcessFixtures):
         self.assertEqual(settled["state"], "failed")
         self.assertEqual(settled["terminal_record"]["generation"], held["generation"])
 
+    @contextlib.contextmanager
+    def hold_the_start_claim(self):
+        """A `_start_run_claimed` stand-in that parks the winner inside the claim.
+
+        The winner signals `entered` and waits on `release`; the test releases it
+        in a `finally:`, so a failing assertion cannot leave the winner parked —
+        holding the slug claim, and at its own timeout spawning into a torn-down
+        temp tree. Events, not files: readiness and release are decided by the
+        threads that participate, not by filesystem polling.
+        """
+        entered = threading.Event()
+        release = threading.Event()
+        real = adapter._start_run_claimed
+
+        def hold_inside(*call_args, **call_kwargs):
+            entered.set()
+            release.wait(timeout=60.0)
+            return real(*call_args, **call_kwargs)
+
+        with mock.patch.object(adapter, "_start_run_claimed", hold_inside):
+            yield entered, release
+
     def test_40_two_concurrent_starts_produce_exactly_one_agent(self):
         """R4: the slug claim is atomic for every start, so a race has one winner."""
         slug = "race-40"
         run_dir = self.run_root / adapter.date_stamp() / slug
         agent_log = self.tmp / "race-40.agents"
-        entered = self.tmp / "race-40.entered"
-        release = self.tmp / "race-40.release"
         env = self.env_for(STUB_APPEND_FILE=agent_log, STUB_MODE="settle")
         args = adapter.build_parser().parse_args([
             "start", "--name", slug, "--prompt", str(self.prompt), "--cwd", str(self.tmp)])
-        real = adapter._start_run_claimed
         outcome = {}
-
-        def hold_inside(*call_args, **call_kwargs):
-            # The file the test controls holds the winner inside the critical
-            # section, so the loser meets a held claim, not a scheduling accident.
-            entered.write_text("in\n", encoding="utf-8")
-            deadline = time.monotonic() + 60.0
-            while not release.exists() and time.monotonic() < deadline:
-                time.sleep(0.05)
-            return real(*call_args, **call_kwargs)
 
         def racer():
             try:
@@ -2251,26 +2509,31 @@ class DshLauncherTests(ProcessFixtures):
             except SystemExit as exc:
                 outcome["code"] = exc.code
 
-        with mock.patch.object(adapter, "_start_run_claimed", hold_inside), \
+        with self.hold_the_start_claim() as (entered, release), \
                 mock.patch.dict(os.environ, env, clear=False):
             winner = threading.Thread(target=racer, daemon=True)
             winner.start()
-            deadline = time.monotonic() + 30.0
-            while not entered.exists() and time.monotonic() < deadline:
-                time.sleep(0.05)
-            self.assertTrue(entered.exists(), "the winner never entered the critical section")
-            loser = self.adapter_run(
-                "start", "--name", slug, "--prompt", str(self.prompt), "--cwd", str(self.tmp),
-                env=env,
-            )
-            self.assertEqual(loser.returncode, 1, loser.stdout + loser.stderr)
-            self.assertIn("another start is claiming", loser.stderr)
-            self.assertFalse(run_dir.exists(), "the loser wrote a run directory")
-            self.assertFalse(agent_log.exists(), "the loser started an agent")
-            release.write_text("go\n", encoding="utf-8")
+            self.assertTrue(entered.wait(timeout=30.0),
+                            "the winner never entered the critical section")
+            try:
+                loser = self.adapter_run(
+                    "start", "--name", slug, "--prompt", str(self.prompt), "--cwd", str(self.tmp),
+                    env=env,
+                )
+                self.assertEqual(loser.returncode, 1, loser.stdout + loser.stderr)
+                self.assertIn("another start is claiming", loser.stderr)
+                self.assertFalse(run_dir.exists(), "the loser wrote a run directory")
+                self.assertFalse(agent_log.exists(), "the loser started an agent")
+            finally:
+                # Release even on failure, and wait for the winner inside the
+                # patch and the temp tree's lifetime: a parked winner would
+                # otherwise spawn into a directory that no longer exists.
+                release.set()
             reaper = self.reap_runner_async(run_dir)
             winner.join(timeout=START_TIMEOUT + 30.0)
-        self.assertFalse(winner.is_alive())
+            self.assertFalse(winner.is_alive(), "the winner never finished")
+        if reaper is not None:
+            reaper.join(timeout=30.0)
         self.assertEqual(outcome.get("code"), 0, outcome)
         state = self.wait_for_state(slug, {"done", "killed", "failed"})
         self.assertTrue(state.get("agent_pid"), state)
@@ -2285,20 +2548,10 @@ class DshLauncherTests(ProcessFixtures):
         self.settle(slug, STUB_TEXT="first answer")
         run_dir = self.run_dir(slug)
         agent_log = self.tmp / "race-41.agents"
-        entered = self.tmp / "race-41.entered"
-        release = self.tmp / "race-41.release"
         env = self.env_for(STUB_APPEND_FILE=agent_log, STUB_MODE="settle")
         args = adapter.build_parser().parse_args([
             "start", "--name", slug, "--prompt", str(self.prompt), "--cwd", str(self.tmp)])
-        real = adapter._start_run_claimed
         outcome = {}
-
-        def hold_inside(*call_args, **call_kwargs):
-            entered.write_text("in\n", encoding="utf-8")
-            deadline = time.monotonic() + 60.0
-            while not release.exists() and time.monotonic() < deadline:
-                time.sleep(0.05)
-            return real(*call_args, **call_kwargs)
 
         def racer():
             try:
@@ -2309,31 +2562,36 @@ class DshLauncherTests(ProcessFixtures):
             except SystemExit as exc:
                 outcome["code"] = exc.code
 
-        with mock.patch.object(adapter, "_start_run_claimed", hold_inside), \
+        with self.hold_the_start_claim() as (entered, release), \
                 mock.patch.dict(os.environ, env, clear=False):
             winner = threading.Thread(target=racer, daemon=True)
             winner.start()
-            deadline = time.monotonic() + 30.0
-            while not entered.exists() and time.monotonic() < deadline:
-                time.sleep(0.05)
-            self.assertTrue(entered.exists(), "the winner never entered the critical section")
-            before = self.stable_snapshot(run_dir)
-            if IS_WINDOWS:
-                command = [os.environ.get("COMSPEC") or "cmd.exe", "/d", "/c",
-                           str(run_dir / "run.cmd")]
-            else:
-                command = [str(run_dir / "run.sh")]
-            replay = subprocess.run(
-                command, capture_output=True, text=True, env=self.env, timeout=SETTLE_TIMEOUT
-            )
-            self.assertNotEqual(replay.returncode, 0, replay.stdout + replay.stderr)
-            self.assertIn("another start owns", replay.stdout + replay.stderr)
-            self.assertEqual(self.stable_snapshot(run_dir), before)
-            self.assertFalse(agent_log.exists(), "the replay started a second agent")
-            release.write_text("go\n", encoding="utf-8")
+            self.assertTrue(entered.wait(timeout=30.0),
+                            "the winner never entered the critical section")
+            try:
+                before = self.stable_snapshot(run_dir)
+                if IS_WINDOWS:
+                    command = [os.environ.get("COMSPEC") or "cmd.exe", "/d", "/c",
+                               str(run_dir / "run.cmd")]
+                else:
+                    command = [str(run_dir / "run.sh")]
+                # The replay runs with the *test's* env (with STUB_APPEND_FILE), not
+                # the base one: if a regression let it spawn a second agent, that
+                # agent must be visible in the log instead of logging nowhere.
+                replay = subprocess.run(
+                    command, capture_output=True, text=True, env=env, timeout=SETTLE_TIMEOUT
+                )
+                self.assertNotEqual(replay.returncode, 0, replay.stdout + replay.stderr)
+                self.assertIn("another start owns", replay.stdout + replay.stderr)
+                self.assertEqual(self.stable_snapshot(run_dir), before)
+                self.assertFalse(agent_log.exists(), "the replay started a second agent")
+            finally:
+                release.set()
             reaper = self.reap_runner_async(run_dir)
             winner.join(timeout=START_TIMEOUT + 30.0)
-        self.assertFalse(winner.is_alive())
+            self.assertFalse(winner.is_alive(), "the winner never finished")
+        if reaper is not None:
+            reaper.join(timeout=30.0)
         self.assertEqual(outcome.get("code"), 0, outcome)
         final = self.wait_for_state(slug, {"done", "killed", "failed"})
         self.assertTrue(final.get("agent_pid"), final)
@@ -2363,9 +2621,10 @@ class DshLauncherTests(ProcessFixtures):
     def test_43_lifecycle_live_over_the_real_artifacts(self):
         """R5: a working run says `live`, and its answer is refused as such."""
         slug = "life-43"
+        self.addCleanup(self.stop_live_run, slug)
         self.start(slug, env=self.env_for(STUB_MODE="sleep"))
-        self.wait_for_state(slug, {"running"}, timeout=START_TIMEOUT)
         try:
+            self.wait_for_state(slug, {"running"}, timeout=START_TIMEOUT)
             view, _output = self.status_view(slug)
             self.assertEqual(view["lifecycle"], "live")
             self.assertTrue(view["alive"])
@@ -2374,18 +2633,29 @@ class DshLauncherTests(ProcessFixtures):
             answer = self.adapter_run("answer", slug)
             self.assertEqual(answer.returncode, 1)
             self.assertIn("not finished yet (live", answer.stderr)
-        finally:
+            # The stop really settles it on the happy path.
             self.adapter_run("kill", slug)
-            self.wait_for_state(slug, {"killed"}, timeout=30.0)
+            self.assertEqual(self.wait_for_state(slug, {"killed"}, timeout=30.0)["exit"],
+                             adapter.KILL_EXIT)
+        finally:
+            # Best-effort only, and never an assertion: cleanup must not mask the
+            # primary failure (the registered `stop_live_run` and class teardown
+            # settle whatever a failing test leaves behind).
+            self.adapter_run("kill", slug)
 
     def test_44_lifecycle_stopping_with_survivors_over_the_real_artifacts(self):
-        """R5: `stopping (survivors known)` is not a terminal state anywhere."""
+        """R5: `stopping (survivors known)` is not a terminal state anywhere.
+
+        (This folds the former `test_36`: the same fixture and the same readers,
+        one process round-trip.)
+        """
         slug = "life-44"
         run_dir, victim, _identity = self.failed_stop_run(slug)
         try:
             view, _output = self.status_view(slug)
             self.assertEqual(view["lifecycle"], "stopping (survivors known)")
             self.assertIs(view["survivors_complete"], True)
+            self.assertTrue(view["stopping"], view)
             self.assertTrue(view["alive"])
             self.assertIn("stopping(survivors-known)", self.list_line(slug))
             self.assertEqual(
@@ -2567,8 +2837,10 @@ class AdapterUnitTests(ProcessFixtures):
     def test_start_fails_when_only_the_runner_recorded_a_pid(self):
         """A live runner without an agent pid is not a successful dispatch (A1).
 
-        The runner is simulated by the test: it records its own (live) pid and
-        never reaches `spawn_agent`, which is exactly the wedged-runner case.
+        The runner is simulated by the test: it records a sacrificial pid — never
+        this process's own, so a cleanup that ends a wedged runner can never
+        signal the test — and never reaches `spawn_agent`, which is exactly the
+        wedged-runner case.
         """
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "runs"
@@ -2577,14 +2849,19 @@ class AdapterUnitTests(ProcessFixtures):
             args = adapter.build_parser().parse_args(
                 ["start", "--name", "wedged-runner", "--prompt", str(prompt), "--cwd", tmp]
             )
-            run_dir = root / adapter.date_stamp() / "wedged-runner"
+            decoy = self.spawn(
+                [sys.executable, "-c", "import time; time.sleep(60)"],
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL, start_new_session=True,
+            )
 
             def fake_spawn(argv, cwd, log_path):
-                adapter.update_lock(str(run_dir), pid=os.getpid())
+                run_dir = Path(log_path).parent
+                adapter.update_lock(str(run_dir), pid=decoy.pid)
                 state = adapter.read_state_file(str(run_dir))
-                state["pid"] = os.getpid()
+                state["pid"] = decoy.pid
                 adapter.write_json(str(run_dir / "state.json"), state)
-                return types.SimpleNamespace(pid=os.getpid(), poll=lambda: None)
+                return types.SimpleNamespace(pid=decoy.pid, poll=lambda: None)
 
             out, err = io.StringIO(), io.StringIO()
             with mock.patch.dict(
@@ -2604,7 +2881,7 @@ class AdapterUnitTests(ProcessFixtures):
     def test_the_tracker_stops_publishing_before_the_verdict_is_committed(self):
         """A reader outliving the drain timeout cannot rewrite the terminal state (A3)."""
         with tempfile.TemporaryDirectory() as tmp:
-            run_dir = Path(tmp)
+            run_dir = self.staged_run_dir(tmp, "late")
             state = {"name": "late", "state": "running", "exit": None, "cwd": tmp,
                      "started": adapter.now_iso(), "backend": "dsh",
                      "generation": adapter.new_nonce()}
@@ -2657,6 +2934,8 @@ class AdapterUnitTests(ProcessFixtures):
         """Liveness must be identity-checked, or a reused pid resurrects a dead run."""
         with tempfile.TemporaryDirectory() as tmp:
             run_dir = Path(tmp)
+            # Deliberately not staged: this test only *reads* (`run_alive`), so no
+            # lock object is created anywhere and there is nothing to leak.
             adapter.write_json(str(run_dir / "state.json"), {
                 "name": "reused", "state": "running", "exit": None, "cwd": tmp,
                 "started": adapter.now_iso()})
@@ -2670,6 +2949,12 @@ class AdapterUnitTests(ProcessFixtures):
                 # is a reused pid, not this run's process.
                 adapter.write_json(str(run_dir / "lock"), {
                     "pid": victim.pid, "agent_pid": None, "pid_identity": "proc:0"})
+                self.assertFalse(adapter.run_alive(str(run_dir)))
+                # …and so is a real, current-format token that names *another*
+                # live process: a constant-shape token cannot pass this.
+                adapter.write_json(str(run_dir / "lock"), {
+                    "pid": victim.pid, "agent_pid": None,
+                    "pid_identity": adapter.process_identity(os.getpid())})
                 self.assertFalse(adapter.run_alive(str(run_dir)))
                 # The identity read at spawn keeps the run alive.
                 identity = adapter.process_identity(victim.pid)
@@ -2685,7 +2970,11 @@ class AdapterUnitTests(ProcessFixtures):
                 victim.kill()
                 victim.wait(timeout=10)
 
-    @unittest.skipIf(IS_WINDOWS, "process groups and pidfds are POSIX/Linux-only")
+    @unittest.skipUnless(
+        adapter.platform_can_force_stop()
+        and adapter.identity_is_strong(adapter.process_identity(os.getpid())),
+        "requires a verified process-instance primitive (pidfd) and an admissible identity",
+    )
     def test_signal_group_refuses_a_pid_it_cannot_prove(self):
         """No signal without a matching, admissible identity; the group id is never sent.
 
@@ -2696,12 +2985,15 @@ class AdapterUnitTests(ProcessFixtures):
         validated handle, never `killpg` on the group id.
         """
         leader, member = self.group_with_ready_member()
-        identity = adapter.process_identity(leader.pid)
-        self.assertTrue(adapter.identity_is_strong(identity), identity)
-        delivered, patches = self.signal_spy()
-        err = io.StringIO()
         try:
-            with patches[0], patches[1], contextlib.redirect_stderr(err):
+            identity = adapter.process_identity(leader.pid)
+            self.assertTrue(adapter.identity_is_strong(identity), identity)
+            delivered, patches = self.signal_spy()
+            err = io.StringIO()
+            with contextlib.ExitStack() as stack:
+                for patch in patches:
+                    stack.enter_context(patch)
+                stack.enter_context(contextlib.redirect_stderr(err))
                 self.assertFalse(adapter.signal_group(leader.pid, signal.SIGTERM, "linux:v2:nope"))
                 self.assertFalse(adapter.signal_group(leader.pid, signal.SIGTERM, ""))
                 self.assertFalse(adapter.signal_group(leader.pid, signal.SIGTERM, "proc:1"))
@@ -2714,7 +3006,8 @@ class AdapterUnitTests(ProcessFixtures):
             self.assertEqual({signum for _pid, signum in delivered}, {signal.SIGTERM})
             self.assertEqual(adapter.liveness_of(leader.pid), adapter.LIVE)
         finally:
-            self.reap_pids([member])
+            self.reap_pids([leader.pid, member])
+            self.reap(leader)
 
     @unittest.skipIf(IS_WINDOWS, "process groups are POSIX-only")
     def test_a_vanished_leader_is_never_signalled(self):
@@ -2732,6 +3025,8 @@ class AdapterUnitTests(ProcessFixtures):
         )
         with tempfile.TemporaryDirectory() as tmp:
             run_dir = Path(tmp)
+            # Deliberately not staged: the calls below enumerate and refuse
+            # (`stop_survivors`, `signal_member_group`) and take no lock.
             adapter.write_json(str(run_dir / "state.json"), {
                 "name": "reused-group", "state": "running", "exit": None, "cwd": tmp,
                 "started": adapter.now_iso(), "backend": "dsh",
@@ -2753,7 +3048,11 @@ class AdapterUnitTests(ProcessFixtures):
                 )
             self.assertEqual(adapter.liveness_of(victim.pid), adapter.LIVE)
 
-    @unittest.skipIf(IS_WINDOWS, "process groups are POSIX-only")
+    @unittest.skipUnless(
+        adapter.platform_can_force_stop()
+        and adapter.identity_is_strong(adapter.process_identity(os.getpid())),
+        "requires a verified process-instance primitive (pidfd) and an admissible identity",
+    )
     def test_a_verified_member_names_the_group_of_a_gone_leader(self):
         """A survivor's own identity aims the group signal after its leader is gone (P7).
 
@@ -2763,15 +3062,18 @@ class AdapterUnitTests(ProcessFixtures):
         are signalled through their own handles.
         """
         leader, member = self.group_with_ready_member()
-        member_identity = adapter.process_identity(member)
-        self.assertTrue(adapter.identity_is_strong(member_identity), member_identity)
-        leader.kill()
-        leader.wait(timeout=10)
-        self.assertEqual(adapter.liveness_of(leader.pid), adapter.GONE)
-        delivered, patches = self.signal_spy()
-        err = io.StringIO()
         try:
-            with patches[0], patches[1], contextlib.redirect_stderr(err):
+            member_identity = adapter.process_identity(member)
+            self.assertTrue(adapter.identity_is_strong(member_identity), member_identity)
+            leader.kill()
+            leader.wait(timeout=10)
+            self.assertEqual(adapter.liveness_of(leader.pid), adapter.GONE)
+            delivered, patches = self.signal_spy()
+            err = io.StringIO()
+            with contextlib.ExitStack() as stack:
+                for patch in patches:
+                    stack.enter_context(patch)
+                stack.enter_context(contextlib.redirect_stderr(err))
                 self.assertTrue(
                     adapter.signal_member_group(
                         member, signal.SIGTERM, member_identity, leader.pid
@@ -2793,66 +3095,84 @@ class AdapterUnitTests(ProcessFixtures):
             self.assertIn("not signalling the group", err.getvalue())
         finally:
             self.reap_pids([member])
+            self.reap(leader)
 
     def test_a_failed_stop_records_survivors_without_finalizing(self):
         """A failed stop stays live/stopping, and only a real stop settles it (A3/T4).
 
         The report itself is exercised here; the *terminal* half is exercised only
-        after the survivor has really exited — with the survivor alive, a direct
+        where the adapter can prove the stop (a verified handle exists) and the
+        survivor has really exited — with the survivor alive, a direct
         `finalize(..., KILL_EXIT)` is refused, and the receipt is accepted only
-        once the process it names is gone.
+        once the process it names is gone. Where C-2 refuses escalation the same
+        call must stay non-terminal instead.
         """
         with tempfile.TemporaryDirectory() as tmp:
-            run_dir = Path(tmp)
+            run_dir = self.staged_run_dir(tmp, "stopping")
             victim = self.ignoring_agent()
-            identity = adapter.process_identity(victim.pid)
-            self.assertTrue(identity, "the platform must supply a process identity")
-            generation = adapter.new_nonce()
-            adapter.write_json(str(run_dir / "state.json"), {
-                "name": "stopping", "state": "running", "exit": None, "cwd": tmp,
-                "started": adapter.now_iso(), "backend": "dsh", "generation": generation,
-            })
-            adapter.write_json(str(run_dir / "lock"), {
-                "pid": None, "agent_pid": None, "backend": "dsh", "generation": generation,
-            })
-            op = adapter.operation_of(str(run_dir))
-            with contextlib.redirect_stdout(io.StringIO()), \
-                    contextlib.redirect_stderr(io.StringIO()):
-                code = adapter.report_incomplete_stop(
-                    op, [(victim.pid, identity, victim.pid)], "control-file"
+            try:
+                identity = adapter.process_identity(victim.pid)
+                if adapter.identity_is_strong(adapter.process_identity(os.getpid())):
+                    self.assertTrue(identity, "a strong-identity platform must name a live pid")
+                generation = adapter.new_nonce()
+                adapter.write_json(str(run_dir / "state.json"), {
+                    "name": "stopping", "state": "running", "exit": None, "cwd": tmp,
+                    "started": adapter.now_iso(), "backend": "dsh", "generation": generation,
+                })
+                adapter.write_json(str(run_dir / "lock"), {
+                    "pid": None, "agent_pid": None, "backend": "dsh", "generation": generation,
+                })
+                op = adapter.operation_of(str(run_dir))
+                with contextlib.redirect_stdout(io.StringIO()), \
+                        contextlib.redirect_stderr(io.StringIO()):
+                    code = adapter.report_incomplete_stop(
+                        op, [(victim.pid, identity, victim.pid)], "control-file"
+                    )
+                self.assertEqual(code, 1)
+                self.assertFalse((run_dir / "finalized").exists())
+                self.assertFalse((run_dir / "exit.code").exists())
+                state = adapter.read_state_file(str(run_dir))
+                self.assertEqual(state["state"], "running", state)
+                self.assertTrue(state["stopping"], state)
+                # The survivor is what keeps the run alive and its slug occupied…
+                self.assertTrue(adapter.run_alive(str(run_dir), state))
+                self.assertIn(victim.pid, adapter.recorded_pids(str(run_dir), state))
+                # …so no reader recovers it into failed/-1 while it is still there.
+                settled, recovered = adapter.effective_state(str(run_dir))
+                self.assertFalse(recovered)
+                self.assertEqual(settled["state"], "running")
+                self.assertFalse((run_dir / "finalized").exists())
+                # A direct terminal commit is refused while the survivor is alive.
+                with contextlib.redirect_stderr(io.StringIO()):
+                    refused = adapter.finalize(
+                        str(run_dir), adapter.KILL_EXIT, expect_generation=generation
+                    )
+                self.assertEqual(refused["state"], "running", refused)
+                # Only a real stop settles it, and the receipt names a process
+                # that is really gone by the time the verdict is accepted.
+                capable = (
+                    adapter.identity_is_strong(identity) and adapter.platform_can_force_stop()
                 )
-            self.assertEqual(code, 1)
-            self.assertFalse((run_dir / "finalized").exists())
-            self.assertFalse((run_dir / "exit.code").exists())
-            state = adapter.read_state_file(str(run_dir))
-            self.assertEqual(state["state"], "running", state)
-            self.assertTrue(state["stopping"], state)
-            # The survivor is what keeps the run alive and its slug occupied…
-            self.assertTrue(adapter.run_alive(str(run_dir), state))
-            self.assertIn(victim.pid, adapter.recorded_pids(str(run_dir), state))
-            # …so no reader recovers it into failed/-1 while it is still there.
-            settled, recovered = adapter.effective_state(str(run_dir))
-            self.assertFalse(recovered)
-            self.assertEqual(settled["state"], "running")
-            self.assertFalse((run_dir / "finalized").exists())
-            # A direct terminal commit is refused while the survivor is alive.
-            with contextlib.redirect_stderr(io.StringIO()):
-                refused = adapter.finalize(
-                    str(run_dir), adapter.KILL_EXIT, expect_generation=generation
-                )
-            self.assertEqual(refused["state"], "running", refused)
-            # Only a real stop settles it, and the receipt names a process that is
-            # really gone by the time the verdict is accepted.
-            with mock.patch.object(adapter, "POLL_SECONDS", 0.01), \
-                    contextlib.redirect_stderr(io.StringIO()):
-                stopped = adapter.stop_run(op, state, seconds=1)
-            self.assertTrue(stopped)
-            self.assertIsNotNone(victim.poll(), "the survivor must have exited")
-            final = adapter.read_state_file(str(run_dir))
-            self.assertEqual(final["state"], "killed")
-            self.assertNotIn("stopping", final)
-            self.assertEqual(final.get("survivors_stopped"), [victim.pid])
-            self.assertEqual(adapter.lifecycle_of(str(run_dir), final), adapter.LIFECYCLE_TERMINAL)
+                with mock.patch.object(adapter, "POLL_SECONDS", 0.01), \
+                        contextlib.redirect_stderr(io.StringIO()):
+                    stopped = adapter.stop_run(op, state, seconds=1)
+                if capable:
+                    self.assertTrue(stopped)
+                    self.assertIsNotNone(victim.poll(), "the survivor must have exited")
+                    final = adapter.read_state_file(str(run_dir))
+                    self.assertEqual(final["state"], "killed")
+                    self.assertNotIn("stopping", final)
+                    self.assertEqual(final.get("survivors_stopped"), [victim.pid])
+                    self.assertEqual(adapter.lifecycle_of(str(run_dir), final),
+                                     adapter.LIFECYCLE_TERMINAL)
+                else:
+                    self.assertFalse(stopped, "without a verified handle the stop cannot complete")
+                    final = adapter.read_state_file(str(run_dir))
+                    self.assertEqual(final["state"], "running", final)
+                    self.assertTrue(final.get("stopping"), final)
+                    self.assertIsNone(victim.poll(), "the survivor must not have been signalled")
+            finally:
+                self.reap(victim)
 
     def test_a_run_dir_must_be_a_direct_child_of_a_date_bucket(self):
         """Any shape but `<root>/<date>/<slug>` is refused before a write (A1)."""
@@ -2904,11 +3224,19 @@ class AdapterUnitTests(ProcessFixtures):
         # an authorization.
         self.assertFalse(adapter.identity_is_strong(first))
         weak = adapter._ps_identity(os.getpid())
-        with mock.patch.object(adapter, "_proc_stat_identity", lambda target: ""), \
-                mock.patch.object(adapter, "_ps_identity",
-                                  lambda target: self.fail("no weak fallback on Linux")), \
-                mock.patch.object(adapter.os.path, "exists", lambda path: True):
+        _delivered, patches = self.signal_spy()
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(mock.patch.object(adapter, "IS_WINDOWS", False))
+            stack.enter_context(mock.patch.object(adapter, "_proc_stat_identity", lambda target: ""))
+            stack.enter_context(mock.patch.object(
+                adapter, "_ps_identity", lambda target: self.fail("no weak fallback on Linux")))
+            stack.enter_context(mock.patch.object(adapter.os.path, "exists", lambda path: True))
+            for patch in patches:
+                stack.enter_context(patch)
+            stack.enter_context(contextlib.redirect_stderr(io.StringIO()))
             self.assertEqual(adapter.process_identity(os.getpid()), "")
+            # The signal is attempted against this very process: the spy is what
+            # makes a weakened identity gate fail the test instead of the runner.
             self.assertFalse(
                 adapter.signal_group(os.getpid(), signal.SIGTERM, weak or "ps:x")
             )
@@ -2936,7 +3264,10 @@ class AdapterUnitTests(ProcessFixtures):
         def run_case(windows, signum_module, capable):
             attempts.clear()
             with tempfile.TemporaryDirectory() as tmp:
-                run_dir = Path(tmp)
+                # Staged inside the test tree: `terminate_agent` takes the slug's
+                # lifecycle mutex, and a bare `Path(tmp)` would put that lock
+                # object (and its directory) into the shared temp root.
+                run_dir = self.staged_run_dir(tmp, "escalate")
                 generation = adapter.new_nonce()
                 adapter.write_json(str(run_dir / "state.json"), {
                     "name": "escalate", "state": "running", "exit": None, "cwd": tmp,
@@ -2994,7 +3325,7 @@ class AdapterUnitTests(ProcessFixtures):
     def test_kill_tree_leaves_an_unverified_pid_alone(self):
         """The forced-kill path fails closed instead of signalling a stranger (A5)."""
         with tempfile.TemporaryDirectory() as tmp:
-            run_dir = Path(tmp)
+            run_dir = self.staged_run_dir(tmp, "stranger")
             generation = adapter.new_nonce()
             adapter.write_json(str(run_dir / "state.json"), {
                 "name": "stranger", "state": "running", "exit": None, "cwd": tmp,
@@ -3023,7 +3354,7 @@ class AdapterUnitTests(ProcessFixtures):
         run without the file ever being unlinked or replaced.
         """
         with tempfile.TemporaryDirectory() as tmp:
-            run_dir = Path(tmp)
+            run_dir = self.staged_run_dir(tmp, "claim")
             (run_dir / "events.ndjson").write_text("", encoding="utf-8")
             generation = adapter.new_nonce()
             adapter.write_json(str(run_dir / "state.json"), {
@@ -3031,6 +3362,7 @@ class AdapterUnitTests(ProcessFixtures):
                 "started": adapter.now_iso(), "backend": "dsh", "generation": generation})
             op = adapter.operation_of(str(run_dir))
             lock_path = adapter.lifecycle_lock_path(op.root, op.slug)
+            os.makedirs(os.path.dirname(lock_path), exist_ok=True)
             holder = open(lock_path, "a+b")
             try:
                 if IS_WINDOWS:
@@ -3086,8 +3418,17 @@ class AdapterUnitTests(ProcessFixtures):
         with tempfile.TemporaryDirectory() as tmp:
             shim = Path(tmp) / "dsh.cmd"
             shim.write_text("@echo off\r\n", encoding="utf-8")
+            # A space in the shim's own directory is a standard Windows shape
+            # (`C:\Program Files\…`, a user profile). The cmd route cannot spell
+            # whitespace safely, so the refusal — not a silently split command
+            # line — is the pinned behaviour.
+            spaced = Path(tmp) / "dir with space" / "dsh.cmd"
+            spaced.parent.mkdir()
+            spaced.write_text("@echo off\r\n", encoding="utf-8")
             with mock.patch.object(adapter, "IS_WINDOWS", True), \
                     mock.patch.dict(os.environ, {"COMSPEC": "cmd.exe"}):
+                with self.assertRaises(ValueError):
+                    adapter.agent_command(str(spaced), ["--session-id", "safe-id"])
                 # No real executable beside the shim: cmd is required, and an
                 # argument it would re-parse is refused, never serialized.
                 with self.assertRaises(ValueError):
@@ -3106,6 +3447,8 @@ class AdapterUnitTests(ProcessFixtures):
         """The replay `.cmd` must quote metacharacters and refuse `%` (A4)."""
         with tempfile.TemporaryDirectory() as tmp:
             run_dir = Path(tmp)
+            # Deliberately not staged: `write_replay` writes `run.cmd` and takes
+            # no lock.
             argv = [str(Path(tmp) / "python.exe"), "arg with space", "a&b", "plain"]
             with mock.patch.object(adapter, "IS_WINDOWS", True):
                 adapter.write_replay(str(run_dir), {
@@ -3117,9 +3460,14 @@ class AdapterUnitTests(ProcessFixtures):
             self.assertIn("plain", line)
             self.assertIn(f"cd /d {adapter.batch_argument(tmp)}", script)
             with mock.patch.object(adapter, "IS_WINDOWS", True):
-                with self.assertRaises(ValueError):
-                    adapter.write_replay(str(run_dir), {
-                        "name": "replay", "argv": ["a%b"], "cwd": tmp, "agent_argv": []})
+                for bad in ("a%b", "a!b", 'a"b', "a\rb", "a\nb"):
+                    with self.subTest(argument=bad):
+                        # `%` and `!` still expand inside quotes, and a quote or a
+                        # newline cannot be represented at all: refused, never
+                        # serialized into a line that would run another command.
+                        with self.assertRaises(ValueError):
+                            adapter.write_replay(str(run_dir), {
+                                "name": "replay", "argv": [bad], "cwd": tmp, "agent_argv": []})
 
     def test_completion_mapping_is_exhaustive(self):
         """The real finalizer, one temp run directory per case."""
@@ -3133,11 +3481,16 @@ class AdapterUnitTests(ProcessFixtures):
                 (143, None, "killed"),
                 (137, None, "killed"),
                 (130, "completed", "killed"),
+                # The raw POSIX signal forms are the same convention: killed, with
+                # the raw code kept (B-completeness for `KILLED_EXITS`).
+                (-2, None, "killed"),
+                (-9, None, "killed"),
+                (-15, "completed", "killed"),
             )
         ):
             with self.subTest(exit=exit_code, reason=reason):
                 with tempfile.TemporaryDirectory() as tmp:
-                    run_dir = Path(tmp)
+                    run_dir = self.staged_run_dir(tmp, f"map-{index}")
                     events = []
                     if reason is not None:
                         events.append(
@@ -3169,7 +3522,7 @@ class AdapterUnitTests(ProcessFixtures):
 
     def test_stale_recovery_is_the_only_path_to_exit_minus_one(self):
         with tempfile.TemporaryDirectory() as tmp:
-            run_dir = Path(tmp)
+            run_dir = self.staged_run_dir(tmp, "stale")
             (run_dir / "events.ndjson").write_text(
                 json.dumps({"type": "session", "sessionId": "s"}) + "\n", encoding="utf-8"
             )
@@ -3188,6 +3541,24 @@ class AdapterUnitTests(ProcessFixtures):
             again, recovered_again = adapter.effective_state(str(run_dir))
             self.assertFalse(recovered_again)
             self.assertEqual(before, (run_dir / "state.json").read_bytes())
+            # The claim in the name is the *combination*: `failed`/`-1` **with**
+            # `stale_recovered` is the recovery path's alone. A direct
+            # `finalize(..., -1, recovered=False)` records the -1 but cannot mint
+            # the stale marker, so a caller cannot fake a crash recovery.
+            direct_dir = self.staged_run_dir(tmp, "stale-direct")
+            adapter.write_json(str(direct_dir / "state.json"), {
+                "name": "stale-direct", "state": "running", "exit": None, "cwd": tmp,
+                "started": adapter.now_iso(), "backend": "dsh",
+                "generation": adapter.new_nonce(),
+            })
+            direct = adapter.finalize(
+                str(direct_dir), -1,
+                expect_generation=adapter.strict_generation(
+                    adapter.read_state_file(str(direct_dir))),
+            )
+            self.assertEqual((direct["state"], direct["exit"]), ("failed", -1))
+            self.assertIsNot(direct.get("stale_recovered"), True,
+                              "only the recovery path may write stale_recovered")
 
     def test_a_terminal_state_without_a_marker_is_repaired_from_its_commit(self):
         """A crash between the commit and the marker leaves a committed verdict.
@@ -3199,7 +3570,7 @@ class AdapterUnitTests(ProcessFixtures):
         commit as a verdict: that is uncommitted data.
         """
         with tempfile.TemporaryDirectory() as tmp:
-            run_dir = Path(tmp)
+            run_dir = self.staged_run_dir(tmp, "repaired")
             (run_dir / "events.ndjson").write_text(
                 json.dumps({"type": "final", "sessionId": "s", "reason": {"kind": "completed"},
                             "text": "done"}) + "\n",
@@ -3332,7 +3703,7 @@ class AdapterUnitTests(ProcessFixtures):
 
         def run_case(capable, settled, terminated, members):
             with tempfile.TemporaryDirectory() as tmp:
-                run_dir = Path(tmp)
+                run_dir = self.staged_run_dir(tmp, "outcome")
                 generation = adapter.new_nonce()
                 adapter.write_json(str(run_dir / "state.json"), {
                     "name": "outcome", "state": "running", "exit": None, "cwd": tmp,
@@ -3373,50 +3744,97 @@ class AdapterUnitTests(ProcessFixtures):
     def test_a_run_that_stopped_without_enumeration_is_never_recovered_as_failed(self):
         """R1: a failed enumeration is not evidence, so a reader leaves it stopping.
 
-        Two shapes of "the enumeration cannot be trusted": a record that says so
-        (`survivors_complete: false`, which is what a platform without a group
-        table or a failed inspection writes) and a live enumeration that fails
-        now. Neither may be read as disappearance, so no reader settles the run,
-        and the slug stays occupied.
+        Four shapes, each staged on its own: a record that says the enumeration
+        was incomplete; a live enumeration answering "unknown" (`None`) where the
+        same record answering "nobody" (`[]`) may settle it — the two answers are
+        never conflated; a live recorded survivor whose group table cannot be
+        read; and the control where the survivor is really gone, which settles.
+        Neither "unknown" shape may be read as disappearance, so no reader settles
+        the run, and the slug stays occupied.
         """
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "run-root"
             run_dir = root / adapter.date_stamp() / "unproven"
             run_dir.mkdir(parents=True)
             (run_dir / "events.ndjson").write_text("", encoding="utf-8")
-            adapter.write_json(str(run_dir / "state.json"), {
+            base = {
                 "name": "unproven", "state": "running", "exit": None, "cwd": tmp,
                 "started": (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat(),
-                "backend": "dsh", "stopping": True, "survivors_complete": False,
-                "survivors": [],
+                "backend": "dsh", "stopping": True,
                 "generation": adapter.new_nonce(),
-            })
-            for shape in ("recorded-unknown", "failed-now", "unreadable-table"):
-                with self.subTest(shape=shape):
-                    patches = []
-                    if shape == "failed-now":
-                        patches.append(mock.patch.object(
-                            adapter, "stop_survivors", lambda *a, **k: None
-                        ))
-                    elif shape == "unreadable-table":
-                        patches.append(mock.patch.object(
-                            adapter, "group_member_pids", lambda pgid: None
-                        ))
-                    with contextlib.ExitStack() as stack:
-                        for patch in patches:
-                            stack.enter_context(patch)
-                        with mock.patch.object(adapter, "run_alive", lambda run, state=None: False), \
-                                contextlib.redirect_stderr(io.StringIO()):
-                            state, recovered = adapter.effective_state(str(run_dir))
-                    self.assertFalse(recovered, state)
-                    self.assertEqual(state["state"], "running", state)
-                    self.assertFalse((run_dir / "finalized").exists())
-                    self.assertFalse((run_dir / "exit.code").exists())
-            # And the slug stays occupied: a probe that found nothing is not a
-            # probe that proved nothing is there.
+            }
+
+            def stage(**fields):
+                # A previous control may have settled this run: the staging for the
+                # next shape starts from the unfinished artifacts alone.
+                adapter.remove_quietly(str(run_dir / "finalized"))
+                adapter.remove_quietly(str(run_dir / "exit.code"))
+                adapter.write_json(str(run_dir / "state.json"), {**base, **fields})
+
+            # (1) The record itself says the enumeration was incomplete: that
+            # field alone blocks recovery, whatever a live probe would answer.
+            stage(survivors_complete=False, survivors=[])
             with mock.patch.object(adapter, "run_alive", lambda run, state=None: False):
+                state, recovered = adapter.effective_state(str(run_dir))
+            self.assertFalse(recovered, state)
+            self.assertEqual(state["state"], "running", state)
+
+            # (2) The enumeration is consulted *now*: "unknown" (`None`) blocks,
+            # and the complete "nobody" (`[]`) settles — the values decide, they
+            # are not interchangeable.
+            stage(survivors_complete=False, survivors=[])
+            calls = []
+            with mock.patch.object(
+                adapter, "stop_survivors", lambda *a, **k: calls.append(a) or None
+            ), mock.patch.object(adapter, "run_alive", lambda run, state=None: False), \
+                    contextlib.redirect_stderr(io.StringIO()):
+                state, recovered = adapter.effective_state(str(run_dir))
+            self.assertFalse(recovered, state)
+            self.assertEqual(state["state"], "running", state)
+            self.assertEqual(len(calls), 1, "the live enumeration must be consulted")
+            with mock.patch.object(
+                adapter, "stop_survivors", lambda *a, **k: calls.append(a) or []
+            ), mock.patch.object(adapter, "run_alive", lambda run, state=None: False), \
+                    contextlib.redirect_stderr(io.StringIO()):
+                state, recovered = adapter.effective_state(str(run_dir))
+            self.assertTrue(recovered, "a complete enumeration of nobody settles the stop")
+            self.assertEqual((state["state"], state["exit"]), ("killed", adapter.KILL_EXIT))
+
+            # (3) A live recorded survivor anchors its group, but the table
+            # cannot be read: `stop_survivors` says `None` (unknown), never `[]`.
+            victim = self.spawn(
+                [sys.executable, "-c", "import time; time.sleep(120)"],
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL, start_new_session=True,
+            )
+            try:
+                identity = adapter.process_identity(victim.pid)
+                stage(survivors_complete=True, survivors=[
+                    {"pid": victim.pid, "identity": identity, "group": victim.pid}])
+                with mock.patch.object(adapter, "group_member_pids", lambda pgid: None), \
+                        mock.patch.object(adapter, "run_alive", lambda run, state=None: False), \
+                        contextlib.redirect_stderr(io.StringIO()):
+                    survivors = adapter.stop_survivors(str(run_dir))
+                    self.assertIsNone(survivors, "an unreadable table is never []")
+                    state, recovered = adapter.effective_state(str(run_dir))
+                self.assertFalse(recovered, state)
+                self.assertEqual(state["state"], "running", state)
+                self.assertFalse((run_dir / "finalized").exists())
+                self.assertFalse((run_dir / "exit.code").exists())
+                # And the slug stays occupied: a live recorded survivor keeps the
+                # run occupying its slug (no mock — its liveness is the evidence).
                 occupant, _occupant_state = adapter.occupying_run(str(root), "unproven")
-            self.assertEqual(occupant, str(run_dir))
+                self.assertEqual(occupant, str(run_dir))
+                # The control: once the survivor is really gone, the same run
+                # settles as the stop it was — never failed/-1.
+                victim.kill()
+                victim.wait(timeout=10)
+                with contextlib.redirect_stderr(io.StringIO()):
+                    state, recovered = adapter.effective_state(str(run_dir))
+                self.assertTrue(recovered, state)
+                self.assertEqual((state["state"], state["exit"]), ("killed", adapter.KILL_EXIT))
+            finally:
+                self.reap(victim)
 
     def test_a_terminal_write_is_bound_to_the_run_generation(self):
         """R3: `finalize` refuses a run that replaced the one the caller decided about.
@@ -3425,7 +3843,7 @@ class AdapterUnitTests(ProcessFixtures):
         that passes the wrong generation writes nothing at all.
         """
         with tempfile.TemporaryDirectory() as tmp:
-            run_dir = Path(tmp)
+            run_dir = self.staged_run_dir(tmp, "generation")
             (run_dir / "events.ndjson").write_text("", encoding="utf-8")
             adapter.write_json(str(run_dir / "state.json"), {
                 "name": "generation", "state": "running", "exit": None, "cwd": tmp,
@@ -3470,13 +3888,17 @@ class AdapterUnitTests(ProcessFixtures):
     def test_the_runner_handshake_is_single_use(self):
         """R4: only the runner `start` spawned can present the credential (G6).
 
-        The credential carries both halves of the handshake and is consumed by the
-        real `runner_main` entry — not by the test deleting the file: after a real
-        authentication the file is gone and the same credential is refused, and a
-        credential minted for one generation is refused by a run recording another.
+        The credential carries both halves of the handshake and is consumed by
+        `runner_main`'s authentication step (the same step exercised end to end by
+        the in-process `runner_main` runs in `failed_stop_run` and by `test_28`);
+        here the single-use rule itself is pinned at the helper, with the
+        lifecycle mutex the `*_locked` contract requires: after one authentication
+        the file is gone, the environment is cleared, and the *same* credential
+        text re-presented afterwards is refused. A credential minted for one
+        generation is refused by a run recording another.
         """
         with tempfile.TemporaryDirectory() as tmp:
-            run_dir = Path(tmp)
+            run_dir = self.staged_run_dir(tmp, "handshake")
             generation = adapter.new_nonce()
             adapter.write_json(str(run_dir / "state.json"), {
                 "name": "handshake", "state": "running", "exit": None, "cwd": tmp,
@@ -3488,52 +3910,118 @@ class AdapterUnitTests(ProcessFixtures):
             recorded_generation, token = adapter.spawn_credentials(op)
             self.assertEqual(recorded_generation, generation)
             credential = f"{generation}:{token}"
-            with mock.patch.dict(os.environ, {adapter.RUNNER_TOKEN_ENV: credential}, clear=False):
-                with contextlib.redirect_stderr(io.StringIO()):
-                    self.assertEqual(
-                        adapter.consume_spawn_credential_locked(op), generation
-                    )
-                # Consumed by that authentication: the credential is refused now.
+            with adapter.lifecycle_claim(op.root, op.slug) as held:
+                self.assertTrue(held, "the *_locked helper needs the lifecycle mutex")
+                with mock.patch.dict(
+                    os.environ, {adapter.RUNNER_TOKEN_ENV: credential}, clear=False
+                ):
+                    with contextlib.redirect_stderr(io.StringIO()):
+                        self.assertEqual(
+                            adapter.consume_spawn_credential_locked(op), generation
+                        )
+                    # Consumed by that authentication: the file is gone and the
+                    # environment entry was cleared.
+                    self.assertFalse((run_dir / adapter.SPAWN_TOKEN_FILE).exists())
+                    self.assertIsNone(os.environ.get(adapter.RUNNER_TOKEN_ENV))
+                # A replay re-presents the credential text after the file is gone:
+                # refused, and nothing is recreated.
+                with mock.patch.dict(
+                    os.environ, {adapter.RUNNER_TOKEN_ENV: credential}, clear=False
+                ):
+                    with contextlib.redirect_stderr(io.StringIO()):
+                        self.assertEqual(adapter.consume_spawn_credential_locked(op), "")
                 self.assertFalse((run_dir / adapter.SPAWN_TOKEN_FILE).exists())
-                self.assertIsNone(os.environ.get(adapter.RUNNER_TOKEN_ENV))
-                with contextlib.redirect_stderr(io.StringIO()):
-                    self.assertEqual(adapter.consume_spawn_credential_locked(op), "")
-            # A credential for another generation is refused, and is not consumed.
-            adapter.write_json(str(run_dir / adapter.SPAWN_TOKEN_FILE),
-                               {"generation": generation, "token": "minted-for-elsewhere"})
-            with mock.patch.dict(
-                os.environ, {adapter.RUNNER_TOKEN_ENV: f"{generation}:other"}, clear=False
-            ):
-                with contextlib.redirect_stderr(io.StringIO()):
-                    self.assertEqual(adapter.consume_spawn_credential_locked(op), "")
-            self.assertTrue((run_dir / adapter.SPAWN_TOKEN_FILE).exists())
-            # …and so is one minted for this token but another run generation.
-            adapter.write_json(str(run_dir / "state.json"), {
-                "name": "handshake", "state": "running", "exit": None, "cwd": tmp,
-                "started": adapter.now_iso(), "backend": "dsh",
-                "generation": adapter.new_nonce(),
-            })
-            with mock.patch.dict(os.environ, {adapter.RUNNER_TOKEN_ENV: credential}, clear=False):
-                with contextlib.redirect_stderr(io.StringIO()):
-                    self.assertEqual(adapter.consume_spawn_credential_locked(op), "")
-            self.assertTrue((run_dir / adapter.SPAWN_TOKEN_FILE).exists())
+                # A credential for another generation is refused, and is not
+                # consumed.
+                adapter.write_json(str(run_dir / adapter.SPAWN_TOKEN_FILE),
+                                   {"generation": generation, "token": "minted-for-elsewhere"})
+                with mock.patch.dict(
+                    os.environ, {adapter.RUNNER_TOKEN_ENV: f"{generation}:other"}, clear=False
+                ):
+                    with contextlib.redirect_stderr(io.StringIO()):
+                        self.assertEqual(adapter.consume_spawn_credential_locked(op), "")
+                self.assertTrue((run_dir / adapter.SPAWN_TOKEN_FILE).exists())
+                # …and so is one minted for this token but another run generation.
+                adapter.write_json(str(run_dir / "state.json"), {
+                    "name": "handshake", "state": "running", "exit": None, "cwd": tmp,
+                    "started": adapter.now_iso(), "backend": "dsh",
+                    "generation": adapter.new_nonce(),
+                })
+                with mock.patch.dict(
+                    os.environ, {adapter.RUNNER_TOKEN_ENV: credential}, clear=False
+                ):
+                    with contextlib.redirect_stderr(io.StringIO()):
+                        self.assertEqual(adapter.consume_spawn_credential_locked(op), "")
+                self.assertTrue((run_dir / adapter.SPAWN_TOKEN_FILE).exists())
             # The agent's environment never carries the credential.
             with mock.patch.dict(
                 os.environ, {adapter.RUNNER_TOKEN_ENV: "leak"}, clear=False
             ):
                 self.assertNotIn(adapter.RUNNER_TOKEN_ENV, adapter.child_env())
 
-    def test_the_lifecycle_words_are_the_documented_five(self):
-        """R5: one vocabulary, and `list`'s single word uses all of it."""
-        self.assertEqual(adapter.LIFECYCLE_TERMINAL, "terminal")
-        self.assertEqual(adapter.LIFECYCLE_LIVE, "live")
-        self.assertEqual(adapter.LIFECYCLE_STOPPING_KNOWN, "stopping (survivors known)")
-        self.assertEqual(adapter.LIFECYCLE_STOPPING_UNKNOWN, "stopping (enumeration failed)")
-        self.assertEqual(adapter.LIFECYCLE_UNKNOWN, "unknown (no state)")
-        source = ADAPTER.read_text(encoding="utf-8")
-        self.assertIn('"stopping(survivors-known)"', source)
-        self.assertIn('"stopping(enumeration-failed)"', source)
-        self.assertIn('"unknown(no-state)"', source)
+    def test_the_lifecycle_words_are_the_documented_vocabulary(self):
+        """R5: one vocabulary — every word distinct — and `list`'s column uses all of it.
+
+        `LIFECYCLE_GONE` is part of the vocabulary, not an afterthought: the
+        single-word renderer is invoked directly for every value (a source-text
+        grep would pass while the mapping rotted), and `cmd_list` is run over a
+        real staged run to prove the column formatter is the renderer.
+        """
+        vocabulary = {
+            adapter.LIFECYCLE_TERMINAL: "terminal",
+            adapter.LIFECYCLE_LIVE: "live",
+            adapter.LIFECYCLE_STOPPING_KNOWN: "stopping (survivors known)",
+            adapter.LIFECYCLE_STOPPING_UNKNOWN: "stopping (enumeration failed)",
+            adapter.LIFECYCLE_UNKNOWN: "unknown (no state)",
+            adapter.LIFECYCLE_GONE: "gone (unfinalized)",
+            adapter.LIFECYCLE_FOREIGN: "read-only",
+        }
+        self.assertEqual(len(set(vocabulary)), len(vocabulary), "one word per lifecycle")
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = self.staged_run_dir(tmp, "vocabulary")
+            base = {"name": "vocabulary", "state": "running", "session_id": "session-v",
+                    "backend": "dsh", "exit": None}
+            cases = (
+                (adapter.LIFECYCLE_TERMINAL, {"state": "done"}, False, "done"),
+                (adapter.LIFECYCLE_TERMINAL, {"state": "failed", "stale_recovered": True},
+                 False, "failed(stale)"),
+                (adapter.LIFECYCLE_LIVE, {"state": "running"}, False, "running(live)"),
+                (adapter.LIFECYCLE_STOPPING_KNOWN, {"state": "running"}, False,
+                 "stopping(survivors-known)"),
+                (adapter.LIFECYCLE_STOPPING_UNKNOWN, {"state": "running"}, False,
+                 "stopping(enumeration-failed)"),
+                (adapter.LIFECYCLE_GONE, {"state": "running"}, False,
+                 "GONE (resume with --session-id session-v)"),
+            )
+            for lifecycle, fields, recovered, expected in cases:
+                with self.subTest(lifecycle=lifecycle, fields=fields):
+                    with mock.patch.object(
+                        adapter, "lifecycle_of", lambda *a, _word=lifecycle: _word
+                    ):
+                        rendered = adapter.state_word(
+                            str(run_dir), {**base, **fields}, recovered
+                        )
+                    self.assertEqual(rendered, expected)
+            # The two words that never reach `lifecycle_of`: no state, and a run
+            # that is not this route's.
+            self.assertEqual(adapter.state_word(str(run_dir), {}, False), "unknown(no-state)")
+            self.assertEqual(
+                adapter.state_word(str(run_dir), {**base, "backend": "omp"}, False),
+                "read-only(omp)",
+            )
+            # `list`'s column is that renderer: a dead unfinalized run prints its
+            # GONE word, and a live one its live word.
+            adapter.write_json(str(run_dir / "state.json"), {
+                **base, "state": "running",
+                "started": (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat(),
+                "generation": adapter.new_nonce(),
+            })
+            out = io.StringIO()
+            with mock.patch.object(adapter, "run_root", lambda: str(Path(tmp) / "runs")), \
+                    contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(adapter.cmd_list(None), 0)
+            line = [row for row in out.getvalue().splitlines() if "vocabulary" in row][0]
+            self.assertIn("GONE (resume with --session-id session-v)", line)
 
     def test_the_documents_state_the_same_exit_mapping(self):
         """R6: goal, transport and the record state the full exit→state mapping.
@@ -3541,8 +4029,8 @@ class AdapterUnitTests(ProcessFixtures):
         The operating-method skill (`skills/dsh-headless-gdd/SKILL.md`) states the
         two endings an operator meets there — `killed`/143 for the adapter's own
         stop and `failed`/−1 with `stale_recovered` for an unfinalized death — and
-        does not contradict the full mapping; it is outside this round's four-file
-        scope, so the signal-convention clause is pinned where the round can write.
+        does not contradict the full mapping; the signal-convention clause is
+        pinned where the full mapping is stated.
         """
         documents = {
             "goal": REPO / "docs/goals/archive/2026-11-15-dsh-headless-launcher.md",
@@ -3638,7 +4126,9 @@ def exit_mapping_entries(text):
             continue
         if current and line.strip() and not line.lstrip().startswith("- "):
             entries[current] += " " + line.strip()
-        elif not line.strip():
+        else:
+            # Any other line — a blank one, or another bullet that names no
+            # mapped state — ends the current entry's continuation.
             current = None
     return entries
 
@@ -3659,18 +4149,31 @@ def exit_mapping_blocks(text):
             spans.setdefault(current, []).append([offset, offset + len(line)])
         elif current and line.strip() and not line.lstrip().startswith("- "):
             spans[current][-1][1] = offset + len(line)
-        elif not line.strip():
+        else:
+            # Any other line — a blank one, or another bullet that names no
+            # mapped state — ends the current entry's span.
             current = None
         offset += len(line)
     return {state: [tuple(span) for span in state_spans] for state, state_spans in spans.items()}
 
 
 def swap_exit_mapping(text, first, second):
-    """A copy of `text` with `first`'s entry text replaced by `second`'s."""
+    """A copy of `text` with `first`'s entry text replaced by `second`'s.
+
+    Every span of `first` is replaced — the full replacement at its first span,
+    `""` at the rest — so a state split across two bullets cannot leave a
+    half-swapped mapping behind.
+    """
     spans = exit_mapping_blocks(text)
-    start, end = spans[first][0]
     second_start, second_end = spans[second][0]
-    return text[:start] + text[second_start:second_end] + text[end:]
+    replacement = text[second_start:second_end]
+    parts, cursor = [], 0
+    for index, (start, end) in enumerate(spans[first]):
+        parts.append(text[cursor:start])
+        parts.append(replacement if index == 0 else "")
+        cursor = end
+    parts.append(text[cursor:])
+    return "".join(parts)
 
 
 def edit_exit_mapping_entry(text, state, old, new=""):
@@ -3907,14 +4410,16 @@ class HardeningRuleTests(ProcessFixtures):
 
         worker = threading.Thread(target=finalize, daemon=True)
         with mock.patch.object(adapter, "_publish_terminal_locked", paused_publication):
+            initial = self.snapshot(run_dir)
             worker.start()
             self.assertTrue(entered.wait(60.0), "the finalizer reached its publication")
-            # A starter cannot pass M while the publication is in flight, and the
-            # run directory has not been touched by anyone else.
+            # A starter cannot pass M while the publication is in flight, and no
+            # writer has touched the run directory since before the publication
+            # began: the snapshot was taken while M was already held.
             self.assertEqual(self.start_probe(op.root, slug), "no-mutex")
-            before = self.snapshot(run_dir)
             self.assertFalse((run_dir / "finalized").exists())
-            self.assertEqual(self.snapshot(run_dir), before)
+            self.assertEqual(self.snapshot(run_dir), initial,
+                             "a writer touched the run while M was held")
             release.set()
         worker.join(60.0)
         self.assertFalse(worker.is_alive(), "the finalizer finished once released")
@@ -3922,6 +4427,8 @@ class HardeningRuleTests(ProcessFixtures):
         record = adapter.terminal_snapshot_locked(committed)
         self.assertIsNotNone(record, committed)
         self.assertEqual(record["generation"], op.generation)
+        self.assertEqual(adapter.strict_generation(outcome["state"]), op.generation)
+        self.assertEqual(adapter.terminal_snapshot_locked(outcome["state"])["exit"], -1)
         self.assertEqual(record["exit"], -1)
         self.assertEqual(committed["state"], "failed")
         self.assertTrue(committed["stale_recovered"])
@@ -3952,13 +4459,18 @@ class HardeningRuleTests(ProcessFixtures):
                 Path(path).touch()
                 inode = os.stat(path).st_ino
                 holder = self.child_holder(path)
-                old = time.time() - 86400 * 30
-                os.utime(path, (old, old))
-                with claim() as held:
-                    self.assertFalse(held, f"{name} was taken from a live holder")
-                if os.name != "nt":
-                    self.assertEqual(os.stat(path).st_ino, inode, f"{name}'s file was replaced")
-                self.reap(holder)
+                try:
+                    # Whole-second epoch: an int survives every filesystem's
+                    # timestamp granularity, so this is about ownership, not about
+                    # `os.utime` precision.
+                    old = int(time.time()) - 86400 * 30
+                    os.utime(path, (old, old))
+                    with claim() as held:
+                        self.assertFalse(held, f"{name} was taken from a live holder")
+                    if os.name != "nt":
+                        self.assertEqual(os.stat(path).st_ino, inode, f"{name}'s file was replaced")
+                finally:
+                    self.reap(holder)
                 with claim() as held:
                     self.assertTrue(held, f"{name} is free once its holder is gone")
                 if os.name != "nt":
@@ -4020,16 +4532,19 @@ class HardeningRuleTests(ProcessFixtures):
 
         def kill():
             with contextlib.redirect_stderr(io.StringIO()):
-                outcome["stopped"] = adapter.stop_run(other_op, seconds=1.0)
+                outcome["stopped"] = adapter.stop_run(other_op, seconds=0.05)
 
         worker = threading.Thread(target=kill, daemon=True)
         with mock.patch.object(adapter, "wait_for_terminal", paused_wait):
             worker.start()
             self.assertTrue(waiting.wait(60.0), "the stop reached its wait")
-            self.assertEqual(self.start_probe(other_op.root, "l3-other-slug"), "claimed")
+            # The probe asks about the *same slug the wait belongs to*: if the
+            # wait held M, its own slug's mutex is exactly what must be denied.
+            self.assertEqual(self.start_probe(other_op.root, other_op.slug), "claimed")
             release.set()
         worker.join(60.0)
         self.assertFalse(worker.is_alive())
+        self.assertFalse(outcome["stopped"], "the stop reported success across a held-M wait")
         # The request was written for this generation, which is what the wait saw.
         request = adapter.read_json(str(other / "stop"), {})
         self.assertEqual(request.get("generation"), other_op.generation)
@@ -4040,7 +4555,7 @@ class HardeningRuleTests(ProcessFixtures):
         run_dir = self.staging(slug)
         op = adapter.operation_of(str(run_dir))
         guard = threading.Lock()
-        state = {"inside": 0, "max": 0}
+        state = {"inside": 0, "max": 0, "completed": 0}
         errors = []
         start = threading.Barrier(2)
 
@@ -4057,15 +4572,21 @@ class HardeningRuleTests(ProcessFixtures):
                     time.sleep(0.2)
                     with guard:
                         state["inside"] -= 1
+                        state["completed"] += 1
             except Exception as exc:  # reported, not swallowed
                 errors.append(f"{type(exc).__name__}: {exc}")
 
-        threads = [threading.Thread(target=writer) for _ in range(2)]
+        threads = [threading.Thread(target=writer, daemon=True) for _ in range(2)]
         for thread in threads:
             thread.start()
         for thread in threads:
             thread.join(30)
+        # A deadlocked second writer must fail the test, not pass it: `join`
+        # returns silently on timeout and would otherwise leave the leak behind.
+        for thread in threads:
+            self.assertFalse(thread.is_alive(), "a writer is still blocked on the lock")
         self.assertEqual(errors, [])
+        self.assertEqual(state["completed"], 2, "a writer never finished its critical section")
         self.assertEqual(state["max"], 1, "two writers were inside one lock object")
 
     def linger_run(self, slug):
@@ -4075,7 +4596,10 @@ class HardeningRuleTests(ProcessFixtures):
         adapter's own finalizer, and then stays alive (`time.sleep(300)`) until the
         caller reaps it — exactly the moment a committed stop's evidence is still
         unproven. It runs in its own session, so the group it leads vanishes with
-        it and the enumeration can reach "nobody left".
+        it and the enumeration can reach "nobody left". The handshake says what
+        actually happened: `committed` only when the returned state carries a
+        validated terminal record, `uncommitted` otherwise — a timed-out or refused
+        finalize never reports readiness as success.
         """
         run_dir = self.root / adapter.date_stamp() / slug
         code = (
@@ -4087,15 +4611,20 @@ class HardeningRuleTests(ProcessFixtures):
             "sys.stdout.write('ready\\n')\n"
             "sys.stdout.flush()\n"
             "deadline = time.monotonic() + 30.0\n"
+            "settled = None\n"
             "while time.monotonic() < deadline:\n"
             "    generation = mod.strict_generation(mod.read_state_file(run_dir))\n"
             "    if generation and mod.stop_request_for(run_dir, generation):\n"
-            "        mod.finalize(run_dir, mod.KILL_EXIT, claim_wait=5.0, expect_generation=generation,\n"
-            "                     note='the runner observed the stop control file and ended the "
-            "agent tree')\n"
+            "        settled = mod.finalize(run_dir, mod.KILL_EXIT, claim_wait=5.0,\n"
+            "                               expect_generation=generation,\n"
+            "                               note='the runner observed the stop control file and "
+            "ended the agent tree')\n"
             "        break\n"
             "    time.sleep(0.05)\n"
-            "sys.stdout.write('committed\\n')\n"
+            "if settled is not None and mod.terminal_snapshot_locked(settled) is not None:\n"
+            "    sys.stdout.write('committed\\n')\n"
+            "else:\n"
+            "    sys.stdout.write('uncommitted\\n')\n"
             "sys.stdout.flush()\n"
             "time.sleep(300)\n"          # the linger: this process is not gone yet
         )
@@ -4110,15 +4639,36 @@ class HardeningRuleTests(ProcessFixtures):
         )
         return child, run_dir
 
+    def noop_agent(self):
+        """A portable no-op CLI: `true` where it exists, else a generated stub."""
+        if not IS_WINDOWS:
+            found = shutil.which("true")
+            if found:
+                return found
+        stub = self.tmp / ("noop.cmd" if IS_WINDOWS else "noop.sh")
+        if IS_WINDOWS:
+            stub.write_text("@exit /b 0\r\n", encoding="utf-8")
+        else:
+            stub.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            stub.chmod(0o755)
+        return str(stub)
+
     def replace_cli(self, slug, **env):
-        """The real `start --replace` for `slug`, `/bin/true` as the new agent's CLI."""
+        """The real `start --replace` for `slug`, a portable no-op CLI as the agent.
+
+        Ambient `DSH_RUN_*` knobs are stripped before the test's own are applied:
+        an exported `DSH_RUN_SETTLE_WAIT_SECONDS=1` would otherwise change the
+        behaviour this test is deciding about.
+        """
         prompt = self.tmp / f"{slug}-prompt.md"
         prompt.write_text("do the thing\n", encoding="utf-8")
+        base = {key: value for key, value in os.environ.items()
+                if not key.startswith("DSH_RUN_")}
         return self.spawn(
             [sys.executable, str(ADAPTER), "start", "--name", slug, "--prompt", str(prompt),
              "--cwd", str(self.tmp), "--replace"],
             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
-            env={**os.environ, "DSH_RUN_ROOT": str(self.root), "DSH_BIN": "/bin/true", **env},
+            env={**base, "DSH_RUN_ROOT": str(self.root), "DSH_BIN": self.noop_agent(), **env},
         )
 
     def test_l3_a_replace_waits_out_a_stop_that_is_not_settled_yet(self):
@@ -4137,33 +4687,59 @@ class HardeningRuleTests(ProcessFixtures):
         """
         slug = "linger-l3"
         child, run_dir = self.linger_run(slug)
-        self.assertTrue(adapter.run_alive(str(run_dir)), "the staged run must be live")
         replacing = self.replace_cli(slug)
-        # The stop request is written in the replacement's phase 2; the child
-        # answers it with a real terminal commit and *stays alive*, so from here
-        # until it is reaped the stop's evidence is unproven.
-        self.assertEqual(self.read_line(child), "committed")
-        self.assertTrue(
-            adapter.run_alive(str(run_dir)), "the committed run still records a live process"
-        )
-        deadline = time.monotonic() + 2.0
-        while time.monotonic() < deadline and replacing.poll() is None:
-            time.sleep(0.05)
-        if replacing.poll() is not None:
-            self.fail(
-                "start --replace decided while the stopped tree was still unproven "
-                f"(exit {replacing.returncode}): {replacing.stderr.read()}"
+        try:
+            self.assertTrue(adapter.run_alive(str(run_dir)), "the staged run must be live")
+            # The stop request is written in the replacement's phase 2; the child
+            # answers it with a real terminal commit and *stays alive*, so from here
+            # until it is reaped the stop's evidence is unproven.
+            self.assertEqual(self.read_line(child), "committed")
+            self.assertTrue(
+                adapter.run_alive(str(run_dir)), "the committed run still records a live process"
             )
-        # The tree is now conclusively gone; the replacement must land.
-        self.reap(child)
-        self.assertEqual(
-            replacing.wait(timeout=60), 0,
-            f"start --replace failed after the tree settled: {replacing.stderr.read()}",
-        )
-        archived = sorted(run_dir.parent.glob(f"{slug}.prev-*"))
-        self.assertEqual(len(archived), 1, archived)
-        stopped = json.loads((archived[0] / "state.json").read_text(encoding="utf-8"))
-        self.assertEqual((stopped["state"], stopped["exit"]), ("killed", adapter.KILL_EXIT))
+            deadline = time.monotonic() + 2.0
+            while time.monotonic() < deadline and replacing.poll() is None:
+                time.sleep(0.05)
+            if replacing.poll() is not None:
+                self.fail(
+                    "start --replace decided while the stopped tree was still unproven "
+                    f"(exit {replacing.returncode}): {replacing.stderr.read()}"
+                )
+            # The tree is now conclusively gone; the replacement must land.
+            self.reap(child)
+            self.assertEqual(
+                replacing.wait(timeout=60), 0,
+                f"start --replace failed after the tree settled: {replacing.stderr.read()}",
+            )
+            archived = sorted(run_dir.parent.glob(f"{slug}.prev-*"))
+            self.assertEqual(len(archived), 1, archived)
+            stopped = json.loads((archived[0] / "state.json").read_text(encoding="utf-8"))
+            self.assertEqual((stopped["state"], stopped["exit"]), ("killed", adapter.KILL_EXIT))
+            # The replacement really materialized at the path: a new generation
+            # that reaches its own terminal state before the test's tree goes away.
+            state = adapter.read_state_file(str(run_dir))
+            self.assertNotEqual(adapter.strict_generation(state),
+                                stopped.get("generation", ""), state)
+            deadline = time.monotonic() + SETTLE_TIMEOUT
+            while time.monotonic() < deadline:
+                state = adapter.read_state_file(str(run_dir))
+                if (adapter.terminal_snapshot_locked(state) is not None
+                        and not adapter.run_alive(str(run_dir), state)):
+                    break
+                time.sleep(adapter.POLL_SECONDS)
+            self.assertIsNotNone(adapter.terminal_snapshot_locked(state), state)
+            self.assertEqual(state.get("exit"), 0, state)
+        finally:
+            self.reap(child)
+            self.reap(replacing)
+            # No live runner may outlive the test tree: end whatever is recorded.
+            state = adapter.read_state_file(str(run_dir))
+            for pid, identity in adapter.recorded_processes(str(run_dir), state):
+                if adapter.liveness_of(pid) == adapter.GONE:
+                    continue
+                if identity and adapter.identity_changed(pid, identity):
+                    continue
+                kill_pid_tree_best_effort(pid)
 
     def test_l3_the_settle_wait_is_bounded_and_the_refusal_stands_at_the_bound(self):
         """L3/M: a stop that stays unproven is refused at the bound, never waited on forever.
@@ -4178,23 +4754,33 @@ class HardeningRuleTests(ProcessFixtures):
         slug = "linger-bound-l3"
         child, run_dir = self.linger_run(slug)
         replacing = self.replace_cli(slug, DSH_RUN_SETTLE_WAIT_SECONDS="1")
-        self.assertEqual(self.read_line(child), "committed")
-        self.assertTrue(
-            adapter.run_alive(str(run_dir)), "the tree must still be unproven at the bound"
-        )
         try:
-            code = replacing.wait(timeout=20)
-        except subprocess.TimeoutExpired:
-            self.fail("the settle wait never gave up: the refusal must stand at its bound")
-        stdout, stderr = replacing.stdout.read(), replacing.stderr.read()
-        self.assertEqual(code, 1, stdout + stderr)
-        self.assertIn("still has unproven processes", stderr)
-        # A refused replacement moved nothing aside and left the run where it was.
-        self.assertEqual(sorted(run_dir.parent.glob(f"{slug}.prev-*")), [])
-        self.assertTrue(adapter.run_alive(str(run_dir)))
-        self.reap(child)
+            self.assertEqual(self.read_line(child), "committed")
+            self.assertTrue(
+                adapter.run_alive(str(run_dir)), "the tree must still be unproven at the bound"
+            )
+            try:
+                code = replacing.wait(timeout=20)
+            except subprocess.TimeoutExpired:
+                self.fail("the settle wait never gave up: the refusal must stand at its bound")
+            stdout, stderr = replacing.stdout.read(), replacing.stderr.read()
+            self.assertEqual(code, 1, stdout + stderr)
+            self.assertIn("still has unproven processes", stderr)
+            # A refused replacement moved nothing aside and left the run where it was.
+            self.assertEqual(sorted(run_dir.parent.glob(f"{slug}.prev-*")), [])
+            self.assertTrue(adapter.run_alive(str(run_dir)))
+        finally:
+            self.reap(child)
+            self.reap(replacing)
+            state = adapter.read_state_file(str(run_dir))
+            for pid, identity in adapter.recorded_processes(str(run_dir), state):
+                if adapter.liveness_of(pid) == adapter.GONE:
+                    continue
+                if identity and adapter.identity_changed(pid, identity):
+                    continue
+                kill_pid_tree_best_effort(pid)
 
-    def test_l4_locks_are_keyed_by_slug_not_by_date_or_root(self):
+    def test_l4_locks_are_keyed_by_slug_not_by_date_bucket(self):
         """L4: distinct slugs proceed; one slug excludes itself across date buckets."""
         first = self.staging("l4", date="2026-01-01")
         second = self.staging("l4", date="2026-01-02")
@@ -4211,6 +4797,19 @@ class HardeningRuleTests(ProcessFixtures):
             adapter.lifecycle_lock_path(first_op.root, first_op.slug),
             adapter.lifecycle_lock_path(neighbour_op.root, neighbour_op.slug),
         )
+        # The root is *canonicalized*: a symlinked alias of the same root resolves
+        # to the same lock namespace, so one slug's mutex is one object however the
+        # root is spelled.
+        alias = self.tmp / "runs-alias"
+        try:
+            alias.symlink_to(self.root, target_is_directory=True)
+        except (OSError, NotImplementedError):
+            alias = None
+        if alias is not None:
+            self.assertEqual(
+                adapter.lifecycle_lock_path(str(alias), first_op.slug),
+                adapter.lifecycle_lock_path(first_op.root, first_op.slug),
+            )
         # Held by a child process, the slug's mutex refuses a mutation of the run
         # in the *other* date bucket, while the neighbour's slug is untouched.
         holder = self.child_holder(adapter.lifecycle_lock_path(first_op.root, first_op.slug))
@@ -4252,6 +4851,153 @@ class HardeningRuleTests(ProcessFixtures):
         self.assertIn("not this route's", kill.stderr)
         self.assertEqual(self.snapshot(run_dir), before)
 
+    # -- K: the forced stop, the generation-bound wait, slug occupancy ------
+
+    def test_kill_tree_holds_the_mutex_through_the_signal_and_refreshes_evidence(self):
+        """K1: guard-read evidence is what is signalled, and M is still held when it is.
+
+        Two rules in one interleaving. (a) The signal is issued *while M is held*:
+        a probe thread attempting the same slug's mutex from inside the signal
+        delivery is denied, so a generation change cannot slip between the guard
+        and the signal. (b) The evidence acted on is refreshed from the state the
+        guard read — state.json names the pid that must be signalled, the entry
+        snapshot names a second pid — and the stale second pid is never touched.
+        """
+        if not adapter.platform_can_force_stop():
+            self.skipTest("the forced path requires a verified handle primitive")
+        slug = "k-hold"
+        run_dir = self.staging(slug)
+        op = adapter.operation_of(str(run_dir))
+        fresh_pid, stale_pid = (1 << 22) + 1, (1 << 22) + 2
+        state = adapter.read_state_file(str(run_dir))
+        state["pid"] = fresh_pid
+        adapter.write_json(str(run_dir / "state.json"), state)
+        lock = adapter.lock_of(str(run_dir))
+        lock.update({"pid": fresh_pid, "generation": op.generation})
+        adapter.write_json(str(run_dir / "lock"), lock)
+        stale = {**state, "pid": stale_pid}
+
+        signalled, probes = [], []
+
+        def probe_mutex():
+            with adapter.lifecycle_claim(op.root, op.slug, 0.2) as held:
+                probes.append(held)
+
+        def spy_group(pid, signum, identity=""):
+            thread = threading.Thread(target=probe_mutex)
+            thread.start()
+            thread.join(timeout=10)
+            signalled.append(pid)
+            return True
+
+        with mock.patch.object(adapter, "signal_group", spy_group), \
+                mock.patch.object(adapter, "signal_member_group", spy_group), \
+                mock.patch.object(adapter, "liveness_of", lambda pid: adapter.LIVE), \
+                mock.patch.object(adapter, "tree_alive", lambda pid: False), \
+                mock.patch.object(adapter, "group_live", lambda pgid: False), \
+                mock.patch.object(adapter, "POLL_SECONDS", 0.01), \
+                contextlib.redirect_stderr(io.StringIO()):
+            forced = adapter.kill_tree(op, stale)
+        self.assertTrue(forced, "the authorized generation's processes are all gone after")
+        self.assertEqual(probes, [False] * len(probes), "M was released before the signal")
+        self.assertTrue(probes, "the signal was never delivered")
+        self.assertEqual(signalled, [fresh_pid],
+                         "the entry evidence was signalled instead of the guard's state")
+        self.assertNotIn(stale_pid, signalled)
+
+    def test_kill_tree_returns_true_when_the_generations_processes_are_already_gone(self):
+        """K1: nothing left to signal is a completed action, not a failed one.
+
+        A guarded pass in which every recorded process of the authorized
+        generation is `GONE` means the caller's generation is the one that was
+        acted on and nothing of it is left alive — the caller gets True, so a stop
+        can conclude instead of being reported unresolved.
+        """
+        if not adapter.platform_can_force_stop():
+            self.skipTest("the forced path requires a verified handle primitive")
+        slug = "k-all-gone"
+        run_dir = self.staging(slug, pid=(1 << 22) + 10)
+        op = adapter.operation_of(str(run_dir))
+        with mock.patch.object(adapter, "liveness_of", lambda pid: adapter.GONE), \
+                contextlib.redirect_stderr(io.StringIO()):
+            forced = adapter.kill_tree(op)
+        self.assertTrue(forced, "an already-gone generation is a completed action")
+
+    def test_wait_for_terminal_binds_the_generation_before_the_terminal_record(self):
+        """K2: the replacement's terminal record is not a verdict about this run.
+
+        The path holds G2 with its own committed terminal record; a caller waiting
+        for G1 must be told the generation changed — never handed G2's terminal
+        snapshot as its own — while a caller bound to G2 does get it.
+        """
+        slug = "k-generation"
+        run_dir = self.staging(slug)
+        stale = adapter.operation_of(str(run_dir))
+        generation = self.replace_with_new_generation(run_dir)
+        state = adapter.read_state_file(str(run_dir))
+        adapter.write_json(str(run_dir / "state.json"), {
+            **state,
+            "state": "failed",
+            "exit": -1,
+            "terminal_record": {
+                "version": adapter.TERMINAL_RECORD_VERSION,
+                "generation": generation,
+                "commit_id": "g2-commit",
+                "answer": "",
+                "session_id": "",
+                "exit": -1,
+            },
+        })
+        self.assertEqual(
+            adapter.wait_for_terminal(stale, 0.0), adapter.WAIT_GENERATION_CHANGED,
+            "the replacement's terminal record was read as this generation's verdict",
+        )
+        fresh = adapter.operation_of(str(run_dir))
+        self.assertEqual(adapter.wait_for_terminal(fresh, 0.0), adapter.WAIT_TERMINAL)
+
+    def test_occupying_run_denies_on_contention_instead_of_reporting_free(self):
+        """K3: "another process is mutating this slug" is never the "slug is free" answer.
+
+        `(None, {})` is the documented "no unfinished run occupies this slug"
+        sentinel. While the slug's lifecycle mutex is held elsewhere, the question
+        cannot be answered at all: after a bounded wait the call must say busy
+        rather than hand a caller the free sentinel and let `start` create a second
+        run for the slug.
+        """
+        slug = "k-busy"
+        run_dir = self.staging(slug)
+        op = adapter.operation_of(str(run_dir))
+        holding, release = threading.Event(), threading.Event()
+        errors = {}
+
+        def hold():
+            try:
+                with adapter.lifecycle_claim(op.root, op.slug, wait=None) as held:
+                    errors["held"] = held
+                    holding.set()
+                    release.wait(60.0)
+            except Exception as exc:  # surfaced below, not swallowed
+                errors["error"] = repr(exc)
+
+        holder = threading.Thread(target=hold, daemon=True)
+        holder.start()
+        try:
+            self.assertTrue(holding.wait(30.0), f"the holder never took the mutex: {errors}")
+            self.assertTrue(errors.get("held"), errors)
+            with contextlib.redirect_stderr(io.StringIO()):
+                with self.assertRaises(adapter.LifecycleBusy):
+                    adapter.occupying_run(op.root, op.slug, wait=0.2)
+        finally:
+            release.set()
+            holder.join(timeout=30)
+        self.assertFalse(holder.is_alive())
+        self.assertNotIn("error", errors)
+        # Released, and the slug genuinely unoccupied: the sentinel is the answer
+        # again — it is reserved for that state alone.
+        with contextlib.redirect_stderr(io.StringIO()):
+            occupant, occupant_state = adapter.occupying_run(op.root, op.slug, wait=0.2)
+        self.assertEqual((occupant, occupant_state), (None, {}))
+
     # -- G: generation binding ----------------------------------------------
 
     def test_g1_a_target_that_changed_between_capture_and_commit_is_refused(self):
@@ -4270,7 +5016,7 @@ class HardeningRuleTests(ProcessFixtures):
                 max_time=None, model=None, thinking=None, session_id=None, resume=None,
             )
             return adapter.start_run(
-                args, str(run_dir), "/bin/true", False, "", "bypassPermissions",
+                args, str(run_dir), self.noop_agent(), False, "", "bypassPermissions",
                 "never",
             )
 
@@ -4316,6 +5062,7 @@ class HardeningRuleTests(ProcessFixtures):
                 # refused start moved nothing, spawned nothing and wrote nothing.
                 written = adapter.read_state_file(str(run_dir))
                 self.assertNotEqual(adapter.strict_generation(written), "")
+                self.assertEqual(adapter.strict_generation(written), state["replaced"])
                 if shape == "this-route":
                     self.assertEqual(
                         len(sorted(run_dir.parent.glob(f"{slug}.prev-*"))), 1,
@@ -4390,11 +5137,17 @@ class HardeningRuleTests(ProcessFixtures):
         self.assertTrue((run_dir / "stop").exists(), "a foreign request is never deleted")
 
     def test_g4_every_escalation_step_reauthorizes_the_generation(self):
-        """G4: between TERM and the escalation the generation is checked again."""
+        """G4: between TERM and the escalation the generation is checked again.
+
+        The identity and the signalling path are stubs on this test's own process:
+        the rule under test is the *generation* revalidation between steps, and it
+        must hold on every platform, including the ones whose adapter refuses real
+        signals.
+        """
         slug = "g4"
         run_dir = self.staging(slug)
         op = adapter.operation_of(str(run_dir))
-        identity = adapter.process_identity(os.getpid())
+        identity = "linux:v2:test-boot:test-ns:%d:0" % os.getpid()
         self.assertTrue(adapter.identity_is_strong(identity))
         group = adapter.process_group(os.getpid())
         signalled = []
@@ -4457,6 +5210,11 @@ class HardeningRuleTests(ProcessFixtures):
         with contextlib.redirect_stderr(errors):
             track(json.dumps({"type": "tool_call", "name": "later"}).encode("utf-8"))
             track(json.dumps({"type": "status", "phase": "turn_end"}).encode("utf-8"))
+            # The `session` branch is its own publisher (it writes `session.id`):
+            # a late session event must be refused the same way.
+            track(json.dumps({"type": "session", "sessionId": "session-late"}).encode("utf-8"))
+            self.assertFalse((run_dir / "session.id").exists(),
+                             "a late session event wrote into the new run")
             self.assertFalse(log.feed(b'{"type":"text","text":"late"}\n'))
             log.finish()
             stop()
@@ -4499,39 +5257,44 @@ class HardeningRuleTests(ProcessFixtures):
         slug = "g7"
         run_dir = self.staging(slug)
         owner = self.ignoring_agent()
-        identity = adapter.process_identity(owner.pid)
-        self.assertTrue(adapter.identity_is_strong(identity))
-        calls = {"n": 0}
-        held = {}
-        real_operation_of = adapter.operation_of
+        try:
+            # Whatever the platform can record: identity "" still keeps a live pid
+            # alive (liveness is the only evidence there), which is the rule under
+            # test — the re-check must run on macOS/Windows too.
+            identity = adapter.process_identity(owner.pid) or ""
+            calls = {"n": 0}
+            held = {}
+            real_operation_of = adapter.operation_of
 
-        def register_owner_first(path, state=None, generation=None):
-            op = real_operation_of(path, state, generation)
-            calls["n"] += 1
-            if calls["n"] == 1:
-                with adapter.lifecycle_claim(op.root, op.slug) as got_m:
-                    self.assertTrue(got_m)
-                    current = adapter.read_state_file(str(run_dir))
-                    current.update({
-                        "pid": owner.pid,
-                        "pid_identity": identity,
-                        "started": adapter.now_iso(),
-                    })
-                    adapter.write_json(str(run_dir / "state.json"), current)
-                held["owner_written"] = self.snapshot(run_dir)
-            return op
+            def register_owner_first(path, state=None, generation=None):
+                op = real_operation_of(path, state, generation)
+                calls["n"] += 1
+                if calls["n"] == 1:
+                    with adapter.lifecycle_claim(op.root, op.slug) as got_m:
+                        self.assertTrue(got_m)
+                        current = adapter.read_state_file(str(run_dir))
+                        current.update({
+                            "pid": owner.pid,
+                            "pid_identity": identity,
+                            "started": adapter.now_iso(),
+                        })
+                        adapter.write_json(str(run_dir / "state.json"), current)
+                    held["owner_written"] = self.snapshot(run_dir)
+                return op
 
-        errors = io.StringIO()
-        with mock.patch.object(adapter, "operation_of", register_owner_first), \
-                contextlib.redirect_stderr(errors):
-            state, recovered = adapter.effective_state(str(run_dir))
-        self.assertFalse(recovered, state)
-        self.assertIsNone(adapter.terminal_snapshot_locked(state))
-        self.assertEqual(state["state"], "running")
-        self.assertTrue(held["owner_written"], "the live owner was never registered")
-        self.assertEqual(self.snapshot(run_dir), held["owner_written"],
-                         "the recovery wrote over a live owner")
-        self.assertEqual(adapter.lifecycle_of(str(run_dir), state), adapter.LIFECYCLE_LIVE)
+            errors = io.StringIO()
+            with mock.patch.object(adapter, "operation_of", register_owner_first), \
+                    contextlib.redirect_stderr(errors):
+                state, recovered = adapter.effective_state(str(run_dir))
+            self.assertFalse(recovered, state)
+            self.assertIsNone(adapter.terminal_snapshot_locked(state))
+            self.assertEqual(state["state"], "running")
+            self.assertTrue(held["owner_written"], "the live owner was never registered")
+            self.assertEqual(self.snapshot(run_dir), held["owner_written"],
+                             "the recovery wrote over a live owner")
+            self.assertEqual(adapter.lifecycle_of(str(run_dir), state), adapter.LIFECYCLE_LIVE)
+        finally:
+            self.reap(owner)
 
     def test_g7_a_committed_recovery_is_never_rewritten(self):
         """G7: re-reading a committed verdict leaves every byte of it alone."""
@@ -4605,7 +5368,9 @@ class HardeningRuleTests(ProcessFixtures):
             return _real(path, payload)
 
         cases = {
-            "before-commit": ("none", None),
+            # The success *shape* — a completed final, a prepared answer, exit 0 —
+            # dies before the commit: authority must still be absent.
+            "before-commit": ("completed", None),
             "after-commit": ("completed", "done"),
             "exit-zero-without-final": ("none", "failed"),
         }
@@ -4635,11 +5400,18 @@ class HardeningRuleTests(ProcessFixtures):
                         adapter.finalize(str(run_dir), 0, expect_generation=op.generation)
                 state = adapter.read_state_file(str(run_dir))
                 if boundary == "before-commit":
+                    # Judged on the artifacts as they stand, before any reader runs
+                    # its recovery: nothing is a verdict without the commit, and
+                    # even the prepared success shape is not terminal.
                     self.assertIsNone(adapter.terminal_snapshot_locked(state))
                     self.assertEqual(state["state"], "running")
-                    self.assertTrue((run_dir / "answer.md").exists(),
-                                    "the prepared artifacts are written first")
+                    self.assertEqual((run_dir / "answer.md").read_text(encoding="utf-8"),
+                                     "t1 answer")
+                    self.assertEqual((run_dir / "exit.code").read_text(encoding="utf-8").strip(),
+                                     "0")
                     self.assertFalse((run_dir / "finalized").exists())
+                    self.assertNotEqual(adapter.lifecycle_of(str(run_dir), state),
+                                        adapter.LIFECYCLE_TERMINAL)
                 else:
                     record = adapter.terminal_snapshot_locked(state)
                     self.assertIsNotNone(record, state)
@@ -4733,9 +5505,11 @@ class HardeningRuleTests(ProcessFixtures):
 
     def test_p3_delivery_stays_on_the_handle_that_was_validated(self):
         """P3: the instance is signalled, so a reused number cannot redirect it."""
+        # A synthetic admissible token: the unit half is about *which delivery
+        # path* is used (the handle, never a bare pid), so it must run everywhere,
+        # not only where the host has a native primitive.
+        synthetic = "linux:v2:boot:ns:%d:0" % os.getpid()
         pid = os.getpid()
-        token = adapter.process_identity(pid)
-        self.assertTrue(adapter.identity_is_strong(token))
         delivered = []
 
         class InjectedHandle:
@@ -4760,10 +5534,11 @@ class HardeningRuleTests(ProcessFixtures):
             raise AssertionError("a bare pid or group was signalled")
 
         with mock.patch.object(adapter, "ProcessHandle", InjectedHandle), \
+                mock.patch.object(adapter, "process_identity", lambda probe: synthetic), \
                 mock.patch.object(adapter.os, "kill", bomb), \
                 mock.patch.object(adapter.os, "killpg", bomb):
-            self.assertTrue(adapter.signal_instance(pid, token, signal.SIGTERM))
-        self.assertEqual(delivered, [(pid, token, signal.SIGTERM)])
+            self.assertTrue(adapter.signal_instance(pid, synthetic, signal.SIGTERM))
+        self.assertEqual(delivered, [(pid, synthetic, signal.SIGTERM)])
         # The identity is re-read while the handle is open: a token that no longer
         # matches refuses, whatever the number says.
         delivered.clear()
@@ -4772,98 +5547,122 @@ class HardeningRuleTests(ProcessFixtures):
                                   lambda probe: "linux:v2:elsewhere:elsewhere:9:9"), \
                 mock.patch.object(adapter.os, "kill", bomb), \
                 mock.patch.object(adapter.os, "killpg", bomb):
-            self.assertFalse(adapter.signal_instance(pid, token, signal.SIGTERM))
+            self.assertFalse(adapter.signal_instance(pid, synthetic, signal.SIGTERM))
         self.assertEqual(delivered, [], "a signal was delivered to a reused pid")
-        # Native capability, where it exists: a real handle, a real stop, and a
-        # mismatching token that refuses to touch a live process.
+        # Native capability, where it exists: checked *before* spawning anything,
+        # so a platform without a verified handle never leaves a process behind.
+        if not adapter.platform_can_force_stop() or not adapter.identity_is_strong(
+                adapter.process_identity(os.getpid())):
+            self.skipTest("this platform has no strong process handle primitive")
         victim = self.spawn([sys.executable, "-c", "import time; time.sleep(300)"],
                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                             stderr=subprocess.DEVNULL, start_new_session=True)
-        victim_identity = adapter.process_identity(victim.pid)
-        if not adapter.identity_is_strong(victim_identity):
-            self.skipTest("this platform has no strong process handle primitive")
-        self.assertFalse(
-            adapter.signal_instance(victim.pid, "linux:v2:other:other:1:1", signal.SIGTERM),
-            "a mismatching identity signalled a live process",
-        )
-        self.assertIsNone(victim.poll(), "the mismatching identity killed the process")
-        self.assertTrue(adapter.signal_instance(victim.pid, victim_identity, signal.SIGTERM))
-        self.assertEqual(victim.wait(timeout=20), -signal.SIGTERM)
+        try:
+            victim_identity = adapter.process_identity(victim.pid)
+            self.assertTrue(adapter.identity_is_strong(victim_identity), victim_identity)
+            self.assertFalse(
+                adapter.signal_instance(victim.pid, "linux:v2:other:other:1:1", signal.SIGTERM),
+                "a mismatching identity signalled a live process",
+            )
+            self.assertIsNone(victim.poll(), "the mismatching identity killed the process")
+            self.assertTrue(adapter.signal_instance(victim.pid, victim_identity, signal.SIGTERM))
+            self.assertEqual(victim.wait(timeout=20), -signal.SIGTERM)
+        finally:
+            self.reap(victim)
 
     def test_p5_membership_must_be_readable_and_matching(self):
         """P5: a member outside the group, or with no readable group, is no member."""
+        if not adapter.platform_can_force_stop() or not adapter.identity_is_strong(
+                adapter.process_identity(os.getpid())):
+            self.skipTest("requires a verified process-instance primitive (pidfd)")
         leader, member = self.group_with_ready_member()
-        identity = adapter.process_identity(member)
-        self.assertTrue(adapter.identity_is_strong(identity), identity)
-        group = adapter.process_group(member)
-        self.assertGreater(group, 0, "the fixture's member has no readable group")
-        found = adapter.anchored_members(member, identity, group)
-        self.assertIsNotNone(found)
-        self.assertIn(member, [pid for pid, _identity, _group in found])
-        # A group the member is not in, an unreadable group, and an unreadable
-        # table are all refusals — never a historical group id as a fallback.
-        self.assertIsNone(adapter.anchored_members(member, identity, group + 1))
-        self.assertIsNone(adapter.anchored_members(member, identity, 0))
-        with mock.patch.object(adapter, "process_group", lambda probe: 0):
-            self.assertIsNone(adapter.anchored_members(member, identity, group))
-        with mock.patch.object(adapter, "group_member_pids", lambda pgid: None):
-            self.assertIsNone(adapter.anchored_members(member, identity, group))
-        delivered, patches = self.signal_spy()
-        errors = io.StringIO()
-        with contextlib.ExitStack() as stack:
-            for patch in patches:
-                stack.enter_context(patch)
-            stack.enter_context(mock.patch.object(adapter, "process_group", lambda probe: 0))
-            stack.enter_context(contextlib.redirect_stderr(errors))
-            self.assertFalse(adapter.signal_member_group(member, signal.SIGTERM, identity, group))
-        self.assertEqual(delivered, [], "a group was signalled with no readable membership")
-        self.assertIn("not a fallback", errors.getvalue())
-        del leader
+        try:
+            identity = adapter.process_identity(member)
+            self.assertTrue(adapter.identity_is_strong(identity), identity)
+            group = adapter.process_group(member)
+            self.assertGreater(group, 0, "the fixture's member has no readable group")
+            found = adapter.anchored_members(member, identity, group)
+            self.assertIsNotNone(found)
+            self.assertIn(member, [pid for pid, _identity, _group in found])
+            # A group the member is not in, an unreadable group, and an unreadable
+            # table are all refusals — never a historical group id as a fallback.
+            self.assertIsNone(adapter.anchored_members(member, identity, group + 1))
+            self.assertIsNone(adapter.anchored_members(member, identity, 0))
+            with mock.patch.object(adapter, "process_group", lambda probe: 0):
+                self.assertIsNone(adapter.anchored_members(member, identity, group))
+            with mock.patch.object(adapter, "group_member_pids", lambda pgid: None):
+                self.assertIsNone(adapter.anchored_members(member, identity, group))
+            delivered, patches = self.signal_spy()
+            errors = io.StringIO()
+            with contextlib.ExitStack() as stack:
+                for patch in patches:
+                    stack.enter_context(patch)
+                stack.enter_context(mock.patch.object(adapter, "process_group", lambda probe: 0))
+                stack.enter_context(contextlib.redirect_stderr(errors))
+                self.assertFalse(
+                    adapter.signal_member_group(member, signal.SIGTERM, identity, group)
+                )
+            self.assertEqual(delivered, [], "a group was signalled with no readable membership")
+            self.assertIn("not a fallback", errors.getvalue())
+        finally:
+            self.reap_pids([leader.pid, member])
+            self.reap(leader)
 
     def test_p6_an_anchor_that_leaves_the_enumeration_discards_it(self):
         """P6: the anchor is verified throughout, so a half-seen table is not adopted."""
+        if not adapter.platform_can_force_stop() or not adapter.identity_is_strong(
+                adapter.process_identity(os.getpid())):
+            self.skipTest("requires a verified process-instance primitive (pidfd)")
         leader, member = self.group_with_ready_member()
-        identity = adapter.process_identity(leader.pid)
-        self.assertTrue(adapter.identity_is_strong(identity), identity)
-        group = adapter.process_group(leader.pid)
-        self.assertGreater(group, 0)
-        # The anchor answers "exited" as soon as the table has been read: the
-        # enumeration it anchored is discarded, members and all.
-        left = {"table_read": False}
+        try:
+            identity = adapter.process_identity(leader.pid)
+            self.assertTrue(adapter.identity_is_strong(identity), identity)
+            group = adapter.process_group(leader.pid)
+            self.assertGreater(group, 0)
+            # The anchor answers "exited" as soon as the table has been read: the
+            # enumeration it anchored is discarded, members and all.
+            left = {"table_read": False}
 
-        class LeavingAnchor(adapter.ProcessHandle):
-            def exited(self):
-                return left["table_read"]
+            class LeavingAnchor(adapter.ProcessHandle):
+                def exited(self):
+                    return left["table_read"]
 
-        real_table = adapter.group_member_pids
+            real_table = adapter.group_member_pids
 
-        def table_then_leave(pgid):
-            left["table_read"] = True
-            return real_table(pgid)
+            def table_then_leave(pgid):
+                left["table_read"] = True
+                return real_table(pgid)
 
-        with mock.patch.object(adapter, "ProcessHandle", LeavingAnchor), \
-                mock.patch.object(adapter, "group_member_pids", table_then_leave):
-            self.assertIsNone(adapter.anchored_members(leader.pid, identity, group))
-        # And the signalling path adopts nothing from it either: with the group's
-        # ownership unproven, only the verified process itself may be signalled.
-        delivered, patches = self.signal_spy()
-        left["table_read"] = False
-        with contextlib.ExitStack() as stack:
-            for patch in patches:
-                stack.enter_context(patch)
-            stack.enter_context(mock.patch.object(adapter, "ProcessHandle", LeavingAnchor))
-            stack.enter_context(mock.patch.object(adapter, "group_member_pids", table_then_leave))
-            stack.enter_context(contextlib.redirect_stderr(io.StringIO()))
-            # The enumeration is discarded, and by the time the fallback asks the
-            # anchor's own handle, that handle reports the process gone: nothing is
-            # signalled — least of all a member the discarded table named.
-            self.assertFalse(adapter.signal_group(leader.pid, signal.SIGTERM, identity))
-        self.assertEqual(delivered, [], "a discarded enumeration was signalled")
-        self.assertNotIn(member, [pid for pid, _signum in delivered],
-                         "a member discovered in a discarded enumeration was signalled")
+            with mock.patch.object(adapter, "ProcessHandle", LeavingAnchor), \
+                    mock.patch.object(adapter, "group_member_pids", table_then_leave):
+                self.assertIsNone(adapter.anchored_members(leader.pid, identity, group))
+            # And the signalling path adopts nothing from it either: with the group's
+            # ownership unproven, only the verified process itself may be signalled.
+            delivered, patches = self.signal_spy()
+            left["table_read"] = False
+            with contextlib.ExitStack() as stack:
+                for patch in patches:
+                    stack.enter_context(patch)
+                stack.enter_context(mock.patch.object(adapter, "ProcessHandle", LeavingAnchor))
+                stack.enter_context(
+                    mock.patch.object(adapter, "group_member_pids", table_then_leave)
+                )
+                stack.enter_context(contextlib.redirect_stderr(io.StringIO()))
+                # The enumeration is discarded, and by the time the fallback asks the
+                # anchor's own handle, that handle reports the process gone: nothing
+                # is signalled — least of all a member the discarded table named.
+                self.assertFalse(adapter.signal_group(leader.pid, signal.SIGTERM, identity))
+            self.assertEqual(delivered, [], "a discarded enumeration was signalled")
+            self.assertNotIn(member, [pid for pid, _signum in delivered],
+                             "a member discovered in a discarded enumeration was signalled")
+        finally:
+            self.reap_pids([leader.pid, member])
+            self.reap(leader)
 
     def test_p8_an_unreadable_process_table_stays_conservative(self):
         """P8: a failed inspection is unknown, never "gone" and never "nobody"."""
+        if not adapter.identity_is_strong(adapter.process_identity(os.getpid())):
+            self.skipTest("no strong process identity on this platform")
         slug = "p8"
         run_dir = self.staging(slug, pid=os.getpid(), pid_identity=adapter.process_identity(os.getpid()))
         state = adapter.read_state_file(str(run_dir))
@@ -4942,7 +5741,7 @@ class HardeningRuleTests(ProcessFixtures):
             [sys.executable, str(ADAPTER), "start", "--name", "b1", "--prompt", str(prompt),
              "--cwd", str(self.tmp), "--max-time", "inf"],
             capture_output=True, text=True, timeout=60,
-            env={**os.environ, "DSH_RUN_ROOT": str(self.root), "DSH_BIN": "/bin/true"},
+            env={**os.environ, "DSH_RUN_ROOT": str(self.root), "DSH_BIN": self.noop_agent()},
         )
         self.assertNotEqual(cli.returncode, 0)
         self.assertIn("--max-time must be a positive number", cli.stderr)

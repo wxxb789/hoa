@@ -43,9 +43,13 @@ them, not re-derive them by trial.
    (`130`/`137`/`143` and their raw POSIX forms `-2`/`-9`/`-15`); a non-signal, non-zero exit is
    `failed`; a run whose process disappeared without finalizing is `failed` with exit `-1` and
    `stale_recovered: true`, finalized by the next `status`/`result`/`list`/`answer` — idempotently,
-   guarded by a `finalized` marker.
-5. `kill` works without signals: it writes a control file the monitor observes, waits for the run's own
-   finalizer, and only then escalates to a process-group TERM/KILL.
+   guarded by the committed `state.json` terminal record (the `finalized` marker is compatibility text
+   written after the commit, never the authority).
+5. `kill` works without signals: it writes a generation-bound `stop` request the monitor observes, waits
+   for the run's own finalizer, and only then — where a verified process handle (`pidfd`) exists — ends
+   the tree by signalling each validated process instance (TERM, then KILL), never a bare pid or group
+   id; where it does not (macOS, Windows, Linux without `pidfd`) the adapter refuses to escalate, `kill`
+   exits 1, and the run stays `running`/`stopping` for a human to finish.
 6. The event log is bounded and reports `events_bytes`, `events_bytes_total`, `events_truncated`,
    `events_dropped_bytes`; counters derived from a truncated stream are marked `*_partial`.
 7. `python3 -B -m unittest discover -s skills/gdd/scripts/tests -p 'test_dsh_run_python.py'` passes with a

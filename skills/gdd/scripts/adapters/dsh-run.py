@@ -2393,14 +2393,19 @@ def kill_tree(op: Operation, state=None) -> bool:
     """Force an unresponsive run to stop, one authorized step at a time.
 
     Every signal decision is revalidated under M for the generation the caller
-    captured: the guard re-reads the route, the generation and the terminal
-    commit, the recorded process evidence is refreshed from *that* generation, and
-    the permitted signal action is performed before M is released. A generation
+    captured, and M is *retained through the signal*: the guard re-reads the
+    route, the generation and the terminal commit, the recorded process evidence
+    is refreshed from that re-read (never from the entry snapshot), and the
+    permitted signal action is performed before M is released. A generation
     change therefore stops the escalation where it stands — no further signal, no
-    enumeration of the replacement, no write. A platform with no verified handle
-    primitive refuses outright (`platform_can_force_stop`). Returns True when the
-    caller's operation generation is the one that was acted on and no recorded
-    process of it is still alive.
+    enumeration of the replacement, no write — and M is released only while the
+    polling loops wait for the tree to disappear. A platform with no verified
+    handle primitive refuses outright (`platform_can_force_stop`). Returns True
+    when the caller's operation generation is the one that was acted on and no
+    recorded process of it is still alive; a guarded pass that finds every
+    recorded process of that generation already GONE is the same conclusion
+    (there is nothing left to signal), so it returns True rather than a spurious
+    False.
     """
     processes = recorded_processes(op.run_dir, state)
     if not processes:
@@ -2423,51 +2428,86 @@ def kill_tree(op: Operation, state=None) -> bool:
             return tree_alive(pid) or (bool(group) and group_live(group) is not False)
         return tree_alive(pid)
 
-    def authorize() -> bool:
-        """Revalidate the operation generation under M; True when it may act."""
+    def gone() -> bool:
+        return not any(alive(pid) for pid, _ in processes)
+
+    def act(signum):
+        """One guarded signalling pass; M is held from the guard read to the signal.
+
+        Returns `(outcome, evidence)`. `outcome` is one of:
+        `"acted"` — at least one recorded process of the validated generation was
+        signalled; `"complete"` — the validated state still holds and every
+        recorded process it names is already GONE, so nothing is left to signal;
+        `"idle"` — recorded processes are live but none could be signalled;
+        `"refused"` — the guard refused (busy, foreign, changed generation or an
+        already-committed verdict), and nothing was signalled or enumerated.
+        `evidence` is the `(processes, survivors)` pair refreshed from the very
+        state the guard validated, so the polling that follows asks about the
+        same generation the signal decision was made from.
+        """
         with mutex_of(op, MUTEX_WAIT_SECONDS) as held:
             if not held:
                 warn(guard_refusal(op, GUARD_BUSY, ""))
-                return False
+                return "refused", None
             verdict, fresh, detail = guard_locked(op, require_lock_generation=True)
             if verdict != GUARD_OK:
                 warn(guard_refusal(op, verdict, detail))
-                return False
-            del fresh
-            return True
-
-    def signal_all(signum) -> bool:
-        acted, refused = False, False
-        for pid, identity in processes:
-            if not authorize():
-                refused = True
-                break
-            if liveness_of(pid) == GONE:
-                continue
-            record = survivors.get(pid)
-            if record:
-                record_identity, group = record
-                if group <= 0:
-                    record_identity, group = identity, process_group(pid)
-                if signal_member_group(pid, signum, record_identity or identity, group):
+                return "refused", None
+            fresh_processes = recorded_processes(op.run_dir, fresh)
+            fresh_survivors = {
+                pid: (identity, group)
+                for pid, identity, group in recorded_survivors(op.run_dir, fresh)
+            }
+            acted, pending = False, False
+            for pid, identity in fresh_processes:
+                if liveness_of(pid) == GONE:
+                    continue
+                pending = True
+                record = fresh_survivors.get(pid)
+                if record:
+                    record_identity, group = record
+                    if group <= 0:
+                        record_identity, group = identity, process_group(pid)
+                    if signal_member_group(pid, signum, record_identity or identity, group):
+                        acted = True
+                elif signal_group(pid, signum, identity):
                     acted = True
-            elif signal_group(pid, signum, identity):
-                acted = True
-        return acted and not refused
+            evidence = (fresh_processes, fresh_survivors)
+            if acted:
+                return "acted", evidence
+            if pending:
+                return "idle", evidence
+            return "complete", evidence
 
-    if not signal_all(signal.SIGTERM):
+    def step(signum) -> str:
+        """One pass; the evidence it acted on becomes the evidence polled next."""
+        nonlocal processes, survivors
+        outcome, evidence = act(signum)
+        if evidence is not None:
+            processes, survivors = evidence
+        return outcome
+
+    outcome = step(signal.SIGTERM)
+    if outcome == "complete":
+        return True
+    if outcome != "acted":
         return False
     for _ in range(20):
-        if not any(alive(pid) for pid, _ in processes):
+        if gone():
             return True
         time.sleep(POLL_SECONDS)
-    if not signal_all(signal.SIGKILL):
+    outcome = step(signal.SIGKILL)
+    if outcome == "complete":
+        return True
+    if outcome != "acted":
         return False
     for _ in range(20):
-        if not any(alive(pid) for pid, _ in processes):
+        if gone():
             return True
         time.sleep(POLL_SECONDS)
     return False
+
+
 def request_stop(op: Operation) -> bool:
     """Publish the stop request the runner polls, bound to one generation.
 
@@ -2528,10 +2568,15 @@ def wait_for_terminal(op: Operation, seconds) -> str:
     deadline = time.monotonic() + max(0.0, seconds)
     while True:
         state = read_state_file(op.run_dir)
-        if terminal_snapshot_locked(state) is not None:
-            return WAIT_TERMINAL
         if op.generation and strict_generation(state) not in ("", op.generation):
+            # Generation binding first: a terminal record the replacement run
+            # committed is that run's verdict, never evidence about this one.
             return WAIT_GENERATION_CHANGED
+        record = terminal_snapshot_locked(state)
+        if record is not None and (
+            not op.generation or record.get("generation") == op.generation
+        ):
+            return WAIT_TERMINAL
         if time.monotonic() >= deadline:
             return WAIT_TIMEOUT
         time.sleep(POLL_SECONDS)
@@ -2647,24 +2692,14 @@ def slug_run_dirs(root, slug):
 
     Not `find_run`'s newest-only answer: a slug can have one run per date bucket,
     and `start` has to see all of them to know whether the slug is occupied.
+    The discovery (globbing, marker checks, realpath dedup, ordering) is
+    `run_dirs`' single implementation; this only selects the slug's entries.
     """
-    found = []
-    seen = set()
-    for pattern in RUN_DIR_PATTERNS:
-        for path in glob.glob(os.path.join(root, pattern)):
-            if os.path.basename(path) != slug or not os.path.isdir(path):
-                continue
-            if not any(
-                os.path.exists(os.path.join(path, marker))
-                for marker in ("state.json", "lock", "prompt.md")
-            ):
-                continue
-            real = os.path.realpath(path)
-            if real in seen:
-                continue
-            seen.add(real)
-            found.append(path)
-    return newest_first(found)
+    return [
+        path
+        for path in run_dirs(root)
+        if os.path.basename(path) == slug and os.path.isdir(path)
+    ]
 
 
 def find_run(name):
@@ -2696,26 +2731,42 @@ def _occupying_run_locked(root, slug):
     return None, {}
 
 
-def occupying_run(root, slug):
-    """(run_dir, state): this slug's unfinished run, in any date bucket, or (None, {}).
+class LifecycleBusy(RuntimeError):
+    """A question that needs the lifecycle mutex could not get it.
 
-    A run directory is unfinished while no terminal record is committed, and it
-    occupies its slug wherever it is dated: `start` must not create a second run
-    for the same slug just because midnight moved the date bucket. Dead
-    unfinished runs are settled first by the recovery path, so what remains — and
-    what this returns — is work that is still live, still inside its startup
-    grace, or a stop that was never proven complete. That last case occupies the
-    slug even when nothing recorded is alive: the enumeration that would have
-    shown there is nobody left is exactly the one that failed. The scan runs
-    under M, because settling a dead run is a mutation.
+    Raised instead of answering, so "another process is mutating this slug right
+    now" can never be mistaken for the answer itself (for `occupying_run`, the
+    "slug is free" sentinel).
     """
-    with lifecycle_claim(root, slug) as held:
+
+
+def occupying_run(root, slug, wait=MUTEX_WAIT_SECONDS):
+    """(run_dir, state): this slug's unfinished run, in any date bucket.
+
+    Returns the `(None, {})` sentinel only for a slug no unfinished run occupies.
+    The scan needs M (settling a dead run is a mutation), so it waits up to `wait`
+    for it; if the mutex cannot be held — another process is mutating the slug —
+    that is *busy*, not free, and this raises `LifecycleBusy` rather than
+    answering the unoccupied sentinel. A run directory is unfinished while no
+    terminal record is committed, and it occupies its slug wherever it is dated:
+    `start` must not create a second run for the same slug just because midnight
+    moved the date bucket. Dead unfinished runs are settled first by the recovery
+    path, so what remains — and what this returns — is work that is still live,
+    still inside its startup grace, or a stop that was never proven complete.
+    That last case occupies the slug even when nothing recorded is alive: the
+    enumeration that would have shown there is nobody left is exactly the one
+    that failed.
+    """
+    with lifecycle_claim(root, slug, wait) as held:
         if not held:
             warn(
-                f"not scanning {root} for run '{slug}': its lifecycle mutex is held by "
+                f"cannot scan {root} for run '{slug}': its lifecycle mutex is held by "
                 "another process"
             )
-            return None, {}
+            raise LifecycleBusy(
+                f"run '{slug}' is being mutated by another process "
+                f"(see {lifecycle_lock_path(root, slug)}); refusing to report it unoccupied"
+            )
         return _occupying_run_locked(root, slug)
 
 

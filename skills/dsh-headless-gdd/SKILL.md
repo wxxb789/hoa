@@ -65,7 +65,7 @@ dsh-run.py answer <slug>     # the final assistant text
 - **Launcher flags precede app flags.** `--profile`, `--patch`, `--dump-config` belong to the launcher;
   putting `--patch` after `--json` or `--session-id` fails with `unknown option '--patch'`.
 - A session is anchored to the directory that recorded it. Resuming elsewhere is refused
-  (`was recorded in "<A>", not "<B>"`), and a second concurrent writer is refused
+  (`was recorded in "<A>", not "<B>"`), and dsh refuses a second concurrent writer of the *same session*
   (`already owned by an active write handle`). One worktree per session, one writer at a time.
 - **New increment → new session.** An unrelated increment resumed into an old session works but re-sends
   the accumulated context (measured ≈8× a fresh session's first-step input) for no benefit.
@@ -77,8 +77,10 @@ dsh-run.py answer <slug>     # the final assistant text
   restarts.
 - Parallel goals: different worktrees, different sessions. **The isolation unit is the worktree/session,
   not the repository**: several goals of one repository run in parallel in their own worktrees, while the
-  *same* worktree (and the same session) never has two writers — a second concurrent writer to one
-  worktree is refused (`already owned by an active write handle`). Two writers in one worktree would
+  *same* worktree (and the same session) never has two writers. The mechanical refusals are dsh's
+  per-*session* write handle (`already owned by an active write handle`) and the adapter's per-slug
+  lifecycle mutex; for a worktree, one-session-per-worktree is the discipline those mechanisms assume —
+  two sessions pointed at one worktree are not mechanically refused by dsh, and their writers would
   interleave edits, gates and `git status` in exactly the tree a reviewer is inspecting.
 
 A task prompt that keeps a worker inside its lane: repository context **by file path** (never re-narrated),
@@ -116,12 +118,15 @@ a detached run never notifies.
 
 ## Stopping and recovering
 
-- Stop through the adapter: `dsh-run.py kill <slug>`. It writes the `stop` control file inside the run
-  directory (`<run_dir>/stop`), the runner polls it, the run's own finalizer settles it, and only then does
+- Stop through the adapter: `dsh-run.py kill <slug>`. It writes a generation-bound `stop` request inside
+  the run directory (`<run_dir>/stop`; `{generation, request_id, requested_at, by}`), the runner polls it
+  and acts only on its own generation, the run's own finalizer settles it, and only then does
   the adapter escalate — through a validated process handle, never a bare pid or group id (see the
   capability bullet below). A stopped run is `killed` with exit 143; a run that
   died unfinalized is finalized `failed` with exit −1 and `stale_recovered: true` by the next
-  `status`/`result`/`list`/`answer` — idempotently, behind a `finalized` marker. Starting a replacement
+  `status`/`result`/`list`/`answer` — idempotently, and only while no committed terminal record exists
+  (the authority is the `state.json` terminal record; the `finalized` marker is compatibility text written
+  after the commit, for the observer plugin and older readers). Starting a replacement
   (`start --replace`) stops the live run first and then waits that last moment out: once the verdict is
   committed it re-checks — bounded, and holding no lock — that no recorded process is live and nothing is
   left to enumerate, before it moves the old run aside; only a stop still unresolved at that bound is
@@ -191,6 +196,7 @@ environment-specific value belongs in the adapter, the skill body, or the goal c
 | `DSH_RUN_EVENTS_MAX_BYTES` | retained event-log bound, handed to the shared bounded writer | `8388608` |
 | `DSH_RUN_START_GRACE_SECONDS` | how long a run with no recorded pid is still starting | `60` |
 | `DSH_RUN_STOP_WAIT_SECONDS` | how long `kill` waits for the run to finalize itself | `20` |
+| `DSH_RUN_SETTLE_WAIT_SECONDS` | how long `start --replace` re-asks the settle question after a committed stop | `10` |
 | `DSH_RUN_DRAIN_TIMEOUT_SECONDS` | how long the runner waits for dsh's stdout to reach EOF after dsh exits | `30` |
 
 `DSH_PROFILE`, `DSH_PROFILE_DIR` and `DSH_SESSION_ID` are DeepSeek Harness's own session identity, exported

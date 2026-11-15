@@ -10,7 +10,9 @@ entry and the mirrored `metadata.version` fields of every skill.
 
 Every command below ran from the worktree root. Exit codes are process exit codes. The **adapter** never
 reads, logs or stores a key: apart from removing the three harness-reserved identity names it passes the
-launch environment through to the runner and to the agent, and no credential value appears in this record.
+launch environment through to the runner and to the agent, and neither a credential value nor the verbatim
+content of a profile file appears in this record (what it states about the scratch copy is the profile
+patch layer's value, `[]`, and file sizes).
 A dispatch is therefore environment-only — the profile's own configuration (`apiKeyEnv`) supplies the
 provider key from the launch environment, so no credential has to be copied anywhere. That is how the
 operator's canonical dispatch ran (§ appendix), and it is what the author's smoke ran too: a copy of the
@@ -21,20 +23,22 @@ session's nested `workspace-write` sandbox. The copy matched the live tree outsi
 profile's own configuration supplied the provider route and the launch environment supplied the key; no
 provider route was substituted. The scratch copy existed only under `/tmp/dsh-adapter-smoke`
 (a scratch directory owned by the operator's user, outside this repository, the run root and every skill),
-was never the live `$DSH_HOME`, and was never printed or read back into this record. Its cleanup is
+was never the live `$DSH_HOME`, and nothing in it was read back verbatim into this record: no credential
+value and no profile file content appears here — only the comparison's conclusion (the copied tree
+matched the live one outside the installed `node_modules`, and the profile's patch layer was the empty
+list `[]` in both). Its cleanup is
 `rm -rf /tmp/dsh-adapter-smoke`, not yet run: on the authoring host the directory is still present at the
 time of this round, as scratch data outside the repository. The
 facts the adapter encodes come from the measured handoff note given to the implementer
 (`dsh-headless-facts.md`, outside this repository; `@deepseek-ai/dsh` 0.2.2-rc.1).
 
-Six correction rounds ran on this increment, plus a closeout round for the repository's own gates:
-round 1 (adapter and tests), round 2 (documentation), round 3 (the adapter review findings A1–A8 and
-their tests), the closeout round (`VERSION` 0.1.62, its `CHANGELOG.md` entry and the regenerated
-mirrors), round 4 (the start-handshake race round 3 introduced), round 5 (the second independent
-machine-review cycle: the adapter findings A1–A7, the test findings B1–B2, the documentation findings
-C1–C4, and this record's numbers re-derived once more on the round-5 tree), and round 6 (the third
-machine-review cycle, a cross-family diff-only review, whose run-lifecycle class is fixed once by the
-six rules R1–R6 in §7). §7 lists each round's files
+Ten passes ran on this increment: rounds 1–7 (adapter/tests, documentation, the A1–A8 review findings,
+the round-3 handshake race it introduced, the second machine-review cycle, the third cross-family review's
+run-lifecycle class — the six rules R1–R6 in §7 — and the hardening round that class named), and three
+closeout passes: the version/entry bookkeeping round, the round-7 closeout (the momentary-hold and
+committed-stop fixes with their stability series), and the review-closeout round on the hardened head
+(`07658f1`, fourteen cross-family packets, seven blocking verdicts) whose fixes produced the final-tree
+numbers in §2's closeout-3 block. §7 lists each round's files
 and what it changed; the scope claim in §1 is re-derived from `git status --porcelain` on the final tree.
 
 ## 1. Contract clause audit
@@ -44,10 +48,10 @@ and what it changed; the scope claim in §1 is re-derived from `git status --por
 | 1. stdlib-only adapter, `start/list/status/result/answer/tail/kill`, fixed argument shapes | met | `dsh-run.py` imports the standard library only; `build_parser()` declares all seven commands plus the internal `_run`; `start` takes `--name --prompt [--cwd] [--session-id] [--model] [--thinking] [--max-time] [--resume] [--replace]` |
 | 2. `<run root>/<YYYY-MM-DD>/<SLUG>/` with prompt.md, run.json, events log, stderr.log, exit.code, answer.md, state.json; `state.json` current with the contract fields and the five states | met | `_start_run_claimed()` creates the directory and the first `state.json`; `runner_main()` republishes counters every `STATE_REFRESH_SECONDS`; the real run's directory lists all thirteen artifacts (§5); `state` ∈ `running\|done\|killed\|failed\|unknown` |
 | 3. `start` exits 0 only once the run started; a second `start` for a live slug is refused | met | `wait_for_start()` + `agent_recorded()` and the terminal-startup refusal in `_start_run_claimed()`; `test_28`/`test_29` (an agent that writes `error` and exits at once is a started run: exit 0, finalized `failed` with the error recorded); `test_16` (refusal when the agent cannot spawn, exit 127 recorded); `test_start_fails_when_only_the_runner_recorded_a_pid` (a live runner alone is not a started run); `test_12` (exit 1, `still running`, recorded pid unchanged); round 5's `test_30` (a `.`/`..` name — or a slug directory that resolves out of its date bucket — is refused before any write) and `test_31` (the recorded `run.sh` refuses a live run rather than starting a second agent on the same cwd) |
-| 4. completion = exit 0 **and** last `final` `reason.kind == completed`; the exit→state mapping is the one the contract's §3 states | met | verdict ladder in `_publish_terminal_locked()`; `effective_state()` recovery; `test_05` (exit 0 + `aborted` → `failed`), `test_04`, `test_07`, `test_22` (round 1: the **last** of several `final` events decides), `test_completion_mapping_is_exhaustive` (the real finalizer, eight cases), `test_01` (the committed `terminal_record` and its fields), and round 7's `test_t1_death_at_each_publication_boundary_leaves_one_verdict` (the `exit-zero-without-final` boundary). The mapping: `killed` is this adapter's own stop path (`143`) **or** a signal-convention exit (`130`/`137`/`143` and their raw POSIX forms `-2`/`-9`/`-15`, the `KILLED_EXITS` set shared with `omp-run.py`), which keeps its raw code — it is not rewritten to `143`; an `exit 0` whose last `final` event is missing or does not carry `reason.kind == "completed"`, and any other non-signal, non-zero exit, are `failed` with the exit code recorded unchanged; an unfinalized death is `failed` with `-1` and `stale_recovered: true`. Every reader decides "finished" from the committed `terminal_record` in `state.json` — the `finalized` marker is written after the commit and is never an authority. Round 5's `test_32` shows recovery leaves a run another backend recorded untouched, and only runs whose state records `backend: dsh` are finalized |
-| 5. `kill` without signals: control file the monitor observes, the run's own finalizer, then escalation | met | `request_stop()`/`wait_for_agent()`/`stop_run()`; `test_08` pins `stopped_by: control-file` from the runner's own finalizer; `test_09` pins the forced escalation when nothing observes the file; the real kill run in §5 shows `stopped_by: control-file` against real `dsh`; round 5's `test_a_vanished_leader_is_never_signalled` / `test_a_verified_member_names_the_group_of_a_gone_leader` pin the identity gate on group signals, and `test_33` / `test_a_failed_stop_records_survivors_without_finalizing` pin that a stop which cannot end every process stays `running`/`stopping` instead of publishing `killed`. Round 6 splits that outcome three ways (proven gone / survivors known / enumeration failed) and keeps the slug occupied until a later attempt proves the stop complete: `test_34`–`test_38`, §7 |
+| 4. completion = exit 0 **and** last `final` `reason.kind == completed`; the exit→state mapping is the one the contract's §3 states | met | verdict ladder in `_publish_terminal_locked()`; `effective_state()` recovery; `test_05` (exit 0 + `aborted` → `failed`), `test_04`, `test_07`, `test_22` (round 1: the **last** of several `final` events decides), `test_completion_mapping_is_exhaustive` (the real finalizer, eleven cases, including the three raw POSIX signal forms), `test_01` (the committed `terminal_record` and its fields), and round 7's `test_t1_death_at_each_publication_boundary_leaves_one_verdict` (the `exit-zero-without-final` boundary). The mapping: `killed` is this adapter's own stop path (`143`) **or** a signal-convention exit (`130`/`137`/`143` and their raw POSIX forms `-2`/`-9`/`-15`, the `KILLED_EXITS` set shared with `omp-run.py`), which keeps its raw code — it is not rewritten to `143`; an `exit 0` whose last `final` event is missing or does not carry `reason.kind == "completed"`, and any other non-signal, non-zero exit, are `failed` with the exit code recorded unchanged; an unfinalized death is `failed` with `-1` and `stale_recovered: true`. Every reader decides "finished" from the committed `terminal_record` in `state.json` — the `finalized` marker is written after the commit and is never an authority. Round 5's `test_32` shows recovery leaves a run another backend recorded untouched, and only runs whose state records `backend: dsh` are finalized |
+| 5. `kill` without signals: stop request the monitor observes, the run's own finalizer, then escalation only through a verified handle | met | `request_stop()`/`wait_for_agent()`/`stop_run()`; `test_08` pins `stopped_by: control-file` from the runner's own finalizer; `test_09` pins the forced escalation where the capability exists **and** the C-2 refuse path (exit 1, run stays `running`/`stopping`) where it does not; the real kill run in §5 shows `stopped_by: control-file` against real `dsh`; round 5's `test_a_vanished_leader_is_never_signalled` / `test_a_verified_member_names_the_group_of_a_gone_leader` pin the identity gate on group signals, and `test_33` / `test_a_failed_stop_records_survivors_without_finalizing` pin that a stop which cannot end every process stays `running`/`stopping` instead of publishing `killed`. Round 6 splits that outcome three ways (proven gone / survivors known / enumeration failed) and keeps the slug occupied until a later attempt proves the stop complete: `test_34`–`test_38`, §7. The review-closeout round pins the forced path itself: `kill_tree` holds M from the guard read through the signal, acts on the guard's refreshed evidence, and treats an all-GONE generation as a completed action (`test_kill_tree_holds_the_mutex_through_the_signal_and_refreshes_evidence`, `test_kill_tree_returns_true_when_the_generations_processes_are_already_gone`), and `wait_for_terminal` binds the generation before it consults a terminal record (`test_wait_for_terminal_binds_the_generation_before_the_terminal_record`) |
 | 6. bounded event log reporting `events_bytes`, `events_bytes_total`, `events_truncated`, `events_dropped_bytes`, counters marked `*_partial` | met | `EventLog` reuses `adapters/events-writer.py` with the bound resolved from `DSH_RUN_EVENTS_MAX_BYTES`; `summarize()`/`events_view()` expose the four fields; `turns_partial`, `tool_calls_partial`, `usage_partial`; `test_10` drives a non-zero `events_dropped_bytes` |
-| 7. stub-`dsh` unittest suite covering settled run + exit mapping, stale recovery, control-file kill, event accounting, argv passthrough, second-start refusal | met — green in every round-6 run (§2) | `test_dsh_run_python.py`, **89 tests**, `OK` (§2): `test_01`/`test_04`, `test_07`, `test_08`, `test_10`, `test_11`, `test_12`, plus round 1's `test_21` (recovery triggered by `result`/`list`/`answer`), `test_22` (last `final` decides), `test_23`, the reserved-identity property tests, round 4's `test_28`/`test_29` (a fast-failing agent is a started run), round 5's `test_30`–`test_33` (bucket escape, live replay, foreign-run recovery, failed stop), and round 6's `test_34`–`test_46` plus the lifecycle/generation/handshake/doc unit pins (§7) |
+| 7. stub-`dsh` unittest suite covering settled run + exit mapping, stale recovery, stop-request kill, event accounting, argv passthrough, second-start refusal | met — green in the closeout-3 fifteen-run series and its confirmation run (§2) | `test_dsh_run_python.py`, **123 tests**, `OK` (§2's closeout-3 block): `test_01`/`test_04`, `test_07`, `test_08`, `test_10`, `test_11`, `test_12`, plus round 1's `test_21` (recovery triggered by `result`/`list`/`answer`), `test_22` (last `final` decides), `test_23`, the reserved-identity property tests, round 4's `test_28`/`test_29` (a fast-failing agent is a started run), round 5's `test_30`–`test_33` (bucket escape, live replay, foreign-run recovery, failed stop), round 6's `test_34`–`test_46` plus the lifecycle/generation/handshake/doc pins, round 7's rule pins (§7), and the review-closeout round's K1–K3 pins (§3) |
 | 8. transport.md gains the DSH row, the configuration table and the two DSH-specific rules | met | `transport.md` route table row (which also names `dsh-headless-gdd` as this route's operating method); `## DSH headless adapter` + `### DSH configuration`; the cwd rule and `--approval-policy never` rule are the numbered pair in that section; the config table names `DSH_RUN_PROFILE` and states the run-root precedence and the reserved names |
 | 9. goal README row + one real end-to-end dispatch with exit code and artifact paths | met | `docs/goals/README.md` lists this goal as `archived 2026-11-15` with a link to the archived contract; §5 records the author's real `start` → `status` → `answer` (exit 0, `ADAPTER_SMOKE_OK`), and the appendix records the operator's canonical dispatch (`exit.code` 0, `OPERATOR_DISPATCH_OK`) |
 | 10. `skills/dsh-headless-gdd/SKILL.md` exists, declares `kind: mechanism`, and is referenced by the DSH route documentation | met | the skill's frontmatter carries `kind: "mechanism"`; `transport.md`'s DSH route row and the paragraph below the invocation call it this route's operating method; `check_contract_graph.py` passes on the final tree (60 skills, `ok` — a mechanism that no trigger case `must_pick`s), §2 |
@@ -71,7 +75,9 @@ suite checks the *associations* between each state and its own conditions, not k
   committed.
 
 ## 2. Gates
-Run on the final tree, sequentially, with real exit codes (re-measured on the closeout-round-2 tree). The
+Run sequentially on the increment's own tree, with real exit codes; this block's numbers were re-measured
+on the closeout-round-2 tree and are historical — the **current final-tree numbers are the closeout-3
+block at the end of this section**. The
 first row is the increment's own suite; the rest are the repository gates. The PyYAML steps — the
 `scripts/` suite, `check_frontmatter`, `check_contract_graph`, `generate_index`, `check_changelog` and
 `version.py` — ran with `/usr/bin/python3` (3.12, PyYAML 6.0.1), because this host's mise `python3`
@@ -79,7 +85,7 @@ first row is the increment's own suite; the rest are the repository gates. The P
 
 | Command | Output | Exit |
 |---|---|---|
-| `python3 -B -m unittest discover -s skills/gdd/scripts/tests -p 'test_dsh_run_python.py'` | `Ran 120 tests in 98.712s` → `OK` (the fifteen-run series and this confirmation run on the final tree; the pre-fix revision of this row failed once here — §7's second closeout round) | 0 |
+| `python3 -B -m unittest discover -s skills/gdd/scripts/tests -p 'test_dsh_run_python.py'` | `Ran 120 tests in 98.712s` → `OK` (the closeout-round-2 tree's fifteen-run series and its confirmation run; the pre-fix revision of this row failed once — §7's second closeout round) | 0 |
 | `python3 -B -m unittest discover -s scripts -p 'test_*.py'` (repo harness suite) | `Ran 189 tests in 9.272s` → `OK` | 0 |
 | `python3 scripts/check_frontmatter.py` | `check_frontmatter: 60 skills OK` | 0 |
 | `python3 scripts/check_contract_graph.py` | `contract graph: 60 skills, 11 artifacts, ok` | 0 |
@@ -93,6 +99,9 @@ Every subcommand's help also ran clean — `start`, `list`, `status`, `result`, 
 `kill`: `--help` → exit 0 each, e.g.
 `usage: dsh-run.py start [-h] --name NAME --prompt PROMPT [--cwd CWD]` and
 `usage: dsh-run.py tail [-h] name [lines]`.
+
+The block below is the **round-6** suite output, kept as that revision's historical measurement (`89` is
+the round-6 count, not the final tree's):
 
 ```text
 ----------------------------------------------------------------------
@@ -129,10 +138,12 @@ load-5   exit 0  Ran 89 tests in 85.987s  OK
 load-6   exit 0  Ran 89 tests in 86.768s  OK
 ```
 
-A thirteenth run confirmed the frozen files after the series (`Ran 89 tests in 71.961s` → `OK`, the gate
-table's first row above); a fourteenth run, made after the twelve summary lines above were written into
-this record, ran `Ran 89 tests in 72.053s` → `OK` (exit 0). The adapter and test files were byte-identical
-across all fourteen runs (sha256 `e77f5b7f…` / `ac33af98…`).
+A thirteenth run confirmed the frozen round-6 files after the series (`Ran 89 tests in 71.961s` → `OK`);
+a fourteenth run, made after the twelve summary lines above were written into this record, ran `Ran 89
+tests in 72.053s` → `OK` (exit 0). The adapter and test files were byte-identical across all fourteen
+runs (sha256 `e77f5b7f…` / `ac33af98…`). This entire block is the **round-6 revision's** measurement:
+`89` is that revision's test count, not the final tree's (the count reconciliations are §3's closing
+paragraph, and the final-tree numbers are the closeout-3 block below).
 
 The round-2 note recorded one unidentified failure in fifteen runs. Round 4 identified it as the `start`
 handshake refusing a run whose agent emitted `error` and exited before the confirmation read
@@ -152,7 +163,7 @@ no PyYAML — a step run with the wrong interpreter is a false alarm, not a find
 
 | Command | Output | Exit |
 |---|---|---|
-| `python3 -B -m unittest discover -s skills/gdd/scripts/tests -p 'test_dsh_run_python.py'` | `Ran 120 tests in 98.712s` → `OK` (re-measured on the closeout-round-2 tree; the round-7 run of this row was `Ran 117 tests` → `OK`) | 0 |
+| `python3 -B -m unittest discover -s skills/gdd/scripts/tests -p 'test_dsh_run_python.py'` | `Ran 120 tests in 98.712s` → `OK` (re-measured on the closeout-round-2 tree; the round-7 final run of this row was `Ran 118 tests` → `OK`, and the 117-test run quoted here in an earlier revision was round 7 *before* the M1 pin — §3's closing paragraph reconciles 117/118/120) | 0 |
 | `python3 -B -m unittest discover -s skills/gdd/scripts/tests -p 'test_*.py'` (every gdd module) | `Ran 247 tests in 228.172s` → `OK (skipped=4)` (re-measured on the closeout-round-2 tree) | 0 |
 | `python3 -B -m unittest discover -s scripts -p 'test_*.py'` (`/usr/bin/python3`) | `Ran 189 tests in 9.272s` → `OK` | 0 |
 | `python3 scripts/check_frontmatter.py` (`/usr/bin/python3`) | `check_frontmatter: 60 skills OK` | 0 |
@@ -186,7 +197,9 @@ load-5   exit=0  Ran 118 tests in 140.119s OK  OK  [wall=140s]
 
 **Stability, re-derived on the closeout-round-2 tree.** The series above is the round-7 revision — the one
 that exposed the momentary-hold and committed-stop regressions (§7; its `plain-7` line is the flake). The
-same script (`evidence/goal8-hardening/stability-series.sh`, `STABILITY_OUT` pointed at a fresh file) was
+same script (external, uncommitted task-workspace scratch:
+`~/claw/tasks/2026-11-15/dsh-gdd-integration/evidence/goal8-hardening/stability-series.sh`,
+`STABILITY_OUT` pointed at a fresh file) was
 then re-run on the fixed tree: fifteen runs, ten alone and five with four busy-loop processes saturating
 the same four CPUs (`nproc` = 4). Every run exited 0 with `Ran 120 tests` and `OK`; every run's summary
 line, verbatim:
@@ -219,6 +232,100 @@ fifteen summary lines and the gate rows above were written into this record, ran
 changed.
 
 
+### Closeout round 3 — the review-closeout round, re-measured on the frozen tree
+
+The fourteen-packet cross-family review's **blocking** packets — `adapter-packet-3`, `docs-packet`, and the
+five `tests-packet*` lanes — were closed on the tree this record now describes. The per-finding
+disposition (packet, severity, finding, change, pin test, mutation row) is the round's report and is kept
+with the adjudication at the external, uncommitted task workspace
+`~/claw/tasks/2026-11-15/dsh-gdd-integration/evidence/goal8-hardening/review-closeout/per-finding-disposition.md`;
+the clauses are:
+
+| Packet | Findings | Disposition |
+|---|---|---|
+| `adapter-packet-3` | 4 | all fixed: `kill_tree` holds M from the guard read through the signal and polls the guard's refreshed evidence, and an authorized generation whose recorded processes are all GONE is a completed action (`K1` rows); `wait_for_terminal` binds the generation before the terminal record (`K2`); `occupying_run` raises `LifecycleBusy` on contention instead of answering the unoccupied sentinel (`K3`); `slug_run_dirs` is a filter over `run_dirs` |
+| `docs-packet` | 5 | all fixed in this file, `CHANGELOG.md`, `references/transport.md`, `SKILL.md` and the archived goal: the pre-hardening changelog claims, the stale counts/cross-references, the Q1/Q2 disclosure and external-path labelling, the smoke-narrative precision and the `/tmp` recipe's `umask 077`, and the layering/count reconciliation |
+| `tests-packet` | 6 | all fixed: capability gates for the forced-stop and identity tests, a Windows-safe reader thread and OS-level reaping in `ProcessFixtures`, the `os.kill` arm of the signal spy, runner-first `kill_hard`, `STUB_FINAL_TEXT`, and the loop/redundancy cleanups |
+| `tests-packet.2` | 6 | all fixed: Windows-safe `reap_runner_async`, the `test_33`/identity capability branch, `test_32`'s C-3 byte-identity matrix, `stable_snapshot`'s `OSError` retry, the non-vacuous `test_12c` hold, and the `test_21` comment |
+| `tests-packet.3` | 6 | all fixed: capability gates before spawning, failure-path `try/finally` with the Event-based start-claim holder, `test_41`'s `env=env`, the `os.getpid()` hazards, the current-format recycled-pid case, and the `test_36`→`test_44` fold (including the shadowed duplicate definition the fold first left behind) |
+| `tests-packet.4` | 7 | all fixed: `staged_run_dir` for the nine leaking unit tests, per-shape enumeration staging with a live-enumeration call assertion, the single-use handshake replay, the full seven-word lifecycle vocabulary rendered through `cmd_list`, the space-containing `.cmd` shim and quote/CR/LF refusals, the `exit_mapping_*` helper resets, and the negative-signal/`-1` cases; a follow-up audit of every `Path(tmp)` root then staged the escalation test's `run_case` (`test_the_stop_escalation_branches_on_the_platform`), which reached the slug mutex through `terminate_agent` — while the four genuinely lock-free sites carry in-place comments saying why staging is unnecessary, and a `TMPDIR`-rooted run of them leaves no `.dsh-locks` behind (proof: `/tmp/mut/lock-leak-proof.txt`; the shared-name-space census is unchanged across the series and gates) |
+| `tests-packet.5` | 7 | all fixed: synthetic-strong-token unit halves with capability checks before spawning, `test_l3`'s own-slug probe, both `l3` tests' `try/finally` reaping, `linger_run`'s truthful handshake plus portable no-op binary and env stripping, the serialized-writers assertions, `test_l1`/`test_t1`/`test_g1`, and the mtime/reaping/`session.id` items |
+
+Nothing in the seven blocking packets was left "not reproduced": each finding was either fixed with a pin
+(and, for the adapter-side clauses, a mutation row that fails without it — §3's closeout-3 subsection) or
+is a Settled item or the adjudication's C-2/C-4 consequence, cited rather than re-litigated. The Q1/Q2
+fixture repairs have no stand-alone revert-mutation row by construction; §3 discloses that explicitly per
+C-4's item-by-item reporting rule.
+
+**Identities.** The adapter and test file that every number below was measured on:
+`skills/gdd/scripts/adapters/dsh-run.py` sha256
+`de549febc40703f1c8b7e72db1ffe14366e2f8f8427e0a39d022b0b53010106d`, and
+`skills/gdd/scripts/tests/test_dsh_run_python.py` sha256
+`cce5233accb8e62fc32bbcd5855264e2ddb919710a83763b73d604a3ceed5d25`.
+
+**The fifteen-run series.** One foreground command
+(`STABILITY_OUT=/tmp/mut/stability-closeout3-final.tsv`; the script is external, uncommitted
+task-workspace scratch at
+`~/claw/tasks/2026-11-15/dsh-gdd-integration/evidence/goal8-hardening/stability-closeout3.sh`): ten runs
+with the machine otherwise idle, then five with four busy-loop processes saturating the same four CPUs
+(`nproc` = 4). Every run exited 0 with `Ran 123 tests` and `OK`, and none reported a skip (this host has
+the verified handle primitive, so every capability-gated test took its active path); the summary lines,
+verbatim (the command's own tabs shown as two spaces; each run's full output at
+`/tmp/mut/stability-closeout3-<phase>-<n>.log`):
+
+```text
+plain-1  exit=0  Ran 123 tests in 95.119s OK  [wall=95s]
+plain-2  exit=0  Ran 123 tests in 94.925s OK  [wall=95s]
+plain-3  exit=0  Ran 123 tests in 100.093s OK  [wall=101s]
+plain-4  exit=0  Ran 123 tests in 95.019s OK  [wall=95s]
+plain-5  exit=0  Ran 123 tests in 94.737s OK  [wall=95s]
+plain-6  exit=0  Ran 123 tests in 97.939s OK  [wall=98s]
+plain-7  exit=0  Ran 123 tests in 98.820s OK  [wall=99s]
+plain-8  exit=0  Ran 123 tests in 94.497s OK  [wall=95s]
+plain-9  exit=0  Ran 123 tests in 94.578s OK  [wall=94s]
+plain-10  exit=0  Ran 123 tests in 94.751s OK  [wall=95s]
+load-11  exit=0  Ran 123 tests in 111.195s OK  [wall=112s]
+load-12  exit=0  Ran 123 tests in 109.466s OK  [wall=110s]
+load-13  exit=0  Ran 123 tests in 115.923s OK  [wall=116s]
+load-14  exit=0  Ran 123 tests in 121.726s OK  [wall=123s]
+load-15  exit=0  Ran 123 tests in 125.217s OK  [wall=126s]
+```
+
+The whole command took 1552.69 s and left no busy loop behind (`busy loops left: 0`). The adapter and test
+file were byte-identical before and after it (the sha256 values above are re-checked afterwards,
+unchanged), and the external scratch lock namespace gained no file across it (§3's closeout-3 note).
+
+**The gates.** The same day's chain, sequentially, real exit codes. The PyYAML steps (the `scripts/`
+suite, `check_frontmatter`, `check_contract_graph`, `generate_index`, `check_changelog`, `version.py
+check`) ran with `/usr/bin/python3` (3.12, PyYAML 6.0.1), because this host's mise `python3` (3.15.2) has
+no PyYAML; the `dsh` suites, `compileall` and the seven help runs used the mise interpreter:
+
+| Command | Output | Exit |
+|---|---|---|
+| `python3 -B -m unittest discover -s skills/gdd/scripts/tests -p 'test_dsh_run_python.py'` | `Ran 123 tests in 94.487s` → `OK` | 0 |
+| `python3 -B -m unittest discover -s skills/gdd/scripts/tests -p 'test_*.py'` (every gdd module) | `Ran 250 tests in 195.232s` → `OK (skipped=4)` | 0 |
+| `python3 -m compileall -q skills/gdd/scripts/adapters/dsh-run.py` | no output | 0 |
+| `/usr/bin/python3 -B -m unittest discover -s scripts -p 'test_*.py'` (repo harness suite) | `Ran 189 tests in 8.838s` → `OK` | 0 |
+| `/usr/bin/python3 scripts/check_frontmatter.py` | `check_frontmatter: 60 skills OK` | 0 |
+| `/usr/bin/python3 scripts/check_contract_graph.py` | `contract graph: 60 skills, 11 artifacts, ok` | 0 |
+| `/usr/bin/python3 scripts/generate_index.py --check` | index current (no output) | 0 |
+| `/usr/bin/python3 scripts/check_changelog.py --base origin/main` | `check_changelog: VERSION and CHANGELOG.md both changed` | 0 |
+| `/usr/bin/python3 scripts/version.py check` | check silent (every mirror agrees) | 0 |
+| `dsh-run.py <cmd> --help` for all seven subcommands | `usage:` line each (`start … --name NAME --prompt PROMPT [--cwd CWD]`, `list [-h]`, `status [-h] [name]`, `result [-h] name`, `answer [-h] name`, `tail [-h] name [lines]`, `kill [-h] name`) | 0 each |
+
+The chain's full log is `/tmp/mut/flake-repro/gates-closeout3.log`; its runner is external, uncommitted
+task-workspace scratch
+(`~/claw/tasks/2026-11-15/dsh-gdd-integration/evidence/goal8-hardening/run-gates-closeout3.sh`). The
+suite run in the first row is the confirmation run of the series above, made on the text as it stood at
+the gates; the final prose edits to this record were then made and a single further confirmation run
+followed, recorded at the end of this block.
+
+**The final confirmation run.** After the series, the gate table and the per-finding text above were
+written into this record, the increment's suite ran once more on the edited text:
+`Ran 123 tests in 93.690s` → `OK` (exit 0). It exercises the document checks that read this file, so the
+record's own claims are part of what it covers. The only edits made after it are this sentence and the
+"four K pins" wording in §7's scope block — no code, test, or gate input changed after it.
+
 ## 3. What the suite pins, verified by mutation
 
 Each mutant was applied to a **copy** of `skills/gdd/scripts` under `/tmp` (the worktree adapter was never
@@ -247,7 +354,8 @@ live-run refusal in `_run`; the `backend: dsh` gate in `effective_state`, in `cm
 worktree adapter before each mutant, so every mutation started from the pristine file.
 
 **Round 6's own pins, one mutation per rule, verified the same way.** Each mutant was applied to a fresh
-copy of `skills/gdd/scripts` under `/tmp` (`.tmp-artifacts/round6-tests/r6-mutate.py`, reused for both
+copy of `skills/gdd/scripts` under `/tmp` (`.tmp-artifacts/round6-tests/r6-mutate.py` — an external,
+uncommitted scratch script in the authoring worktree, never committed — reused for both
 sub-mutations of a rule), only the rule's new test(s) were run against the copy, and the copy was removed;
 the three documentation mutations were applied to the worktree files for the duration of one test run and
 restored byte-for-byte (`sha256sum -c`). Every mutant was caught:
@@ -309,17 +417,76 @@ a patch that no longer matches reports itself as skipped rather than passing sil
 
 All 31 mutants made the suite fail (`31/31`); none survived. The 28 rule rows are the driver's own earlier
 measurements on the round-7 revision; `M1`–`M3` were measured in the closeout passes described in §7
-(`M1` on the 118-test revision, `M2`/`M3` on the final 120-test revision). `M1` and `M2` revert,
+(`M1` on the 118-test revision, `M2`/`M3` on the 120-test revision). `M1` and `M2` revert,
 respectively, the bounded wait for the lifecycle mutex and the settle wait for a committed stop; `M3`
 removes that settle wait's bound, so a tree that stays unproven is waited on forever. Each revert fails
-exactly the test added with the rule it reverts. The three rows whose targets live in files this round
-touched (`M1`, `R6-transport`, `R6-skill`) were also re-run on the final revision and still fail exactly
-their rules' tests; being a re-check, their rows are kept beside the table
-(`evidence/goal8-hardening/mutation-results-recheck-closeout2.tsv`) rather than rewriting the measured
-pass. Each row's `Ran … in Xs` line and failure list are that mutant's own output; the driver (kept at `evidence/goal8-hardening/mutation-drive.py`, its raw rows at `mutation-results-final.tsv`) refuses to pass silently when a mutation no longer matches its target — the one row that did (`R6-transport-loses-the-raw-signal-codes`, reported as `SKIPPED-patch-not-found` in the earlier partial pass) was re-derived from the entry's current text and is measured here. Rows whose failing line is not their own rule's test (`L1`, `L2`, `G7`, `B1`, `G8`) report more than one failure because the reverted code path is shared; each rule's own pin is named in §7 and in §4's coverage map.
+exactly the test added with the rule it reverts. The three rows whose targets live in files that round
+touched (`M1`, `R6-transport`, `R6-skill`) were also re-run and still fail exactly their rules' tests;
+the re-check rows, verbatim: `M1` → `Ran 120 tests in 93.342s` / `FAILED (failures=1)` /
+`test_12c_a_momentary_mutation_never_fails_a_start_or_a_stop`; `R6-transport` → `Ran 120 tests in 99.406s`
+/ `FAILED (failures=2)` / `test_q3_the_document_mapping_check_catches_a_swapped_mapping`,
+`test_the_documents_state_the_same_exit_mapping`; `R6-skill` → `Ran 120 tests in 99.200s` /
+`FAILED (failures=1)` / `test_the_docs_state_the_write_isolation_unit`. Each row's `Ran … in Xs` line and
+failure list are that mutant's own output. The driver and its raw rows are **external, uncommitted
+task-workspace scratch**, not repository files and not in any commit: they live under
+`~/claw/tasks/2026-11-15/dsh-gdd-integration/evidence/goal8-hardening/` (`mutation-drive.py`,
+`mutation-results-final.tsv`, `mutation-results-recheck-closeout2.tsv`, `stability-series.sh`), and this
+record quotes their measured rows instead of pointing a reader at files no checkout contains. The driver
+refuses to pass silently when a mutation no longer matches its target — the one row that did
+(`R6-transport-loses-the-raw-signal-codes`, reported as `SKIPPED-patch-not-found` in the earlier partial
+pass) was re-derived from the entry's current text and is measured here. Rows whose failing line is not
+their own rule's test (`L1`, `L2`, `G7`, `B1`, `G8`) report more than one failure because the reverted
+code path is shared; each rule's own pin is named in §7 and in §4's coverage map.
+
+**Count reconciliation (117 vs 118 vs 120 vs the final tree).** Four revisions are quoted in this record
+and they are not interchangeable: the 117-test revision is round 7 *before* the M1 pin; 118 is the
+round-7 final tree, whose fifteen-run series is §2's round-7 block; 120 is the closeout-round-2 tree
+(the M2/M3 pins), whose fifteen-run series is §2's closeout-round-2 block; and the final review-closeout
+tree is **123 tests**, the count in §2's closeout-3 block. The earlier prose here that quoted a "`116`-test unmutated
+tree" is gone: no such row exists in this record, and the unmutated evidence for any revision is that
+revision's own confirmation run in §2.
+
+**Q1/Q2 (fixture repairs) — status and reason (disclosed per the adjudication's C-4 reporting rule).** The review
+adjudication named four mutation requirements: `P7`, `T4`, `Q1` (real-process readiness handshakes
+instead of sleeps) and `Q2` (immediate reaping on failure paths). `P7` and `T4` are adapter rules with
+rows above. `Q1`/`Q2` are *test-side hygiene repairs* and have no stand-alone revert-mutation row; this
+is the explicit, item-by-item disclosure C-4 requires instead of a silent half-report: reverting them
+(back to sleep-based readiness, or without the immediate `addCleanup`/`try/finally` registration) is not
+a deterministic suite failure on this host —
+the defect such a revert restores only manifests as an environmental race, or as a leaked process/thread
+on a failure path. What the final tree does instead: every readiness is an acknowledged handshake
+(`read_line` reads through a per-process reader thread + queue with a finite timeout; `ignoring_agent`
+and `group_with_ready_member` report ready only *after* installing their handlers), every successful
+`Popen()` and thread registers its cleanup at once (`spawn`, `group_with_ready_member`, `hold_mutex_for`,
+`child_holder`, `hold_the_start_claim`), and failure paths reap immediately (`try/finally` around every
+live-run fixture; `stop_live_run` on `addCleanup`; class teardown kills recorded pids through the OS,
+never through the adapter's refusing path). The repairs are exercised by the fifteen-run series under
+load (§2, closeout-3 block) and by the closeout tests that fail when a handshake or a reap is the thing
+under test.
 
 A mutant that survives would mean the suite does not pin the rule; the rows above are the measured
-result, and the "unmutated tree" row is the same revision without any revert (`Ran 116 tests` → `OK`).
+result, and the same revision without any revert is the corresponding confirmation run in §2 (for the
+final tree, the closeout-3 gate table's first row).
+
+### Closeout round 3 — the stop/wait/occupancy clauses, per mutation
+
+The review-closeout round hardened four adapter-side clauses (`adapter-packet-3`). Each was re-proved the
+same way as the rows above: its patch (or pair of patches) was applied to a **copy** of
+`skills/gdd/scripts` under `/tmp`, the full suite was run from that copy — on the frozen test file, whose
+sha256 is in §2's closeout-3 block — and the copy was removed. Every row failed, on exactly the pin
+test(s) it was written for; the rows below are verbatim:
+
+| Removed behaviour | Row | Suite result |
+|---|---|---|
+| `kill_tree`'s pass signals the pids of the caller's *entry* snapshot instead of the guard's refreshed evidence, and an authorized generation whose recorded processes are all GONE is reported `idle` instead of `complete` | `K1-kill-tree-acts-on-the-entry-evidence` | `Ran 123 tests in 109.217s` → `FAILED (failures=2)`: `test_kill_tree_holds_the_mutex_through_the_signal_and_refreshes_evidence`, `test_kill_tree_returns_true_when_the_generations_processes_are_already_gone` |
+| `kill_tree` releases M before the signal (the guard's read and the signal no longer share one mutex scope) | `K1-kill-tree-releases-m-before-the-signal` | `Ran 123 tests in 98.288s` → `FAILED (failures=1)`: `test_kill_tree_holds_the_mutex_through_the_signal_and_refreshes_evidence` |
+| `wait_for_terminal` checks the terminal record before the generation, so a replacement generation's verdict answers for the old one | `K2-wait-terminal-checks-the-record-before-the-generation` | `Ran 123 tests in 96.424s` → `FAILED (failures=1)`: `test_wait_for_terminal_binds_the_generation_before_the_terminal_record` |
+| `occupying_run` answers the unoccupied `(None, {})` sentinel when the slug's mutex is held by another process | `K3-occupying-run-reports-a-contended-slug-free` | `Ran 123 tests in 97.507s` → `FAILED (failures=1)`: `test_occupying_run_denies_on_contention_instead_of_reporting_free` |
+
+All four rows were re-run in one command against the frozen tree
+(`python3 mutation-drive.py` with the four row names, from the external, uncommitted task-workspace
+directory `~/claw/tasks/2026-11-15/dsh-gdd-integration/evidence/goal8-hardening/`, output also at
+`/tmp/mut/k-rows-final.tsv`); the tree itself is never written by the driver.
 
 ## 4. Stub-suite coverage map
 
@@ -334,14 +501,15 @@ result, and the "unmutated tree" row is the same revision without any revert (`R
 | slug/date-bucket escape and live-run replay refused before any write | `test_30`, `test_31`, `test_a_run_dir_must_be_a_direct_child_of_a_date_bucket` |
 | route-scoped discovery, recovery and signalling (`backend: dsh` only) | `test_32` |
 | stop outcomes: proven gone / survivors known / enumeration failed | `test_34`, `test_the_stop_outcome_has_three_distinct_values`, `test_a_run_that_stopped_without_enumeration_is_never_recovered_as_failed` |
-| a failed stop stays non-terminal, reported live, occupying its slug and killable | `test_35`, `test_36`, `test_37`, `test_38` |
+| a failed stop stays non-terminal, reported live, occupying its slug and killable | `test_35`, `test_37`, `test_38` (plus `test_44`, which now carries the folded `test_36` assertions) |
 | a terminal write bound to the run generation | `test_39`, `test_a_terminal_write_is_bound_to_the_run_generation` |
 | one agent per run: two starts, and a start against a replay | `test_40`, `test_41`, `test_the_runner_handshake_is_single_use` |
-| the lifecycle vocabulary in `status`/`result`/`answer`/`list` | `test_42`–`test_46`, `test_the_lifecycle_words_are_the_documented_five` |
+| the lifecycle vocabulary in `status`/`result`/`answer`/`list` | `test_42`–`test_46`, `test_the_lifecycle_words_are_the_documented_vocabulary` (every value, including `gone (unfinalized)`, rendered-and-asserted directly; `cmd_list` run over a staged run) |
 | one statement of the contract across the documents | `test_the_documents_state_the_same_exit_mapping`, `test_transport_and_the_skill_state_the_same_isolation_precondition`, `test_the_record_does_not_claim_a_substituted_provider_route`, and round 7's `test_q3_the_document_mapping_check_catches_a_swapped_mapping` / `test_the_docs_state_the_write_isolation_unit` (association checks, each mutation-checked on a copy) |
 | round 7: the mutex covers a whole publication and a preparation re-checks its target | `test_l1_a_finalization_cannot_be_interleaved_with_a_replacement`, `test_g1_a_target_that_changed_between_capture_and_commit_is_refused` |
 | round 7 closeout: a momentary hold and a committed stop are waited out, never refused — and the wait is bounded | `test_12c_a_momentary_mutation_never_fails_a_start_or_a_stop`, `test_l3_a_replace_waits_out_a_stop_that_is_not_settled_yet`, `test_l3_the_settle_wait_is_bounded_and_the_refusal_stands_at_the_bound` |
-| round 7: kernel ownership, lock namespace, no reversed lock order | `test_l2_a_held_lock_is_never_taken_by_age`, `test_l2_a_lock_io_failure_denies_every_mutation`, `test_l3_waits_hold_no_mutex_and_finalization_takes_no_start_claim`, `test_l3_same_process_writers_are_serialized`, `test_l4_locks_are_keyed_by_slug_not_by_date_or_root`, `test_l4_a_foreign_run_is_never_mutated` |
+| round 7: kernel ownership, lock namespace, no reversed lock order | `test_l2_a_held_lock_is_never_taken_by_age`, `test_l2_a_lock_io_failure_denies_every_mutation`, `test_l3_waits_hold_no_mutex_and_finalization_takes_no_start_claim`, `test_l3_same_process_writers_are_serialized`, `test_l4_locks_are_keyed_by_slug_not_by_date_bucket`, `test_l4_a_foreign_run_is_never_mutated` |
+| round 7 review-closeout: the forced stop's mutex/evidence, the generation-first terminal wait, busy-vs-free slug occupancy | `test_kill_tree_holds_the_mutex_through_the_signal_and_refreshes_evidence`, `test_kill_tree_returns_true_when_the_generations_processes_are_already_gone`, `test_wait_for_terminal_binds_the_generation_before_the_terminal_record`, `test_occupying_run_denies_on_contention_instead_of_reporting_free` |
 | round 7: generation binding of stops, escalations, publishers and late reports | `test_g2_a_stale_kill_cannot_request_or_wait_against_the_new_run`, `test_g3_only_the_runs_own_wellformed_stop_request_is_actionable`, `test_g4_every_escalation_step_reauthorizes_the_generation`, `test_g5_every_publisher_is_generation_bound`, `test_g5_a_merge_never_republishes_a_stale_snapshot`, `test_g8_a_late_stop_report_cannot_revive_a_committed_verdict` |
 | round 7: recovery repeats its predicate; a legacy record authorizes nothing | `test_g7_recovery_repeats_its_liveness_predicate_under_the_mutex`, `test_g7_a_committed_recovery_is_never_rewritten`, `test_g9_a_legacy_record_is_readable_and_can_mutate_nothing` |
 | round 7: one terminal commit, atomic writes that never truncate, no unproven stop | `test_t1_death_at_each_publication_boundary_leaves_one_verdict` (three boundaries, including `exit 0` without a completed `final` → `failed`), `test_t2_an_atomic_write_failure_never_truncates_the_destination` |
@@ -361,7 +529,7 @@ Scratch directory `/tmp/dsh-adapter-smoke/` with `work/` (the run's cwd), `home/
 `DSH_HOME`) and `runs/` (`GDD_RUN_ROOT`). Setup and environment for every command:
 
 ```bash
-mkdir -p /tmp/dsh-adapter-smoke/{work,home,runs}
+umask 077 && mkdir -p /tmp/dsh-adapter-smoke/{work,home,runs}   # scratch DSH_HOME: private modes
 cp -a <HOME>/.dsh/profiles /tmp/dsh-adapter-smoke/home/profiles   # scratch DSH_HOME; never the live one
 # the profile is used as it is: the route resolves its provider key from the launch environment
 # (the profile's apiKeyEnv), which is the recommended shape; see the deviation note below
@@ -374,8 +542,9 @@ printf 'Reply with exactly: ADAPTER_SMOKE_OK\n' > /tmp/dsh-adapter-smoke/prompt.
 ```
 
 The scratch copy's cleanup is `rm -rf /tmp/dsh-adapter-smoke` (not yet run: it is still present on the
-authoring host, owned by the operator's user). Nothing in it was printed, read back into this record or
-committed, and it is not the live `$DSH_HOME`.
+authoring host, owned by the operator's user). No credential value and no verbatim profile file from it
+appears in this record (only the comparison's conclusion); nothing in it was committed, and it is not the
+live `$DSH_HOME`.
 
 Then, in this order:
 
@@ -495,8 +664,9 @@ composes, `headless/`, is 24 KB of configuration). That copy matched the live tr
 outside the installed `node_modules` — including the profile's patch layer, which is the empty list `[]`
 in both — so the route this smoke reached came from the profile copy plus the launch environment. Whether
 that route was the live default route or the local `ghc` route is **not verified here**: the orchestrator's
-acceptance record states the author's run used the local `ghc` route
-([`ORCHESTRATOR-ACCEPTANCE.md`](../goal8-pilot/ORCHESTRATOR-ACCEPTANCE.md), "Canonical real dispatch"), and
+acceptance record (external, uncommitted task-workspace scratch, not a repository file and not in any
+commit: `~/claw/tasks/2026-11-15/dsh-gdd-integration/evidence/goal8-pilot/ORCHESTRATOR-ACCEPTANCE.md`,
+"Canonical real dispatch") states the author's run used the local `ghc` route, and
 nothing retained in this repository — no `dsh` config dump, no route field in `state.json`, no log line —
 can confirm or refute which route the profile copy composed. The canonical evidence for the route question is
 the operator's own dispatch, which ran on the **default** route with the real credential in the launch
@@ -529,9 +699,13 @@ adapter reads nothing from stderr.
   re-ran the stub suite, not a real model dispatch.
 - The operator's canonical dispatch (§ appendix) is the run on the default profile route; its numbers
   come from the run directory itself.
-- The Windows branch (hidden console, `taskkill /T /F`, `%COMSPEC%` shim handling) is implemented by
+- The Windows branch (hidden console, `%COMSPEC%` shim handling) is implemented by
   analogy with the OMP adapter and is **not** executed here; the DSH facts were measured on Linux.
-  `spawn`/`detach` record what the process observed, so a Windows operator can check the claim.
+  Destructive escalation is deliberately refused on Windows (no verified process handle exists there —
+  see `references/transport.md`'s residual limits and the stop-capability section); the cooperative stop
+  request is the supported path, and `test_a_failing_taskkill_is_reported_not_assumed` pins that no
+  `taskkill` command is issued at all. `spawn`/`detach` record what the process observed, so a Windows
+  operator can check the claim.
 - Long stages, `--resume` and `--add-dir` are covered by the stub suite only; no real run exercised
   them.
 - `--max-time` is the adapter's own deadline (DSH has no task-deadline flag); no real long-deadline run
@@ -677,7 +851,11 @@ allowed to touch (scope block below).
   `surviving_members` return `None` — not `[]` — when they could not read the table, `terminate_agent`
   returns that third value, and `report_incomplete_stop` records it as `survivors_complete: false` together
   with every live recorded process it still knows, so a later attempt has real identities to verify. Only
-  the proven outcome may reach a terminal state; on Windows the `taskkill` receipt is the proof.
+  the proven outcome may reach a terminal state; the Windows `taskkill` receipt this round's original
+  notes described is **superseded** by the hardening rounds — `taskkill` is disabled as a stop path (no
+  verified handle binds the destructive call to the process object), so a Windows stop records
+  `survivors_complete: false` and the run stays `running`/`stopping` (see
+  `test_a_failing_taskkill_is_reported_not_assumed` and `references/transport.md`).
 - **R2 — an unconfirmed stop keeps the run live and the slug occupied.** The run stays non-terminal,
   `status`/`list` report it as stopping, `occupying_run` returns it even when no recorded process is alive,
   and a later `kill` can still finish it: a fresh, complete enumeration (`stop_survivors() == []`) or the
@@ -692,9 +870,12 @@ allowed to touch (scope block below).
   directory is replaced. The runner `start` spawned proves it owns its directory with the single-use
   `spawn.token`/`DSH_RUN_SPAWN_TOKEN` handshake instead of re-claiming what its parent already holds.
 - **R5 — every lifecycle answer names its uncertainty.** One vocabulary — `terminal`, `live`,
-  `stopping (survivors known)`, `stopping (enumeration failed)`, `unknown (no state)` — is a `lifecycle`
+  `stopping (survivors known)`, `stopping (enumeration failed)`, `unknown (no state)`, `gone
+  (unfinalized)` for a recorded run that died without committing a verdict, and `read-only` for another
+  backend's run — is a `lifecycle`
   field in `status` and `result`, the named reason in `answer`'s refusal, and `list`'s single word
-  (`running(live)`, `stopping(survivors-known)`, `stopping(enumeration-failed)`, `unknown(no-state)`).
+  (`running(live)`, `stopping(survivors-known)`, `stopping(enumeration-failed)`, `unknown(no-state)`,
+  `GONE (resume with --session-id …)`, `read-only(<route>)`).
   `run_dirs` now also lists a directory that never recorded a `state.json`, so `unknown (no state)` is
   listable rather than invisible.
 - **R6 — one statement of the contract in every document.** `transport.md`'s DSH completion paragraph states
@@ -710,7 +891,7 @@ allowed to touch (scope block below).
   different provider route is gone and no credential value appears. The operating-method skill's "Stopping and
   recovering" stanza states the two
   endings an operator meets there (`killed`/143; `failed`/−1 with `stale_recovered`) without contradicting
-  the full mapping; the skill was outside this round's four-file scope, so the signal-convention clause is
+  the full mapping — the skill is updated in this branch too — and the signal-convention clause itself is
   pinned in the archived goal, `transport.md` and this record.
 - **Review-scope notes, not defects.** Each review lane received one part of the 70-file branch, so "the diff
   lacks the stub suite / skill / transport section / evidence" and "the core implementation is not in the
@@ -926,7 +1107,8 @@ AssertionError: 1 != 0 : start --replace failed: dsh-run: start: run 'momentary-
 ```
 
 **Reproduced before fixing.** Thirty consecutive single-test runs of `test_12c` on the pre-fix tree
-(`evidence/goal8-hardening/flake-repro.sh plain12c` — one process per run, `python3 -B -m unittest
+(`evidence/goal8-hardening/flake-repro.sh plain12c` — external, uncommitted task-workspace scratch at
+`~/claw/tasks/2026-11-15/dsh-gdd-integration/evidence/goal8-hardening/flake-repro.sh` — one process per run, `python3 -B -m unittest
 discover … -k test_12c_…`) produced **2 failures** (runs 10 and 21) and 28 `OK`; thirty runs of `test_12b`
 produced 30 `OK`. A temporary, environment-gated trace on the phase-3 settle sample (removed from the
 final tree; the block was marked `REPRO-INSTRUMENTATION`) recorded one NDJSON line per sample — the exact
@@ -991,6 +1173,32 @@ first test and only it; removing the bound (row `M3`) fails the second and only 
 118 to 120 tests; thirty further single-test runs of `test_12c` and of `test_12b` passed on the fixed
 tree (60 `OK`) before the bound pin — with the small call-time bound resolution it needs — and the
 docstring clause were added, and the §2 series and the final confirmation run cover the final revision.
+
+### Closeout-3 scope — the review-closeout round's files
+
+`git status --porcelain` on the final tree, verbatim — exactly seven modified files, no new files, no
+`VERSION` change (the entry stays `0.1.62`):
+
+```text
+ M CHANGELOG.md
+ M docs/evidence/2026-11-15-dsh-headless-launcher.md
+ M docs/goals/archive/2026-11-15-dsh-headless-launcher.md
+ M skills/dsh-headless-gdd/SKILL.md
+ M skills/gdd/references/transport.md
+ M skills/gdd/scripts/adapters/dsh-run.py
+ M skills/gdd/scripts/tests/test_dsh_run_python.py
+```
+
+What the round changed in each, per finding: the adapter's `kill_tree` (M retained through the signal,
+evidence refreshed from the guard's state, an all-GONE authorized generation is a completed action),
+`wait_for_terminal` (generation binding before the terminal record), `occupying_run` (contention raises
+`LifecycleBusy` instead of answering the free sentinel) and one discovery helper shared by
+`run_dirs`/`slug_run_dirs`; the suite's platform gates, failure-path reaping, the four K pins (K1 ×2, K2, K3) and the
+test-quality repairs the five blocking test packets named; `CHANGELOG.md` bullet 1 (hardened stop
+semantics and the four timeouts) and bullet 4 (user-visible coverage, **123 tests**);
+`transport.md` and `SKILL.md` (the lifecycle vocabulary including `gone (unfinalized)`, the
+settle knob, the session-vs-worktree refusal wording); this record and the archived goal (the facts and
+counts reconciled above).
 
 ## Appendix — the operator's canonical dispatch
 
