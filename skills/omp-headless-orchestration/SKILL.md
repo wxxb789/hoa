@@ -113,11 +113,13 @@ path.
     an instant crash, not a rejected flag. Use `90m`, `2h` or plain seconds. The wrapper does not
     validate this, so read `stderr.log` before blaming the prompt or the repo.
 
-15. **A run that says it "launched" its verification is not evidence.** Teardown at the end of a run —
-    cgroup/process-group kill (`systemd-run` and the like) or a killed tmux session — takes
-    backgrounded children with it, so a gate left running under `&` / `nohup` dies with no exit code
-    anywhere: require the exit code before treating the verification as done. The stage-side rule lives
-    in skill `gdd` → `references/run-failure-modes.md` §8.
+15. **A run that says it "launched" its verification is not evidence.** Whether teardown takes
+    backgrounded children with it is the launcher's cleanup contract, not a universal law: a launcher
+    that terminates its cleanup group at finalize (`systemd-run`, `KillMode=control-group`) kills a gate
+    left under `&` / `nohup` with no exit code anywhere, while one that merely returns may leave it
+    running. Require the exit code before treating the verification as done — a gate awaited to
+    completion is fine, a gate left behind is not. The stage-side rule lives in skill `gdd` →
+    `references/run-failure-modes.md` §8.
 
 ## Recovery after a session restart
 

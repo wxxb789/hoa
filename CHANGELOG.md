@@ -9,8 +9,9 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
 
 - **Three PR-closeout failure modes the catalog was missing.** `gdd/references/run-failure-modes.md`: §6
   out-of-tree tools can silently review missing inputs; §7 gates run under a bare runtime die on a
-  missing import and then get skipped; §8 a stage's backgrounded verification dies with its launcher
-  unit. `omp-headless-orchestration/SKILL.md` pitfall 15: a "launched" verification is not evidence
+  missing import and then get skipped; §8 a gate backgrounded inside its launcher unit must be awaited
+  before the stage returns or moved outside the stage's teardown boundary.
+  `omp-headless-orchestration/SKILL.md` pitfall 15: a "launched" verification is not evidence
   without an exit code.
 
 ## [0.1.62] — 2026-11-14
