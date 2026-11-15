@@ -43,6 +43,12 @@ jobs:
       - name: GDD machine-review evidence tests
         run: python skills/gdd/scripts/tests/test_review_evidence.py
 
+      - name: GDD merge-gate verdict matrix
+        run: python3 skills/gdd/scripts/tests/test_verdict_matrix.py
+
+      - name: GDD merge-gate mutation harness
+        run: python3 skills/gdd/scripts/tests/mutate_verdict_matrix.py
+
       - name: GDD launcher forwarder tests
         run: bash skills/gdd/scripts/tests/test-omp-run-stale.sh
 
