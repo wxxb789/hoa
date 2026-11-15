@@ -640,8 +640,9 @@ check $? "delivery-state --help states its env vars"
 
 PR_HELP="$("$SCRIPTS/pr-merge-check.py" --help 2>&1)"
 printf '%s\n' "$PR_HELP" | grep -q -- '--marker' \
-  && printf '%s\n' "$PR_HELP" | grep -q -- '--allow-no-machine-review'
-check $? "pr-merge-check --help documents marker and allow-no-machine-review"
+  && printf '%s\n' "$PR_HELP" | grep -q -- '--allow-no-machine-review' \
+  && printf '%s\n' "$PR_HELP" | grep -q -- '--allow-table-only-checks'
+check $? "pr-merge-check --help documents marker, allow-no-machine-review and the table opt-in"
 
 # --- 12b. bounded event writer ---------------------------------------------
 

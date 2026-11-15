@@ -3,15 +3,350 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
-## [0.1.62] — 2026-11-15
+## [0.1.63] — 2026-11-15
 
-### Changed
+### Added
 
-- GDD phase 6 states when its CI clause is inapplicable: a repository that declares **no workflow at
-  all** *and* a PR carrying zero checks/statuses reads the merge script's `BLOCKED: no checks` verdict
-  as not-applicable for that head and merges on the remaining clauses, with the zero-workflow evidence
-  recorded in the verdict line and the PR body. Red or pending checks in a repository that *has*
-  workflows stay blocking.
+- **Three PR-closeout failure modes the catalog was missing.** `gdd/references/run-failure-modes.md`: §6
+  out-of-tree tools can silently review missing inputs; §7 gates run under a bare runtime die on a
+  missing import and then get skipped; §8 a gate backgrounded inside its launcher unit must be awaited
+  before the stage returns or moved outside the stage's teardown boundary.
+  `omp-headless-orchestration/SKILL.md` pitfall 15: a "launched" verification is not evidence
+  without an exit code.
+
+## [0.1.62] — 2026-11-14
+
+### Fixed
+
+- **Round-17 review findings: the ignored-line report's order is pinned, and the diagnostic surface
+  gets the one-shot systematic pass.** The round-16 fixture carried the ignored lines `required-a,
+  required-b, required-a` — a palindrome — so a report that reverses its iteration order
+  (`for line in reversed(lines):`) survived all 397 cells, the golden call log, the 94 evidence
+  tests and the 68 selftest fixtures, with the same MERGE-OK and tally `1/1/0/0`. The fixture is now
+  `required-a, required-b, required-a, required-c` — non-palindromic, the repeat kept — and both
+  cells assert the exact four-line stderr list in order. Per the standing rule the one-round patch
+  stopped there: the whole ignored-line diagnostic surface and the cell assertion mechanism that
+  pins it were enumerated as eight properties and each is pinned by its own mutation —
+  completeness (`ignored-line-diagnostic-truncated-to-the-first`, from round 16), ordering
+  (`ignored-line-diagnostic-reversed`), duplicates (`ignored-line-diagnostic-deduplicated`),
+  exactness (`ignored-line-diagnostic-extra-note`), no false positives
+  (`ignored-lines-include-recognised-rows`), both paths
+  (`ignored-line-diagnostic-only-under-the-opt-in`, `ignored-line-opt-in-warning-dropped`), silence
+  when clean (`ignored-line-diagnostic-prints-when-clean`) and the comparison itself (below). The
+  comparison is test-side, so no gate mutation can pin its strictness: the comparison is factored
+  into one `stderr_problems()` and `comparator_self_check()` runs the de-duplicated, re-ordered and
+  extra-line witness of every pinned stderr list through `main()`'s guards — a comparator weakened
+  to set equality or containment, or a fixture that stops discriminating (no repeat, a palindrome),
+  fails the guard by name while the matrix passes everything else, so neither can land silently.
+  The catalogue grows to 90 mutations (58 anchored plus the 32 generated from the 16 declared
+  vocabulary entries) and all 90 are caught; the class of gap is recorded under *Closed* in
+  `tests/COVERAGE_BACKLOG.md` with the property-to-pin table. The matrix stays at its 397 cells (390
+  verdict + 3 stream + 1 sh-trim + 3 boundary) over 9 declared dimensions,
+  `test_review_evidence.py` stays at its 94 tests, and the selftest at its 68 fixtures.
+- **Round-16 review finding: the ignored-line report is pinned to the whole list.** Both cells that
+  drove a tab-less line through `main()` used a *one-line* fixture and asserted the diagnostic as
+  substrings, so the reporting loop in `report_ignored_table_lines()` could stop at the first line —
+  `for line in lines[:1]:`, or a de-duplicating rewrite — and survive the whole matrix: through
+  `main()` on the opt-in path the fallback `(0, "build\tpass\nrequired-a\nrequired-b\n", "")`
+  printed two diagnostics under the shipped gate and one under the mutant, both MERGE-OK with tally
+  `1/1/0/0`, the second truncated row swallowed silently. The truncated fixture now carries three
+  ignored tab-less lines — two distinct, one repeated — and both cells (the opt-in path and the
+  default path) assert the **exact stderr line list**: every expected line, in order, repeats
+  included, and no other line beside them (a non-ERROR cell that names none must print none), so a
+  report that stops at the first line or de-duplicates fails. The mutation
+  `ignored-line-diagnostic-truncated-to-the-first` is registered and
+  is caught by these two cells (82 -> 83 mutations, 50 -> 51 anchored); the class of gap is
+  recorded under *Closed* in `tests/COVERAGE_BACKLOG.md`. The matrix stays at its 397 cells (390
+  verdict + 3 stream + 1 sh-trim + 3 boundary) over 9 declared dimensions, and
+  `test_review_evidence.py` stays at its 94 tests.
+
+- **Round-15 review findings: the row-retention contract is qualified, the ignored line is named, and
+  the table opt-in is pinned against the evidence blockers.** `pr-merge-check.py` stated "only the
+  exact header is skipped: every other line is a row", but the shipped parser also ignored a nonblank
+  line **without a tab** — and a truncated row has exactly that shape — so the replicated run
+  `(0, "build\tpass\nrequired\n", "")` with `--allow-table-only-checks` printed `1 total, 1 ok` and
+  reported MERGE-OK with the `required` line gone without trace. The contract is now qualified where
+  it is stated — the module docstring, the parser, Phase 6 and this entry: only tab-delimited lines
+  other than the exact header are rows; a nonblank line without a tab is not a row, and the explicit
+  opt-in accepts that parsing limitation. The skip is no longer silent: `ignored_table_lines()`
+  collects every nonblank tab-less line of the table read and `report_ignored_table_lines()` prints
+  one `pr-merge-check: ignored table line without a tab (not a row): '…'` diagnostic per line on
+  stderr once the read has produced something to report — an operator error keeps its single stderr
+  line — adding on the opt-in path that the ignored line could conceal a check. The merge decision
+  is unchanged (observability, not a new gate); two cells drive the truncated fixture with and
+  without the opt-in and assert the diagnostic beside the unchanged verdict, and the mutation that
+  drops the diagnostic is registered. Separately, no cell enabled `--allow-table-only-checks`
+  beside blocking *evidence* rather than a blocking *checks* read, so two mutants survived the whole
+  matrix — `if not review["pass"] and not
+  allow_table_only_checks:` and `if unresolved and not allow_table_only_checks:`, each reporting
+  MERGE-OK over a green exit-0 fallback table while the shipped gate blocks with `review` /
+  `threads`. Two cells now pair the opt-in with the page-2 marker and the page-2 unresolved thread;
+  the two mutations are registered (79 -> 82 mutations, 47 -> 50 anchored), and the class of gap is
+  recorded under *Closed* in `tests/COVERAGE_BACKLOG.md`. The matrix now runs 397 cells (390 verdict
+  + 3 stream + 1 sh-trim + 3 boundary) over 9 declared dimensions, and `test_review_evidence.py`
+  stays at its 94 tests.
+
+- **Round-14 review findings: the table opt-in is pinned against the head/gate blockers, and the
+  completeness guards count only executed reads.** `--allow-table-only-checks` decides only whether
+  the *table* read is authoritative; every cell that enabled it supplied a matching verified head
+  and `--gates-rc 0`, so a mutant that clears the reasons already accumulated at the `table_only = …`
+  assignment — `if allow_table_only_checks: reasons = []` — survived all 391 cells (the total then),
+  the golden call log, the 94 evidence tests and the selftest, turning a mismatched verified head or
+  a failing local gate into MERGE-OK over a green table. Two cells now drive the opt-in beside
+  `--verified-head MISMATCHED_HEAD` (BLOCKED `head mismatch, verified head missing`) and
+  `--gates-rc 1` (BLOCKED `gates unverified`), and the mutation is registered (78 -> 79 mutations,
+  46 -> 47 anchored). Separately, the two completeness guards read `cell.table_result[0]` for every
+  cell, including the ones whose structured read succeeded and whose `TABLE_UNUSED = (0, "", "")`
+  fixture was never consulted — so table-exit 0 (and its negative coverage) was supplied by cells
+  whose table never ran. Both guards now count a table exit only when the cell's read actually ends
+  on the table (`_table_consumed()`), and `guard_self_check()` runs the reviewer's reproduction —
+  replace every *consumed* table exit 0 with a pending exit-8 table — requiring both guards to name
+  the missing table exit 0. The matrix then ran 393 cells (386 verdict + 3 stream + 1 sh-trim + 3
+  boundary) over 9 declared dimensions.
+
+- **Round-13 review finding: the exit-code domain is declared once, and both read surfaces carry it.**
+  The structured-exit dimension named `0, 1, 4, 8` while the table-exit one named `0, 1, 8, 2, 4,
+  -15, 127` — the same `gh pr checks` domain written twice, so one copy fell behind and a category
+  could be represented on one surface and missing from the other. Two mutants survived the whole
+  matrix through that gap: `if returncode == 0:` read as `if returncode <= 0:` (trusting a
+  signal-terminated read, exit -15) and as `if returncode in (0, 2):` (trusting a cancelled one,
+  exit 2), each turning a structured `(-15, <passing array>, "")` / `(2, <passing array>, "")` over
+  a non-green fallback from BLOCKED `checks pending` (2/1/1/0) into MERGE-OK (1/1/0/0). The domain
+  is now declared **once** (`CHECK_RESULT_EXITS` + `OPERATOR_FAILURE_EXITS` = `EXIT_CATEGORIES`) and
+  both the `structured-exit` and `table-exit` dimensions are driven from it, so a category cannot
+  appear on one surface only; six generated cells — one per declared non-zero exit — hand the
+  structured read a parseable **passing** array beside a parsing, pending fallback table, asserting
+  the exact verdict and tally. The completeness guard gains a **cross-surface** check
+  (`cross_surface_exit_problems()`) that fails by name on a category represented on one surface but
+  missing from the other, alongside the per-dimension `dimension_problems()`. Both mutations are
+  registered (76 -> 78 mutations, 44 -> 46 anchored); the matrix then ran 391 cells (384 verdict + 3
+  stream + 1 sh-trim + 3 boundary) over 9 declared dimensions.
+
+- **Round-11 review findings: the structured read's exit code is required, and the opt-in wording is
+  corrected.** Every non-zero structured-read fixture paired its exit with *empty* stdout, so the
+  cells could not tell "require exit 0" from "trust any parseable stdout": `if returncode == 0:` read
+  as `if returncode == 0 or stdout:` survived all 379 cells (the total then), the golden call log,
+  the 94 evidence tests and the selftest — a structured exit 4 whose stdout parsed reported MERGE-OK
+  while the real gate fell back to the table and its operator error. Three cells now hand the
+  structured read a non-zero exit *and* a parseable payload — a passing array (falling back to a table
+  at exit 4 with `authentication failed`, exit 2 with the diagnostic preserved, and to an all-green
+  `checks unreadable`), and, with `--allow-no-checks`, an empty array — and the mutation
+  is registered (74 -> 75 mutations, 42 -> 43 anchored), so the matrix then ran 382 cells (375
+  verdict + 3 stream + 1 sh-trim + 3 boundary). Separately, the *structured-only* wording of
+  `--allow-no-checks` was wrong in Phase 6, the module docstring and this entry: alone the flag
+  cannot authorise table-only evidence, but together with `--allow-table-only-checks` the table is
+  authoritative and an empty one is accepted, so the documented boundary now matches the implemented
+  and tested one.
+
+- **Round-12 review finding: the check-result exits are covered, and the completeness of the cell
+  dimensions is asserted.** Every round-11 non-zero structured-read fixture used exit **4** — not a
+  check-result exit — so the narrower mutant `if returncode == 0 or (returncode in (1, 8) and
+  stdout):`, trusting a parseable stdout only at the two exits `gh pr checks` uses for CI state,
+  survived all 382 cells and the golden call log. Three cells now pair a structured exit **1** and
+  **8** carrying a parseable payload (a passing array, and an empty one under `--allow-no-checks`)
+  with a **non-green** fallback table, so the fallback verdict and its exact tally are asserted —
+  BLOCKED `checks` (3/1/1/1) at exit 1, BLOCKED `checks pending` (2/1/1/0) at exit 8 — and the
+  mutation is registered (75 -> 76 mutations, 43 -> 44 anchored). The class-closing fix is
+  structural: every dimension the cells vary over — read source, structured exit code, table exit
+  code, flag combinations, JSON shape, table shape, bucket, state, and the fixed
+  `--verified-head`/`--gates-rc` pair — is declared as a constant list in the test file, and
+  `dimension_problems()` asserts over the assembled `CELLS` that each declared value is represented
+  by at least one cell — and by at least one *negative* (BLOCKED or ERROR) cell where the value has a
+  verdict consequence — naming the missing value and dimension otherwise. Rounds 11 and 12 both
+  slipped through as a value of a declared dimension (a structured exit code) that no cell
+  represented; this turns that class into a loud failure. The matrix then ran 385 cells (378 verdict
+  + 3 stream + 1 sh-trim + 3 boundary) over 9 declared dimensions.
+
+- **Round-8 review finding: the subprocess boundary pins the repository it forwards.**
+  Both boundary fakes accepted `cwd` and ignored it, and every `gh` argument was the same whichever
+  directory was passed, so dropping `cwd=repo` at a call site — or replacing `cwd=cwd` inside
+  `sh_raw()` with `cwd=None` — left all 376 cells (the matrix total then), the 94 review-evidence
+  tests and the 68-fixture selftest green while the child inspected the caller's repository instead
+  of the one `--repo` named, invalidating the evidence the gate exists to collect. The matrix gains a
+  **boundary dimension** — `boundary-repo-gh-cwd` (`gh` must run in the working directory `--repo`
+  names) and `boundary-repo-git-flag` (`git` must carry the same directory in argv as `-C <path>`),
+  each driven from a directory distinct from the runner's against a fake that records what
+  `subprocess.run()` actually received, and the fingerprint of the hole is that only the *boundary*
+  cells flip.
+  `RealSubprocessBoundaryTests` gains a recording run over the whole gate and a probe that runs a
+  **real** child and asserts the directory it reports — one assertion that covers the forwarded
+  directory, text mode and captured output at once. Both surviving mutations are registered in the
+  catalogue (63 -> 65 mutations, 31 -> 33 anchored). This is the only relied-on obligation of that
+  shape besides the repository: the gate passes no `env=` (its docstring states "Environment:
+  none"), so no test pins an environment the gate does not use. The `gh` argv was **not** pinned:
+  the cells branch on `cmd[:3]` and on the presence of `--json`, so a dropped `str(pr)` or a trimmed
+  field list is invisible to them — round 9 closes that with the golden call log below.
+- **Round-9 review findings: the whole forwarded call surface is pinned mechanically, not case by
+  case.** Round 8 added the boundary dimension, but two holes of the same family remained, both
+  invisible to every cell, every evidence test and the selftest. First, the boundary cells all drove
+  a *successful* structured read, so the **table-fallback** call site
+  (`sh_raw(["gh", "pr", "checks", str(pr)], cwd=repo)`) was never reached and dropping its `cwd=repo`
+  survived the whole matrix — with the requested repository pending and the caller's green, the
+  baseline blocked with `checks pending` while the mutant merged. Second, the disk assertions
+  dispatched on prefixes (`cmd[:3] == ["gh", "pr", "checks"]`, `"--json" in cmd`) and on path
+  membership (`repo in cmd`), so dropping `str(pr)` from the structured argv survived — real `gh`
+  then reads the *current branch's* PR — as did `["git", "-C", repo, ...]` -> `["git", repo, ...]`,
+  where the path is still in argv but Git no longer has a valid repository selection. The matrix now
+  exercises the fallback read at the boundary (`boundary-repo-gh-fallback-cwd`), requires that call
+  to have happened with the repository directory, asserts the **complete** check-command shape — the
+  structured `gh pr checks <pr> --json name,state,bucket` or the fallback `gh pr checks <pr>`, for
+  the requested PR — on both read surfaces, and asserts the adjacent `["-C", <repo>]` pair for every
+  `git` call. The class is closed by construction with a **golden call log**: every
+  `subprocess.run()` invocation the gate issues while a cell drives `main()` is recorded as
+  `(argv, cwd, has_env)` — normalised only by folding the named repository onto `<repo>`; nothing the
+  gate relies on is dropped — and the distinct set is compared with an **8-entry snapshot committed
+  in the test file** (10 entries after round 10), one entry per distinct call with the reason it is
+  there. Any change to a command, an argument, a flag, the PR number, the repository pair or a call's
+  working directory, or any new call, fails with the added or removed entry spelled out, and the
+  failure tells the operator to review the gate diff and update the snapshot deliberately — a blind
+  paste-back would turn "the gate invokes something new" into "the test agrees with the mutation".
+  `evaluate_with_calls()` runs the comparison, so the mutation harness exercises it per mutant as
+  well: a mutation that trims the `gh pr view --json` field list, which no cell names, is caught by
+  the log alone. Six mutations are registered (65 -> 71 mutations, 33 -> 39 anchored), and the matrix
+  ran 376 cells after that round (one more boundary cell).
+- **Round-10 review findings: the evidence reads' continuation pages and `sh()`'s trimming are
+  pinned, and the unexercised paths become a work list.** Both evidence readers paginate, and every
+  fake handed back a single terminal page — 100 comments then a stop, or `hasNextPage: false` — so
+  neither continuation rule was exercised. `fetch_issue_comments()`'s `if len(batch) < 100: return`
+  read as `<= 100` stops at a full page before the page 2 that carries the machine-review marker, and
+  `fetch_review_threads()`'s `cursor = page.get("endCursor")` read as `None` stops the thread loop
+  before the page 2 that carries an unresolved thread; each turns `BLOCKED` into `MERGE-OK` once the
+  blocking evidence lives on page 2, and both survived all 376 cells, the golden log, the 94
+  evidence tests and the selftest. The matrix now serves multi-page evidence (`comment_pages`,
+  `thread_pages`) and drives two cells whose **page 2 is what changes the verdict** — a marker on
+  comment page 2 and an unresolved thread on thread page 2 — and the golden call log grows to 10
+  entries so it covers the comment page-2 read and the cursor-carrying GraphQL request. Separately,
+  every fake fed the gate a child that printed exactly `feature`/`HEAD` with no trailing newline, so
+  `sh()`'s `stdout.strip()` never had to remove anything and deleting it survived everything; a real
+  child prints `feature\n`, which `resolve_head()` would compare against `headRefName` and report as
+  `head not verified` for a branch that did verify. A new `ShCell` probe asserts the value `sh()`
+  returns from newline-terminated output, against the literal. Three mutations are registered (71 ->
+  74, 39 -> 42 anchored), and because four rounds each found an unexercised path rather than a
+  defect, the increment also adds `tests/COVERAGE_BACKLOG.md`: an ordered work list of the paths in
+  `pr-merge-check.py` these artefacts still do not pin — a GraphQL `errors` payload read as an empty
+  thread list, a non-array comment page read as no comments, `main()`'s `--json` contract and usage
+  exits, a `hasNextPage` page that returns no cursor, the composed human lines other than `checks:`
+  and `verdict:`, the malformed `gh pr view` payload, the `--gates-note`/`--gates-rc` plumbing, a
+  slash-less `gh repo view` name, and the unreachable `offline` parameter — each with the
+  regression's effect on a verdict and the smallest fixture that would pin it.
+- **Round-7 review findings: only a check-result exit is CI data, and both opt-ins together still
+  cannot forgive a non-green read.** `gh pr checks` reports CI state through exactly two exit codes —
+  1 (a check failed) and 8 (a check is pending). The table fallback accepted *every* non-zero exit as
+  data once the parsed table was not all green, so an operator error — gh's documented 2
+  (cancellation) and 4 (authentication), or a signal's negative code — was laundered into
+  `verdict: BLOCKED: checks pending` (exit 1) with stderr discarded, hiding an interrupted or
+  unauthorised read behind the gate's own exit-2 operator-error contract. `fetch_checks()` now
+  accepts only `1`/`8` as table data and raises `GateError` (exit 2) for any other non-zero exit,
+  preserving that exit code and the diagnostic in the one-line message. `--allow-table-only-checks`
+  together with `--allow-no-checks` is still two narrow opt-ins, not a bypass: the matrix now pins
+  both flags against non-green JSON **and** non-green table evidence, where a mutant that skipped the
+  non-green branch when both flags were set previously reported MERGE-OK over a pending run. And
+  because `gh` check names are not unique identifiers, the matrix pins row retention as a family —
+  two rows that differ only by verdict, under a repeated name, an empty name, a whitespace-only name
+  and a printed column name, in both orders and on both surfaces — where a mutant that indexed
+  structured rows by name previously collapsed two rows into one and reported MERGE-OK over a failing
+  run. All three mutations are registered in the catalogue.
+- **The merge gate could not be run while CI was in flight.** `pr-merge-check.py` asked `gh pr
+  checks --json name,state,conclusion`; gh 2.103 removed `conclusion` (`Unknown JSON field:
+  "conclusion"`), so it failed and fell back to the table, whose non-zero exits — 8 while a check is
+  pending, 1 when one failed — reached `sh()` and ended the gate at **exit 2**. `fetch_checks()` now
+  reads `--json name,state,bucket`, mapping gh's grouping to the tool's vocabulary:
+  `pass`/`skipping`/`neutral` ok, `fail`/`cancel` failures, anything else — including `pending` —
+  pending. With `--json` gh exits 0, an unfinished run as a `"bucket":"pending"` row, so the bucket
+  mapping is the mechanism for a pending run. The non-zero table branch is the `gh < 2.103`
+  fallback, where a parsed table is data too: an unfinished run reports `checks: N total, M ok, P
+  pending, F failing` and verdict `BLOCKED: checks pending`, so the operator re-runs. Unparseable
+  output raises and exits 2. A malformed `--json` array — a non-object row beside a passing one, or
+  only non-objects — also exits 2 rather than dropping the bad row: `--allow-no-checks` forgives a
+  PR with zero check runs, never an unreadable list. The table fallback no longer skips rows by a
+  `NAME` prefix — that dropped checks named e.g. `NAME-required` and could report MERGE-OK over a
+  failing run; gh's column header is now recognized as exactly the five printed column names in
+  print order (`NAME STATUS ELAPSED URL DESCRIPTION`), because matching them as an unordered set
+  accepted `STATUS\tNAME` as a header and let a row whose verdict word was unknown *vanish* under an
+  all-green remainder; and a comparison that stripped empty fields and uppercased before comparing
+  made two more data rows indistinguishable from the header — `NAME\t\tSTATUS\tELAPSED\tURL\t
+  DESCRIPTION` (an empty field) and `name\tstatus\telapsed\turl\tdescription` (lower case) — so the
+  row vanished and only the passing remainder counted. The header comparison is now exact: the five
+  printed column names, in print order, with the field count, the empty fields and the case
+  preserved. Every other line — a permutation of the column names, a partial header, an empty-field
+  row, a lower-cased row, a check named after a column — is a row, and a row whose verdict word is
+  unknown blocks. Header recognition and the field split both read the **original** line: stripping
+  the whole line first erased a field boundary, so a row carrying a leading empty field, and the
+  five-column header carrying one extra trailing tab, collapsed onto the exact header and vanished,
+  leaving an all-green remainder to report MERGE-OK. Only a whitespace-only line is now detected
+  through a strip, and each data field is normalised on its own. The verdict words are one declared
+  `CHECK_VOCABULARY` (`pass`/`skipping`/`neutral` ok, `fail`/`cancel` failures, `pending` pending,
+  plus the words earlier revisions accepted) rather than two hand-kept maps, and
+  `tests/gh_checks_fixtures.py` holds the `gh pr checks` table and
+  `--json` output captured live from three open PRs — one with a pending run, one failing, one
+  finished — so the vocabulary is read from the tool rather than remembered. A non-zero exit is also
+  evidence the read was incomplete, so an *all-green* parsed table under one — a truncated row that
+  vanished, or a command error beside passing rows — now exits 2 instead of reporting MERGE-OK; only
+  a successful read of zero check runs is the empty state, and
+  only `--allow-no-checks` accepts it. The class-closing rule ends the whole family of fail-opens
+  this increment produced, all of which came from the human table fallback authorising a merge: a
+  **table-only read may never produce MERGE-OK**. When the structured read did not produce the rows,
+  the parsed table is *advisory* — a non-green row blocks as before, and an all-green or empty table
+  blocks too, with reason `checks unreadable` and **exit 1** (a verdict about unverifiable evidence,
+  not an operator error, so not exit 2). `--allow-table-only-checks`, named in the module docstring
+  and in Phase 6, is the explicit opt-in that restores the table's authority for an operator whose
+  gh cannot do `--json`; the default fails closed, and the opt-in bypasses neither the exact-header
+  rule nor the unknown-verdict rule. The zero-check-runs block, `--allow-no-checks`, the marker
+  schema and the `--gates-rc`/`--verified-head` clauses are untouched: pending is never green.
+- **Tests**: `tests/test_review_evidence.py` gains `CheckFetchTests` and `CheckFetchCliTests` — the
+  requested JSON fields, the surface label each read carries (`json` authoritative, `table`
+  advisory), the bucket mapping (including an unknown bucket, which must stay pending even when the
+  raw `state` reads `SUCCESS`), a pending table at exit 8 and at exit 1, unparseable output,
+  malformed check rows at exit 2 with and without `--allow-no-checks`, the empty fallback table with
+  a zero exit in all four flag combinations (table-only: neither flag and `--allow-no-checks` alone
+  block `checks unreadable`, the table opt-in alone blocks `no checks`, and only both flags together
+  merge), a missing gh binary at exit 2, the non-JSON and non-list-JSON fallbacks, a table-only green
+  read blocking with `--allow-table-only-checks` restoring it, the opt-in unable to bypass the header
+  or unknown-verdict rules, and `main()`'s exit code plus verdict for each — plus
+  `RealSubprocessBoundaryTests`, which patches `subprocess.run()` only, keeping `sh()`/`sh_raw()`
+  real: the exit code and both streams are forwarded verbatim, and a non-zero exit never becomes an
+  empty-but-valid check list — 42 -> 94 test methods. The shipped `--selftest` gains the bucket
+  vocabulary (a recognized raw state under an unknown bucket stays pending), its tally, the table
+  rows whose names begin with `NAME`, the unordered and partial headers that used to vanish, the four
+  header-shaped data rows a normalising comparison dropped (an empty middle field, a lower-cased
+  row, a leading empty field and the header with a trailing one) with their tallies, the captured
+  pending row, and one fixture per declared table verdict with the whole vocabulary's tally
+  (30 -> 68 fixtures).
+- **The check-fetch surface is pinned by two self-verifying artefacts** rather than hand-picked
+  cases. `tests/test_verdict_matrix.py` declares, test-side and literally, the meaning of every
+  vocabulary token (`DECLARED_VOCABULARY`) and asserts the gate's `CHECK_VOCABULARY` matches it token
+  by token; the cells derive their expectations from that declaration, never from the gate, so a
+  reclassified token — or a swap of two tokens' meanings, the shape that stayed invisible while the
+  matrix read the artefact for what was correct — fails loudly. It enumerates the closed input space
+  — JSON shape x fallback table shape x exit code x `--allow-no-checks` x the table-only opt-in,
+  with all four combinations of the two opt-ins pinned for an empty table so neither can stand in for
+  the other — and *generates* the rest: one cell per declared `CHECK_VOCABULARY` entry (on the table
+  surface with and without the opt-in) and the bucket x state dimension from the raw state vocabulary
+  gh reports, with each expectation computed from the invariants (fail closed; the bucket governs;
+  pending and failing block; a table-only read may never authorise; the opt-out forgives a
+  zero-check read, and the two opt-ins are independent — the table opt-in alone makes an empty
+  table the zero-check state, which only `--allow-no-checks` forgives). Every cell drives `main()`
+  with `subprocess.run()` mocked and compares
+  the **complete** verdict line plus the printed `checks:` tally — and, where a cell names them,
+  its exact stderr line list, no line beside them — so a failing read cannot pass as a
+  pending one (`verdict: BLOCKED: checks` is a prefix of `verdict: BLOCKED: checks pending`) — 390
+  verdict cells + 3 stream cells + 1 sh-trim cell + 3 boundary cells (397 cells) over 9 declared
+  dimensions, plus
+  the 10-entry golden call
+  log that pins every `subprocess.run()` invocation the gate issues. `dimension_problems()` asserts
+  that every value of every declared dimension is represented by at least one cell — and by at least
+  one negative cell where the value has a verdict consequence — so a future dimension value cannot be
+  silently unrepresented, and `cross_surface_exit_problems()` fails on an exit category the cells
+  exercise on one read surface but not the other (round 13's gap, now a hard failure). The captured
+  live output in
+  `tests/gh_checks_fixtures.py` is a matrix input as well: a value gh prints that the declared
+  vocabulary does not know fails the matrix instead of reaching the gate as an unknown token.
+  `tests/mutate_verdict_matrix.py` applies 90 in-memory mutations of the module — 58 anchored plus
+  two generated per declared vocabulary entry, reclassifying that token into every other
+  classification — and requires each to flip at least one cell (or change the golden call log),
+  naming the survivor loudly if one does. Both run in CI. The paths the artefacts still do not
+  pin are queued, by consequence, in `tests/COVERAGE_BACKLOG.md`, which also keeps the gaps already
+  found and closed.
 
 ## [0.1.61] — 2026-11-14
 
