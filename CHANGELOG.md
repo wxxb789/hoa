@@ -70,7 +70,7 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   `--approval-policy never` is required for unattended runs), the DSH configuration table, and the
   route's stub-driven suite beside the OMP and Paseo suites. The route is selected with
   `GDD_LAUNCHER`, never by a reachability probe.
-- Bumped the shared skill/catalog version from `0.1.61` to `0.1.62` through `scripts/version.py bump`,
+- Bumped the shared skill/catalog version from `0.1.63` to `0.1.64` through `scripts/version.py bump`,
   which mirrors every `skills/*/SKILL.md` `metadata.version` and regenerates both indexes.
 
 ## [0.1.63] — 2026-11-15
