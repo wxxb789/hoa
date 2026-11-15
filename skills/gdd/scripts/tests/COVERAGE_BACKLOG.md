@@ -6,9 +6,11 @@ into an ordered queue an operator can work one entry at a time.
 
 Scope: every reachable path in `skills/gdd/scripts/pr-merge-check.py` (and what it calls in this
 repo) that the round-10 increment did not touch and that the artefacts — `test_verdict_matrix.py`
-(the 393 cells + the 10-entry golden call log + the mutation catalogue), `test_review_evidence.py`
+(the 397 cells + the 10-entry golden call log + the mutation catalogue), `test_review_evidence.py`
 and `pr-merge-check.py --selftest` — still do not pin. Entries already pinned somewhere say so, so
-the queue does not re-litigate covered ground.
+the queue does not re-litigate covered ground; a gap that was found and closed is kept under
+*Closed* below, so this file stays the single record of each class rather than only of what is
+still open.
 
 Ordering is by consequence: what an untested regression there would do to a *verdict* first, then to
 an operator's diagnosis, then to usage. Each entry names the smallest fixture that would pin it; a
@@ -141,6 +143,24 @@ sees what the gate *invokes*, never what it does with the answer.
 - **Smallest fixture**: none through `main()` — a decision first (delete the parameter, or add the
   flag), then a cell for it.
 - **Pinned today**: nothing, by construction.
+
+---
+
+## Closed — round 15 F2: the table opt-in beside a blocker judged elsewhere
+
+- **Path**: `evaluate()` — the `if not review["pass"]:` and `if unresolved:` clauses, which run
+  *after* the checks read. `--allow-table-only-checks` decides only whether the table read is
+  authoritative; it says nothing about the machine-review marker or the review threads.
+- **The gap**: every cell that enabled the opt-in beside blocking evidence paired it with a blocking
+  *checks* read, so a mutant that skipped those clauses when the opt-in was set survived the whole
+  matrix. Two of them did: `if not review["pass"] and not allow_table_only_checks:` and
+  `if unresolved and not allow_table_only_checks:` each reported MERGE-OK over a green exit-0
+  fallback table where the shipped gate blocks with `review` / `threads`.
+- **Now pinned**: `rule-table-opt-in-does-not-waive-review` and
+  `rule-table-opt-in-does-not-waive-threads` — the opt-in plus a green exit-0 fallback table beside
+  the blocking marker on comment page 2 and the unresolved thread on page 2 — with the mutations
+  `opt-in-drops-blocking-review` and `opt-in-drops-unresolved-threads` registered in
+  `mutate_verdict_matrix.py`.
 
 ---
 

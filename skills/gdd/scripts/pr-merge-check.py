@@ -28,9 +28,13 @@ Checks:
      the empty state, and only `--allow-no-checks` accepts it — the structured read directly, and
      the *table* one too once `--allow-table-only-checks` has made the table authoritative (see 2),
      so neither opt-in alone forgives a table-only read. Only the header — all five printed
-     column names in print order — is skipped: every other line is a row, and a row whose verdict
-     word is unknown blocks. The header comparison is exact (field count, empty fields and case
-     preserved), so no data row can be mistaken for it.
+     column names in print order — is skipped: every other *tab-delimited* line is a row, and a
+     row whose verdict word is unknown blocks. A nonblank line *without* a tab is not a row either
+     — it carries no STATUS field — so the parser ignores it and names it on stderr through
+     `report_ignored_table_lines`: a truncated row has exactly that shape, so an ignored line could
+     conceal a check, and the explicit opt-in accepts that parsing limitation. The header
+     comparison is exact (field count, empty fields and case preserved), so no data row can be
+     mistaken for it.
   2. **A table-only read can never produce MERGE-OK.** When the structured read
      (`--json name,state,bucket`) did not produce the rows, the parsed human table is *advisory*:
      a non-green row blocks as above, and an all-green or empty table blocks too, with the reason
@@ -264,6 +268,13 @@ def parse_text_checks(text):
         # header with one extra trailing tab — collapsed onto the exact header and vanished,
         # leaving an all-green remainder to report MERGE-OK. Only a whitespace-only line is
         # detected through a strip; each data field is normalised on its own below.
+        #
+        # The same guard skips a nonblank line with no tab, which is not a row either: with no tab
+        # it has no STATUS field to read, and the header (the one line that is not a row) always
+        # carries tabs. A *truncated* row — a check whose remaining fields were dropped — has
+        # exactly that shape, so the skip is not left silent: `ignored_table_lines()` collects
+        # every such line and `report_ignored_table_lines()` names it on stderr once the read has
+        # produced a verdict (round-15 F1).
         if not line.strip() or "\t" not in line or is_text_check_header(line):
             continue
         cells = line.split("\t")
@@ -273,6 +284,35 @@ def parse_text_checks(text):
         state = "COMPLETED" if conclusion != "PENDING" else "PENDING"
         checks.append({"name": name, "state": state, "conclusion": conclusion})
     return checks
+
+
+def ignored_table_lines(text):
+    """The nonblank, tab-less lines `parse_text_checks` cannot read as rows.
+
+    Such a line has no STATUS field, so it is not a check row — and the header, the only line the
+    parser recognises as *not* a row, always carries tabs. A *truncated* row has exactly this shape,
+    which is why the caller reports these lines rather than dropping them silently (round-15 F1).
+    """
+    return [line for line in text.splitlines() if line.strip() and "\t" not in line]
+
+
+def report_ignored_table_lines(lines, allow_table_only):
+    """Print one diagnostic per ignored table line, quoting it — the only trace a truncated row
+    leaves.
+
+    With the table opt-in the diagnostic also states what it means: the operator made the table
+    authoritative, so an ignored line could conceal a check. The merge decision is untouched —
+    observability, not a gate. It is called only once the read produced something to report (rows,
+    or the recognised zero-check state), so an operator error's one-line stderr stays one line.
+    """
+    for line in lines:
+        message = f"pr-merge-check: ignored table line without a tab (not a row): {line!r}"
+        if allow_table_only:
+            message += (
+                "; --allow-table-only-checks accepts the table as authoritative, so this ignored "
+                "line could conceal a check"
+            )
+        print(message, file=sys.stderr)
 
 
 def bucket_check(entry):
@@ -289,12 +329,13 @@ def bucket_check(entry):
     }
 
 
-def fetch_checks(pr, repo):
+def fetch_checks(pr, repo, allow_table_only=False):
     """The PR's check rows, and the surface that produced them: `(rows, "json" | "table")`.
 
     The structured read (`--json name,state,bucket`) is authoritative. When it does not produce
     rows the human table is the fallback, and `"table"` marks the rows advisory: the caller must
     never let a table-only read authorise a merge (the class-closing rule; see `evaluate`).
+    `allow_table_only` only picks the wording of the ignored-line diagnostic below.
     """
     returncode, stdout, _ = sh_raw(
         ["gh", "pr", "checks", str(pr), "--json", "name,state,bucket"], cwd=repo
@@ -318,6 +359,7 @@ def fetch_checks(pr, repo):
     # pending; with a table that parses, those two are the CI state, not a CLI failure.
     returncode, stdout, stderr = sh_raw(["gh", "pr", "checks", str(pr)], cwd=repo)
     checks = parse_text_checks(stdout)
+    ignored = ignored_table_lines(stdout)
     if returncode != 0:
         message = (stderr or stdout).strip()
         # Only the documented check-result exits carry CI state. Any other non-zero exit — gh's 2
@@ -336,12 +378,13 @@ def fetch_checks(pr, repo):
         if not checks:
             # `gh pr checks` exits 1 with "no checks reported" when nothing registered yet (or ever,
             # for a repo with no CI). That is an empty read, not a CLI failure — otherwise the
-            # --allow-no-checks opt-out could never be reached. Genuine errors still raise.
+            # --allow-no-checks opt-out could never be reached — so it falls through to the common
+            # tail below, where the ignored lines are reported like any other read. Genuine errors
+            # still raise.
             lowered = message.lower()
-            if "no checks reported" in lowered or "no check runs found" in lowered:
-                return [], "table"
-            raise GateError(message.splitlines()[0] if message else f"exit {returncode}")
-        if evaluate_checks(checks)["pass"]:
+            if "no checks reported" not in lowered and "no check runs found" not in lowered:
+                raise GateError(message.splitlines()[0] if message else f"exit {returncode}")
+        elif evaluate_checks(checks)["pass"]:
             # A non-zero exit means the read was not complete (gh exits 8 while any check is
             # pending and 1 when one failed), so an all-green parsed table is a partial read —
             # a truncated row or an ignored command error. That is never permission.
@@ -350,6 +393,9 @@ def fetch_checks(pr, repo):
                 "gh pr checks: non-zero exit with an all-green table "
                 f"({detail}); the read was incomplete"
             )
+    # The read produced a verdict, so the lines the parser ignored are named — after every raise
+    # above, because an operator error's stderr is exactly its one line.
+    report_ignored_table_lines(ignored, allow_table_only)
     return checks, "table"
 
 
@@ -552,7 +598,7 @@ def evaluate(
     )
     reasons.extend(gate_reasons)
 
-    checks_rows, checks_source = fetch_checks(pr, repo)
+    checks_rows, checks_source = fetch_checks(pr, repo, allow_table_only_checks)
     checks = evaluate_checks(checks_rows, allow_no_checks=allow_no_checks)
     facts["checks"] = checks
     facts["checks_source"] = checks_source

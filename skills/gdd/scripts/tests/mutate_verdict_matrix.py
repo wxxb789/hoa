@@ -177,15 +177,15 @@ MUTATIONS = [
      '    "bucket/pass": "SUCCESS",\n    "bucket/skipping": "FAILURE",',
      "the skipping bucket is a failure"),
     ("command-error-becomes-empty",
-     """            if "no checks reported" in lowered or "no check runs found" in lowered:
-                return [], "table"
-            raise GateError(message.splitlines()[0] if message else f"exit {returncode}")""",
-     """            if "no checks reported" in lowered or "no check runs found" in lowered:
-                return [], "table"
-            return [], "json\"""",
+     """            lowered = message.lower()
+            if "no checks reported" not in lowered and "no check runs found" not in lowered:
+                raise GateError(message.splitlines()[0] if message else f"exit {returncode}")""",
+     """            lowered = message.lower()
+            if "no checks reported" not in lowered and "no check runs found" not in lowered:
+                return [], "json\"""",
      "an unparseable command error becomes a structured zero-check success"),
     ("all-green-nonzero-returns",
-     """        if evaluate_checks(checks)["pass"]:
+     """        elif evaluate_checks(checks)["pass"]:
             # A non-zero exit means the read was not complete (gh exits 8 while any check is
             # pending and 1 when one failed), so an all-green parsed table is a partial read —
             # a truncated row or an ignored command error. That is never permission.
@@ -327,6 +327,24 @@ MUTATIONS = [
      "the structured read trusts exit 2 (gh's cancellation), so a cancelled read whose stdout "
      "parses is taken as the read instead of falling back to the table; the old structured-exit "
      "dimension named no exit 2, so nothing flipped"),
+
+    # --- round-15 findings --------------------------------------------------
+    ("ignored-line-diagnostic-dropped",
+     """    report_ignored_table_lines(ignored, allow_table_only)
+    return checks, "table\"""",
+     '    return checks, "table"',
+     "the tab-less lines the table parser ignores are never named on stderr, so the only trace of a "
+     "truncated row disappears while the verdict stays green"),
+    ("opt-in-drops-blocking-review",
+     '    if not review["pass"]:',
+     '    if not review["pass"] and not allow_table_only_checks:',
+     "the table opt-in drops a blocking machine-review verdict, though it decides only whether the "
+     "table read is authoritative"),
+    ("opt-in-drops-unresolved-threads",
+     "    if unresolved:",
+     "    if unresolved and not allow_table_only_checks:",
+     "the table opt-in drops the unresolved-thread blocker, though it decides only whether the "
+     "table read is authoritative"),
 ]
 
 

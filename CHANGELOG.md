@@ -7,6 +7,32 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
 
 ### Fixed
 
+- **Round-15 review findings: the row-retention contract is qualified, the ignored line is named, and
+  the table opt-in is pinned against the evidence blockers.** `pr-merge-check.py` stated "only the
+  exact header is skipped: every other line is a row", but the shipped parser also ignored a nonblank
+  line **without a tab** — and a truncated row has exactly that shape — so the replicated run
+  `(0, "build\tpass\nrequired\n", "")` with `--allow-table-only-checks` printed `1 total, 1 ok` and
+  reported MERGE-OK with the `required` line gone without trace. The contract is now qualified where
+  it is stated — the module docstring, the parser, Phase 6 and this entry: only tab-delimited lines
+  other than the exact header are rows; a nonblank line without a tab is not a row, and the explicit
+  opt-in accepts that parsing limitation. The skip is no longer silent: `ignored_table_lines()`
+  collects every nonblank tab-less line of the table read and `report_ignored_table_lines()` prints
+  one `pr-merge-check: ignored table line without a tab (not a row): '…'` diagnostic per line on
+  stderr once the read has produced something to report — an operator error keeps its single stderr
+  line — adding on the opt-in path that the ignored line could conceal a check. The merge decision
+  is unchanged (observability, not a new gate); two cells drive the truncated fixture with and
+  without the opt-in and assert the diagnostic beside the unchanged verdict, and the mutation that
+  drops the diagnostic is registered. Separately, no cell enabled `--allow-table-only-checks`
+  beside blocking *evidence* rather than a blocking *checks* read, so two mutants survived the whole
+  matrix — `if not review["pass"] and not
+  allow_table_only_checks:` and `if unresolved and not allow_table_only_checks:`, each reporting
+  MERGE-OK over a green exit-0 fallback table while the shipped gate blocks with `review` /
+  `threads`. Two cells now pair the opt-in with the page-2 marker and the page-2 unresolved thread;
+  the two mutations are registered (79 -> 82 mutations, 47 -> 50 anchored), and the class of gap is
+  recorded under *Closed* in `tests/COVERAGE_BACKLOG.md`. The matrix now runs 397 cells (390 verdict
+  + 3 stream + 1 sh-trim + 3 boundary) over 9 declared dimensions, and `test_review_evidence.py`
+  stays at its 94 tests.
+
 - **Round-14 review findings: the table opt-in is pinned against the head/gate blockers, and the
   completeness guards count only executed reads.** `--allow-table-only-checks` decides only whether
   the *table* read is authoritative; every cell that enabled it supplied a matching verified head
@@ -22,7 +48,7 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   whose table never ran. Both guards now count a table exit only when the cell's read actually ends
   on the table (`_table_consumed()`), and `guard_self_check()` runs the reviewer's reproduction —
   replace every *consumed* table exit 0 with a pending exit-8 table — requiring both guards to name
-  the missing table exit 0. The matrix now runs 393 cells (386 verdict + 3 stream + 1 sh-trim + 3
+  the missing table exit 0. The matrix then ran 393 cells (386 verdict + 3 stream + 1 sh-trim + 3
   boundary) over 9 declared dimensions.
 
 - **Round-13 review finding: the exit-code domain is declared once, and both read surfaces carry it.**
@@ -248,9 +274,11 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   zero-check read, and the two opt-ins are independent — the table opt-in alone makes an empty
   table the zero-check state, which only `--allow-no-checks` forgives). Every cell drives `main()`
   with `subprocess.run()` mocked and compares
-  the **complete** verdict line plus the printed `checks:` tally, so a failing read cannot pass as a
-  pending one (`verdict: BLOCKED: checks` is a prefix of `verdict: BLOCKED: checks pending`) — 386
-  verdict cells + 3 stream cells + 1 sh-trim cell + 3 boundary cells over 9 declared dimensions, plus
+  the **complete** verdict line plus the printed `checks:` tally — and, where a cell names it, the
+  stderr diagnostic — so a failing read cannot pass as a
+  pending one (`verdict: BLOCKED: checks` is a prefix of `verdict: BLOCKED: checks pending`) — 390
+  verdict cells + 3 stream cells + 1 sh-trim cell + 3 boundary cells (397 cells) over 9 declared
+  dimensions, plus
   the 10-entry golden call
   log that pins every `subprocess.run()` invocation the gate issues. `dimension_problems()` asserts
   that every value of every declared dimension is represented by at least one cell — and by at least
@@ -260,11 +288,12 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   live output in
   `tests/gh_checks_fixtures.py` is a matrix input as well: a value gh prints that the declared
   vocabulary does not know fails the matrix instead of reaching the gate as an unknown token.
-  `tests/mutate_verdict_matrix.py` applies 79 in-memory mutations of the module — 47 anchored plus
+  `tests/mutate_verdict_matrix.py` applies 82 in-memory mutations of the module — 50 anchored plus
   two generated per declared vocabulary entry, reclassifying that token into every other
   classification — and requires each to flip at least one cell (or change the golden call log),
   naming the survivor loudly if one does not. Both run in CI. The paths the artefacts still do not
-  pin are queued, by consequence, in `tests/COVERAGE_BACKLOG.md`.
+  pin are queued, by consequence, in `tests/COVERAGE_BACKLOG.md`, which also keeps the gaps already
+  found and closed.
 
 ## [0.1.61] — 2026-11-14
 

@@ -243,7 +243,8 @@ NAME_PREFIXED_PENDING_TABLE = (TABLE_HEADER + "build\tpass\t1m0s\thttps://exampl
                                "NAME-required\tpending\t2m0s\thttps://example/2\t\n")
 REAL_GH_TABLE = ("release\tskipping\t0\thttps://example/runs/1/job/2\t\n"
                  "test\tpass\t1m52s\thttps://example/runs/1/job/3\t\n")
-# A truncated row: the trailing line carries no tab, so it is not a row and disappears.
+# A truncated row: the trailing line carries no tab, so it is not a row — it is ignored, and
+# `report_ignored_table_lines()` names it on stderr, which is the only trace a truncated row leaves.
 TRUNCATED_TABLE = "build\tpass\t1s\thttps://example/1\t\nrequired\n"
 # The unordered-header shape that used to vanish: `STATUS\tNAME` is a row, not the header.
 UNORDERED_HEADER_TABLE = "build\tpass\nSTATUS\tNAME\n"
@@ -270,19 +271,21 @@ JSON_PASS_PENDING = _json([{"name": "build", "state": "SUCCESS", "bucket": "pass
 
 Cell = namedtuple("Cell", "id json_result table_result allow_no_checks exit_code verdict reason "
                           "checks why allow_table_only error_contains comment_pages thread_pages "
-                          "verified_head gates_rc",
-                  defaults=(None, None, HEAD, 0))
+                          "verified_head gates_rc stderr_contains",
+                  defaults=(None, None, None, HEAD, 0, None))
 StreamCell = namedtuple("StreamCell", "id stdout stderr exit_code why")
 ShCell = namedtuple("ShCell", "id stdout stderr exit_code expected why")
 
 
 def cell(cid, json_result, table_result, allow_no_checks, exit_code, verdict, reason, checks, why,
          allow_table_only=False, error_contains=None, comment_pages=None, thread_pages=None,
-         verified_head=HEAD, gates_rc=0):
+         verified_head=HEAD, gates_rc=0, stderr_contains=None):
     """One verdict cell. `checks` is the expected `checks:` tally, or None when there is no read.
 
     `error_contains` is the fragments the one-line stderr of an ERROR cell must carry — so an
     operator error's own exit code and diagnostic are pinned, not merely its exit status.
+    `stderr_contains` is the fragments a non-ERROR cell's stderr must carry — the observability the
+    gate prints beside a verdict, which a mutant could otherwise drop silently (round-15 F1).
     `comment_pages` and `thread_pages` are the multi-page evidence the fake serves: a list of
     comment batches (page 1 first) and a list of `(nodes, hasNextPage, endCursor)` thread pages.
     `None` keeps the single terminal page every other cell uses, so only a cell that names them
@@ -293,7 +296,7 @@ def cell(cid, json_result, table_result, allow_no_checks, exit_code, verdict, re
     """
     return Cell(cid, json_result, table_result, allow_no_checks, exit_code, verdict, reason,
                 checks, why, allow_table_only, error_contains, comment_pages, thread_pages,
-                verified_head, gates_rc)
+                verified_head, gates_rc, stderr_contains)
 
 
 # --- the exit-code domain, declared once for both read surfaces -------------
@@ -426,6 +429,24 @@ CELLS = [
     cell("table-truncated-exit-8-flag", JSON_ABSENT, (8, TRUNCATED_TABLE, ""), True, 2, "ERROR",
          None, None, "a dropped row is not a zero-check read"),
 
+    # --- an ignored tab-less line leaves a trace (round-15 F1) -------------
+    # `parse_text_checks` cannot read a nonblank line with no tab as a row — it has no STATUS field
+    # — and a truncated row has exactly that shape. The parser keeps ignoring it, so the merge
+    # decision is unchanged, but the skip is no longer silent: the diagnostic names the line, and
+    # with the table opt-in it adds that the ignored line could conceal a check.
+    cell("table-truncated-line-opt-in", JSON_ABSENT, (0, TRUNCATED_TABLE, ""), False, 0,
+         "MERGE-OK", None, (1, 1, 0, 0),
+         "with --allow-table-only-checks the truncated tab-less line is still ignored and the "
+         "green row merges unchanged, but its diagnostic is printed, naming the line and what it "
+         "could conceal", allow_table_only=True,
+         stderr_contains=("ignored table line without a tab (not a row): 'required'",
+                          "could conceal a check")),
+    cell("table-truncated-line", JSON_ABSENT, (0, TRUNCATED_TABLE, ""), False, 1, "BLOCKED",
+         "checks unreadable", (1, 1, 0, 0),
+         "without the opt-in the same ignored line is reported beside the table-only verdict, so "
+         "the diagnostic is not conditional on the opt-in",
+         stderr_contains=("ignored table line without a tab (not a row): 'required'",)),
+
     # --- table path: reported CI state (invariants 4, 6) -------------------
     cell("table-mixed-exit-8", JSON_ABSENT, (8, MIXED_TABLE, ""), False, 1, "BLOCKED", "checks",
          (3, 1, 1, 1), "a failed row blocks; the non-zero exit is the CI state it reports"),
@@ -504,7 +525,9 @@ CELLS = [
     # `gh pr checks` prints NAME then STATUS, the full five column names in print order. A set
     # comparison accepted `STATUS\tNAME` as the header, so the row — whose verdict word is unknown
     # — vanished and an all-green remainder printed MERGE-OK. Only the exact header is skipped;
-    # every other line is a row, and a row whose verdict word is unknown blocks.
+    # every other *tab-delimited* line is a row, and a row whose verdict word is unknown blocks. A
+    # nonblank line without a tab is not a row either — it is ignored, with a stderr diagnostic
+    # (`table-truncated-line*`).
     cell("table-unordered-header-row", JSON_ABSENT, (0, UNORDERED_HEADER_TABLE, ""), False, 1,
          "BLOCKED", "checks", (2, 1, 0, 1),
          "`STATUS\tNAME` is a row with the unknown verdict NAME, beside a passing row"),
@@ -905,6 +928,28 @@ CELLS += [
          "threads", (1, 1, 0, 0),
          "an unresolved review thread on page 2 is counted, so stopping after page 1 cannot "
          "report MERGE-OK with a thread still open", thread_pages=THREAD_PAGES_WITH_UNRESOLVED),
+]
+
+
+# --- the table opt-in does not waive the evidence blockers (round-15 F2) ----
+# `--allow-table-only-checks` decides only whether the *table* read is authoritative: the
+# machine-review marker and the review threads are read and judged after it, on their own evidence.
+# Every cell that enabled the opt-in beside blocking evidence paired it with a blocking *checks*
+# read, so a mutant that skips those clauses when the opt-in is set — `if not review["pass"] and
+# not allow_table_only_checks:` / `if unresolved and not allow_table_only_checks:` — reported
+# MERGE-OK over a green table while the shipped gate blocks. Each cell pairs the opt-in and a green
+# exit-0 fallback table with one blocker whose evidence lives on a continuation page.
+CELLS += [
+    cell("rule-table-opt-in-does-not-waive-review", JSON_ABSENT, (0, GREEN_TABLE, ""), False, 1,
+         "BLOCKED", "review", (2, 2, 0, 0),
+         "the table opt-in does not waive the machine-review clause: the blocking marker on "
+         "comment page 2 still blocks, though the authoritative table is green",
+         allow_table_only=True, comment_pages=COMMENT_PAGES_WITH_MARKER),
+    cell("rule-table-opt-in-does-not-waive-threads", JSON_ABSENT, (0, GREEN_TABLE, ""), False, 1,
+         "BLOCKED", "threads", (2, 2, 0, 0),
+         "the table opt-in does not waive the unresolved-thread clause: the thread on page 2 is "
+         "still counted, though the authoritative table is green",
+         allow_table_only=True, thread_pages=THREAD_PAGES_WITH_UNRESOLVED),
 ]
 
 
@@ -1398,6 +1443,9 @@ def check_cell(module, cell_):
     observed_checks = lines_with_prefix(out, "checks: ")
     if observed_checks != [expected_checks]:
         return "expected checks line %r, got %r" % (expected_checks, observed_checks)
+    for fragment in cell_.stderr_contains or ():
+        if fragment not in err:
+            return "expected the stderr diagnostic to carry %r, got %r" % (fragment, err.strip())
     return None
 
 
