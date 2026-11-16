@@ -196,8 +196,14 @@ not finish under its own control — the runner timed it out, or a signal killed
 group terminated (POSIX only, through `os.killpg`) and the processes still holding that scratch
 stopped (found by the cwd they were started in or the scratch paths in their environment, from
 `/proc`), before that scratch is deleted. Both parts signal only what the run can prove is its own —
-the group of a command that is still unreaped, a process that still points into the suite's own
-scratch — and report teardown unverified instead of signalling a group they cannot prove is theirs.
+the group of a command the kernel still holds as the run's unreaped child (probed with `waitid` +
+`WNOWAIT`, the same observation that keeps a signalled command unreaped; a host with no such probe
+reaps inside the exit observation, so a reaped command cannot be proven and its teardown is reported
+unverified), a process that still points into the suite's own scratch — and report teardown
+unverified instead of signalling a group they cannot prove is theirs. The group is checked before a
+command is reaped, so a clean exit that leaves same-group members behind is still torn down while
+the group is provable; and an exit that can no longer be waited for (an inherited `SIGCHLD`
+disposition lets the kernel reap it) settles as an error rather than taking the run down.
 
 | Gate command (CI step) | Protects |
 |---|---|

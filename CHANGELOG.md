@@ -48,12 +48,18 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   through `os.killpg`) and the processes still holding its task-local scratch stopped — identified
   by the cwd they were started in or the scratch paths in their environment, from `/proc` — before
   that scratch is deleted; and the record says which outcome happened instead of claiming a teardown
-  nothing verified. Every signal has to be justified by identity this run recorded itself: a group is
-  signalled only while the command's own process is still unreaped — the kernel does not recycle an
-  unreaped child's pid, so a group id that still equals that process's own group cannot be a
-  recycled number — and a scratch holder only while it still points into the suite's own task-local
-  scratch; where neither proof holds, nothing is signalled and the record says teardown is
-  unverified. Both launcher suites declare the detached resource its sweep owns in
+  nothing verified. Every signal has to be justified by identity the run recorded itself: a group is
+  signalled only while the kernel still holds the command's own process as this run's unreaped child
+  — `waitid` with `WNOWAIT` is that probe, the reservation that keeps a pid which still names its own
+  group from being a recycled number — and a scratch holder only while it still points into the
+  suite's own task-local scratch; where neither proof holds, nothing is signalled and the record says
+  teardown is unverified. The check runs before a command is reaped, so a command that exits cleanly
+  and still leaves same-group members behind is torn down while its group is still provable; on a
+  host where Python exposes no `waitid`/`WNOWAIT` (macOS before 3.13) the exit observation reaps the
+  command instead, whose group teardown — a signal-killed command's above all — is then recorded
+  unverified rather than assumed; and a child the kernel reaps outright (an inherited
+  `SIGCHLD=SIG_IGN`) settles as an error with an unverified teardown instead of crashing the
+  discoverer. Both launcher suites declare the detached resource its sweep owns in
   `scripts/test_manifest.toml`.
 - The suite `PATH` prepends the selected interpreter's own directory without resolving it: a POSIX
   virtual environment's `bin/python3` is a symlink to the base interpreter, and resolving it handed a
