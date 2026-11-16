@@ -20,6 +20,11 @@ Retained layout over the cap:
     {"type":"truncated","dropped_bytes":N,"dropped_lines":M}
     <most recent lines, <= max_bytes - marker reserve>
 
+The newest line is never dropped: when one line alone exceeds the tail region's
+budget it is retained whole, and the file may exceed the bound by that one line.
+Drops only ever take the oldest retained lines, and `dropped_bytes` /
+`dropped_lines` count exactly those.
+
 Under the cap the file is byte-for-byte the input stream. Sidecar counters are
 written atomically to RUN_DIR/events.stats.json every 64 KiB of input and at
 exit; the session id from the first `{"type":"session"}` event is persisted to
@@ -296,7 +301,11 @@ class Writer:
             self.head_closed = True
             self.tail.append(line)
             self.tail_bytes += len(line)
-            while self.tail_bytes > self.tail_budget and self.tail:
+            # The newest line is never a drop: it is the event a finalizing reader
+            # needs (the run's own `final`). A single line larger than the whole
+            # tail budget is therefore retained whole — the file may exceed the
+            # bound by that one line — and only older retained lines are dropped.
+            while len(self.tail) > 1 and self.tail_bytes > self.tail_budget:
                 dropped = self.tail.popleft()
                 self.tail_bytes -= len(dropped)
                 self.dropped_bytes += len(dropped)
@@ -306,8 +315,13 @@ class Writer:
                 self._compact()
             else:
                 self._append(line)
+            # The retained tail's overshoot (the one oversized newest line) is a
+            # legitimate part of the retained size, so the on-disk file is measured
+            # against bound + slack + overshoot: the hysteresis that stops a
+            # compaction per line survives, without compacting the newest line away.
             if self.truncated and self.disk_bytes > (
                 self.head_bytes + self.max_bytes + self.slack
+                + max(0, self.tail_bytes - self.tail_budget)
             ):
                 self._compact()
         if self.total_bytes - self.last_stats_total >= SIDECAR_EVERY:
