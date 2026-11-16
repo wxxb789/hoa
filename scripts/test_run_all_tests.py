@@ -217,21 +217,37 @@ with open(sys.argv[1], "w", encoding="utf-8") as handle:
     handle.write(f"{child.pid}\\n")
 '''
 
+# One provisioning command that leaves a same-group worker behind — environment emptied, cwd `/`,
+# nothing a scratch sweep can match — and then exits 1: a normal failure, not a timeout and not a
+# death by signal, so only the pre-reap check's own record can account for the worker.
+FAILING_PROVISION = '''import subprocess
+import sys
+
+child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(120)"], env={}, cwd="/")
+with open(sys.argv[1], "w", encoding="utf-8") as handle:
+    handle.write(f"{child.pid}\\n")
+raise SystemExit(1)
+'''
+
 # A suite that records its own pid and exits 0 without cleanup — a reaper outside this run can
 # block in `os.waitpid` on that pid and take the status the moment the suite ends, leaving the
-# runner a child it can no longer wait for.
+# runner a child it can no longer wait for.  The pid file is replaced atomically (temp + rename):
+# a poller that sees the file must never read a half-written, truncated one.
 REAPED_SUITE = '''import os
 import time
 
-with open(os.environ["PID_FILE"], "w", encoding="utf-8") as handle:
+path = os.environ["PID_FILE"]
+with open(path + ".tmp", "w", encoding="utf-8") as handle:
     handle.write(str(os.getpid()))
+os.replace(path + ".tmp", path)
 time.sleep(0.2)
 '''
 
 # A command leader that ignores SIGTERM, starts a same-group child that ignores it too, records
-# both pids, and exits by itself inside the first kill-grace window.  A test that blocks in
-# `os.waitpid` on the leader takes the leader's status the moment it exits, so the kernel's hold on
-# it — the anchor every escalation round re-probes — is gone before the second round.
+# both pids atomically, and exits by itself inside the first kill-grace window.  A test that blocks
+# in `os.waitpid` on the leader takes the leader's status the moment it exits, so the kernel's hold
+# on it — the identity the escalation must re-pin before every round — is gone before the second
+# round.
 ANCHOR_LEADER = '''import os
 import signal
 import subprocess
@@ -242,10 +258,33 @@ signal.signal(signal.SIGTERM, signal.SIG_IGN)
 child = subprocess.Popen([sys.executable, "-c",
                           "import signal, time; signal.signal(signal.SIGTERM, signal.SIG_IGN);"
                           " time.sleep(60)"])
-with open(sys.argv[1], "w", encoding="utf-8") as handle:
+path = os.environ["PID_FILE"]
+with open(path + ".tmp", "w", encoding="utf-8") as handle:
     handle.write(f"{os.getpid()} {child.pid}\\n")
+os.replace(path + ".tmp", path)
 time.sleep(0.5)
 os._exit(0)
+'''
+
+# A leader that ignores SIGTERM, starts a same-group child that ignores it too, records both pids
+# atomically and then keeps running: the test's own instrumentation ends it (and a thread it does
+# not control reaps it) at the moment the teardown's evidence enumeration runs.
+HELD_LEADER = '''import os
+import signal
+import subprocess
+import sys
+import time
+
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+child = subprocess.Popen([sys.executable, "-c",
+                          "import signal, time; signal.signal(signal.SIGTERM, signal.SIG_IGN);"
+                          " time.sleep(60)"])
+path = os.environ["PID_FILE"]
+with open(path + ".tmp", "w", encoding="utf-8") as handle:
+    handle.write(f"{os.getpid()} {child.pid}\\n")
+os.replace(path + ".tmp", path)
+while True:
+    time.sleep(1)
 '''
 
 
@@ -309,8 +348,15 @@ def process_running(pid: int) -> bool:
     return True
 
 
-def kill_quietly(pid: int, signum: int = signal.SIGKILL) -> None:
-    """Signal `pid`, tolerating a process that is already gone."""
+def kill_quietly(pid: int, signum: int | None = None) -> None:
+    """Signal `pid`, tolerating a process that is already gone.
+
+    The signal is resolved when a guarded cleanup path runs, never at import: `signal.SIGKILL` does
+    not exist on every platform, and a default argument would be evaluated before any capability
+    skip could protect the module that uses it.
+    """
+    if signum is None:
+        signum = getattr(signal, "SIGKILL", signal.SIGTERM)
     with contextlib.suppress(ProcessLookupError, PermissionError):
         os.kill(pid, signum)
 
@@ -323,6 +369,29 @@ class PatchingTestCase(unittest.TestCase):
         saved = getattr(target, attribute)
         setattr(target, attribute, value)
         self.addCleanup(setattr, target, attribute, saved)
+
+
+def can_deliver_signals() -> bool:
+    """Whether this host can deliver a teardown signal at all (the runner's own delivery gates).
+
+    Successful delivery needs pidfds, `/proc` (start times and group members) and `waitid` with
+    `WNOWAIT`; a test that expects a signal to arrive must be guarded by this, while the refusal
+    cases pin what each missing capability does.
+    """
+    return (runner.PIDFD_PINNING and runner.PROC_ROOT.is_dir() and runner.WAITID_WNOWAIT
+            and hasattr(os, "killpg") and hasattr(signal, "SIGCHLD"))
+
+
+def pidfd_target(fd: int) -> int | None:
+    """The pid a pidfd refers to, from the kernel's own `/proc/self/fdinfo` (`Pid:`), or None."""
+    try:
+        with open(Path("/proc/self/fdinfo") / str(fd), encoding="utf-8") as handle:
+            for line in handle:
+                if line.startswith("Pid:"):
+                    return int(line.split()[1])
+    except (OSError, ValueError):
+        return None
+    return None
 
 
 SHIM_TOOL_FIXTURE = '''import json
@@ -959,121 +1028,186 @@ class TeardownRecordTests(unittest.TestCase):
 
 
 class TeardownOwnershipTests(PatchingTestCase):
-    """Every signal must be justified by identity this run recorded itself (module docstring)."""
+    """Every signal must be justified by identity pinned at delivery (module docstring)."""
 
     def setUp(self):
         ARTIFACTS.mkdir(parents=True, exist_ok=True)
         self.addCleanup(shutil.rmtree, ARTIFACTS, ignore_errors=True)
         self.log_path = ARTIFACTS / "ownership.log"
-        # Ownership rests on the run's own `SIGCHLD` disposition (`establish_exit_disposition`);
-        # the end-to-end runs take that startup step in `main`, and these unit tests stand in for
-        # it instead of inheriting whatever this test host happens to have.
-        establish = getattr(runner, "establish_exit_disposition", None)
-        if establish is not None and hasattr(signal, "SIGCHLD"):
+        # Delivery rests on the run's own `SIGCHLD` disposition (`establish_exit_disposition`); the
+        # end-to-end runs take that startup step in `main`, and these unit tests stand in for it
+        # instead of inheriting whatever this test host happens to have.  Both the disposition and
+        # the module state the step sets are restored, so no other test inherits either.
+        self.patch(runner, "EXIT_DISPOSITION", False)
+        if hasattr(signal, "SIGCHLD"):
             saved = signal.getsignal(signal.SIGCHLD)
             self.addCleanup(signal.signal, signal.SIGCHLD, saved)
-            self.assertTrue(establish(), "the test host will not let the run establish it")
+            self.assertTrue(runner.establish_exit_disposition(),
+                            "the test host will not let the run establish its own disposition")
 
-    def spawn(self, *, code: str = "import time; time.sleep(60)") -> subprocess.Popen:
+    def spawn(self, *, code: str = "import time; time.sleep(60)",
+              env: dict[str, str] | None = None) -> subprocess.Popen:
         """A child that is a session (and process group) leader, and always reaped."""
-        process = subprocess.Popen([sys.executable, "-c", code], start_new_session=True)
+        process = subprocess.Popen([sys.executable, "-c", code], start_new_session=True,
+                                   env={**os.environ, **env} if env else None)
         self.addCleanup(process.wait)
         self.addCleanup(process.kill)
         return process
 
-    @unittest.skipUnless(hasattr(os, "killpg"), "POSIX process groups only")
-    def test_group_teardown_refuses_a_recycled_group_id(self):
-        """A reaped command's number is history; even if it now names a live group, it is not ours.
+    def record_deliveries(self, deliveries: list) -> None:
+        """Record every delivery and every pidfd the runner opens, and deliver nothing for real.
 
-        Model: the command finished and this run reaped it, and the kernel recycled its number onto
-        an unrelated live group — an intercepted `getpgid` answers with one, so the number looks
-        live and self-consistent to anything that has only the number.  A bare-number teardown
-        signals that group; this one must refuse and report teardown unverified.
+        The log holds `("open", pid)` per pin the runner opens and
+        `("pidfd"|"kill"|"killpg", target, signum)` per delivery it attempts; signal 0 is the
+        non-destructive liveness probe, never a delivery.  A pidfd's target is the pid the runner
+        opened it for, with the kernel's own `/proc/self/fdinfo` as the fallback — fdinfo alone
+        reports no pid for a handle whose process is already gone, which is exactly when the target
+        must still be named.  Recording instead of forwarding keeps a fixture alive long enough for
+        the escalation to be observed, and keeps every refusal test safe from a real signal.
+        """
+        fds: dict[int, int] = {}
+        real_kill, real_killpg, real_open = os.kill, os.killpg, os.pidfd_open
+
+        def opening(pid: int, *flags: int) -> int:
+            fd = real_open(pid, *flags)
+            if not flags:  # `subprocess`'s own wait path passes one; that is not the run's pin
+                fds[fd] = pid
+                deliveries.append(("open", pid))
+            return fd
+
+        def kill(pid: int, signum: int) -> None:
+            if signum:
+                deliveries.append(("kill", pid, signum))
+            real_kill(pid, signum)
+
+        def killpg(group: int, signum: int) -> None:
+            if signum:
+                deliveries.append(("killpg", group, signum))
+            real_killpg(group, signum)
+
+        def send(fd: int, signum: int) -> None:
+            deliveries.append(("pidfd", fds.get(fd) or pidfd_target(fd) or -1, signum))
+
+        self.patch(os, "kill", kill)
+        self.patch(os, "killpg", killpg)
+        self.patch(os, "pidfd_open", opening)
+        if hasattr(signal, "pidfd_send_signal"):
+            self.patch(signal, "pidfd_send_signal", send)
+
+    def deliveries(self, events: list, signum: int | None = None) -> list[tuple[str, int]]:
+        """The recorded deliveries as (handle, pid), optionally only those of one signal."""
+        return [(handle, pid) for handle, pid, *rest in events
+                if handle != "open" and (signum is None or rest[0] == signum)]
+
+    def anchor_fixture(self, fixture: str) -> tuple[runner.Spawned, int, int]:
+        """Spawn a leader fixture that records its own and its same-group child's pids.
+
+        Returns the spawned command (its identity recorded at spawn, as the run does), the leader's
+        pid and the child's pid; both are killed when the test ends.
+        """
+        pid_file = ARTIFACTS / f"anchor-{time.monotonic_ns()}.txt"
+        pid_file.unlink(missing_ok=True)
+        process = self.spawn(code=fixture, env={"PID_FILE": str(pid_file)})
+        deadline = time.monotonic() + 10
+        while not pid_file.exists() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        leader_pid, child_pid = (int(value) for value in pid_file.read_text().split())
+        self.addCleanup(kill_quietly, child_pid)
+        self.assertEqual(leader_pid, process.pid, "the fixture's pid file is not the leader's")
+        return runner._spawned(process), leader_pid, child_pid
+
+    @unittest.skipUnless(runner.PROC_ROOT.is_dir() and hasattr(os, "killpg"),
+                         "the model reads /proc and POSIX group ids")
+    def test_group_teardown_refuses_a_recycled_group_id(self):
+        """A reaped command's pid is history, however complete the recycle looks to a field reader.
+
+        Model: the command finished and this run reaped it, and the number now answers the one
+        readable question the run asks about an instance — its start time, here with the very value
+        recorded at spawn — so nothing field-shaped can tell the difference.  The pin is not
+        field-shaped: `pidfd_open` cannot be opened for a pid the kernel has released, so the
+        teardown must refuse every delivery and report teardown unverified, and the unrelated
+        process the number now names must not be signalled.
         """
         victim = self.spawn()
         command = self.spawn(code="pass")
-        command.wait()  # reaped: the run no longer holds the pid, so it no longer owns the group
-        real_getpgid = os.getpgid
-        self.patch(os, "getpgid",
-                   lambda pid: victim.pid if pid == command.pid else real_getpgid(pid))
-        attempts: list = []
-        self.patch(os, "kill", lambda pid, signum: attempts.append(("kill", pid, signum)))
-        self.patch(os, "killpg", lambda group, signum: attempts.append(("killpg", group, signum)))
+        spawned = runner._spawned(command)  # recorded at spawn, the way the run records it
+        command.wait()  # reaped: the pid no longer names the instance this run spawned
+        self.patch(runner, "_start_time", lambda pid: spawned.start)
+        deliveries: list = []
+        self.record_deliveries(deliveries)
         with self.log_path.open("ab") as log:
-            teardown = runner._terminate_group(command, log)
-        self.assertEqual(attempts, [],
+            teardown = runner._terminate_group(spawned, log)
+        self.assertEqual(self.deliveries(deliveries), [],
                          "the teardown signalled a group it cannot prove is this run's")
         self.assertFalse(teardown.verified)
         self.assertIn("unverified", teardown.describe())
         self.assertIsNone(victim.poll(), "the unrelated group's leader was signalled")
 
     @unittest.skipUnless(hasattr(os, "killpg"), "POSIX process groups only")
-    def test_group_teardown_reaches_the_group_without_proc(self):
-        """The group is signalled through `os.killpg`, so a host without /proc still stops it.
+    def test_group_teardown_refuses_without_the_proc_evidence_it_cannot_pin(self):
+        """A host without `/proc` cannot read an identity, so no delivery can be justified.
 
-        Model: POSIX with the group API but no `/proc` (macOS).  A teardown that starts from /proc
-        enumeration sends nothing there; this one signals the group, and only its final observation
-        is limited by the platform.  Delivery is real, so the group really empties.
+        Model: POSIX with the group API but no `/proc` (macOS).  The group number is not a target
+        in its own right — nothing about it can be proven — and no member's start time can be read,
+        so the teardown must signal nothing at all and record the limit.
         """
-        victim = self.spawn()
-        attempts: list = []
-        real_killpg = os.killpg
-
-        def deliver(group: int, signum: int) -> None:
-            attempts.append((group, signum))
-            real_killpg(group, signum)
-
-        self.patch(os, "killpg", deliver)
+        process = self.spawn()
+        spawned = runner._spawned(process)
         self.patch(runner, "PROC_ROOT", Path("/nonexistent-proc"))
         self.patch(runner, "KILL_GRACE_SECONDS", 0.5)
+        deliveries: list = []
+        self.record_deliveries(deliveries)
         with self.log_path.open("ab") as log:
-            teardown = runner._terminate_group(victim, log)
-        self.assertIn((victim.pid, signal.SIGTERM), attempts,
-                      "the group was not signalled through os.killpg without /proc")
-        self.assertIsNotNone(victim.poll(), "the signalled group's leader is still running")
-        self.assertIn("process group terminated", teardown.describe())
+            teardown = runner._terminate_group(spawned, log)
+        self.assertEqual(self.deliveries(deliveries), [],
+                         "a delivery was attempted with no /proc to read an identity from")
+        self.assertFalse(teardown.verified)
+        self.assertIn("/proc", teardown.describe())
+        self.assertNotIn("process group terminated", teardown.describe())
+        self.assertIsNone(process.poll(), "the probe's own child must stay untouched")
 
-    @unittest.skipUnless(hasattr(os, "waitid") and hasattr(os, "WNOWAIT"),
-                         "the observation uses waitid(WNOWAIT)")
+    @unittest.skipUnless(runner.WAITID_WNOWAIT and runner.PIDFD_PINNING,
+                         "the observation is waitid(WNOWAIT) and the identity is a pidfd")
     def test_an_observed_exit_leaves_the_pid_reserved_for_the_teardown(self):
-        """The exit is observed without reaping, so the ownership proof outlives the command.
+        """The exit is observed without reaping, so the identity recorded at spawn still pins.
 
         This is what still lets a signal-killed suite be torn down: the command is dead, but its
         pid — and with it the group it leads — stays reserved until this run reaps it itself.
         """
-        exited = self.spawn(code="import sys; sys.exit(3)")
-        self.assertEqual(runner._observe_exit(exited, 5), (3, False))
-        self.assertIsNone(exited.returncode, "the observation reaped the command")
-        self.assertEqual(os.getpgid(exited.pid), exited.pid,
+        spawned = runner._spawned(self.spawn(code="import sys; sys.exit(3)"))
+        self.assertEqual(runner._observe_exit(spawned.process, 5), (3, False))
+        self.assertIsNone(spawned.process.returncode, "the observation reaped the command")
+        self.assertEqual(os.getpgid(spawned.pid), spawned.pid,
                          "the pid stopped naming the group the teardown must still prove")
-        killed = self.spawn()
+        pin, note = runner._pin_identity(spawned.pid, recorded=spawned.start)
+        self.assertIsNotNone(pin, f"a zombie's recorded identity is no longer pinnable: {note}")
+        pin.close()
+        killed = runner._spawned(self.spawn())
         os.kill(killed.pid, signal.SIGKILL)
-        self.assertEqual(runner._observe_exit(killed, 5), (-signal.SIGKILL, False))
-        self.assertIsNone(killed.returncode, "the observation reaped the signalled command")
+        self.assertEqual(runner._observe_exit(killed.process, 5), (-signal.SIGKILL, False))
+        self.assertIsNone(killed.process.returncode, "the observation reaped the signalled command")
 
-    @unittest.skipUnless(runner.WAITID_WNOWAIT, "the anchor is the waitid(WNOWAIT) probe")
+    @unittest.skipUnless(runner.WAITID_WNOWAIT and runner.PIDFD_PINNING,
+                         "a reaped pid is refused by the identity pin itself")
     def test_an_externally_reaped_child_is_no_longer_this_runs_to_signal(self):
-        """A reaper outside `Popen` leaves `returncode` at None; the kernel probe is the anchor.
+        """A reaper outside `Popen` leaves `returncode` at None; the identity pin is the proof.
 
-        Model: another waiter reaped the command (`os.waitpid`), and the pid's number was recycled
-        onto a group that still looks self-consistent to `getpgid`.  The cached field — the old
-        proof — cannot see the external reap; `waitid(WEXITED | WNOWAIT | WNOHANG)` raises once the
-        child is gone, so the teardown must refuse the number and report teardown unverified.
+        Model: another waiter reaped the command (`os.waitpid`) — its number no longer names
+        anything, and the cached field cannot see that.  The start time is unreadable and
+        `pidfd_open` raises for the pid, so the teardown must refuse it and report teardown
+        unverified rather than signal a number whose content it can no longer ask about.
         """
-        process = self.spawn(code="pass")
-        os.waitpid(process.pid, 0)  # reaped outside Popen: the cached returncode stays None
-        self.assertIsNone(process.returncode, "the external reap must stay invisible to Popen")
-        real_getpgid = os.getpgid
-        self.patch(os, "getpgid",
-                   lambda pid: process.pid if pid == process.pid else real_getpgid(pid))
-        self.assertIsNone(runner._owned_group(process),
-                          "a pid the kernel no longer holds as this run's child is not an anchor")
-        attempts: list = []
-        self.patch(os, "kill", lambda pid, signum: attempts.append(("kill", pid, signum)))
-        self.patch(os, "killpg", lambda group, signum: attempts.append(("killpg", group, signum)))
+        spawned = runner._spawned(self.spawn(code="pass"))
+        os.waitpid(spawned.pid, 0)  # reaped outside Popen: the cached returncode stays None
+        self.assertIsNone(spawned.process.returncode,
+                          "the external reap must stay invisible to Popen")
+        claim, note = runner._claim_group(spawned)
+        self.assertIsNone(claim, f"a pid the kernel no longer holds is no identity to pin: {note}")
+        deliveries: list = []
+        self.record_deliveries(deliveries)
         with self.log_path.open("ab") as log:
-            teardown = runner._terminate_group(process, log)
-        self.assertEqual(attempts, [],
+            teardown = runner._terminate_group(spawned, log)
+        self.assertEqual(self.deliveries(deliveries), [],
                          "the teardown signalled a group the kernel no longer reserves for it")
         self.assertFalse(teardown.verified)
         self.assertIn("unverified", teardown.describe())
@@ -1093,20 +1227,26 @@ class TeardownOwnershipTests(PatchingTestCase):
 
     @unittest.skipUnless(hasattr(os, "killpg"), "POSIX process groups only")
     def test_an_unowned_live_command_is_refused_without_claiming_survivors(self):
-        """Nothing was signalled to an unowned live process, so nothing "survived SIGKILL".
+        """Nothing was signalled to a command whose identity was never recorded, so nothing
+        "survived SIGKILL".
 
-        Model: ownership cannot be established (`_owned_group` answers None) while the command is
-        still running.  The refusal must not wait out the kill grace on a process nothing stopped,
-        and the record must not borrow the survivor wording of a signalled process.
+        Model: the run holds a live command but never recorded its identity — the start time could
+        not be read when it was spawned — so no delivery can be justified.  The refusal must not
+        wait out the kill grace on a process nothing stopped, and the record must not borrow the
+        survivor wording of a signalled process.
         """
         process = self.spawn(code="import time; time.sleep(60)")
-        self.patch(runner, "_owned_group", lambda owned: None)
+        spawned = runner.Spawned(process=process, start=None)
         self.patch(runner, "KILL_GRACE_SECONDS", 5.0)
+        deliveries: list = []
+        self.record_deliveries(deliveries)
         started = time.monotonic()
         with self.log_path.open("ab") as log:
-            teardown = runner._terminate_group(process, log)
+            teardown = runner._terminate_group(spawned, log)
         self.assertLess(time.monotonic() - started, 2.0,
-                        "an unowned command was waited out instead of refused")
+                        "an unpinnable command was waited out instead of refused")
+        self.assertEqual(self.deliveries(deliveries), [],
+                         "a delivery was attempted with no identity to pin")
         self.assertEqual(teardown.survivors, ())
         self.assertFalse(teardown.verified)
         self.assertIn("unverified", teardown.describe())
@@ -1116,46 +1256,44 @@ class TeardownOwnershipTests(PatchingTestCase):
     def test_a_clean_exit_whose_group_cannot_be_checked_is_recorded_unverified(self):
         """When the group cannot be checked before the reap, the record must not claim it emptied.
 
-        Model: the ownership proof is gone before the check (a host without `waitid(WNOWAIT)`
-        reaps its command inside the exit observation) while the exit itself was observed
-        normally; the reap must still happen, and the record must say the check did not.
+        Model: the identity can no longer be read at the check (a host without `waitid(WNOWAIT)`
+        reaps its command inside the exit observation; here `/proc` itself is gone by then) while
+        the exit itself was observed normally; the reap must still happen, and the record must say
+        the check did not.
         """
-        process = self.spawn(code="pass")
-        self.assertEqual(runner._observe_exit(process, 5), (0, False))
-        self.patch(runner, "_owned_group", lambda owned: None)
+        spawned = runner._spawned(self.spawn(code="pass"))
+        self.assertEqual(runner._observe_exit(spawned.process, 5), (0, False))
+        self.patch(runner, "PROC_ROOT", Path("/nonexistent-proc"))
         with self.log_path.open("ab") as log:
-            teardown = runner._teardown_before_reap(process, log)
+            teardown = runner._teardown_before_reap(spawned, log)
         self.assertFalse(teardown.verified)
         self.assertIn("unverified", teardown.describe())
-        self.assertIsNotNone(process.poll(), "the command must still be reaped")
+        self.assertIn("could not be checked before the reap", teardown.describe())
+        self.assertIsNotNone(spawned.process.poll(), "the command must still be reaped")
 
     @unittest.skipUnless(hasattr(os, "killpg"), "POSIX process groups only")
     def test_an_externally_reaped_child_is_no_proof_without_the_kernel_probe(self):
-        """Where there is no `waitid(WNOWAIT)` probe, the cached field is all that is left — and it
-        cannot see a reap, so it is not ownership.
+        """Where there is no `waitid(WNOWAIT)` probe, a cached field is all that is left — and it
+        cannot see a reap, so it is not an identity.
 
-        Model: a host without the non-reaping observation, a command reaped by someone else (so
-        `Popen.returncode` still reads None) and a pid whose number was recycled onto a group that
-        looks live and self-consistent.  The absence of the probe must fail closed: no ownership,
-        no signal, teardown unverified.
+        Model: a host without the non-reaping observation and a command reaped by someone else, so
+        `Popen.returncode` still reads None while the kernel's hold on the child is long gone.  The
+        absence of the probe must fail closed: no pin, no signal, teardown unverified.
         """
-        process = self.spawn(code="pass")
-        os.waitpid(process.pid, 0)  # reaped outside Popen: the cached returncode stays None
-        self.assertIsNone(process.returncode, "the external reap must stay invisible to Popen")
+        spawned = runner._spawned(self.spawn(code="pass"))
+        os.waitpid(spawned.pid, 0)  # reaped outside Popen: the cached returncode stays None
+        self.assertIsNone(spawned.process.returncode,
+                          "the external reap must stay invisible to Popen")
         self.patch(runner, "WAITID_WNOWAIT", False)
         self.patch(runner, "KILL_GRACE_SECONDS", 0.2)
-        real_getpgid = os.getpgid
-        self.patch(os, "getpgid",
-                   lambda pid: process.pid if pid == process.pid else real_getpgid(pid))
-        self.patch(runner, "_group_running", lambda group: True)  # the recycled number looks live
-        self.assertIsNone(runner._owned_group(process),
-                          "a cached `returncode` is not ownership proof")
-        attempts: list = []
-        self.patch(os, "kill", lambda pid, signum: attempts.append(("kill", pid, signum)))
-        self.patch(os, "killpg", lambda group, signum: attempts.append(("killpg", group, signum)))
+        claim, note = runner._claim_group(spawned)
+        self.assertIsNone(claim, f"a cached `returncode` is not an identity to pin: {note}")
+        deliveries: list = []
+        self.record_deliveries(deliveries)
         with self.log_path.open("ab") as log:
-            teardown = runner._terminate_group(process, log)
-        self.assertEqual(attempts, [], "a group without any kernel proof was signalled")
+            teardown = runner._terminate_group(spawned, log)
+        self.assertEqual(self.deliveries(deliveries), [],
+                         "a signal went out with no pinnable identity behind it")
         self.assertFalse(teardown.verified)
         self.assertIn("unverified", teardown.describe())
 
@@ -1163,61 +1301,217 @@ class TeardownOwnershipTests(PatchingTestCase):
     def test_ownership_is_refused_where_the_disposition_was_never_established(self):
         """A run that could not establish its own child-reaping disposition proves nothing.
 
-        Model: the startup step failed (`EXIT_DISPOSITION` is None — no `SIGCHLD` on this platform,
-        or a process that will not let the run change it), so the reservation the ownership proof
-        reads cannot be held.  The teardown must refuse instead of signalling, and say why.
+        Model: the startup step failed (`EXIT_DISPOSITION` stays False — no `SIGCHLD` on this
+        platform, or a process that will not let the run change it), so the reservation the
+        delivery's identity rests on cannot be held.  The teardown must refuse instead of
+        signalling, and say why.
         """
         process = self.spawn(code="import time; time.sleep(60)")
-        self.patch(runner, "EXIT_DISPOSITION", None)
+        self.patch(runner, "EXIT_DISPOSITION", False)
         self.patch(runner, "KILL_GRACE_SECONDS", 0.5)
-        attempts: list = []
-        self.patch(os, "kill", lambda pid, signum: attempts.append(("kill", pid, signum)))
-        self.patch(os, "killpg", lambda group, signum: attempts.append(("killpg", group, signum)))
+        deliveries: list = []
+        self.record_deliveries(deliveries)
         with self.log_path.open("ab") as log:
-            teardown = runner._terminate_group(process, log)
-        self.assertEqual(attempts, [], "a group was signalled with no disposition to prove it")
+            teardown = runner._terminate_group(runner._spawned(process), log)
+        self.assertEqual(self.deliveries(deliveries), [],
+                         "a signal went out with no disposition to justify it")
         self.assertFalse(teardown.verified)
         self.assertIn("SIGCHLD", teardown.describe())
         self.assertIsNone(process.poll(), "the probe's own child must stay untouched")
 
-    @unittest.skipUnless(hasattr(os, "killpg"), "the escalation is the POSIX group path")
-    @unittest.skipUnless(runner.WAITID_WNOWAIT, "the anchor is the waitid(WNOWAIT) probe")
+    @unittest.skipUnless(hasattr(signal, "SIGCHLD") and hasattr(signal, "SIG_IGN"),
+                         "the gate is the SIGCHLD disposition itself")
+    def test_a_sigchld_disposition_changed_after_startup_refuses_delivery(self):
+        """A disposition changed after startup must not leave the invariant reported intact.
+
+        Model: the run established `SIG_DFL` before spawning, and `SIGCHLD` was changed afterwards
+        (a library, an operator, an inherited handler restored) — the kernel will now reap this
+        run's children inside their own exit, so the reservation the delivery rests on is gone even
+        though the startup step once succeeded.  The gate must read the live disposition and
+        refuse, never trust the recorded one.
+        """
+        process = self.spawn(code="import time; time.sleep(60)")
+        signal.signal(signal.SIGCHLD, signal.SIG_IGN)
+        deliveries: list = []
+        self.record_deliveries(deliveries)
+        with self.log_path.open("ab") as log:
+            teardown = runner._terminate_group(runner._spawned(process), log)
+        self.assertEqual(self.deliveries(deliveries), [],
+                         "a signal went out while the disposition was no longer SIG_DFL")
+        self.assertFalse(teardown.verified)
+        self.assertIn("SIGCHLD", teardown.describe())
+        self.assertIsNone(process.poll(), "the probe's own child must stay untouched")
+
+    @unittest.skipUnless(hasattr(os, "killpg"), "POSIX process groups only")
+    def test_a_platform_without_pidfds_refuses_every_delivery(self):
+        """`pidfd is unavailable (platform)` is a refusal, never a fallback to a bare pid.
+
+        Model: POSIX process groups and `/proc` exist, but the platform cannot open a pidfd (no
+        `os.pidfd_open`/`signal.pidfd_send_signal` — Windows), so no target's identity can be
+        pinned at delivery.  Nothing may be signalled — not the command, not the group — and the
+        record must name the reason.
+        """
+        process = self.spawn(code="import time; time.sleep(60)")
+        self.patch(runner, "PIDFD_PINNING", False)
+        deliveries: list = []
+        self.record_deliveries(deliveries)
+        with self.log_path.open("ab") as log:
+            teardown = runner._terminate_group(runner._spawned(process), log)
+        self.assertEqual(self.deliveries(deliveries), [],
+                         "a signal was delivered without a pidfd to carry the identity")
+        self.assertFalse(teardown.verified)
+        self.assertIn("pidfd", teardown.describe())
+        self.assertIsNone(process.poll(), "the probe's own child must stay untouched")
+
+    @unittest.skipUnless(runner.PIDFD_PINNING, "the pin is a pidfd")
+    def test_a_pid_that_no_longer_names_the_spawned_instance_is_refused(self):
+        """The recorded start time is what makes the pin the run's own instance, not just any.
+
+        Model: the number still names a live process, but a *different* instance — the recorded
+        start time (what the run read when it spawned its command) does not match what the pid
+        reports now.  The pin must refuse it, because delivering on that number would signal a
+        process that is not the one this run started.
+        """
+        process = self.spawn(code="import time; time.sleep(60)")
+        real_start = runner._start_time(process.pid)
+        self.assertIsNotNone(real_start, "the fixture's start time must be readable")
+        pin, note = runner._pin_identity(process.pid, recorded=str(int(real_start) + 1))
+        self.assertIsNone(pin, "a mismatched recorded identity was pinned anyway")
+        self.assertIn("not name the process instance this run recorded at spawn", note)
+        pin, note = runner._pin_identity(process.pid, recorded=real_start)
+        self.assertIsNotNone(pin, note)
+        pin.close()
+
+    @unittest.skipUnless(can_deliver_signals(), "the delivery needs a pinnable identity")
+    def test_a_member_whose_identity_changed_since_the_evidence_is_refused(self):
+        """The identity read with the evidence is the authority, not the pid the evidence named.
+
+        Model: the enumeration hands back a member with a start time that no longer matches what
+        the pid reports — the number was recycled after the evidence pass, so the pid now names a
+        different instance.  That member must not be signalled, while the member whose evidence and
+        identity still agree is delivered to; the refusal is recorded.
+        """
+        spawned, leader_pid, child_pid = self.anchor_fixture(HELD_LEADER)
+        self.patch(runner, "KILL_GRACE_SECONDS", 0.2)
+        self.patch(runner, "_group_members",
+                   lambda group: [(leader_pid, spawned.start), (child_pid, "0")])
+        deliveries: list = []
+        self.record_deliveries(deliveries)
+        with self.log_path.open("ab") as log:
+            teardown = runner._terminate_group(spawned, log)
+        self.assertNotIn(("pidfd", child_pid), self.deliveries(deliveries),
+                         "a member whose identity changed since the evidence was signalled")
+        self.assertIn(("pidfd", leader_pid), self.deliveries(deliveries, signal.SIGTERM),
+                      "the member whose evidence still agrees was not signalled")
+        self.assertFalse(teardown.verified)
+        self.assertIn("unverified", teardown.describe())
+
+    @unittest.skipUnless(can_deliver_signals(), "the delivery needs a pinnable identity")
+    def test_no_signal_is_delivered_to_a_target_lost_after_the_rounds_last_probe(self):
+        """Loss after the round's last probe: the leader is reaped while the evidence is read.
+
+        The leader is killed and reaped by a thread this run does not control at the moment the
+        round enumerates its members — after the round's own claim was pinned, but before any
+        signal goes out.  The surviving member must still be delivered to through its own pin, no
+        delivery may be carried by a bare pid or group number (whose ownership is exactly what was
+        just lost), and the next round must re-pin the claim, find it lost and stop the escalation.
+        """
+        spawned, leader_pid, child_pid = self.anchor_fixture(HELD_LEADER)
+        reaped: list[int] = []
+        reaper = threading.Thread(target=lambda: reaped.append(os.waitpid(leader_pid, 0)[0]),
+                                  daemon=True)
+        reaper.start()
+        kill_directly = os.kill  # before the delivery recorder patches it: this kill is the test's
+        real_members = runner._group_members
+        released: list[bool] = []
+
+        def release_then_enumerate(group: int) -> list[int] | None:
+            members = real_members(group)
+            if not released:
+                released.append(True)
+                kill_directly(leader_pid, signal.SIGKILL)  # release it to the external reaper
+                reaper.join(5)
+            return members
+
+        self.patch(runner, "_group_members", release_then_enumerate)
+        self.patch(runner, "KILL_GRACE_SECONDS", 0.5)
+        deliveries: list = []
+        self.record_deliveries(deliveries)
+        with self.log_path.open("ab") as log:
+            teardown = runner._terminate_group(spawned, log)
+        self.assertEqual(reaped, [leader_pid], "the external reaper did not take the status")
+        recorded = self.deliveries(deliveries)
+        self.assertEqual({handle for handle, _pid in recorded}, {"pidfd"},
+                         f"a signal was carried by something other than a pinned handle: {recorded}")
+        for index, entry in enumerate(deliveries):
+            if entry[0] == "pidfd" and entry[1] == leader_pid:
+                self.assertIn(("open", leader_pid), deliveries[:index],
+                              "a signal to the leader went through a handle not opened for it")
+        self.assertIn(("pidfd", child_pid), self.deliveries(deliveries, signal.SIGTERM),
+                      "the surviving member was not delivered to through its own pin")
+        self.assertNotIn(("pidfd", child_pid), self.deliveries(deliveries, signal.SIGKILL),
+                         "the escalation continued after the claim was lost")
+        self.assertFalse(teardown.verified)
+        self.assertIn("unverified", teardown.describe())
+
+    @unittest.skipUnless(can_deliver_signals(), "the delivery needs a pinnable identity")
+    def test_members_are_delivered_to_per_pin_and_re_pinned_every_round(self):
+        """There is no group broadcast: each member is signalled through its own fresh pin.
+
+        The leader and its same-group child both ignore SIGTERM, so both rounds run.  Every
+        delivery must be carried by a pidfd (never by `os.kill`/`os.killpg` with a signal), each
+        member must be addressed by its own pid, and the SIGKILL round must open a *new* pidfd for
+        each target after its TERM was sent rather than reusing the earlier round's handle.
+        """
+        spawned, leader_pid, child_pid = self.anchor_fixture(HELD_LEADER)
+        self.patch(runner, "KILL_GRACE_SECONDS", 0.5)
+        events: list = []
+        self.record_deliveries(events)
+        with self.log_path.open("ab") as log:
+            teardown = runner._terminate_group(spawned, log)
+        sends = [entry for entry in events if entry[0] != "open"]
+        self.assertEqual([handle for handle, _pid, _sig in sends], ["pidfd"] * len(sends),
+                         f"a signal went out through something other than a pinned pidfd: {sends}")
+        for pid in (leader_pid, child_pid):
+            self.assertIn(("pidfd", pid, signal.SIGTERM), sends,
+                          f"pid {pid} was not delivered to in the first round")
+            self.assertIn(("pidfd", pid, signal.SIGKILL), sends,
+                          f"pid {pid} was not escalated to in the second round")
+            term_index = events.index(("pidfd", pid, signal.SIGTERM))
+            kill_index = events.index(("pidfd", pid, signal.SIGKILL))
+            self.assertIn(("open", pid), events[term_index:kill_index],
+                          "the second round reused an earlier pin instead of re-pinning")
+        self.assertTrue(teardown.survivors,
+                        "the undelivered signals must leave the survivors recorded")
+
+    @unittest.skipUnless(can_deliver_signals(), "the escalation needs a pinnable identity")
     def test_escalation_stops_when_the_anchor_is_lost_before_a_round(self):
-        """The anchor can end between the rounds; the bare group number is not signalable then.
+        """The claim can end between the rounds; the group number is not signalable then.
 
         The leader ignores SIGTERM and exits by itself inside the first grace window while a
         same-group child keeps the group alive, and a thread this run does not control is already
-        blocked in `os.waitpid` on the leader, so the kernel's hold on it ends the moment it exits.
-        Round two must find no anchor, send no SIGKILL, and record the group's state as unverified
-        instead of claiming a termination it can no longer justify.
+        blocked in `os.waitpid` on the leader, so the identity recorded at spawn stops naming it
+        the moment it exits.  Round one delivers to both members through their own pins; round two
+        must re-pin the claim, find it lost, send no SIGKILL, and record the group's state as
+        unverified instead of claiming a termination it can no longer justify.
         """
-        pid_file = ARTIFACTS / "anchor-pids.txt"
-        pid_file.unlink(missing_ok=True)
-        leader_file = ARTIFACTS / "anchor-leader.py"
-        leader_file.write_text(ANCHOR_LEADER, encoding="utf-8")
-        process = subprocess.Popen([sys.executable, str(leader_file), str(pid_file)],
-                                   start_new_session=True)
-        self.addCleanup(process.wait)
-        self.addCleanup(kill_quietly, process.pid)
-        deadline = time.monotonic() + 10
-        while not pid_file.exists() and time.monotonic() < deadline:
-            time.sleep(0.01)
-        leader_pid, child_pid = (int(value) for value in pid_file.read_text().split())
-        self.addCleanup(kill_quietly, child_pid)
-        self.assertEqual(leader_pid, process.pid, "the fixture's pid file is not the leader's")
+        spawned, leader_pid, child_pid = self.anchor_fixture(ANCHOR_LEADER)
         reaped: list[int] = []
         reaper = threading.Thread(target=lambda: reaped.append(os.waitpid(leader_pid, 0)[0]),
                                   daemon=True)
         reaper.start()
         self.patch(runner, "KILL_GRACE_SECONDS", 1.0)
-        attempts: list = []
-        self.patch(os, "killpg", lambda group, signum: attempts.append((group, signum)))
+        deliveries: list = []
+        self.record_deliveries(deliveries)
         with self.log_path.open("ab") as log:
-            teardown = runner._terminate_group(process, log)
+            teardown = runner._terminate_group(spawned, log)
         reaper.join(5)
         self.assertEqual(reaped, [leader_pid], "the external reaper did not take the status")
-        self.assertEqual(attempts, [(leader_pid, signal.SIGTERM)],
-                         "escalation continued although the anchor was gone")
+        self.assertEqual(sorted(self.deliveries(deliveries, signal.SIGTERM)),
+                         sorted([("pidfd", leader_pid), ("pidfd", child_pid)]),
+                         "the first round did not deliver to both members through their pins")
+        self.assertEqual(self.deliveries(deliveries, signal.SIGKILL), [],
+                         "escalation continued although the claim was gone")
         self.assertFalse(teardown.verified)
         self.assertIn("unverified", teardown.describe())
         self.assertNotIn("process group terminated", teardown.describe())
@@ -1234,6 +1528,12 @@ class EndToEndTests(PatchingTestCase):
         # scratch roots that cannot hold a socket.
         self.scratch = runner.scratch_root_for()
         self.addCleanup(shutil.rmtree, self.scratch, ignore_errors=True)
+        # `main` takes the run's startup step in-process: both the module state it sets and the
+        # signal disposition it establishes are restored, so no other test inherits either.
+        self.patch(runner, "EXIT_DISPOSITION", runner.EXIT_DISPOSITION)
+        if hasattr(signal, "SIGCHLD"):
+            saved = signal.getsignal(signal.SIGCHLD)
+            self.addCleanup(signal.signal, signal.SIGCHLD, saved)
 
     def build(self) -> Path:
         root = synthetic_tree(
@@ -1530,6 +1830,8 @@ class EndToEndTests(PatchingTestCase):
         self.assertEqual([entry.name for entry in padded.iterdir()], [],
                          "the bounded-out per-suite scratch tree was not cleaned up")
 
+    @unittest.skipUnless(can_deliver_signals(),
+                         "successful delivery needs pidfds, /proc evidence and waitid(WNOWAIT)")
     def test_timeout_tears_down_the_whole_process_group(self):
         root = self.build()
         code, _, payload = self.run_main(root, "--suite", "scripts/test_hang.py")
@@ -1607,7 +1909,8 @@ class EndToEndTests(PatchingTestCase):
                          "the per-suite scratch tree was not cleaned up")
         return entry, pids
 
-    @unittest.skipUnless(hasattr(os, "killpg"), "the escalation is the POSIX group path")
+    @unittest.skipUnless(can_deliver_signals(),
+                         "successful delivery needs pidfds, /proc evidence and waitid(WNOWAIT)")
     def test_timeout_escalates_while_a_group_member_ignores_sigterm(self):
         """Escalation follows the group: the leader exiting on SIGTERM must not end it.
 
@@ -1712,8 +2015,8 @@ class EndToEndTests(PatchingTestCase):
         self.assertEqual(signal.getsignal(signal.SIGCHLD), signal.SIG_DFL,
                          "the run did not leave its own disposition in the state it established")
 
-    @unittest.skipUnless(runner.WAITID_WNOWAIT and hasattr(os, "killpg") and runner.PROC_ROOT.is_dir(),
-                         "the check needs the non-reaping observation, POSIX groups and /proc")
+    @unittest.skipUnless(can_deliver_signals(),
+                         "the check and its delivery need the delivery gates")
     def test_a_command_that_exited_cleanly_is_checked_before_its_reap(self):
         """A clean exit can still leave same-group members; the check must precede the reap.
 
@@ -1793,9 +2096,10 @@ class EndToEndTests(PatchingTestCase):
     def test_provisionings_teardown_limits_survive_the_suite_command_vector(self):
         """Successful provisioning's own teardown is merged into the suite's, never replaced.
 
-        Model: a host that cannot enumerate processes.  Provisioning exits 0 and leaves a same-group
-        worker behind, so its own record says the pre-reap check could not run; the suite command
-        then times out and its group teardown succeeds.  The published record must carry both: the
+        Model: a host that cannot read an identity (`/proc` absent).  Provisioning exits 0 and
+        leaves a same-group worker behind, so its own record says the pre-reap check could not run;
+        the suite command then times out and cannot be torn down either.  The published record must
+        carry both limits — the provisioning vector's and the command vector's — because the
         provisioning limit is a limit of this suite's run, wherever the worker was started.
         """
         pids_file = ARTIFACTS / "provision-pids.txt"
@@ -1820,13 +2124,56 @@ class EndToEndTests(PatchingTestCase):
         self.assertEqual(code, 1, output)
         entry = self.states(payload)["canned:provision-then-hang"]
         self.assertEqual(entry["state"], "TIMEOUT", entry["reason"])
-        self.assertIn("process group terminated", entry["reason"])
         self.assertIn("could not be checked before the reap", entry["reason"],
                       "provisioning's teardown record was replaced by the suite command's")
+        self.assertNotIn("process group terminated", entry["reason"],
+                         "a platform with no identity evidence claimed a termination")
+        notes = entry["teardown"]["unverified"]
+        self.assertIn("could not be checked before the reap", " ".join(notes),
+                      "provisioning's own limit is missing from the merged record")
+        self.assertIn("could not be re-proven this run's own before SIGTERM", " ".join(notes),
+                      "the command vector's own limit is missing from the merged record")
         pids = self.leftover_pids(pids_file)
         self.assertEqual(len(pids), 1)
 
-    @unittest.skipUnless(runner.PROC_ROOT.is_dir(), "the scratch sweep reads /proc")
+    @unittest.skipUnless(runner.WAITID_WNOWAIT, "the clean exit is observed without reaping")
+    def test_a_provisioning_failure_publishes_its_teardown_limit(self):
+        """A provisioning failure that is a normal non-zero exit still carries its teardown's limit.
+
+        Provisioning exits 1 — not a timeout, not a death by signal — after leaving a same-group
+        worker whose environment is empty and whose cwd is `/`, and this host cannot read the
+        identity the pre-reap check needs, so the teardown is unverified.  That limit must reach
+        `outcome.reason` the way `settle()` publishes its own: a provisioning failure may not read
+        like a bare command echo while its record says the group was never checked.
+        """
+        pids_file = ARTIFACTS / "provision-fail-pids.txt"
+        pids_file.unlink(missing_ok=True)
+        root = synthetic_tree(patterns=["scripts/test_*.py"], prune=[], floor=[],
+                              suites="\n".join([
+                                  "[[suite]]",
+                                  'id = "canned:provision-fails"',
+                                  "provision = [",
+                                  f'  ["{{python}}", "scripts/failing_provision.py", '
+                                  f'{json.dumps(str(pids_file))}],',
+                                  "]",
+                                  'command = [["{python}", "-c", "pass"]]',
+                                  "",
+                              ]))
+        write_suite(root, "scripts/failing_provision.py", FAILING_PROVISION)
+        self.patch(runner, "PROC_ROOT", Path("/nonexistent-proc"))
+        code, output, payload = self.run_main(root)
+        self.assertEqual(code, 1, output)
+        entry = self.states(payload)["canned:provision-fails"]
+        self.assertEqual(entry["state"], "ERROR", entry["reason"])
+        self.assertIn("provisioning failed", entry["reason"])
+        self.assertIn("could not be checked before the reap", entry["reason"],
+                      "the provisioning failure's teardown limit is not in its reason")
+        self.assertFalse(entry["teardown"]["verified"], entry["teardown"])
+        pids = self.leftover_pids(pids_file)
+        self.assertEqual(len(pids), 1)
+
+    @unittest.skipUnless(can_deliver_signals(),
+                         "the sweep's delivery needs pidfds, /proc evidence and waitid(WNOWAIT)")
     def test_timeout_stops_detached_workers_before_the_scratch_goes(self):
         """A worker that left the suite's group is stopped before the records it polls are deleted.
 
@@ -1864,10 +2211,12 @@ class EndToEndTests(PatchingTestCase):
                                   cwd=scratch, env={}, start_new_session=True)
         self.addCleanup(worker.wait)
         self.addCleanup(worker.kill)
-        self.assertIn(worker.pid, runner._scratch_processes(scratch) or [],
+        found = [pid for pid, _start in runner._scratch_processes(scratch) or []]
+        self.assertIn(worker.pid, found,
                       "a worker whose only tie to scratch is its cwd was not found")
 
-    @unittest.skipUnless(runner.PROC_ROOT.is_dir(), "the scratch sweep reads /proc")
+    @unittest.skipUnless(can_deliver_signals(),
+                         "the sweep's delivery needs pidfds, /proc evidence and waitid(WNOWAIT)")
     def test_timeout_stops_a_worker_only_its_cwd_identifies(self):
         """The environment check is not the only tie to scratch: the cwd symlink counts too.
 
@@ -1889,8 +2238,8 @@ class EndToEndTests(PatchingTestCase):
                          "the scratch tree was deleted while the worker still polled it")
         self.assertIn("detached processes terminated", entry["reason"])
 
-    @unittest.skipUnless(runner.WAITID_WNOWAIT and hasattr(os, "killpg"),
-                         "a signalled command needs the non-reaping observation and the group API")
+    @unittest.skipUnless(can_deliver_signals(),
+                         "a signalled command needs pidfds, /proc evidence and waitid(WNOWAIT)")
     def test_a_signal_killed_suite_still_tears_down_its_group(self):
         """A suite killed by a signal lost its cleanup callbacks; teardown must run anyway.
 
