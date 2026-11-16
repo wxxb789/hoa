@@ -1273,14 +1273,15 @@ class DshLauncherTests(ProcessFixtures):
                          stats_blank["dropped_lines"] + len(retained_blank.splitlines()) - 1)
 
     def test_10g_the_open_file_stays_within_the_slack_ceiling(self):
-        """The hysteresis ceiling: the live file carries at most `slack` dropped history.
+        """The hysteresis ceiling: the live file stays inside a bounded size.
 
         Between compactions the retained file holds dropped lines a compaction
         has not rewritten yet, so a reader mid-run could otherwise see the
         unbounded stream: the writer rewrites the file once it exceeds its
         compacted ceiling by more than `slack`, which bounds what a live reader
-        (or the disk) sees. `finish()` compacts anyway; this is the mid-run
-        state, asserted before it.
+        (or the disk) sees. `slack` is an allowance above that ceiling, not an
+        exact cap on the dropped-history bytes the file holds. `finish()` compacts
+        anyway; this is the mid-run state, asserted before it.
         """
         Writer = adapter.load_writer()
         run_dir = self.tmp / "writer-10g"

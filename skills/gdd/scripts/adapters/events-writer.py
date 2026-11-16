@@ -30,12 +30,17 @@ retained line that is neither the newest nor the protected one, and
 The un-evictable lines are the newest one and, when one is declared, the
 protected one: neither is ever dropped, so when those one or two lines together
 exceed the tail region's budget (`max_bytes - MARKER_RESERVE`) they are retained
-whole. After compaction the file therefore overshoots its compacted ceiling
-(head lines + `max_bytes`) by the retained tail's overshoot,
-`max(0, tail_bytes - (max_bytes - MARKER_RESERVE))`, and `tail_bytes` is at most
-`max(tail budget, the combined bytes of those un-evictable lines)`. Between
-compactions the open file may carry up to `slack` bytes of dropped history that a
-rewrite has not yet reclaimed, on top of that same overshoot.
+whole, and `tail_bytes` is at most `max(tail budget, the combined bytes of those
+un-evictable lines)`.
+
+The sizes below are allowances, not exact values: the exact compacted size is
+`head_bytes` + the marker line's bytes + `tail_bytes`. The writer rewrites the
+file once it exceeds `head_bytes + max_bytes + slack` plus the retained tail's
+overshoot, `max(0, tail_bytes - (max_bytes - MARKER_RESERVE))`, so the live file
+stays under that ceiling — and `slack` is the allowance for dropped history a
+rewrite has not yet reclaimed, not an exact cap on those bytes: unused tail and
+marker capacity can leave slightly more of them on disk while the file is still
+inside the ceiling.
 
 Under the cap the file is byte-for-byte the input stream. Sidecar counters are
 written atomically to RUN_DIR/events.stats.json every 64 KiB of input and at
