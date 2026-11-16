@@ -165,6 +165,70 @@ with open(os.environ["PID_FILE"], "w", encoding="utf-8") as handle:
 time.sleep(120)
 '''
 
+# The same detached worker as `DETACHED_WORKER`, but identified only by the cwd it was started
+# in: `env={}` strips every scratch path out of its environment, so only the `/proc/<pid>/cwd`
+# symlink ties it to the suite (the probe a `read_bytes()` on that symlink could never see).
+CWD_WORKER = '''import os
+import sys
+import time
+
+beat, sentinel = sys.argv[1], sys.argv[2]
+count = 0
+while True:
+    count += 1
+    with open(beat, "w", encoding="utf-8") as handle:
+        handle.write(str(count))
+    if not os.path.exists(sentinel):
+        with open(beat + ".gone", "w", encoding="utf-8") as handle:
+            handle.write("scratch-gone")
+        break
+    time.sleep(0.05)
+'''
+
+CWD_DETACHED_SUITE = '''import os
+import subprocess
+import sys
+import time
+
+sentinel = os.path.join(os.environ["TMPDIR"], "sentinel")
+open(sentinel, "w", encoding="utf-8").close()
+child = subprocess.Popen([sys.executable, os.environ["WORKER_FILE"], os.environ["BEAT"], sentinel],
+                         start_new_session=True, cwd=os.environ["TMPDIR"], env={})
+with open(os.environ["PID_FILE"], "w", encoding="utf-8") as handle:
+    handle.write(f"{child.pid}\\n")
+time.sleep(120)
+'''
+
+# A same-group child that SIGKILLs the suite leader once the suite reports readiness, then stays.
+# Its environment is emptied and its cwd is `/`, so no scratch sweep can match it: only the group
+# the leader was recorded in finds it (and only after the leader it outlives is gone).
+SIGNAL_KILLER = '''import os
+import signal
+import sys
+import time
+
+ready, target = sys.argv[1], sys.argv[2]
+while not os.path.exists(ready):
+    time.sleep(0.01)
+os.kill(int(target), signal.SIGKILL)
+while True:
+    time.sleep(1)
+'''
+
+SIGNALLED_SUITE = '''import os
+import subprocess
+import sys
+import time
+
+ready = os.environ["READY"]
+child = subprocess.Popen([sys.executable, os.environ["KILLER_FILE"], ready, str(os.getpid())],
+                         env={}, cwd="/")
+with open(os.environ["PID_FILE"], "w", encoding="utf-8") as handle:
+    handle.write(f"{child.pid}\\n")
+open(ready, "w", encoding="utf-8").close()
+time.sleep(120)
+'''
+
 
 def synthetic_tree(patterns: list[str], prune: list[str], floor: list[str], suites: str) -> Path:
     """Create a throwaway root with a manifest and return it."""
@@ -770,6 +834,20 @@ class SettleTests(unittest.TestCase):
         self.assertIn("zero executed checks", outcome.reason)
         self.assertEqual(outcome.counts, {"passed": 0, "executed": 0, "total": 0})
 
+    def test_covered_counter_child_with_a_disagreeing_line_is_error(self):
+        """The consistency rule of a scheduled counter suite applies through `covered_by` too.
+
+        A PASS parent with the real dispatch-guard pattern (`dispatch-guards: 1/100 ok`) used to
+        settle this child PASS although `settle` rejects that identical summary as ERROR, so
+        contradictory evidence went green by not being scheduled.
+        """
+        outcome = self.covered_child("dispatch-guards: 1/100 ok\n", patterns=(
+            r"^dispatch-guards: (?P<passed>\d+)/(?P<total>\d+) ok$",
+        ))
+        self.assertEqual(outcome.state, "ERROR")
+        self.assertEqual(outcome.counts, {"passed": 1, "executed": 100, "total": 100})
+        self.assertIn("disagrees", outcome.reason)
+
     def test_covered_unittest_child_needs_a_summary_in_the_parent_log(self):
         outcome = self.covered_child("the parent ran the child without a summary\n",
                                      assertion="unittest", patterns=())
@@ -1232,6 +1310,112 @@ class EndToEndTests(unittest.TestCase):
         self.assertIn("teardown: SIGTERM", Path(entry["log"]).read_text(encoding="utf-8"))
         self.assertEqual([item.name for item in self.scratch.iterdir()], [],
                          "the per-suite scratch tree was not cleaned up")
+
+    @unittest.skipUnless(runner.PROC_ROOT.is_dir(), "the detection reads /proc")
+    def test_scratch_detection_follows_the_cwd_symlink(self):
+        """`cwd` is a symlink, not a file: readlink sees what read_bytes raised IsADirectoryError on.
+
+        The worker empties its environment, so the cwd it was started in is the only tie to the
+        suite's scratch — and the only way to find it is the `/proc/<pid>/cwd` symlink.
+        """
+        scratch = Path(tempfile.mkdtemp(prefix="cwd-detect-", dir=self.scratch))
+        self.addCleanup(shutil.rmtree, scratch, ignore_errors=True)
+        worker = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"],
+                                  cwd=scratch, env={}, start_new_session=True)
+        self.addCleanup(worker.wait)
+        self.addCleanup(worker.kill)
+        self.assertIn(worker.pid, runner._scratch_processes(scratch) or [],
+                      "a worker whose only tie to scratch is its cwd was not found")
+
+    def test_timeout_stops_a_worker_only_its_cwd_identifies(self):
+        """The environment check is not the only tie to scratch: the cwd symlink counts too.
+
+        The fixture worker sanitizes its environment (`env={}`) and is started with its cwd in
+        the suite's task-local TMPDIR, so `environ` shows nothing and only the `/proc/<pid>/cwd`
+        symlink finds it after the timeout.
+        """
+        write_suite(ARTIFACTS, "cwd-worker.py", CWD_WORKER)
+        beat = ARTIFACTS / "cwd-beat"
+        root = synthetic_tree(patterns=["scripts/test_*.py"], prune=[], floor=[],
+                              suites="\n".join([
+                                  "[[suite]]",
+                                  'path = "scripts/test_cwd_detached.py"',
+                                  f'env = {{ PID_FILE = "{ARTIFACTS / "cwd-pids.txt"}", '
+                                  f'BEAT = "{beat}", '
+                                  f'WORKER_FILE = "{ARTIFACTS / "cwd-worker.py"}" }}',
+                                  "",
+                              ]))
+        write_suite(root, "scripts/test_cwd_detached.py", CWD_DETACHED_SUITE)
+        code, output, payload = self.run_main(root, "--timeout", "5")
+        entry = self.states(payload)["scripts/test_cwd_detached.py"]
+        self.assertEqual(entry["state"], "TIMEOUT", output)
+        self.assertEqual(code, 1)
+        pids = [int(value) for value in (ARTIFACTS / "cwd-pids.txt").read_text().split()]
+        self.assertEqual(len(pids), 1)
+        self.assert_stopped(pids, "the cwd-identified worker")
+        self.assertGreaterEqual(int(beat.read_text(encoding="utf-8")), 1,
+                                "the worker never wrote a heartbeat")
+        self.assertFalse((ARTIFACTS / "cwd-beat.gone").exists(),
+                         "the scratch tree was deleted while the worker still polled it")
+        self.assertIn("teardown: SIGTERM", Path(entry["log"]).read_text(encoding="utf-8"))
+        self.assertEqual([item.name for item in self.scratch.iterdir()], [],
+                         "the per-suite scratch tree was not cleaned up")
+
+    def test_a_signal_killed_suite_still_tears_down_its_group(self):
+        """A suite killed by a signal lost its cleanup callbacks; teardown must run anyway.
+
+        The fixture's same-group child SIGKILLs the suite leader once it is ready, and the long
+        timeout keeps the timeout path out of the picture.  The child sanitizes its environment
+        and runs with `cwd="/"`, so only group liveness can stop it — and the group id had to be
+        recorded at spawn, because the killed leader is reaped before any cleanup could ask for
+        its group.
+        """
+        write_suite(ARTIFACTS, "signal-killer.py", SIGNAL_KILLER)
+        ready = ARTIFACTS / "signal-ready"
+        ready.unlink(missing_ok=True)
+        root = synthetic_tree(patterns=["scripts/test_*.py"], prune=[], floor=[],
+                              suites="\n".join([
+                                  "[[suite]]",
+                                  'path = "scripts/test_signalled.py"',
+                                  f'env = {{ PID_FILE = "{ARTIFACTS / "signal-pids.txt"}", '
+                                  f'READY = "{ready}", '
+                                  f'KILLER_FILE = "{ARTIFACTS / "signal-killer.py"}" }}',
+                                  "",
+                              ]))
+        write_suite(root, "scripts/test_signalled.py", SIGNALLED_SUITE)
+        code, output, payload = self.run_main(root, "--timeout", "20")
+        entry = self.states(payload)["scripts/test_signalled.py"]
+        self.assertEqual(entry["state"], "ERROR", output)
+        self.assertEqual(entry["exit_code"], -9, "the fixture leader was not killed by SIGKILL")
+        self.assertEqual(code, 1)
+        pids = [int(value) for value in (ARTIFACTS / "signal-pids.txt").read_text().split()]
+        self.assertEqual(len(pids), 1)
+        self.assert_stopped(pids, "the signal-killed suite's same-group child")
+        self.assertIn("terminated by signal 9", entry["reason"])
+        self.assertIn("detached processes terminated", entry["reason"])
+        log = Path(entry["log"]).read_text(encoding="utf-8")
+        self.assertIn("cleanup: terminating process group", log)
+        self.assertEqual([item.name for item in self.scratch.iterdir()], [],
+                         "the per-suite scratch tree was not cleaned up")
+
+    def test_covered_child_with_a_hiding_counter_line_is_error(self):
+        """Contradictory counter evidence may not settle PASS by way of `covered_by`.
+
+        The parent settles PASS on its own consistent line while the child's line claims 1 of
+        100 checks passed; the same summary is ERROR for a scheduled suite, so it is ERROR here.
+        """
+        root = self.build()
+        (root / "scripts/tests/parent.py").write_text(
+            "# executes scripts/tests/test-counter-child.py in production\n"
+            "print('parent-counter: 2/2 ok')\n"
+            "print('child-counter: 1/100 ok')\n", encoding="utf-8")
+        code, _, payload = self.run_main(root, "--suite", "parent")
+        self.assertEqual(self.states(payload)["parent"]["state"], "PASS")
+        child = self.states(payload)["scripts/tests/test-counter-child.py"]
+        self.assertEqual(child["state"], "ERROR")
+        self.assertEqual(child["counts"], {"passed": 1, "executed": 100, "total": 100})
+        self.assertIn("disagrees", child["reason"])
+        self.assertEqual(code, 1)
 
 
 if __name__ == "__main__":

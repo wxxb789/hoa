@@ -175,6 +175,11 @@ release job 自己的命令，不是被调度的测试套件）。它同时调�
 `skills/gdd/scripts/tests/test_paseo_run_python.py`——以及 `paseo-plugins/gdd-run-observer`
 这个 Vitest 包。
 
+结算是防假绿的：零执行检查永远不是 PASS，counter 必须交代每一个未通过的检查——包括通过
+`covered_by` 依据父套件日志结算的子套件。每个套件在自己的进程组与任务级 scratch 目录中运行；
+未能按自身流程收尾的套件（被 runner 超时终止，或被信号杀死）会在 scratch 目录被删除前得到处理：
+其进程组的残余成员与仍持有该 scratch 的进程会被终止。
+
 | 检查命令（CI step） | 保护什么 |
 |---|---|
 | 在 `scripts/shared`、`skills/teams-cdp/scripts`、`skills/m365-copilot-cdp/scripts` 中运行 `bun install --frozen-lockfile && bun run check && bun test` | 共享代码与两个桌面 skill 的 CDP 类型和行为。 |

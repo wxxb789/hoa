@@ -189,6 +189,13 @@ before —
 `skills/gdd/scripts/tests/test_paseo_run_python.py` — and the `paseo-plugins/gdd-run-observer` Vitest
 package.
 
+Settling is anti-false-green. Zero executed checks never settles PASS, and a counter must account for
+every check it did not pass — including a suite that settles from a parent's log through
+`covered_by`. Each suite runs in its own process group and task-local scratch tree; a suite that did
+not finish under its own control — the runner timed it out, or a signal killed it — has the surviving
+members of its process groups and the processes still holding that scratch stopped before the tree is
+deleted.
+
 | Gate command (CI step) | Protects |
 |---|---|
 | `bun install --frozen-lockfile && bun run check && bun test` in `scripts/shared`, `skills/teams-cdp/scripts`, `skills/m365-copilot-cdp/scripts` | Desktop CDP types and behavior in the shared code and both desktop skills. |

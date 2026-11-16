@@ -15,7 +15,9 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
 - Tested assertion adapters stop a required suite from passing with zero executed checks: declared
   unittest suites reject `Ran 0 tests`, a missing summary and an all-skipped summary (`Ran N tests` is
   unittest's collection count, not execution), the custom-assertion suites must report a positive
-  count, and a covered child settles from the parent output that claims to run it.
+  count, and a covered child settles from the parent output that claims to run it under the same
+  counter-consistency rule as a scheduled suite — a line whose totals contradict the parent's PASS is
+  ERROR, not PASS.
 - The manifest declares the non-glob suites discovery cannot name: five static gates, three
   pull-request gates, the three Bun CDP packages, and the `paseo-plugins/gdd-run-observer` Vitest
   package with its own cwd, provisioning, typecheck and test commands.
@@ -39,12 +41,15 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
 - Suite processes keep the shim toolchain's absolute state directories (`MISE_STATE_DIR`,
   `MISE_DATA_DIR`), so a mise-managed `bun` on `PATH` runs under the task-local `HOME` instead of
   refusing with "Config files … are not trusted" or re-installing the tool into the scratch tree.
-- Timeout teardown is observed, not assumed. The escalation follows the process *group* rather than
-  its leader, so a leader that exits on SIGTERM no longer ends it while a same-group descendant keeps
-  running; the processes a suite detached with `start_new_session` — the launcher adapters' watchers
-  and runners — are swept before the task-local scratch they poll is deleted; and the TIMEOUT record
-  says which outcome happened instead of claiming a teardown nothing verified. Both launcher suites
-  declare that resource and its owning teardown in `scripts/test_manifest.toml`.
+- Teardown is observed, not assumed, and covers every uncontrolled suite exit. The escalation
+  follows the process *group* rather than its leader, so a leader that exits on SIGTERM no longer
+  ends it while a same-group descendant keeps running; a suite the runner timed out, or one a signal
+  killed before its cleanup callbacks could run, has the surviving members of the groups its commands
+  ran in terminated and the processes still holding its task-local scratch stopped — identified by
+  the cwd they were started in or the scratch paths in their environment — before that scratch is
+  deleted; and the record says which outcome happened instead of claiming a teardown nothing
+  verified. Both launcher suites declare that resource and its owning teardown in
+  `scripts/test_manifest.toml`.
 - The suite `PATH` prepends the selected interpreter's own directory without resolving it: a POSIX
   virtual environment's `bin/python3` is a symlink to the base interpreter, and resolving it handed a
   suite's own `python3` the base interpreter instead of the environment that carries the repository

@@ -57,13 +57,17 @@
 #   covered_by     id of the suite that already executes this one.  The child is
 #                  accounted for, never scheduled, and settles from the parent's own
 #                  output: the parent must name the child (checked at plan time) and
-#                  the child's count_regexes must match in the parent's log.
+#                  the child's count_regexes must match in the parent's log while
+#                  satisfying the same consistency rule as a scheduled counter suite
+#                  (positive passed count; every check not passed declared skipped).
 #   detached       detached resources the suite creates (setsid runs, tmux sessions,
 #                  `start_new_session` launcher workers), the mechanism that makes them
 #                  leave the suite's process group, and where their teardown is asserted.
-#                  Declarative: the runner sweeps a timed-out suite's task-local scratch
-#                  whatever this says — the suite that lost its cleanup callbacks is
-#                  precisely the one that cannot clean up after itself.
+#                  Declarative: whenever the suite did not finish under its own control —
+#                  a timeout, or a death by signal — the runner terminates the surviving
+#                  members of the groups its commands ran in and sweeps its task-local
+#                  scratch whatever this says: the suite that lost its cleanup callbacks
+#                  is precisely the one that cannot clean up after itself.
 #   socket_tail    the deepest path tree the suite builds below its own task-local
 #                  scratch root, with `{uid}` replaced by the running user's id.  A run
 #                  is bounded by the longest declared tail, so the suite that creates an
