@@ -135,11 +135,11 @@ while True:
 
 # A worker that left the suite's process group (`start_new_session`, the way both launcher adapters
 # start theirs) and polls the suite's task-local scratch.  It records `beat.gone` the first time
-# that tree disappears and keeps running: these tests read "the run sent it nothing" from the worker
-# still being alive, so a fixture that exited by itself would make that reading a race with the
-# suite's own cleanup.  It counts its heartbeats so a stopped worker is distinguishable from a
-# silent one, and replaces the beat file atomically so a test reading it never sees a half-written
-# one.
+# that tree disappears and keeps running until the test stops it: the run leaves it alone, and a
+# fixture that exited by itself would make the "still running" reading a race with the suite's own
+# scratch cleanup rather than something about signals.  It counts its heartbeats so a stopped worker
+# is distinguishable from a silent one, and replaces the beat file atomically so a test reading it
+# never sees a half-written one.
 DETACHED_WORKER = '''import os
 import sys
 import time
@@ -381,22 +381,15 @@ class PatchingTestCase(unittest.TestCase):
         """Make `target.attribute` absent for this test, restoring exactly what was there before.
 
         `patch` cannot model absence — it reads the attribute to save it, and a platform where the
-        attribute genuinely does not exist is exactly the platform such a test must run on.  An
-        attribute that was never there is deleted again on the way out.
+        attribute genuinely does not exist is exactly the platform such a test must run on.  So the
+        attribute is deleted (if it was there) and, on the way out, deleted again rather than
+        restored when it never existed.
         """
         absent = object()
         saved = getattr(target, attribute, absent)
-        if saved is absent:
-            self.addCleanup(drop_attribute, target, attribute)
-        else:
+        if saved is not absent:
             delattr(target, attribute)
             self.addCleanup(setattr, target, attribute, saved)
-
-
-def drop_attribute(target, attribute: str) -> None:
-    """Delete `target.attribute` if it is there, tolerating one that a cleanup already removed."""
-    with contextlib.suppress(AttributeError):
-        delattr(target, attribute)
 
 
 def can_deliver_signals() -> bool:
@@ -1297,7 +1290,7 @@ class TeardownOwnershipTests(PatchingTestCase):
         self.assertFalse(teardown.verified)
         self.assertIn("unverified", teardown.describe())
         self.assertIsNone(process.poll(), "the probe's own child must stay untouched")
-        self.assertNotIn("delivered to", self.log_path.read_text(encoding="utf-8"),
+        self.assertNotIn(runner.DELIVERY_MARKER, self.log_path.read_text(encoding="utf-8"),
                          "the log claimed a delivery that never happened")
 
     @unittest.skipUnless(runner.WAITID_WNOWAIT, "the exit observation must not reap")
@@ -1491,7 +1484,7 @@ class TeardownOwnershipTests(PatchingTestCase):
                       "the report must name the process it left alone")
         self.assertTrue(process_running(worker.pid), "the holder must be left running")
         log_text = log_path.read_text(encoding="utf-8")
-        self.assertNotIn("delivered to", log_text, "the log claimed a delivery it never made")
+        self.assertNotIn(runner.DELIVERY_MARKER, log_text, "the log claimed a delivery it never made")
         self.assertIn("left alone", log_text)
         self.assertIn(str(worker.pid), log_text)
 
@@ -2018,15 +2011,21 @@ class EndToEndTests(PatchingTestCase):
     def assert_no_delivery_to(self, entry: dict, pid: int) -> None:
         """The run's own log must claim no delivery to `pid`: it signals only what it spawned.
 
-        A delivery is what the log records as `delivered to pid <n>, the process this run spawned`,
-        so a line naming any other pid is the run claiming a signal it may not send.  On a host that
-        cannot deliver at all the log has no delivery line to check, and the worker's liveness is
-        the only reading there is.
+        The target pid is read out of each delivery line (the runner's own `DELIVERY_TARGET_RE`)
+        rather than searched for anywhere in the line — a start time, or another delivery's pid, can
+        contain these digits too, and a line that names another pid is the run claiming a signal it
+        may not send.  The pattern comes from the runner, so rewording the line cannot silently turn
+        this into a check of nothing; where this host can deliver, an empty match set is itself a
+        failure, and where it cannot, the capability refusal is what the record carries instead
+        (asserted by the callers).
         """
         log_text = Path(entry["log"]).read_text(encoding="utf-8")
-        deliveries = [line for line in log_text.splitlines() if "delivered to" in line]
-        self.assertEqual([line for line in deliveries if str(pid) in line], [],
-                         f"the run claims a delivery to a process it did not spawn: {deliveries}")
+        targets = [int(raw) for raw in runner.DELIVERY_TARGET_RE.findall(log_text)]
+        if can_deliver_signals():
+            self.assertTrue(targets, "no delivery line for a suite this run signalled, so this check "
+                                     "would pass on any log")
+        self.assertNotIn(pid, targets,
+                         f"the run claims a delivery to a process it did not spawn: {targets}")
 
     def leftover_pids(self, pids_file: Path) -> list[int]:
         """The pids a fixture recorded, killed when the test ends.
@@ -2372,9 +2371,9 @@ class EndToEndTests(PatchingTestCase):
 
         The fixture worker does what both launcher adapters do — `start_new_session`, then poll the
         suite's task-local scratch — and records `beat.gone` the first time that tree disappears.
-        It keeps running after that, so liveness at assertion time is the run's answer about signals
-        and not a race: the run must name the worker it found in the record, deliver nothing to it,
-        and leave it running for the test to stop.
+        It keeps running until the test stops it, so the "still running" reading cannot race the
+        suite's own scratch cleanup: the run must name the worker it found in the record, its log
+        must claim no delivery to it, and it must leave it running for the test to stop.
         """
         write_suite(ARTIFACTS, "detached-worker.py", DETACHED_WORKER)
         beat = ARTIFACTS / "beat"

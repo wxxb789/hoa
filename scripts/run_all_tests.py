@@ -107,9 +107,14 @@ KILL_GRACE_SECONDS = 10.0
 EXIT_POLL_SECONDS = 0.05
 # The teardown escalation, weakest first, by name rather than by constant: `signal.SIGKILL` is not
 # defined on every platform (Windows has none), so the sequence is resolved from the names this
-# platform defines, and the capability refusal is completed before any of them is resolved
-# (`_stop_spawned`).
+# platform defines, after the capability refusal in `_stop_spawned` has been settled.
 ESCALATION_NAMES = ("SIGTERM", "SIGKILL")
+# The delivery record's wording, shared with the tests that assert what the run claims about itself:
+# one source, so a reworded line cannot silently turn a "no delivery to X" assertion into a check of
+# nothing.  The pattern reads the target pid out of a delivery line rather than searching a line for a
+# pid's digits, which its start time or another delivery can also contain.
+DELIVERY_MARKER = "delivered to pid"
+DELIVERY_TARGET_RE = re.compile(rf"\b{re.escape(DELIVERY_MARKER)} (\d+)\b")
 # `/proc` is how teardown reads the evidence every delivery is justified by: a process's start time
 # (its identity) and the live members of the group the command leads; it is also how the scratch
 # sweep finds the holders a suite left behind, since a detached worker (`start_new_session`) leaves
@@ -1079,7 +1084,7 @@ def _signal_spawned(spawned: Spawned, signum: int, log) -> tuple[bool, str | Non
             f"({exc.strerror or exc})")
     finally:
         pin.close()
-    log.write(f"[discoverer] teardown: {name} delivered to pid {spawned.pid}, the process this run"
+    log.write(f"[discoverer] teardown: {name} {DELIVERY_MARKER} {spawned.pid}, the process this run"
               f" spawned (pinned at delivery, start time {pin.start})\n".encode())
     log.flush()
     return True, None
@@ -1094,11 +1099,6 @@ def _command_stopped(spawned: Spawned, seconds: float) -> bool:
     """
     code, lost = _observe_exit(spawned.process, seconds)
     return code is not None or lost
-
-
-def _escalation_signals() -> tuple[int, ...]:
-    """The escalation signals this platform defines, in escalation order (TERM, then KILL)."""
-    return tuple(getattr(signal, name) for name in ESCALATION_NAMES if hasattr(signal, name))
 
 
 def _stop_spawned(spawned: Spawned, log) -> Teardown:
@@ -1124,7 +1124,7 @@ def _stop_spawned(spawned: Spawned, log) -> Teardown:
     if limit is not None:
         refused = (_not_sent(_spawned_target(spawned), ESCALATION_NAMES[0], limit),)
     else:
-        for signum in _escalation_signals():
+        for signum in (getattr(signal, name) for name in ESCALATION_NAMES if hasattr(signal, name)):
             delivered, note = _signal_spawned(spawned, signum, log)
             if not delivered:
                 if note is not None:
@@ -1134,9 +1134,11 @@ def _stop_spawned(spawned: Spawned, log) -> Teardown:
             if _command_stopped(spawned, KILL_GRACE_SECONDS):
                 stopped = True
                 break
-    kill = getattr(signal, "SIGKILL", None)  # absent where no KILL round could have been delivered
-    survivors = ((spawned.pid,) if signalled and signalled[-1] == kill and not stopped
-                 else ())
+    # A survivor is a process that took a delivered SIGKILL and outlived the grace; where nothing was
+    # delivered — a refused run, or a platform without KILL — there is no survivor to name, and the
+    # constant is read only when a round actually ran (it does not exist everywhere).
+    survivors = ((spawned.pid,) if signalled and not stopped
+                 and signalled[-1] == getattr(signal, "SIGKILL", None) else ())
     teardown = _group_report(spawned, log, NO_ENUMERATION)
     spawned.process.poll()  # reconcile `Popen` with an exit observed without reaping
     return teardown.merge(Teardown(
