@@ -192,39 +192,40 @@ package.
 Settling is anti-false-green. Zero executed checks never settles PASS, and a counter must account for
 every check it did not pass — including a suite that settles from a parent's log through
 `covered_by`. Each suite runs in its own process group and task-local scratch tree; a suite that did
-not finish under its own control — the runner timed it out, or a signal killed it — has what it left
-running stopped and the processes still holding that scratch stopped too (found by the cwd they were
-started in or the scratch paths in their environment, from `/proc`), before that scratch is deleted.
-Nothing is ever broadcast to a process group: a group number is read as evidence only — the members
-of the group the command leads — and every signal goes to one target at a time, through a handle
-that carries that target's identity, pinned *at delivery* rather than sampled before it. The process
-this run spawned carries an identity recorded at spawn (its pid and the start time
-`/proc/<pid>/stat` field 22 reported then); at delivery a pidfd is opened for the target
-(`os.pidfd_open`), the start time is re-read and must equal the recorded one — or, for a same-group
-member or a scratch holder, the one read in the same pass as its evidence — and only then is the
-signal sent through `signal.pidfd_send_signal`. The pidfd pins that process instance, so a pid
-someone else's reap recycled cannot receive the run's signal, a target that is gone is reported as
-gone, and escalation (TERM, a bounded grace, KILL) re-pins every target in every round instead of
-reusing an earlier round's authority. The run also establishes its own `SIGCHLD` disposition
-(`SIG_DFL`) before spawning anything and observes a command's exit without reaping it (`waitid` with
-`WNOWAIT`), which is what keeps the pid — and the group it names — from being a recycled number's
-while the teardown still needs it. Where any of that proof cannot be held — no established or
-still-live disposition, no kernel probe, no pidfd, no `/proc` to read the identity and the members
-from, a start-time re-check that fails, a target reaped by someone else — nothing is signalled and
-the teardown is reported unverified; there is no fallback to `Popen`'s cached `returncode` (which
-cannot see a reap) or to a bare pid or group number (which can name anything by the time it is
-used). The group's members are checked before a command is reaped, so a clean exit that leaves
-same-group members behind is still torn down while its own instance can still be pinned — that
-check needs `/proc` (identity *and* member enumeration) on top of `waitid` + `WNOWAIT`, so a host
-missing either one cannot run it and reports that limit instead. Every exit path — clean, timed out
-or signalled — publishes the teardown record, limits included, in the suite's entry of the result,
-so a limit is readable by whoever reads the run and not only by the helper that found it; a command
-whose exit can no longer be waited for settles as an error rather than taking the run down; and the
-residual limit is plain: a target whose identity cannot be pinned at delivery is left running and
-reported, never guessed at. The gates bound the teardown's reach on real platforms: macOS and
-Windows expose no pidfds (and no `/proc`), so there nothing is ever signalled — each teardown
-refuses and records that limit — while on Linux the same run gates every delivery as described
-above.
+not finish under its own control — the runner timed it out, or a signal killed it — has the process
+the run spawned terminated, while everything else that command left behind is *reported and left
+alone*: the members of the group the command led, and the processes still holding the suite's
+task-local scratch (found by the cwd they were started in or the scratch paths in their environment,
+from `/proc`). The rule is deliberately narrow — **the runner signals only the process it spawned** —
+because that is the one process whose identity it recorded itself; a same-group member, a scratch
+holder or any descendant is named in the suite's record and keeps running, and the suite's teardown
+is `unverified` whenever such a process is found, so the limit is readable in the result instead of
+being silently absorbed. Nothing is ever broadcast to a process group, and no signal ever goes
+through a bare pid or group number. The spawned process's identity — its pid and the start time
+`/proc/<pid>/stat` field 22 read at spawn — is pinned *at delivery* rather than sampled before it: a
+pidfd is opened for that pid (`os.pidfd_open`), the start time is re-read and must equal the recorded
+one, and only then is the signal sent through `signal.pidfd_send_signal`. The pidfd pins that
+process instance, so a pid someone else's reap recycled cannot receive the run's signal, a target
+that is gone is reported as gone, a process that has already terminated takes no signal at all, and
+escalation (TERM, a bounded grace, KILL) re-pins the target in every round instead of reusing an
+earlier round's authority. The run also establishes its own `SIGCHLD` disposition (`SIG_DFL`) before
+spawning anything and observes a command's exit without reaping it (`waitid` with `WNOWAIT`), which
+is what keeps the pid from being recycled while the teardown still needs it; the group the command
+led is read before the command is reaped, so what a clean exit left behind is reported while the
+number is still the command's own. Where any of that proof cannot be held — no established or
+still-live disposition, no kernel probe, no pidfd, no `/proc` to read the identity from, a
+start-time re-check that fails, a target reaped by someone else — nothing is signalled and the
+teardown is reported unverified; there is no fallback to `Popen`'s cached `returncode` (which cannot
+see a reap) or to a bare pid or group number (which can name anything by the time it is used). Every
+exit path — clean, timed out or signalled — publishes the teardown record, limits included, in the
+suite's entry of the result, so a limit is readable by whoever reads the run and not only by the
+helper that found it; and a command whose exit can no longer be waited for settles as an error
+rather than taking the run down. **Residual limit, stated plainly:** the runner signals only the
+process it spawned, so whatever else a suite leaves behind — a same-group member, a detached holder,
+any descendant — outlives the run; the teardown's record names it and says it was left alone. The
+gates bound the teardown's reach on real platforms: macOS and Windows expose no pidfds (and no
+`/proc`), so there nothing is ever signalled — each teardown refuses and records that limit — while
+on Linux the same run gates every delivery as described above.
 
 | Gate command (CI step) | Protects |
 |---|---|

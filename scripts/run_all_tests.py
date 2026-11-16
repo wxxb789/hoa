@@ -23,51 +23,52 @@ short `/tmp` directory of its own whenever `/tmp` can hold one — an inherited 
 consulted only where it cannot, through `tempfile`'s own chain; the default location is outside the
 checkout and `--scratch` names its own (`scratch_root_for`) — a per-suite timeout, and a teardown
 that runs whenever the suite did not finish under its own control: the runner timed it out, or a
-signal killed it (a negative exit status, `settle`).  That teardown stops what the command that did
-not finish left running, and then sweeps every process still holding the suite's task-local scratch,
-found by the cwd it was started in or the scratch paths in its environment (`_scratch_processes`;
-the sweep reads `/proc`) — before that scratch is deleted.  Nothing is ever broadcast to a process
-group: a group number is not a thing this run can prove it owns, so it is read as evidence only —
-the members of the group the command leads — and every signal goes to one target at a time,
-through a handle that carries that target's identity.
+signal killed it (a negative exit status, `settle`).  That teardown terminates the one process this
+run spawned — the process whose identity the run recorded itself (`_spawned`) — and reports, without
+touching them, what that command left behind: the members of the group the command led
+(`_group_report`), and the processes still holding the suite's task-local scratch, found by the cwd
+they were started in or the scratch paths in their environment (`_scratch_processes`; both reports
+read `/proc`).  No other process is ever signalled — not a same-group member, not a scratch holder,
+not a descendant — because a process this run did not spawn is not one it can prove it may signal:
+such a process is left running, and the suite's teardown is `unverified` whenever one is found, with
+the note that names it saying so.  Nothing is ever broadcast to a process group either, and no
+signal ever goes through a bare pid or group number: the only target is the pid this run recorded at
+spawn, signalled through a handle that carries that target's identity.
 
-Identity is pinned at delivery, not sampled before it.  The process this run spawned carries an
+Identity is pinned at delivery, not sampled before it.  The one process this run signals carries an
 identity recorded at spawn: its pid and the start time `/proc/<pid>/stat` field 22 reported then
-(`_spawned`).  At delivery a pidfd is opened for the target, the start time is re-read and must
-equal the recorded one — for the spawned process — or the one read in the same pass as the
-evidence — for a same-group member or a scratch holder — and only then is the signal sent through
-`signal.pidfd_send_signal(fd, signum)` (`_pin_identity`, `_signal_pinned`).  The pidfd pins that
-process instance, so a pid someone else's reap recycled cannot receive this run's signal, and a
-target that is gone before the signal (`ProcessLookupError`) is reported as gone instead of being
-signalled.  A group teardown is therefore per member: the round's claim is that the group number
-still names the instance this run recorded at spawn, each enumerated member is pinned in that same
-pass, and escalation (TERM, a bounded grace, KILL) re-pins every target in every round — a proof
-taken earlier, or a handle opened earlier, is never authority for a later delivery.
+(`_spawned`).  At delivery a pidfd is opened for that pid, the start time is re-read and must equal
+the recorded one, and only then is the signal sent through `signal.pidfd_send_signal(fd, signum)`
+(`_pin_identity`, `_signal_spawned`).  The pidfd pins that process instance, so a pid someone else's
+reap recycled cannot receive this run's signal, a target that is gone before the signal
+(`ProcessLookupError`) is reported as gone instead of being signalled, and a process that has
+already terminated takes no signal at all — a delivery to a corpse would be a claim, not a
+delivery.  Escalation is TERM, a bounded grace, KILL (`_stop_spawned`), and every round re-pins: a
+proof taken earlier, or a handle opened earlier, is never authority for a later delivery.
 
 Before anything is spawned the run also puts its own `SIGCHLD` disposition in `SIG_DFL`
 (`establish_exit_disposition`) — under an inherited `SIG_IGN` the kernel reaps a child inside its
 own exit and takes the status, and with it the reservation, before the run can see it — and the
 exit is observed without reaping the command (`waitid(P_PID, pid, WEXITED | WNOWAIT | WNOHANG)`,
-probed once as `WAITID_WNOWAIT`), which is what keeps the pid, and the group it names, from being a
-recycled number's while the teardown still needs it.  Where any of that proof cannot be held — no
-established or still-live disposition, no kernel probe, no pidfd, no `/proc` to read the identity
-and the members from, a start-time re-check that fails, a target reaped by someone else — nothing
-is signalled and the record says teardown is unverified; there is no weaker fallback, because
-`Popen`'s cached `returncode` cannot see a reap the kernel performed and a bare pid or group number
-can name anything by the time it is used.  The group is checked before a command is reaped, so a
-command that exits cleanly and still leaves same-group members behind is torn down while its own
-instance can still be pinned, and the teardown's record — what it terminated and what it could not
-verify — is carried into the settled outcome and the result record on every exit path, clean, timed
-out or signalled, so a limit is readable by whoever reads the run and not only by the helper that
-found it.  A command whose exit can no longer be waited for settles as an error with an unverified
-teardown instead of escaping the run.  The gates are ordered and all of them must hold where a
-signal is delivered (`_ownership_limit`): the live `SIGCHLD` disposition, `os.waitid` with
-`WNOWAIT`, pidfds, and `/proc`; where one does not — macOS and Windows have no pidfds at all —
-every teardown refuses and records its limit.  The residual limit, stated plainly: a target whose
-identity cannot be pinned at delivery is left running and reported, never guessed at.  A scratch
-tree too long to hold the toolkit's AF_UNIX socket — given the deepest
-`socket_tail` the scheduled suites
-declare in the manifest — is reported as that suite's ERROR before it runs (`socket_path_length`).
+probed once as `WAITID_WNOWAIT`), which is what keeps the pid from being recycled while the teardown
+still needs it.  Where any of that proof cannot be held — no established or still-live disposition,
+no kernel probe, no pidfd, no `/proc` to read the identity from, a start-time re-check that fails, a
+target reaped by someone else — nothing is signalled and the record says teardown is unverified;
+there is no weaker fallback, because `Popen`'s cached `returncode` cannot see a reap the kernel
+performed and a bare pid or group number can name anything by the time it is used.  The group is
+read before a command is reaped, so the members a clean exit left behind are reported while the
+number is still the command's own, and the teardown's record — what it terminated, what it found and
+left alone, and what it could not verify — is carried into the settled outcome and the result record
+on every exit path, clean, timed out or signalled, so a limit is readable by whoever reads the run
+and not only by the helper that found it.  A command whose exit can no longer be waited for settles
+as an error with an unverified teardown instead of escaping the run.  The gates are ordered and all
+of them must hold where a signal is delivered (`_ownership_limit`): the live `SIGCHLD` disposition,
+`os.waitid` with `WNOWAIT`, pidfds, and `/proc`; where one does not — macOS and Windows have no
+pidfds at all — every teardown refuses and records its limit, and the processes the suite left
+behind are left running.  The residual limit, stated plainly: the runner signals only the process it
+spawned, so whatever else a suite leaves behind outlives the run.  A scratch tree too long to hold
+the toolkit's AF_UNIX socket — given the deepest `socket_tail` the scheduled suites declare in the
+manifest — is reported as that suite's ERROR before it runs (`socket_path_length`).
 Per-suite logs stay under `.tmp-artifacts/test-runs/<UTC stamp>-<pid>/logs/`, and the JSON result
 record is `result.json` in that same run directory (`--report` writes it elsewhere).  Suite processes also keep the shim
 toolchain's absolute state directories (`shim_state_environment`), because a task-local HOME otherwise
@@ -92,7 +93,6 @@ import sys
 import tempfile
 import time
 import tomllib
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -101,7 +101,6 @@ MANIFEST_RELATIVE = Path("scripts") / "test_manifest.toml"
 DEFAULT_TIMEOUT = 120.0
 LOG_TAIL_BYTES = 128 * 1024
 KILL_GRACE_SECONDS = 10.0
-TEARDOWN_POLL_SECONDS = 0.1
 EXIT_POLL_SECONDS = 0.05
 # `/proc` is how teardown reads the evidence every delivery is justified by: a process's start time
 # (its identity) and the live members of the group the command leads; it is also how the scratch
@@ -117,7 +116,7 @@ WAITID_WNOWAIT = all(hasattr(os, name)
 # Where Python exposes pidfds, a signal is delivered through a handle that carries the target's
 # identity, never through a bare pid or a group number (module docstring).
 PIDFD_PINNING = hasattr(os, "pidfd_open") and hasattr(signal, "pidfd_send_signal")
-NO_ENUMERATION = "this platform cannot enumerate processes, so teardown is unverified"
+NO_ENUMERATION = "this platform cannot enumerate processes"
 TERMINAL_STATES = ("PASS", "FAIL", "ERROR", "TIMEOUT", "SKIP")
 FAILING_STATES = ("FAIL", "ERROR", "TIMEOUT")
 RUNTIMES = ("python", "bash", "bun", "npm")
@@ -763,13 +762,15 @@ def _write_report(report_path: Path | None, payload: dict) -> None:
 class Teardown:
     """What a teardown established, and what it could not.
 
-    `clauses` names the steps that really terminated their target — "process group" for a group
-    teardown, "detached processes" for a scratch sweep — so a record cannot claim a termination
-    that never ran or never signalled; `survivors` are the pids still running after SIGKILL;
+    `clauses` names the steps that really terminated their target — "the spawned process" is the
+    only one this run ever terminates — so a record cannot claim a termination that never ran or
+    never signalled; `survivors` are pids that actually received SIGKILL and outlived it, never a
+    process that was merely found (a process this run does not signal is not a survivor); and
     `unverified` names, one note per limit, what the teardown could not observe or justify — no
-    process enumeration on this platform, a target whose identity could not be pinned at delivery
-    and which is then not signalled at all, a group that could not be checked before a reap.  A
-    record is `verified` only when it carries neither a limit note nor a survivor.
+    process enumeration on this platform, a process found and deliberately left alone because this
+    run signals only the process it spawned, a delivery refused because the target's identity could
+    not be pinned, a group that could not be read before a reap.  A record is `verified` only when
+    it carries neither a limit note nor a survivor.
     """
 
     survivors: tuple[int, ...] = ()
@@ -797,6 +798,11 @@ class Teardown:
             claims.append("teardown incomplete: pids "
                           + ", ".join(str(pid) for pid in self.survivors) + " survived SIGKILL")
         return "; ".join(claims) if claims else "no processes remained to be terminated"
+
+
+def _unverified(statement: str) -> str:
+    """One `Teardown` limit note: what could not be established, then the consequence it has."""
+    return f"{statement}; teardown is unverified"
 
 
 def _proc_stat(pid: int) -> list[bytes] | None:
@@ -847,11 +853,13 @@ def _spawned(process: subprocess.Popen) -> Spawned:
     return Spawned(process=process, start=_start_time(process.pid))
 
 
-def _proc_pids() -> list[int] | None:
-    """Pids this platform can still see, or None when it cannot enumerate them.
+def _proc_scan() -> list[tuple[int, list[bytes]]] | None:
+    """Every live process this platform can see, each with its `/proc/<pid>/stat` fields — or None.
 
-    Zombies are left out: a zombie is terminated, holds no scratch and cannot be signalled again —
-    only its parent's `wait` is outstanding, and that parent may not be the runner.
+    One read per candidate, and the single source the reports below are built from.  Zombies are
+    left out: a zombie is terminated, holds no scratch and cannot be signalled again — only its
+    parent's `wait` is outstanding, and that parent may not be the runner.  None where nothing can
+    be enumerated.
     """
     if not PROC_ROOT.is_dir():
         return None
@@ -859,40 +867,37 @@ def _proc_pids() -> list[int] | None:
         names = os.listdir(PROC_ROOT)
     except OSError:
         return None
-    return [int(name) for name in names
-            if name.isdigit() and _proc_state(int(name)) not in (None, "Z")]
+    live: list[tuple[int, list[bytes]]] = []
+    for name in sorted(names):
+        if not name.isdigit():
+            continue
+        pid = int(name)
+        fields = _proc_stat(pid)
+        if fields is None or len(fields) <= 19 or fields[0] == b"Z":
+            continue
+        live.append((pid, fields))
+    return live
 
 
 def _group_members(group: int) -> list[tuple[int, str]] | None:
     """Live members of `group`, each with the start time read in the same pass — or None.
 
-    Membership and identity come from one read of each candidate's `/proc/<pid>/stat`: the group
-    field (`pgrp`) says the process was in `group` when that read happened, the start time is the
-    identity the delivery that follows must still find (`_pin_identity`), and a pid recycled
-    between the two would have to be recycled, and look identical again, inside one read.  Zombies
-    are left out as everywhere (`_proc_pids`); group liveness is asked independently of the leader
-    on purpose, because `process.wait()` returning says the leader exited, not that its group is
-    empty.  None where nothing can be enumerated.
+    A report, never a list of signal targets: this run signals only the process it spawned (module
+    docstring).  Membership comes from the group field (`pgrp`) of the same `/proc/<pid>/stat` read
+    the start time comes from, and zombies are left out as everywhere (`_proc_scan`).  None where
+    nothing can be enumerated.
     """
-    if not PROC_ROOT.is_dir():
-        return None
-    try:
-        names = os.listdir(PROC_ROOT)
-    except OSError:
+    scan = _proc_scan()
+    if scan is None:
         return None
     members: list[tuple[int, str]] = []
-    for name in sorted(names):
-        if not name.isdigit():
-            continue
-        fields = _proc_stat(int(name))
-        if fields is None or len(fields) <= 19 or fields[0] == b"Z":
-            continue
+    for pid, fields in scan:
         try:
             in_group = int(fields[2]) == group
         except ValueError:
             continue
         if in_group:
-            members.append((int(name), fields[19].decode()))
+            members.append((pid, fields[19].decode()))
     return members
 
 
@@ -916,105 +921,72 @@ def _refers_to_scratch(pid: int, needle: bytes) -> bool:
 
 def _scratch_processes(scratch: Path) -> list[tuple[int, str]] | None:
     """Live pids, other than the runner itself, that still point into `scratch` — with each one's
-    start time, read in the same pass — or None where nothing can be enumerated.
+    start time — or None where nothing can be enumerated.
 
-    A detached worker (`start_new_session`) leaves the suite's process group, so no group signal can
-    reach it; it does keep the task-local paths it inherited, and that is what identifies it from
-    outside — the cwd it was started in, or the HOME/TMPDIR/XDG root the suite's environment put in
-    its environment.  The start time is read immediately after that evidence, and the delivery that
-    follows must still find it (`_pin_identity`), so the match and the identity cannot be traded
-    against each other (module docstring).
+    A detached worker (`start_new_session`) leaves the suite's process group, so the group report
+    cannot reach it; it does keep the task-local paths it inherited, and that is what identifies it
+    from outside — the cwd it was started in, or the HOME/TMPDIR/XDG root the suite's environment put
+    in its environment.  The start time is taken from the same `/proc` read that found the pid, and
+    is carried for the report's sake: this is a report, never a list of signal targets — this run
+    signals only the process it spawned (module docstring).
     """
-    pids = _proc_pids()
-    if pids is None:
+    scan = _proc_scan()
+    if scan is None:
         return None
     needle = os.fsencode(str(scratch))
     own = os.getpid()
     found: list[tuple[int, str]] = []
-    for pid in pids:
+    for pid, fields in scan:
         if pid == own or not _refers_to_scratch(pid, needle):
             continue
-        start = _start_time(pid)
-        if start is None:  # gone between the evidence and its identity: nothing left to signal
-            continue
-        found.append((pid, start))
+        found.append((pid, fields[19].decode()))
     return found
 
 
-def _wait_until_gone(match: Callable[[], list | None], deadline: float) -> list | None:
-    """What `match` still finds at `deadline` (empty when nothing), or None when unenumerable."""
-    while True:
-        found = match()
-        if not found or time.monotonic() >= deadline:
-            return found
-        time.sleep(TEARDOWN_POLL_SECONDS)
+def _left_alone(log, found: list[tuple[int, str]], subject: str) -> Teardown:
+    """A record note for processes this run found and deliberately did not touch.
 
-
-def _stop_matching(match: Callable[[], list | None], log) -> Teardown:
-    """SIGTERM then SIGKILL every process `match` accepts, re-pinning identity in every round.
-
-    The predicate is re-evaluated after each round, so a process that outlives its parent — a
-    detached worker's own child — is found and signalled too, and each round's matches are the
-    evidence read again, each with the start time that goes with it.  Every match is pinned in the
-    same pass as the delivery that follows it (`_signal_pinned` with the matched start time); one
-    that cannot be pinned is not signalled and the note is recorded.  A process that outlasts
-    SIGKILL is recorded as a survivor, never assumed dead; a platform that cannot enumerate
-    processes returns an unverified teardown rather than a clean one.  The caller is the scratch
-    sweep, whose matches are the suite's detached holders, so a completed teardown records them.
+    `subject` says what they were found by (the group's membership, the scratch they still hold);
+    each note names the pids, because a report nobody can act on is not a report.  This run signals
+    only the process it spawned (module docstring), so what is found here is left running and the
+    teardown is unverified — never a survivor, which is a process that took a delivered SIGKILL.
     """
-    found = match()
-    if found is None:
-        return Teardown(unverified=(NO_ENUMERATION,))
-    signalled = False
-    refused: tuple[str, ...] = ()
-    for signum in (signal.SIGTERM, signal.SIGKILL):
-        if not found:
-            break
-        log.write(f"[discoverer] teardown: {signal.Signals(signum).name} to "
-                  f"{len(found)} process(es) {sorted(pid for pid, _start in found)}\n".encode())
-        log.flush()
-        for pid, start in found:
-            delivered, note = _signal_pinned(pid, signum, log, recorded=start)
-            signalled = signalled or delivered
-            if note is not None:
-                refused = (*refused, note)
-        found = _wait_until_gone(match, time.monotonic() + KILL_GRACE_SECONDS)
-        if found is None:
-            return Teardown(unverified=(NO_ENUMERATION, *refused))
-    if found:
-        surviving = sorted(pid for pid, _start in found)
-        log.write(f"[discoverer] teardown: pids {surviving} survived SIGKILL\n".encode())
-        log.flush()
-        return Teardown(survivors=tuple(surviving), unverified=refused)
-    return Teardown(clauses=("detached processes",) if signalled else (), unverified=refused)
+    if not found:
+        return Teardown()
+    pids = sorted(pid for pid, _start in found)
+    log.write(f"[discoverer] teardown: {len(found)} process(es) {subject} left alone (pids "
+              f"{pids})\n".encode())
+    log.flush()
+    return Teardown(unverified=(_unverified(
+        f"{len(found)} process(es) {subject} were found and left alone, because this run signals "
+        f"only the process it spawned (pids {pids})"),))
 
 
-def _sweep_scratch(scratch: Path, log_path: Path) -> Teardown:
-    """Stop the processes still holding `scratch`, before the runner deletes that tree.
+def _group_report(spawned: Spawned, log, limit: str) -> Teardown:
+    """Report what the group the command led still holds, the command's own process excluded.
 
-    Deleting the tree first would leave a launcher's watcher polling records that no longer exist.
+    Read while that process is still this run's unreaped child — the caller runs it before any
+    reap — so the number being read is still the command's own; what is found is reported and left
+    alone (module docstring).  `limit` is the note for a platform that cannot enumerate at all.
+    """
+    members = _group_members(spawned.pid)
+    if members is None:
+        return Teardown(unverified=(_unverified(limit),))
+    return _left_alone(log, [member for member in members if member[0] != spawned.pid],
+                       "in the group the command led")
+
+
+def _report_scratch(scratch: Path, log_path: Path) -> Teardown:
+    """Report the processes still holding `scratch`, before the runner deletes that tree.
+
+    Deleting the tree first would leave a launcher's watcher polling records that no longer exist;
+    the report names what still holds it and leaves it alone (module docstring).
     """
     with log_path.open("ab") as log:
-        return _stop_matching(lambda: _scratch_processes(scratch), log)
-
-
-def _group_alive(group: int) -> bool:
-    """Whether any process still names `group`, asked through the group API alone (no /proc)."""
-    try:
-        os.killpg(group, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    return True
-
-
-def _group_running(group: int) -> bool:
-    """Whether live processes remain in `group` (zombies excluded where /proc can say)."""
-    members = _group_members(group)
-    if members is not None:
-        return bool(members)
-    return _group_alive(group)
+        found = _scratch_processes(scratch)
+        if found is None:
+            return Teardown(unverified=(_unverified(NO_ENUMERATION),))
+        return _left_alone(log, found, "still holding the suite's task-local scratch")
 
 
 @dataclass(frozen=True)
@@ -1022,7 +994,6 @@ class Pin:
     """A pidfd that still refers to the process instance its start time identified."""
 
     fd: int
-    pid: int
     start: str
 
     def close(self) -> None:
@@ -1030,163 +1001,116 @@ class Pin:
             os.close(self.fd)
 
 
-def _pin_identity(pid: int, recorded: str | None = None) -> tuple[Pin | None, str | None]:
-    """Open a pidfd for the process instance `pid` names, pinned in one pass — or refuse, and say why.
-
-    The start time is the identity: it is read, the pidfd is opened, the start time is re-read and
-    must be equal, so the handle can only refer to the instance the evidence named.  Where
-    `recorded` is given — the identity the run read for this target, at spawn for the command it
-    spawned or in the same pass as the evidence for a member — the pin must still name that very
-    instance, not merely a consistent one.  Nothing about a refused pid is signalled: the returned
-    note is what the record carries instead (module docstring).
+def _pin_identity(pid: int, expected: str) -> tuple[Pin | None, str | None]:
+    """Pin `pid` to the start time `expected` — this run's evidence for that target — or refuse
+    with the reason: a pidfd opened for `pid` whose start-time re-read equals `expected`, or no
+    handle and a note (`_ownership_limit` gates the pin itself, module docstring).
     """
     limit = _ownership_limit()
     if limit is not None:
         return None, limit
-    evidence = _start_time(pid)
-    if evidence is None:
-        return None, (f"the start time of pid {pid} could not be read, so its identity could not "
-                      f"be pinned")
     try:
         fd = os.pidfd_open(pid)
     except ProcessLookupError:
-        return None, f"pid {pid} was gone before its identity could be pinned"
+        return None, f"pid {pid} was gone before a pidfd for it could be opened"
     except OSError as exc:
         return None, f"a pidfd for pid {pid} could not be opened ({exc.strerror or exc})"
     confirmed = _start_time(pid)
     if confirmed is None:
-        pin, note = None, (f"the start time of pid {pid} could not be re-read after its pidfd "
-                           f"was opened")
-    elif confirmed != evidence:
-        pin, note = None, (f"pid {pid} stopped naming the instance the evidence was read from "
-                           f"before its pidfd was opened")
-    elif recorded is not None and confirmed != recorded:
-        pin, note = None, (f"pid {pid} does not name the process instance this run recorded at "
-                           f"spawn (start time {recorded} then, {confirmed} now)")
+        note = f"the start time of pid {pid} could not be read after its pidfd was opened"
+    elif confirmed != expected:
+        note = (f"pid {pid} no longer names the process instance the evidence identified (start "
+                f"time {expected} then, {confirmed} now)")
     else:
-        return Pin(fd=fd, pid=pid, start=confirmed), None
+        return Pin(fd=fd, start=confirmed), None
     os.close(fd)
-    return pin, note
+    return None, note
 
 
-def _claim_group(spawned: Spawned) -> tuple[Pin | None, str | None]:
-    """The pin that proves the group `spawned` leads is this run's own, or why it cannot be pinned.
+def _signal_spawned(spawned: Spawned, signum: int, log) -> tuple[bool, str | None]:
+    """Deliver `signum` to the process this run spawned, or send nothing and return the reason.
 
-    The group number is the spawned process's pid, and it is the identity recorded at spawn — the
-    start time read then — that says the number still names this run's own instance rather than a
-    number a reap released and the kernel recycled; without that record, or with a re-check that
-    fails, no member of the group may be signalled (module docstring).  The group itself comes from
-    `start_new_session=True` at spawn; the pid still leading it is confirmed against the pin, since
-    a session leader cannot leave its own group.
+    The only signal this run ever sends (module docstring): the target is the pid recorded at
+    spawn, its identity is pinned at delivery (`_pin_identity` with that recorded start time), and
+    the signal goes through the pidfd.  `(True, None)` means it was delivered; `(False, None)`
+    means there was nothing to deliver (the process has already terminated, so a signal would be a
+    claim rather than a delivery); `(False, note)` is a refusal, and the note carries the reason.
     """
-    if spawned.start is None:
-        return None, ("the start time of the process this run spawned could not be read when it "
-                      "was spawned, so its identity — and the group it leads — cannot be pinned")
-    pin, note = _pin_identity(spawned.pid, recorded=spawned.start)
-    if pin is None:
-        return None, note
-    pid = pin.pid
-    with contextlib.suppress(ProcessLookupError, PermissionError):
-        if os.getpgid(pid) == pid:
-            return pin, None
-    pin.close()
-    return None, (f"pid {pid} no longer leads its own process group, so the group cannot be "
-                  f"proven this run's")
-
-
-def _signal_pinned(pid: int, signum: int, log, claimed: Pin | None = None,
-                   recorded: str | None = None) -> tuple[bool, str | None]:
-    """Deliver `signum` to `pid` through a pidfd pinned now, or refuse and return the note.
-
-    `claimed` is the pin the round's own claim already opened for this pid (the spawned process's
-    recorded identity); `recorded` is the start time read in the same pass as the evidence that
-    named this target (a group member, a scratch holder), and the pin requires the pid to still
-    name it.  A target that cannot be pinned, or that is gone before the signal is delivered, is
-    not signalled: the returned note is the record of why (module docstring).
-    """
-    pin, note = (claimed, None) if claimed is not None else _pin_identity(pid, recorded=recorded)
-    if pin is None:
-        return False, f"pid {pid} was not signalled ({note}), so teardown is unverified"
     name = signal.Signals(signum).name
+    target = f"the process this run spawned (pid {spawned.pid})"
+    limit = _ownership_limit()
+    if limit is not None:
+        return False, _unverified(f"{target} was not sent {name}: {limit}")
+    if spawned.start is None:
+        return False, _unverified(
+            f"{target} has no start time recorded at spawn, so its identity cannot be pinned and "
+            f"it was not sent {name}")
+    pin, why = _pin_identity(spawned.pid, spawned.start)
+    if pin is None:
+        return False, _unverified(f"{target} was not sent {name} ({why})")
     try:
+        if _proc_state(spawned.pid) == "Z":
+            return False, None  # already terminated: nothing to deliver, nothing to claim
         signal.pidfd_send_signal(pin.fd, signum)
     except ProcessLookupError:
-        return False, (f"pid {pid} was gone before the {name} could be delivered through its "
-                       f"pidfd, so teardown is unverified")
+        return False, _unverified(
+            f"{target} was gone before the {name} could be delivered through its pidfd")
     except OSError as exc:
-        return False, (f"the {name} could not be delivered through the pidfd of pid {pid} "
-                       f"({exc.strerror or exc}), so teardown is unverified")
+        return False, _unverified(
+            f"the {name} could not be delivered through the pidfd of {target} "
+            f"({exc.strerror or exc})")
     finally:
-        if claimed is None:
-            pin.close()
-    log.write(f"[discoverer] teardown: {name} to pid {pid} (pinned, start time "
-              f"{pin.start})\n".encode())
+        pin.close()
+    log.write(f"[discoverer] teardown: {name} delivered to pid {spawned.pid}, the process this run"
+              f" spawned (pinned at delivery, start time {pin.start})\n".encode())
     log.flush()
     return True, None
 
 
-def _stop_owned_group(spawned: Spawned, log) -> Teardown:
-    """Terminate the group `spawned` leads, per member, delivered to through identity pinned now.
+def _command_stopped(spawned: Spawned, seconds: float) -> bool:
+    """Whether the process this run spawned stopped within `seconds`, observed without reaping it.
 
-    The group number is evidence, never a signal's target: the round's own claim is that it still
-    names the process instance this run recorded at spawn (`_claim_group`), which is what makes the
-    members enumerated below this run's own group's members and not a recycled number's.  Every
-    member is then pinned in the same pass as its delivery (`_signal_pinned`) and sent the signal on
-    its own pidfd — never a group broadcast, and never on the strength of an earlier round's proof:
-    each round re-pins every target.  A member that cannot be pinned is not signalled and the note
-    is recorded; a round whose claim cannot be re-proven signals nothing and stops the escalation.
-    The leader is reaped and the group only then asked what it left (`_group_verdict`: an unreaped
-    leader is a member of its own group); a lost identity or an unreaped leader is recorded, never
-    raised — teardown must not take the run down with it.
+    One escalation round's bounded grace (`_stop_spawned`): the exit is observed with
+    `_observe_exit`, never by a blocking wait that could outlive the deadline, and where the
+    non-reaping observation is unavailable it reports the loss instead (`_observe_exit`).
     """
-    group = spawned.pid
-    signalled = False
+    code, lost = _observe_exit(spawned.process, seconds)
+    return code is not None or lost
+
+
+def _stop_spawned(spawned: Spawned, log) -> Teardown:
+    """Terminate the process this run spawned — the only process it may signal — and report the rest.
+
+    Escalation is TERM, a bounded grace, KILL, and it applies to that one process only; the grace
+    runs on a real delivery, never on a round that delivered nothing, and each round re-pins the
+    target at delivery (`_signal_spawned`).  Everything else the command left is enumerated and
+    reported, never touched (`_group_report`): a member or holder this run did not spawn is left
+    running and the teardown is unverified.  Only a process that took a delivered SIGKILL and
+    outlived the grace is a survivor; the group is read before the command is reaped, so the number
+    read is still the command's own.
+    """
+    signalled: tuple[int, ...] = ()
     refused: tuple[str, ...] = ()
+    stopped = False
     for signum in (signal.SIGTERM, signal.SIGKILL):
-        name = signal.Signals(signum).name
-        claim, note = _claim_group(spawned)
-        if claim is None:
-            log.write(f"\n[discoverer] teardown: escalation stopped before {name} to process "
-                      f"group {group}: {note}\n".encode())
-            log.flush()
-            return Teardown(unverified=(
-                f"the process group could not be re-proven this run's own before {name} ({note}), "
-                f"so its remaining members were not signalled: teardown is unverified", *refused))
-        try:
-            members = _group_members(group)
-            if members is None:
-                log.write(f"\n[discoverer] teardown: {NO_ENUMERATION}\n".encode())
-                log.flush()
-                return Teardown(unverified=(NO_ENUMERATION, *refused))
-            if not members:
-                break
-            log.write(f"[discoverer] teardown: {name} to {len(members)} process(es) "
-                      f"{sorted(pid for pid, _start in members)} in process group "
-                      f"{group}\n".encode())
-            log.flush()
-            for pid, start in members:
-                delivered, refusal = _signal_pinned(
-                    pid, signum, log, claimed=claim if pid == group else None,
-                    recorded=None if pid == group else start)
-                signalled = signalled or delivered
-                if refusal is not None:
-                    refused = (*refused, refusal)
-        finally:
-            claim.close()
-        deadline = time.monotonic() + KILL_GRACE_SECONDS
-        while time.monotonic() < deadline and _group_running(group):
-            time.sleep(TEARDOWN_POLL_SECONDS)
-    leader_reaped = _reap(spawned.process)
-    if not leader_reaped:
-        log.write(f"[discoverer] suite process {spawned.pid} still not reaped "
-                  f"{KILL_GRACE_SECONDS:g}s after teardown\n".encode())
-        log.flush()
-    teardown = _group_verdict(group, signalled=signalled, leader_reaped=leader_reaped)
-    if refused:
-        teardown = teardown.merge(Teardown(unverified=refused))
-    if not leader_reaped:
-        teardown = teardown.merge(Teardown(survivors=(spawned.pid,)))
-    return teardown
+        delivered, note = _signal_spawned(spawned, signum, log)
+        if not delivered:
+            if note is not None:
+                refused = (*refused, note)
+            break
+        signalled = (*signalled, signum)
+        if _command_stopped(spawned, KILL_GRACE_SECONDS):
+            stopped = True
+            break
+    survivors = ((spawned.pid,) if signalled and signalled[-1] == signal.SIGKILL and not stopped
+                 else ())
+    teardown = _group_report(spawned, log, NO_ENUMERATION)
+    spawned.process.poll()  # reconcile `Popen` with an exit observed without reaping
+    return teardown.merge(Teardown(
+        clauses=("the spawned process",) if signalled and stopped else (),
+        survivors=survivors,
+        unverified=refused,
+    ))
 
 
 # Whether this run put its own `SIGCHLD` disposition in the state ownership rests on (`SIG_DFL`),
@@ -1215,15 +1139,14 @@ def _ownership_limit() -> str | None:
 
     The gates are ordered and all of them must hold where a signal is delivered: this run's live
     `SIGCHLD` disposition, the non-reaping exit observation, pidfds, and `/proc` — the identity
-    (start times) and the members every delivery is justified by.
+    (start times) every delivery is justified by.
     """
-    if (not EXIT_DISPOSITION or not hasattr(signal, "SIGCHLD")
-            or signal.getsignal(signal.SIGCHLD) != signal.SIG_DFL):
+    if not EXIT_DISPOSITION or signal.getsignal(signal.SIGCHLD) != signal.SIG_DFL:
         return ("this run has no child-reaping SIGCHLD disposition of its own, so no process can "
                 "be proven this run's")
     if not WAITID_WNOWAIT:
-        return ("this platform cannot observe a child's exit without reaping it, so no process "
-                "group can be proven this run's")
+        return ("this platform cannot observe a child's exit without reaping it, so the pid this "
+                "run spawned cannot be proven still its own")
     if not PIDFD_PINNING:
         return ("this platform cannot open a pidfd, so a signal's target identity cannot be "
                 "pinned at delivery")
@@ -1233,35 +1156,17 @@ def _ownership_limit() -> str | None:
     return None
 
 
-def _group_verdict(group: int, *, signalled: bool, leader_reaped: bool) -> Teardown:
-    """What `group` looks like after the leader this run reaps is out of the way.
-
-    Only a group this run actually signalled, whose leader it reaped, and which is verifiably
-    empty — no member this platform can enumerate, and the group's own signal-0 probe silent — is
-    recorded as terminated; a member still alive is a survivor, and a platform that cannot
-    enumerate members records the limit instead of a claim.
-    """
-    members = _group_members(group)
-    if members:
-        return Teardown(survivors=tuple(sorted(pid for pid, _start in members)))
-    if members is None and _group_alive(group):
-        return Teardown(unverified=(
-            "the group outlived SIGKILL and this platform cannot enumerate its members, "
-            "so teardown is unverified",))
-    return Teardown(clauses=("process group",)) if signalled and leader_reaped else Teardown()
-
-
 def _observe_exit(process: subprocess.Popen, timeout: float) -> tuple[int | None, bool]:
     """The exit code `process` reaches within `timeout`, or None at the deadline — plus whether
     the status was lost instead of observed (the child is not waitable any more).
 
     Where Python exposes `os.waitid` with `WNOWAIT` (probed once as `WAITID_WNOWAIT`), the exit is
-    observed without reaping the child, which is what keeps the pid — and the group it names —
-    reserved for a teardown that still needs the identity recorded at spawn — and the loss is
-    reported rather than raised when the child is not waitable any more.  Where the non-reaping
-    observation is unavailable, `subprocess`'s own wait is used; it reaps the child, and it absorbs
-    the same loss as an exit status of 0, which is why the cached `returncode` is never this run's
-    evidence.  The value follows `subprocess`: a negative number is the killing signal.
+    observed without reaping the child, which is what keeps the pid reserved for a teardown that
+    still needs the identity recorded at spawn — and the loss is reported rather than raised when
+    the child is not waitable any more.  Where the non-reaping observation is unavailable,
+    `subprocess`'s own wait is used; it reaps the child, and it absorbs the same loss as an exit
+    status of 0, which is why the cached `returncode` is never this run's evidence.  The value
+    follows `subprocess`: a negative number is the killing signal.
     """
     if not WAITID_WNOWAIT:
         try:
@@ -1283,20 +1188,6 @@ def _observe_exit(process: subprocess.Popen, timeout: float) -> tuple[int | None
         time.sleep(min(EXIT_POLL_SECONDS, remaining))
 
 
-def _reap(process: subprocess.Popen) -> bool:
-    """Reap the command's own process within the grace window; False while it cannot be reaped.
-
-    Reaping here is what lets the group's own signal-0 probe be asked afterwards without the
-    unreaped leader looking like a live member.  `Popen.wait` absorbs a `ChildProcessError` (the
-    child may have been reaped elsewhere) as exit status 0 — that is why the exit is read through
-    `_observe_exit`, never from the cached `returncode`; only "is it reaped" is asked here.
-    """
-    if process.poll() is None:
-        with contextlib.suppress(subprocess.TimeoutExpired):
-            process.wait(timeout=KILL_GRACE_SECONDS)
-    return process.poll() is not None
-
-
 def _run_commands(commands: tuple[tuple[str, ...], ...], *, cwd: Path, env: dict[str, str],
                   timeout: float, log_path: Path,
                   appending: bool = False) -> tuple[int | None, bool, float, Teardown, bool]:
@@ -1305,11 +1196,11 @@ def _run_commands(commands: tuple[tuple[str, ...], ...], *, cwd: Path, env: dict
     Returns the exit code, whether the deadline hit, the seconds taken, the teardown record and
     whether an exit was observed at all.  A command that timed out or died by a signal is torn
     down before this returns, while its own instance can still be pinned — the identity recorded at
-    spawn (`_spawned`, read right after `Popen` returns); a command that exited on its own is
-    checked for the same-group members it left behind before it is reaped
-    (`_teardown_before_reap`), and every command's teardown merges into the record this returns.
-    `observed` is False where the exit status was lost (`_observe_exit`): the suite then settles as
-    an error on an unverified teardown rather than on a status the kernel discarded.
+    spawn (`_spawned`, read right after `Popen` returns); a command that exited on its own has the
+    members of the group it led reported before it is reaped (`_teardown_before_reap`), and every
+    command's teardown merges into the record this returns.  `observed` is False where the exit
+    status was lost (`_observe_exit`): the suite then settles as an error on an unverified teardown
+    rather than on a status the kernel discarded.
     """
     started = time.monotonic()
     last_code: int | None = 0
@@ -1344,16 +1235,17 @@ def _run_commands(commands: tuple[tuple[str, ...], ...], *, cwd: Path, env: dict
                           b"status is gone, so nothing can be proven about it\n")
                 log.flush()
                 return None, False, time.monotonic() - started, teardown.merge(Teardown(
-                    unverified=("its process group could not be checked, so teardown is "
-                                "unverified",))), False
+                    unverified=(_unverified(
+                        "the process this run spawned could no longer be waited for, so nothing "
+                        "about what it left behind was established"),))), False
             if code is None:
-                teardown = teardown.merge(_terminate_group(spawned, log))
+                teardown = teardown.merge(_stop_spawned(spawned, log))
                 return process.poll(), True, time.monotonic() - started, teardown, True
             last_code = code
             if code < 0:
                 # A signal killed the command: its own cleanup callbacks did not run, and, where
                 # the exit was observed without reaping, its identity is still pinnable.
-                teardown = teardown.merge(_terminate_group(spawned, log))
+                teardown = teardown.merge(_stop_spawned(spawned, log))
                 return last_code, False, time.monotonic() - started, teardown, True
             teardown = teardown.merge(_teardown_before_reap(spawned, log))
             if code != 0:
@@ -1365,47 +1257,22 @@ def _display(argv: tuple[str, ...]) -> str:
     return " ".join(argv)
 
 
-def _terminate_group(spawned: Spawned, log) -> Teardown:
-    """Terminate what the command `spawned` was recorded for left running: its group, per member.
-
-    The group's own path is `_stop_owned_group` (identity pinned at delivery decides everything:
-    module docstring).  A platform without POSIX process groups has no members to read and no
-    group liveness to ask, so nothing is signalled and the record says the teardown is unverified —
-    there is no fallback to a bare pid, which can name anything by the time it is used.
-    """
-    if not (hasattr(os, "getpgid") and hasattr(os, "killpg")):
-        return Teardown(unverified=(
-            "this platform has no process groups, so nothing was signalled for the command that "
-            "did not finish: teardown is unverified",))
-    return _stop_owned_group(spawned, log)
-
-
 def _teardown_before_reap(spawned: Spawned, log) -> Teardown:
-    """Stop what a command that exited under its own control left in its process group.
+    """Report what a command that exited under its own control left in its process group, and reap it.
 
     A command can exit — 0 or not — and still leave same-group members behind, and one whose
-    environment is empty and whose cwd is outside the scratch matches no sweep; once the command is
-    reaped its pid is no evidence at all, so the check must run while its identity — the start time
-    recorded at spawn — can still be pinned.  With no recorded identity, or no members to
-    enumerate, the check cannot run, and the record says so instead of claiming the group emptied.
+    environment is empty and whose cwd is outside the scratch matches no scratch report; once the
+    command is reaped its pid is no evidence at all, so the group is read while its own unreaped
+    instance still holds the number.  What is found is reported and left alone — this run signals
+    only the process it spawned (module docstring) — and where the group cannot be read at all, the
+    record says the check could not run instead of claiming the group emptied.
     """
-    claim, reason = _claim_group(spawned)
-    members = _group_members(spawned.pid) if claim is not None else None
-    if claim is not None:
-        claim.close()
-    if members is None:
-        spawned.process.wait()
-        return Teardown(unverified=(
-            f"the process group of a command that exited could not be checked before the reap "
-            f"({reason or NO_ENUMERATION}), so members it left behind may have survived: teardown "
-            f"is unverified",))
-    if not members:
-        spawned.process.wait()
-        return Teardown()
-    log.write(f"[discoverer] teardown: an exited command left {len(members)} process(es) in its "
-              f"group {spawned.pid}; stopping it\n".encode())
-    log.flush()
-    return _stop_owned_group(spawned, log)
+    teardown = _group_report(
+        spawned, log,
+        f"the process group of a command that exited could not be checked before the reap "
+        f"({NO_ENUMERATION})")
+    spawned.process.wait()
+    return teardown
 
 
 def _read_log(path: Path, limit: int | None = None) -> str:
@@ -1508,11 +1375,10 @@ def settle(suite: Suite, *, exit_code: int | None, timed_out: bool, output: str,
            teardown: Teardown | None = None, exit_observed: bool = True) -> tuple[str, dict, str]:
     """Settle one scheduled suite as PASS, FAIL, ERROR or TIMEOUT.
 
-    Every state is computed once here and the teardown's own account is appended at the single
-    return: a teardown that could not be verified, or left survivors, must be readable in the
-    reason of the outcome it belongs to, not only in the helper that produced it (module
-    docstring).  A timeout and a lost exit name what teardown established either way, since the
-    suite never finished under its own control and there is no settle to read there.
+    The teardown's own account is appended to the reason wherever the suite did not finish under
+    its own control: a timeout, a lost exit and a death by signal name what teardown established
+    whether or not the record is verified, and every other outcome appends it when there is a
+    limit or a survivor to report (`_teardown_note`, module docstring).
     """
     if timed_out:
         effective = suite.timeout if timeout is None else timeout
@@ -1624,7 +1490,7 @@ def run_suite(suite: Suite, *, root: Path, scratch_root: Path, log_root: Path,
         if not provisioned:
             reason = "provisioning failed: " + _display(suite.provision[0])
             if timed_out or not observed or (code is not None and code < 0):
-                teardown = teardown.merge(_sweep_scratch(suite_scratch, log_path))
+                teardown = teardown.merge(_report_scratch(suite_scratch, log_path))
             if not teardown.verified:
                 reason += "; " + teardown.describe()
             outcome = Outcome(
@@ -1644,9 +1510,9 @@ def run_suite(suite: Suite, *, root: Path, scratch_root: Path, log_root: Path,
     teardown = teardown.merge(command_teardown)
     if timed_out or not observed or (code is not None and code < 0):
         # The suite's own cleanup callbacks did not run — the runner timed it out, a signal killed
-        # it, or its exit was lost — so stop what still holds its scratch before that tree is
-        # deleted.
-        teardown = teardown.merge(_sweep_scratch(suite_scratch, log_path))
+        # it, or its exit was lost — so report what still holds its scratch before that tree is
+        # deleted, and leave those processes alone (the run signals only what it spawned).
+        teardown = teardown.merge(_report_scratch(suite_scratch, log_path))
     output = _read_log(log_path)
     state, counts, reason = settle(suite, exit_code=code, timed_out=timed_out, output=output,
                                    provisioned=provisioned, timeout=timeout, teardown=teardown,
@@ -1792,11 +1658,12 @@ def _teardown_record(teardown: Teardown | None) -> dict | None:
     """The published account of a teardown, or None where no command teardown was ever observed.
 
     A record is published for every suite whose command vector ran — a clean `PASS` whose group was
-    checked before its reap, a `Popen` that could not be started, a provisioning failure — and it
+    read before its reap, a `Popen` that could not be started, a provisioning failure — and it
     is None only where `run_suite` returned before execution or the suite never executed at all (a
     covered child, a condition-skipped suite, an unusable scratch root).  `verified` is False
-    wherever the record carries a limit note or a pid that outlived SIGKILL; `clauses` names the
-    steps that really terminated their target, `unverified` one note per limit (module docstring).
+    wherever the record carries a limit note or a pid that took a SIGKILL and outlived it;
+    `clauses` names the steps that really terminated their target, `unverified` one note per limit
+    (module docstring).
     """
     if teardown is None:
         return None

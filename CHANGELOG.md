@@ -41,33 +41,38 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
 - Suite processes keep the shim toolchain's absolute state directories (`MISE_STATE_DIR`,
   `MISE_DATA_DIR`), so a mise-managed `bun` on `PATH` runs under the task-local `HOME` instead of
   refusing with "Config files … are not trusted" or re-installing the tool into the scratch tree.
-- Teardown is observed, not assumed, and covers every uncontrolled suite exit. The escalation
-  follows the process *group* rather than its leader, so a leader that exits on SIGTERM no longer
-  ends it while a same-group descendant keeps running; a suite the runner timed out, or one a signal
-  killed before its cleanup callbacks could run, has its process group terminated (POSIX only,
-  through `os.killpg`) and the processes still holding its task-local scratch stopped — identified
-  by the cwd they were started in or the scratch paths in their environment, from `/proc` — before
-  that scratch is deleted. Ownership is an invariant the run maintains, not a fact sampled once: it
-  puts its own `SIGCHLD` disposition in `SIG_DFL` before anything is spawned (an inherited `SIG_IGN`
-  has the kernel reap a child — status and all — inside its own exit), signals a group only while
-  the kernel still holds the command's own process as this run's unreaped child (`waitid` with
-  `WNOWAIT`: the reservation that keeps a pid which still names its own group from being a recycled
-  number), re-proves that anchor before every escalation round so a proof lost mid-teardown stops
-  the escalation, and signals a scratch holder only while it still points into the suite's own
-  task-local scratch. Where the proof cannot be held — no kernel probe, no established disposition,
-  an externally reaped child, a platform without the capability — nothing is signalled, nothing
-  falls back to `Popen`'s cached `returncode` (which cannot see a reap), and the record says
-  teardown is unverified. The check runs before a command is reaped, so a command that exits cleanly
-  and still leaves same-group members behind is torn down while its group is still provable; every
-  exit path — clean, timed out or signalled — carries the teardown record, limits included, into the
-  settled outcome and the published result, so a limit is readable by whoever reads the run instead
-  of vanishing with the helper that found it; and a command whose exit can no longer be waited for
-  settles as an error rather than taking the discoverer down. Residual limit, stated plainly: a
-  survivor whose group can no longer be proven the run's own is left running and reported as
-  unverified, never guessed at — no macOS/BSD host runs the pre-reap check at all (it needs `/proc`
-  member enumeration on top of `waitid` with `WNOWAIT`), and where Python exposes no
-  `waitid`/`WNOWAIT` (macOS before 3.13) no group can be proven. Both launcher suites declare the
-  detached resource its sweep owns in `scripts/test_manifest.toml`.
+- Teardown is observed, not assumed, and stops at the one process the run can prove is its own. The
+  teardown terminates the process the runner spawned — TERM, a bounded grace, KILL, re-pinned
+  through a pidfd at every round — and *reports, without touching*, everything else that command
+  left behind: the members of the group it led, and the processes still holding its task-local
+  scratch (identified by the cwd they were started in or the scratch paths in their environment,
+  from `/proc`). The rule is deliberately narrow: the runner signals only the process it spawned,
+  because that is the one process whose identity it recorded itself — a same-group member, a scratch
+  holder or any descendant is named in the suite's record and left running, and the suite's teardown
+  is `unverified` whenever such a process is found. Nothing is ever broadcast to a process group,
+  and no signal goes through a bare pid or group number; the spawned process's identity (its pid and
+  the start time `/proc/<pid>/stat` field 22 read at spawn) is pinned *at delivery* — pidfd opened,
+  start time re-read and required to equal the record — so a pid someone else's reap recycled cannot
+  receive the run's signal, a process that has already terminated takes no signal at all, and only a
+  process that took a delivered SIGKILL and outlived the grace is recorded as a survivor. Ownership
+  is an invariant the run maintains, not a fact sampled once: it puts its own `SIGCHLD` disposition
+  in `SIG_DFL` before anything is spawned (an inherited `SIG_IGN` has the kernel reap a child —
+  status and all — inside its own exit) and observes a command's exit without reaping it (`waitid`
+  with `WNOWAIT`), which keeps the pid from being recycled while the teardown still needs it; the
+  group is read before a command is reaped, so what a clean exit left behind is reported while the
+  number is still that command's own. Where the proof cannot be held — no kernel probe, no
+  established disposition, no pidfd, no `/proc`, an externally reaped child, a platform without the
+  capability — nothing is signalled, nothing falls back to `Popen`'s cached `returncode` (which
+  cannot see a reap) or to a bare pid or group number, and the record says teardown is unverified. A
+  refused delivery waits out no kill grace and is never written as a survivor or as a delivery the
+  log never made. Every exit path — clean, timed out or signalled — carries the teardown record,
+  limits included, into the settled outcome and the published result, so a limit is readable by
+  whoever reads the run instead of vanishing with the helper that found it; and a command whose exit
+  can no longer be waited for settles as an error rather than taking the discoverer down. Residual
+  limit, stated plainly: the runner signals only the process it spawned, so whatever else a suite
+  leaves behind outlives the run — on a host with no pidfd, no `/proc` or no established `SIGCHLD`
+  disposition nothing is signalled at all, and each teardown records that limit. Both launcher suites
+  declare the detached resource the report covers in `scripts/test_manifest.toml`.
 - The suite `PATH` prepends the selected interpreter's own directory without resolving it: a POSIX
   virtual environment's `bin/python3` is a symlink to the base interpreter, and resolving it handed a
   suite's own `python3` the base interpreter instead of the environment that carries the repository

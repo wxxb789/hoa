@@ -150,3 +150,11 @@ branch, so the durable form of that evidence is the detector each fault has here
 | missing runtime | the same test: `canned:missing-runtime` settles ERROR (environment), never FAIL |
 | empty discovery set | `DiscoveryTests.test_empty_discovery_is_a_plan_error`, `test_unmet_floor_is_a_plan_error` and `EndToEndTests.test_an_untrustworthy_plan_exits_two_and_says_so` (exit 2, both problems named) |
 | zero-test unittest and zero-count custom adapters (separately required) | `SettleTests.test_unittest_suite_with_zero_collected_tests_is_error`, `test_unittest_suite_that_skips_every_test_is_error`, `test_counter_suite_with_zero_checks_is_error`, `test_covered_unittest_child_that_skips_every_test_is_error`, and the same end-to-end test's `test_zero.py`, `test_skipped.py` and `canned:empty-counter` |
+
+The hang row's three detectors were renamed by PR #69 when the teardown stopped signalling anything but
+the process the run spawned; the faults they detect are unchanged, and they are now
+`EndToEndTests.test_timeout_stops_the_process_it_spawned_and_reports_the_group`,
+`test_escalation_stops_the_spawned_process_and_the_member_is_only_reported` and
+`test_a_detached_worker_is_reported_before_the_scratch_goes` (the same TIMEOUT, the same TERM →
+grace → KILL escalation — now applied to the process the run spawned, whose own exit on SIGTERM ends
+it — and a `start_new_session` worker named in the record and left running instead of stopped).
