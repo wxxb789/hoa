@@ -64,10 +64,11 @@
 #                  `start_new_session` launcher workers), the mechanism that makes them
 #                  leave the suite's process group, and where their teardown is asserted.
 #                  Declarative: whenever the suite did not finish under its own control —
-#                  a timeout, or a death by signal — the runner terminates the surviving
-#                  members of the groups its commands ran in and sweeps its task-local
-#                  scratch whatever this says: the suite that lost its cleanup callbacks
-#                  is precisely the one that cannot clean up after itself.
+#                  a timeout, or a death by signal — the runner sweeps the processes
+#                  still holding the suite's task-local scratch whatever this says (the
+#                  sweep reads /proc).  Same-group termination is not this field: it is
+#                  the runner's own POSIX group teardown (`os.killpg`), and it signals
+#                  only a group the run can still prove is its own.
 #   socket_tail    the deepest path tree the suite builds below its own task-local
 #                  scratch root, with `{uid}` replaced by the running user's id.  A run
 #                  is bounded by the longest declared tail, so the suite that creates an

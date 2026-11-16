@@ -23,11 +23,16 @@ short `/tmp` directory of its own whenever `/tmp` can hold one — an inherited 
 consulted only where it cannot, through `tempfile`'s own chain; the default location is outside the
 checkout and `--scratch` names its own (`scratch_root_for`) — a per-suite timeout, and a teardown
 that runs whenever the suite did not finish under its own control: the runner timed it out, or a
-signal killed it (a negative exit status, `settle`).  That teardown terminates the surviving members
-of the process groups the suite's commands ran in — each group id recorded at spawn, because a
-killed leader is reaped before its group could be asked for — and then sweeps every process still
-holding the suite's task-local scratch, found by the cwd it was started in or the scratch paths in
-its environment (`_scratch_processes`) — before that scratch is deleted.  A scratch tree
+signal killed it (a negative exit status, `settle`).  That teardown terminates the process group of
+the command that did not finish — POSIX only, through `os.killpg` — and then sweeps every process
+still holding the suite's task-local scratch, found by the cwd it was started in or the scratch
+paths in its environment (`_scratch_processes`; the sweep and every per-pid signal read `/proc`) —
+before that scratch is deleted.  Both parts signal only what this run can prove is its own: a
+process group is signalled only while the command's own process is still unreaped — the command was
+spawned as a session leader (`start_new_session`), and the kernel does not recycle an unreaped
+child's pid, so a group id that still equals that process's own group cannot be a recycled number —
+and a scratch holder only while it still points into the suite's own task-local scratch.  Where
+neither proof holds, no signal is sent and the record reports teardown as unverified.  A scratch tree
 too long to hold the toolkit's AF_UNIX socket — given the deepest `socket_tail` the scheduled suites
 declare in the manifest — is reported as that suite's ERROR before it runs (`socket_path_length`).
 Per-suite logs stay under `.tmp-artifacts/test-runs/<UTC stamp>-<pid>/logs/`, and the JSON result
@@ -64,9 +69,15 @@ DEFAULT_TIMEOUT = 120.0
 LOG_TAIL_BYTES = 128 * 1024
 KILL_GRACE_SECONDS = 10.0
 TEARDOWN_POLL_SECONDS = 0.1
+EXIT_POLL_SECONDS = 0.05
 # `/proc` is how teardown sees what a suite left behind: a detached worker
 # (`start_new_session`) leaves the suite's process group, so the group cannot show it.
 PROC_ROOT = Path("/proc")
+# POSIX lets a command's exit be observed without reaping it (`waitid` + `WNOWAIT`), which keeps
+# the pid — and with it the teardown's ownership proof (`_owned_group`) — reserved.
+WAITID_WNOWAIT = all(hasattr(os, name)
+                     for name in ("waitid", "WNOWAIT", "WEXITED", "WNOHANG", "CLD_EXITED"))
+NO_ENUMERATION = "this platform cannot enumerate processes, so teardown is unverified"
 TERMINAL_STATES = ("PASS", "FAIL", "ERROR", "TIMEOUT", "SKIP")
 FAILING_STATES = ("FAIL", "ERROR", "TIMEOUT")
 RUNTIMES = ("python", "bash", "bun", "npm")
@@ -709,31 +720,41 @@ def _write_report(report_path: Path | None, payload: dict) -> None:
 
 @dataclass(frozen=True)
 class Teardown:
-    """What a timeout did and did not stop.
+    """What a teardown established, and what it could not.
 
-    `survivors` are the pids still running after SIGKILL; `verified` is False where this platform
-    cannot enumerate processes at all, so the record reports that limit instead of claiming a
-    teardown nothing observed.
+    `clauses` names the steps that really terminated something — "process group" for a group
+    teardown, "detached processes" for a scratch sweep — so a record cannot claim a termination
+    that never ran or never signalled; `survivors` are the pids still running after SIGKILL;
+    `verified` is False where the teardown could not observe or justify its own outcome — no
+    process enumeration on this platform, or a group whose ownership could not be established and
+    which is then not signalled at all — with `unverified` naming that limit.
     """
 
     survivors: tuple[int, ...] = ()
     verified: bool = True
+    clauses: tuple[str, ...] = ()
+    unverified: str = ""
 
     def merge(self, other: "Teardown") -> "Teardown":
         return Teardown(
             survivors=tuple(sorted(set(self.survivors) | set(other.survivors))),
             verified=self.verified and other.verified,
+            clauses=tuple(dict.fromkeys(self.clauses + other.clauses)),
+            unverified="; ".join(dict.fromkeys(
+                part for part in (self.unverified, other.unverified) if part)),
         )
 
     def describe(self) -> str:
-        """One clause naming what the teardown could establish, for the suite's record."""
+        """What the teardown could establish, for the suite's record."""
+        claims: list[str] = []
+        if self.clauses and not self.survivors:
+            claims.append(" and ".join(self.clauses) + " terminated")
         if not self.verified:
-            return ("signalled, but this platform cannot enumerate processes, so teardown "
-                    "is unverified")
+            claims.append(self.unverified or "teardown is unverified")
         if self.survivors:
-            return ("teardown incomplete: pids " + ", ".join(str(pid) for pid in self.survivors)
-                    + " survived SIGKILL")
-        return "process group and detached processes terminated"
+            claims.append("teardown incomplete: pids "
+                          + ", ".join(str(pid) for pid in self.survivors) + " survived SIGKILL")
+        return "; ".join(claims) if claims else "no processes remained to be terminated"
 
 
 def _proc_state(pid: int) -> str | None:
@@ -825,89 +846,147 @@ def _wait_until_gone(match: Callable[[], list[int] | None], deadline: float) -> 
 def _stop_matching(match: Callable[[], list[int] | None], log) -> Teardown:
     """SIGTERM then SIGKILL every process `match` accepts, re-checking between the rounds.
 
-    The predicate is re-evaluated after each round, so a process that outlives its parent — a group
-    member whose leader already exited, or a detached worker's own child — is found and signalled
-    too.  A process that outlasts SIGKILL is recorded as a survivor, never assumed dead; a platform
-    that cannot enumerate processes returns `verified=False` rather than a clean teardown.
+    The predicate is re-evaluated after each round, so a process that outlives its parent — a
+    detached worker's own child — is found and signalled too.  A process that outlasts SIGKILL is
+    recorded as a survivor, never assumed dead; a platform that cannot enumerate processes returns
+    an unverified teardown rather than a clean one.  The caller is the scratch sweep, whose matches
+    are the suite's detached holders, so a completed teardown records them as such.
     """
     found = match()
     if found is None:
-        return Teardown(verified=False)
+        return Teardown(verified=False, unverified=NO_ENUMERATION)
+    signalled = False
     for signum in (signal.SIGTERM, signal.SIGKILL):
         if not found:
-            return Teardown()
+            break
         log.write(f"[discoverer] teardown: {signal.Signals(signum).name} to "
                   f"{len(found)} process(es) {sorted(found)}\n".encode())
         log.flush()
+        signalled = True
         for pid in found:
             with contextlib.suppress(ProcessLookupError, PermissionError):
                 os.kill(pid, signum)
         found = _wait_until_gone(match, time.monotonic() + KILL_GRACE_SECONDS)
         if found is None:
-            return Teardown(verified=False)
+            return Teardown(verified=False, unverified=NO_ENUMERATION)
     if found:
         log.write(f"[discoverer] teardown: pids {sorted(found)} survived SIGKILL\n".encode())
         log.flush()
-    return Teardown(survivors=tuple(sorted(found)))
+        return Teardown(survivors=tuple(sorted(found)))
+    return Teardown(clauses=("detached processes",) if signalled else ())
 
 
 def _sweep_scratch(scratch: Path, log_path: Path) -> Teardown:
     """Stop the processes still holding `scratch`, before the runner deletes that tree.
 
-    A suite whose own cleanup callbacks did not run — the runner timed it out, or a signal killed
-    it — cannot stop what it detached; deleting the tree first would leave a launcher's watcher
-    polling records that no longer exist.
+    Deleting the tree first would leave a launcher's watcher polling records that no longer exist.
     """
     with log_path.open("ab") as log:
         return _stop_matching(lambda: _scratch_processes(scratch), log)
 
 
-def _terminate_groups(groups: tuple[int, ...], log_path: Path) -> Teardown:
-    """Stop the surviving members of the process groups `groups`.
+def _group_alive(group: int) -> bool:
+    """Whether any process still names `group`, asked through the group API alone (no /proc)."""
+    try:
+        os.killpg(group, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
 
-    The leader may be gone while the members it left behind are still in its group — a group
-    holds no liveness of the leader's — and a leader killed by a signal is reaped before its
-    group could be asked for; the ids recorded at spawn time are what still find those members.
+
+def _group_running(group: int) -> bool:
+    """Whether live processes remain in `group` (zombies excluded where /proc can say)."""
+    members = _group_members(group)
+    if members is not None:
+        return bool(members)
+    return _group_alive(group)
+
+
+def _stop_group(group: int, log) -> Teardown:
+    """SIGTERM then SIGKILL the process group `group`, re-checking between the rounds.
+
+    The signal goes out through `os.killpg`, so a platform with the POSIX group API needs no /proc
+    to reach the group; the re-check names live members from /proc where it can and otherwise falls
+    back to the group's own signal-0 probe.  Called only for a group this run proved is its own
+    (`_owned_group`).
     """
-    teardown = Teardown()
-    if not (groups and hasattr(os, "killpg")):
-        return teardown
-    with log_path.open("ab") as log:
-        for group in groups:
-            log.write(f"[discoverer] cleanup: terminating process group {group}\n".encode())
-            log.flush()
-            teardown = teardown.merge(_stop_matching(lambda g=group: _group_members(g), log))
-    return teardown
+    signalled = False
+    for signum in (signal.SIGTERM, signal.SIGKILL):
+        if not _group_running(group):
+            break
+        log.write(f"[discoverer] teardown: {signal.Signals(signum).name} to process group "
+                  f"{group}\n".encode())
+        log.flush()
+        signalled = True
+        with contextlib.suppress(ProcessLookupError, PermissionError):
+            os.killpg(group, signum)
+        deadline = time.monotonic() + KILL_GRACE_SECONDS
+        while time.monotonic() < deadline and _group_running(group):
+            time.sleep(TEARDOWN_POLL_SECONDS)
+    return Teardown(clauses=("process group",) if signalled else ())
 
 
-def _abnormal_cleanup(scratch: Path, log_path: Path, groups: tuple[int, ...],
-                      teardown: Teardown) -> Teardown:
-    """Stop what a suite left behind when its own cleanup callbacks could not run.
+def _owned_group(process: subprocess.Popen) -> int | None:
+    """The group `process` provably leads, or None where ownership cannot be established.
 
-    A timed-out suite was killed by the runner and a signal-killed one never reached its exit
-    path; either way the members of the groups its commands ran in, and the processes still
-    holding its task-local scratch, must be stopped before that scratch is deleted (see
-    `_scratch_processes`).
+    Two checks, each load-bearing: this run has not reaped the process (`returncode`), and its pid
+    still names the group that process leads (`os.getpgid`) — the module docstring's ownership rule.
     """
-    return (teardown
-            .merge(_terminate_groups(groups, log_path))
-            .merge(_sweep_scratch(scratch, log_path)))
+    if process.returncode is not None:
+        return None
+    with contextlib.suppress(ProcessLookupError, PermissionError):
+        if os.getpgid(process.pid) == process.pid:
+            return process.pid
+    return None
+
+
+def _group_verdict(group: int) -> Teardown:
+    """What remains of `group`, asked after the leader this run reaps is out of the way."""
+    members = _group_members(group)
+    if members is not None:
+        return Teardown(survivors=tuple(sorted(members))) if members else Teardown()
+    if _group_alive(group):
+        return Teardown(verified=False, unverified=(
+            "the group outlived SIGKILL and this platform cannot enumerate its members, "
+            "so teardown is unverified"))
+    return Teardown()
+
+
+def _observe_exit(process: subprocess.Popen, timeout: float) -> int | None:
+    """The exit code `process` reaches within `timeout` seconds, or None at the deadline.
+
+    POSIX observes the exit without reaping the child (`waitid` with `WNOWAIT`) — the state the
+    ownership proof reads (`_owned_group`); where that observation is unavailable, and with it any
+    POSIX group to own, `subprocess`'s own wait is used.  The value follows `subprocess`: a negative
+    number is the killing signal.
+    """
+    if not WAITID_WNOWAIT:
+        try:
+            return process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            return None
+    deadline = time.monotonic() + timeout
+    while True:
+        info = os.waitid(os.P_PID, process.pid, os.WEXITED | os.WNOWAIT | os.WNOHANG)
+        if info is not None:
+            return info.si_status if info.si_code == os.CLD_EXITED else -info.si_status
+        if time.monotonic() >= deadline:
+            return None
+        time.sleep(min(EXIT_POLL_SECONDS, max(deadline - time.monotonic(), 0.001)))
 
 
 def _run_commands(commands: tuple[tuple[str, ...], ...], *, cwd: Path, env: dict[str, str],
                   timeout: float, log_path: Path,
-                  appending: bool = False) -> tuple[int | None, bool, float, Teardown,
-                                                     tuple[int, ...]]:
-    """Run argv vectors in order into one log file.
+                  appending: bool = False) -> tuple[int | None, bool, float, Teardown]:
+    """Run argv vectors in order into one log file; return code, timeout, seconds, teardown.
 
-    Returns the exit code, whether the deadline hit, the seconds taken, the timeout teardown,
-    and the process group of every command that was started here — recorded while the command
-    was alive, because a leader killed by a signal is reaped before any cleanup could ask for
-    its group, and only the recorded id still finds the members it left behind.
+    A command that timed out or died by a signal is torn down before this returns, while its own
+    process is still unreaped — the state the teardown's ownership proof reads (`_owned_group`).
     """
     started = time.monotonic()
     last_code: int | None = 0
-    groups: list[int] = []
     with log_path.open("ab" if appending else "wb") as log:
         for argv in commands:
             log.write(f"=== {_display(argv)}\n".encode())
@@ -924,20 +1003,21 @@ def _run_commands(commands: tuple[tuple[str, ...], ...], *, cwd: Path, env: dict
                 )
             except OSError as exc:
                 log.write(f"\n[discoverer] cannot start {_display(argv)}: {exc}\n".encode())
-                return None, False, time.monotonic() - started, Teardown(), tuple(groups)
-            if hasattr(os, "killpg"):
-                # `start_new_session` makes the command its own session leader, so its group is
-                # its pid; recorded here, before `wait` can reap it.
-                groups.append(process.pid)
+                return None, False, time.monotonic() - started, Teardown()
             remaining = max(timeout - (time.monotonic() - started), 0.1)
-            try:
-                last_code = process.wait(timeout=remaining)
-            except subprocess.TimeoutExpired:
+            last_code = _observe_exit(process, remaining)
+            if last_code is None:
                 teardown = _terminate_group(process, log)
-                return process.poll(), True, time.monotonic() - started, teardown, tuple(groups)
+                return process.poll(), True, time.monotonic() - started, teardown
+            if last_code < 0:
+                # A signal killed the command: its own cleanup callbacks did not run, and its
+                # process may still be unreaped, so the teardown still has an ownership anchor.
+                teardown = _terminate_group(process, log)
+                return last_code, False, time.monotonic() - started, teardown
+            process.wait()  # what `_observe_exit` saw is reaped here; teardown does not need it
             if last_code != 0:
                 break
-    return last_code, False, time.monotonic() - started, Teardown(), tuple(groups)
+    return last_code, False, time.monotonic() - started, Teardown()
 
 
 def _display(argv: tuple[str, ...]) -> str:
@@ -945,28 +1025,34 @@ def _display(argv: tuple[str, ...]) -> str:
 
 
 def _terminate_group(process: subprocess.Popen, log) -> Teardown:
-    """Terminate a suite's whole process group, escalating to SIGKILL.
+    """Terminate the process group of the command `process` was spawned for, escalating to SIGKILL.
 
-    Liveness is the group's, never the leader's alone: a leader that exits on its SIGTERM while a
-    same-group descendant ignores it must not end the escalation, or the descendant keeps running
-    under a record that says the group was terminated.
+    Ownership decides everything here (module docstring): the group is signalled only while
+    `_owned_group` can still prove it is the run's own, and otherwise nothing is signalled and the
+    record says teardown is unverified.  The leader itself is reaped here — it is the run's own
+    child, and the one group member that no signal of ours can ever remove.
     """
-    log.write(f"\n[discoverer] timeout: terminating process group {process.pid}\n".encode())
-    log.flush()
     if not hasattr(os, "killpg"):
-        # No process groups to enumerate: the suite process itself is all that can be stopped.
+        # No POSIX groups: the command's own process is all that can be stopped, and nothing here
+        # can be enumerated — the record must not claim a teardown nothing observed.
+        unverified = "this platform has no process groups, so teardown is unverified"
         process.kill()
         with contextlib.suppress(subprocess.TimeoutExpired):
             process.wait(timeout=KILL_GRACE_SECONDS)
         if process.poll() is None:
-            return Teardown(survivors=(process.pid,), verified=False)
-        return Teardown(verified=False)
-    try:
-        group = os.getpgid(process.pid)
-    except ProcessLookupError:
-        teardown = Teardown()
+            return Teardown(survivors=(process.pid,), verified=False, unverified=unverified)
+        return Teardown(verified=False, unverified=unverified)
+    group = _owned_group(process)
+    if group is None:
+        log.write(b"\n[discoverer] teardown: process group not signalled: ownership cannot be "
+                  b"established\n")
+        log.flush()
+        teardown = Teardown(verified=False, unverified=(
+            "the process group could not be proven to be the suite's, so teardown is unverified"))
     else:
-        teardown = _stop_matching(lambda: _group_members(group), log)
+        log.write(f"\n[discoverer] teardown: terminating process group {group}\n".encode())
+        log.flush()
+        teardown = _stop_group(group, log)
     if process.poll() is None:
         with contextlib.suppress(subprocess.TimeoutExpired):
             process.wait(timeout=KILL_GRACE_SECONDS)
@@ -977,6 +1063,10 @@ def _terminate_group(process: subprocess.Popen, log) -> Teardown:
                   f"{KILL_GRACE_SECONDS:g}s after teardown\n".encode())
         log.flush()
         teardown = teardown.merge(Teardown(survivors=(process.pid,)))
+    if group is not None:
+        # Asked after the reap: a group whose members are all gone can still look occupied while
+        # the run's own unreaped leader is a member of it.
+        teardown = teardown.merge(_group_verdict(group))
     return teardown
 
 
@@ -1041,10 +1131,8 @@ def parse_counter_counts(output: str, patterns: tuple[str, ...]) -> dict:
 def _counts_consistent(counts: dict) -> bool:
     """A passing counter line may not hide unaccounted checks.
 
-    `total` counts everything the suite says it executed; every check that did not
-    pass must be a declared skip, or the exit status and the count disagree.  The
-    same rule applies through `covered_by` to a covered child's line in its parent's
-    log, so contradictory evidence cannot settle PASS by not being scheduled.
+    `total` counts everything the suite says it executed; every check that did not pass must be a
+    declared skip, or the exit status and the count disagree.
     """
     passed = counts.get("passed", 0)
     total = counts.get("total")
@@ -1073,8 +1161,8 @@ def _unittest_shortfall(counts: dict) -> str | None:
 
 
 def _teardown_note(teardown: Teardown | None) -> str:
-    """What the caller observed about teardown; None keeps the bare termination claim."""
-    return teardown.describe() if teardown is not None else "process group terminated"
+    """What the caller observed about teardown; None says so instead of naming one."""
+    return teardown.describe() if teardown is not None else "teardown was not observed"
 
 
 def settle(suite: Suite, *, exit_code: int | None, timed_out: bool, output: str,
@@ -1175,14 +1263,13 @@ def run_suite(suite: Suite, *, root: Path, scratch_root: Path, log_root: Path,
     timeout = float(timeout_override or suite.timeout)
     provisioned = True
     if suite.provision:
-        code, timed_out, _, teardown, groups = _run_commands(suite.provision, cwd=suite.cwd,
-                                                             env=env, timeout=timeout,
-                                                             log_path=log_path)
+        code, timed_out, _, teardown = _run_commands(suite.provision, cwd=suite.cwd, env=env,
+                                                     timeout=timeout, log_path=log_path)
         provisioned = not timed_out and code == 0
         if not provisioned:
             reason = "provisioning failed: " + _display(suite.provision[0])
             if timed_out or (code is not None and code < 0):
-                teardown = _abnormal_cleanup(suite_scratch, log_path, groups, teardown)
+                teardown = teardown.merge(_sweep_scratch(suite_scratch, log_path))
                 reason += "; " + teardown.describe()
             outcome = Outcome(
                 suite_id=suite.id, state="ERROR", duration=0.0, exit_code=code,
@@ -1192,15 +1279,13 @@ def run_suite(suite: Suite, *, root: Path, scratch_root: Path, log_root: Path,
             shutil.rmtree(suite_scratch, ignore_errors=True)
             return outcome
 
-    code, timed_out, duration, teardown, groups = _run_commands(suite.commands, cwd=suite.cwd,
-                                                               env=env, timeout=timeout,
-                                                               log_path=log_path,
-                                                               appending=bool(suite.provision))
+    code, timed_out, duration, teardown = _run_commands(suite.commands, cwd=suite.cwd, env=env,
+                                                       timeout=timeout, log_path=log_path,
+                                                       appending=bool(suite.provision))
     if timed_out or (code is not None and code < 0):
         # The suite's own cleanup callbacks did not run — the runner timed it out, or a signal
-        # killed it, exit status negated — so stop the members of the groups its commands ran in,
-        # and every process still holding its scratch, before that tree is deleted.
-        teardown = _abnormal_cleanup(suite_scratch, log_path, groups, teardown)
+        # killed it — so stop what still holds its scratch before that tree is deleted.
+        teardown = teardown.merge(_sweep_scratch(suite_scratch, log_path))
     output = _read_log(log_path)
     state, counts, reason = settle(suite, exit_code=code, timed_out=timed_out, output=output,
                                    provisioned=provisioned, timeout=timeout, teardown=teardown)
@@ -1246,8 +1331,6 @@ def settle_covered(child: Suite, parent: Suite, parent_outcome: Outcome,
                 log=str(parent_log), covered_by=parent.id,
             )
         if not _counts_consistent(counts):
-            # The same rule as a scheduled counter suite: a parent PASS may not hide a counter
-            # line whose own totals contradict it.
             return Outcome(
                 suite_id=child.id, state="ERROR", counts=counts,
                 reason="counter line disagrees with the parent's exit status",

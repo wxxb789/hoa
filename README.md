@@ -192,9 +192,12 @@ package.
 Settling is anti-false-green. Zero executed checks never settles PASS, and a counter must account for
 every check it did not pass — including a suite that settles from a parent's log through
 `covered_by`. Each suite runs in its own process group and task-local scratch tree; a suite that did
-not finish under its own control — the runner timed it out, or a signal killed it — has the surviving
-members of its process groups and the processes still holding that scratch stopped before the tree is
-deleted.
+not finish under its own control — the runner timed it out, or a signal killed it — has its process
+group terminated (POSIX only, through `os.killpg`) and the processes still holding that scratch
+stopped (found by the cwd they were started in or the scratch paths in their environment, from
+`/proc`), before that scratch is deleted. Both parts signal only what the run can prove is its own —
+the group of a command that is still unreaped, a process that still points into the suite's own
+scratch — and report teardown unverified instead of signalling a group they cannot prove is theirs.
 
 | Gate command (CI step) | Protects |
 |---|---|

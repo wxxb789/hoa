@@ -151,6 +151,10 @@ while True:
     time.sleep(0.05)
 '''
 
+# The suite that starts `DETACHED_WORKER`; `WORKER_CWD_SCRATCH` moves the worker's cwd into the
+# suite's own TMPDIR and `WORKER_SANITIZED` empties its environment, so the cwd it was started in is
+# the only tie to the suite (the probe a `read_bytes()` on the `/proc/<pid>/cwd` symlink could never
+# see).
 DETACHED_SUITE = '''import os
 import subprocess
 import sys
@@ -158,42 +162,13 @@ import time
 
 sentinel = os.path.join(os.environ["TMPDIR"], "sentinel")
 open(sentinel, "w", encoding="utf-8").close()
+options = {}
+if os.environ.get("WORKER_CWD_SCRATCH"):
+    options["cwd"] = os.environ["TMPDIR"]
+if os.environ.get("WORKER_SANITIZED"):
+    options["env"] = {}
 child = subprocess.Popen([sys.executable, os.environ["WORKER_FILE"], sentinel, os.environ["BEAT"]],
-                         start_new_session=True)
-with open(os.environ["PID_FILE"], "w", encoding="utf-8") as handle:
-    handle.write(f"{child.pid}\\n")
-time.sleep(120)
-'''
-
-# The same detached worker as `DETACHED_WORKER`, but identified only by the cwd it was started
-# in: `env={}` strips every scratch path out of its environment, so only the `/proc/<pid>/cwd`
-# symlink ties it to the suite (the probe a `read_bytes()` on that symlink could never see).
-CWD_WORKER = '''import os
-import sys
-import time
-
-beat, sentinel = sys.argv[1], sys.argv[2]
-count = 0
-while True:
-    count += 1
-    with open(beat, "w", encoding="utf-8") as handle:
-        handle.write(str(count))
-    if not os.path.exists(sentinel):
-        with open(beat + ".gone", "w", encoding="utf-8") as handle:
-            handle.write("scratch-gone")
-        break
-    time.sleep(0.05)
-'''
-
-CWD_DETACHED_SUITE = '''import os
-import subprocess
-import sys
-import time
-
-sentinel = os.path.join(os.environ["TMPDIR"], "sentinel")
-open(sentinel, "w", encoding="utf-8").close()
-child = subprocess.Popen([sys.executable, os.environ["WORKER_FILE"], os.environ["BEAT"], sentinel],
-                         start_new_session=True, cwd=os.environ["TMPDIR"], env={})
+                         start_new_session=True, **options)
 with open(os.environ["PID_FILE"], "w", encoding="utf-8") as handle:
     handle.write(f"{child.pid}\\n")
 time.sleep(120)
@@ -884,10 +859,15 @@ class SettleTests(unittest.TestCase):
     def test_timeout_reason_reports_the_teardown_it_observed(self):
         """The record says what teardown established, not what it hoped for."""
         suite = self.suite()
-        clean = runner.settle(suite, exit_code=0, timed_out=True, output="",
-                              teardown=runner.Teardown())
-        self.assertEqual(clean[0], "TIMEOUT")
-        self.assertIn("detached processes terminated", clean[2])
+        nothing = runner.settle(suite, exit_code=0, timed_out=True, output="",
+                                teardown=runner.Teardown())
+        self.assertEqual(nothing[0], "TIMEOUT")
+        self.assertIn("no processes remained to be terminated", nothing[2])
+        observed = runner.settle(suite, exit_code=0, timed_out=True, output="",
+                                 teardown=runner.Teardown(clauses=("process group",)))
+        self.assertIn("process group terminated", observed[2])
+        unobserved = runner.settle(suite, exit_code=0, timed_out=True, output="")
+        self.assertIn("teardown was not observed", unobserved[2])
         survivor = runner.settle(suite, exit_code=0, timed_out=True, output="",
                                  teardown=runner.Teardown(survivors=(4242,)))
         self.assertIn("4242", survivor[2])
@@ -895,6 +875,99 @@ class SettleTests(unittest.TestCase):
         unverified = runner.settle(suite, exit_code=0, timed_out=True, output="",
                                    teardown=runner.Teardown(verified=False))
         self.assertIn("unverified", unverified[2])
+
+
+class TeardownOwnershipTests(unittest.TestCase):
+    """Every signal must be justified by identity this run recorded itself (module docstring)."""
+
+    def setUp(self):
+        ARTIFACTS.mkdir(parents=True, exist_ok=True)
+        self.addCleanup(shutil.rmtree, ARTIFACTS, ignore_errors=True)
+        self.log_path = ARTIFACTS / "ownership.log"
+
+    def spawn(self, *, group_leader: bool = False,
+              code: str = "import time; time.sleep(60)") -> subprocess.Popen:
+        """A child that is a session (and group) leader when `group_leader`, and always reaped."""
+        process = subprocess.Popen([sys.executable, "-c", code], start_new_session=group_leader)
+        self.addCleanup(process.wait)
+        self.addCleanup(process.kill)
+        return process
+
+    def patch(self, target, attribute: str, value) -> None:
+        """Set `target.attribute` for this test and restore it afterwards."""
+        saved = getattr(target, attribute)
+        setattr(target, attribute, value)
+        self.addCleanup(setattr, target, attribute, saved)
+
+    @unittest.skipUnless(hasattr(os, "killpg"), "POSIX process groups only")
+    def test_group_teardown_refuses_a_recycled_group_id(self):
+        """A reaped command's number is history; even if it now names a live group, it is not ours.
+
+        Model: the command finished and this run reaped it, and the kernel recycled its number onto
+        an unrelated live group — an intercepted `getpgid` answers with one, so the number looks
+        live and self-consistent to anything that has only the number.  A bare-number teardown
+        signals that group; this one must refuse and report teardown unverified.
+        """
+        victim = self.spawn(group_leader=True)
+        command = self.spawn(group_leader=True, code="pass")
+        command.wait()  # reaped: the run no longer holds the pid, so it no longer owns the group
+        real_getpgid = os.getpgid
+        self.patch(os, "getpgid",
+                   lambda pid: victim.pid if pid == command.pid else real_getpgid(pid))
+        attempts: list = []
+        self.patch(os, "kill", lambda pid, signum: attempts.append(("kill", pid, signum)))
+        self.patch(os, "killpg", lambda group, signum: attempts.append(("killpg", group, signum)))
+        with self.log_path.open("ab") as log:
+            teardown = runner._terminate_group(command, log)
+        self.assertEqual(attempts, [],
+                         "the teardown signalled a group it cannot prove is this run's")
+        self.assertFalse(teardown.verified)
+        self.assertIn("unverified", teardown.describe())
+        self.assertIsNone(victim.poll(), "the unrelated group's leader was signalled")
+
+    @unittest.skipUnless(hasattr(os, "killpg"), "POSIX process groups only")
+    def test_group_teardown_reaches_the_group_without_proc(self):
+        """The group is signalled through `os.killpg`, so a host without /proc still stops it.
+
+        Model: POSIX with the group API but no `/proc` (macOS).  A teardown that starts from /proc
+        enumeration sends nothing there; this one signals the group, and only its final observation
+        is limited by the platform.  Delivery is real, so the group really empties.
+        """
+        victim = self.spawn(group_leader=True)
+        attempts: list = []
+        real_killpg = os.killpg
+
+        def deliver(group: int, signum: int) -> None:
+            attempts.append((group, signum))
+            real_killpg(group, signum)
+
+        self.patch(os, "killpg", deliver)
+        self.patch(runner, "PROC_ROOT", Path("/nonexistent-proc"))
+        self.patch(runner, "KILL_GRACE_SECONDS", 0.5)
+        with self.log_path.open("ab") as log:
+            teardown = runner._terminate_group(victim, log)
+        self.assertIn((victim.pid, signal.SIGTERM), attempts,
+                      "the group was not signalled through os.killpg without /proc")
+        self.assertIsNotNone(victim.poll(), "the signalled group's leader is still running")
+        self.assertIn("process group terminated", teardown.describe())
+
+    @unittest.skipUnless(hasattr(os, "waitid") and hasattr(os, "WNOWAIT"),
+                         "the observation uses waitid(WNOWAIT)")
+    def test_an_observed_exit_leaves_the_pid_reserved_for_the_teardown(self):
+        """The exit is observed without reaping, so the ownership proof outlives the command.
+
+        This is what still lets a signal-killed suite be torn down: the command is dead, but its
+        pid — and with it the group it leads — stays reserved until this run reaps it itself.
+        """
+        exited = self.spawn(group_leader=True, code="import sys; sys.exit(3)")
+        self.assertEqual(runner._observe_exit(exited, 5), 3)
+        self.assertIsNone(exited.returncode, "the observation reaped the command")
+        self.assertEqual(os.getpgid(exited.pid), exited.pid,
+                         "the pid stopped naming the group the teardown must still prove")
+        killed = self.spawn(group_leader=True)
+        os.kill(killed.pid, signal.SIGKILL)
+        self.assertEqual(runner._observe_exit(killed, 5), -signal.SIGKILL)
+        self.assertIsNone(killed.returncode, "the observation reaped the signalled command")
 
 
 class EndToEndTests(unittest.TestCase):
@@ -1239,40 +1312,58 @@ class EndToEndTests(unittest.TestCase):
                         os.kill(leftover, signal.SIGKILL)
                 self.fail(f"{message}: pid {pid} is still running")
 
+    def run_abnormal_fixture(self, name: str, source: str, *, env: dict[str, str],
+                             timeout: str = "5") -> tuple[dict, list[int]]:
+        """Run one synthetic single-suite fixture whose suite exits abnormally, and check teardown.
+
+        `source` runs as `scripts/test_<name>.py`, records the pids it started in
+        `<ARTIFACTS>/<name>-pids.txt` (the runner supplies its `PID_FILE`), and dies abnormally
+        however the test arranged.  Whatever that abnormal exit is, the teardown owes the run the
+        same observable outcome: the scratch tree is deleted, and every pid the fixture recorded is
+        stopped.  Returns the suite's result entry and those pids.
+        """
+        pids_file = ARTIFACTS / f"{name}-pids.txt"
+        variables = {"PID_FILE": str(pids_file), **env}
+        root = synthetic_tree(patterns=["scripts/test_*.py"], prune=[], floor=[],
+                              suites="\n".join([
+                                  "[[suite]]",
+                                  f'path = "scripts/test_{name}.py"',
+                                  "env = { " + ", ".join(f'{key} = "{value}"'
+                                                         for key, value in variables.items())
+                                  + " }",
+                                  "",
+                              ]))
+        write_suite(root, f"scripts/test_{name}.py", source)
+        code, output, payload = self.run_main(root, "--timeout", timeout)
+        self.assertEqual(code, 1, output)
+        entry = self.states(payload)[f"scripts/test_{name}.py"]
+        pids = [int(value) for value in pids_file.read_text().split()]
+        self.assert_stopped(pids, f"a process of the {name} fixture")
+        self.assertEqual([item.name for item in self.scratch.iterdir()], [],
+                         "the per-suite scratch tree was not cleaned up")
+        return entry, pids
+
     def test_timeout_escalates_while_a_group_member_ignores_sigterm(self):
         """Escalation follows the group: the leader exiting on SIGTERM must not end it.
 
         The leader here exits cleanly on SIGTERM while the child it leaves in the *same* group
         ignores it, and that child holds nothing a scratch sweep could match (empty environment,
-        cwd `/`), so only group liveness can stop it.  The old leader-based loop broke out of its
-        escalation as soon as `process.wait()` returned and left this child running.
+        cwd `/`), so only group liveness can stop it.  Both rounds are pinned by their outcomes:
+        the leader's exit code 0 says SIGTERM reached the group, and the child — which ignores
+        SIGTERM by construction — being stopped says the escalation went on to SIGKILL after the
+        leader was gone, the break-out the old leader-based loop took.
         """
         write_suite(ARTIFACTS, "stubborn-child.py", STUBBORN_CHILD)
-        root = synthetic_tree(patterns=["scripts/test_*.py"], prune=[], floor=[],
-                              suites="\n".join([
-                                  "[[suite]]",
-                                  'path = "scripts/test_stubborn.py"',
-                                  f'env = {{ PID_FILE = "{ARTIFACTS / "stubborn-pids.txt"}", '
-                                  f'READY = "{ARTIFACTS / "stubborn-ready"}", '
-                                  f'CHILD_FILE = "{ARTIFACTS / "stubborn-child.py"}" }}',
-                                  "",
-                              ]))
-        write_suite(root, "scripts/test_stubborn.py", STUBBORN_SUITE)
-        code, output, payload = self.run_main(root, "--timeout", "3")
-        entry = self.states(payload)["scripts/test_stubborn.py"]
-        self.assertEqual(entry["state"], "TIMEOUT", output)
-        self.assertEqual(code, 1)
+        entry, pids = self.run_abnormal_fixture(
+            "stubborn", STUBBORN_SUITE, timeout="3",
+            env={"READY": str(ARTIFACTS / "stubborn-ready"),
+                 "CHILD_FILE": str(ARTIFACTS / "stubborn-child.py")})
+        self.assertEqual(entry["state"], "TIMEOUT")
         self.assertEqual(entry["exit_code"], 0, "the fixture leader did not exit on SIGTERM")
-        self.assertIn("detached processes terminated", entry["reason"])
-        pids = [int(value) for value in (ARTIFACTS / "stubborn-pids.txt").read_text().split()]
         self.assertEqual(len(pids), 2)
-        self.assert_stopped(pids, "the SIGTERM-resistant group member")
-        log = Path(entry["log"]).read_text(encoding="utf-8")
-        self.assertIn("teardown: SIGTERM", log)
-        self.assertIn("teardown: SIGKILL", log, "the escalation never reached SIGKILL")
-        self.assertEqual([item.name for item in self.scratch.iterdir()], [],
-                         "the per-suite scratch tree was not cleaned up")
+        self.assertIn("process group terminated", entry["reason"])
 
+    @unittest.skipUnless(runner.PROC_ROOT.is_dir(), "the scratch sweep reads /proc")
     def test_timeout_stops_detached_workers_before_the_scratch_goes(self):
         """A worker that left the suite's group is stopped before the records it polls are deleted.
 
@@ -1282,23 +1373,11 @@ class EndToEndTests(unittest.TestCase):
         """
         write_suite(ARTIFACTS, "detached-worker.py", DETACHED_WORKER)
         beat = ARTIFACTS / "beat"
-        root = synthetic_tree(patterns=["scripts/test_*.py"], prune=[], floor=[],
-                              suites="\n".join([
-                                  "[[suite]]",
-                                  'path = "scripts/test_detached.py"',
-                                  f'env = {{ PID_FILE = "{ARTIFACTS / "detached-pids.txt"}", '
-                                  f'BEAT = "{beat}", '
-                                  f'WORKER_FILE = "{ARTIFACTS / "detached-worker.py"}" }}',
-                                  "",
-                              ]))
-        write_suite(root, "scripts/test_detached.py", DETACHED_SUITE)
-        code, output, payload = self.run_main(root, "--timeout", "5")
-        entry = self.states(payload)["scripts/test_detached.py"]
-        self.assertEqual(entry["state"], "TIMEOUT", output)
-        self.assertEqual(code, 1)
-        pids = [int(value) for value in (ARTIFACTS / "detached-pids.txt").read_text().split()]
+        entry, pids = self.run_abnormal_fixture(
+            "detached", DETACHED_SUITE,
+            env={"BEAT": str(beat), "WORKER_FILE": str(ARTIFACTS / "detached-worker.py")})
+        self.assertEqual(entry["state"], "TIMEOUT")
         self.assertEqual(len(pids), 1)
-        self.assert_stopped(pids, "the detached worker")
         self.assertGreaterEqual(int(beat.read_text(encoding="utf-8")), 1,
                                 "the worker never wrote a heartbeat")
         self.assertFalse((ARTIFACTS / "beat.gone").exists(),
@@ -1307,9 +1386,7 @@ class EndToEndTests(unittest.TestCase):
         time.sleep(0.5)
         self.assertEqual(int(beat.read_text(encoding="utf-8")), beats,
                          "the worker kept polling after the run")
-        self.assertIn("teardown: SIGTERM", Path(entry["log"]).read_text(encoding="utf-8"))
-        self.assertEqual([item.name for item in self.scratch.iterdir()], [],
-                         "the per-suite scratch tree was not cleaned up")
+        self.assertIn("detached processes terminated", entry["reason"])
 
     @unittest.skipUnless(runner.PROC_ROOT.is_dir(), "the detection reads /proc")
     def test_scratch_detection_follows_the_cwd_symlink(self):
@@ -1327,76 +1404,47 @@ class EndToEndTests(unittest.TestCase):
         self.assertIn(worker.pid, runner._scratch_processes(scratch) or [],
                       "a worker whose only tie to scratch is its cwd was not found")
 
+    @unittest.skipUnless(runner.PROC_ROOT.is_dir(), "the scratch sweep reads /proc")
     def test_timeout_stops_a_worker_only_its_cwd_identifies(self):
         """The environment check is not the only tie to scratch: the cwd symlink counts too.
 
-        The fixture worker sanitizes its environment (`env={}`) and is started with its cwd in
-        the suite's task-local TMPDIR, so `environ` shows nothing and only the `/proc/<pid>/cwd`
-        symlink finds it after the timeout.
+        The fixture worker sanitizes its environment (`WORKER_SANITIZED`) and is started with its
+        cwd inside the suite's task-local TMPDIR (`WORKER_CWD_SCRATCH`), so `environ` shows nothing
+        and only the `/proc/<pid>/cwd` symlink finds it after the timeout.
         """
-        write_suite(ARTIFACTS, "cwd-worker.py", CWD_WORKER)
+        write_suite(ARTIFACTS, "detached-worker.py", DETACHED_WORKER)
         beat = ARTIFACTS / "cwd-beat"
-        root = synthetic_tree(patterns=["scripts/test_*.py"], prune=[], floor=[],
-                              suites="\n".join([
-                                  "[[suite]]",
-                                  'path = "scripts/test_cwd_detached.py"',
-                                  f'env = {{ PID_FILE = "{ARTIFACTS / "cwd-pids.txt"}", '
-                                  f'BEAT = "{beat}", '
-                                  f'WORKER_FILE = "{ARTIFACTS / "cwd-worker.py"}" }}',
-                                  "",
-                              ]))
-        write_suite(root, "scripts/test_cwd_detached.py", CWD_DETACHED_SUITE)
-        code, output, payload = self.run_main(root, "--timeout", "5")
-        entry = self.states(payload)["scripts/test_cwd_detached.py"]
-        self.assertEqual(entry["state"], "TIMEOUT", output)
-        self.assertEqual(code, 1)
-        pids = [int(value) for value in (ARTIFACTS / "cwd-pids.txt").read_text().split()]
+        entry, pids = self.run_abnormal_fixture(
+            "cwd_detached", DETACHED_SUITE,
+            env={"BEAT": str(beat), "WORKER_FILE": str(ARTIFACTS / "detached-worker.py"),
+                 "WORKER_SANITIZED": "1", "WORKER_CWD_SCRATCH": "1"})
+        self.assertEqual(entry["state"], "TIMEOUT")
         self.assertEqual(len(pids), 1)
-        self.assert_stopped(pids, "the cwd-identified worker")
         self.assertGreaterEqual(int(beat.read_text(encoding="utf-8")), 1,
                                 "the worker never wrote a heartbeat")
         self.assertFalse((ARTIFACTS / "cwd-beat.gone").exists(),
                          "the scratch tree was deleted while the worker still polled it")
-        self.assertIn("teardown: SIGTERM", Path(entry["log"]).read_text(encoding="utf-8"))
-        self.assertEqual([item.name for item in self.scratch.iterdir()], [],
-                         "the per-suite scratch tree was not cleaned up")
+        self.assertIn("detached processes terminated", entry["reason"])
 
     def test_a_signal_killed_suite_still_tears_down_its_group(self):
         """A suite killed by a signal lost its cleanup callbacks; teardown must run anyway.
 
         The fixture's same-group child SIGKILLs the suite leader once it is ready, and the long
-        timeout keeps the timeout path out of the picture.  The child sanitizes its environment
-        and runs with `cwd="/"`, so only group liveness can stop it — and the group id had to be
-        recorded at spawn, because the killed leader is reaped before any cleanup could ask for
-        its group.
+        timeout keeps the timeout path out of the picture.  The child sanitizes its environment and
+        runs with `cwd="/"`, so only the group the leader leads can stop it — and the leader is
+        still unreaped when its death is observed, which is what proves the group is this run's.
         """
         write_suite(ARTIFACTS, "signal-killer.py", SIGNAL_KILLER)
         ready = ARTIFACTS / "signal-ready"
         ready.unlink(missing_ok=True)
-        root = synthetic_tree(patterns=["scripts/test_*.py"], prune=[], floor=[],
-                              suites="\n".join([
-                                  "[[suite]]",
-                                  'path = "scripts/test_signalled.py"',
-                                  f'env = {{ PID_FILE = "{ARTIFACTS / "signal-pids.txt"}", '
-                                  f'READY = "{ready}", '
-                                  f'KILLER_FILE = "{ARTIFACTS / "signal-killer.py"}" }}',
-                                  "",
-                              ]))
-        write_suite(root, "scripts/test_signalled.py", SIGNALLED_SUITE)
-        code, output, payload = self.run_main(root, "--timeout", "20")
-        entry = self.states(payload)["scripts/test_signalled.py"]
-        self.assertEqual(entry["state"], "ERROR", output)
+        entry, pids = self.run_abnormal_fixture(
+            "signalled", SIGNALLED_SUITE, timeout="20",
+            env={"READY": str(ready), "KILLER_FILE": str(ARTIFACTS / "signal-killer.py")})
+        self.assertEqual(entry["state"], "ERROR")
         self.assertEqual(entry["exit_code"], -9, "the fixture leader was not killed by SIGKILL")
-        self.assertEqual(code, 1)
-        pids = [int(value) for value in (ARTIFACTS / "signal-pids.txt").read_text().split()]
         self.assertEqual(len(pids), 1)
-        self.assert_stopped(pids, "the signal-killed suite's same-group child")
         self.assertIn("terminated by signal 9", entry["reason"])
-        self.assertIn("detached processes terminated", entry["reason"])
-        log = Path(entry["log"]).read_text(encoding="utf-8")
-        self.assertIn("cleanup: terminating process group", log)
-        self.assertEqual([item.name for item in self.scratch.iterdir()], [],
-                         "the per-suite scratch tree was not cleaned up")
+        self.assertIn("process group terminated", entry["reason"])
 
     def test_covered_child_with_a_hiding_counter_line_is_error(self):
         """Contradictory counter evidence may not settle PASS by way of `covered_by`.

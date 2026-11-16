@@ -44,11 +44,16 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
 - Teardown is observed, not assumed, and covers every uncontrolled suite exit. The escalation
   follows the process *group* rather than its leader, so a leader that exits on SIGTERM no longer
   ends it while a same-group descendant keeps running; a suite the runner timed out, or one a signal
-  killed before its cleanup callbacks could run, has the surviving members of the groups its commands
-  ran in terminated and the processes still holding its task-local scratch stopped — identified by
-  the cwd they were started in or the scratch paths in their environment — before that scratch is
-  deleted; and the record says which outcome happened instead of claiming a teardown nothing
-  verified. Both launcher suites declare that resource and its owning teardown in
+  killed before its cleanup callbacks could run, has its process group terminated (POSIX only,
+  through `os.killpg`) and the processes still holding its task-local scratch stopped — identified
+  by the cwd they were started in or the scratch paths in their environment, from `/proc` — before
+  that scratch is deleted; and the record says which outcome happened instead of claiming a teardown
+  nothing verified. Every signal has to be justified by identity this run recorded itself: a group is
+  signalled only while the command's own process is still unreaped — the kernel does not recycle an
+  unreaped child's pid, so a group id that still equals that process's own group cannot be a
+  recycled number — and a scratch holder only while it still points into the suite's own task-local
+  scratch; where neither proof holds, nothing is signalled and the record says teardown is
+  unverified. Both launcher suites declare the detached resource its sweep owns in
   `scripts/test_manifest.toml`.
 - The suite `PATH` prepends the selected interpreter's own directory without resolving it: a POSIX
   virtual environment's `bin/python3` is a symlink to the base interpreter, and resolving it handed a
