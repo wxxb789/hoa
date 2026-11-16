@@ -127,13 +127,13 @@ def main():
         # The stored head region fills first, then the *final* event alone is
         # larger than the bound's whole remaining tail budget: with exit 0 the
         # verdict and the answer both hang on that newest line surviving.
-        filler = "y" * 4096
-        for index in range(20):
+        filler = "y" * 34000
+        for index in range(2):
             emit({"type": "status", "turn": 1, "step": index, "phase": "step_start",
                   "filler": filler})
         emit({"type": "text", "text": "almost"})
         emit({"type": "final", "sessionId": session, "reason": {"kind": "completed"},
-              "text": "F" * 65536})
+              "text": "F" * 16384})
         return 0
     if mode == "trailing":
         # The round-2 shape: the terminal record is followed by one more stdout
@@ -1048,10 +1048,10 @@ class DshLauncherTests(ProcessFixtures):
     def test_10b_the_newest_event_survives_the_bound(self):
         """The bound drops the oldest retained lines; the newest line is never one.
 
-        A single line larger than the remaining tail budget is retained whole:
-        the file may exceed the bound by at most that one line. The drop
-        accounting still counts the lines that were really dropped, so the
-        sidecar and the `truncated` marker stay honest about the loss.
+        A single line larger than the tail region's budget is retained whole and
+        evicts every older tail line: the compacted file is the head lines, the
+        `truncated` marker and that line, and nothing of the tail in between. The
+        marker and the sidecar count the lines and bytes that were really dropped.
         """
         Writer = adapter.load_writer()
         run_dir = self.tmp / "writer-10b"
@@ -1060,70 +1060,64 @@ class DshLauncherTests(ProcessFixtures):
         writer = Writer(str(run_dir), cap, passthrough=False)
         filler = (json.dumps({"type": "status", "phase": "step_start", "filler": "x" * 4000})
                   + "\n").encode("utf-8")
-        writer.feed(b'{"type":"session","sessionId":"s-10b"}\n')
-        while not writer.head_closed:
-            writer.feed(filler)
-        # The feed that closed the head landed in the tail (the head was full);
-        # whatever the tail already holds is what the oversized line may drop.
-        older = list(writer.tail)
-        tail_lines = [
-            (json.dumps({"type": "text", "text": f"kept {index}"}) + "\n").encode("utf-8")
-            for index in range(3)
-        ]
-        for line in tail_lines:
+        tail_line = (json.dumps({"type": "text", "text": "tail"}) + "\n").encode("utf-8")
+        # The session line and the first fillers fill the head region; every line
+        # after them lands in the tail and is what the oversized `final` drops.
+        fed = [b'{"type":"session","sessionId":"s-10b"}\n'] + [filler] * 20 + [tail_line] * 3
+        for line in fed:
             writer.feed(line)
-        dropped_expected = older + tail_lines
         # 2x the whole bound: larger than the tail budget even when the tail is empty.
         final = (json.dumps({"type": "final", "reason": {"kind": "completed"},
                              "text": "A" * (cap * 2)}) + "\n").encode("utf-8")
         writer.feed(final)
         writer.finish()
         retained = (run_dir / "events.ndjson").read_bytes()
-        self.assertTrue(retained.endswith(final), retained[-200:])
         lines = [line for line in retained.splitlines() if line.strip()]
-        self.assertEqual(json.loads(lines[-1])["type"], "final")
+        # The retained lines are the head lines, then the splice marker the input
+        # never carried, then `final`: everything else fed was dropped, and the
+        # marker and the sidecar must account for exactly those.
+        head_count = len(lines) - 2
+        dropped_expected = fed[head_count:]
+        marker = json.loads(lines[-2])
         stats = json.loads((run_dir / "events.stats.json").read_text(encoding="utf-8"))
+        self.assertEqual(marker["type"], "truncated")
+        self.assertEqual(marker["dropped_lines"], len(dropped_expected))
+        self.assertEqual(marker["dropped_bytes"], sum(len(line) for line in dropped_expected))
         self.assertTrue(stats["truncated"])
-        # Exactly the older tail lines were dropped: the newest line is not a drop.
-        self.assertEqual(stats["dropped_lines"], len(dropped_expected))
-        self.assertEqual(stats["dropped_bytes"], sum(len(line) for line in dropped_expected))
-        # Every input line is either dropped or retained; the splice marker is
-        # the one retained line the input never carried.
+        self.assertEqual(stats["dropped_lines"], marker["dropped_lines"])
+        self.assertEqual(stats["dropped_bytes"], marker["dropped_bytes"])
+        # Every input line is either dropped or retained, and the marker is the
+        # one retained line the input never carried.
         self.assertEqual(stats["total_lines"], stats["dropped_lines"] + len(lines) - 1)
-        # The file stays inside the bound plus that one line, and holds it entire.
-        self.assertLessEqual(len(retained), stats["head_bytes"] + cap + len(final))
-        self.assertGreaterEqual(len(retained), len(final))
+        # Exact compacted layout: the head lines held whole, the marker, then
+        # `final` entire — a writer that truncated nothing, or dropped the newest
+        # line, cannot pass either half of this.
+        self.assertEqual(retained, b"".join(fed[:head_count]) + lines[-2] + b"\n" + final)
+        self.assertEqual(len(retained),
+                         stats["head_bytes"] + len(lines[-2]) + 1 + len(final))
 
     def test_10c_an_oversized_final_event_still_settles_done(self):
         """The consumer half: an oversized final event is what `summarize` reads.
 
         The DSH route derives both the verdict and the answer from the retained
-        log alone. A run whose final event exceeds the bound's remaining budget
-        must therefore settle `done` with that event's text, not `failed` for a
-        `final` the writer dropped.
+        log alone, so a run whose final event exceeds the bound's remaining tail
+        budget must settle `done` with that event's text, not `failed` for a
+        `final` the writer dropped. The writer's own accounting for that shape is
+        `test_10b`'s; this test asserts what the consumer sees.
         """
         slug = "bigfinal-10c"
-        cap = 20000
+        cap = 4096
         state = self.settle(slug, STUB_MODE="bigfinal", DSH_RUN_EVENTS_MAX_BYTES=cap)
         self.assertEqual(state["state"], "done", state)
         self.assertEqual(state["final_reason"], "completed")
         self.assertEqual(state["answer_source"], "final")
-        self.assertEqual(state["answer_chars"], 65536)
-        run_dir = self.run_dir(slug)
-        retained = (run_dir / "events.ndjson").read_bytes()
-        last_line = [line for line in retained.splitlines() if line.strip()][-1]
-        last = json.loads(last_line)
-        self.assertEqual(last["type"], "final")
-        self.assertEqual(last["reason"]["kind"], "completed")
-        self.assertEqual(len(last["text"]), 65536)
-        self.assertEqual((run_dir / "answer.md").read_text(encoding="utf-8"),
-                         "F" * 65536)
-        stats = json.loads((run_dir / "events.stats.json").read_text(encoding="utf-8"))
-        self.assertTrue(stats["truncated"])
-        self.assertGreater(stats["dropped_lines"], 0)
-        # Bound plus the one oversized line, held entire.
-        self.assertLessEqual(state["events_bytes"],
-                             stats["head_bytes"] + cap + len(last_line))
+        self.assertEqual(state["answer_chars"], 16384)
+        # The run really went through a truncating writer: what settled it is the
+        # retained log's newest line, not the width of the bound.
+        self.assertTrue(state["events_truncated"], state)
+        self.assertGreater(state["events_dropped_bytes"], 0, state)
+        self.assertEqual((self.run_dir(slug) / "answer.md").read_text(encoding="utf-8"),
+                         "F" * 16384)
 
     def test_10d_the_terminal_record_survives_a_trailing_line(self):
         """P2, the reviewer's exact shape, at the route's own sink.

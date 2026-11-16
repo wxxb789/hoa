@@ -20,8 +20,12 @@ Retained layout over the cap:
     {"type":"truncated","dropped_bytes":N,"dropped_lines":M}
     <most recent lines, <= max_bytes - marker reserve>
 
-The newest line is never dropped: when one line alone exceeds the tail region's
-budget it is retained whole, and the file may exceed the bound by that one line.
+The newest line is never dropped: it is the event a finalizing reader needs (the
+run's own `final`). When one line alone exceeds the tail region's budget it is
+retained whole, so after compaction the file overshoots its compacted ceiling
+(head lines + `max_bytes`) by at most that line's overshoot past the tail budget
+(`len(line) - (max_bytes - MARKER_RESERVE)`); before the next compaction the
+open file may additionally carry up to `slack` bytes of dropped history.
 A caller may also declare a line protected (`feed(line, protect=True)`) for a
 record its reader settles the run from — the DSH route marks its terminal
 `final` event, which may well be followed by more output. A protected line is
@@ -345,14 +349,6 @@ class Writer:
                         entry.superseded = True
             self.tail.append(_Protected(line) if protect else line)
             self.tail_bytes += len(line)
-            # The newest line is never a drop: it is the event a finalizing reader
-            # needs (the run's own `final`). A single line larger than the whole
-            # tail budget is therefore retained whole — the file may exceed the
-            # bound by that one line — and only older retained lines are dropped.
-            # A protected line is never a drop either: the reader settles the run
-            # from it, so it must outlive every line that comes after it. The
-            # eviction therefore takes the oldest line that is neither the newest
-            # nor a live protected one, and nothing when only those remain.
             while self.tail_bytes > self.tail_budget and len(self.tail) > 1:
                 limit = len(self.tail) - 1
                 index = 0
@@ -371,11 +367,8 @@ class Writer:
                 self._compact()
             else:
                 self._append(line)
-            # The retained tail's overshoot (the one oversized newest line, or a
-            # protected line kept whole) is a legitimate part of the retained
-            # size, so the on-disk file is measured against bound + slack +
-            # overshoot: the hysteresis that stops a compaction per line
-            # survives, without compacting the newest line away.
+            # Count an oversized tail line's overshoot as retained size so slack
+            # hysteresis holds.
             if self.truncated and self.disk_bytes > (
                 self.head_bytes + self.max_bytes + self.slack
                 + max(0, self.tail_bytes - self.tail_budget)
