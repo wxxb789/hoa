@@ -137,9 +137,8 @@ while True:
 # start theirs) and polls the suite's task-local scratch.  It records `beat.gone` the first time
 # that tree disappears and keeps running until the test stops it: the run leaves it alone, and a
 # fixture that exited by itself would make the "still running" reading a race with the suite's own
-# scratch cleanup rather than something about signals.  It counts its heartbeats so a stopped worker
-# is distinguishable from a silent one, and replaces the beat file atomically so a test reading it
-# never sees a half-written one.
+# scratch cleanup.  It counts its heartbeats so a stopped worker is distinguishable from a silent
+# one, and replaces the beat file atomically so a test reading it never sees a half-written one.
 DETACHED_WORKER = '''import os
 import sys
 import time
@@ -381,9 +380,9 @@ class PatchingTestCase(unittest.TestCase):
         """Make `target.attribute` absent for this test, restoring exactly what was there before.
 
         `patch` cannot model absence — it reads the attribute to save it, and a platform where the
-        attribute genuinely does not exist is exactly the platform such a test must run on.  So the
-        attribute is deleted (if it was there) and, on the way out, deleted again rather than
-        restored when it never existed.
+        attribute genuinely does not exist is exactly the platform such a test must run on.  So an
+        attribute that is there is deleted and restored on the way out, and one that is already
+        absent is left untouched, with nothing registered to restore.
         """
         absent = object()
         saved = getattr(target, attribute, absent)
@@ -2021,9 +2020,14 @@ class EndToEndTests(PatchingTestCase):
         """
         log_text = Path(entry["log"]).read_text(encoding="utf-8")
         targets = [int(raw) for raw in runner.DELIVERY_TARGET_RE.findall(log_text)]
-        if can_deliver_signals():
-            self.assertTrue(targets, "no delivery line for a suite this run signalled, so this check "
-                                     "would pass on any log")
+        # Exposed APIs and `/proc` do not promise a delivery the kernel will allow: a host can have
+        # `pidfd_open` and still refuse it (an older kernel answers ENOSYS, a sandbox denies it), and
+        # the runner then records an unverified refusal and sends nothing.  So a delivery line is
+        # required only where the record carries no refusal at all; either way the run may not be
+        # silent about what it did, or this check would pass on any log.
+        if can_deliver_signals() and not (entry.get("teardown") or {}).get("unverified"):
+            self.assertTrue(targets, "no delivery line and no recorded refusal for a suite this run "
+                                     "signalled, so this check would pass on any log")
         self.assertNotIn(pid, targets,
                          f"the run claims a delivery to a process it did not spawn: {targets}")
 
