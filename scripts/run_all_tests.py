@@ -44,7 +44,10 @@ reap recycled cannot receive this run's signal, a target that is gone before the
 (`ProcessLookupError`) is reported as gone instead of being signalled, and a process that has
 already terminated takes no signal at all — a delivery to a corpse would be a claim, not a
 delivery.  Escalation is TERM, a bounded grace, KILL (`_stop_spawned`), and every round re-pins: a
-proof taken earlier, or a handle opened earlier, is never authority for a later delivery.
+proof taken earlier, or a handle opened earlier, is never authority for a later delivery.  The
+escalation is resolved from the signal names this platform defines, and the capability refusal is
+completed before any of them is resolved, so a platform that has no `SIGKILL` records its refusal
+and the group it reports instead of raising while the sequence is built.
 
 Before anything is spawned the run also puts its own `SIGCHLD` disposition in `SIG_DFL`
 (`establish_exit_disposition`) — under an inherited `SIG_IGN` the kernel reaps a child inside its
@@ -102,6 +105,11 @@ DEFAULT_TIMEOUT = 120.0
 LOG_TAIL_BYTES = 128 * 1024
 KILL_GRACE_SECONDS = 10.0
 EXIT_POLL_SECONDS = 0.05
+# The teardown escalation, weakest first, by name rather than by constant: `signal.SIGKILL` is not
+# defined on every platform (Windows has none), so the sequence is resolved from the names this
+# platform defines, and the capability refusal is completed before any of them is resolved
+# (`_stop_spawned`).
+ESCALATION_NAMES = ("SIGTERM", "SIGKILL")
 # `/proc` is how teardown reads the evidence every delivery is justified by: a process's start time
 # (its identity) and the live members of the group the command leads; it is also how the scratch
 # sweep finds the holders a suite left behind, since a detached worker (`start_new_session`) leaves
@@ -1027,6 +1035,16 @@ def _pin_identity(pid: int, expected: str) -> tuple[Pin | None, str | None]:
     return None, note
 
 
+def _spawned_target(spawned: Spawned) -> str:
+    """How the record names the one process this run may signal."""
+    return f"the process this run spawned (pid {spawned.pid})"
+
+
+def _not_sent(target: str, name: str, why: str) -> str:
+    """The record note for a delivery that was refused: what was not sent, and why."""
+    return _unverified(f"{target} was not sent {name}: {why}")
+
+
 def _signal_spawned(spawned: Spawned, signum: int, log) -> tuple[bool, str | None]:
     """Deliver `signum` to the process this run spawned, or send nothing and return the reason.
 
@@ -1037,10 +1055,10 @@ def _signal_spawned(spawned: Spawned, signum: int, log) -> tuple[bool, str | Non
     claim rather than a delivery); `(False, note)` is a refusal, and the note carries the reason.
     """
     name = signal.Signals(signum).name
-    target = f"the process this run spawned (pid {spawned.pid})"
+    target = _spawned_target(spawned)
     limit = _ownership_limit()
     if limit is not None:
-        return False, _unverified(f"{target} was not sent {name}: {limit}")
+        return False, _not_sent(target, name, limit)
     if spawned.start is None:
         return False, _unverified(
             f"{target} has no start time recorded at spawn, so its identity cannot be pinned and "
@@ -1078,6 +1096,11 @@ def _command_stopped(spawned: Spawned, seconds: float) -> bool:
     return code is not None or lost
 
 
+def _escalation_signals() -> tuple[int, ...]:
+    """The escalation signals this platform defines, in escalation order (TERM, then KILL)."""
+    return tuple(getattr(signal, name) for name in ESCALATION_NAMES if hasattr(signal, name))
+
+
 def _stop_spawned(spawned: Spawned, log) -> Teardown:
     """Terminate the process this run spawned — the only process it may signal — and report the rest.
 
@@ -1088,21 +1111,31 @@ def _stop_spawned(spawned: Spawned, log) -> Teardown:
     running and the teardown is unverified.  Only a process that took a delivered SIGKILL and
     outlived the grace is a survivor; the group is read before the command is reaped, so the number
     read is still the command's own.
+
+    The capability refusal is completed before any escalation signal is resolved: the platform may
+    not define every constant in the sequence (`signal.SIGKILL` on Windows), and a refused delivery
+    is a record entry, not an exception — the group report below still runs and the settled result
+    still carries the limit.
     """
     signalled: tuple[int, ...] = ()
     refused: tuple[str, ...] = ()
     stopped = False
-    for signum in (signal.SIGTERM, signal.SIGKILL):
-        delivered, note = _signal_spawned(spawned, signum, log)
-        if not delivered:
-            if note is not None:
-                refused = (*refused, note)
-            break
-        signalled = (*signalled, signum)
-        if _command_stopped(spawned, KILL_GRACE_SECONDS):
-            stopped = True
-            break
-    survivors = ((spawned.pid,) if signalled and signalled[-1] == signal.SIGKILL and not stopped
+    limit = _ownership_limit()
+    if limit is not None:
+        refused = (_not_sent(_spawned_target(spawned), ESCALATION_NAMES[0], limit),)
+    else:
+        for signum in _escalation_signals():
+            delivered, note = _signal_spawned(spawned, signum, log)
+            if not delivered:
+                if note is not None:
+                    refused = (*refused, note)
+                break
+            signalled = (*signalled, signum)
+            if _command_stopped(spawned, KILL_GRACE_SECONDS):
+                stopped = True
+                break
+    kill = getattr(signal, "SIGKILL", None)  # absent where no KILL round could have been delivered
+    survivors = ((spawned.pid,) if signalled and signalled[-1] == kill and not stopped
                  else ())
     teardown = _group_report(spawned, log, NO_ENUMERATION)
     spawned.process.poll()  # reconcile `Popen` with an exit observed without reaping

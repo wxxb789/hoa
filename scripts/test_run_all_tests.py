@@ -134,23 +134,28 @@ while True:
 '''
 
 # A worker that left the suite's process group (`start_new_session`, the way both launcher adapters
-# start theirs) and polls the suite's task-local scratch.  It records `beat.gone` if that tree
-# disappears while it is alive, and counts its heartbeats so a stopped worker is distinguishable
-# from a silent one.
+# start theirs) and polls the suite's task-local scratch.  It records `beat.gone` the first time
+# that tree disappears and keeps running: these tests read "the run sent it nothing" from the worker
+# still being alive, so a fixture that exited by itself would make that reading a race with the
+# suite's own cleanup.  It counts its heartbeats so a stopped worker is distinguishable from a
+# silent one, and replaces the beat file atomically so a test reading it never sees a half-written
+# one.
 DETACHED_WORKER = '''import os
 import sys
 import time
 
 sentinel, beat = sys.argv[1], sys.argv[2]
 count = 0
+gone = False
 while True:
     count += 1
-    with open(beat, "w", encoding="utf-8") as handle:
+    with open(beat + ".tmp", "w", encoding="utf-8") as handle:
         handle.write(str(count))
-    if not os.path.exists(sentinel):
+    os.replace(beat + ".tmp", beat)
+    if not gone and not os.path.exists(sentinel):
         with open(beat + ".gone", "w", encoding="utf-8") as handle:
             handle.write("scratch-gone")
-        break
+        gone = True
     time.sleep(0.05)
 '''
 
@@ -371,6 +376,27 @@ class PatchingTestCase(unittest.TestCase):
         saved = getattr(target, attribute)
         setattr(target, attribute, value)
         self.addCleanup(setattr, target, attribute, saved)
+
+    def remove_attribute(self, target, attribute: str) -> None:
+        """Make `target.attribute` absent for this test, restoring exactly what was there before.
+
+        `patch` cannot model absence — it reads the attribute to save it, and a platform where the
+        attribute genuinely does not exist is exactly the platform such a test must run on.  An
+        attribute that was never there is deleted again on the way out.
+        """
+        absent = object()
+        saved = getattr(target, attribute, absent)
+        if saved is absent:
+            self.addCleanup(drop_attribute, target, attribute)
+        else:
+            delattr(target, attribute)
+            self.addCleanup(setattr, target, attribute, saved)
+
+
+def drop_attribute(target, attribute: str) -> None:
+    """Delete `target.attribute` if it is there, tolerating one that a cleanup already removed."""
+    with contextlib.suppress(AttributeError):
+        delattr(target, attribute)
 
 
 def can_deliver_signals() -> bool:
@@ -1393,12 +1419,13 @@ class TeardownOwnershipTests(PatchingTestCase):
         """The delivery recorder instruments pidfd APIs only where the platform has them.
 
         Model: the same platform as the refusal test above — no `os.pidfd_open` — reached through
-        this module's own instrumentation instead of `PIDFD_PINNING`: the recorder must not read or
-        patch an API the platform does not expose (attribute set to its absent-platform value),
-        and the refusal must still be the runner's own, recorded as nothing delivered.
+        this module's own instrumentation instead of `PIDFD_PINNING`: the API is genuinely absent
+        for the duration of this test rather than set to a stand-in value, the recorder must not
+        read or patch what the platform does not expose, and the refusal must still be the runner's
+        own, recorded as nothing delivered.
         """
         process = self.spawn(code="import time; time.sleep(60)")
-        self.patch(os, "pidfd_open", None)  # the absent-platform value the recorder must tolerate
+        self.remove_attribute(os, "pidfd_open")  # the platform genuinely has no such attribute
         self.patch(runner, "PIDFD_PINNING", False)
         deliveries: list = []
         self.record_deliveries(deliveries)
@@ -1494,8 +1521,8 @@ class TeardownOwnershipTests(PatchingTestCase):
                          "the spawned process was not the only TERM target")
         self.assertEqual(self.deliveries(deliveries, signal.SIGKILL), [("pidfd", leader_pid)],
                          "the spawned process was not the only SIGKILL target")
-        self.assertNotIn(("pidfd", child_pid), sends,
-                         "a member whose evidence matched perfectly was signalled")
+        self.assertEqual({pid for _handle, pid, _signum in sends}, {leader_pid},
+                         f"a delivery targeted something other than the spawned process: {sends}")
         term_index = deliveries.index(("pidfd", leader_pid, signal.SIGTERM))
         kill_index = deliveries.index(("pidfd", leader_pid, signal.SIGKILL))
         self.assertIn(("open", leader_pid), deliveries[term_index:kill_index],
@@ -1548,10 +1575,13 @@ class TeardownOwnershipTests(PatchingTestCase):
             if entry[0] == "pidfd":
                 self.assertIn(("open", entry[1]), deliveries[:index],
                               "a signal went through a handle not opened for its target")
-        self.assertNotIn(("pidfd", child_pid), [entry for entry in deliveries if entry[0] != "open"],
-                         "the loss of the spawned process turned the member into a target")
+        sends = [entry for entry in deliveries if entry[0] != "open"]
+        self.assertEqual({pid for _handle, pid, _signum in sends}, {leader_pid},
+                         f"a delivery targeted something other than the spawned process: {sends}")
         self.assertFalse(teardown.verified)
         self.assertIn("left alone", teardown.describe())
+        self.assertIn(str(child_pid), teardown.describe(),
+                      "the member that outlived the spawned process is not named in the record")
 
     @unittest.skipUnless(can_deliver_signals(), "the delivery needs a pinnable identity")
     def test_only_the_spawned_process_is_delivered_to_and_re_pinned_every_round(self):
@@ -1580,8 +1610,8 @@ class TeardownOwnershipTests(PatchingTestCase):
         kill_index = events.index(("pidfd", leader_pid, signal.SIGKILL))
         self.assertIn(("open", leader_pid), events[term_index:kill_index],
                       "the second round reused an earlier pin instead of re-pinning")
-        self.assertNotIn(("pidfd", child_pid), sends,
-                         "a same-group member was signalled: only the spawned process may be")
+        self.assertEqual({pid for _handle, pid, _signum in sends}, {leader_pid},
+                         f"a delivery targeted something other than the spawned process: {sends}")
         self.assertEqual(teardown.survivors, (leader_pid,),
                          "the spawned process took both delivered signals and outlived them")
         self.assertNotIn(child_pid, teardown.survivors,
@@ -1985,6 +2015,19 @@ class EndToEndTests(PatchingTestCase):
         self.assertEqual(entry["teardown"]["survivors"], [],
                          "a child that was never signalled is not a survivor")
 
+    def assert_no_delivery_to(self, entry: dict, pid: int) -> None:
+        """The run's own log must claim no delivery to `pid`: it signals only what it spawned.
+
+        A delivery is what the log records as `delivered to pid <n>, the process this run spawned`,
+        so a line naming any other pid is the run claiming a signal it may not send.  On a host that
+        cannot deliver at all the log has no delivery line to check, and the worker's liveness is
+        the only reading there is.
+        """
+        log_text = Path(entry["log"]).read_text(encoding="utf-8")
+        deliveries = [line for line in log_text.splitlines() if "delivered to" in line]
+        self.assertEqual([line for line in deliveries if str(pid) in line], [],
+                         f"the run claims a delivery to a process it did not spawn: {deliveries}")
+
     def leftover_pids(self, pids_file: Path) -> list[int]:
         """The pids a fixture recorded, killed when the test ends.
 
@@ -2328,9 +2371,10 @@ class EndToEndTests(PatchingTestCase):
         """A worker that left the suite's group is found and named before the scratch is deleted.
 
         The fixture worker does what both launcher adapters do — `start_new_session`, then poll the
-        suite's task-local scratch — and records `beat.gone` if that tree disappears while it is
-        alive.  The run must name the worker it found in the record and leave it running: it
-        signals only the process it spawned, so the worker outlives the run and the test stops it.
+        suite's task-local scratch — and records `beat.gone` the first time that tree disappears.
+        It keeps running after that, so liveness at assertion time is the run's answer about signals
+        and not a race: the run must name the worker it found in the record, deliver nothing to it,
+        and leave it running for the test to stop.
         """
         write_suite(ARTIFACTS, "detached-worker.py", DETACHED_WORKER)
         beat = ARTIFACTS / "beat"
@@ -2347,6 +2391,9 @@ class EndToEndTests(PatchingTestCase):
         self.assertIn(str(worker_pid), entry["reason"],
                       "the detached worker left behind is not named in the record")
         self.assertIn("left alone", entry["reason"])
+        self.assert_no_delivery_to(entry, worker_pid)
+        self.assertEqual(entry["teardown"]["survivors"], [],
+                         "a worker that was never signalled is not a survivor")
         self.assertFalse(entry["teardown"]["verified"], entry["teardown"])
 
     @unittest.skipUnless(runner.PROC_ROOT.is_dir(), "the detection reads /proc")
@@ -2373,7 +2420,7 @@ class EndToEndTests(PatchingTestCase):
         The fixture worker sanitizes its environment (`WORKER_SANITIZED`) and is started with its
         cwd inside the suite's task-local TMPDIR (`WORKER_CWD_SCRATCH`), so `environ` shows nothing
         and only the `/proc/<pid>/cwd` symlink finds it after the timeout; the record must name it,
-        and the run must leave it running.
+        the run's log must claim no delivery to it, and the run must leave it running.
         """
         write_suite(ARTIFACTS, "detached-worker.py", DETACHED_WORKER)
         beat = ARTIFACTS / "cwd-beat"
@@ -2391,6 +2438,9 @@ class EndToEndTests(PatchingTestCase):
         self.assertIn(str(worker_pid), entry["reason"],
                       "the worker found through its cwd symlink is not named in the record")
         self.assertIn("left alone", entry["reason"])
+        self.assert_no_delivery_to(entry, worker_pid)
+        self.assertEqual(entry["teardown"]["survivors"], [],
+                         "a worker that was never signalled is not a survivor")
 
     @unittest.skipUnless(can_deliver_signals(),
                          "a signalled command needs pidfds, /proc evidence and waitid(WNOWAIT)")
