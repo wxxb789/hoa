@@ -69,8 +69,15 @@
 #                  suite's task-local scratch whatever this says (the sweep reads /proc).
 #                  Same-group termination is not this field: it is the runner's own POSIX
 #                  group teardown (`os.killpg`), checked before each command is reaped so
-#                  even a clean exit's survivors are covered, and it signals only a group
-#                  the kernel still holds as this run's own unreaped child.
+#                  even a clean exit's survivors are covered.  It signals only a group the
+#                  kernel still holds as this run's own unreaped child — the run establishes
+#                  its own `SIGCHLD` disposition first, and re-probes the anchor before every
+#                  escalation round — and where that proof is unavailable (no `waitid` with
+#                  `WNOWAIT`, no established disposition, an externally reaped child, a
+#                  platform without the capability) nothing is signalled: the suite's
+#                  published `teardown` record says unverified on every exit path, and a
+#                  survivor whose group can no longer be proven is left running and
+#                  reported, never guessed at.
 #   socket_tail    the deepest path tree the suite builds below its own task-local
 #                  scratch root, with `{uid}` replaced by the running user's id.  A run
 #                  is bounded by the longest declared tail, so the suite that creates an

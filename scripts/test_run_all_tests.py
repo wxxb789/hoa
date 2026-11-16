@@ -18,6 +18,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from pathlib import Path
@@ -216,6 +217,37 @@ with open(sys.argv[1], "w", encoding="utf-8") as handle:
     handle.write(f"{child.pid}\\n")
 '''
 
+# A suite that records its own pid and exits 0 without cleanup — a reaper outside this run can
+# block in `os.waitpid` on that pid and take the status the moment the suite ends, leaving the
+# runner a child it can no longer wait for.
+REAPED_SUITE = '''import os
+import time
+
+with open(os.environ["PID_FILE"], "w", encoding="utf-8") as handle:
+    handle.write(str(os.getpid()))
+time.sleep(0.2)
+'''
+
+# A command leader that ignores SIGTERM, starts a same-group child that ignores it too, records
+# both pids, and exits by itself inside the first kill-grace window.  A test that blocks in
+# `os.waitpid` on the leader takes the leader's status the moment it exits, so the kernel's hold on
+# it — the anchor every escalation round re-probes — is gone before the second round.
+ANCHOR_LEADER = '''import os
+import signal
+import subprocess
+import sys
+import time
+
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+child = subprocess.Popen([sys.executable, "-c",
+                          "import signal, time; signal.signal(signal.SIGTERM, signal.SIG_IGN);"
+                          " time.sleep(60)"])
+with open(sys.argv[1], "w", encoding="utf-8") as handle:
+    handle.write(f"{os.getpid()} {child.pid}\\n")
+time.sleep(0.5)
+os._exit(0)
+'''
+
 
 def synthetic_tree(patterns: list[str], prune: list[str], floor: list[str], suites: str) -> Path:
     """Create a throwaway root with a manifest and return it."""
@@ -275,6 +307,22 @@ def process_running(pid: int) -> bool:
     except OSError:
         return False
     return True
+
+
+def kill_quietly(pid: int, signum: int = signal.SIGKILL) -> None:
+    """Signal `pid`, tolerating a process that is already gone."""
+    with contextlib.suppress(ProcessLookupError, PermissionError):
+        os.kill(pid, signum)
+
+
+class PatchingTestCase(unittest.TestCase):
+    """Attribute patching the test runner itself restores."""
+
+    def patch(self, target, attribute: str, value) -> None:
+        """Set `target.attribute` for this test and restore it afterwards."""
+        saved = getattr(target, attribute)
+        setattr(target, attribute, value)
+        self.addCleanup(setattr, target, attribute, saved)
 
 
 SHIM_TOOL_FIXTURE = '''import json
@@ -910,13 +958,21 @@ class TeardownRecordTests(unittest.TestCase):
         self.assertFalse(runner.Teardown(unverified=("a limit this run cannot observe",)).verified)
 
 
-class TeardownOwnershipTests(unittest.TestCase):
+class TeardownOwnershipTests(PatchingTestCase):
     """Every signal must be justified by identity this run recorded itself (module docstring)."""
 
     def setUp(self):
         ARTIFACTS.mkdir(parents=True, exist_ok=True)
         self.addCleanup(shutil.rmtree, ARTIFACTS, ignore_errors=True)
         self.log_path = ARTIFACTS / "ownership.log"
+        # Ownership rests on the run's own `SIGCHLD` disposition (`establish_exit_disposition`);
+        # the end-to-end runs take that startup step in `main`, and these unit tests stand in for
+        # it instead of inheriting whatever this test host happens to have.
+        establish = getattr(runner, "establish_exit_disposition", None)
+        if establish is not None and hasattr(signal, "SIGCHLD"):
+            saved = signal.getsignal(signal.SIGCHLD)
+            self.addCleanup(signal.signal, signal.SIGCHLD, saved)
+            self.assertTrue(establish(), "the test host will not let the run establish it")
 
     def spawn(self, *, code: str = "import time; time.sleep(60)") -> subprocess.Popen:
         """A child that is a session (and process group) leader, and always reaped."""
@@ -924,12 +980,6 @@ class TeardownOwnershipTests(unittest.TestCase):
         self.addCleanup(process.wait)
         self.addCleanup(process.kill)
         return process
-
-    def patch(self, target, attribute: str, value) -> None:
-        """Set `target.attribute` for this test and restore it afterwards."""
-        saved = getattr(target, attribute)
-        setattr(target, attribute, value)
-        self.addCleanup(setattr, target, attribute, saved)
 
     @unittest.skipUnless(hasattr(os, "killpg"), "POSIX process groups only")
     def test_group_teardown_refuses_a_recycled_group_id(self):
@@ -992,13 +1042,13 @@ class TeardownOwnershipTests(unittest.TestCase):
         pid — and with it the group it leads — stays reserved until this run reaps it itself.
         """
         exited = self.spawn(code="import sys; sys.exit(3)")
-        self.assertEqual(runner._observe_exit(exited, 5), 3)
+        self.assertEqual(runner._observe_exit(exited, 5), (3, False))
         self.assertIsNone(exited.returncode, "the observation reaped the command")
         self.assertEqual(os.getpgid(exited.pid), exited.pid,
                          "the pid stopped naming the group the teardown must still prove")
         killed = self.spawn()
         os.kill(killed.pid, signal.SIGKILL)
-        self.assertEqual(runner._observe_exit(killed, 5), -signal.SIGKILL)
+        self.assertEqual(runner._observe_exit(killed, 5), (-signal.SIGKILL, False))
         self.assertIsNone(killed.returncode, "the observation reaped the signalled command")
 
     @unittest.skipUnless(runner.WAITID_WNOWAIT, "the anchor is the waitid(WNOWAIT) probe")
@@ -1038,8 +1088,8 @@ class TeardownOwnershipTests(unittest.TestCase):
         """
         process = self.spawn(code="pass")
         os.waitpid(process.pid, 0)
-        with self.assertRaises(runner._WaitabilityLost):
-            runner._observe_exit(process, 5)
+        self.assertEqual(runner._observe_exit(process, 5), (None, True),
+                         "a status that is gone is reported as lost, not as an exit")
 
     @unittest.skipUnless(hasattr(os, "killpg"), "POSIX process groups only")
     def test_an_unowned_live_command_is_refused_without_claiming_survivors(self):
@@ -1071,7 +1121,7 @@ class TeardownOwnershipTests(unittest.TestCase):
         normally; the reap must still happen, and the record must say the check did not.
         """
         process = self.spawn(code="pass")
-        self.assertEqual(runner._observe_exit(process, 5), 0)
+        self.assertEqual(runner._observe_exit(process, 5), (0, False))
         self.patch(runner, "_owned_group", lambda owned: None)
         with self.log_path.open("ab") as log:
             teardown = runner._teardown_before_reap(process, log)
@@ -1079,8 +1129,101 @@ class TeardownOwnershipTests(unittest.TestCase):
         self.assertIn("unverified", teardown.describe())
         self.assertIsNotNone(process.poll(), "the command must still be reaped")
 
+    @unittest.skipUnless(hasattr(os, "killpg"), "POSIX process groups only")
+    def test_an_externally_reaped_child_is_no_proof_without_the_kernel_probe(self):
+        """Where there is no `waitid(WNOWAIT)` probe, the cached field is all that is left — and it
+        cannot see a reap, so it is not ownership.
 
-class EndToEndTests(unittest.TestCase):
+        Model: a host without the non-reaping observation, a command reaped by someone else (so
+        `Popen.returncode` still reads None) and a pid whose number was recycled onto a group that
+        looks live and self-consistent.  The absence of the probe must fail closed: no ownership,
+        no signal, teardown unverified.
+        """
+        process = self.spawn(code="pass")
+        os.waitpid(process.pid, 0)  # reaped outside Popen: the cached returncode stays None
+        self.assertIsNone(process.returncode, "the external reap must stay invisible to Popen")
+        self.patch(runner, "WAITID_WNOWAIT", False)
+        self.patch(runner, "KILL_GRACE_SECONDS", 0.2)
+        real_getpgid = os.getpgid
+        self.patch(os, "getpgid",
+                   lambda pid: process.pid if pid == process.pid else real_getpgid(pid))
+        self.patch(runner, "_group_running", lambda group: True)  # the recycled number looks live
+        self.assertIsNone(runner._owned_group(process),
+                          "a cached `returncode` is not ownership proof")
+        attempts: list = []
+        self.patch(os, "kill", lambda pid, signum: attempts.append(("kill", pid, signum)))
+        self.patch(os, "killpg", lambda group, signum: attempts.append(("killpg", group, signum)))
+        with self.log_path.open("ab") as log:
+            teardown = runner._terminate_group(process, log)
+        self.assertEqual(attempts, [], "a group without any kernel proof was signalled")
+        self.assertFalse(teardown.verified)
+        self.assertIn("unverified", teardown.describe())
+
+    @unittest.skipUnless(hasattr(os, "killpg"), "POSIX process groups only")
+    def test_ownership_is_refused_where_the_disposition_was_never_established(self):
+        """A run that could not establish its own child-reaping disposition proves nothing.
+
+        Model: the startup step failed (`EXIT_DISPOSITION` is None — no `SIGCHLD` on this platform,
+        or a process that will not let the run change it), so the reservation the ownership proof
+        reads cannot be held.  The teardown must refuse instead of signalling, and say why.
+        """
+        process = self.spawn(code="import time; time.sleep(60)")
+        self.patch(runner, "EXIT_DISPOSITION", None)
+        self.patch(runner, "KILL_GRACE_SECONDS", 0.5)
+        attempts: list = []
+        self.patch(os, "kill", lambda pid, signum: attempts.append(("kill", pid, signum)))
+        self.patch(os, "killpg", lambda group, signum: attempts.append(("killpg", group, signum)))
+        with self.log_path.open("ab") as log:
+            teardown = runner._terminate_group(process, log)
+        self.assertEqual(attempts, [], "a group was signalled with no disposition to prove it")
+        self.assertFalse(teardown.verified)
+        self.assertIn("SIGCHLD", teardown.describe())
+        self.assertIsNone(process.poll(), "the probe's own child must stay untouched")
+
+    @unittest.skipUnless(hasattr(os, "killpg"), "the escalation is the POSIX group path")
+    @unittest.skipUnless(runner.WAITID_WNOWAIT, "the anchor is the waitid(WNOWAIT) probe")
+    def test_escalation_stops_when_the_anchor_is_lost_before_a_round(self):
+        """The anchor can end between the rounds; the bare group number is not signalable then.
+
+        The leader ignores SIGTERM and exits by itself inside the first grace window while a
+        same-group child keeps the group alive, and a thread this run does not control is already
+        blocked in `os.waitpid` on the leader, so the kernel's hold on it ends the moment it exits.
+        Round two must find no anchor, send no SIGKILL, and record the group's state as unverified
+        instead of claiming a termination it can no longer justify.
+        """
+        pid_file = ARTIFACTS / "anchor-pids.txt"
+        pid_file.unlink(missing_ok=True)
+        leader_file = ARTIFACTS / "anchor-leader.py"
+        leader_file.write_text(ANCHOR_LEADER, encoding="utf-8")
+        process = subprocess.Popen([sys.executable, str(leader_file), str(pid_file)],
+                                   start_new_session=True)
+        self.addCleanup(process.wait)
+        self.addCleanup(kill_quietly, process.pid)
+        deadline = time.monotonic() + 10
+        while not pid_file.exists() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        leader_pid, child_pid = (int(value) for value in pid_file.read_text().split())
+        self.addCleanup(kill_quietly, child_pid)
+        self.assertEqual(leader_pid, process.pid, "the fixture's pid file is not the leader's")
+        reaped: list[int] = []
+        reaper = threading.Thread(target=lambda: reaped.append(os.waitpid(leader_pid, 0)[0]),
+                                  daemon=True)
+        reaper.start()
+        self.patch(runner, "KILL_GRACE_SECONDS", 1.0)
+        attempts: list = []
+        self.patch(os, "killpg", lambda group, signum: attempts.append((group, signum)))
+        with self.log_path.open("ab") as log:
+            teardown = runner._terminate_group(process, log)
+        reaper.join(5)
+        self.assertEqual(reaped, [leader_pid], "the external reaper did not take the status")
+        self.assertEqual(attempts, [(leader_pid, signal.SIGTERM)],
+                         "escalation continued although the anchor was gone")
+        self.assertFalse(teardown.verified)
+        self.assertIn("unverified", teardown.describe())
+        self.assertNotIn("process group terminated", teardown.describe())
+
+
+class EndToEndTests(PatchingTestCase):
     """One synthetic repository, run through main(): states, isolation, teardown."""
 
     def setUp(self):
@@ -1408,6 +1551,17 @@ class EndToEndTests(unittest.TestCase):
                         os.kill(leftover, signal.SIGKILL)
                 self.fail(f"pid {pid} survived the suite timeout")
 
+    def leftover_pids(self, pids_file: Path) -> list[int]:
+        """The pids a fixture recorded, killed when the test ends.
+
+        A platform without `/proc`, or a group that can no longer be proven, cannot sweep them —
+        so the test itself owns stopping what it deliberately leaves running to observe.
+        """
+        pids = [int(value) for value in pids_file.read_text().split()]
+        for pid in pids:
+            self.addCleanup(kill_quietly, pid)
+        return pids
+
     def assert_stopped(self, pids: list[int], message: str) -> None:
         """Every pid stops running inside the grace window, or the failure names the survivor."""
         deadline = time.monotonic() + 10
@@ -1473,15 +1627,70 @@ class EndToEndTests(unittest.TestCase):
         self.assertEqual(entry["exit_code"], 0, "the fixture leader did not exit on SIGTERM")
         self.assertEqual(len(pids), 2)
         self.assertIn("process group terminated", entry["reason"])
+        self.assertTrue(entry["teardown"]["verified"], entry["teardown"])
+        self.assertEqual(entry["teardown"]["clauses"], ["process group"])
 
     @unittest.skipUnless(runner.WAITID_WNOWAIT, "the loss is only visible to waitid(WNOWAIT)")
     def test_a_suite_whose_child_is_not_waitable_settles_error_instead_of_crashing(self):
-        """An inherited `SIGCHLD=SIG_IGN` hands the child's exit to the kernel.
+        """A suite leader reaped by someone else is no more waitable than one the kernel took.
 
-        The status is then gone before this run can observe it — the probe raises
-        `ChildProcessError` — and nothing can prove the group.  Each affected suite must settle
-        ERROR with an unverified teardown, and the run must continue to settle the rest of the
-        plan and publish its record instead of taking the whole discoverer down.
+        The run establishes its own `SIGCHLD` disposition, so an *inherited* handler can no longer
+        take a suite's exit; a reaper this run does not control still can — here a thread already
+        blocked in `os.waitpid` on the suite's own pid, which takes its status the moment the suite
+        ends (the exit-poll interval is widened so the runner's probe cannot catch that exit first
+        and hide the loss).  The affected suite must settle ERROR with an unverified teardown, and
+        the run must continue to settle the rest of the plan and publish its record instead of
+        taking the whole discoverer down.
+        """
+        pids_file = ARTIFACTS / "reaped-pids.txt"
+        pids_file.unlink(missing_ok=True)
+        root = synthetic_tree(patterns=["scripts/test_*.py"], prune=[], floor=[],
+                              suites="\n".join([
+                                  "[[suite]]",
+                                  'id = "canned:pass"',
+                                  'command = [["{python}", "-c", "pass"]]',
+                                  'assertion = "exit"',
+                                  "",
+                                  "[[suite]]",
+                                  'path = "scripts/test_reaped.py"',
+                                  f'env = {{ PID_FILE = "{pids_file}" }}',
+                                  "",
+                              ]))
+        write_suite(root, "scripts/test_reaped.py", REAPED_SUITE)
+        self.patch(runner, "EXIT_POLL_SECONDS", 3.0)
+        reaped: list[int] = []
+
+        def reap_outside_popen() -> None:
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline and not pids_file.exists():
+                time.sleep(0.01)
+            reaped.append(os.waitpid(int(pids_file.read_text()), 0)[0])
+
+        reaper = threading.Thread(target=reap_outside_popen, daemon=True)
+        reaper.start()
+        code, output, payload = self.run_main(root)
+        reaper.join(5)
+        states = self.states(payload)
+        self.assertEqual(sorted(states), ["canned:pass", "scripts/test_reaped.py"])
+        lost = states["scripts/test_reaped.py"]
+        self.assertEqual(lost["state"], "ERROR", lost["reason"])
+        self.assertIn("no longer waitable", lost["reason"])
+        self.assertIn("unverified", lost["reason"])
+        self.assertEqual(reaped, [int(pids_file.read_text())],
+                         "the external reaper did not take the suite's status")
+        self.assertEqual(states["canned:pass"]["state"], "PASS",
+                         states["canned:pass"]["reason"])
+        self.assertEqual(code, 1, output)
+
+    @unittest.skipUnless(runner.WAITID_WNOWAIT, "the loss would only be visible to waitid(WNOWAIT)")
+    def test_an_inherited_sigchld_ignore_is_normalized_before_anything_is_spawned(self):
+        """An inherited `SIGCHLD=SIG_IGN` must not reap a suite's exit out from under the run.
+
+        Under `SIG_IGN` the kernel reaps a child inside its own exit: the status, and with it the
+        `waitid(WNOWAIT)` reservation every ownership proof reads, is gone the moment a suite ends,
+        and even a clean exit settles as "no longer waitable" ERROR.  `main` puts the run's own
+        disposition in `SIG_DFL` before the first spawn, so both suites below settle on their real
+        exits instead.
         """
         root = synthetic_tree(patterns=["scripts/test_*.py"], prune=[], floor=[],
                               suites="\n".join([
@@ -1496,20 +1705,24 @@ class EndToEndTests(unittest.TestCase):
         self.addCleanup(signal.signal, signal.SIGCHLD, saved)
         code, output, payload = self.run_main(root)
         states = self.states(payload)
-        self.assertEqual(sorted(states), ["canned:pass", "scripts/test_pass.py"])
+        self.assertEqual(code, 0, output)
         for suite_id, entry in states.items():
-            self.assertEqual(entry["state"], "ERROR",
+            self.assertEqual(entry["state"], "PASS",
                              f"{suite_id}: {entry['state']} ({entry['reason']})")
-            self.assertIn("unverified", entry["reason"])
-        self.assertEqual(code, 1, output)
+        self.assertEqual(signal.getsignal(signal.SIGCHLD), signal.SIG_DFL,
+                         "the run did not leave its own disposition in the state it established")
 
+    @unittest.skipUnless(runner.WAITID_WNOWAIT and hasattr(os, "killpg") and runner.PROC_ROOT.is_dir(),
+                         "the check needs the non-reaping observation, POSIX groups and /proc")
     def test_a_command_that_exited_cleanly_is_checked_before_its_reap(self):
         """A clean exit can still leave same-group members; the check must precede the reap.
 
         Command one starts a worker whose environment is empty and whose cwd is `/` — nothing a
         scratch sweep can match — and exits 0; command two times out.  While command one's own
         process is unreaped its group is provable, so the worker is stopped there, and the later
-        timeout's record must not claim a clean teardown over a survivor it never saw.
+        timeout's record must not claim a clean teardown over a survivor it never saw.  The check
+        itself needs the non-reaping observation, POSIX groups *and* `/proc` member enumeration:
+        a host without any of them reports the limit instead (the degraded path's own test).
         """
         pids_file = ARTIFACTS / "clean-exit-pids.txt"
         pids_file.unlink(missing_ok=True)
@@ -1530,11 +1743,88 @@ class EndToEndTests(unittest.TestCase):
         self.assertEqual(code, 1, output)
         entry = self.states(payload)["canned:exit-then-hang"]
         self.assertEqual(entry["state"], "TIMEOUT")
-        pids = [int(value) for value in pids_file.read_text().split()]
+        pids = self.leftover_pids(pids_file)
         self.assertEqual(len(pids), 1)
         self.assert_stopped(pids, "the worker the cleanly exited first command left in its group")
         self.assertIn("process group terminated", entry["reason"])
         self.assertNotIn("unverified", entry["reason"])
+        self.assertTrue(entry["teardown"]["verified"], entry["teardown"])
+        self.assertEqual(entry["teardown"]["clauses"], ["process group"])
+
+    @unittest.skipUnless(runner.WAITID_WNOWAIT, "the clean exit is observed without reaping")
+    def test_a_clean_exits_unverified_teardown_reaches_the_published_record(self):
+        """A clean exit whose group cannot be checked must say so in the run's own record.
+
+        Model: a host that cannot enumerate processes (`PROC_ROOT` absent — macOS/BSD).  Command one
+        exits 0 and leaves a same-group worker whose environment is empty and whose cwd is `/`; the
+        pre-reap check cannot run, so the worker is left running — and the suite's published entry
+        must carry that limit in its reason and in its teardown record instead of reading
+        `PASS / reason: ok` with nothing else to show.
+        """
+        pids_file = ARTIFACTS / "degraded-clean-exit-pids.txt"
+        pids_file.unlink(missing_ok=True)
+        root = synthetic_tree(patterns=["scripts/test_*.py"], prune=[], floor=[],
+                              suites="\n".join([
+                                  "[[suite]]",
+                                  'id = "canned:clean-exit"',
+                                  "command = [",
+                                  f'  ["{{python}}", "scripts/exit_worker.py", '
+                                  f'{json.dumps(str(pids_file))}],',
+                                  "]",
+                                  "",
+                              ]))
+        write_suite(root, "scripts/exit_worker.py", CLEAN_EXIT_WORKER)
+        self.patch(runner, "PROC_ROOT", Path("/nonexistent-proc"))
+        code, output, payload = self.run_main(root)
+        self.assertEqual(code, 0, output)
+        entry = self.states(payload)["canned:clean-exit"]
+        self.assertEqual(entry["state"], "PASS", entry["reason"])
+        self.assertIn("unverified", entry["reason"])
+        self.assertIn("could not be checked before the reap", entry["reason"])
+        self.assertFalse(entry["teardown"]["verified"], entry["teardown"])
+        self.assertIn("could not be checked before the reap",
+                      " ".join(entry["teardown"]["unverified"]))
+        pids = self.leftover_pids(pids_file)
+        self.assertEqual(len(pids), 1)
+        self.assertTrue(process_running(pids[0]),
+                        "the worker this platform cannot find was reported as stopped")
+
+    @unittest.skipUnless(runner.WAITID_WNOWAIT, "the clean exit is observed without reaping")
+    def test_provisionings_teardown_limits_survive_the_suite_command_vector(self):
+        """Successful provisioning's own teardown is merged into the suite's, never replaced.
+
+        Model: a host that cannot enumerate processes.  Provisioning exits 0 and leaves a same-group
+        worker behind, so its own record says the pre-reap check could not run; the suite command
+        then times out and its group teardown succeeds.  The published record must carry both: the
+        provisioning limit is a limit of this suite's run, wherever the worker was started.
+        """
+        pids_file = ARTIFACTS / "provision-pids.txt"
+        pids_file.unlink(missing_ok=True)
+        root = synthetic_tree(patterns=["scripts/test_*.py"], prune=[], floor=[],
+                              suites="\n".join([
+                                  "[[suite]]",
+                                  'id = "canned:provision-then-hang"',
+                                  "provision = [",
+                                  f'  ["{{python}}", "scripts/exit_worker.py", '
+                                  f'{json.dumps(str(pids_file))}],',
+                                  "]",
+                                  "command = [",
+                                  '  ["{python}", "-c", "import time; time.sleep(120)"],',
+                                  "]",
+                                  "",
+                              ]))
+        write_suite(root, "scripts/exit_worker.py", CLEAN_EXIT_WORKER)
+        self.patch(runner, "PROC_ROOT", Path("/nonexistent-proc"))
+        self.patch(runner, "KILL_GRACE_SECONDS", 0.3)
+        code, output, payload = self.run_main(root, "--timeout", "3")
+        self.assertEqual(code, 1, output)
+        entry = self.states(payload)["canned:provision-then-hang"]
+        self.assertEqual(entry["state"], "TIMEOUT", entry["reason"])
+        self.assertIn("process group terminated", entry["reason"])
+        self.assertIn("could not be checked before the reap", entry["reason"],
+                      "provisioning's teardown record was replaced by the suite command's")
+        pids = self.leftover_pids(pids_file)
+        self.assertEqual(len(pids), 1)
 
     @unittest.skipUnless(runner.PROC_ROOT.is_dir(), "the scratch sweep reads /proc")
     def test_timeout_stops_detached_workers_before_the_scratch_goes(self):
@@ -1620,6 +1910,8 @@ class EndToEndTests(unittest.TestCase):
         self.assertEqual(len(pids), 1)
         self.assertIn("terminated by signal 9", entry["reason"])
         self.assertIn("process group terminated", entry["reason"])
+        self.assertTrue(entry["teardown"]["verified"], entry["teardown"])
+        self.assertEqual(entry["teardown"]["clauses"], ["process group"])
 
     def test_covered_child_with_a_hiding_counter_line_is_error(self):
         """Contradictory counter evidence may not settle PASS by way of `covered_by`.

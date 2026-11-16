@@ -195,15 +195,22 @@ every check it did not pass — including a suite that settles from a parent's l
 not finish under its own control — the runner timed it out, or a signal killed it — has its process
 group terminated (POSIX only, through `os.killpg`) and the processes still holding that scratch
 stopped (found by the cwd they were started in or the scratch paths in their environment, from
-`/proc`), before that scratch is deleted. Both parts signal only what the run can prove is its own —
-the group of a command the kernel still holds as the run's unreaped child (probed with `waitid` +
-`WNOWAIT`, the same observation that keeps a signalled command unreaped; a host with no such probe
-reaps inside the exit observation, so a reaped command cannot be proven and its teardown is reported
-unverified), a process that still points into the suite's own scratch — and report teardown
-unverified instead of signalling a group they cannot prove is theirs. The group is checked before a
-command is reaped, so a clean exit that leaves same-group members behind is still torn down while
-the group is provable; and an exit that can no longer be waited for (an inherited `SIGCHLD`
-disposition lets the kernel reap it) settles as an error rather than taking the run down.
+`/proc`), before that scratch is deleted. Both parts signal only what the run can prove it owns, and
+that proof is maintained: the run establishes its own `SIGCHLD` disposition (`SIG_DFL`) before
+spawning anything, signals a group only while the kernel still holds the command as the run's
+unreaped child (probed with `waitid` + `WNOWAIT` and re-probed before every escalation round — an
+anchor lost mid-teardown stops the escalation), and signals a process only while it still points
+into the suite's own scratch. Where the proof cannot be held — no kernel probe, no established
+disposition, an externally reaped child, a platform without the capability — nothing is signalled
+and the teardown is reported unverified; there is no fallback to `Popen`'s cached `returncode`, which
+cannot see a reap. The group is checked before a command is reaped, so a clean exit that leaves
+same-group members behind is still torn down while the group is provable — the check needs `/proc`
+member enumeration on top of `waitid` + `WNOWAIT`, so a host with neither reports that limit
+instead. Every exit path — clean, timed out or signalled — publishes the teardown record, limits
+included, in the suite's entry of the result, so a limit is readable by whoever reads the run and not
+only by the helper that found it; a command whose exit can no longer be waited for settles as an
+error rather than taking the run down; and the residual limit is plain: a survivor whose group can no
+longer be proven is left running and reported, never guessed at.
 
 | Gate command (CI step) | Protects |
 |---|---|
