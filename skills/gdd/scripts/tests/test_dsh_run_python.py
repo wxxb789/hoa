@@ -1073,14 +1073,10 @@ class DshLauncherTests(ProcessFixtures):
         writer.finish()
         retained = (run_dir / "events.ndjson").read_bytes()
         lines = [line for line in retained.splitlines() if line.strip()]
-        # The retained lines are the head lines, then the splice marker the input
-        # never carried, then `final`: everything else fed was dropped, and the
-        # marker and the sidecar must account for exactly those.
-        head_count = len(lines) - 2
         # The head region is the writer's documented one — the first complete
-        # lines up to 64 KiB, kept whole — so its size is pinned here instead of
-        # being read back from the output: a writer that dropped the whole head
-        # (or closed it early) would otherwise pass every assertion below.
+        # lines up to 64 KiB, kept whole — so it is computed here instead of being
+        # read back from the output: a writer that dropped the whole head (or
+        # closed it early) would otherwise pass every assertion below.
         expected_head = []
         expected_head_bytes = 0
         for line in fed:
@@ -1088,8 +1084,11 @@ class DshLauncherTests(ProcessFixtures):
                 break
             expected_head.append(line)
             expected_head_bytes += len(line)
-        self.assertEqual(head_count, len(expected_head))
-        dropped_expected = fed[head_count:]
+        # The retained lines are those head lines, then the splice marker the input
+        # never carried, then `final`: every other fed line was dropped, and the
+        # marker and the sidecar must account for exactly those.
+        self.assertEqual(len(lines), len(expected_head) + 2)
+        dropped_expected = fed[len(expected_head):]
         marker = json.loads(lines[-2])
         stats = json.loads((run_dir / "events.stats.json").read_text(encoding="utf-8"))
         self.assertEqual(marker["type"], "truncated")
@@ -1098,14 +1097,14 @@ class DshLauncherTests(ProcessFixtures):
         self.assertTrue(stats["truncated"])
         self.assertEqual(stats["dropped_lines"], marker["dropped_lines"])
         self.assertEqual(stats["dropped_bytes"], marker["dropped_bytes"])
-        # Every input line is either dropped or retained, and the marker is the
-        # one retained line the input never carried.
+        # Every fed line plus the separately fed `final` is counted; the splice
+        # marker is not an input line, so `total_lines` does not carry it.
         self.assertEqual(stats["total_lines"], len(fed) + 1)
-        self.assertEqual(stats["head_bytes"], sum(len(line) for line in fed[:head_count]))
+        self.assertEqual(stats["head_bytes"], expected_head_bytes)
         # Exact compacted layout: the head lines held whole, the marker, then
         # `final` entire — a writer that truncated nothing, or dropped the newest
         # line, cannot pass either half of this.
-        self.assertEqual(retained, b"".join(fed[:head_count]) + lines[-2] + b"\n" + final)
+        self.assertEqual(retained, b"".join(expected_head) + lines[-2] + b"\n" + final)
 
     def test_10c_an_oversized_final_event_still_settles_done(self):
         """The consumer half: an oversized final event is what `summarize` reads.
@@ -1209,18 +1208,12 @@ class DshLauncherTests(ProcessFixtures):
             line that would cross the cap is the first to land in the tail, and
             the expected drop accounting needs to name it.
             """
-            lines = [session]
-            total = len(session)
-            while total + len(filler) <= 64 * 1024:
-                lines.append(filler)
-                total += len(filler)
-            return lines
+            return [session] + [filler] * ((64 * 1024 - len(session)) // len(filler))
 
         for line in head_prefix(b'{"type":"session","sessionId":"s-10f"}\n'):
             writer.feed(line)
-        older = [filler]  # did not fit the head region: the tail's oldest entry
-        for line in older:
-            writer.feed(line)
+        # Did not fit the head region: the tail's oldest entry.
+        writer.feed(filler)
         final = (json.dumps({"type": "final", "reason": {"kind": "completed"},
                              "text": "A" * 2048}) + "\n").encode("utf-8")
         # Distinct trailing lines: identical bytes could not tell a retained
@@ -1245,7 +1238,7 @@ class DshLauncherTests(ProcessFixtures):
         self.assertTrue(retained.endswith(successor))
         stats = json.loads((run_dir / "events.stats.json").read_text(encoding="utf-8"))
         self.assertTrue(stats["truncated"])
-        dropped_expected = older + trailing[:3] + [final]
+        dropped_expected = [filler] + trailing[:3] + [final]
         self.assertEqual(stats["dropped_lines"], len(dropped_expected))
         self.assertEqual(stats["dropped_bytes"],
                          sum(len(line) for line in dropped_expected))
@@ -1261,9 +1254,7 @@ class DshLauncherTests(ProcessFixtures):
         blanks = Writer(str(blank_dir), 1024, passthrough=False)
         for line in head_prefix(b'{"type":"session","sessionId":"s-10f-b"}\n'):
             blanks.feed(line)
-        blanks_older = [filler]
-        for line in blanks_older:
-            blanks.feed(line)
+        blanks.feed(filler)
         blanks.feed(final, protect=True)
         for _ in range(3):
             blanks.feed(b"\n")
@@ -1277,8 +1268,7 @@ class DshLauncherTests(ProcessFixtures):
         # The closing filler and the first two blanks were dropped; the newest
         # blank and the protected final were not.
         self.assertEqual(stats_blank["dropped_lines"], 3)
-        self.assertEqual(stats_blank["dropped_bytes"],
-                         sum(len(line) for line in blanks_older) + 2)
+        self.assertEqual(stats_blank["dropped_bytes"], len(filler) + 2)
         self.assertEqual(stats_blank["total_lines"],
                          stats_blank["dropped_lines"] + len(retained_blank.splitlines()) - 1)
 
@@ -1299,16 +1289,16 @@ class DshLauncherTests(ProcessFixtures):
         writer = Writer(str(run_dir), cap, passthrough=False)
         filler = (json.dumps({"type": "status", "phase": "step_start", "filler": "x" * 2000})
                   + "\n").encode("utf-8")
+        # `cap` 4096 exercises the documented slack floor (64 KiB); the ceiling is
+        # the compacted size (head + cap) plus that slack, and it is asserted after
+        # *every* feed: sampling once at the end would miss a writer that rides
+        # above the ceiling between its rewrites and lands inside it by luck.
+        ceiling = 64 * 1024 + cap + 64 * 1024
         for _ in range(200):
             writer.feed(filler)
-        # Not finished: this is the state a reader (or df) sees mid-run.
-        size = (run_dir / "events.ndjson").stat().st_size
-        slack = max(64 * 1024, min(1024 * 1024, cap // 8))  # the documented slack
-        # The compacted ceiling is head + cap; the writer rewrites the file once
-        # it exceeds that by more than `slack`, so after every feed the live file
-        # is inside the ceiling — without the rewrite it would carry every line
-        # fed since its first truncation, several times this bound.
-        self.assertLessEqual(size, 64 * 1024 + cap + slack, size)
+            # Not finished: this is the state a reader (or df) sees mid-run.
+            size = (run_dir / "events.ndjson").stat().st_size
+            self.assertLessEqual(size, ceiling, size)
         writer.finish()
         self.assertLessEqual((run_dir / "events.ndjson").stat().st_size, 64 * 1024 + cap)
 

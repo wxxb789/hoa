@@ -27,16 +27,15 @@ so at most one protected line is alive at a time. Eviction takes the oldest
 retained line that is neither the newest nor the protected one, and
 `dropped_bytes` / `dropped_lines` count exactly those.
 
-The un-evictable lines are therefore the newest one and, when one is declared,
-the protected one. An un-evictable line oversizing the tail region is retained
-whole, so after compaction the file overshoots its compacted ceiling (head lines
-+ `max_bytes`) by the retained tail's overshoot,
-`max(0, tail_bytes - (max_bytes - MARKER_RESERVE))`, where `tail_bytes` is at
-at most the combined bytes of the newest and the declared line — for a caller that
-declares nothing, a single oversized newest line's overshoot past the tail
-budget, `len(line) - (max_bytes - MARKER_RESERVE)`. Between compactions the open
-file may exceed that compacted ceiling by up to `slack` bytes — dropped history
-a rewrite has not yet reclaimed — plus the retained tail's overshoot.
+The un-evictable lines are the newest one and, when one is declared, the
+protected one: neither is ever dropped, so when those one or two lines together
+exceed the tail region's budget (`max_bytes - MARKER_RESERVE`) they are retained
+whole. After compaction the file therefore overshoots its compacted ceiling
+(head lines + `max_bytes`) by the retained tail's overshoot,
+`max(0, tail_bytes - (max_bytes - MARKER_RESERVE))`, and `tail_bytes` is at most
+`max(tail budget, the combined bytes of those un-evictable lines)`. Between
+compactions the open file may carry up to `slack` bytes of dropped history that a
+rewrite has not yet reclaimed, on top of that same overshoot.
 
 Under the cap the file is byte-for-byte the input stream. Sidecar counters are
 written atomically to RUN_DIR/events.stats.json every 64 KiB of input and at
@@ -320,22 +319,18 @@ class Writer:
             self.tail.append(line)
             self.tail_bytes += len(line)
             if protect:
-                # A newer declared line supersedes the older: the guard index
-                # moves to this entry, so at most one is alive at a time.
                 self.protected_idx = len(self.tail) - 1
-            while self.tail_bytes > self.tail_budget and len(self.tail) > 1:
-                if self.protected_idx == 0:
-                    # The guarded entry is the oldest retained line; only the
-                    # newest may follow it, and neither of those is droppable.
-                    if len(self.tail) <= 2:
-                        break
-                    guarded = self.tail.popleft()
-                    dropped = self.tail.popleft()
-                    self.tail.appendleft(guarded)
-                else:
-                    dropped = self.tail.popleft()
-                    if self.protected_idx is not None:
-                        self.protected_idx -= 1
+            while self.tail_bytes > self.tail_budget:
+                # Index 0 is skipped while it holds the protected line, and the
+                # break leaves the last entry alone: neither un-evictable entry is
+                # ever a drop, so this stops with only those two left at most.
+                drop_idx = 1 if self.protected_idx == 0 else 0
+                if drop_idx >= len(self.tail) - 1:
+                    break
+                dropped = self.tail[drop_idx]
+                del self.tail[drop_idx]
+                if self.protected_idx:
+                    self.protected_idx -= 1
                 self.tail_bytes -= len(dropped)
                 self.dropped_bytes += len(dropped)
                 self.dropped_lines += 1
