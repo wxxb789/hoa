@@ -2800,6 +2800,27 @@ def load_writer():
     return namespace["Writer"]
 
 
+def terminal_record_line(raw) -> bool:
+    """Whether one raw stream line carries this route's terminal record.
+
+    `summarize` settles the run from the retained stream alone, and both the
+    verdict (`final_reason == "completed"`) and the answer come from the last
+    `final` event — so that is the one line the bounded writer is told to
+    protect, whatever arrives after it. The test is exactly `summarize`'s own:
+    decode, parse, `type == "final"`. A byte-level prefilter would be cheaper
+    but would miss a `final` whose type value is JSON-escaped, which `summarize`
+    still reads as a final, so the declaration must not be narrower than the
+    reader. The declaration is deliberately the route's: the shared writer
+    learns nothing about event types, and a route that declares nothing keeps
+    the writer's retention behaviour exactly.
+    """
+    try:
+        event = json.loads(raw.decode("utf-8", "replace").strip())
+    except (ValueError, UnicodeDecodeError):
+        return False
+    return isinstance(event, dict) and event.get("type") == "final"
+
+
 class EventLog:
     """This run's bounded NDJSON log: the shared writer plus its stats sidecar.
 
@@ -2843,7 +2864,11 @@ class EventLog:
                 verdict, _state, _detail = guard_locked(self.op)
                 if verdict != GUARD_OK:
                     return
-                self.writer.feed(raw)
+                # The terminal record is declared protected: a trailing line
+                # (a configured wrapper's extra stdout, another status event)
+                # must never cost a finalizing reader the `final` it settles
+                # the run from.
+                self.writer.feed(raw, protect=terminal_record_line(raw))
 
     def finish(self) -> None:
         with mutex_of(self.op, wait=None) as held:

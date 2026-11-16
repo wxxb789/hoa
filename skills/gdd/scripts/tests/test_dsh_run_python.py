@@ -135,6 +135,24 @@ def main():
         emit({"type": "final", "sessionId": session, "reason": {"kind": "completed"},
               "text": "F" * 65536})
         return 0
+    if mode == "trailing":
+        # The round-2 shape: the terminal record is followed by one more stdout
+        # line, so a writer that only protects the newest *line* loses the
+        # record the run settles from. STUB_TRAILER picks the trailing line: a
+        # blank line or an ordinary event.
+        filler = "z" * 4096
+        for index in range(20):
+            emit({"type": "status", "turn": 1, "step": index, "phase": "step_start",
+                  "filler": filler})
+        emit({"type": "final", "sessionId": session, "reason": {"kind": "completed"},
+              "text": "T" * 2048})
+        if os.environ.get("STUB_TRAILER", "blank") == "blank":
+            sys.stdout.write("\\n")
+            sys.stdout.flush()
+        else:
+            emit({"type": "status", "turn": 1, "step": 21, "phase": "step_start",
+                  "note": "one line after the terminal record"})
+        return 0
     if mode == "flood":
         filler = "x" * 2000
         for index in range(300):
@@ -460,6 +478,7 @@ class DshLauncherTests(ProcessFixtures):
             "DSH_PERMISSION_MODE", "DSH_APPROVAL_POLICY", "STUB_MODE", "STUB_EXIT",
             "STUB_ARGV_FILE", "STUB_STDIN_FILE", "STUB_ENV_FILE", "STUB_FINALS",
             "STUB_TEXT", "STUB_REASON", "STUB_SESSION", "STUB_APPEND_FILE", "STUB_FINAL_TEXT",
+            "STUB_TRAILER",
         ):
             cls.env.pop(key, None)
 
@@ -1105,6 +1124,141 @@ class DshLauncherTests(ProcessFixtures):
         # Bound plus the one oversized line, held entire.
         self.assertLessEqual(state["events_bytes"],
                              stats["head_bytes"] + cap + len(last_line))
+
+    def test_10d_the_terminal_record_survives_a_trailing_line(self):
+        """P2, the reviewer's exact shape, at the route's own sink.
+
+        Cap 1024, the head region filled by filler status events, one completed
+        `final` larger than the tail budget, then one trailing blank stdout line.
+        "The newest raw line is never dropped" protected the final only until
+        that blank arrived; the record the reader settles the run from has to
+        survive whatever comes after it.
+        """
+        slug = "trailing-10d"
+        cap = 1024
+        state = self.settle(slug, STUB_MODE="trailing", STUB_TRAILER="blank",
+                            DSH_RUN_EVENTS_MAX_BYTES=cap)
+        self.assertEqual(state["state"], "done", state)
+        self.assertEqual(state["exit"], 0)
+        self.assertEqual(state["final_reason"], "completed")
+        self.assertEqual(state["answer_source"], "final")
+        self.assertEqual(state["answer_chars"], 2048)
+        run_dir = self.run_dir(slug)
+        retained = (run_dir / "events.ndjson").read_bytes()
+        # The trailing blank is an ordinary line: retained while it fits, and it
+        # does fit here. The protected record is the last non-blank line, whole.
+        self.assertTrue(retained.endswith(b"\n\n"), retained[-80:])
+        lines = [line for line in retained.splitlines() if line.strip()]
+        last = json.loads(lines[-1])
+        self.assertEqual(last["type"], "final")
+        self.assertEqual(last["reason"]["kind"], "completed")
+        self.assertEqual(len(last["text"]), 2048)
+        self.assertEqual((run_dir / "answer.md").read_text(encoding="utf-8"), "T" * 2048)
+        stats = json.loads((run_dir / "events.stats.json").read_text(encoding="utf-8"))
+        self.assertTrue(stats["truncated"])
+        self.assertGreater(stats["dropped_lines"], 0)
+        self.assertEqual(state["events_dropped_bytes"], stats["dropped_bytes"])
+
+    def test_10e_the_terminal_record_survives_a_nonblank_trailing_event(self):
+        """The invariant is about the record, not about whitespace.
+
+        The trailing line here is an ordinary event, so "skip blank lines" is
+        not an explanation of the retention: the protected `final` stays in the
+        stream and the untouched trailing event stays the newest line.
+        """
+        slug = "trailing-10e"
+        state = self.settle(slug, STUB_MODE="trailing", STUB_TRAILER="event",
+                            DSH_RUN_EVENTS_MAX_BYTES=1024)
+        self.assertEqual(state["state"], "done", state)
+        self.assertEqual(state["final_reason"], "completed")
+        self.assertEqual(state["answer_source"], "final")
+        self.assertEqual(state["answer_chars"], 2048)
+        retained = (self.run_dir(slug) / "events.ndjson").read_bytes()
+        events = [json.loads(line) for line in retained.splitlines() if line.strip()]
+        self.assertEqual(events[-1]["type"], "status")
+        finals = [event for event in events if event["type"] == "final"]
+        self.assertEqual([len(event["text"]) for event in finals], [2048])
+        self.assertEqual(finals[-1]["reason"]["kind"], state["final_reason"])
+
+    def test_10f_the_writer_protects_only_declared_lines(self):
+        """The shared writer's protection contract, pinned at its own API.
+
+        A declared line is never a drop and is never counted as one, whatever
+        arrives after it; a newer declared line supersedes the older, which
+        becomes droppable again; an undeclared blank is an ordinary droppable
+        line; and the sidecar still reconciles every input line as dropped or
+        retained — the drop accounting describes exactly the loss.
+        """
+        Writer = adapter.load_writer()
+        run_dir = self.tmp / "writer-10f"
+        run_dir.mkdir(exist_ok=True)
+        cap = 4096
+        writer = Writer(str(run_dir), cap, passthrough=False)
+        filler = (json.dumps({"type": "status", "phase": "step_start", "filler": "x" * 4000})
+                  + "\n").encode("utf-8")
+        writer.feed(b'{"type":"session","sessionId":"s-10f"}\n')
+        while not writer.head_closed:
+            writer.feed(filler)
+        older = list(writer.tail)  # the feed that closed the head, now the tail's oldest
+        final = (json.dumps({"type": "final", "reason": {"kind": "completed"},
+                             "text": "A" * 2048}) + "\n").encode("utf-8")
+        # Distinct trailing lines: identical bytes could not tell a retained
+        # line from a dropped twin of it.
+        trailing = [(json.dumps({"type": "text", "text": f"trail {index} " + "t" * 1900})
+                     + "\n").encode("utf-8")
+                    for index in range(4)]
+        writer.feed(final, protect=True)
+        for line in trailing:
+            writer.feed(line)
+        # A newer declared record supersedes the older one: the older final is
+        # droppable again, and this feed's eviction takes it.
+        successor = (json.dumps({"type": "final", "reason": {"kind": "aborted"},
+                                 "text": "B" * 200}) + "\n").encode("utf-8")
+        writer.feed(successor, protect=True)
+        writer.finish()
+        retained = (run_dir / "events.ndjson").read_bytes()
+        self.assertIn(successor, retained)
+        self.assertNotIn(final, retained)
+        self.assertIn(trailing[-1], retained)
+        self.assertNotIn(trailing[0], retained)
+        self.assertTrue(retained.endswith(successor))
+        stats = json.loads((run_dir / "events.stats.json").read_text(encoding="utf-8"))
+        self.assertTrue(stats["truncated"])
+        dropped_expected = older + trailing[:3] + [final]
+        self.assertEqual(stats["dropped_lines"], len(dropped_expected))
+        self.assertEqual(stats["dropped_bytes"],
+                         sum(len(line) for line in dropped_expected))
+        # Every input line is either dropped or retained; the splice marker is
+        # the one retained line the input never carried.
+        self.assertEqual(stats["total_lines"],
+                         stats["dropped_lines"] + len(retained.splitlines()) - 1)
+
+        # Blank lines are ordinary lines: never protected implicitly, droppable
+        # like any other, retained while they fit.
+        blank_dir = self.tmp / "writer-10f-blanks"
+        blank_dir.mkdir(exist_ok=True)
+        blanks = Writer(str(blank_dir), 1024, passthrough=False)
+        blanks.feed(b'{"type":"session","sessionId":"s-10f-b"}\n')
+        while not blanks.head_closed:
+            blanks.feed(filler)
+        blanks_older = list(blanks.tail)
+        blanks.feed(final, protect=True)
+        for _ in range(3):
+            blanks.feed(b"\n")
+        blanks.finish()
+        retained_blank = (blank_dir / "events.ndjson").read_bytes()
+        self.assertIn(final, retained_blank)
+        self.assertTrue(retained_blank.endswith(b"\n\n"),
+                        "the newest blank is a line like any other, and it is retained")
+        stats_blank = json.loads(
+            (blank_dir / "events.stats.json").read_text(encoding="utf-8"))
+        # The closing filler and the first two blanks were dropped; the newest
+        # blank and the protected final were not.
+        self.assertEqual(stats_blank["dropped_lines"], 3)
+        self.assertEqual(stats_blank["dropped_bytes"],
+                         sum(len(line) for line in blanks_older) + 2)
+        self.assertEqual(stats_blank["total_lines"],
+                         stats_blank["dropped_lines"] + len(retained_blank.splitlines()) - 1)
 
     def test_11_agent_arguments_and_prompt_are_passed_through(self):
         slug = "argv-11"

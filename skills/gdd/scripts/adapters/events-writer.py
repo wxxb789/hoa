@@ -22,8 +22,13 @@ Retained layout over the cap:
 
 The newest line is never dropped: when one line alone exceeds the tail region's
 budget it is retained whole, and the file may exceed the bound by that one line.
-Drops only ever take the oldest retained lines, and `dropped_bytes` /
-`dropped_lines` count exactly those.
+A caller may also declare a line protected (`feed(line, protect=True)`) for a
+record its reader settles the run from — the DSH route marks its terminal
+`final` event, which may well be followed by more output. A protected line is
+never dropped either, and a newer declared line supersedes the older one, so at
+most one is alive at a time. Eviction takes the oldest retained line that is
+neither the newest nor protected, and `dropped_bytes` / `dropped_lines` count
+exactly those.
 
 Under the cap the file is byte-for-byte the input stream. Sidecar counters are
 written atomically to RUN_DIR/events.stats.json every 64 KiB of input and at
@@ -81,6 +86,36 @@ def resolve_cap():
             % (value, DEFAULT_MAX_BYTES)
         )
     return value, None
+
+
+class _Protected:
+    """A tail entry its caller declared must survive later lines.
+
+    The DSH sink marks the line carrying the route's terminal record, so the
+    drop loop never takes it: a reader settling the run from the retained stream
+    needs exactly that line, whatever arrives after it — a trailing line is
+    enough to make an oversized newest line droppable under a plain
+    newest-line rule. A newer declared line marks the older one superseded,
+    which becomes droppable again, so at most one protected line is alive at a
+    time and the tail's memory stays bounded. The tail holds raw byte lines
+    except for these wrappers: a caller that declares nothing keeps the exact
+    representation and retention behaviour it had.
+    """
+    __slots__ = ("line", "superseded")
+
+    def __init__(self, line):
+        self.line = line
+        self.superseded = False
+
+
+def _guarded(entry):
+    """Whether one tail entry is a protected line no drop may take."""
+    return isinstance(entry, _Protected) and not entry.superseded
+
+
+def _line_of(entry):
+    """The raw line of one tail entry; the wrapper is not part of the stream."""
+    return entry.line if isinstance(entry, _Protected) else entry
 
 
 class Writer:
@@ -169,7 +204,8 @@ class Writer:
         if not self.file_ok:
             return
         marker = self._marker() if self.dropped_lines else b""
-        content = b"".join(self.head) + marker + b"".join(self.tail)
+        content = (b"".join(self.head) + marker
+                   + b"".join(_line_of(entry) for entry in self.tail))
         tmp = "%s.tmp.%d" % (self.events_path, os.getpid())
         try:
             if self.events is not None:
@@ -282,7 +318,7 @@ class Writer:
 
     # -- stream ----------------------------------------------------------
 
-    def feed(self, line):
+    def feed(self, line, protect=False):
         self.total_bytes += len(line)
         self.total_lines += 1
         self._note_session(line)
@@ -292,6 +328,8 @@ class Writer:
         if not self.head_closed and (
             not self.head or self.head_bytes + len(line) <= HEAD_LIMIT
         ):
+            # The head is never dropped, so a declared line landing here is
+            # retained by construction and needs no wrapper.
             self.head.append(line)
             self.head_bytes += len(line)
             if self.head_bytes >= HEAD_LIMIT:
@@ -299,26 +337,45 @@ class Writer:
             self._append(line)
         else:
             self.head_closed = True
-            self.tail.append(line)
+            if protect:
+                # A newer terminal record supersedes the older: the previous
+                # protected line becomes droppable again (see _Protected).
+                for entry in self.tail:
+                    if isinstance(entry, _Protected):
+                        entry.superseded = True
+            self.tail.append(_Protected(line) if protect else line)
             self.tail_bytes += len(line)
             # The newest line is never a drop: it is the event a finalizing reader
             # needs (the run's own `final`). A single line larger than the whole
             # tail budget is therefore retained whole — the file may exceed the
             # bound by that one line — and only older retained lines are dropped.
-            while len(self.tail) > 1 and self.tail_bytes > self.tail_budget:
-                dropped = self.tail.popleft()
-                self.tail_bytes -= len(dropped)
-                self.dropped_bytes += len(dropped)
+            # A protected line is never a drop either: the reader settles the run
+            # from it, so it must outlive every line that comes after it. The
+            # eviction therefore takes the oldest line that is neither the newest
+            # nor a live protected one, and nothing when only those remain.
+            while self.tail_bytes > self.tail_budget and len(self.tail) > 1:
+                limit = len(self.tail) - 1
+                index = 0
+                while index < limit and _guarded(self.tail[index]):
+                    index += 1
+                if index == limit:
+                    break
+                entry = self.tail[index]
+                del self.tail[index]
+                size = len(entry.line) if isinstance(entry, _Protected) else len(entry)
+                self.tail_bytes -= size
+                self.dropped_bytes += size
                 self.dropped_lines += 1
             if self.dropped_lines and not self.truncated:
                 self.truncated = True
                 self._compact()
             else:
                 self._append(line)
-            # The retained tail's overshoot (the one oversized newest line) is a
-            # legitimate part of the retained size, so the on-disk file is measured
-            # against bound + slack + overshoot: the hysteresis that stops a
-            # compaction per line survives, without compacting the newest line away.
+            # The retained tail's overshoot (the one oversized newest line, or a
+            # protected line kept whole) is a legitimate part of the retained
+            # size, so the on-disk file is measured against bound + slack +
+            # overshoot: the hysteresis that stops a compaction per line
+            # survives, without compacting the newest line away.
             if self.truncated and self.disk_bytes > (
                 self.head_bytes + self.max_bytes + self.slack
                 + max(0, self.tail_bytes - self.tail_budget)
