@@ -13,11 +13,13 @@ Paths below are relative to the installed `gdd` skill directory.
 | Route | Launcher | Runtime requirement |
 |---|---|---|
 | Headless CLI (default) | `scripts/adapters/omp-run.py` | An OMP-style `-p` CLI hosted in a detached process; stdlib Python 3, no bash, `setsid`, or `tmux` dependency |
+| Headless CLI — DeepSeek Harness (opt-in) | Set `GDD_LAUNCHER` to `scripts/adapters/dsh-run.py` | An installed `dsh` CLI with a `headless` profile; each stage is one `dsh --profile headless` task in a detached runner. Operating method for this route: the [`dsh-headless-gdd`](../../dsh-headless-gdd/SKILL.md) mechanism skill |
 | Native Paseo (opt-in) | Set `GDD_LAUNCHER` to `scripts/adapters/paseo-run.py` | An installed Paseo CLI and a reachable Paseo daemon; each stage is a native Paseo agent |
 
 Select the route as configuration, never from a daemon reachability probe. An unreachable daemon
 does not substitute the headless launcher, and a reachable daemon does not opt a default install into
-native agents. Both Python adapters use the existing launcher contract and add no Python dependencies.
+native agents. All three Python adapters use the existing launcher contract and add no Python
+dependencies.
 `scripts/adapters/omp-run.sh` remains the POSIX reference adapter with the attachable `tmux` backend;
 `scripts/tests/test-omp-run-setsid.sh` and `test-omp-run-stale.sh` pin its behaviour.
 
@@ -117,7 +119,9 @@ counter derived from a truncated stream is marked partial (the OMP adapters set
 Stopping a headless run is the launcher's business, and it has to work where signals do not: `omp-run.py`
 writes a `stop` control file the run polls, waits for the run's own finalizer, and only then escalates
 to a process-group TERM/KILL (POSIX) or `taskkill /T /F` (Windows). A run stopped this way ends as
-`killed` with exit `143`; a run that died without finalizing is finalized as `failed` with exit `-1`
+`killed` with exit `143`; `killed` also covers an exit carrying a signal convention (`130`/`137`/`143`
+and their raw POSIX forms `-2`/`-9`/`-15`), which keeps its own raw code rather than being rewritten to
+`143`. A run that died without finalizing is finalized as `failed` with exit `-1`
 by the next `status`/`result`/`list`/`answer`, which sets `stale_recovered: true` — and only while no
 `finalized` marker exists, so recovery stays idempotent.
 
@@ -143,6 +147,165 @@ the runner owns the run, so a second `start` refuses instead of moving a startin
 and one ledger row). The `finalized` marker is the authority either way; a run whose finalizer died
 between publishing `state.json` and writing the marker is finalized again from its recorded exit code
 and marked `finalize_repaired`.
+
+## DSH headless adapter
+
+`dsh-run.py` implements the same `start`, `list`, `status`, `result`, `answer`, `tail` and `kill`
+commands on top of `dsh --profile headless`, which answers one task and exits. A detached runner owns
+the run: POSIX it is spawned with its own session, Windows with one hidden console the whole tree
+inherits. The runner pipes dsh's `--json` NDJSON stream through the same bounded writer the OMP
+adapters use (`scripts/adapters/events-writer.py`), so the event bound and `events.stats.json` have
+one implementation.
+
+The invocation is `dsh --profile headless [launcher flags] [app flags] -` with `prompt.md` on stdin:
+launcher flags must precede the app's own flags (a `--patch` after an app flag is rejected with
+`unknown option '--patch'`), and a lone `-` is the only stdin marker. The app flags this adapter
+passes are `--json`, `--session-id ID`, `--permission-mode MODE` and `--approval-policy POLICY`;
+`--permission-mode` and `--approval-policy` are repeated on every start and resume because session
+adoption requires them again. The contract's `--resume ID` is an alias of `--session-id ID`: `start`
+adopts the one id, dies immediately with exit `1` and
+`start: --session-id 'A' and --resume 'B' disagree` when both are given with different values, and
+passes the resolved id to dsh as `--session-id`; with neither, dsh starts a fresh session.
+
+The operating method for this route — session/worktree rules, the completion judgement, recovery and the
+harness traps — is the [`dsh-headless-gdd`](../../dsh-headless-gdd/SKILL.md) mechanism skill, which
+operates the contract below.
+
+Two rules are specific to this route:
+
+1. **The run's cwd must be the worktree the stage's session recorded.** DSH refuses `--session-id`
+   when the stored session was recorded in another directory, and a stage dispatched into a different
+   tree is worse than a refusal. The adapter resolves `--cwd`, records it in `state.json` and never
+   rewrites it; a resume must name the same directory.
+2. **`--approval-policy never` is required for unattended runs, and the write boundary is the
+   permission policy, not the working directory.** Headless has no live approval channel, so a call
+   that needs approval is rejected and the turn ends without completing; `never` is this adapter's
+   documented default (`DSH_APPROVAL_POLICY`). The permission policy constrains model tool writes
+   **only where the host's harness enforces a sandbox**: with the default `workspace-write`
+   (`DSH_PERMISSION_MODE`), writes inside the policy's boundary succeed and writes outside it are
+   denied on such a host, while `--cwd` only selects the run's working directory and is not itself a
+   boundary. Changing the profile or `DSH_PERMISSION_MODE` changes that boundary, so re-confirm it on
+   the target host before dispatching rather than assuming the working directory alone confines the
+   worker, and do not reach for `danger-full-access` to "unblock" a task. The operating method states
+   the same precondition ([`dsh-headless-gdd`](../../dsh-headless-gdd/SKILL.md), "Harness facts that
+   bite").
+
+Completion is `exit 0` **and** the last `final` event carrying `reason.kind == "completed"`; a
+`tool_result` status of `completed` only means the tool returned. The exit→state mapping is the one the
+archived goal's failure clause states, and the same one `omp-run.py` implements, so two routes of one
+contract cannot disagree:
+
+- `done` — `exit 0` **and** the last `final` event's `reason.kind == "completed"`.
+- `killed` — this adapter stopped the run (its stop path, like `kill` and `--max-time`, records exit
+  `143`), **or** the process exited carrying a signal convention: `130`/`137`/`143` and their raw
+  POSIX forms `-2`/`-9`/`-15`, the `KILLED_EXITS` set the adapter shares with `omp-run.py`. A
+  signal-convention exit keeps its raw code — it is not rewritten to `143`.
+- `failed` — every other settled outcome: an `exit 0` whose last `final` event is missing or does not
+  carry `reason.kind == "completed"` (the run stopped early or was aborted, and the exit code is
+  recorded unchanged), any other non-signal, non-zero exit (a runner-level `error` event, a refused
+  dispatch), and the disappeared-process case below.
+- `failed` with exit `-1` and `stale_recovered: true` — the process disappeared without finalizing;
+  the next `status`/`result`/`list`/`answer` writes it, idempotently and only while no terminal record
+  is committed.
+
+A run with no `final` event keeps the last committed `text` event
+as a partial `answer.md`. `--max-time` has no DSH equivalent, so it is the adapter's own deadline: the
+runner stops the run through the same path `kill` uses and records `killed`/`143` with
+`deadline_exceeded: true`; it is never silently dropped. `--model` and `--thinking` are **refused**:
+headless composes no presets and has no such flags, so the provider route and model are the profile's
+own configuration.
+
+**What a verdict is.** The authoritative terminal record is one atomic `state.json` replacement
+(`terminal_record{version, generation, commit_id, answer, session_id, exit}`, written last, after the
+compatibility artifacts); the `finalized` marker keeps its historical exit-code-text form and is
+written *after* the commit, for the observer plugin and older readers only. Every reader decides
+"finished" from that record, never from marker existence; a state that looks terminal without a valid
+commit is uncommitted data and is neither trusted nor rewritten. Until the commit, an `answer` refuses
+("not finished yet") even if a prepared `answer.md` already exists. `status`/`result` carry one
+lifecycle vocabulary beside the state word — `terminal`, `live`, `stopping (survivors known)`,
+`stopping (enumeration failed)`, `unknown (no state)`, `gone (unfinalized)` for a recorded run that
+died without committing a verdict (whose `list` line reads `GONE (resume with --session-id …)`), and
+`read-only` for another backend's run.
+
+**Ownership and mutation.** Two stable OS locks carry ownership, both keyed by the slug and both outside
+every replaceable run directory: `<run root>/<slug>.start.lock` serializes every entry that can start an
+agent, and `<run root>/.dsh-locks/<slug>.lifecycle.lock` is the mutex every mutation is taken under. A
+mutation is bound to the immutable operation context (canonical root, slug, run path, expected
+generation): start (including `--replace`), the stop request, each escalation step, finalization,
+recovery, incomplete-stop reporting, tracker/session/event publication and the spawn handshake all
+re-establish the route, the generation and the absence of a committed verdict under that mutex before
+they act, and a changed generation means no write, no signal and no enumeration against whoever holds
+the path now. Kernel ownership is authoritative: a lock file that exists is not a held lock, and neither
+its age nor a recorded pid transfers it.
+
+Stopping is a request plus a capability. `kill` writes a `stop` request carrying
+`{generation, request_id, requested_at, by}` and waits for the run's own finalizer to commit; a runner
+acts only on its own generation's request, and a request that arrives before the agent is spawned is
+honoured as a stop. Escalation exists only where a process *instance* can be proven: on Linux each
+member is signalled through a verified `pidfd` handle (open the handle, re-read the identity, confirm
+the handle has not reported exit, signal through that same handle — never a bare pid, never `killpg`),
+and group breadth comes from enumerating the group under a continuously verified anchor member. Where
+that capability does not exist — Linux without `pidfd_open`/`pidfd_send_signal`, macOS, Windows — no
+destructive call is made: the stop stays a request, the run stays `running`/`stopping`, and `kill` exits
+`1` saying it cannot confirm. The operator then ends the process tree by hand and runs `kill` (or
+`status`) again: once every recorded process is conclusively gone the run settles `killed`/`143`.
+**A committed verdict is not yet a settled tree.** The runner that wrote the verdict is still one of the
+run's recorded processes until it returns and is reaped, and an enumeration that anchors on it answers
+"unknown" (`stop_survivors()` returns `None`, never `[]`) while it leaves — so `start --replace`
+re-asks the settle question on freshly read state, bounded (`SETTLE_WAIT_SECONDS`, 10 s, overridable
+with `DSH_RUN_SETTLE_WAIT_SECONDS`) and holding no mutex, until it is conclusive: no recorded process
+live and a complete enumeration that found nobody.
+Where the bound expires — a genuinely live survivor, or a table that cannot be read at all — the
+existing refusal stands and the run is not moved aside; a momentary absence of proof is never read as a
+refusal and a genuine one is never waited away.
+
+**Residual limits, stated as limits.** The macOS and Windows strong-identity and tree-termination
+capability is **UNCONFIRMED** here, so those platforms refuse destructive escalation; Linux without
+pidfds refuses too; power-loss durability across platforms and filesystems is **UNCONFIRMED**
+(`os.replace` is atomic, not durable); descendants that deliberately leave the recorded process groups
+are not guaranteed to be found; and no atomic arbitration is promised against a foreign starter that
+does not follow this protocol (this route still leaves another backend's run bytes untouched).
+
+### DSH configuration
+
+| Key | Resolves | Default |
+|---|---|---|
+| `DSH_BIN` | dsh CLI | `dsh`, resolved through `PATH`; a Windows `.cmd`/`.bat` shim is run through `%COMSPEC%` |
+| `DSH_RUN_ROOT`, `GDD_RUN_ROOT` | run root; `DSH_RUN_ROOT` wins over `GDD_RUN_ROOT`, which wins over the default | `${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs`, the same tree as every other route |
+| `DSH_RUN_PROFILE` | launcher `--profile` | `headless` |
+| `DSH_PERMISSION_MODE` | app `--permission-mode` | `workspace-write` |
+| `DSH_APPROVAL_POLICY` | app `--approval-policy` | `never` (required unattended) |
+| `DSH_RUN_EVENTS_MAX_BYTES` | bound for the retained event log, handed to the shared writer | `8388608` |
+| `DSH_RUN_START_GRACE_SECONDS` | how long a run that has recorded no pid is *starting*, not dead | `60` |
+| `DSH_RUN_STOP_WAIT_SECONDS` | how long `kill` waits for the run's own finalizer before forcing its tree | `20` |
+| `DSH_RUN_SETTLE_WAIT_SECONDS` | how long `start --replace` waits for a committed stop's tree to be conclusively gone before its refusal stands | `10` |
+| `DSH_RUN_DRAIN_TIMEOUT_SECONDS` | how long the runner waits for dsh's stdout to reach EOF after dsh exits | `30` |
+
+Every setting above is environment-only: of the contract's flags, this adapter accepts exactly
+`--name --prompt --cwd --session-id --model --thinking --max-time --resume --replace` on `start` (plus the
+other subcommand arguments), and nothing else is a flag. The profile key is `DSH_RUN_PROFILE`:
+`DSH_PROFILE`, `DSH_PROFILE_DIR` and `DSH_SESSION_ID` are DeepSeek Harness's own session identity, exported
+into every model shell call, so the adapter never reads them and removes all three from the environment of
+every child it spawns — the profile and any adopted session id travel on `argv`, and a stage dispatched from
+inside a live `dsh` session cannot inherit its caller's identity.
+
+`gdd.py` exports `GDD_RUN_ROOT` (its own resolved value) and never sets `DSH_RUN_ROOT`. With both set, the
+adapter files the run under `DSH_RUN_ROOT` while `gdd.py`'s `poll:` hint prints the root it resolved;
+`stage --wait` still polls the run directory the adapter printed. Leave `DSH_RUN_ROOT` unset to keep one tree
+with every other route; set it deliberately when the DSH route should file runs elsewhere.
+
+Credentials are the environment's business: headless resolves a key from the launch environment, then
+`<cwd>/.env`, then `$DSH_HOME/.env`, ignoring GUI-saved logins, and the adapter passes the
+environment through without reading, logging or storing a key. A missing key fails loudly with a
+runner-level `error` event and exit `1`. The DSH route writes no `ledger.tsv` row — that file is the
+OMP adapters' finished-run ledger — and `state.json` plus the `finalized` marker stay the authority.
+
+`--model`/`--thinking` are refused before a run directory is created: headless composes no presets and has no
+such flags, so the provider route and model are the profile's own configuration. A GDD install that pins a
+model or thinking level for another route must leave `GDD_MODEL`/`GDD_THINKING` unset (or drop `--model` /
+`--thinking`) for this one: `gdd.py` passes them through only when set, and `start` then exits `1` with
+`start: --model is not supported on the DSH route: …` (or the `--thinking` form) — an immediate, named
+refusal, not a silently ignored setting. Nothing here selects a PTC, preset or executor.
 
 ## Native Paseo adapter
 
@@ -286,8 +449,12 @@ The default headless adapter's suite is stdlib `unittest` (`scripts/tests/test_o
 every platform, with a stub agent CLI that emits OMP-style NDJSON — no network, no model, no real
 agent. It covers start → settled run, the exit-code mapping, stale recovery, `kill` through the stop
 file, the event-bound accounting with a non-zero `events_dropped_bytes`, the argument passthrough, and
-the detachment evidence above. The real `omp -p` smoke is an operator step, not a CI step: CI has no
-agent credentials.
+the detachment evidence above. The DSH route's suite is `scripts/tests/test_dsh_run_python.py`, the
+same shape driven by a stub `dsh` on `PATH` that emits canned headless NDJSON; it pins the completion
+rule (exit 0 **and** `reason.kind == completed`), the `--max-time` deadline, the control-file kill and
+its forced escalation, the argument passthrough with the prompt on stdin, and the refusal of a second
+`start`. The real `omp -p` or `dsh` smoke is an operator step, not a CI step: CI has no agent
+credentials.
 
 On WSL over DrvFS, the tmux-backed test needs `TMPDIR` on a **native Linux filesystem** (for example,
 a fresh directory under `/tmp`). The fixture derives `TMUX_TMPDIR` from it. On this host DrvFS temp

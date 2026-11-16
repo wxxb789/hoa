@@ -3,6 +3,76 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## [0.1.65] — 2026-11-15
+
+### Added
+
+- An opt-in DeepSeek Harness launcher, `skills/gdd/scripts/adapters/dsh-run.py`, implements the GDD
+  launcher contract on `dsh --profile headless`. `start` spawns a detached runner that pipes the
+  `--json` NDJSON stream through the shared `adapters/events-writer.py` bound, keeps `state.json`
+  current, and refuses a second `start` for a live slug. Completion is `exit 0` **and** the last
+  `final` event carrying `reason.kind == "completed"`; an `exit 0` whose last `final` is missing or not
+  `completed`, a runner-level `error` and any other non-signal non-zero exit are `failed`, an
+  unfinalized death is recovered as `failed`/`-1` with `stale_recovered: true`, and `kill` writes a
+  generation-bound `stop` request the runner polls. A run whose runner is gone is ended by signalling
+  each validated process instance through its own `pidfd` handle (TERM, then KILL) — never a bare pid or
+  group id — and a platform without that primitive (macOS, Windows, Linux without pidfds) refuses to
+  escalate: `kill` exits 1, the run stays `running`/`stopping`, and an operator ends the tree by hand.
+  `--max-time` is
+  the runner's own stop path (`killed`/`143`, `deadline_exceeded: true`); `--model`/`--thinking` are
+  refused before a run directory exists because headless composes no agent presets. Ownership and
+  recovery are strict: `start`/`_run` refuse a slug whose run is still live (a hand replay of `run.sh`
+  cannot start a second agent), a `.`/`..` name or a slug directory that resolves out of its date bucket
+  is refused before any write, discovery and recovery touch only runs whose `state.json` records
+  `backend: dsh` (another route's run is listed read-only), a stop that leaves processes alive stays
+  `running`/`stopping` with the survivors named instead of publishing `killed`, and a process group is
+  only ever signalled per member, enumerated under a continuously verified live anchor — including when
+  the group's leader has already exited. Every setting is environment-only: `DSH_BIN`,
+  `DSH_RUN_ROOT`/`GDD_RUN_ROOT`, `DSH_RUN_PROFILE`, `DSH_PERMISSION_MODE`, `DSH_APPROVAL_POLICY`, the
+  four timeouts (`DSH_RUN_START_GRACE_SECONDS`, `DSH_RUN_STOP_WAIT_SECONDS`,
+  `DSH_RUN_SETTLE_WAIT_SECONDS`, `DSH_RUN_DRAIN_TIMEOUT_SECONDS`) and `DSH_RUN_EVENTS_MAX_BYTES`.
+- The launcher's ownership and lifecycle are *provable*, not documented: two stable OS locks outside
+  every replaceable run directory (a slug claim for starting, a per-slug lifecycle mutex for mutating)
+  carry ownership, kernel-held and never taken by age or by a recorded pid; every mutation is bound to
+  the immutable operation context (root, slug, run path, generation) and re-validated under the mutex
+  immediately before it writes or signals, so a run that replaced the one an operation decided about
+  refuses the write; the terminal verdict is one atomic `state.json` replacement written last (the
+  `finalized` marker stays for the observer plugin and is never an authority); a stop request names the
+  generation and a runner acts only on its own; and escalation signals only through a validated process
+  handle (`pidfd`) with the group enumerated under a continuously verified anchor — a platform without
+  that primitive (Linux without pidfds, macOS, Windows) refuses to escalate, `kill` exits 1 saying so,
+  and the operator ends the tree by hand before re-running `kill` or `status`.
+- `skills/dsh-headless-gdd/SKILL.md` is the `kind: mechanism` operating method for that route:
+  launcher flags before app flags, one worktree per recorded session (the isolation unit is the
+  worktree/session, so the *same* worktree never has two writers while several goals of one repository
+  run in parallel in their own), resume of the same increment in the same cwd, the exit→state mapping
+  restated with its conditions (including `exit 0` whose last `final` is not `completed` → `failed`),
+  the two-condition completion rule with `tool_result.status == "completed"` read as "the tool
+  returned", and the file-only recovery substrate (worktree, harness session log, run artifacts).
+- `skills/gdd/scripts/tests/test_dsh_run_python.py` runs the adapter against a stub `dsh` on `PATH`
+  that emits canned headless NDJSON, with no network or model: **123 tests** pin the completion rule, the
+  exit mapping (including `exit 0` whose last `final` is not `completed` → `failed`), the `--max-time`
+  deadline, the stop request and its identity-gated escalation, stale recovery, the bounded event
+  accounting, argv/stdin passthrough, and every refusal (second start, live replay, bucket escape,
+  foreign runs). The hardening rounds add the ownership and lifecycle rules — the mutex spanning a whole
+  terminal publication, one lock object per slug across date buckets, generation-bound stops and
+  publications, the single-commit order under injected death, fail-closed process identity and
+  capability handling, the forced stop holding its mutex through the signal — each with a
+  revert-the-rule mutation that fails the suite (the mutation rows, the fifteen-run stability series and
+  the counts are recorded in `docs/evidence/2026-11-15-dsh-headless-launcher.md`). A momentary hold of
+  the lifecycle mutex is waited out, not read as a refusal, and a committed stop whose tree has not
+  vanished yet is waited out within a bound (`DSH_RUN_SETTLE_WAIT_SECONDS`); both are pinned by name.
+
+### Changed
+
+- `skills/gdd/references/transport.md` adds the DSH row to the route table, the DSH headless adapter
+  section with the two route-specific rules (the run's cwd must be the worktree its session recorded;
+  `--approval-policy never` is required for unattended runs), the DSH configuration table, and the
+  route's stub-driven suite beside the OMP and Paseo suites. The route is selected with
+  `GDD_LAUNCHER`, never by a reachability probe.
+- Bumped the shared skill/catalog version from `0.1.64` to `0.1.65` through `scripts/version.py bump`,
+  which mirrors every `skills/*/SKILL.md` `metadata.version` and regenerates both indexes.
+
 ## [0.1.64] — 2026-11-15
 
 ### Changed
