@@ -781,24 +781,28 @@ class Teardown:
     process that was merely found (a process this run does not signal is not a survivor); and
     `unverified` names, one note per limit, what the teardown could not observe or justify — no
     process enumeration on this platform, a process found and deliberately left alone because this
-    run signals only the process it spawned, a delivery refused because the target's identity could
-    not be pinned, a group that could not be read before a reap.  A record is `verified` only when
-    it carries neither a limit note nor a survivor.
+    run signals only the process it spawned, a group that could not be read before a reap; `refused`
+    names, one note per round, a delivery this run did not send to the process it spawned (a missing
+    capability, an identity that could not be pinned, a target already gone) — a different fact from
+    a limit, and the one a reader needs to tell "it signalled nothing" from "it found things and left
+    them alone".  A record is `verified` only when it carries neither a limit note nor a survivor.
     """
 
     survivors: tuple[int, ...] = ()
     clauses: tuple[str, ...] = ()
     unverified: tuple[str, ...] = ()
+    refused: tuple[str, ...] = ()
 
     @property
     def verified(self) -> bool:
-        return not self.unverified and not self.survivors
+        return not self.unverified and not self.survivors and not self.refused
 
     def merge(self, other: "Teardown") -> "Teardown":
         return Teardown(
             survivors=tuple(sorted(set(self.survivors) | set(other.survivors))),
             clauses=tuple(dict.fromkeys(self.clauses + other.clauses)),
             unverified=tuple(dict.fromkeys(self.unverified + other.unverified)),
+            refused=tuple(dict.fromkeys(self.refused + other.refused)),
         )
 
     def describe(self) -> str:
@@ -807,6 +811,7 @@ class Teardown:
         if self.clauses:
             claims.append(" and ".join(self.clauses) + " terminated")
         claims.extend(self.unverified)
+        claims.extend(self.refused)
         if self.survivors:
             claims.append("teardown incomplete: pids "
                           + ", ".join(str(pid) for pid in self.survivors) + " survived SIGKILL")
@@ -1144,7 +1149,7 @@ def _stop_spawned(spawned: Spawned, log) -> Teardown:
     return teardown.merge(Teardown(
         clauses=("the spawned process",) if signalled and stopped else (),
         survivors=survivors,
-        unverified=refused,
+        refused=refused,
     ))
 
 
@@ -1697,8 +1702,9 @@ def _teardown_record(teardown: Teardown | None) -> dict | None:
     is None only where `run_suite` returned before execution or the suite never executed at all (a
     covered child, a condition-skipped suite, an unusable scratch root).  `verified` is False
     wherever the record carries a limit note or a pid that took a SIGKILL and outlived it;
-    `clauses` names the steps that really terminated their target, `unverified` one note per limit
-    (module docstring).
+    `clauses` names the steps that really terminated their target, `unverified` one note per limit,
+    and `refused` one note per delivery this run did not send to the process it spawned (module
+    docstring).
     """
     if teardown is None:
         return None
@@ -1707,6 +1713,7 @@ def _teardown_record(teardown: Teardown | None) -> dict | None:
         "clauses": list(teardown.clauses),
         "survivors": list(teardown.survivors),
         "unverified": list(teardown.unverified),
+        "refused": list(teardown.refused),
     }
 
 

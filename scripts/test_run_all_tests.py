@@ -2020,12 +2020,14 @@ class EndToEndTests(PatchingTestCase):
         """
         log_text = Path(entry["log"]).read_text(encoding="utf-8")
         targets = [int(raw) for raw in runner.DELIVERY_TARGET_RE.findall(log_text)]
-        # Exposed APIs and `/proc` do not promise a delivery the kernel will allow: a host can have
-        # `pidfd_open` and still refuse it (an older kernel answers ENOSYS, a sandbox denies it), and
-        # the runner then records an unverified refusal and sends nothing.  So a delivery line is
-        # required only where the record carries no refusal at all; either way the run may not be
-        # silent about what it did, or this check would pass on any log.
-        if can_deliver_signals() and not (entry.get("teardown") or {}).get("unverified"):
+        # The record's own field says whether this run refused the delivery it would have sent its
+        # spawned process (a missing capability, an identity it could not pin, a target already gone)
+        # — a different fact from the limit notes that also live in the record, such as a detached
+        # worker left alone, which is the normal case here.  So the log must show a delivery unless
+        # that refusal is what the record carries; a suite's entry always publishes the record, and
+        # indexing it strictly means a rename fails loudly here instead of silently skipping this.
+        refused = entry["teardown"]["refused"]
+        if can_deliver_signals() and not refused:
             self.assertTrue(targets, "no delivery line and no recorded refusal for a suite this run "
                                      "signalled, so this check would pass on any log")
         self.assertNotIn(pid, targets,
@@ -2322,13 +2324,13 @@ class EndToEndTests(PatchingTestCase):
         notes = " ".join(entry["teardown"]["unverified"])
         self.assertIn("could not be checked before the reap", notes,
                       "provisioning's own limit is missing from the merged record")
-        self.assertIn("was not sent SIGTERM", notes,
-                      "the command vector's own limit is missing from the merged record")
+        self.assertIn("was not sent SIGTERM", " ".join(entry["teardown"]["refused"]),
+                      "the command vector's own refusal is missing from the merged record")
         # The refusal names the first capability this host cannot hold (`/proc` where pidfds
         # exist, the pidfd itself where they do not); the enumeration limit above is exact either
         # way, because the group report never consults the delivery gates.
         expected = "pidfd" if not runner.PIDFD_PINNING else "has no /proc"
-        self.assertIn(expected, notes,
+        self.assertIn(expected, " ".join(entry["teardown"]["refused"]),
                       "the merged record does not say which capability refused the delivery")
         pids = self.leftover_pids(pids_file)
         self.assertEqual(len(pids), 1)
@@ -2504,9 +2506,9 @@ class EndToEndTests(PatchingTestCase):
         self.assertEqual(entry["teardown"]["survivors"], [],
                          "a process that was never signalled is not a survivor")
         self.assertNotIn("survived SIGKILL", entry["reason"])
-        self.assertIn("was not sent SIGTERM", " ".join(entry["teardown"]["unverified"]),
+        self.assertIn("was not sent SIGTERM", " ".join(entry["teardown"]["refused"]),
                       "the refusal and its reason are missing from the record")
-        self.assertIn("pidfd", " ".join(entry["teardown"]["unverified"]))
+        self.assertIn("pidfd", " ".join(entry["teardown"]["refused"]))
         pids = self.leftover_pids(ARTIFACTS / "pids.txt")
         self.assertEqual(len(pids), 2)
         for pid in pids:
