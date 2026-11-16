@@ -2807,16 +2807,16 @@ def terminal_record_line(raw) -> bool:
     verdict (`final_reason == "completed"`) and the answer come from the last
     `final` event — so that is the one line the bounded writer is told to
     protect, whatever arrives after it. The test is exactly `summarize`'s own:
-    decode, parse, `type == "final"`. A byte-level prefilter would be cheaper
-    but would miss a `final` whose type value is JSON-escaped, which `summarize`
-    still reads as a final, so the declaration must not be narrower than the
-    reader. The declaration is deliberately the route's: the shared writer
-    learns nothing about event types, and a route that declares nothing keeps
-    the writer's retention behaviour exactly.
+    decode, strip, parse, `type == "final"`. The `.strip()` is load-bearing for
+    that parity: `str.strip` removes whitespace `json.loads` alone would reject,
+    so dropping it would make the declaration narrower than the reader — and a
+    narrower declaration can drop a line the reader still settles from. A
+    byte-level prefilter would be cheaper but would miss a `final` whose type
+    value is JSON-escaped, which `summarize` still reads as a final.
     """
     try:
         event = json.loads(raw.decode("utf-8", "replace").strip())
-    except (ValueError, UnicodeDecodeError):
+    except ValueError:
         return False
     return isinstance(event, dict) and event.get("type") == "final"
 
@@ -2864,10 +2864,6 @@ class EventLog:
                 verdict, _state, _detail = guard_locked(self.op)
                 if verdict != GUARD_OK:
                     return
-                # The terminal record is declared protected: a trailing line
-                # (a configured wrapper's extra stdout, another status event)
-                # must never cost a finalizing reader the `final` it settles
-                # the run from.
                 self.writer.feed(raw, protect=terminal_record_line(raw))
 
     def finish(self) -> None:

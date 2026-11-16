@@ -1077,6 +1077,18 @@ class DshLauncherTests(ProcessFixtures):
         # never carried, then `final`: everything else fed was dropped, and the
         # marker and the sidecar must account for exactly those.
         head_count = len(lines) - 2
+        # The head region is the writer's documented one — the first complete
+        # lines up to 64 KiB, kept whole — so its size is pinned here instead of
+        # being read back from the output: a writer that dropped the whole head
+        # (or closed it early) would otherwise pass every assertion below.
+        expected_head = []
+        expected_head_bytes = 0
+        for line in fed:
+            if expected_head and expected_head_bytes + len(line) > 64 * 1024:
+                break
+            expected_head.append(line)
+            expected_head_bytes += len(line)
+        self.assertEqual(head_count, len(expected_head))
         dropped_expected = fed[head_count:]
         marker = json.loads(lines[-2])
         stats = json.loads((run_dir / "events.stats.json").read_text(encoding="utf-8"))
@@ -1088,13 +1100,12 @@ class DshLauncherTests(ProcessFixtures):
         self.assertEqual(stats["dropped_bytes"], marker["dropped_bytes"])
         # Every input line is either dropped or retained, and the marker is the
         # one retained line the input never carried.
-        self.assertEqual(stats["total_lines"], stats["dropped_lines"] + len(lines) - 1)
+        self.assertEqual(stats["total_lines"], len(fed) + 1)
+        self.assertEqual(stats["head_bytes"], sum(len(line) for line in fed[:head_count]))
         # Exact compacted layout: the head lines held whole, the marker, then
         # `final` entire — a writer that truncated nothing, or dropped the newest
         # line, cannot pass either half of this.
         self.assertEqual(retained, b"".join(fed[:head_count]) + lines[-2] + b"\n" + final)
-        self.assertEqual(len(retained),
-                         stats["head_bytes"] + len(lines[-2]) + 1 + len(final))
 
     def test_10c_an_oversized_final_event_still_settles_done(self):
         """The consumer half: an oversized final event is what `summarize` reads.
@@ -1190,10 +1201,26 @@ class DshLauncherTests(ProcessFixtures):
         writer = Writer(str(run_dir), cap, passthrough=False)
         filler = (json.dumps({"type": "status", "phase": "step_start", "filler": "x" * 4000})
                   + "\n").encode("utf-8")
-        writer.feed(b'{"type":"session","sessionId":"s-10f"}\n')
-        while not writer.head_closed:
-            writer.feed(filler)
-        older = list(writer.tail)  # the feed that closed the head, now the tail's oldest
+
+        def head_prefix(session):
+            """The writer's documented head region: the first complete lines up to 64 KiB.
+
+            Computed here rather than read back from `writer.head_closed`: the
+            line that would cross the cap is the first to land in the tail, and
+            the expected drop accounting needs to name it.
+            """
+            lines = [session]
+            total = len(session)
+            while total + len(filler) <= 64 * 1024:
+                lines.append(filler)
+                total += len(filler)
+            return lines
+
+        for line in head_prefix(b'{"type":"session","sessionId":"s-10f"}\n'):
+            writer.feed(line)
+        older = [filler]  # did not fit the head region: the tail's oldest entry
+        for line in older:
+            writer.feed(line)
         final = (json.dumps({"type": "final", "reason": {"kind": "completed"},
                              "text": "A" * 2048}) + "\n").encode("utf-8")
         # Distinct trailing lines: identical bytes could not tell a retained
@@ -1232,10 +1259,11 @@ class DshLauncherTests(ProcessFixtures):
         blank_dir = self.tmp / "writer-10f-blanks"
         blank_dir.mkdir(exist_ok=True)
         blanks = Writer(str(blank_dir), 1024, passthrough=False)
-        blanks.feed(b'{"type":"session","sessionId":"s-10f-b"}\n')
-        while not blanks.head_closed:
-            blanks.feed(filler)
-        blanks_older = list(blanks.tail)
+        for line in head_prefix(b'{"type":"session","sessionId":"s-10f-b"}\n'):
+            blanks.feed(line)
+        blanks_older = [filler]
+        for line in blanks_older:
+            blanks.feed(line)
         blanks.feed(final, protect=True)
         for _ in range(3):
             blanks.feed(b"\n")
@@ -1253,6 +1281,76 @@ class DshLauncherTests(ProcessFixtures):
                          sum(len(line) for line in blanks_older) + 2)
         self.assertEqual(stats_blank["total_lines"],
                          stats_blank["dropped_lines"] + len(retained_blank.splitlines()) - 1)
+
+    def test_10g_the_open_file_stays_within_the_slack_ceiling(self):
+        """The hysteresis ceiling: the live file carries at most `slack` dropped history.
+
+        Between compactions the retained file holds dropped lines a compaction
+        has not rewritten yet, so a reader mid-run could otherwise see the
+        unbounded stream: the writer rewrites the file once it exceeds its
+        compacted ceiling by more than `slack`, which bounds what a live reader
+        (or the disk) sees. `finish()` compacts anyway; this is the mid-run
+        state, asserted before it.
+        """
+        Writer = adapter.load_writer()
+        run_dir = self.tmp / "writer-10g"
+        run_dir.mkdir(exist_ok=True)
+        cap = 4096
+        writer = Writer(str(run_dir), cap, passthrough=False)
+        filler = (json.dumps({"type": "status", "phase": "step_start", "filler": "x" * 2000})
+                  + "\n").encode("utf-8")
+        for _ in range(200):
+            writer.feed(filler)
+        # Not finished: this is the state a reader (or df) sees mid-run.
+        size = (run_dir / "events.ndjson").stat().st_size
+        slack = max(64 * 1024, min(1024 * 1024, cap // 8))  # the documented slack
+        # The compacted ceiling is head + cap; the writer rewrites the file once
+        # it exceeds that by more than `slack`, so after every feed the live file
+        # is inside the ceiling — without the rewrite it would carry every line
+        # fed since its first truncation, several times this bound.
+        self.assertLessEqual(size, 64 * 1024 + cap + slack, size)
+        writer.finish()
+        self.assertLessEqual((run_dir / "events.ndjson").stat().st_size, 64 * 1024 + cap)
+
+    def test_10h_the_declaration_matches_the_reader(self):
+        """`terminal_record_line` accepts exactly the lines `summarize` reads a `final` from.
+
+        The declaration and the reader must agree line by line: wider, and the
+        writer guards lines the run is not settled from; narrower, and a
+        trailing line can cost a finalizing reader the very `final` it settles
+        from. Decode, strip, parse, `type == "final"` — the same shape on both
+        sides, including for a `final` whose type value is JSON-escaped and for
+        one whose leading whitespace only `.strip()` removes.
+        """
+        run_dir = self.tmp / "record-10h"
+        run_dir.mkdir(exist_ok=True)
+        events = run_dir / "events.ndjson"
+        cases = [
+            b'{"type":"final","reason":{"kind":"completed"},"text":"done"}\n',
+            b'{"type":"final"}\n',
+            b'{"type":"\\u0066inal","text":"escaped type value"}\n',
+            b'\x0c{"type":"final","text":"form feed prefix"}\n',
+            b'{"type":"final","text":"trailing whitespace"} \t\n',
+            b'{"type":"status","phase":"turn_end"}\n',
+            b'{"type":"truncated","dropped_bytes":1,"dropped_lines":1}\n',
+            b'{"type":"session","sessionId":"s-10h"}\n',
+            b'{"type":"final-ish"}\n',
+            b'[{"type":"final"}]\n',
+            b'"final"\n',
+            b'{"type":"final"} trailing\n',
+            b'\n',
+            b'not json\n',
+        ]
+        for raw in cases:
+            with self.subTest(line=raw):
+                events.write_bytes(raw)
+                summary = adapter.summarize(str(run_dir), str(events))
+                self.assertEqual(adapter.terminal_record_line(raw),
+                                 summary["answer_source"] == "final")
+        # Both directions are exercised above, so an always-true or always-false
+        # declaration cannot pass the loop: pin one case of each.
+        self.assertTrue(adapter.terminal_record_line(cases[0]))
+        self.assertFalse(adapter.terminal_record_line(cases[10]))
 
     def test_11_agent_arguments_and_prompt_are_passed_through(self):
         slug = "argv-11"
