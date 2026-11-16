@@ -20,6 +20,28 @@ Retained layout over the cap:
     {"type":"truncated","dropped_bytes":N,"dropped_lines":M}
     <most recent lines, <= max_bytes - marker reserve>
 
+The newest line is never dropped, and a caller may declare a line protected
+(`feed(line, protect=True)`) — a record its own reader settles the run from —
+which no drop may take either; a newer declared line supersedes the older one,
+so at most one protected line is alive at a time. Eviction takes the oldest
+retained line that is neither the newest nor the protected one, and
+`dropped_bytes` / `dropped_lines` count exactly those.
+
+The un-evictable lines are the newest one and, when one is declared, the
+protected one: neither is ever dropped, so when those one or two lines together
+exceed the tail region's budget (`max_bytes - MARKER_RESERVE`) they are retained
+whole, and `tail_bytes` is at most `max(tail budget, the combined bytes of those
+un-evictable lines)`.
+
+The sizes below are allowances, not exact values: the exact compacted size is
+`head_bytes` + the marker line's bytes + `tail_bytes`. The writer rewrites the
+file once it exceeds `head_bytes + max_bytes + slack` plus the retained tail's
+overshoot, `max(0, tail_bytes - (max_bytes - MARKER_RESERVE))`, so the live file
+stays under that ceiling — and `slack` is the allowance for dropped history a
+rewrite has not yet reclaimed, not an exact cap on those bytes: unused tail and
+marker capacity can leave slightly more of them on disk while the file is still
+inside the ceiling.
+
 Under the cap the file is byte-for-byte the input stream. Sidecar counters are
 written atomically to RUN_DIR/events.stats.json every 64 KiB of input and at
 exit; the session id from the first `{"type":"session"}` event is persisted to
@@ -97,6 +119,9 @@ class Writer:
         self.head_bytes = 0
         self.head_closed = False
         self.tail = collections.deque()
+        # The index of the one declared (protected) line currently in `tail`, or
+        # None; a newer declaration moves it, so at most one is alive at a time.
+        self.protected_idx = None
         self.tail_bytes = 0
         self.total_bytes = 0
         self.total_lines = 0
@@ -277,7 +302,7 @@ class Writer:
 
     # -- stream ----------------------------------------------------------
 
-    def feed(self, line):
+    def feed(self, line, protect=False):
         self.total_bytes += len(line)
         self.total_lines += 1
         self._note_session(line)
@@ -287,6 +312,8 @@ class Writer:
         if not self.head_closed and (
             not self.head or self.head_bytes + len(line) <= HEAD_LIMIT
         ):
+            # The head is never dropped, so a declared line landing here is
+            # retained by construction and needs no guard index.
             self.head.append(line)
             self.head_bytes += len(line)
             if self.head_bytes >= HEAD_LIMIT:
@@ -296,8 +323,19 @@ class Writer:
             self.head_closed = True
             self.tail.append(line)
             self.tail_bytes += len(line)
-            while self.tail_bytes > self.tail_budget and self.tail:
-                dropped = self.tail.popleft()
+            if protect:
+                self.protected_idx = len(self.tail) - 1
+            while self.tail_bytes > self.tail_budget:
+                # Index 0 is skipped while it holds the protected line, and the
+                # break leaves the last entry alone: neither un-evictable entry is
+                # ever a drop, so this stops with only those two left at most.
+                drop_idx = 1 if self.protected_idx == 0 else 0
+                if drop_idx >= len(self.tail) - 1:
+                    break
+                dropped = self.tail[drop_idx]
+                del self.tail[drop_idx]
+                if self.protected_idx:
+                    self.protected_idx -= 1
                 self.tail_bytes -= len(dropped)
                 self.dropped_bytes += len(dropped)
                 self.dropped_lines += 1
@@ -306,8 +344,11 @@ class Writer:
                 self._compact()
             else:
                 self._append(line)
+            # Count the retained tail's overshoot as retained size so slack
+            # hysteresis holds.
             if self.truncated and self.disk_bytes > (
                 self.head_bytes + self.max_bytes + self.slack
+                + max(0, self.tail_bytes - self.tail_budget)
             ):
                 self._compact()
         if self.total_bytes - self.last_stats_total >= SIDECAR_EVERY:

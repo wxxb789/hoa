@@ -131,9 +131,11 @@ floor = [
   "skills/gdd/scripts/tests/test-dispatch-guards.py",
   "skills/gdd/scripts/tests/test-omp-run-setsid.sh",
   "skills/gdd/scripts/tests/test-omp-run-stale.sh",
+  "skills/gdd/scripts/tests/test_dsh_run_python.py",
   "skills/gdd/scripts/tests/test_omp_run_python.py",
   "skills/gdd/scripts/tests/test_paseo_run_python.py",
   "skills/gdd/scripts/tests/test_review_evidence.py",
+  "skills/gdd/scripts/tests/test_verdict_matrix.py",
   "skills/gdd/scripts/tests/test_watch_pr_checks.py",
   "skills/ghc-search/scripts/test_ghc_search.py",
   "skills/hermes-models/scripts/tests/test-provider-metadata.py",
@@ -245,6 +247,18 @@ command = [["{python}", "scripts/version.py", "check-merge"]]
 condition = "pull_request"
 skip_reason = "pull-request guard: the remote patch + 1 and the tag check"
 notes = "replaces the CI step 'Version claim is still free' (if: pull_request)"
+
+# The merge gate's own mutation harness.  Its name matches no discovery pattern
+# (`mutate_` is neither `test*` nor an eval runner), which is exactly the declared
+# case; the verdict matrix it drives is discovered and refined further below.
+[[suite]]
+id = "gate:merge-gate-mutations"
+path = "skills/gdd/scripts/tests/mutate_verdict_matrix.py"
+command = [["{python}", "skills/gdd/scripts/tests/mutate_verdict_matrix.py"]]
+assertion = "counter"
+count_regexes = ['^mutation-harness: (?P<passed>\d+) mutations over \d+ cells, 0 survived, \d+\.\d+s$']
+timeout = 300
+notes = "replaces the CI step 'GDD merge-gate mutation harness' (main, #67): 90 in-memory mutations of pr-merge-check.py — 58 anchored plus the generated vocabulary reclassifications — each re-run against the whole verdict matrix and required to flip a cell or the golden call log; the checkout is never written"
 
 # ── declared: packages ───────────────────────────────────────────────────────
 # These keep their own package-manager commands instead of a discovered test glob
@@ -392,6 +406,18 @@ path = "skills/gdd/scripts/tests/test_paseo_run_python.py"
 timeout = 300
 detached = "the watcher paseo-run.py starts with `start_new_session` (paseo-run.py:340-342), which polls the run's state until it is finalized (paseo-run.py:356-366). The suite's own `stop_monitors` teardown stops every monitor pid it started (test_paseo_run_python.py:100,150-169); without that, a timed-out suite would leave the watcher polling records the runner then deletes."
 notes = "previously unwired (§1: exists but not in baseline CI); ~45s of launcher wait loops"
+
+[[suite]]
+path = "skills/gdd/scripts/tests/test_dsh_run_python.py"
+timeout = 300
+detached = "the run's detached processes: the runner `spawn_runner` starts with POSIX `start_new_session` (dsh-run.py:2056-2100) and the `dsh` agent `spawn_agent` starts in its own session (dsh-run.py:2102-2125); the suite's class teardown reaps every live run it left behind (`reap_remaining_runs`, test_dsh_run_python.py:491-513) with OS primitives — never `kill_tree`, which refuses to signal without a pidfd — and `kill_hard` covers the abrupt-death path (test_dsh_run_python.py:637-645)."
+notes = "the discoverer's test*.py pattern schedules it; main's CI never ran it (#70's own evidence ran it by hand), and 123 unittest tests with real process spawns and wait loops measured 94-126s under load on the 4-core evidence host (docs/evidence/2026-11-15-dsh-headless-launcher.md:277-291), so the timeout is explicit"
+
+[[suite]]
+path = "skills/gdd/scripts/tests/test_verdict_matrix.py"
+assertion = "counter"
+count_regexes = ['^verdict-matrix: .*= (?P<passed>\d+) cells, .*, 0 failed, \d+\.\d+s$']
+notes = "replaces the CI step 'GDD merge-gate verdict matrix' (main, #67); it imports `unittest.mock`, so `auto` would classify it as a unittest suite although its summary is not `Ran N tests` — every cell is a check and the counter line carries the positive evidence"
 
 [[suite]]
 path = "skills/gdd/scripts/tests/test-omp-run-stale.sh"

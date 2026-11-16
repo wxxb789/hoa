@@ -39,6 +39,7 @@ targets:  runtime-agnostic | repo-only |
 | design-md | skill | software-development | runtime-agnostic | `skills/design-md/` | 编写、校验并导出 DESIGN.md 令牌规范（含对比度检查与 Tailwind/DTCG 导出） |
 | discord-rich-message | skill | software-development,work-management | runtime-agnostic | `skills/discord-rich-message/` | 在平台限制内发送结构化 Discord 消息：Components V2、等宽对齐表格、附件兜底 |
 | dotnet-repo-workflow | skill | software-development | runtime-agnostic | `skills/dotnet-repo-workflow/` | 走仓库自带 .NET gate 而非手搓 `dotnet test`；lock 文件、Roslyn 编译陷阱、merge-ready 清单 |
+| dsh-headless-gdd | skill | software-development,work-management | runtime-agnostic | `skills/dsh-headless-gdd/` | 把 GDD 阶段派发给 dsh headless 并监督：会话/worktree 规则、完成判定、恢复、harness 陷阱 |
 | evidence-backed-analytical-writing | skill | work-management | runtime-agnostic | `skills/evidence-backed-analytical-writing/` | 中文分析报告：证据地图与「主张 → 证据 → 机制 → 局限」骨架；时效边界、状态阶梯、否定性结论 |
 | evidence-boundary-discipline | skill | work-management | runtime-agnostic | `skills/evidence-boundary-discipline/` | 只陈述有日期的来源所能支持的事实：时态对齐日期、来源标签全链路一致、缺失不升级为不存在 |
 | find-nearby | skill | self-management | runtime-agnostic | `skills/find-nearby/` | 用随附脚本查找附近地点：按类别检索、按距离排序 |

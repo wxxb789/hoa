@@ -7,7 +7,7 @@ description: >-
   recovering a run that was killed mid-turn. Do not use for a two-minute command (run it inline) or for
   work that needs live steering (that is a TUI session).
 metadata:
-  version: "0.1.62"
+  version: "0.1.66"
   areas: "software-development,work-management"
   targets: "pi"
   summary: "detached tmux launcher for long `omp -p` runs; polled completion, session-id recovery"
@@ -112,6 +112,14 @@ path.
     `Invalid --max-time value`, leaving a 0-byte `answer.md` and an empty event log — which reads like
     an instant crash, not a rejected flag. Use `90m`, `2h` or plain seconds. The wrapper does not
     validate this, so read `stderr.log` before blaming the prompt or the repo.
+
+15. **A run that says it "launched" its verification is not evidence.** Whether teardown takes
+    backgrounded children with it is the launcher's cleanup contract, not a universal law: a launcher
+    that terminates its cleanup group at finalize (`systemd-run`, `KillMode=control-group`) kills a gate
+    left under `&` / `nohup` with no exit code anywhere, while one that merely returns may leave it
+    running. Require the exit code before treating the verification as done — a gate awaited to
+    completion is fine, a gate left behind is not. The stage-side rule lives in skill `gdd` →
+    `references/run-failure-modes.md` §8.
 
 ## Recovery after a session restart
 
