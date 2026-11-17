@@ -34,10 +34,6 @@ CONSUMERS: dict[str, list[str]] = {
         "skills/hoa-introspect/scripts",
         "skills/hoa-introspect-distill/scripts",
     ],
-    **{
-        name: ["skills/teams-cdp/scripts", "skills/m365-copilot-cdp/scripts"]
-        for name in ("cdp.ts", "package.json", "tsconfig.json", "bun.lock")
-    },
 }
 
 

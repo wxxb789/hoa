@@ -52,7 +52,7 @@ class InstallHostSkillsTests(unittest.TestCase):
         directory.mkdir()
         (directory / "SKILL.md").write_text(
             f"---\nname: {name}\ndescription: {body}\nmetadata:\n"
-            f"  version: \"0.1.0\"\n  areas: \"{areas}\"\n"
+            f"  revision: \"1\"\n  areas: \"{areas}\"\n"
             f"  targets: \"runtime-agnostic\"\n---\n# {name}\n{body}\n",
             encoding="utf-8")
         (directory / "references").mkdir()

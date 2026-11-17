@@ -35,7 +35,7 @@ This repo is a practice ground for two crafts:
 ## Personal aim, public repo
 
 Built for my **personal** use, but the repository is **public** — clone it,
-fork it, `npx skills add wxxb789/hoa`, take any part you like. Because it is
+fork it, install the skills you need with `npx skills`, take any part you like. Because it is
 public, **no secrets and no personal information are ever tracked by git** (see
 [`.gitignore`](./.gitignore)): commit templates and sanitized assets only; real
 credentials and private content stay untracked (`.env`, `*.key`, `*.token`,
@@ -59,7 +59,7 @@ agents `npx skills` supports)*
 
 | Concern | Owner | Mechanism |
 |---|---|---|
-| Skills (`SKILL.md` packages) | **hoa** | `npx skills add wxxb789/hoa` → `~/<agent>/skills/` |
+| Skills (`SKILL.md` packages) | **hoa** | `npx skills add wxxb789/hoa -s <skill>` → `~/<agent>/skills/` |
 | Agent roles, orchestration, prompts, rules, mcps, workflows, evals | **hoa** | version-controlled library / knowledge (composed into skills or used by hand) |
 | Reflections & external refs | **hoa** | knowledge, never deployed |
 | Runtime **settings** — LLM provider, models, plugins, `settings.json` / `config.toml` / `opencode.json` | **chezmoi** | `chezmoi apply` |
@@ -73,7 +73,7 @@ custom deploy tooling.
 ```text
 hoa/
 ├── index.md · index.zh-CN.md   # every artifact, labeled by area + target (GENERATED — see scripts/)
-├── VERSION        # canonical version shared by every custom skill
+├── VERSION        # the one project version; skills carry their own metadata.revision
 ├── CHANGELOG.md   # notable changes; older entries retain historical per-skill versions
 ├── skills/        # THE deploy surface — SKILL.md packages installed via `npx skills`
 ├── paseo-plugins/ # optional Paseo plugin source; explicitly installed, never auto-deployed
@@ -128,26 +128,26 @@ the layer is a fact about the tree, not a label someone remembers to add.
 |---|---|---|
 | `entry` | Directly routable from a user request. It may consume/produce artifacts, but it needs no controller to be invoked. | e.g. `ghc-search`, `hoa-skill-work`, `spec-convergence` |
 | `controller` | Routes a chain: decides which stage runs, and produces only `chain-plan`. | `gdd` |
-| `stage` | One phase of a chain, invoked by its controller. Declares what it consumes and produces. | `subagent-driven-development` |
+| `stage` | One phase of a chain, invoked by its controller. Declares what it consumes and produces. | none at present |
 | `mechanism` | Invoked only by another skill; never a routing target. CI rejects it as a trigger-case `must_pick`. | `delegated-work-acceptance` |
 
 ### Surfaces
 
 | Folder | What lives there | Deployed? |
 |---|---|---|
-| `skills/` | `SKILL.md` packages: the only auto-deployed artifact. `npx skills add wxxb789/hoa` installs them. | yes |
+| `skills/` | `SKILL.md` packages: the only deployable artifact. `npx skills add wxxb789/hoa -s <skill>` installs the ones you pick. | yes |
 | `paseo-plugins/` | Optional Paseo plugin source, including the read-only GDD run observer. | manual opt-in only |
 | `agents/` | 1 role / authority / I-O contract (`skill-scout`). | no — library |
 | `mcps/` | 1 portable MCP definition (`ghc-proxy`). | no — library |
 | `orchestration/` | 1 scheduling/handoff/termination pattern (`typed-verification-gates`). | no — library |
-| `prompts/` | 4 per-task request templates. | no — library |
+| `prompts/` | 5 per-task request templates. | no — library |
 | `rules/` | 1 standing constraint (`generated-means-generated`). | no — library |
 | `workflows/` | 1 finite outcome-oriented recipe (`adopt-a-pattern`). | no — library |
 | `evals/` | Two case suites (`trigger-cases.json`, `skill-method-cases.json`) and their offline validators. | no — repo only |
 | `reflections/`, `ref/` | Write-ups and external reference submodules; study material, never deployed. | no |
-| `scripts/` | Repo maintenance: catalog, host parity, version/release, contract graph, config resolver. | no |
+| `scripts/` | Repo maintenance: catalog, host parity, version/revision gates, contract graph, config resolver. | no |
 
-A skill's frontmatter carries the catalog and composition fields together: `version`, `kind`,
+A skill's frontmatter carries the catalog and composition fields together: `revision`, `kind`,
 optional comma-separated `consumes` / `produces`, `areas`, `targets`, `summary`, `summary_zh`.
 Library artifacts keep their metadata in an `<!-- index: ... -->` comment. `index.md` and
 `index.zh-CN.md` are generated from those two sources and cover every artifact in the catalog; CI fails on drift.
@@ -160,7 +160,7 @@ artifact graph, and checks it offline (`--list` prints the graph). `scripts/cont
 registers three escape hatches: `external:` artifacts produced outside the skill graph (request,
 work-report, git-commit, ci-result), `shared:` artifacts two skills may both produce (currently
 none), and `terminal:` artifacts no skill consumes, each with a one-line reason (chain-plan,
-implementation, acceptance-verdict, scope-seal). Every rule is enforced by that command:
+spec, acceptance-verdict, scope-seal). Every rule is enforced by that command:
 
 | Rule | Rejects |
 |---|---|
@@ -176,14 +176,13 @@ implementation, acceptance-verdict, scope-seal). Every rule is enforced by that 
 
 ### What CI runs
 
-The `test` job runs on every push to `main`, every pull request, and `workflow_dispatch`; the
-`release` job runs only after it on `main` and tags the commit CI tested.
+The `test` job runs on every push to `main`, every pull request, and `workflow_dispatch`. There is
+no release job: `npx skills` installs straight from GitHub, so nothing is tagged or published.
 
 The `test` job provisions the runtimes and dependencies, then runs
 `python scripts/run_all_tests.py`. That discoverer schedules the commands below as entries in
 `scripts/test_manifest.toml` rather than as separate CI steps (the table is being converged onto the
-manifest in a later step of this series, and its `scripts/release.py` row describes the release job's
-own command, not a scheduled suite). It also schedules the Python suites that were never wired in
+manifest in a later step of this series). It also schedules the Python suites that were never wired in
 before —
 `skills/delegated-work-acceptance/scripts/tests/test_worktree_scope.py` and
 `skills/gdd/scripts/tests/test_paseo_run_python.py` — and the `paseo-plugins/gdd-run-observer` Vitest
@@ -229,7 +228,6 @@ on Linux the same run gates every delivery as described above.
 
 | Gate command (CI step) | Protects |
 |---|---|
-| `bun install --frozen-lockfile && bun run check && bun test` in `scripts/shared`, `skills/teams-cdp/scripts`, `skills/m365-copilot-cdp/scripts` | Desktop CDP types and behavior in the shared code and both desktop skills. |
 | `python scripts/vendor_shared.py --check` | Vendored copies of shared scripts match their canonical file. |
 | `python scripts/generate_index.py --check` | `index.md` / `index.zh-CN.md` match artifact metadata. |
 | `python scripts/check_contract_graph.py` | Rules R1–R9 above. |
@@ -240,12 +238,10 @@ on Linux the same run gates every delivery as described above.
 | `python -m unittest scripts.test_check_changelog` | The changelog rule's own tests. |
 | `python scripts/check_frontmatter.py` | Every `SKILL.md` frontmatter and catalog field. |
 | `python -m unittest scripts.test_check_frontmatter` | The frontmatter checker's own tests. |
-| `python scripts/version.py check` | `VERSION` is mirrored by every skill and both indexes. |
 | `python scripts/version.py check-bump` (pull requests) | `VERSION` is exactly `origin/main`'s patch + 1. |
+| `python scripts/version.py check-revisions` (pull requests) | Every skill directory changed since the merge base raises its `metadata.revision`. |
 | `python scripts/check_changelog.py --base origin/main` (pull requests) | A changed `VERSION` has a changed `CHANGELOG.md`. |
-| `python scripts/version.py check-merge` (pull requests) | The version claim is still free on the remote before merge. |
-| `python scripts/test_version.py` | Version, sync and release-guard behavior. |
-| `python scripts/test_release.py` | Automatic release against isolated local Git remotes. |
+| `python scripts/test_version.py` | The `bump`, `check-bump` and `check-revisions` CLI against throwaway Git repos. |
 | `python skills/ghc-search/scripts/test_ghc_search.py` | The search client's request/parse/error behavior. |
 | `python skills/hoa-introspect/evals/run.py` | `hoa-introspect` eval fixtures. |
 | `python skills/hoa-introspect-distill/evals/run_evals.py` | `hoa-introspect-distill` eval fixtures. |
@@ -254,7 +250,6 @@ on Linux the same run gates every delivery as described above.
 | `python -m unittest evals.test_judge_trigger_evals` | Judge configuration precedence, exit codes, per-case failures, baseline writes, against a local stub. |
 | `python evals/validate_skill_method_cases.py` | `skill-method-cases.json` structure and isolation paths. |
 | `python -m unittest evals.test_validate_skill_method_cases` | Setup-file isolation for skill-method cases. |
-| `python scripts/release.py` (release job, after `test` on `main`) | Publishes the version CI just tested; never bumps. |
 
 The dependency install (`python -m pip install -r scripts/requirements.txt`) precedes the gates.
 The judge's HTTP client is stdlib only; the catalog builder it imports uses the repo's PyYAML
@@ -304,34 +299,25 @@ pins model, effort, endpoint host and date precisely because changing any of the
 comparability. The suite proves discrimination on curated near-misses, not routing quality in the
 wild.
 
-## Unified skill versions
+## Versions and revisions
 
-`VERSION` is the release version for every custom package under `skills/`, starting
-at `0.1.0`. Each SKILL.md mirrors it in standard YAML `metadata.version` so installed
-packages retain the version. Catalog labels share the same metadata mapping;
-custom-skill HTML index comments are rejected, not read as a fallback.
-Third-party/reference trees and non-skill library artifacts keep their own metadata.
+Two counters, each with one job:
+
+- `VERSION` is the one project version (semver). Every pull request bumps its patch: CI requires
+  exactly `origin/main`'s patch + 1, so a branch cut before another merge rebases and bumps again.
+- `metadata.revision` in each `SKILL.md` is an integer string counting that skill's own iterations.
+  A pull request raises it only for the skill directories it changes; a new skill starts at `"1"`.
+  The project version is never copied into skills.
 
 ```bash
 python -m pip install -r scripts/requirements.txt  # repository tooling; prefer a venv
-python scripts/version.py check       # read-only consistency and index check
-python scripts/version.py sync        # mirror VERSION and regenerate indexes
-python scripts/version.py bump        # patch by default: 0.1.0 -> 0.1.1
-python scripts/version.py bump minor  # explicit minor; major is also supported
+python scripts/version.py bump             # patch by default: 0.1.0 -> 0.1.1
+python scripts/version.py check-bump       # VERSION is origin/main's patch + 1
+python scripts/version.py check-revisions  # every changed skill raised its revision
 ```
 
-Every pull request bumps the patch itself: CI requires `VERSION` to be exactly
-`origin/main`'s version with the patch component +1, so a branch cut before another
-merge must rebase and run `python scripts/version.py bump` again. After CI succeeds
-on `main`, the release job only tags the version already committed by the merged
-pull request (initially `v0.1.0` is published as-is); it never bumps or creates a
-version commit. Publication retains the browser/CDP tests and all existing
-repository gates, serializes releases, rejects stale tested heads, and pushes the
-tag atomically without force.
-
-Local version commands never commit or push. The CI-only release helper requires
-`contents: write`; branch protection must permit its normal push. It does not
-bypass repository policy. Re-running an already published push is a no-op.
+There are no releases, tags or binaries: `npx skills` installs from the GitHub default branch.
+Local version commands never commit or push.
 
 
 ## Bilingual policy
@@ -378,21 +364,25 @@ internally.
 
 ## Deploy
 
-**Skills** — the only auto-deployed artifacts — install with the Vercel
+**Skills** — the only deployable artifacts — install with the Vercel
 [`skills`](https://github.com/vercel-labs/skills) CLI:
 
 ```bash
-# install all hoa skills into every detected runtime (global)
-npx skills add wxxb789/hoa -g
-
-# just some skills, into specific runtimes
-npx skills add wxxb789/hoa -g -s <skill> -a claude-code -a opencode
-
-# list before installing / update / remove
+# 1. see what is available
 npx skills add wxxb789/hoa --list
+
+# 2. install only the skills you need, into the runtimes you use
+npx skills add wxxb789/hoa -g -s <skill> -s <other-skill> -a claude-code -a codex
+
+# update / remove
 npx skills update
 npx skills remove <skill>
 ```
+
+**Install only what you need.** Do not install the whole library (`--all` or `-s '*'`): every
+installed skill's description competes for routing in every session, and many skills here are
+specialised (Hermes-coupled `hermes-*`, `gdd` and its launchers, repo maintenance). Read
+[`index.md`](./index.md), pick the few that match your work, and add more later.
 
 - Global (`-g`) installs to `~/<agent>/skills/` (`~/.claude/skills`,
   `~/.config/opencode/skills`, `~/.agents/skills`, …); default scope installs to
@@ -444,28 +434,15 @@ a required dependency of these runtime-agnostic hoa skills. The
 [source-level ownership study](./reflections/2026-09-25-claude-code-skill-source.md)
 distinguishes the implementations and their evidence limits.
 
-## Desktop messaging automation
-
-- [`teams-cdp`](./skills/teams-cdp/SKILL.md) discovers exact people and existing
-  group chats, sends authorized plain text, and checks a new **Sent** receipt.
-- [`m365-copilot-cdp`](./skills/m365-copilot-cdp/SKILL.md) operates desktop Copilot
-  Chat and Code through local CDP, including model selection and reply reads.
-
-Both packages use strict TypeScript, Bun, and `playwright-core`; they attach to
-already signed-in applications without downloading another browser. Each skill
-contains its own dependency manifest and lockfile. Local CDP must be enabled for
-the actual working application surface; Code also requires a ready native host.
-Read each skill's startup and authority instructions before using a real account.
-
 ## Labels
 
 Areas and targets are tracked as labels in [`index.md`](./index.md), not as folders
 (one artifact often serves several). Custom skills store them as comma-separated
-strings under standard YAML `metadata`, alongside their version:
+strings under standard YAML `metadata`, alongside their revision:
 
 ```yaml
 metadata:
-  version: "0.1.0"
+  revision: "1"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "one line for the English catalog"
@@ -519,7 +496,7 @@ External requests are also the best signal for what to build next.
 
 ## Using this repo
 
-- **Anyone:** `npx skills add wxxb789/hoa` to install the skills, or fork and
-  take whichever parts help.
-- **Me:** author skills here → `npx skills add wxxb789/hoa -g` → they land in
-  every runtime; settings ride along via chezmoi.
+- **Anyone:** `npx skills add wxxb789/hoa --list`, then install the few skills you
+  need with `-s <skill>`, or fork and take whichever parts help.
+- **Me:** author skills here → `npx skills add wxxb789/hoa -g -s <skill> -a '*'` →
+  they land in every runtime; settings ride along via chezmoi.

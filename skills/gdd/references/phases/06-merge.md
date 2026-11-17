@@ -59,17 +59,16 @@ A version claim is only true for the main it was measured against. **After** any
 `origin/main` — never before it — run the gate the project **profile** declares for merge time:
 
 ```bash
-python scripts/version.py check-merge      # hoa; other repos: whatever their profile names
+git fetch origin main && python scripts/version.py check-bump   # hoa; other repos: their profile's gate
 ```
 
 A repo whose profile declares no merge-time version gate skips this step. It is not part of the
 generic protocol: `version.py` exists in `hoa` only, and writing it as universal made every consumer
 repo silently skip Phase 6.
 
-A non-zero exit blocks the merge. `check-merge` reads the remote's real main with `git ls-remote`, so a
-sibling PR that merged after your last fetch cannot hide behind a stale `origin/main`; it also fails
-when tag `v<VERSION>` already exists on the remote. The fix is always
-`git fetch origin main && python scripts/version.py bump` — never a hand-edited `VERSION`.
+A non-zero exit blocks the merge. The fetch comes first so a sibling PR that merged after your last
+fetch cannot hide behind a stale `origin/main`. The fix is always a rebase onto `origin/main` plus
+`python scripts/version.py bump` — never a hand-edited `VERSION`.
 
 Then `gh pr merge <N> --squash --delete-branch`, `git fetch --prune`, `git checkout main`,
 `git pull --ff-only`, prove `gh pr view <N> --json headRefOid` equals the head you verified, report.

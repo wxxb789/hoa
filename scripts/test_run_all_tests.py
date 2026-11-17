@@ -895,9 +895,9 @@ class RealTreePlanTests(unittest.TestCase):
 
     def test_every_static_gate_is_still_scheduled(self):
         for suite_id in ("gate:frontmatter", "gate:contract-graph", "gate:index-drift",
-                         "gate:version-check", "gate:vendor-shared"):
+                         "gate:vendor-shared"):
             self.assertIn(suite_id, self.ids)
-        self.assertTrue({"gate:version-bump", "gate:changelog", "gate:version-merge"}
+        self.assertTrue({"gate:version-bump", "gate:changelog", "gate:revision-bump"}
                         <= {suite.id for suite in self.plan.skipped})
 
     def test_the_plan_has_no_problems_and_no_filtered_floor(self):
@@ -926,17 +926,6 @@ class RealTreePlanTests(unittest.TestCase):
         self.assertEqual(suite.provision, (("npm", "ci"),))
         self.assertEqual([argv[1] for argv in suite.commands], ["run", "test"])
         self.assertEqual(suite.assertion, "counter")
-
-    def test_bun_packages_keep_their_separate_commands(self):
-        for suite_id, directory in (
-            ("pkg:cdp-shared", "scripts/shared"),
-            ("pkg:teams-cdp", "skills/teams-cdp/scripts"),
-            ("pkg:m365-copilot-cdp", "skills/m365-copilot-cdp/scripts"),
-        ):
-            suite = next(item for item in self.plan.scheduled if item.id == suite_id)
-            self.assertEqual(suite.cwd, ROOT / directory)
-            self.assertEqual(suite.provision, (("bun", "install", "--frozen-lockfile"),))
-            self.assertEqual(suite.commands, (("bun", "run", "check"), ("bun", "test")))
 
     def test_unittest_suites_keep_their_declared_module_invocation(self):
         for path, module in (
@@ -996,7 +985,7 @@ class RealTreePlanTests(unittest.TestCase):
 
     def test_pull_request_gates_skip_outside_a_pull_request(self):
         skipped = {suite.id: suite for suite in self.plan.skipped}
-        self.assertEqual(set(skipped), {"gate:version-bump", "gate:changelog", "gate:version-merge"})
+        self.assertEqual(set(skipped), {"gate:version-bump", "gate:changelog", "gate:revision-bump"})
         for suite in skipped.values():
             self.assertEqual(suite.condition, "pull_request")
             self.assertTrue(suite.skip_reason)
@@ -1006,7 +995,7 @@ class RealTreePlanTests(unittest.TestCase):
         ids = {suite.id for suite in plan.scheduled}
         self.assertIn("gate:version-bump", ids)
         self.assertIn("gate:changelog", ids)
-        self.assertIn("gate:version-merge", ids)
+        self.assertIn("gate:revision-bump", ids)
         self.assertEqual(plan.skipped, [])
 
     def test_filtered_plan_skips_the_floor_check_and_keeps_children(self):

@@ -21,6 +21,29 @@ only when each environment-specific value can be supplied from outside it.
   literal path, id and model: demote each to configuration, keep the defaults honest, and re-run the
   skill's own acceptance commands before opening the PR. A skill that only works here is not ready.
 
+## Hermes-evolved skills
+
+Many skills here were first evolved on Hermes, a self-evolving assistant runtime. Its edits are
+unreviewed and accumulate install-specific detail, so a Hermes-born change enters hoa only through
+the port review gate above — never as a sync or a copy.
+
+- **Coupled skills carry a `hermes-` prefix.** A skill is coupled when it depends on Hermes runtime
+  paths, config, tools, gateway, or memory. Everything else stays portable and free of Hermes paths.
+- **Hermes built-in skills are not tracked here.** They are tracked upstream on the Hermes instance;
+  never fork or re-create one in hoa. `prompts/hermes-skill-naming.md` is the brief to hand Hermes.
+
+## Engineering restraint
+
+Scripts and tests follow one bar: default to deletion. Keep a gate, check, or abstraction only when
+removing it risks real, irreversible harm, or after the same pain has hit three times.
+
+- Stdlib first; no single-caller wrapper layers, custom verification envelopes, or lockfile ceremony
+  on zero-dependency code. Diagnostics name the exact offending key, path, or value.
+- Tests target public contracts and CLI behaviour, not private functions. No tests that pin prose.
+- No mutation harnesses or self-tests of test infrastructure unless they clear the irreversible-harm bar.
+  `gate:merge-gate-mutations` and `scripts/test_run_all_tests.py` predate this rule and stay only
+  until the pending test-suite simplification removes or justifies them.
+
 ## Composition contracts
 
 Skills declare their role and artifacts in `metadata` as comma-separated strings:

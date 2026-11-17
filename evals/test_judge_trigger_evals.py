@@ -390,7 +390,7 @@ class JudgeUnitTests(unittest.TestCase):
 
     def test_parse_answer(self) -> None:
         self.assertEqual(judge.parse_answer(
-            {"choices": [{"message": {"content": "  teams-cdp\n"}}]}), "teams-cdp")
+            {"choices": [{"message": {"content": "  ghc-search\n"}}]}), "ghc-search")
         for payload in ({}, {"choices": []}, {"choices": [{}]},
                         {"choices": [{"message": {"content": ""}}]},
                         {"error": "bad"}, []):
@@ -473,7 +473,7 @@ class BaselineGateTests(unittest.TestCase):
     def test_retargeted_case_invalidates_the_recorded_flag(self) -> None:
         record = self.record()
         cases = _cases()
-        cases[0] = {**cases[0], "must_pick": ["ghc-search"]}
+        cases[0] = {**cases[0], "must_pick": ["gdd"]}
         errors = gate.baseline_errors(cases, record, gate._catalog_names())
         self.assertTrue(errors, "a case retargeted after recording must invalidate the baseline")
         message = next(error for error in errors if cases[0]["id"] in error)

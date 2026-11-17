@@ -5,10 +5,10 @@ description: >-
   technical arguments that combine supplied claims with retrieved sources — by classifying every
   load-bearing number, building an evidence map, and drafting a uniform claim → evidence → mechanism
   → limitation spine. Use when the deliverable is prose whose every figure must survive an audit.
-  Not for citation mechanics (that is grounded-citations), social posts, changelogs, or any piece
+  Not for citation-ledger mechanics, social posts, changelogs, or any piece
   where the claims are already verified and only the wording needs work.
 metadata:
-  version: "0.1.66"
+  revision: "1"
   areas: "work-management"
   targets: "runtime-agnostic"
   summary: "evidence map plus a claim → evidence → mechanism → limitation spine for Chinese analytical reports; recency window, status ladder, negative findings"
@@ -20,9 +20,8 @@ metadata:
 
 Use this skill for Chinese analytical reports, policy briefs, capability assessments,
 and technical arguments that combine user-supplied claims with retrieved evidence.
-It complements `grounded-citations`: this skill governs claim hygiene, structure,
-and user-facing prose; `grounded-citations` governs the citation ledger and source
-rendering.
+This skill governs claim hygiene, structure, and user-facing prose; it leaves the
+citation-ledger tooling to whatever the operator uses.
 
 ## Procedure
 
@@ -84,16 +83,15 @@ rendering.
 8. **Cite while drafting, not after.** Put inline citations immediately after the
    sentence carrying the figure or externally sourced claim. Register every source
    in the citation ledger before using its number, then render the Sources block
-   mechanically — `grounded-citations/scripts/sources.py` owns both.
+   mechanically from that ledger, never by hand.
 
 9. **Run a source-to-claim audit after edits.** After adding, removing, or
    reordering sources, inspect each citation number's title/topic against the
    sentence it supports. For an independent draft, reset the citation ledger
    before registering sources; for a continuation, preserve the existing ledger
-   ids. Render the Sources block with `sources.py render --replace-in <draft>`
-   before running `sources.py verify --strict`; stale registered sources can make
-   strict verification fail even when the prose citations are correct. Ledger
-   validation proves that an id exists; it does not prove that the page supports
+   ids. Re-render the Sources block from the ledger, then run the ledger's strict
+   verification; stale registered sources can make strict verification fail
+   even when the prose citations are correct. Ledger validation proves that an id exists; it does not prove that the page supports
    that claim.
 
 10. **Deliver directly usable prose.** Default to concise Simplified Chinese,
