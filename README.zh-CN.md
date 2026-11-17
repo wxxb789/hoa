@@ -30,7 +30,7 @@ runtime；runtime 的**设置**（LLM provider、models、plugins）留在 chezm
 ## 个人用途，公开仓库
 
 给我**个人**用，但仓库是**公开的**——你可以直接 clone、fork、
-`npx skills add wxxb789/hoa`、拿走任何喜欢的部分。正因为公开，**任何 secret 和
+用 `npx skills` 安装你需要的 skill、拿走任何喜欢的部分。正因为公开，**任何 secret 和
 个人信息都绝不纳入 git**（见 [`.gitignore`](./.gitignore)）：只提交模板和脱敏
 资产；真实凭据与私密内容保持未跟踪（`.env`、`*.key`、`*.token`、`*.local.*`、
 `private/`）或放进 secret manager。
@@ -53,7 +53,7 @@ Hermes · Claude Code · Codex · pi · OpenCode · Kimi Code · *(`npx skills` 
 
 | 关注点 | 归属 | 机制 |
 |---|---|---|
-| Skills（`SKILL.md` 包） | **hoa** | `npx skills add wxxb789/hoa` → `~/<agent>/skills/` |
+| Skills（`SKILL.md` 包） | **hoa** | `npx skills add wxxb789/hoa -s <skill>` → `~/<agent>/skills/` |
 | agent 角色、orchestration、prompt、rule、mcp、workflow、eval | **hoa** | 版本控制的库 / 知识（拼进 skill 或手动取用） |
 | reflections 与外部参考 | **hoa** | 知识，永不下发 |
 | runtime **设置**——LLM provider、models、plugins、`settings.json` / `config.toml` / `opencode.json` | **chezmoi** | `chezmoi apply` |
@@ -66,7 +66,7 @@ Hermes · Claude Code · Codex · pi · OpenCode · Kimi Code · *(`npx skills` 
 ```text
 hoa/
 ├── index.md · index.zh-CN.md   # 全部 artifact，按 area + target 打标签（自动生成——见 scripts/）
-├── VERSION        # 全部自定义 skill 共用的权威版本
+├── VERSION        # 唯一的项目版本；skill 各自携带 metadata.revision
 ├── CHANGELOG.md   # 重要变更；旧条目保留历史上的各 skill 版本
 ├── skills/        # 唯一部署面 —— 用 `npx skills` 安装的 SKILL.md 包
 ├── paseo-plugins/ # 可选 Paseo 插件源码；显式安装，不自动下发
@@ -117,26 +117,26 @@ category 取该 skill 的第一个 `metadata.areas` 值，可用 `--category` �
 |---|---|---|
 | `entry` | 可由用户请求直接路由。它可以消费/生产 artifact，但不需要 controller 来调用。 | 例如 `ghc-search`、`hoa-skill-work`、`spec-convergence` |
 | `controller` | 路由一条链：决定哪个 stage 运行，且只生产 `chain-plan`。 | `gdd` |
-| `stage` | 链中的一个阶段，由它的 controller 调用。声明它消费和生产什么。 | `subagent-driven-development` |
+| `stage` | 链中的一个阶段，由它的 controller 调用。声明它消费和生产什么。 | 目前没有 |
 | `mechanism` | 只由另一个 skill 调用，永远不是路由目标。CI 拒绝把它列为 trigger case 的 `must_pick`。 | `delegated-work-acceptance` |
 
 ### 面（Surfaces）
 
 | 目录 | 内容 | 是否下发 |
 |---|---|---|
-| `skills/` | `SKILL.md` 包：唯一自动下发的 artifact。`npx skills add wxxb789/hoa` 安装它们。 | 是 |
+| `skills/` | `SKILL.md` 包：唯一可下发的 artifact。`npx skills add wxxb789/hoa -s <skill>` 安装你选中的那些。 | 是 |
 | `paseo-plugins/` | 可选 Paseo 插件源码，包括只读的 GDD run observer。 | 仅手动选择安装 |
 | `agents/` | 1 个 role / authority / I-O 契约（`skill-scout`）。 | 否——库 |
 | `mcps/` | 1 个可移植 MCP 定义（`ghc-proxy`）。 | 否——库 |
 | `orchestration/` | 1 个调度/handoff/termination 模式（`typed-verification-gates`）。 | 否——库 |
-| `prompts/` | 4 个按任务调用的 prompt 模板。 | 否——库 |
+| `prompts/` | 5 个按任务调用的 prompt 模板。 | 否——库 |
 | `rules/` | 1 条常驻约束（`generated-means-generated`）。 | 否——库 |
 | `workflows/` | 1 个面向结果的有限 recipe（`adopt-a-pattern`）。 | 否——库 |
 | `evals/` | 两个 case suite（`trigger-cases.json`、`skill-method-cases.json`）及其离线校验器。 | 否——仅仓库 |
 | `reflections/`、`ref/` | 人写的复盘与外部参考子模块；研究材料，从不下发。 | 否 |
-| `scripts/` | 仓库维护：目录、主机一致性、版本/发布、契约图、配置解析器。 | 否 |
+| `scripts/` | 仓库维护：目录、主机一致性、版本/revision 检查、契约图、配置解析器。 | 否 |
 
-skill 的 frontmatter 同时携带目录字段与组合字段：`version`、`kind`、可选的逗号分隔
+skill 的 frontmatter 同时携带目录字段与组合字段：`revision`、`kind`、可选的逗号分隔
 `consumes` / `produces`、`areas`、`targets`、`summary`、`summary_zh`。库 artifact 把元数据
 放在 `<!-- index: ... -->` 注释里。`index.md` 与 `index.zh-CN.md` 从这两个来源生成，覆盖目录里的全部
 artifact；CI 对漂移报错。runtime **设置**（provider、模型、插件）归 chezmoi，不归本仓库。
@@ -147,7 +147,7 @@ artifact；CI 对漂移报错。runtime **设置**（provider、模型、插件�
 artifact 图并离线检查（`--list` 打印图）。`scripts/contract_graph_registry.yaml` 登记三个
 豁免口：`external:` 是 skill 图之外生产的 artifact（request、work-report、git-commit、
 ci-result）；`shared:` 是两个 skill 都可以生产的 artifact（当前为空）；`terminal:` 是没有任何
-skill 消费的 artifact，每个都带一行理由（chain-plan、implementation、acceptance-verdict、
+skill 消费的 artifact，每个都带一行理由（chain-plan、spec、acceptance-verdict、
 scope-seal）。每条规则都由该命令执行：
 
 | 规则 | 拒绝什么 |
@@ -164,13 +164,12 @@ scope-seal）。每条规则都由该命令执行：
 
 ### CI 跑什么
 
-`test` job 在每次 push 到 `main`、每个 pull request 与 `workflow_dispatch` 时运行；`release`
-job 只在 `main` 上、`test` 成功之后运行，并为 CI 验证过的提交打 tag。
+`test` job 在每次 push 到 `main`、每个 pull request 与 `workflow_dispatch` 时运行。没有 release
+job：`npx skills` 直接从 GitHub 安装，因此不打 tag、不发布。
 
 `test` job 先装好运行时与依赖，然后运行 `python scripts/run_all_tests.py`。该 discoverer 将下表
 中的每一条命令作为 `scripts/test_manifest.toml` 里的 manifest 条目来调度，而非独立的 CI
-step（该表将在本系列的后续步骤中与 manifest 收敛；表末 `scripts/release.py` 一行描述的是
-release job 自己的命令，不是被调度的测试套件）。它同时调度此前从未接入 CI 的 Python 测试套件——
+step（该表将在本系列的后续步骤中与 manifest 收敛）。它同时调度此前从未接入 CI 的 Python 测试套件——
 `skills/delegated-work-acceptance/scripts/tests/test_worktree_scope.py` 与
 `skills/gdd/scripts/tests/test_paseo_run_python.py`——以及 `paseo-plugins/gdd-run-observer`
 这个 Vitest 包。
@@ -202,7 +201,6 @@ unverified；既不退回 `Popen` 缓存的 `returncode`（它看不见 reap）�
 
 | 检查命令（CI step） | 保护什么 |
 |---|---|
-| 在 `scripts/shared`、`skills/teams-cdp/scripts`、`skills/m365-copilot-cdp/scripts` 中运行 `bun install --frozen-lockfile && bun run check && bun test` | 共享代码与两个桌面 skill 的 CDP 类型和行为。 |
 | `python scripts/vendor_shared.py --check` | 分发到 skill 内的共享脚本副本与权威文件一致。 |
 | `python scripts/generate_index.py --check` | `index.md` / `index.zh-CN.md` 与 artifact 元数据一致。 |
 | `python scripts/check_contract_graph.py` | 上面的 R1–R9。 |
@@ -213,12 +211,10 @@ unverified；既不退回 `Popen` 缓存的 `returncode`（它看不见 reap）�
 | `python -m unittest scripts.test_check_changelog` | changelog 规则自身的测试。 |
 | `python scripts/check_frontmatter.py` | 每个 `SKILL.md` 的 frontmatter 与目录字段。 |
 | `python -m unittest scripts.test_check_frontmatter` | frontmatter 检查器自身的测试。 |
-| `python scripts/version.py check` | `VERSION` 被每个 skill 与两个索引镜像。 |
 | `python scripts/version.py check-bump`（pull request） | `VERSION` 恰好是 `origin/main` 的 patch + 1。 |
+| `python scripts/version.py check-revisions`（pull request） | 自 merge base 以来改动过的每个 skill 目录都提高了 `metadata.revision`。 |
 | `python scripts/check_changelog.py --base origin/main`（pull request） | `VERSION` 变化时 `CHANGELOG.md` 也变化。 |
-| `python scripts/version.py check-merge`（pull request） | 合并前版本声明在远端仍然可用。 |
-| `python scripts/test_version.py` | 版本、同步与发布守卫行为。 |
-| `python scripts/test_release.py` | 针对隔离本地 Git remote 的自动发布。 |
+| `python scripts/test_version.py` | 在临时 Git 仓库中检验 `bump`、`check-bump`、`check-revisions` CLI。 |
 | `python skills/ghc-search/scripts/test_ghc_search.py` | 搜索客户端的请求/解析/错误行为。 |
 | `python skills/hoa-introspect/evals/run.py` | `hoa-introspect` eval fixtures。 |
 | `python skills/hoa-introspect-distill/evals/run_evals.py` | `hoa-introspect-distill` eval fixtures。 |
@@ -227,7 +223,6 @@ unverified；既不退回 `Popen` 缓存的 `returncode`（它看不见 reap）�
 | `python -m unittest evals.test_judge_trigger_evals` | judge 配置优先级、退出码、逐 case 失败、baseline 写入；对本地 stub 运行。 |
 | `python evals/validate_skill_method_cases.py` | `skill-method-cases.json` 结构与隔离路径。 |
 | `python -m unittest evals.test_validate_skill_method_cases` | skill-method case 的 setup 文件隔离。 |
-| `python scripts/release.py`（release job，`main` 上 `test` 之后） | 发布 CI 刚验证过的版本；从不升版。 |
 
 依赖安装（`python -m pip install -r scripts/requirements.txt`）先于这些检查。judge 的 HTTP
 客户端只用标准库；它导入的目录生成器使用仓库的 PyYAML 工具。
@@ -269,30 +264,24 @@ judge 在这一天这样理解了这些描述；它不证明用户会同样路�
 模型会同意。baseline 固定 model、effort、endpoint host 与日期，正是因为改动其中任何一项都会
 破坏可比性。这个 suite 证明的是在人工挑选的近义 case 上有区分度，而不是真实世界的路由质量。
 
-## 统一 skill 版本
+## 版本与 revision
 
-`VERSION` 是 `skills/` 下所有自定义包共用的发布版本，从 `0.1.0` 开始。
-每个 SKILL.md 通过标准 YAML `metadata.version` 同步版本，独立安装后也保留该信息。
-目录标签也放在同一个 metadata mapping 中；自定义 skill 的旧 HTML index 注释
-会报错，不作为兼容回退。第三方/参考目录及非 skill 的库 artifact 保持原有元数据。
+两个计数器，各管一件事：
+
+- `VERSION` 是唯一的项目版本（semver）。每个 PR 递增它的 patch：CI 要求恰好等于
+  `origin/main` 的 patch + 1，所以落后于他人合并的分支要 rebase 后重新 bump。
+- 每个 `SKILL.md` 里的 `metadata.revision` 是整数字符串，记录该 skill 自身的迭代次数。
+  PR 只为它改动过的 skill 目录提高 revision；新 skill 从 `"1"` 开始。项目版本不会复制进 skill。
 
 ```bash
 python -m pip install -r scripts/requirements.txt  # 仓库工具依赖；建议使用 venv
-python scripts/version.py check       # 只读检查版本一致性和索引
-python scripts/version.py sync        # 同步 VERSION 并重新生成索引
-python scripts/version.py bump        # 默认 patch：0.1.0 -> 0.1.1
-python scripts/version.py bump minor  # 显式 minor；也支持 major
+python scripts/version.py bump             # 默认 patch：0.1.0 -> 0.1.1
+python scripts/version.py check-bump       # VERSION 是 origin/main 的 patch + 1
+python scripts/version.py check-revisions  # 每个改动过的 skill 都提高了 revision
 ```
 
-每个 PR 自行递增 patch：CI 要求 `VERSION` 恰好等于 `origin/main` 的版本且 patch 加 1，
-因此在他人的合并之后才建立或落后的分支必须 rebase 并再次运行
-`python scripts/version.py bump`。`main` 的 CI 成功后，发布 job 只为已合并 PR 提交的
-版本打 tag（首次的 `v0.1.0` 原样发布）；它从不递增版本，也不创建版本提交。
-发布保留 desktop CDP 测试及现有仓库检查，串行执行，拒绝过期 CI 对应的提交，
-并以原子 push 发布 tag，不使用 force。
-
-本地版本命令不会 commit 或 push。仅供 CI 的发布 helper 需要 `contents: write`，
-分支保护也必须允许正常 push；它不会绕过仓库策略。重跑已发布的 push 不会再次升版。
+没有 release、tag 或二进制产物：`npx skills` 直接从 GitHub 默认分支安装。
+本地版本命令不会 commit 或 push。
 
 
 ## 双语政策
@@ -334,21 +323,24 @@ git clone https://github.com/wxxb789/hoa   # 用 skill / 跑测试都不需要�
 
 ## 下发
 
-**Skills**——唯一自动下发的 artifact——用 Vercel 的
+**Skills**——唯一可下发的 artifact——用 Vercel 的
 [`skills`](https://github.com/vercel-labs/skills) CLI 安装：
 
 ```bash
-# 把 hoa 所有 skill 装进每个检测到的 runtime(全局)
-npx skills add wxxb789/hoa -g
-
-# 只装某些 skill,到指定 runtime
-npx skills add wxxb789/hoa -g -s <skill> -a claude-code -a opencode
-
-# 安装前先列 / 更新 / 移除
+# 1. 先看有哪些
 npx skills add wxxb789/hoa --list
+
+# 2. 只装你需要的 skill，装到你用的 runtime
+npx skills add wxxb789/hoa -g -s <skill> -s <other-skill> -a claude-code -a codex
+
+# 更新 / 移除
 npx skills update
 npx skills remove <skill>
 ```
+
+**只装你需要的。** 不要整库安装（`--all` 或 `-s '*'`）：每个已安装 skill 的描述都会在每次会话里
+争夺路由，而这里很多 skill 很专门（与 Hermes 耦合的 `hermes-*`、`gdd` 及其 launcher、仓库维护）。
+先看 [`index.zh-CN.md`](./index.zh-CN.md)，挑几个对得上你工作的，以后再加。
 
 - 全局（`-g`）装到 `~/<agent>/skills/`（`~/.claude/skills`、
   `~/.config/opencode/skills`、`~/.agents/skills` …）；默认 scope 装到当前项目。
@@ -394,27 +386,15 @@ Claude Code 内置的 `plugin eval` 测试 plugin 形态的包；Anthropic 的
 [源码归属研究](./reflections/2026-09-25-claude-code-skill-source.md)
 区分了实现及各自的证据边界。
 
-## 桌面消息自动化
-
-- [`teams-cdp`](./skills/teams-cdp/SKILL.md) 查找准确的联系人和现有群聊，
-  发送已授权的纯文本消息，并检查新消息的 **Sent** 回执。
-- [`m365-copilot-cdp`](./skills/m365-copilot-cdp/SKILL.md) 通过本机 CDP 操作
-  桌面 Copilot 的 Chat 与 Code，包括模型选择和回复读取。
-
-两个包使用 strict TypeScript、Bun 和 `playwright-core`，连接已登录的应用，
-不额外下载浏览器。每个 skill 均包含独立的依赖清单和 lockfile。
-必须为实际工作界面启用本机 CDP；Code 还依赖已就绪的 native host。
-使用真实账号前，先阅读各 skill 的启动方式和授权边界。
-
 ## 标签
 
 area 与 target 作为标签记录在 [`index.md`](./index.md) 里，而不是建目录
 （一个 artifact 常同时服务多个）。自定义 skill 将标签保存为标准 YAML
-`metadata` 下的逗号分隔字符串，与版本放在一起：
+`metadata` 下的逗号分隔字符串，与 revision 放在一起：
 
 ```yaml
 metadata:
-  version: "0.1.0"
+  revision: "1"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
 ```
@@ -463,7 +443,7 @@ phase 收尾前产出第一个自产 skill。
 
 ## 如何使用
 
-- **任何人：** `npx skills add wxxb789/hoa` 装上这些 skill，或 fork 拿走对你有用的
-  部件。
-- **我：** 在这里写 skill → `npx skills add wxxb789/hoa -g` → 落到每个 runtime；
+- **任何人：** 先 `npx skills add wxxb789/hoa --list`，再用 `-s <skill>` 只装需要的
+  几个，或 fork 拿走对你有用的部件。
+- **我：** 在这里写 skill → `npx skills add wxxb789/hoa -g -s <skill> -a '*'` → 落到每个 runtime；
   设置随 chezmoi 一起走。

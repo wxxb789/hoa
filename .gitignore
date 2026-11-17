@@ -43,5 +43,5 @@ private/
 __pycache__/
 *.pyc
 
-# Local dependencies for bundled TypeScript skill scripts
+# Local npm dependencies (paseo-plugins)
 node_modules/

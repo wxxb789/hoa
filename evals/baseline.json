@@ -1,42 +1,12 @@
 {
-  "case_count": 27,
+  "case_count": 20,
   "model": "gemini-4-carbon",
   "effort": "low",
-  "passed": 25,
-  "total": 27,
+  "passed": 19,
+  "total": 20,
   "judge_endpoint_host": "localhost:4141",
-  "generated_at": "2026-11-13T02:15:46Z",
+  "generated_at": "2026-11-17T15:15:58Z",
   "per_case": [
-    {
-      "id": "route-to-teams-send",
-      "pick": "teams-cdp",
-      "passed": true
-    },
-    {
-      "id": "route-to-copilot-chat-code",
-      "pick": "m365-copilot-cdp",
-      "passed": true
-    },
-    {
-      "id": "route-explicit-teams-cdp",
-      "pick": "teams-cdp",
-      "passed": true
-    },
-    {
-      "id": "route-explicit-copilot-cdp",
-      "pick": "m365-copilot-cdp",
-      "passed": true
-    },
-    {
-      "id": "teams-api-search-not-ui-send",
-      "pick": "ghc-search",
-      "passed": true
-    },
-    {
-      "id": "copilot-cli-search-not-desktop",
-      "pick": "ghc-search",
-      "passed": true
-    },
     {
       "id": "route-to-search",
       "pick": "ghc-search",
@@ -89,8 +59,8 @@
     },
     {
       "id": "route-to-skill-judgment",
-      "pick": "fresh-context-grader",
-      "passed": false
+      "pick": "hoa-skill-review",
+      "passed": true
     },
     {
       "id": "route-to-skill-creation",
@@ -120,11 +90,6 @@
     {
       "id": "route-to-spec-convergence",
       "pick": "spec-convergence",
-      "passed": true
-    },
-    {
-      "id": "route-decided-change-to-writing-plans",
-      "pick": "writing-plans",
       "passed": true
     },
     {

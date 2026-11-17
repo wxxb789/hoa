@@ -9,42 +9,6 @@
   ],
   "cases": [
     {
-      "id": "route-to-teams-send",
-      "request": "Send this approved status update to the exact Project Atlas group in my installed Microsoft Teams app.",
-      "must_pick": ["teams-cdp"],
-      "distractors": ["m365-copilot-cdp", "ghc-search"]
-    },
-    {
-      "id": "route-to-copilot-chat-code",
-      "request": "Use my desktop M365 Copilot Code to send this prompt, select the available model I named, and read its response.",
-      "must_pick": ["m365-copilot-cdp"],
-      "distractors": ["teams-cdp", "ghc-search"]
-    },
-    {
-      "id": "route-explicit-teams-cdp",
-      "request": "Use teams-cdp to find the exact recipient before sending the approved message.",
-      "must_pick": ["teams-cdp"],
-      "distractors": ["m365-copilot-cdp", "hoa-skill-work"]
-    },
-    {
-      "id": "route-explicit-copilot-cdp",
-      "request": "Use m365-copilot-cdp to list the models offered by the desktop Chat UI without sending anything.",
-      "must_pick": ["m365-copilot-cdp"],
-      "distractors": ["teams-cdp", "hoa-skill-work"]
-    },
-    {
-      "id": "teams-api-search-not-ui-send",
-      "request": "Find current public documentation for sending Teams messages through Microsoft Graph. Do not operate my Teams app.",
-      "must_pick": ["ghc-search"],
-      "distractors": ["teams-cdp", "m365-copilot-cdp"]
-    },
-    {
-      "id": "copilot-cli-search-not-desktop",
-      "request": "Find the latest documentation for GitHub Copilot CLI model configuration. Do not interact with Microsoft 365 Copilot.",
-      "must_pick": ["ghc-search"],
-      "distractors": ["m365-copilot-cdp", "teams-cdp"]
-    },
-    {
       "id": "route-to-search",
       "request": "Find out what the current stable version of the .NET SDK is; I don't have a URL.",
       "must_pick": ["ghc-search"],
@@ -144,19 +108,13 @@
       "id": "route-to-spec-convergence",
       "request": "这个需求边界还没想清楚，帮我把范围和验收理出来。",
       "must_pick": ["spec-convergence"],
-      "distractors": ["define-goal", "writing-plans"]
-    },
-    {
-      "id": "route-decided-change-to-writing-plans",
-      "request": "The boundaries, acceptance criteria and testing seam for the export fix are already decided and written down. Turn them into a step-by-step execution plan with exact files, complete code and test commands.",
-      "must_pick": ["writing-plans"],
-      "distractors": ["spec-convergence", "define-goal"]
+      "distractors": ["define-goal", "gdd"]
     },
     {
       "id": "route-contract-increment-to-gdd",
       "request": "这个增量我已经写好验收契约（可观测的通过条件、判定工件、失败对照都齐了），帮我从分支开始一路跑到合并，不用逐步问我。",
       "must_pick": ["gdd"],
-      "distractors": ["kanban-workflows", "subagent-driven-development"]
+      "distractors": ["kanban-workflows", "ai-coding-agent-delegation"]
     },
     {
       "id": "route-explicit-gdd",
@@ -168,7 +126,7 @@
       "id": "route-boundaryless-goal-to-spec-first",
       "request": "我想把团队的发布流程改成全自动，目标定大一点，顺便把这季度的计划排出来。但现在连这件事该包含什么、什么算做完了都还没想清楚。",
       "must_pick": ["spec-convergence"],
-      "distractors": ["define-goal", "writing-plans"]
+      "distractors": ["define-goal", "gdd"]
     }
   ]
 }

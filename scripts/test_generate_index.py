@@ -44,7 +44,7 @@ def make_skill(root: Path, name: str, *, index=None, frontmatter=True, quoted=Fa
     if frontmatter:
         parts += ["---", "name: " + name,
                   "description: " + name + " does one thing. And another.",
-                  "metadata:", '  version: "0.1.0"',
+                  "metadata:", '  revision: "1"',
                   f"  areas: {quote}{areas}{quote}",
                   f"  targets: {quote}{targets}{quote}"]
         if summary is not None:
@@ -78,14 +78,14 @@ class ParseMetadataTests(unittest.TestCase):
             b"metadata:\n", b"metadata:\n  owner: unchanged\n"))
         self.assertEqual(gi.parse_skill_metadata(skill), {
             "areas": "work-management, software-development",
-            "targets": "codex,claude-code,runtime-agnostic", "version": "0.1.0"})
+            "targets": "codex,claude-code,runtime-agnostic", "revision": "1"})
 
     def test_summary_scalars_are_optional_strings(self):
         skill = make_skill(self.tmp, "with-summary", summary="en note",
                            summary_zh="zh note") / "SKILL.md"
         self.assertEqual(gi.parse_skill_metadata(skill), {
             "areas": "software-development", "targets": "runtime-agnostic",
-            "version": "0.1.0", "summary": "en note", "summary_zh": "zh note"})
+            "revision": "1", "summary": "en note", "summary_zh": "zh note"})
         for number, key in enumerate(("summary", "summary_zh")):
             bad = make_skill(self.tmp, f"typed-{key}") / "SKILL.md"
             bad.write_bytes(bad.read_bytes().replace(
@@ -111,7 +111,7 @@ class ParseMetadataTests(unittest.TestCase):
 
     def test_missing_yaml_catalog_fields_rejected(self):
         for key, value in (("areas", "software-development"),
-                           ("targets", "runtime-agnostic"), ("version", '"0.1.0"')):
+                           ("targets", "runtime-agnostic"), ("revision", '"1"')):
             with self.subTest(key=key):
                 skill = make_skill(self.tmp, f"missing-{key}") / "SKILL.md"
                 skill.write_bytes(skill.read_bytes().replace(
@@ -133,7 +133,7 @@ class ParseMetadataTests(unittest.TestCase):
 
     def test_duplicate_yaml_catalog_fields_are_not_silently_overwritten(self):
         for key, value in (("areas", "software-development"),
-                           ("targets", "runtime-agnostic"), ("version", '"0.1.0"')):
+                           ("targets", "runtime-agnostic"), ("revision", '"1"')):
             with self.subTest(key=key):
                 skill = make_skill(self.tmp, f"duplicate-{key}") / "SKILL.md"
                 field = f"  {key}: {value}\n".encode()
@@ -147,7 +147,7 @@ class ParseMetadataTests(unittest.TestCase):
             b"  areas: software-development\n  targets: runtime-agnostic\n",
             b'  areas: !!str "software-development"\n  targets: >-\n    codex,claude-code\n'))
         self.assertEqual(gi.parse_skill_metadata(skill), {
-            "areas": "software-development", "targets": "codex,claude-code", "version": "0.1.0"})
+            "areas": "software-development", "targets": "codex,claude-code", "revision": "1"})
 
     def test_legacy_html_index_rejected_even_with_valid_yaml(self):
         comments = (
@@ -174,7 +174,7 @@ class ParseMetadataTests(unittest.TestCase):
         skill = make_skill(self.tmp, "template") / "SKILL.md"
         before = skill.read_bytes() + b"\n<!-- Fill in this template. -->\n<!-- example: keep -->\n"
         skill.write_bytes(before)
-        self.assertEqual(gi.parse_skill_metadata(skill)["version"], "0.1.0")
+        self.assertEqual(gi.parse_skill_metadata(skill)["revision"], "1")
         self.assertEqual(skill.read_bytes(), before)
 
     def test_library_html_metadata_and_version_are_unchanged(self):
@@ -222,7 +222,7 @@ class CollectTests(unittest.TestCase):
             "name": "unlisted-skill", "type": "skill", "path": "skills/unlisted-skill/",
             "note_en": "unlisted-skill does one thing.",
             "note_zh": "unlisted-skill does one thing.",
-            "areas": "software-development", "targets": "runtime-agnostic", "version": "0.1.0"}])
+            "areas": "software-development", "targets": "runtime-agnostic", "revision": "1"}])
 
     def test_frontmatter_summary_beats_description_for_both_languages(self):
         make_skill(self.tmp, "listed-skill", summary="summary-en", summary_zh="summary-zh")

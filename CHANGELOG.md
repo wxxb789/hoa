@@ -1,7 +1,33 @@
 # Changelog
 
-Notable changes to this repo. `VERSION` is authoritative for all custom skills;
-their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
+Notable changes to this repo. `VERSION` is the one project version; each skill counts its own
+iterations in `metadata.revision`. Earlier entries retain historical per-skill versions.
+
+## [0.1.67] — 2026-11-17
+
+### Changed
+
+- Versioning: `VERSION` stays the project version (patch bump per PR, `check-bump`); skills no longer
+  mirror it. Each `SKILL.md` carries `metadata.revision` (reset to `"1"`), and the new
+  `python scripts/version.py check-revisions` PR gate requires every changed skill directory to raise
+  it. `version.py check`/`sync`/`check-merge` are gone; gdd's hoa merge gate is now
+  `git fetch origin main && python scripts/version.py check-bump`.
+- README: list skills with `npx skills add wxxb789/hoa --list` and install only the ones you need.
+- AGENTS.md: "Hermes-evolved skills" (hermes- prefix for coupled skills; built-ins stay upstream) and
+  "Engineering restraint" sections. New `prompts/hermes-skill-naming.md` brief for Hermes.
+- `ref/`: 20 submodules moved to their upstream heads; `ref/baoyu-design` stays pinned (upstream
+  repository is now empty).
+
+### Removed
+
+- Release machinery: the CI `release` job, `scripts/release.py` and its test. Existing tags stay.
+- `teams-cdp` and `m365-copilot-cdp` (replaced by MCP), with the shared CDP package, Bun lockfiles
+  and CI Bun provisioning.
+- 14 Hermes-origin skills: design-md, grounded-citations, microsoft-office, rss-feeds,
+  systematic-debugging, github-code-review, github-repo-management, ocr-and-documents,
+  jupyter-live-kernel, find-nearby, whisper, writing-plans, subagent-driven-development,
+  html-artifact. Their trigger cases are dropped and `evals/baseline.json` is re-recorded (19/20,
+  same judge model).
 
 ## [0.1.66] — 2026-11-16
 

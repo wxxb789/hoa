@@ -2,7 +2,7 @@
 """Generate index.md / index.zh-CN.md from per-skill metadata.
 
 Custom-skill catalog fields live only in YAML frontmatter string scalars:
-`metadata.areas`, `metadata.targets`, `metadata.version`, and the optional
+`metadata.areas`, `metadata.targets`, `metadata.revision`, and the optional
 bilingual notes `metadata.summary` / `metadata.summary_zh`. Legacy HTML
 index annotations are rejected for skills; library files retain their
 `<!-- index: ... -->` comments, which also carry `summary` / `summary_zh`.
@@ -158,7 +158,7 @@ def parse_skill_metadata(skill_md: Path) -> dict[str, str]:
     text = skill_md.read_bytes().decode("utf-8")
     if re.search(r"<!--\s*index\s*:", text, re.IGNORECASE):
         raise ValueError(f"legacy HTML index annotations are not allowed in {skill_md}; "
-                         "use frontmatter metadata.areas, metadata.targets, and metadata.version")
+                         "use frontmatter metadata.areas, metadata.targets, and metadata.revision")
     metadata = sm.catalog_metadata(text, skill_md)
     for area in metadata["areas"].split(","):
         if area.strip() not in AREAS:

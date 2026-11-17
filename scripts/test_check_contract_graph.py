@@ -41,7 +41,7 @@ def make_skill(root: Path, name: str, *, kind=None, consumes=None, produces=None
     d.mkdir(parents=True)
     parts = ["---", f"name: {name}",
              f"description: {name} performs one bounded step.",
-             "metadata:", '  version: "0.1.0"',
+             "metadata:", '  revision: "1"',
              '  areas: "software-development"', '  targets: "runtime-agnostic"']
     for key, value in (("kind", kind), ("consumes", consumes), ("produces", produces)):
         if value is not None:

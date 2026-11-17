@@ -31,7 +31,7 @@ def make_temp_root() -> Path:
 
 def valid_frontmatter(name: str) -> str:
     return (f"---\nname: {name}\ndescription: {name} does one thing.\n"
-            "metadata:\n  version: \"0.1.0\"\n  areas: \"software-development\"\n"
+            "metadata:\n  revision: \"1\"\n  areas: \"software-development\"\n"
             "  targets: \"runtime-agnostic\"\n---\n\n# " + name + "\n")
 
 
@@ -93,6 +93,18 @@ class CheckFrontmatterTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("bad-area", out)
         self.assertIn("finding(s)", err)
+
+    def test_revision_must_be_a_positive_integer_and_version_is_retired(self):
+        for number, (old, new, message) in enumerate((
+            ('revision: "1"', 'revision: "0"', "metadata.revision must be a positive integer"),
+            ('revision: "1"', 'revision: "0.1.0"', "metadata.revision must be a positive integer"),
+            ('revision: "1"', 'version: "0.1.0"', "use metadata.revision"),
+        )):
+            with self.subTest(new=new):
+                path = self.skill(f"rev-{number}", valid_frontmatter(f"rev-{number}")
+                                  .replace(old, new))
+                self.assertTrue(any(message in finding
+                                    for finding in frontmatter.check_skill(path)))
 
     def test_missing_skill_md_fails(self):
         (self.skills / "empty").mkdir()

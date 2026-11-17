@@ -116,11 +116,8 @@ prune = [
   "node_modules",
   "ref",
   "fixtures",
-  # Package trees with their own package-manager commands instead of a test glob
-  # (§4.2); the Bun CDP packages and the Paseo plugin are declared suites below.
-  "scripts/shared",
-  "skills/teams-cdp/scripts",
-  "skills/m365-copilot-cdp/scripts",
+  # Package tree with its own package-manager commands instead of a test glob
+  # (§4.2); the Paseo plugin is a declared suite below.
   "paseo-plugins",
 ]
 
@@ -137,7 +134,6 @@ floor = [
   "scripts/test_check_frontmatter.py",
   "scripts/test_generate_index.py",
   "scripts/test_install_host_skills.py",
-  "scripts/test_release.py",
   "scripts/test_run_all_tests.py",
   "scripts/test_skill_config.py",
   "scripts/test_version.py",
@@ -208,7 +204,6 @@ passthrough = [
 # machine, not to a suite.  Per-suite provisioning is the `provision` field.
 runner = [
   "python 3.12 via actions/setup-python",
-  "bun 1.4.4 via oven-sh/setup-bun",
   "node 20.19.4 via actions/setup-node (the Paseo plugin's documented minimum)",
   "python -m pip install -r scripts/requirements.txt",
   "actions/checkout with fetch-depth 0 (the version and changelog gates read origin/main)",
@@ -234,11 +229,6 @@ command = [["{python}", "scripts/generate_index.py", "--check"]]
 notes = "replaces the CI step 'Skill catalog drift check'"
 
 [[suite]]
-id = "gate:version-check"
-command = [["{python}", "scripts/version.py", "check"]]
-notes = "replaces the CI step 'Unified version and catalog check'"
-
-[[suite]]
 id = "gate:vendor-shared"
 command = [["{python}", "scripts/vendor_shared.py", "--check"]]
 notes = "replaces the CI step 'Shared script drift check'"
@@ -258,11 +248,11 @@ skip_reason = "pull-request guard: compared against the merge base with origin/m
 notes = "replaces the CI step 'Pull request adds a changelog entry' (if: pull_request)"
 
 [[suite]]
-id = "gate:version-merge"
-command = [["{python}", "scripts/version.py", "check-merge"]]
+id = "gate:revision-bump"
+command = [["{python}", "scripts/version.py", "check-revisions"]]
 condition = "pull_request"
-skip_reason = "pull-request guard: the remote patch + 1 and the tag check"
-notes = "replaces the CI step 'Version claim is still free' (if: pull_request)"
+skip_reason = "pull-request guard: compared against the merge base with origin/main"
+notes = "every skill directory the pull request changes bumps its metadata.revision"
 
 # The merge gate's own mutation harness.  Its name matches no discovery pattern
 # (`mutate_` is neither `test*` nor an eval runner), which is exactly the declared
@@ -277,42 +267,9 @@ timeout = 300
 notes = "replaces the CI step 'GDD merge-gate mutation harness' (main, #67): 90 in-memory mutations of pr-merge-check.py — 58 anchored plus the generated vocabulary reclassifications — each re-run against the whole verdict matrix and required to flip a cell or the golden call log; the checkout is never written"
 
 # ── declared: packages ───────────────────────────────────────────────────────
-# These keep their own package-manager commands instead of a discovered test glob
-# (§4.2).  `bun install` / `npm ci` are the provisioning step of the suite itself,
-# and their caches land in the task-local HOME, not the operator's.
-
-[[suite]]
-id = "pkg:cdp-shared"
-command = [["bun", "run", "check"], ["bun", "test"]]
-provision = [["bun", "install", "--frozen-lockfile"]]
-cwd = "scripts/shared"
-runtime = "bun"
-assertion = "counter"
-count_regexes = ['^ *(?P<passed>\d+) pass$']
-timeout = 300
-notes = "replaces the CI step 'Desktop CDP types and behavioral tests' for scripts/shared"
-
-[[suite]]
-id = "pkg:teams-cdp"
-command = [["bun", "run", "check"], ["bun", "test"]]
-provision = [["bun", "install", "--frozen-lockfile"]]
-cwd = "skills/teams-cdp/scripts"
-runtime = "bun"
-assertion = "counter"
-count_regexes = ['^ *(?P<passed>\d+) pass$']
-timeout = 300
-notes = "replaces the CI loop body for skills/teams-cdp/scripts; tsc alone runs ~26s"
-
-[[suite]]
-id = "pkg:m365-copilot-cdp"
-command = [["bun", "run", "check"], ["bun", "test"]]
-provision = [["bun", "install", "--frozen-lockfile"]]
-cwd = "skills/m365-copilot-cdp/scripts"
-runtime = "bun"
-assertion = "counter"
-count_regexes = ['^ *(?P<passed>\d+) pass$']
-timeout = 300
-notes = "replaces the CI loop body for skills/m365-copilot-cdp/scripts"
+# This keeps its own package-manager commands instead of a discovered test glob
+# (§4.2).  `npm ci` is the provisioning step of the suite itself, and its cache
+# lands in the task-local HOME, not the operator's.
 
 [[suite]]
 id = "pkg:paseo-run-observer"
