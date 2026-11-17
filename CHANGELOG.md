@@ -65,12 +65,19 @@ their YAML `metadata.version` fields mirror it. Earlier entries retain historica
   capability — nothing is signalled, nothing falls back to `Popen`'s cached `returncode` (which
   cannot see a reap) or to a bare pid or group number, and the record says teardown is unverified. A
   refused delivery waits out no kill grace and is never written as a survivor or as a delivery the
-  log never made. Every exit path — clean, timed out or signalled — carries the teardown record,
-  limits included, into the settled outcome and the published result, so a limit is readable by
-  whoever reads the run instead of vanishing with the helper that found it; and a command whose exit
-  can no longer be waited for settles as an error rather than taking the discoverer down. Residual
-  limit, stated plainly: the runner signals only the process it spawned, so whatever else a suite
-  leaves behind outlives the run — on a host with no pidfd, no `/proc` or no established `SIGCHLD`
+  log never made: the record is a rendering of the escalation's ordered attempts — `delivered`, every
+  signal really sent with the identity pinned at delivery and whether it stopped the target, and
+  `refused`, one note per round that sent nothing (a missing capability, an unresolvable signal name,
+  an identity that could not be pinned, a target already gone) — so a round a later refusal
+  interrupted stays delivered, and a delivery line in the suite's log and a delivery in the record
+  are the same attempt — `scripts/test_run_all_tests.py` checks the log against the record, and the
+  record against the signal the kernel accepted, for every run it drives. Every exit path — clean,
+  timed out or signalled — carries the teardown record, limits included, into the settled outcome
+  and the published result, so a limit is readable by whoever reads the run instead of vanishing
+  with the helper that found it; and a command whose exit can no longer be waited for settles as an
+  error rather than taking the discoverer down. Residual limit, stated plainly: the runner signals
+  only the process it spawned, so whatever else a suite leaves behind outlives the run — on a host
+  with no pidfd, no `/proc` or no established `SIGCHLD`
   disposition nothing is signalled at all, and each teardown records that limit. Both launcher suites
   declare the detached resource the report covers in `scripts/test_manifest.toml`.
 - The suite `PATH` prepends the selected interpreter's own directory without resolving it: a POSIX

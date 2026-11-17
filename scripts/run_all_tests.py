@@ -39,15 +39,20 @@ Identity is pinned at delivery, not sampled before it.  The one process this run
 identity recorded at spawn: its pid and the start time `/proc/<pid>/stat` field 22 reported then
 (`_spawned`).  At delivery a pidfd is opened for that pid, the start time is re-read and must equal
 the recorded one, and only then is the signal sent through `signal.pidfd_send_signal(fd, signum)`
-(`_pin_identity`, `_signal_spawned`).  The pidfd pins that process instance, so a pid someone else's
-reap recycled cannot receive this run's signal, a target that is gone before the signal
+(`_pin_identity`, `_attempt_delivery`).  The pidfd pins that process instance, so a pid someone
+else's reap recycled cannot receive this run's signal, a target that is gone before the signal
 (`ProcessLookupError`) is reported as gone instead of being signalled, and a process that has
 already terminated takes no signal at all — a delivery to a corpse would be a claim, not a
 delivery.  Escalation is TERM, a bounded grace, KILL (`_stop_spawned`), and every round re-pins: a
-proof taken earlier, or a handle opened earlier, is never authority for a later delivery.  The
-escalation is resolved from the signal names this platform defines, and the capability refusal is
-completed before any of them is resolved, so a platform that has no `SIGKILL` records its refusal
-and the group it reports instead of raising while the sequence is built.
+proof taken earlier, or a handle opened earlier, is never authority for a later delivery.  Every
+round is one `_attempt_delivery`: it decides and sends (zero log I/O) and returns what it did, the
+caller commits that attempt, and a delivered attempt writes its own line at that one emission point
+— so the log's delivery lines and the record's `delivered` are two renderings of the same ordered
+attempts, and a round that delivered nothing writes no line.  A name this platform does not define
+(`signal.SIGKILL` on Windows, or a constant a host does not expose) is recorded as a refusal like
+any other: the escalation never skips a round silently, and a target found already terminated after
+an earlier delivery resolves that delivery as stopped instead of ending the sequence without an
+outcome.
 
 Before anything is spawned the run also puts its own `SIGCHLD` disposition in `SIG_DFL`
 (`establish_exit_disposition`) — under an inherited `SIG_IGN` the kernel reaps a child inside its
@@ -60,18 +65,22 @@ target reaped by someone else — nothing is signalled and the record says teard
 there is no weaker fallback, because `Popen`'s cached `returncode` cannot see a reap the kernel
 performed and a bare pid or group number can name anything by the time it is used.  The group is
 read before a command is reaped, so the members a clean exit left behind are reported while the
-number is still the command's own, and the teardown's record — what it terminated, what it found and
-left alone, and what it could not verify — is carried into the settled outcome and the result record
-on every exit path, clean, timed out or signalled, so a limit is readable by whoever reads the run
-and not only by the helper that found it.  A command whose exit can no longer be waited for settles
-as an error with an unverified teardown instead of escaping the run.  The gates are ordered and all
-of them must hold where a signal is delivered (`_ownership_limit`): the live `SIGCHLD` disposition,
-`os.waitid` with `WNOWAIT`, pidfds, and `/proc`; where one does not — macOS and Windows have no
-pidfds at all — every teardown refuses and records its limit, and the processes the suite left
-behind are left running.  The residual limit, stated plainly: the runner signals only the process it
-spawned, so whatever else a suite leaves behind outlives the run.  A scratch tree too long to hold
-the toolkit's AF_UNIX socket — given the deepest `socket_tail` the scheduled suites declare in the
-manifest — is reported as that suite's ERROR before it runs (`socket_path_length`).
+number is still the command's own, and the teardown's record is carried into the settled outcome and
+the result record on every exit path, clean, timed out or signalled, so a limit is readable by
+whoever reads the run and not only by the helper that found it: `delivered`, the signals it really
+sent (each with the identity pinned at delivery and whether it stopped the target); `clauses`, what
+it terminated; `survivors`, what took a delivered SIGKILL and outlived the grace; `unverified`, one
+note per limit, such as a process found and left alone or a report this platform cannot make; and
+`refused`, one note per delivery it did not send to the process it spawned.  A command whose exit
+can no longer be waited for settles as an error with an unverified teardown instead of escaping the
+run.  The gates are ordered and all of them must hold where a signal is delivered
+(`_ownership_limit`): the live `SIGCHLD` disposition, `os.waitid` with `WNOWAIT`, pidfds, and
+`/proc`; where one does not — macOS and Windows have no pidfds at all — every teardown refuses and
+records its limit, and the processes the suite left behind are left running.  The residual limit,
+stated plainly: the runner signals only the process it spawned, so whatever else a suite leaves
+behind outlives the run.  A scratch tree too long to hold the toolkit's AF_UNIX socket — given the
+deepest `socket_tail` the scheduled suites declare in the manifest — is reported as that suite's
+ERROR before it runs (`socket_path_length`).
 Per-suite logs stay under `.tmp-artifacts/test-runs/<UTC stamp>-<pid>/logs/`, and the JSON result
 record is `result.json` in that same run directory (`--report` writes it elsewhere).  Suite processes also keep the shim
 toolchain's absolute state directories (`shim_state_environment`), because a task-local HOME otherwise
@@ -96,7 +105,7 @@ import sys
 import tempfile
 import time
 import tomllib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -115,6 +124,15 @@ ESCALATION_NAMES = ("SIGTERM", "SIGKILL")
 # pid's digits, which its start time or another delivery can also contain.
 DELIVERY_MARKER = "delivered to pid"
 DELIVERY_TARGET_RE = re.compile(rf"\b{re.escape(DELIVERY_MARKER)} (\d+)\b")
+# One delivery line, read back exactly as `Delivery.log_line` writes it: the tests parse the log with
+# this pattern and require every line carrying `DELIVERY_MARKER` to match it, so the renderer and the
+# parser cannot drift apart silently — a reworded line fails the bijection rather than passing a
+# weakened check.
+DELIVERY_LINE_RE = re.compile(
+    rf"^\[discoverer\] teardown: (?P<signal>[A-Z0-9_]+) {re.escape(DELIVERY_MARKER)} "
+    rf"(?P<pid>\d+), the process this run spawned \(pinned at delivery, start time (?P<start>\d+)\)$",
+    re.MULTILINE,
+)
 # `/proc` is how teardown reads the evidence every delivery is justified by: a process's start time
 # (its identity) and the live members of the group the command leads; it is also how the scratch
 # sweep finds the holders a suite left behind, since a detached worker (`start_new_session`) leaves
@@ -772,37 +790,154 @@ def _write_report(report_path: Path | None, payload: dict) -> None:
 
 
 @dataclass(frozen=True)
-class Teardown:
-    """What a teardown established, and what it could not.
+class Delivery:
+    """One signal proven pinned at delivery and sent through its pidfd to the spawned process.
 
-    `clauses` names the steps that really terminated their target — "the spawned process" is the
-    only one this run ever terminates — so a record cannot claim a termination that never ran or
-    never signalled; `survivors` are pids that actually received SIGKILL and outlived it, never a
-    process that was merely found (a process this run does not signal is not a survivor); and
-    `unverified` names, one note per limit, what the teardown could not observe or justify — no
-    process enumeration on this platform, a process found and deliberately left alone because this
-    run signals only the process it spawned, a group that could not be read before a reap; `refused`
-    names, one note per round, a delivery this run did not send to the process it spawned (a missing
-    capability, an identity that could not be pinned, a target already gone) — a different fact from
-    a limit, and the one a reader needs to tell "it signalled nothing" from "it found things and left
-    them alone".  A record is `verified` only when it carries neither a limit note nor a survivor.
+    The positive content of a teardown, and the only thing that ever writes a delivery line: the
+    line is rendered from this attempt, and the record's `delivered` is this attempt again, so the
+    log and the record cannot disagree about what was delivered.  `stopped` is filled in by the
+    round that committed the attempt, once the bounded grace answered whether the target stopped.
     """
 
-    survivors: tuple[int, ...] = ()
-    clauses: tuple[str, ...] = ()
+    pid: int
+    start: str
+    signal: str
+    stopped: bool = False
+
+    def log_line(self) -> str:
+        """The one line this delivery adds to the suite's log, written where it is committed."""
+        return (f"[discoverer] teardown: {self.signal} {DELIVERY_MARKER} {self.pid}, the process "
+                f"this run spawned (pinned at delivery, start time {self.start})\n")
+
+    def to_record(self) -> dict[str, int | str | bool]:
+        """This attempt as the result record publishes it."""
+        return {"pid": self.pid, "start": self.start, "signal": self.signal,
+                "stopped": self.stopped}
+
+
+@dataclass(frozen=True)
+class Refusal:
+    """One escalation round that sent nothing to the spawned process, and why it sent nothing.
+
+    A refusal is an attempt, never a limit: `detail` is the whole statement the record carries
+    (what was not sent, and the reason), and `note` renders it the way the record's limit notes
+    read.  It stays physically distinct from `Teardown.unverified`, which names what the teardown
+    could not observe or justify at all — the reader needs that difference to tell "it signalled
+    nothing" from "it found things and left them alone".
+    """
+
+    pid: int
+    signal: str
+    detail: str
+
+    @property
+    def note(self) -> str:
+        """The refusal as one record note."""
+        return _unverified(self.detail)
+
+
+@dataclass(frozen=True)
+class AlreadyTerminated:
+    """The spawned process had already terminated when a round resolved: nothing to deliver.
+
+    A delivery to a corpse would be a claim, not a delivery.  Where an earlier round delivered a
+    signal, the round that observes this resolves that delivery as having stopped the target
+    (`_stop_spawned`), so the sequence never ends with a delivery that has no outcome.
+    """
+
+    pid: int
+    start: str
+
+
+Attempt = Delivery | Refusal
+AttemptOutcome = Delivery | Refusal | AlreadyTerminated
+
+
+@dataclass(frozen=True)
+class Teardown:
+    """What a teardown established, and what it could not — stored as the two irreducible facts.
+
+    `attempts` is the ordered sequence of signals this run decided on for the process it spawned:
+    a `Delivery` (pinned at delivery, sent through its pidfd, with whether the target stopped) or a
+    `Refusal` (nothing sent, with the reason).  `unverified` names, one note per limit, what the
+    teardown could not observe or justify — no process enumeration on this platform, a process found
+    and deliberately left alone because this run signals only the process it spawned, a group that
+    could not be read before a reap.  Every other fact is a projection of those two, so no field can
+    drift out of step with the delivery lines the log carries: `delivered` are the attempts that
+    were sent, `refused` one note per refusal, `clauses` names the steps that really terminated
+    their target — "the spawned process" is the only one this run ever terminates — `survivors` are
+    pids that took a delivered SIGKILL and outlived the grace, never a process that was merely found
+    (a process this run does not signal is not a survivor), `verified` is True exactly when nothing
+    in `unverified`, `survivors` and `refused` says otherwise, and `describe()` renders those.
+    """
+
+    attempts: tuple[Attempt, ...] = ()
     unverified: tuple[str, ...] = ()
-    refused: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        """Reject an attempt sequence this escalation cannot have produced.
+
+        The escalation is a sequence of rounds over `ESCALATION_NAMES` for one pid, each round
+        either sending its signal or refusing it, and stopping at the first round that stopped the
+        target, refused, or found it already terminated.  A sequence outside that machine — an
+        attempt after a refusal or after a delivery that already stopped the target, or a delivery
+        that is neither stopped nor the final escalation signal — would leave a record claiming
+        "delivered something, stopped nothing, refused nothing, no limit", which is exactly the
+        state a reader must never be shown (`verified` would be True of a target nothing accounted
+        for).  The state is made unrepresentable here, at the one place a record is built.
+        """
+        sequences: dict[int, list[Attempt]] = {}
+        for attempt in self.attempts:
+            sequences.setdefault(attempt.pid, []).append(attempt)
+        for pid, sequence in sequences.items():
+            for attempt in sequence[:-1]:
+                if isinstance(attempt, Refusal):
+                    raise ValueError(f"attempt recorded after the refusal of pid {pid}: {sequence}")
+                if attempt.stopped:
+                    raise ValueError(
+                        f"attempt recorded after pid {pid} already stopped: {sequence}")
+            last = sequence[-1]
+            if (isinstance(last, Delivery) and not last.stopped
+                    and last.signal != ESCALATION_NAMES[-1]):
+                raise ValueError(
+                    f"escalation left pid {pid} without an outcome: the round that delivered "
+                    f"{last.signal} neither stopped the target nor was followed by another round: "
+                    f"{sequence}")
+
+    @property
+    def delivered(self) -> tuple[Delivery, ...]:
+        """The signals this run really sent to the process it spawned, in order."""
+        return tuple(attempt for attempt in self.attempts if isinstance(attempt, Delivery))
+
+    @property
+    def refused(self) -> tuple[str, ...]:
+        """One note per refused delivery, in order."""
+        return tuple(dict.fromkeys(
+            attempt.note for attempt in self.attempts if isinstance(attempt, Refusal)))
+
+    @property
+    def clauses(self) -> tuple[str, ...]:
+        """The steps that really terminated their target."""
+        return ("the spawned process",) if any(d.stopped for d in self.delivered) else ()
+
+    @property
+    def survivors(self) -> tuple[int, ...]:
+        """Pids that took a delivered final signal and outlived the grace."""
+        stopped = {d.pid for d in self.delivered if d.stopped}
+        return tuple(dict.fromkeys(
+            d.pid for d in self.delivered
+            if d.signal == ESCALATION_NAMES[-1] and not d.stopped and d.pid not in stopped))
 
     @property
     def verified(self) -> bool:
+        """Whether nothing in the record qualifies it: no limit, no refusal, no survivor."""
         return not self.unverified and not self.survivors and not self.refused
 
     def merge(self, other: "Teardown") -> "Teardown":
+        """Union with `other`: attempts and limit notes in order, each kept once."""
         return Teardown(
-            survivors=tuple(sorted(set(self.survivors) | set(other.survivors))),
-            clauses=tuple(dict.fromkeys(self.clauses + other.clauses)),
+            attempts=tuple(dict.fromkeys(self.attempts + other.attempts)),
             unverified=tuple(dict.fromkeys(self.unverified + other.unverified)),
-            refused=tuple(dict.fromkeys(self.refused + other.refused)),
         )
 
     def describe(self) -> str:
@@ -1050,49 +1185,51 @@ def _spawned_target(spawned: Spawned) -> str:
     return f"the process this run spawned (pid {spawned.pid})"
 
 
-def _not_sent(target: str, name: str, why: str) -> str:
-    """The record note for a delivery that was refused: what was not sent, and why."""
-    return _unverified(f"{target} was not sent {name}: {why}")
+def _attempt_delivery(spawned: Spawned, name: str) -> AttemptOutcome:
+    """The one place a signal is decided on and sent: pin the target at delivery, then send `name`.
 
-
-def _signal_spawned(spawned: Spawned, signum: int, log) -> tuple[bool, str | None]:
-    """Deliver `signum` to the process this run spawned, or send nothing and return the reason.
-
-    The only signal this run ever sends (module docstring): the target is the pid recorded at
-    spawn, its identity is pinned at delivery (`_pin_identity` with that recorded start time), and
-    the signal goes through the pidfd.  `(True, None)` means it was delivered; `(False, None)`
-    means there was nothing to deliver (the process has already terminated, so a signal would be a
-    claim rather than a delivery); `(False, note)` is a refusal, and the note carries the reason.
+    The single signal syscall site (module docstring) and the only place a refusal is worded.  It
+    takes the signal *name*, not the constant, so every gate is read before the platform constant is
+    resolved: a name this platform does not define (`signal.SIGKILL` on Windows, or one a host does
+    not expose) is a refusal recorded like any other, never a round that silently does not happen.
+    The target is the pid recorded at spawn and its identity is pinned at delivery (`_pin_identity`
+    with that recorded start time); the signal goes through the pidfd.  A target that has already
+    terminated is reported as such — a delivery to a corpse would be a claim, not a delivery.  This
+    function performs no log I/O: the caller commits the attempt it returns and writes the line.
     """
-    name = signal.Signals(signum).name
     target = _spawned_target(spawned)
     limit = _ownership_limit()
     if limit is not None:
-        return False, _not_sent(target, name, limit)
+        return Refusal(spawned.pid, name, f"{target} was not sent {name}: {limit}")
+    signum = getattr(signal, name, None)
+    if signum is None:
+        return Refusal(
+            spawned.pid, name,
+            f"this platform defines no {name}, so {target} was not sent {name}")
     if spawned.start is None:
-        return False, _unverified(
+        return Refusal(
+            spawned.pid, name,
             f"{target} has no start time recorded at spawn, so its identity cannot be pinned and "
             f"it was not sent {name}")
     pin, why = _pin_identity(spawned.pid, spawned.start)
     if pin is None:
-        return False, _unverified(f"{target} was not sent {name} ({why})")
+        return Refusal(spawned.pid, name, f"{target} was not sent {name} ({why})")
     try:
         if _proc_state(spawned.pid) == "Z":
-            return False, None  # already terminated: nothing to deliver, nothing to claim
+            return AlreadyTerminated(pid=spawned.pid, start=pin.start)
         signal.pidfd_send_signal(pin.fd, signum)
     except ProcessLookupError:
-        return False, _unverified(
+        return Refusal(
+            spawned.pid, name,
             f"{target} was gone before the {name} could be delivered through its pidfd")
     except OSError as exc:
-        return False, _unverified(
+        return Refusal(
+            spawned.pid, name,
             f"the {name} could not be delivered through the pidfd of {target} "
             f"({exc.strerror or exc})")
     finally:
         pin.close()
-    log.write(f"[discoverer] teardown: {name} {DELIVERY_MARKER} {spawned.pid}, the process this run"
-              f" spawned (pinned at delivery, start time {pin.start})\n".encode())
-    log.flush()
-    return True, None
+    return Delivery(pid=spawned.pid, start=pin.start, signal=name)
 
 
 def _command_stopped(spawned: Spawned, seconds: float) -> bool:
@@ -1109,48 +1246,46 @@ def _command_stopped(spawned: Spawned, seconds: float) -> bool:
 def _stop_spawned(spawned: Spawned, log) -> Teardown:
     """Terminate the process this run spawned — the only process it may signal — and report the rest.
 
-    Escalation is TERM, a bounded grace, KILL, and it applies to that one process only; the grace
-    runs on a real delivery, never on a round that delivered nothing, and each round re-pins the
-    target at delivery (`_signal_spawned`).  Everything else the command left is enumerated and
-    reported, never touched (`_group_report`): a member or holder this run did not spawn is left
-    running and the teardown is unverified.  Only a process that took a delivered SIGKILL and
-    outlived the grace is a survivor; the group is read before the command is reaped, so the number
-    read is still the command's own.
+    Escalation is `ESCALATION_NAMES` (TERM, a bounded grace, KILL) over that one process, one
+    `_attempt_delivery` per round and every round re-pinned at delivery; the grace runs on a real
+    delivery, never on a round that delivered nothing.  Each round is committed as an attempt here,
+    and a delivery writes its own line from that attempt — the single emission point, so the log's
+    delivery lines and the record's deliveries are two renderings of one sequence and nothing else
+    can write a delivery line.  A round that found the target already terminated ends the
+    escalation: where an earlier round had delivered, that delivery is what the target stopped
+    after, so it is resolved as stopped rather than left without an outcome.  Everything else the
+    command left is enumerated and reported, never touched (`_group_report`): a member or holder
+    this run did not spawn is left running and the teardown is unverified.  Only a process that took
+    a delivered SIGKILL and outlived the grace is a survivor; the group is read before the command
+    is reaped, so the number read is still the command's own.
 
-    The capability refusal is completed before any escalation signal is resolved: the platform may
-    not define every constant in the sequence (`signal.SIGKILL` on Windows), and a refused delivery
-    is a record entry, not an exception — the group report below still runs and the settled result
-    still carries the limit.
+    A capability refusal is an attempt like any other, and it is completed before the escalation
+    signal is resolved: the platform may not define every name in the sequence (`signal.SIGKILL` on
+    Windows), and that is recorded as a refusal — the group report below still runs and the settled
+    result still carries the limit.
     """
-    signalled: tuple[int, ...] = ()
-    refused: tuple[str, ...] = ()
-    stopped = False
-    limit = _ownership_limit()
-    if limit is not None:
-        refused = (_not_sent(_spawned_target(spawned), ESCALATION_NAMES[0], limit),)
-    else:
-        for signum in (getattr(signal, name) for name in ESCALATION_NAMES if hasattr(signal, name)):
-            delivered, note = _signal_spawned(spawned, signum, log)
-            if not delivered:
-                if note is not None:
-                    refused = (*refused, note)
+    attempts: list[Attempt] = []
+    for name in ESCALATION_NAMES:
+        outcome = _attempt_delivery(spawned, name)
+        if isinstance(outcome, Delivery):
+            log.write(outcome.log_line().encode())
+            log.flush()
+            attempts.append(replace(outcome, stopped=_command_stopped(spawned, KILL_GRACE_SECONDS)))
+            if attempts[-1].stopped:
                 break
-            signalled = (*signalled, signum)
-            if _command_stopped(spawned, KILL_GRACE_SECONDS):
-                stopped = True
-                break
-    # A survivor is a process that took a delivered SIGKILL and outlived the grace; where nothing was
-    # delivered — a refused run, or a platform without KILL — there is no survivor to name, and the
-    # constant is read only when a round actually ran (it does not exist everywhere).
-    survivors = ((spawned.pid,) if signalled and not stopped
-                 and signalled[-1] == getattr(signal, "SIGKILL", None) else ())
+            continue
+        if isinstance(outcome, AlreadyTerminated):
+            if attempts and isinstance(attempts[-1], Delivery):
+                # The delivery that did not stop the target inside the grace is what the target
+                # stopped after: resolving it keeps the record from ending on an unaccounted
+                # delivery while the log already carries it.
+                attempts[-1] = replace(attempts[-1], stopped=True)
+            break
+        attempts.append(outcome)
+        break
     teardown = _group_report(spawned, log, NO_ENUMERATION)
     spawned.process.poll()  # reconcile `Popen` with an exit observed without reaping
-    return teardown.merge(Teardown(
-        clauses=("the spawned process",) if signalled and stopped else (),
-        survivors=survivors,
-        refused=refused,
-    ))
+    return teardown.merge(Teardown(attempts=tuple(attempts)))
 
 
 # Whether this run put its own `SIGCHLD` disposition in the state ownership rests on (`SIG_DFL`),
@@ -1700,16 +1835,21 @@ def _teardown_record(teardown: Teardown | None) -> dict | None:
     A record is published for every suite whose command vector ran — a clean `PASS` whose group was
     read before its reap, a `Popen` that could not be started, a provisioning failure — and it
     is None only where `run_suite` returned before execution or the suite never executed at all (a
-    covered child, a condition-skipped suite, an unusable scratch root).  `verified` is False
-    wherever the record carries a limit note or a pid that took a SIGKILL and outlived it;
-    `clauses` names the steps that really terminated their target, `unverified` one note per limit,
-    and `refused` one note per delivery this run did not send to the process it spawned (module
-    docstring).
+    covered child, a condition-skipped suite, an unusable scratch root).  Every field is a rendering
+    of the teardown's own attempts and limits, never a second fact: `delivered` is the ordered
+    signals this run really sent to the process it spawned, each with the identity pinned at
+    delivery and whether it stopped the target — the same attempts the log's delivery lines are
+    written from — `clauses` names the steps that really terminated their target, `survivors` the
+    pids that took a delivered SIGKILL and outlived it, `unverified` one note per limit, and
+    `refused` one note per delivery this run did not send to that process.  `verified` is True
+    exactly when `unverified`, `survivors` and `refused` all carry nothing: a signal that was
+    delivered is the record's positive content, not a reason to distrust it.
     """
     if teardown is None:
         return None
     return {
         "verified": teardown.verified,
+        "delivered": [attempt.to_record() for attempt in teardown.delivered],
         "clauses": list(teardown.clauses),
         "survivors": list(teardown.survivors),
         "unverified": list(teardown.unverified),

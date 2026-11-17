@@ -8,6 +8,7 @@ read-only plan of the real repository: no test executes a real repository suite.
 from __future__ import annotations
 
 import contextlib
+import errno
 import gc
 import importlib.util
 import io
@@ -313,15 +314,27 @@ def synthetic_tree(patterns: list[str], prune: list[str], floor: list[str], suit
 
 
 def run_synthetic(root: Path, scratch: Path, report: Path, *extra: str) -> tuple[int, str, dict]:
-    """Run the discoverer in-process against a synthetic root; return code, stdout, report."""
+    """Run the discoverer in-process against a synthetic root; return code, stdout, report.
+
+    The kernel boundary is spied for the whole run and the three readings of every delivery — the
+    syscall, the record, the log — must agree (`assert_delivery_boundary`), so no test in this file
+    can drive a run that quietly disagrees with itself.  The spy is closed before this function
+    returns, so no cleanup that runs after the run under test is ever trapped.
+    """
     buffer = io.StringIO()
     # 20s, not 5s: these suites start real interpreters and the machine may be loaded; only
     # an injected hang suite is meant to hit the timeout.
     argv = ["--root", str(root), "--event", "local", "--timeout", "20",
             "--scratch", str(scratch), "--report", str(report), *extra]
-    with contextlib.redirect_stdout(buffer):
-        code = runner.main(argv)
-    return code, buffer.getvalue(), json.loads(report.read_text(encoding="utf-8"))
+    spy = DeliverySpy()
+    try:
+        with contextlib.redirect_stdout(buffer):
+            code = runner.main(argv)
+    finally:
+        spy.close()
+    payload = json.loads(report.read_text(encoding="utf-8"))
+    assert_delivery_boundary(spy, payload)
+    return code, buffer.getvalue(), payload
 
 
 def states_of(payload: dict) -> dict:
@@ -367,6 +380,20 @@ def kill_quietly(pid: int, signum: int | None = None) -> None:
         os.kill(pid, signum)
 
 
+def stop_recorded_pids(pids_file: Path, signum: int) -> None:
+    """Stop whatever pids `pids_file` holds, with a constant the caller captured.
+
+    A safety net for a fixture that outlives a run which died before the test could register the
+    pids it recorded (the model that removes `signal.SIGKILL` leaves the fixture running on purpose,
+    and a crashed run must still not leak it).  Nothing happens when the file was never written.
+    """
+    if not pids_file.exists():
+        return
+    for value in pids_file.read_text(encoding="utf-8").split():
+        with contextlib.suppress(ValueError):
+            kill_quietly(int(value), signum)
+
+
 class PatchingTestCase(unittest.TestCase):
     """Attribute patching the test runner itself restores."""
 
@@ -399,7 +426,7 @@ def can_deliver_signals() -> bool:
     cases pin what each missing capability does.
     """
     return (runner.PIDFD_PINNING and runner.PROC_ROOT.is_dir() and runner.WAITID_WNOWAIT
-            and hasattr(os, "killpg") and hasattr(signal, "SIGCHLD"))
+            and hasattr(signal, "SIGCHLD"))
 
 
 def pidfd_target(fd: int) -> int | None:
@@ -412,6 +439,118 @@ def pidfd_target(fd: int) -> int | None:
     except (OSError, ValueError):
         return None
     return None
+
+
+def delivery(pid: int, signal_name: str = "SIGTERM", *, start: str = "1", stopped: bool = False):
+    """One delivery attempt in the model's own terms, for tests that state a record directly."""
+    return runner.Delivery(pid=pid, start=start, signal=signal_name, stopped=stopped)
+
+
+def parse_delivery_lines(log_text: str) -> list[tuple[str, int, int]]:
+    """Every delivery line in `log_text` as (signal, pid, start), through the runner's own pattern.
+
+    Strict by construction: every line carrying the runner's `DELIVERY_MARKER` must read back
+    through `DELIVERY_LINE_RE`, so a delivery line in a shape this reader cannot parse is a claim
+    that cannot be checked — a failure, never a line to skip.  The pattern and the marker are the
+    runner's, so the renderer and this reader cannot drift apart without a test going red.
+    """
+    marked = [line for line in log_text.splitlines() if runner.DELIVERY_MARKER in line]
+    parsed = [(match.group("signal"), int(match.group("pid")), int(match.group("start")))
+              for match in runner.DELIVERY_LINE_RE.finditer(log_text)]
+    if len(parsed) != len(marked):
+        raise AssertionError(
+            f"a delivery line does not read back through the runner's pattern: {marked}")
+    return parsed
+
+
+class DeliverySpy:
+    """The kernel boundary of one in-process run: the signals it really sent.
+
+    Records `(signal name, target pid, start time)` for every successful
+    `signal.pidfd_send_signal` call, read back from the pidfd the call went through, and traps the
+    APIs the run must never use for a delivery (`os.kill`, `os.killpg`) — signal 0 is allowed,
+    because a liveness probe through a bare pid is not a delivery and the runner is entitled to it.
+    Only attributes this platform exposes are patched (a host without pidfds cannot deliver at all,
+    and the refusal it records instead is what the tests pin there), and `close()` restores them
+    immediately, so no cleanup that runs outside the run under test is ever trapped.  A target that
+    cannot be read back is reported separately instead of being dropped: an unreadable delivery is
+    evidence the assertion must see, not evidence to skip.
+    """
+
+    def __init__(self) -> None:
+        self.sent: list[tuple[str, int, int]] = []
+        self.unresolved: list[str] = []
+        self.forbidden: list[str] = []
+        self._saved: list[tuple[object, str, object]] = []
+        if hasattr(signal, "pidfd_send_signal"):
+            real_send = signal.pidfd_send_signal
+
+            def record_send(fd: int, signum: int, *flags: int) -> None:
+                target = pidfd_target(fd)
+                real_send(fd, signum, *flags)
+                start = runner._start_time(target) if target is not None else None
+                if target is None or start is None:
+                    self.unresolved.append(f"{signal.Signals(signum).name} through fd {fd}")
+                else:
+                    self.sent.append((signal.Signals(signum).name, target, int(start)))
+
+            self._install(signal, "pidfd_send_signal", record_send)
+        for module, attribute in ((os, "kill"), (os, "killpg")):
+            if hasattr(module, attribute):
+                real_call = getattr(module, attribute)
+                name = f"{module.__name__}.{attribute}"
+
+                def trap(pid: int, signum: int, *rest: int, _real=real_call, _name=name) -> None:
+                    if signum:
+                        self.forbidden.append(f"{_name}({pid}, {signum})")
+                        raise AssertionError(f"the run signalled through {_name}: {pid}, {signum}")
+                    return _real(pid, signum, *rest)
+
+                self._install(module, attribute, trap)
+
+    def _install(self, target: object, attribute: str, value: object) -> None:
+        self._saved.append((target, attribute, getattr(target, attribute)))
+        setattr(target, attribute, value)
+
+    def close(self) -> None:
+        """Restore every patched attribute now, in reverse order."""
+        while self._saved:
+            target, attribute, saved = self._saved.pop()
+            setattr(target, attribute, saved)
+
+
+def assert_delivery_boundary(spy: DeliverySpy, payload: dict) -> None:
+    """`kernel syscalls == record deliveries == parsed log lines`, for a whole in-process run.
+
+    Three independent readings of the same fact must agree: what the kernel accepted (the spy), what
+    the run's record publishes as `delivered`, and what each suite's log carries as delivery lines.
+    None of the three is trusted over another and none is optional — a signal sent but not recorded,
+    a record entry with no syscall behind it, a line with no entry, or a line the runner's pattern
+    cannot read are all failures here.  Cross-suite order is not compared (suites run concurrently,
+    so wall-clock order across suites is not the run's own); within a suite the record's order is
+    compared with its log's order, which is the run's own.
+    """
+    if spy.forbidden:
+        raise AssertionError(f"the run signalled outside its delivery path: {spy.forbidden}")
+    if spy.unresolved:
+        raise AssertionError(f"a delivery could not be read back at the boundary: {spy.unresolved}")
+    recorded: list[tuple[str, int, int]] = []
+    for entry in payload["suites"]:
+        teardown = entry["teardown"]
+        if teardown is None:
+            continue
+        items = [(item["signal"], item["pid"], int(item["start"]))
+                 for item in teardown["delivered"]]
+        recorded.extend(items)
+        logged = parse_delivery_lines(Path(entry["log"]).read_text(encoding="utf-8"))
+        if logged != items:
+            raise AssertionError(
+                f"suite {entry['id']}: its log's delivery lines {logged} are not the deliveries "
+                f"its record carries {items}")
+    if sorted(spy.sent) != sorted(recorded):
+        raise AssertionError(
+            f"the signals the kernel accepted {sorted(spy.sent)} are not the deliveries the record "
+            f"publishes {sorted(recorded)}")
 
 
 SHIM_TOOL_FIXTURE = '''import json
@@ -1013,12 +1152,13 @@ class SettleTests(unittest.TestCase):
         self.assertEqual(nothing[0], "TIMEOUT")
         self.assertIn("no processes remained to be terminated", nothing[2])
         observed = runner.settle(suite, exit_code=0, timed_out=True, output="",
-                                 teardown=runner.Teardown(clauses=("the spawned process",)))
+                                 teardown=runner.Teardown(attempts=(delivery(4242, stopped=True),)))
         self.assertIn("the spawned process terminated", observed[2])
         unobserved = runner.settle(suite, exit_code=0, timed_out=True, output="")
         self.assertIn("teardown was not observed", unobserved[2])
         survivor = runner.settle(suite, exit_code=0, timed_out=True, output="",
-                                 teardown=runner.Teardown(survivors=(4242,)))
+                                 teardown=runner.Teardown(attempts=(
+                                     delivery(4242, runner.ESCALATION_NAMES[-1]),)))
         self.assertIn("4242", survivor[2])
         self.assertIn("survived SIGKILL", survivor[2])
         unverified = runner.settle(suite, exit_code=0, timed_out=True, output="",
@@ -1033,9 +1173,12 @@ class TeardownRecordTests(unittest.TestCase):
 
     def test_a_surviving_pid_does_not_suppress_a_terminated_target(self):
         """Clauses describe their own targets: a survivor elsewhere is not the terminated target."""
-        described = runner.Teardown(clauses=("the spawned process",), survivors=(4242,)).describe()
+        described = runner.Teardown(attempts=(
+            delivery(4242, "SIGTERM", start="7", stopped=True),
+            delivery(99, runner.ESCALATION_NAMES[-1], start="8"),
+        )).describe()
         self.assertIn("the spawned process terminated", described)
-        self.assertIn("4242 survived SIGKILL", described)
+        self.assertIn("99 survived SIGKILL", described)
 
     def test_unverified_notes_are_deduplicated_as_units(self):
         """Merging keeps each note whole instead of joining first and deduplicating a string."""
@@ -1047,6 +1190,87 @@ class TeardownRecordTests(unittest.TestCase):
         """`verified` is derived from the notes: none, verified; any, not verified."""
         self.assertTrue(runner.Teardown().verified)
         self.assertFalse(runner.Teardown(unverified=("a limit this run cannot observe",)).verified)
+
+    def test_verified_is_false_for_a_limit_a_refusal_or_a_survivor_and_nothing_else(self):
+        """`verified` is decided by the three qualifying facts, and a delivery qualifies nothing.
+
+        The if-and-only-if, one term at a time: a record carrying only a limit note, only a refused
+        delivery, or only a pid that took a delivered final signal and outlived the grace is not
+        verified, while a record whose only content is a delivery that stopped the target is — a
+        delivery is what the teardown established, not a reason to distrust it.
+        """
+        stopped = runner.Teardown(attempts=(delivery(4242, stopped=True),))
+        self.assertTrue(stopped.verified, stopped.describe())
+        self.assertFalse(runner.Teardown(unverified=("a limit",)).verified)
+        self.assertFalse(runner.Teardown(attempts=(
+            runner.Refusal(pid=4242, signal="SIGKILL", detail="not sent"),)).verified)
+        self.assertFalse(runner.Teardown(attempts=(
+            delivery(4242, runner.ESCALATION_NAMES[-1]),)).verified)
+
+    def test_a_refusal_renders_its_own_note_and_is_not_a_limit(self):
+        """A refusal is an attempt: its note says what was not sent, and it lives in `refused`."""
+        refusal = runner.Refusal(pid=4242, signal="SIGKILL", detail="nothing was sent to it")
+        teardown = runner.Teardown(attempts=(refusal,), unverified=("a limit",))
+        self.assertEqual(teardown.refused, ("nothing was sent to it; teardown is unverified",))
+        self.assertEqual(teardown.unverified, ("a limit",),
+                         "a refusal must never be filed as a limit")
+        self.assertEqual(teardown.delivered, ())
+        self.assertEqual(teardown.describe(),
+                         "a limit; nothing was sent to it; teardown is unverified")
+
+    def test_merge_unions_attempts_and_limits_in_order_without_duplication(self):
+        """`merge` is the union of the two stored facts, each kept once, order preserved."""
+        term_refused = runner.Refusal(pid=7, signal="SIGTERM", detail="no pidfd for pid 7")
+        kill_survived = delivery(9, runner.ESCALATION_NAMES[-1], start="2")
+        left = runner.Teardown(attempts=(term_refused,), unverified=("a", "b"))
+        right = runner.Teardown(attempts=(term_refused, kill_survived), unverified=("b", "c"))
+        merged = left.merge(right)
+        self.assertEqual(merged.attempts, (term_refused, kill_survived))
+        self.assertEqual(merged.unverified, ("a", "b", "c"))
+        self.assertEqual(merged.delivered, (kill_survived,))
+        self.assertEqual(merged.refused, (term_refused.note,))
+        self.assertEqual(merged.survivors, (9,))
+        self.assertEqual(merged.clauses, ())
+        self.assertFalse(merged.verified)
+
+    def test_a_record_the_escalation_cannot_have_produced_is_refused(self):
+        """The illegal escalation shapes are unrepresentable, not merely unlikely.
+
+        A sequence this machine cannot produce is rejected where the record is built: an attempt
+        after a refusal or after a delivery that stopped the target, and an escalation that ends on
+        a delivery which is neither stopped nor the final signal — the shape that would leave
+        "delivered something, stopped nothing, refused nothing, no limit" readable as verified.
+        """
+        with self.assertRaises(ValueError):
+            runner.Teardown(attempts=(delivery(4242),))
+        with self.assertRaises(ValueError):
+            runner.Teardown(attempts=(
+                runner.Refusal(pid=4242, signal="SIGTERM", detail="not sent"),
+                delivery(4242, runner.ESCALATION_NAMES[-1]),
+            ))
+        with self.assertRaises(ValueError):
+            runner.Teardown(attempts=(
+                delivery(4242, "SIGTERM", stopped=True),
+                delivery(4242, runner.ESCALATION_NAMES[-1]),
+            ))
+        # The reachable shapes stay constructible: the escalation's two and three-round sequences.
+        self.assertTrue(runner.Teardown(attempts=(delivery(4242, stopped=True),)))
+        self.assertTrue(runner.Teardown(attempts=(delivery(4242, runner.ESCALATION_NAMES[-1]),)))
+        self.assertTrue(runner.Teardown(attempts=(
+            delivery(4242), delivery(4242, runner.ESCALATION_NAMES[-1], stopped=True))))
+
+    def test_the_delivery_line_reads_back_as_the_attempt_it_was_written_from(self):
+        """The line the runner writes and the pattern the tests read are one wording.
+
+        The renderer (`Delivery.log_line`) and the reader (`DELIVERY_LINE_RE`, `DELIVERY_MARKER`)
+        are the same fact in two forms: the attempt's pid, start time and signal name must come back
+        out unchanged, which is what lets a log be compared with a record at all.
+        """
+        attempt = delivery(4242, "SIGKILL", start="112233")
+        line = attempt.log_line()
+        self.assertIn(runner.DELIVERY_MARKER, line)
+        self.assertEqual(parse_delivery_lines(line), [("SIGKILL", 4242, 112233)])
+        self.assertEqual([int(raw) for raw in runner.DELIVERY_TARGET_RE.findall(line)], [4242])
 
 
 class TeardownOwnershipTests(PatchingTestCase):
@@ -1649,6 +1873,244 @@ class TeardownOwnershipTests(PatchingTestCase):
                       "the member left behind must be named in the record")
         self.assertEqual(teardown.clauses, ("the spawned process",), teardown.describe())
 
+    @unittest.skipUnless(can_deliver_signals(), "the delivery needs a pinnable identity")
+    def test_an_already_terminated_target_resolves_the_delivery_that_stopped_it(self):
+        """A round that finds the target already gone resolves the delivery that preceded it.
+
+        Model: the target ignores SIGTERM and dies between the first round's grace and the second
+        round's identity check — killed at that boundary here, so the state is reached
+        deterministically, which is the state a target that exits on its own produces — and the
+        kernel keeps the corpse until this run reaps it, so the second round's pin still succeeds
+        and the round finds it in `Z`.  The log already carries the SIGTERM delivery, so the record
+        must resolve that delivery as what the target stopped after: a termination, never "no
+        processes remained to be terminated" against a log that records a delivery.
+        """
+        child = self.spawn(code="import signal, time;"
+                                " signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(60)")
+        time.sleep(0.2)  # let the fixture's handler land: the delivery must not end it
+        spawned = runner._spawned(child)
+        real_pin = runner._pin_identity
+        rounds: list[int] = []
+
+        def pin(pid: int, expected: str):
+            rounds.append(pid)
+            if len(rounds) == 2:  # the target dies before the second round's identity check
+                os.kill(child.pid, signal.SIGKILL)
+                time.sleep(0.1)
+            return real_pin(pid, expected)
+
+        self.patch(runner, "_pin_identity", pin)
+        self.patch(runner, "KILL_GRACE_SECONDS", 0.2)
+        with self.log_path.open("ab") as log:
+            teardown = runner._stop_spawned(spawned, log)
+        self.assertEqual(rounds, [child.pid, child.pid],
+                         "the escalation did not reach its second round")
+        self.assertEqual(teardown.delivered,
+                         (runner.Delivery(pid=child.pid, start=spawned.start, signal="SIGTERM",
+                                          stopped=True),),
+                         teardown.describe())
+        self.assertEqual(teardown.clauses, ("the spawned process",), teardown.describe())
+        self.assertEqual(teardown.survivors, (), "a target that stopped is no survivor")
+        self.assertEqual(teardown.refused, ())
+        self.assertTrue(teardown.verified, teardown.describe())
+        self.assertEqual(teardown.describe(), "the spawned process terminated")
+        self.assertEqual(parse_delivery_lines(self.log_path.read_text(encoding="utf-8")),
+                         [("SIGTERM", child.pid, int(spawned.start))])
+
+
+class EscalationMachineTests(PatchingTestCase):
+    """Every reachable path of the escalation, one row per path, over the machine itself.
+
+    Each row drives the real `_stop_spawned`/`_attempt_delivery` with the kernel boundary stubbed (a
+    real pidfd and a real signal would end the fixture before the next round) and states what the
+    machine must do: the attempts it commits, the lines its log gains, the signals its send really
+    made, and every derived view of the record it publishes.  The rows are derived from the code,
+    decision point by decision point: each round resolves its signal name, reads the ownership
+    gates, resolves the platform constant, pins identity at delivery, observes an already-terminated
+    target, sends through the pidfd and commits the attempt; the escalation ends at the first round
+    that stopped the target, refused, or found it already terminated; and `ESCALATION_NAMES` bounds
+    the rounds.  The three paths a whole harness reaches are pinned end to end as well:
+    `EndToEndTests.test_a_refusal_after_a_delivery_does_not_erase_it`,
+    `EndToEndTests.test_a_host_without_the_final_signal_records_the_refusal`, and
+    `TeardownOwnershipTests.test_an_already_terminated_target_resolves_the_delivery_that_stopped_it`.
+    """
+
+    TERM, FINAL = runner.ESCALATION_NAMES
+
+    # (name, boundary stubs, what the record must say).  Stubs: `limit` (the ownership gate's
+    # answer), `start=False` (no start time recorded at spawn), `pins` (per round: "ok" or the
+    # reason the pin refused), `states` (per read: "alive" or "zombie"), `sends` (per round: "ok",
+    # "gone" or "emfile"), `stops` (per delivered round: whether the grace observed the exit),
+    # `drop_constant` (a signal name removed from the platform for the row).
+    PATHS = (
+        ("refused-first-round-ownership-limit",
+         {"limit": "this platform cannot open a pidfd"},
+         {"attempts": (("refused", TERM),), "lines": (), "clauses": False, "survivors": False,
+          "refused": ("was not sent SIGTERM: this platform cannot open a pidfd",),
+          "verified": False, "describe": ("unverified",)}),
+        ("refused-first-round-no-start-time",
+         {"start": False},
+         {"attempts": (("refused", TERM),), "lines": (), "clauses": False, "survivors": False,
+          "refused": ("has no start time recorded at spawn",),
+          "verified": False, "describe": ("unverified",)}),
+        ("refused-first-round-unpinnable-identity",
+         {"pins": ("pid 4242 was gone before a pidfd for it could be opened",)},
+         {"attempts": (("refused", TERM),), "lines": (), "clauses": False, "survivors": False,
+          "refused": ("was not sent SIGTERM (pid 4242 was gone before a pidfd",),
+          "verified": False, "describe": ("unverified",)}),
+        ("already-terminated-first-round",
+         {"states": ("zombie",)},
+         {"attempts": (), "lines": (), "clauses": False, "survivors": False, "refused": (),
+          "verified": True, "describe": ("no processes remained to be terminated",)}),
+        ("refused-first-round-target-gone-before-the-send",
+         {"sends": ("gone",)},
+         {"attempts": (("refused", TERM),), "lines": (), "clauses": False, "survivors": False,
+          "refused": ("was gone before the SIGTERM could be delivered through its pidfd",),
+          "verified": False, "describe": ("unverified",)}),
+        ("refused-first-round-send-errored",
+         {"sends": ("emfile",)},
+         {"attempts": (("refused", TERM),), "lines": (), "clauses": False, "survivors": False,
+          "refused": ("could not be delivered through the pidfd of",),
+          "verified": False, "describe": ("unverified",)}),
+        ("delivered-and-stopped",
+         {"stops": (True,)},
+         {"attempts": (("delivered", TERM, True),), "lines": (TERM,), "clauses": True,
+          "survivors": False, "refused": (), "verified": True,
+          "describe": ("the spawned process terminated",)}),
+        ("delivered-then-the-final-signal-stopped-it",
+         {"stops": (False, True)},
+         {"attempts": (("delivered", TERM, False), ("delivered", FINAL, True)),
+          "lines": (TERM, FINAL), "clauses": True, "survivors": False, "refused": (),
+          "verified": True, "describe": ("the spawned process terminated",)}),
+        ("delivered-then-the-final-signal-did-not-stop-it",
+         {"stops": (False, False)},
+         {"attempts": (("delivered", TERM, False), ("delivered", FINAL, False)),
+          "lines": (TERM, FINAL), "clauses": False, "survivors": True, "refused": (),
+          "verified": False, "describe": ("survived SIGKILL",)}),
+        ("delivered-then-the-final-signal-is-not-defined",
+         {"stops": (False,), "drop_constant": FINAL},
+         {"attempts": (("delivered", TERM, False), ("refused", FINAL)), "lines": (TERM,),
+          "clauses": False, "survivors": False,
+          "refused": ("this platform defines no SIGKILL",), "verified": False,
+          "describe": ("unverified",)}),
+        ("delivered-then-already-terminated",
+         {"stops": (False,), "states": ("alive", "zombie")},
+         {"attempts": (("delivered", TERM, True),), "lines": (TERM,), "clauses": True,
+          "survivors": False, "refused": (), "verified": True,
+          "describe": ("the spawned process terminated",)}),
+        ("delivered-then-the-final-signal-could-not-be-pinned",
+         {"stops": (False,),
+          "pins": ("ok", "a pidfd for pid 4242 could not be opened (Too many open files)")},
+         {"attempts": (("delivered", TERM, False), ("refused", FINAL)), "lines": (TERM,),
+          "clauses": False, "survivors": False,
+          "refused": ("was not sent SIGKILL (a pidfd for pid 4242 could not be opened",),
+          "verified": False, "describe": ("unverified",)}),
+        ("delivered-then-target-gone-before-the-final-send",
+         {"stops": (False,), "sends": ("ok", "gone")},
+         {"attempts": (("delivered", TERM, False), ("refused", FINAL)), "lines": (TERM,),
+          "clauses": False, "survivors": False,
+          "refused": ("was gone before the SIGKILL could be delivered",), "verified": False,
+          "describe": ("unverified",)}),
+    )
+
+    def setUp(self):
+        ARTIFACTS.mkdir(parents=True, exist_ok=True)
+        self.addCleanup(shutil.rmtree, ARTIFACTS, ignore_errors=True)
+        self.process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"],
+                                        start_new_session=True)
+        self.addCleanup(self.process.wait)
+        self.addCleanup(self.process.kill)
+        self.spawned = runner._spawned(self.process)
+
+    def run_path(self, stubs: dict) -> tuple[runner.Teardown, list[tuple[str, int, int]], list[str]]:
+        """Drive `_stop_spawned` once with the boundary stubbed as the row states."""
+        log_path = ARTIFACTS / f"machine-{time.monotonic_ns()}.log"
+        sends: list[str] = []
+        plans = {key: list(stubs.get(key, ())) for key in ("pins", "states", "sends", "stops")}
+
+        def step(key: str, default):
+            return plans[key].pop(0) if plans[key] else default
+
+        def pin(pid: int, expected: str):
+            answer = step("pins", "ok")
+            return ((runner.Pin(fd=-1, start=expected), None) if answer == "ok"
+                    else (None, answer))
+
+        def state(pid: int) -> str | None:
+            return {"alive": "S", "zombie": "Z"}[step("states", "alive")]
+
+        def send(fd: int, signum: int) -> None:
+            answer = step("sends", "ok")
+            if answer == "gone":
+                raise ProcessLookupError(errno.ESRCH, "No such process")
+            if answer == "emfile":
+                raise OSError(errno.EMFILE, "Too many open files")
+            sends.append(signal.Signals(signum).name)
+
+        def stopped(spawned, seconds: float) -> bool:
+            return bool(step("stops", False))
+
+        self.patch(runner, "_ownership_limit", lambda: stubs.get("limit"))
+        self.patch(runner, "_group_members", lambda group: [])  # nothing left behind: no limits
+        self.patch(runner, "_pin_identity", pin)
+        self.patch(runner, "_proc_state", state)
+        self.patch(runner, "_command_stopped", stopped)
+        self.patch(signal, "pidfd_send_signal", send)
+        spawned = self.spawned
+        if not stubs.get("start", True):
+            spawned = runner.Spawned(process=self.process, start=None)
+        # A row that removes a platform constant puts it back before the next row runs: the machine
+        # reads `getattr(signal, name)` live, so a leaked removal would decide later rows.
+        dropped = stubs.get("drop_constant")
+        saved_constant = getattr(signal, dropped, None) if dropped else None
+        if dropped:
+            delattr(signal, dropped)
+        try:
+            with log_path.open("ab") as log:
+                teardown = runner._stop_spawned(spawned, log)
+        finally:
+            if dropped:
+                setattr(signal, dropped, saved_constant)
+        return teardown, parse_delivery_lines(log_path.read_text(encoding="utf-8")), sends
+
+    @unittest.skipUnless(can_deliver_signals(),
+                         "the machine's delivery path needs a pinnable identity")
+    def test_every_reachable_escalation_path_is_recorded_as_its_attempts(self):
+        """One row per path: the attempts, the lines, the sends and the record must all agree."""
+        for name, stubs, expected in self.PATHS:
+            with self.subTest(path=name):
+                teardown, logged, sends = self.run_path(stubs)
+                pid = self.process.pid
+                attempts = tuple(
+                    ("delivered", attempt.signal, attempt.stopped)
+                    if isinstance(attempt, runner.Delivery) else ("refused", attempt.signal)
+                    for attempt in teardown.attempts)
+                self.assertEqual(attempts, expected["attempts"], name)
+                self.assertEqual([(signal_name, target) for signal_name, target, _start in logged],
+                                 [(signal_name, pid) for signal_name in expected["lines"]], name)
+                self.assertEqual(sends, list(expected["lines"]),
+                                 "a delivery is exactly a signal the kernel accepted")
+                self.assertEqual(teardown.clauses,
+                                 ("the spawned process",) if expected["clauses"] else (), name)
+                self.assertEqual(teardown.survivors, (pid,) if expected["survivors"] else (), name)
+                self.assertEqual(teardown.verified, expected["verified"], name)
+                refused = teardown.refused
+                self.assertEqual(len(refused), len(expected["refused"]), refused)
+                for fragment in expected["refused"]:
+                    self.assertIn(fragment, " ".join(refused), name)
+                for fragment in expected["describe"]:
+                    self.assertIn(fragment, teardown.describe(), name)
+                record = runner._teardown_record(teardown)
+                self.assertEqual(record["delivered"],
+                                 [{"pid": attempt.pid, "start": attempt.start,
+                                   "signal": attempt.signal, "stopped": attempt.stopped}
+                                  for attempt in teardown.delivered], name)
+                self.assertEqual(record["clauses"], list(teardown.clauses), name)
+                self.assertEqual(record["survivors"], list(teardown.survivors), name)
+                self.assertEqual(record["unverified"], list(teardown.unverified), name)
+                self.assertEqual(record["refused"], list(refused), name)
+                self.assertEqual(record["verified"], teardown.verified, name)
+
 
 class EndToEndTests(PatchingTestCase):
     """One synthetic repository, run through main(): states, isolation, teardown."""
@@ -2008,28 +2470,31 @@ class EndToEndTests(PatchingTestCase):
                          "a child that was never signalled is not a survivor")
 
     def assert_no_delivery_to(self, entry: dict, pid: int) -> None:
-        """The run's own log must claim no delivery to `pid`: it signals only what it spawned.
+        """The log's delivery lines and the record's deliveries are one ordered bijection.
 
-        The target pid is read out of each delivery line (the runner's own `DELIVERY_TARGET_RE`)
-        rather than searched for anywhere in the line — a start time, or another delivery's pid, can
-        contain these digits too, and a line that names another pid is the run claiming a signal it
-        may not send.  The pattern comes from the runner, so rewording the line cannot silently turn
-        this into a check of nothing; where this host can deliver, an empty match set is itself a
-        failure, and where it cannot, the capability refusal is what the record carries instead
-        (asserted by the callers).
+        Unconditional, on purpose: an executed suite always publishes its teardown record, so the
+        record's `delivered` is read strictly here (a renamed field fails loudly, never as "no
+        deliveries"), every line carrying the runner's `DELIVERY_MARKER` is parsed through the
+        runner's own anchored pattern, and the two sequences must be equal — an empty log against a
+        delivery in the record fails, a line with no delivery in the record fails, and a delivery
+        line naming a pid this run did not spawn fails whether or not the record claims it too.
+        There is no capability branch and no refusal branch for a defect to steer around: a host
+        that cannot deliver writes no line and records no delivery, and the same equality holds
+        there.  The fixtures that call this helper run a single command vector, so a second target
+        pid in one log would itself be the run signalling something it did not spawn.
         """
+        teardown = entry["teardown"]
+        self.assertIsNotNone(teardown, "an executed suite always publishes its teardown record")
+        delivered = teardown["delivered"]
+        claimed = [(item["signal"], item["pid"], int(item["start"])) for item in delivered]
         log_text = Path(entry["log"]).read_text(encoding="utf-8")
+        self.assertEqual(parse_delivery_lines(log_text), claimed,
+                         "the log's delivery lines and the record's deliveries disagree")
         targets = [int(raw) for raw in runner.DELIVERY_TARGET_RE.findall(log_text)]
-        # The record's own field says whether this run refused the delivery it would have sent its
-        # spawned process (a missing capability, an identity it could not pin, a target already gone)
-        # — a different fact from the limit notes that also live in the record, such as a detached
-        # worker left alone, which is the normal case here.  So the log must show a delivery unless
-        # that refusal is what the record carries; a suite's entry always publishes the record, and
-        # indexing it strictly means a rename fails loudly here instead of silently skipping this.
-        refused = entry["teardown"]["refused"]
-        if can_deliver_signals() and not refused:
-            self.assertTrue(targets, "no delivery line and no recorded refusal for a suite this run "
-                                     "signalled, so this check would pass on any log")
+        self.assertEqual(targets, [item["pid"] for item in delivered],
+                         "the log names delivery targets the record does not carry")
+        self.assertLessEqual(len(set(targets)), 1,
+                             f"the log names deliveries to more than one target pid: {targets}")
         self.assertNotIn(pid, targets,
                          f"the run claims a delivery to a process it did not spawn: {targets}")
 
@@ -2042,6 +2507,18 @@ class EndToEndTests(PatchingTestCase):
         pids = [int(value) for value in pids_file.read_text().split()]
         for pid in pids:
             self.addCleanup(kill_quietly, pid)
+        return pids
+
+    def leftover_pids_with(self, pids_file: Path, signum: int) -> list[int]:
+        """`leftover_pids`, stopping each pid with a signal constant captured by the caller.
+
+        For the one model that removes a signal constant from the platform (`signal.SIGKILL`):
+        cleanups run before the attribute is restored, so resolving the constant there would raise
+        instead of stopping the fixture the model deliberately leaves running.
+        """
+        pids = [int(value) for value in pids_file.read_text().split()]
+        for pid in pids:
+            self.addCleanup(kill_quietly, pid, signum)
         return pids
 
     def assert_stopped(self, pids: list[int], message: str) -> None:
@@ -2071,6 +2548,9 @@ class EndToEndTests(PatchingTestCase):
         """
         pids_file = ARTIFACTS / f"{name}-pids.txt"
         variables = {"PID_FILE": str(pids_file), **env}
+        # A net registered before the run: these fixtures ignore SIGTERM (or leave workers that do),
+        # so a run that dies before the pids below are registered must not leak what it started.
+        self.addCleanup(stop_recorded_pids, pids_file, getattr(signal, "SIGKILL", signal.SIGTERM))
         root = synthetic_tree(patterns=["scripts/test_*.py"], prune=[], floor=[],
                               suites="\n".join([
                                   "[[suite]]",
@@ -2514,6 +2994,193 @@ class EndToEndTests(PatchingTestCase):
         for pid in pids:
             self.assertTrue(process_running(pid),
                             "a process was stopped although nothing could be delivered")
+
+    def test_the_delivery_log_and_the_record_are_one_bijection(self):
+        """Both directions of the bijection fail, and a renamed field fails loudly.
+
+        The helper reads the record's `delivered` strictly and compares it with the log through the
+        runner's own pattern, so: a log with no line for a delivery the record carries fails, a line
+        the record does not carry fails, a line the pattern cannot read fails, a record that has been
+        renamed where `delivered` was fails (`KeyError`, never "no deliveries"), and a delivery to a
+        pid this run did not spawn fails even when the record carries it consistently.
+        """
+        attempt = delivery(4242, start="7", stopped=True)
+        record = runner._teardown_record(runner.Teardown(attempts=(attempt,)))
+        agreeing = ARTIFACTS / "bijection-agreeing.log"
+        agreeing.write_text(attempt.log_line(), encoding="utf-8")
+        self.assert_no_delivery_to({"log": str(agreeing), "teardown": record}, 999)
+        empty = ARTIFACTS / "bijection-empty.log"
+        empty.write_text("", encoding="utf-8")
+        with self.assertRaises(AssertionError, msg="an empty log passed for a real delivery"):
+            self.assert_no_delivery_to({"log": str(empty), "teardown": record}, 999)
+        phantom = ARTIFACTS / "bijection-phantom.log"
+        phantom.write_text(attempt.log_line() + delivery(999, start="3").log_line(),
+                           encoding="utf-8")
+        with self.assertRaises(AssertionError, msg="a phantom line passed"):
+            self.assert_no_delivery_to({"log": str(phantom), "teardown": record}, 4242)
+        reworded = ARTIFACTS / "bijection-reworded.log"
+        reworded.write_text(
+            f"[discoverer] teardown: {runner.DELIVERY_MARKER} {attempt.pid}, the process this run "
+            f"spawned (pinned at delivery)\n", encoding="utf-8")
+        with self.assertRaises(AssertionError, msg="an unreadable delivery line passed"):
+            self.assert_no_delivery_to(
+                {"log": str(reworded),
+                 "teardown": runner._teardown_record(runner.Teardown())}, 999)
+        renamed = {key: value for key, value in record.items() if key != "delivered"}
+        with self.assertRaises(KeyError, msg="a renamed field did not fail loudly"):
+            self.assert_no_delivery_to({"log": str(agreeing), "teardown": renamed}, 999)
+
+    @unittest.skipUnless(can_deliver_signals(),
+                         "the mixed path needs one real delivery and one real pin")
+    def test_a_refusal_after_a_delivery_does_not_erase_it(self):
+        """A later round's refusal is an attempt beside the delivery, never a replacement for it.
+
+        Model: the fixture ignores SIGTERM and the run's second pin cannot open a pidfd (`EMFILE`
+        injected on the runner's own `os.pidfd_open(pid)` call, the second one) — so SIGTERM is
+        really delivered and logged, SIGKILL is refused with its reason, and the record must carry
+        both: `delivered` names the SIGTERM delivery, `refused` names the SIGKILL refusal, and
+        neither `clauses` nor `survivors` is emptied by the refusal.  The delivery lines must be
+        required of the log whichever way the record reads, so clearing them from a copy of the log
+        must fail — that negative control is what the helper is unconditional for.
+        """
+        real_open = os.pidfd_open
+        pins: list[int] = []
+
+        def opening(pid: int, *flags: int) -> int:
+            if not flags:  # the runner's pin calls `os.pidfd_open(pid)`; `subprocess` passes flags
+                pins.append(pid)
+                if len(pins) >= 2:
+                    raise OSError(errno.EMFILE, "Too many open files")
+            return real_open(pid, *flags)
+
+        self.patch(os, "pidfd_open", opening)
+        self.patch(runner, "KILL_GRACE_SECONDS", 0.3)
+        entry, pids = self.run_abnormal_fixture("held", HELD_LEADER, env={}, timeout="3")
+        leader_pid, child_pid = pids
+        self.assertEqual(len(pins), 2, "the run did not pin the target once per round")
+        teardown = entry["teardown"]
+        self.assertEqual([(item["pid"], item["signal"], item["stopped"])
+                          for item in teardown["delivered"]],
+                         [(leader_pid, "SIGTERM", False)],
+                         "the delivered SIGTERM is not in the record")
+        self.assertIn("was not sent SIGKILL", " ".join(teardown["refused"]),
+                      "the refused SIGKILL and its reason are missing from the record")
+        self.assertIn("Too many open files", " ".join(teardown["refused"]))
+        self.assertEqual(teardown["clauses"], [],
+                         "a later refusal emptied a record that delivered a signal")
+        self.assertEqual(teardown["survivors"], [],
+                         "a process that took no SIGKILL is not a survivor")
+        self.assertFalse(teardown["verified"], teardown)
+        self.assertEqual([signal_name for signal_name, _pid, _start
+                          in parse_delivery_lines(Path(entry["log"]).read_text(encoding="utf-8"))],
+                         ["SIGTERM"], "the log does not carry exactly the delivery that happened")
+        self.assert_no_delivery_to(entry, child_pid)
+        self.assertTrue(process_running(leader_pid),
+                        "the fixture ignores SIGTERM, so it must still be running")
+        self.assertTrue(process_running(child_pid),
+                        "the member was signalled although the run signals only what it spawned")
+        cleared = ARTIFACTS / "held-cleared.log"
+        cleared.write_text("\n".join(
+            line for line in Path(entry["log"]).read_text(encoding="utf-8").splitlines()
+            if runner.DELIVERY_MARKER not in line) + "\n", encoding="utf-8")
+        with self.assertRaises(AssertionError,
+                               msg="a cleared log passed for a run that delivered a signal"):
+            self.assert_no_delivery_to({**entry, "log": str(cleared)}, child_pid)
+
+    @unittest.skipUnless(can_deliver_signals(),
+                         "the path needs one real delivery before the missing constant")
+    def test_a_host_without_the_final_signal_records_the_refusal_it_cannot_send(self):
+        """A signal name this platform does not define is a refusal, never a silently skipped round.
+
+        Model: the host can deliver (pidfds, `/proc`, the observation all hold) but `signal.SIGKILL`
+        is gone, and the fixture ignores SIGTERM — the escalation's first round really delivers and
+        logs, and the second round must record that it could not send its signal.  The record names
+        the missing constant, the target is still running, and nothing claims it was terminated or
+        that it survived a signal nobody sent.
+        """
+        kill_signal = signal.SIGKILL
+        self.remove_attribute(signal, "SIGKILL")
+        pids_file = ARTIFACTS / "no-final-signal-pids.txt"
+        pids_file.unlink(missing_ok=True)
+        # Registered before the run: this fixture ignores SIGTERM and only the test can stop it, so a
+        # run that dies before the pids below are registered must not leak it.
+        self.addCleanup(stop_recorded_pids, pids_file, kill_signal)
+        root = synthetic_tree(patterns=["scripts/test_*.py"], prune=[], floor=[],
+                              suites="\n".join([
+                                  "[[suite]]",
+                                  'path = "scripts/test_held.py"',
+                                  f'env = {{ PID_FILE = "{pids_file}" }}',
+                                  "",
+                              ]))
+        write_suite(root, "scripts/test_held.py", HELD_LEADER)
+        self.patch(runner, "KILL_GRACE_SECONDS", 0.5)
+        code, output, payload = self.run_main_leaving_strays(root, "--timeout", "3")
+        self.assertEqual(code, 1, output)
+        entry = self.states(payload)["scripts/test_held.py"]
+        self.assertEqual(entry["state"], "TIMEOUT")
+        leader_pid, child_pid = self.leftover_pids_with(pids_file, kill_signal)
+        teardown = entry["teardown"]
+        self.assertEqual([(item["pid"], item["signal"], item["stopped"])
+                          for item in teardown["delivered"]],
+                         [(leader_pid, "SIGTERM", False)], teardown)
+        self.assertIn("this platform defines no SIGKILL", " ".join(teardown["refused"]),
+                      "the round that could not resolve its constant is not in the record")
+        self.assertEqual(teardown["survivors"], [],
+                         "a target nothing could finish off is not a survivor")
+        self.assertEqual(teardown["clauses"], [],
+                         "nothing terminated the target, so no clause may claim it")
+        self.assertFalse(teardown["verified"], teardown)
+        self.assert_no_delivery_to(entry, child_pid)
+        self.assertTrue(process_running(leader_pid),
+                        "the fixture must still be running: no signal could stop it")
+
+    def test_only_an_executed_suite_publishes_the_teardown_record(self):
+        """An executed suite's entry always carries the full record; one that never ran has none.
+
+        The record is the evidence surface, so its key set is pinned as a whole — a rename must fail
+        loudly rather than read as an empty field — and both ways a suite is not executed publish
+        None instead of a record that pretends a teardown happened: a covered child, whose evidence
+        lives in its parent's log, and a condition-skipped suite.
+        """
+        root = synthetic_tree(patterns=["scripts/test_*.py", "scripts/tests/test*.py"], prune=[],
+                              floor=[], suites="\n".join([
+                                  "[[suite]]",
+                                  'path = "scripts/test_pass.py"',
+                                  "",
+                                  "[[suite]]",
+                                  'id = "canned:pr-only"',
+                                  'condition = "pull_request"',
+                                  'skip_reason = "the local event does not run PR gates"',
+                                  'command = [["{python}", "-c", "print(\'pr-only: 1/1 ok\')"]]',
+                                  'assertion = "counter"',
+                                  'count_regexes = ["^pr-only: (?P<passed>\\\\d+)/'
+                                  '(?P<total>\\\\d+) ok$"]',
+                                  "",
+                                  "[[suite]]",
+                                  'path = "scripts/tests/test-child.py"',
+                                  'covered_by = "scripts/test_pass.py"',
+                                  'assertion = "unittest"',
+                                  "required = false",
+                                  "",
+                              ]))
+        write_suite(root, "scripts/test_pass.py",
+                    "# executes scripts/tests/test-child.py in production\n" + PASS_SUITE)
+        write_suite(root, "scripts/tests/test-child.py", "print('never scheduled on its own')\n")
+        code, output, payload = self.run_main(root)
+        entries = self.states(payload)
+        executed = entries["scripts/test_pass.py"]
+        self.assertEqual(executed["state"], "PASS", output)
+        self.assertEqual(set(executed["teardown"]),
+                         {"verified", "delivered", "clauses", "survivors", "unverified", "refused"},
+                         "the published record's fields are the record's contract")
+        self.assertEqual(executed["teardown"]["delivered"], [])
+        self.assertTrue(executed["teardown"]["verified"], executed["teardown"])
+        self.assertEqual(entries["canned:pr-only"]["state"], "SKIP", output)
+        self.assertIsNone(entries["canned:pr-only"]["teardown"],
+                          "a suite that never executed published a record")
+        self.assertIsNone(entries["scripts/tests/test-child.py"]["teardown"],
+                          "a covered child published a record of its own")
+        self.assertEqual(code, 0, output)
 
     def test_covered_child_with_a_hiding_counter_line_is_error(self):
         """Contradictory counter evidence may not settle PASS by way of `covered_by`.
