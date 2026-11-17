@@ -37,6 +37,8 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
   user-provided patterns in `hoa-skill-create`.
 - Restored audit CLI regression coverage for unresolved Git markers, manifest ordering, file size,
   and unreadable sources. Documented the shared audit state namespace and retro config overrides.
+- gdd: add a shared headless runner for OMP and DSH, with event fixtures and pytest coverage
+  on Ubuntu, macOS and Windows.
 
 - Trigger evals now route on visible skills' frontmatter descriptions, accept `none` when no
   artifact fits, and include three no-trigger cases.

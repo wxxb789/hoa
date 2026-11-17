@@ -86,3 +86,19 @@ jobs:
         working-directory: paseo-plugins/gdd-run-observer
         timeout-minutes: 5
         run: npm ci && npm run typecheck && npm test
+
+  gdd-runner:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]  # Ubuntu is covered by the test job.
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r scripts/requirements.txt
+      - name: Shared gdd runner contract
+        run: python -m pytest skills/gdd/scripts/tests/test_agent_run.py -q

@@ -1,0 +1,15 @@
+# SYNTHETIC: dsh is not installed on the recording host. Built from the event shapes measured and
+# recorded in the retired dsh-run.py docstring (`dsh --profile headless --json ... -`).
+{"type": "session", "sessionId": "dsh-session-0001", "cwd": "/work/repo"}
+{"type": "status", "turn": 1, "step": 1, "phase": "turn_start"}
+{"type": "status", "turn": 1, "step": 1, "phase": "step_start"}
+{"type": "thinking", "text": "run the check first", "truncated": false}
+{"type": "tool_call", "callId": "c1", "tool": "bash", "input": {"command": "echo hi"}}
+{"type": "tool_result", "callId": "c1", "status": "completed", "result": "hi", "truncated": false}
+{"type": "status", "turn": 1, "step": 1, "phase": "step_end", "usage": {"inputTokens": 100, "outputTokens": 20, "totalTokens": 120, "cacheReadTokens": 5}}
+{"type": "status", "turn": 1, "step": 2, "phase": "step_start"}
+{"type": "tool_call", "callId": "c2", "tool": "read", "input": {"path": "README.md"}}
+{"type": "tool_result", "callId": "c2", "status": "completed", "result": "# repo", "truncated": false}
+{"type": "text", "text": "Checked: hi."}
+{"type": "status", "turn": 1, "step": 2, "phase": "turn_end", "reason": {"kind": "completed"}, "usage": {"inputTokens": 250, "outputTokens": 40, "totalTokens": 290, "cacheReadTokens": 80}}
+{"type": "final", "sessionId": "dsh-session-0001", "reason": {"kind": "completed"}, "text": "done"}
