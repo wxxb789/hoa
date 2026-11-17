@@ -8,7 +8,7 @@ description: >-
   stopped or recovered, or when the DSH launcher route needs configuring. Not for deciding what to build
   (that is the goal contract) and not for the delivery protocol itself (that is `gdd`).
 metadata:
-  version: "0.1.65"
+  version: "0.1.66"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "dispatch and supervise a GDD stage on dsh headless: session/worktree rules, completion judgement, recovery, harness traps"

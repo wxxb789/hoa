@@ -3,6 +3,96 @@
 Notable changes to this repo. `VERSION` is authoritative for all custom skills;
 their YAML `metadata.version` fields mirror it. Earlier entries retain historical per-skill versions.
 
+## [0.1.66] — 2026-11-16
+
+### Added
+
+- `scripts/run_all_tests.py` discovers, isolates and settles every repository test suite from the
+  data in `scripts/test_manifest.toml`: named entry-point patterns only, a reviewed discovery floor
+  that turns a shrunken discovery set into a plan error, per-suite process groups with task-local
+  TMPDIR/HOME/XDG roots and a timeout, and PASS/FAIL/ERROR/TIMEOUT/SKIP terminal states with a JSON
+  result record.
+- Tested assertion adapters stop a required suite from passing with zero executed checks: declared
+  unittest suites reject `Ran 0 tests`, a missing summary and an all-skipped summary (`Ran N tests` is
+  unittest's collection count, not execution), the custom-assertion suites must report a positive
+  count, and a covered child settles from the parent output that claims to run it under the same
+  counter-consistency rule as a scheduled suite — a line whose totals contradict the parent's PASS is
+  ERROR, not PASS.
+- The manifest declares the non-glob suites discovery cannot name: five static gates, three
+  pull-request gates, the three Bun CDP packages, and the `paseo-plugins/gdd-run-observer` Vitest
+  package with its own cwd, provisioning, typecheck and test commands.
+- Coverage the old globs missed: `skills/ghc-search/scripts/test_ghc_search.py`, plus two Python
+  suites that existed but were never wired into CI —
+  `skills/delegated-work-acceptance/scripts/tests/test_worktree_scope.py` and
+  `skills/gdd/scripts/tests/test_paseo_run_python.py`.
+
+### Changed
+
+- The CI test job installs the runtimes and dependencies, then calls the discoverer. The 34 hand-written
+  test-job commands it replaces are reconciled entry by entry in `scripts/test_manifest.toml`, and were
+  deleted only once `scripts/test_run_all_tests.py` reproduced every fault plan §4 item 8 requires red —
+  a syntax error, a failing assertion, a hang, a missing runtime and an empty discovery set; the
+  fault-to-detector mapping is in `docs/evidence/2026-11-14-catalog-refactor.md`.
+- Per-suite scratch trees are created under `/tmp` whenever it can hold a directory (an inherited
+  operator `TMPDIR` is consulted only where it cannot, and `--scratch` overrides the location); the
+  default is outside the checkout, and a root whose worst-case tmux socket would exceed the 108-byte
+  `sun_path` limit is reported as that suite's ERROR before it runs instead of failing later as a tmux
+  mystery.
+- Suite processes keep the shim toolchain's absolute state directories (`MISE_STATE_DIR`,
+  `MISE_DATA_DIR`), so a mise-managed `bun` on `PATH` runs under the task-local `HOME` instead of
+  refusing with "Config files … are not trusted" or re-installing the tool into the scratch tree.
+- Teardown is observed, not assumed, and stops at the one process the run can prove is its own. The
+  teardown terminates the process the runner spawned — TERM, a bounded grace, KILL, re-pinned
+  through a pidfd at every round — and *reports, without touching*, everything else that command
+  left behind: the members of the group it led, and the processes still holding its task-local
+  scratch (identified by the cwd they were started in or the scratch paths in their environment,
+  from `/proc`). The rule is deliberately narrow: the runner signals only the process it spawned,
+  because that is the one process whose identity it recorded itself — a same-group member, a scratch
+  holder or any descendant is named in the suite's record and left running, and the suite's teardown
+  is `unverified` whenever such a process is found. Nothing is ever broadcast to a process group,
+  and no signal goes through a bare pid or group number; the spawned process's identity (its pid and
+  the start time `/proc/<pid>/stat` field 22 read at spawn) is pinned *at delivery* — pidfd opened,
+  start time re-read and required to equal the record — so a pid someone else's reap recycled cannot
+  receive the run's signal, a process that has already terminated takes no signal at all, and only a
+  process that took a delivered SIGKILL and outlived the grace is recorded as a survivor. Ownership
+  is an invariant the run maintains, not a fact sampled once: it puts its own `SIGCHLD` disposition
+  in `SIG_DFL` before anything is spawned (an inherited `SIG_IGN` has the kernel reap a child —
+  status and all — inside its own exit) and observes a command's exit without reaping it (`waitid`
+  with `WNOWAIT`), which keeps the pid from being recycled while the teardown still needs it; the
+  group is read before a command is reaped, so what a clean exit left behind is reported while the
+  number is still that command's own. Where the proof cannot be held — no kernel probe, no
+  established disposition, no pidfd, no `/proc`, an externally reaped child, a platform without the
+  capability — nothing is signalled, nothing falls back to `Popen`'s cached `returncode` (which
+  cannot see a reap) or to a bare pid or group number, and the record says teardown is unverified. A
+  refused delivery waits out no kill grace and is never written as a survivor or as a delivery the
+  log never made: the record is a rendering of the escalation's ordered attempts — `delivered`, every
+  signal really sent with the identity pinned at delivery and whether it stopped the target, and
+  `refused`, one note per round that sent nothing (a missing capability, an unresolvable signal name,
+  an identity that could not be pinned, a target already gone) — so a round a later refusal
+  interrupted stays delivered, and a delivery line in the suite's log and a delivery in the record
+  are the same attempt — `scripts/test_run_all_tests.py` checks the log against the record, and the
+  record against the signal the kernel accepted, for every run it drives. Every exit path — clean,
+  timed out or signalled — carries the teardown record, limits included, into the settled outcome
+  and the published result, so a limit is readable by whoever reads the run instead of vanishing
+  with the helper that found it; and a command whose exit can no longer be waited for settles as an
+  error rather than taking the discoverer down. Residual limit, stated plainly: the runner signals
+  only the process it spawned, so whatever else a suite leaves behind outlives the run — on a host
+  with no pidfd, no `/proc` or no established `SIGCHLD`
+  disposition nothing is signalled at all, and each teardown records that limit. Both launcher suites
+  declare the detached resource the report covers in `scripts/test_manifest.toml`.
+- The suite `PATH` prepends the selected interpreter's own directory without resolving it: a POSIX
+  virtual environment's `bin/python3` is a symlink to the base interpreter, and resolving it handed a
+  suite's own `python3` the base interpreter instead of the environment that carries the repository
+  dependencies. `scripts/test_run_all_tests.py` measures that against a real virtual environment.
+- The merge with main accounts for the merge-gate suites its CI added: `test_verdict_matrix.py` is
+  discovered and refined with a counter adapter (its `unittest.mock` import would otherwise make
+  `auto` read it as a unittest suite its summary format is not), and `mutate_verdict_matrix.py`,
+  which no discovery pattern names, is declared — both keep running in the discoverer's job.
+- The DSH route's suite, `test_dsh_run_python.py`, arrives discovered: the `test*.py` pattern
+  schedules it, its detached runner and agent processes are declared in the manifest, and its
+  measured 94-126s wall time on the 4-core host makes the 300s timeout explicit.
+- Bumped shared skill/catalog version from 0.1.65 to 0.1.66.
+
 ## [0.1.65] — 2026-11-15
 
 ### Added

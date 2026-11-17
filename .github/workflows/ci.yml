@@ -13,134 +13,33 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
+      # ── provisioning: runtimes and dependencies the discoverer's suites declare ──
+      # The per-suite commands these steps used to spell out one by one now live in
+      # scripts/test_manifest.toml, which scripts/run_all_tests.py applies.
       - uses: actions/checkout@v4
         with:
+          # The version and changelog gates read origin/main.
           fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Install repository script dependencies
-        run: python -m pip install -r scripts/requirements.txt
-
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.4.4"
 
-      - name: Desktop CDP types and behavioral tests
-        run: |
-          for dir in scripts/shared skills/teams-cdp/scripts skills/m365-copilot-cdp/scripts; do
-            (cd "$dir" && bun install --frozen-lockfile && bun run check && bun test)
-          done
+      # The Paseo plugin package needs npm; its README documents Node 20.19.4+.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.4"
 
-      - name: Shared script drift check
-        run: python scripts/vendor_shared.py --check
+      - name: Install repository script dependencies
+        run: python -m pip install -r scripts/requirements.txt
 
-      - name: GDD loop selftest
-        run: bash skills/gdd/scripts/tests/run-gdd-selftest.sh
-
-      - name: GDD machine-review evidence tests
-        run: python skills/gdd/scripts/tests/test_review_evidence.py
-
-      - name: GDD merge-gate verdict matrix
-        run: python3 skills/gdd/scripts/tests/test_verdict_matrix.py
-
-      - name: GDD merge-gate mutation harness
-        run: python3 skills/gdd/scripts/tests/mutate_verdict_matrix.py
-
-      - name: GDD launcher forwarder tests
-        run: bash skills/gdd/scripts/tests/test-omp-run-stale.sh
-
-      - name: GDD launcher setsid backend tests
-        run: bash skills/gdd/scripts/tests/test-omp-run-setsid.sh
-
-      - name: GDD launcher Python adapter tests
-        run: python3 skills/gdd/scripts/tests/test_omp_run_python.py
-
-      - name: GDD CI watcher tests
-        run: python3 skills/gdd/scripts/tests/test_watch_pr_checks.py
-
-      - name: Routing inventory fixture tests
-        run: python3 skills/hermes-models/scripts/tests/test-routing-inventory.py
-
-      - name: Provider metadata fixture tests
-        run: python3 skills/hermes-models/scripts/tests/test-provider-metadata.py
-
-      - name: Skill catalog drift check
-        run: python scripts/generate_index.py --check
-
-      - name: Composition contract graph
-        run: python scripts/check_contract_graph.py
-
-      - name: Contract graph checker tests
-        run: python scripts/test_check_contract_graph.py
-
-      - name: Skill configuration resolver tests
-        run: python -m unittest scripts.test_skill_config
-
-      - name: Index generator tests
-        run: python scripts/test_generate_index.py
-
-      - name: Catalog measurement convention tests
-        run: python scripts/test_catalog_measurement.py
-
-      - name: Host install parity tests
-        run: python -m unittest scripts.test_install_host_skills
-
-      - name: Changelog rule tests
-        run: python -m unittest scripts.test_check_changelog
-
-      - name: SKILL.md frontmatter and catalog fields
-        run: python scripts/check_frontmatter.py
-
-      - name: Frontmatter checker tests
-        run: python -m unittest scripts.test_check_frontmatter
-
-      - name: Unified version and catalog check
-        run: python scripts/version.py check
-
-      - name: Pull request bumps the patch
-        if: github.event_name == 'pull_request'
-        run: python scripts/version.py check-bump
-
-      - name: Pull request adds a changelog entry
-        if: github.event_name == 'pull_request'
-        run: python scripts/check_changelog.py --base origin/main
-
-      - name: Version claim is still free
-        if: github.event_name == 'pull_request'
-        run: python scripts/version.py check-merge
-
-      - name: Unified version tests
-        run: python scripts/test_version.py
-
-      - name: Automatic release tests (isolated local Git remotes)
-        run: python scripts/test_release.py
-
-      - name: ghc-search tests
-        run: python skills/ghc-search/scripts/test_ghc_search.py
-
-      - name: hoa-introspect evals
-        run: python skills/hoa-introspect/evals/run.py
-
-      - name: hoa-introspect-distill evals
-        run: python skills/hoa-introspect-distill/evals/run_evals.py
-
-      - name: define-goal fixture validation
-        run: python skills/define-goal/evals/validate_fixtures.py
-
-      - name: Trigger-eval case validation
-        run: python evals/run_trigger_evals.py
-
-      - name: Eval judge configuration and baseline tests
-        run: python -m unittest evals.test_judge_trigger_evals
-
-      - name: Skill-method case validation
-        run: python evals/validate_skill_method_cases.py
-
-      - name: Skill-method setup isolation tests
-        run: python -m unittest evals.test_validate_skill_method_cases
+      # ── every suite: discovered patterns, declared gates, declared packages ──
+      - name: Repository test discoverer
+        run: python scripts/run_all_tests.py
 
   release:
     needs: test

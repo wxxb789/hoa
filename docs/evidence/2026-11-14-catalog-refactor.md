@@ -125,3 +125,36 @@ existing unanimous contracts. The corrected plan retains safety/governance issue
 No future discoverer/fault injection, C1/C2 checker, split behavior/install/routing acceptance or
 host migration is claimed complete. This PR's acceptance is corrected attributable facts, dispositions,
 reproducible measurements and the repository's real PR gates/review.
+
+## The discoverer's deletion precondition (plan §4 item 8)
+
+Added by the discoverer increment (goal 0001, `feat/0001-test-discoverer`); the plan-correction
+record above is unchanged.
+
+At the base revision `32553f9` the CI `test` job had 38 steps: three setup actions, one provisioning
+run step (`python -m pip install -r scripts/requirements.txt`, kept) and 34 run steps spelling out
+suites. All 34 are replaced by entries the discoverer schedules from `scripts/test_manifest.toml`: a
+step whose command needed a declaration, a preserved `-m unittest` invocation or an assertion adapter
+has an entry whose `notes` name it, and a step whose file the discovery patterns already match runs
+unchanged. The job adds `actions/setup-node` for the newly scheduled Paseo Vitest package.
+
+Plan §4 item 8 requires five injected faults to go red while the remaining suites still settle, and the
+zero-collection adapters separately. Those fault transcripts were operator-held and are not in the
+branch, so the durable form of that evidence is the detector each fault has here:
+
+| fault plan §4 item 8 names | detector in `scripts/test_run_all_tests.py` |
+|---|---|
+| syntax error | `EndToEndTests.test_every_suite_settles_and_the_run_goes_red_for_the_broken_ones`: the injected `test_syntax.py` settles FAIL while every other suite reaches a terminal state |
+| failing assertion | the same test: `test_fail.py` settles FAIL, exit 1 |
+| hang | the same test, plus three teardown detectors: `test_timeout_tears_down_the_whole_process_group` (TIMEOUT and no process of the killed group survives), `test_timeout_escalates_while_a_group_member_ignores_sigterm` (the escalation outlives a leader that exits on SIGTERM, and the record says so) and `test_timeout_stops_detached_workers_before_the_scratch_goes` (a `start_new_session` worker is stopped before the records it polls are deleted) |
+| missing runtime | the same test: `canned:missing-runtime` settles ERROR (environment), never FAIL |
+| empty discovery set | `DiscoveryTests.test_empty_discovery_is_a_plan_error`, `test_unmet_floor_is_a_plan_error` and `EndToEndTests.test_an_untrustworthy_plan_exits_two_and_says_so` (exit 2, both problems named) |
+| zero-test unittest and zero-count custom adapters (separately required) | `SettleTests.test_unittest_suite_with_zero_collected_tests_is_error`, `test_unittest_suite_that_skips_every_test_is_error`, `test_counter_suite_with_zero_checks_is_error`, `test_covered_unittest_child_that_skips_every_test_is_error`, and the same end-to-end test's `test_zero.py`, `test_skipped.py` and `canned:empty-counter` |
+
+The hang row's three detectors were renamed by PR #69 when the teardown stopped signalling anything but
+the process the run spawned; the faults they detect are unchanged, and they are now
+`EndToEndTests.test_timeout_stops_the_process_it_spawned_and_reports_the_group`,
+`test_escalation_stops_the_spawned_process_and_the_member_is_only_reported` and
+`test_a_detached_worker_is_reported_before_the_scratch_goes` (the same TIMEOUT, the same TERM →
+grace → KILL escalation — now applied to the process the run spawned, whose own exit on SIGTERM ends
+it — and a `start_new_session` worker named in the record and left running instead of stopped).

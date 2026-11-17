@@ -179,6 +179,54 @@ implementation, acceptance-verdict, scope-seal). Every rule is enforced by that 
 The `test` job runs on every push to `main`, every pull request, and `workflow_dispatch`; the
 `release` job runs only after it on `main` and tags the commit CI tested.
 
+The `test` job provisions the runtimes and dependencies, then runs
+`python scripts/run_all_tests.py`. That discoverer schedules the commands below as entries in
+`scripts/test_manifest.toml` rather than as separate CI steps (the table is being converged onto the
+manifest in a later step of this series, and its `scripts/release.py` row describes the release job's
+own command, not a scheduled suite). It also schedules the Python suites that were never wired in
+before —
+`skills/delegated-work-acceptance/scripts/tests/test_worktree_scope.py` and
+`skills/gdd/scripts/tests/test_paseo_run_python.py` — and the `paseo-plugins/gdd-run-observer` Vitest
+package.
+
+Settling is anti-false-green. Zero executed checks never settles PASS, and a counter must account for
+every check it did not pass — including a suite that settles from a parent's log through
+`covered_by`. Each suite runs in its own process group and task-local scratch tree; a suite that did
+not finish under its own control — the runner timed it out, or a signal killed it — has the process
+the run spawned terminated, while everything else that command left behind is *reported and left
+alone*: the members of the group the command led, and the processes still holding the suite's
+task-local scratch (found by the cwd they were started in or the scratch paths in their environment,
+from `/proc`). The rule is deliberately narrow — **the runner signals only the process it spawned** —
+because that is the one process whose identity it recorded itself; a same-group member, a scratch
+holder or any descendant is named in the suite's record and keeps running, and the suite's teardown
+is `unverified` whenever such a process is found, so the limit is readable in the result instead of
+being silently absorbed. Nothing is ever broadcast to a process group, and no signal ever goes
+through a bare pid or group number. The spawned process's identity — its pid and the start time
+`/proc/<pid>/stat` field 22 read at spawn — is pinned *at delivery* rather than sampled before it: a
+pidfd is opened for that pid (`os.pidfd_open`), the start time is re-read and must equal the recorded
+one, and only then is the signal sent through `signal.pidfd_send_signal`. The pidfd pins that
+process instance, so a pid someone else's reap recycled cannot receive the run's signal, a target
+that is gone is reported as gone, a process that has already terminated takes no signal at all, and
+escalation (TERM, a bounded grace, KILL) re-pins the target in every round instead of reusing an
+earlier round's authority. The run also establishes its own `SIGCHLD` disposition (`SIG_DFL`) before
+spawning anything and observes a command's exit without reaping it (`waitid` with `WNOWAIT`), which
+is what keeps the pid from being recycled while the teardown still needs it; the group the command
+led is read before the command is reaped, so what a clean exit left behind is reported while the
+number is still the command's own. Where any of that proof cannot be held — no established or
+still-live disposition, no kernel probe, no pidfd, no `/proc` to read the identity from, a
+start-time re-check that fails, a target reaped by someone else — nothing is signalled and the
+teardown is reported unverified; there is no fallback to `Popen`'s cached `returncode` (which cannot
+see a reap) or to a bare pid or group number (which can name anything by the time it is used). Every
+exit path — clean, timed out or signalled — publishes the teardown record, limits included, in the
+suite's entry of the result, so a limit is readable by whoever reads the run and not only by the
+helper that found it; and a command whose exit can no longer be waited for settles as an error
+rather than taking the run down. **Residual limit, stated plainly:** the runner signals only the
+process it spawned, so whatever else a suite leaves behind — a same-group member, a detached holder,
+any descendant — outlives the run; the teardown's record names it and says it was left alone. The
+gates bound the teardown's reach on real platforms: macOS and Windows expose no pidfds (and no
+`/proc`), so there nothing is ever signalled — each teardown refuses and records that limit — while
+on Linux the same run gates every delivery as described above.
+
 | Gate command (CI step) | Protects |
 |---|---|
 | `bun install --frozen-lockfile && bun run check && bun test` in `scripts/shared`, `skills/teams-cdp/scripts`, `skills/m365-copilot-cdp/scripts` | Desktop CDP types and behavior in the shared code and both desktop skills. |

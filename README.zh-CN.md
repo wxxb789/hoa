@@ -167,6 +167,39 @@ scope-seal）。每条规则都由该命令执行：
 `test` job 在每次 push 到 `main`、每个 pull request 与 `workflow_dispatch` 时运行；`release`
 job 只在 `main` 上、`test` 成功之后运行，并为 CI 验证过的提交打 tag。
 
+`test` job 先装好运行时与依赖，然后运行 `python scripts/run_all_tests.py`。该 discoverer 将下表
+中的每一条命令作为 `scripts/test_manifest.toml` 里的 manifest 条目来调度，而非独立的 CI
+step（该表将在本系列的后续步骤中与 manifest 收敛；表末 `scripts/release.py` 一行描述的是
+release job 自己的命令，不是被调度的测试套件）。它同时调度此前从未接入 CI 的 Python 测试套件——
+`skills/delegated-work-acceptance/scripts/tests/test_worktree_scope.py` 与
+`skills/gdd/scripts/tests/test_paseo_run_python.py`——以及 `paseo-plugins/gdd-run-observer`
+这个 Vitest 包。
+
+结算是防假绿的：零执行检查永远不是 PASS，counter 必须交代每一个未通过的检查——包括通过
+`covered_by` 依据父套件日志结算的子套件。每个套件在自己的进程组与任务级 scratch 目录中运行；
+未能按自身流程收尾的套件（被 runner 超时终止，或被信号杀死）只会终止**本运行 spawn 的那一个
+进程**，其余一切都只**报告、不碰**：该命令所领导组的成员，以及仍持有该套件任务级 scratch 的进程
+（按启动时的 cwd 或环境中的 scratch 路径识别，读 `/proc`）。规则刻意收窄——**runner 只对本运行
+spawn 的进程发信号**——因为只有那个进程的身份是本运行自己记下的；同组成员、scratch 持有者、任何
+后代都只会在记录里被点名并继续运行，而且只要发现这类进程，该套件的 teardown 就是 `unverified`，
+让这条限制出现在结果里，而不是被悄悄吸收。绝不向进程组广播，也绝不通过裸 pid 或组号发信号。
+被 spawn 进程的身份（pid 与 spawn 时读到的 `/proc/<pid>/stat` 第 22 字段：起始时间）是**投递时**
+钉住的，而不是之前采样来的：为该 pid 打开 pidfd（`os.pidfd_open`），重读起始时间并要求等于记下的
+那个，然后才经 `signal.pidfd_send_signal` 发信号。pidfd 钉住的是那个进程实例，所以被别人的 reap
+释放、又被内核复用的 pid 收不到本运行的信号；已经消失的目标记为消失；已经终止的进程根本不会收到
+信号；升级（TERM → 有界宽限 → KILL）每一轮都重新钉住目标，绝不复用上一轮的授权。spawn 之前本运行
+还会把自己的 `SIGCHLD` 处置置为 `SIG_DFL`，并以不 reap 的方式观察命令退出（`waitid` + `WNOWAIT`），
+这才让 pid 在 teardown 还需要它时不会被回收复用；组在命令被 reap 之前读取，所以干净退出留下的成员
+会在组号仍属于该命令时被如实报告。证明拿不到时——处置没能建立或已不再存活、没有内核探针、没有
+pidfd、没有 `/proc` 可读身份、起始时间复核失败、目标被别人 reap——一律不发信号，teardown 记为
+unverified；既不退回 `Popen` 缓存的 `returncode`（它看不见 reap），也不退回裸 pid 或组号（用时它
+可能已经指向别的什么）。每条退出路径——干净退出、超时、被信号杀死——都把 teardown 记录（含它证明
+不了的部分）写进结果里的套件条目，让看记录的人看得到而不止产生它的那个 helper；再也无法等待其退出
+的命令按错误结算，而不是把整轮运行拖下水。**残留限制写明**：runner 只对 spawn 的进程发信号，所以
+套件留下的其他进程——同组成员、detached 持有者、任何后代——都会活过本轮运行，记录会点名它们并写明
+未被触碰。这些门槛也决定了 teardown 在各平台上的上限：macOS 与 Windows 没有 pidfd（也没有
+`/proc`），那里永远不发信号——每次 teardown 都拒绝并如实记录——Linux 上则按上面的方式逐次把关。
+
 | 检查命令（CI step） | 保护什么 |
 |---|---|
 | 在 `scripts/shared`、`skills/teams-cdp/scripts`、`skills/m365-copilot-cdp/scripts` 中运行 `bun install --frozen-lockfile && bun run check && bun test` | 共享代码与两个桌面 skill 的 CDP 类型和行为。 |
