@@ -441,6 +441,25 @@ def pidfd_target(fd: int) -> int | None:
     return None
 
 
+def proc_start_time(pid: int) -> str | None:
+    """`/proc/<pid>/stat` field 22, read here rather than through the runner's own readers.
+
+    The spy's reading must be independent of the code under test, so this parses the file itself —
+    the command name can contain spaces and parentheses, so the fields begin after the *last* `)` —
+    and indexes field 22 itself; a runner that read a different field, or shared its parse with the
+    record, could not have the two readings agree by construction (the identity pins in
+    `StartTimeOracleTests` compare the runner's own readings against this one).
+    """
+    try:
+        with open(f"/proc/{pid}/stat", "rb") as handle:
+            raw = handle.read()
+    except OSError:
+        return None
+    close = raw.rfind(b")")
+    fields = raw[close + 1:].split() if close >= 0 else []
+    return fields[19].decode() if len(fields) > 19 else None
+
+
 def delivery(pid: int, signal_name: str = "SIGTERM", *, start: str = "1", stopped: bool = False):
     """One delivery attempt in the model's own terms, for tests that state a record directly."""
     return runner.Delivery(pid=pid, start=start, signal=signal_name, stopped=stopped)
@@ -467,11 +486,13 @@ class DeliverySpy:
     """The kernel boundary of one in-process run: the signals it really sent.
 
     Records `(signal name, target pid, start time)` for every successful
-    `signal.pidfd_send_signal` call, read back from the pidfd the call went through, and traps the
-    APIs the run must never use for a delivery (`os.kill`, `os.killpg`) — signal 0 is allowed,
-    because a liveness probe through a bare pid is not a delivery and the runner is entitled to it.
-    Only attributes this platform exposes are patched (a host without pidfds cannot deliver at all,
-    and the refusal it records instead is what the tests pin there), and `close()` restores them
+    `signal.pidfd_send_signal` call, read back from the pidfd the call went through — the start
+    time from `proc_start_time`'s own parse of `/proc/<pid>/stat`, never through the runner's
+    readers, so the kernel reading and the record cannot agree by construction — and traps the APIs
+    the run must never use for a delivery (`os.kill`, `os.killpg`): signal 0 is allowed, because a
+    liveness probe through a bare pid is not a delivery and the runner is entitled to it.  Only
+    attributes this platform exposes are patched (a host without pidfds cannot deliver at all, and
+    the refusal it records instead is what the tests pin there), and `close()` restores them
     immediately, so no cleanup that runs outside the run under test is ever trapped.  A target that
     cannot be read back is reported separately instead of being dropped: an unreadable delivery is
     evidence the assertion must see, not evidence to skip.
@@ -488,7 +509,7 @@ class DeliverySpy:
             def record_send(fd: int, signum: int, *flags: int) -> None:
                 target = pidfd_target(fd)
                 real_send(fd, signum, *flags)
-                start = runner._start_time(target) if target is not None else None
+                start = proc_start_time(target) if target is not None else None
                 if target is None or start is None:
                     self.unresolved.append(f"{signal.Signals(signum).name} through fd {fd}")
                 else:
@@ -526,9 +547,11 @@ def assert_delivery_boundary(spy: DeliverySpy, payload: dict) -> None:
     the run's record publishes as `delivered`, and what each suite's log carries as delivery lines.
     None of the three is trusted over another and none is optional — a signal sent but not recorded,
     a record entry with no syscall behind it, a line with no entry, or a line the runner's pattern
-    cannot read are all failures here.  Cross-suite order is not compared (suites run concurrently,
-    so wall-clock order across suites is not the run's own); within a suite the record's order is
-    compared with its log's order, which is the run's own.
+    cannot read are all failures here.  Suites are settled one after another (`main` runs
+    `run_suite` over the plan in a plain loop; nothing is scheduled concurrently), so each suite's
+    own order is the run's own and is compared — the record's `delivered` against that suite's
+    log — while no cross-suite concatenation is compared: the record publishes deliveries per suite
+    and no artifact of the run states a global order.
     """
     if spy.forbidden:
         raise AssertionError(f"the run signalled outside its delivery path: {spy.forbidden}")
@@ -1234,12 +1257,12 @@ class TeardownRecordTests(unittest.TestCase):
         self.assertFalse(merged.verified)
 
     def test_a_record_the_escalation_cannot_have_produced_is_refused(self):
-        """The illegal escalation shapes are unrepresentable, not merely unlikely.
+        """The orderings the outcome rules forbid are refused where the record is built.
 
-        A sequence this machine cannot produce is rejected where the record is built: an attempt
-        after a refusal or after a delivery that stopped the target, and an escalation that ends on
-        a delivery which is neither stopped nor the final signal — the shape that would leave
-        "delivered something, stopped nothing, refused nothing, no limit" readable as verified.
+        Per pid: an attempt after a refusal or after a delivery that stopped the target is rejected,
+        and so is a sequence ending on a delivery that is neither stopped nor the final escalation
+        signal — the shape that would leave "delivered something, stopped nothing, refused nothing,
+        no limit" readable as verified.
         """
         with self.assertRaises(ValueError):
             runner.Teardown(attempts=(delivery(4242),))
@@ -1253,7 +1276,8 @@ class TeardownRecordTests(unittest.TestCase):
                 delivery(4242, "SIGTERM", stopped=True),
                 delivery(4242, runner.ESCALATION_NAMES[-1]),
             ))
-        # The reachable shapes stay constructible: the escalation's two and three-round sequences.
+        # The accepted shorthands and the real one- and two-attempt shapes stay constructible: a
+        # lone stopped delivery, a lone final-signal delivery, and TERM then a stopped final signal.
         self.assertTrue(runner.Teardown(attempts=(delivery(4242, stopped=True),)))
         self.assertTrue(runner.Teardown(attempts=(delivery(4242, runner.ESCALATION_NAMES[-1]),)))
         self.assertTrue(runner.Teardown(attempts=(
@@ -1918,6 +1942,86 @@ class TeardownOwnershipTests(PatchingTestCase):
                          [("SIGTERM", child.pid, int(spawned.start))])
 
 
+class StartTimeOracleTests(PatchingTestCase):
+    """The identity every published reading carries is pinned against a test-side parse."""
+
+    def setUp(self):
+        ARTIFACTS.mkdir(parents=True, exist_ok=True)
+        self.addCleanup(shutil.rmtree, ARTIFACTS, ignore_errors=True)
+        self.log_path = ARTIFACTS / "start-time-oracle.log"
+        # `_stop_spawned`'s delivery path rests on the run's own `SIGCHLD` disposition
+        # (`establish_exit_disposition`); the end-to-end runs take that startup step in `main`, and
+        # this class stands in for it instead of inheriting whatever this test host happens to
+        # have.  Both the disposition and the module state the step sets are restored.
+        self.patch(runner, "EXIT_DISPOSITION", False)
+        if hasattr(signal, "SIGCHLD"):
+            saved = signal.getsignal(signal.SIGCHLD)
+            self.addCleanup(signal.signal, signal.SIGCHLD, saved)
+            self.assertTrue(runner.establish_exit_disposition(),
+                            "the test host will not let the run establish its own disposition")
+
+    def spawn(self, *, code: str = "import time; time.sleep(60)",
+              cwd: Path | None = None) -> subprocess.Popen:
+        """A child in its own session, killed and reaped by this test."""
+        process = subprocess.Popen([sys.executable, "-c", code], cwd=cwd, start_new_session=True)
+        self.addCleanup(process.wait)
+        self.addCleanup(process.kill)
+        return process
+
+    @unittest.skipUnless(can_deliver_signals(), "the spy needs one real pidfd delivery")
+    def test_the_spy_reads_the_start_time_itself_not_through_the_runner(self):
+        """The kernel side of the trijection is read without the runner's start-time readers.
+
+        One real pidfd delivery goes through the installed spy (the fixture ignores SIGTERM, so the
+        process the spy reads stays the one the delivery reached), and the start time the spy
+        records must be this test's own parse of `/proc/<pid>/stat`: a spy that delegated to the
+        runner would publish whatever the runner read, which is exactly what this reading exists to
+        catch.
+        """
+        child = self.spawn(code="import signal, time; signal.signal(signal.SIGTERM, "
+                                "signal.SIG_IGN); time.sleep(60)")
+        independent = proc_start_time(child.pid)
+        self.assertIsNotNone(independent, "the test could not read the fixture's own start time")
+        fd = os.pidfd_open(child.pid)
+        spy = DeliverySpy()
+        try:
+            signal.pidfd_send_signal(fd, signal.SIGTERM)
+        finally:
+            spy.close()
+            os.close(fd)
+        self.assertEqual(spy.sent, [("SIGTERM", child.pid, int(independent))])
+
+    @unittest.skipUnless(can_deliver_signals(), "the record's identity needs one real delivery")
+    def test_the_start_time_every_reading_reports_is_the_readers_own_field_22(self):
+        """Five readings of one identity must be the file's own field 22, parsed here.
+
+        The value `_spawned` records, what `_start_time` re-reads, what the group report and the
+        scratch report carry, and what the delivered entry publishes are each compared against this
+        test's independent parse of `/proc/<pid>/stat`: a runner that indexed another field could
+        not publish any of them.
+        """
+        child = self.spawn()
+        independent = proc_start_time(child.pid)
+        self.assertIsNotNone(independent, "the test could not read the fixture's own start time")
+        spawned = runner._spawned(child)
+        self.assertEqual(spawned.start, independent, "the spawn record is not field 22")
+        self.assertEqual(runner._start_time(child.pid), independent,
+                         "the runner's own start-time read is not field 22")
+        self.assertEqual(dict(runner._group_members(child.pid)).get(child.pid), independent,
+                         "the group report's start time is not field 22")
+        scratch = ARTIFACTS / "start-time-scratch"
+        scratch.mkdir(parents=True, exist_ok=True)
+        holder = self.spawn(cwd=scratch)
+        holder_start = proc_start_time(holder.pid)
+        self.assertIsNotNone(holder_start, "the test could not read the holder's own start time")
+        self.assertEqual(dict(runner._scratch_processes(scratch)).get(holder.pid), holder_start,
+                         "the scratch report's start time is not field 22")
+        with self.log_path.open("ab") as log:
+            teardown = runner._stop_spawned(spawned, log)
+        self.assertEqual([item["start"] for item in runner._teardown_record(teardown)["delivered"]],
+                         [independent], "the published delivery's start time is not field 22")
+
+
 class EscalationMachineTests(PatchingTestCase):
     """Every reachable path of the escalation, one row per path, over the machine itself.
 
@@ -1929,9 +2033,27 @@ class EscalationMachineTests(PatchingTestCase):
     gates, resolves the platform constant, pins identity at delivery, observes an already-terminated
     target, sends through the pidfd and commits the attempt; the escalation ends at the first round
     that stopped the target, refused, or found it already terminated; and `ESCALATION_NAMES` bounds
-    the rounds.  The three paths a whole harness reaches are pinned end to end as well:
-    `EndToEndTests.test_a_refusal_after_a_delivery_does_not_erase_it`,
-    `EndToEndTests.test_a_host_without_the_final_signal_records_the_refusal`, and
+    the rounds.  That derivation yields one row per decision a round can end on — not one per
+    refusal wording: the ownership gate, an undefined signal name and a refused pin (either round),
+    the missing start time only a first round can see, a send the kernel refused (target gone, and
+    any other `OSError`, apart), and the non-refusal endings (delivered-and-stopped,
+    found-already-terminated before or after a delivery, survived the final signal).  A second round
+    cannot end on the gate or on a missing start time: the gate is a live read of state only the
+    run's own startup changes, and a first-round delivery proves the start time was there.  Some
+    rows are pinned a second time over a whole harness (`main`, real processes, real signals): the
+    ownership-gate refusal by
+    `EndToEndTests.test_a_refused_delivery_claims_no_sigkill_and_records_no_survivor`, the
+    already-terminated first round by
+    `EndToEndTests.test_a_signal_killed_suite_reports_the_group_it_did_not_touch`, the
+    delivered-and-stopped ending by
+    `EndToEndTests.test_timeout_stops_the_process_it_spawned_and_reports_the_group` and
+    `EndToEndTests.test_escalation_stops_the_spawned_process_and_the_member_is_only_reported`, the
+    delivered-then-undefined-final-signal row by
+    `EndToEndTests.test_a_host_without_the_final_signal_records_the_refusal_it_cannot_send`, and the
+    delivered-then-pin-refused row by
+    `EndToEndTests.test_a_refusal_after_a_delivery_does_not_erase_it`; the
+    delivered-then-already-terminated row is pinned beside `_stop_spawned` itself (not through
+    `main`) by
     `TeardownOwnershipTests.test_an_already_terminated_target_resolves_the_delivery_that_stopped_it`.
     """
 
@@ -1947,6 +2069,11 @@ class EscalationMachineTests(PatchingTestCase):
          {"limit": "this platform cannot open a pidfd"},
          {"attempts": (("refused", TERM),), "lines": (), "clauses": False, "survivors": False,
           "refused": ("was not sent SIGTERM: this platform cannot open a pidfd",),
+          "verified": False, "describe": ("unverified",)}),
+        ("refused-first-round-the-first-signal-is-not-defined",
+         {"drop_constant": TERM},
+         {"attempts": (("refused", TERM),), "lines": (), "clauses": False, "survivors": False,
+          "refused": ("this platform defines no SIGTERM",),
           "verified": False, "describe": ("unverified",)}),
         ("refused-first-round-no-start-time",
          {"start": False},
@@ -2010,6 +2137,12 @@ class EscalationMachineTests(PatchingTestCase):
          {"attempts": (("delivered", TERM, False), ("refused", FINAL)), "lines": (TERM,),
           "clauses": False, "survivors": False,
           "refused": ("was gone before the SIGKILL could be delivered",), "verified": False,
+          "describe": ("unverified",)}),
+        ("delivered-then-the-final-send-errored",
+         {"stops": (False,), "sends": ("ok", "emfile")},
+         {"attempts": (("delivered", TERM, False), ("refused", FINAL)), "lines": (TERM,),
+          "clauses": False, "survivors": False,
+          "refused": ("could not be delivered through the pidfd of",), "verified": False,
           "describe": ("unverified",)}),
     )
 
@@ -3038,8 +3171,10 @@ class EndToEndTests(PatchingTestCase):
         Model: the fixture ignores SIGTERM and the run's second pin cannot open a pidfd (`EMFILE`
         injected on the runner's own `os.pidfd_open(pid)` call, the second one) — so SIGTERM is
         really delivered and logged, SIGKILL is refused with its reason, and the record must carry
-        both: `delivered` names the SIGTERM delivery, `refused` names the SIGKILL refusal, and
-        neither `clauses` nor `survivors` is emptied by the refusal.  The delivery lines must be
+        both: `delivered` names the SIGTERM delivery, `refused` names the SIGKILL refusal, and the
+        refusal does not erase the delivery.  Neither `clauses` nor `survivors` may claim anything,
+        though — the SIGTERM did not stop the target and the SIGKILL was never sent, so both must
+        stay empty.  The delivery lines must be
         required of the log whichever way the record reads, so clearing them from a copy of the log
         must fail — that negative control is what the helper is unconditional for.
         """
@@ -3067,7 +3202,8 @@ class EndToEndTests(PatchingTestCase):
                       "the refused SIGKILL and its reason are missing from the record")
         self.assertIn("Too many open files", " ".join(teardown["refused"]))
         self.assertEqual(teardown["clauses"], [],
-                         "a later refusal emptied a record that delivered a signal")
+                         "the record claims a terminated target although the delivered SIGTERM "
+                         "stopped nothing and no SIGKILL was sent")
         self.assertEqual(teardown["survivors"], [],
                          "a process that took no SIGKILL is not a survivor")
         self.assertFalse(teardown["verified"], teardown)

@@ -875,16 +875,16 @@ class Teardown:
     unverified: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        """Reject an attempt sequence this escalation cannot have produced.
+        """Reject the attempt sequences the escalation's outcome rules forbid.
 
-        The escalation is a sequence of rounds over `ESCALATION_NAMES` for one pid, each round
-        either sending its signal or refusing it, and stopping at the first round that stopped the
-        target, refused, or found it already terminated.  A sequence outside that machine — an
-        attempt after a refusal or after a delivery that already stopped the target, or a delivery
-        that is neither stopped nor the final escalation signal — would leave a record claiming
-        "delivered something, stopped nothing, refused nothing, no limit", which is exactly the
+        Per pid, what is enforced is outcome finality: no attempt follows a refusal, and none
+        follows a delivery that stopped the target; and the sequence may not end on a delivery that
+        is neither stopped nor the final escalation signal — that shape would leave a record
+        claiming "delivered something, stopped nothing, refused nothing, no limit", exactly the
         state a reader must never be shown (`verified` would be True of a target nothing accounted
-        for).  The state is made unrepresentable here, at the one place a record is built.
+        for).  Only those orderings are refused, at the one place a record is built; the shorthands
+        they leave constructible (a lone final signal, a repeated final signal) are deliberate, not
+        an oversight of this check.
         """
         sequences: dict[int, list[Attempt]] = {}
         for attempt in self.attempts:
@@ -978,6 +978,16 @@ def _proc_state(pid: int) -> str | None:
     return fields[0].decode() if fields else None
 
 
+def _start_time_from(fields: list[bytes]) -> str:
+    """`/proc/<pid>/stat` field 22 — the start time — from an already-parsed field list.
+
+    The one place the field is indexed: `_start_time`, `_group_members` and `_scratch_processes`
+    read every start time through here, and the tests pin the value against an independent parse of
+    the same file, so a wrong index cannot hide behind any of the three callers.
+    """
+    return fields[19].decode()
+
+
 def _start_time(pid: int) -> str | None:
     """`/proc/<pid>/stat` field 22 — when this process instance started, in clock ticks — or None.
 
@@ -986,7 +996,7 @@ def _start_time(pid: int) -> str | None:
     can never be pinned as the instance the evidence was read from (module docstring).
     """
     fields = _proc_stat(pid)
-    return fields[19].decode() if fields and len(fields) > 19 else None
+    return _start_time_from(fields) if fields and len(fields) > 19 else None
 
 
 @dataclass(frozen=True)
@@ -1050,7 +1060,7 @@ def _group_members(group: int) -> list[tuple[int, str]] | None:
         except ValueError:
             continue
         if in_group:
-            members.append((pid, fields[19].decode()))
+            members.append((pid, _start_time_from(fields)))
     return members
 
 
@@ -1092,7 +1102,7 @@ def _scratch_processes(scratch: Path) -> list[tuple[int, str]] | None:
     for pid, fields in scan:
         if pid == own or not _refers_to_scratch(pid, needle):
             continue
-        found.append((pid, fields[19].decode()))
+        found.append((pid, _start_time_from(fields)))
     return found
 
 
