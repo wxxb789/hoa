@@ -1963,10 +1963,29 @@ class StartTimeOracleTests(PatchingTestCase):
     def spawn(self, *, code: str = "import time; time.sleep(60)",
               cwd: Path | None = None) -> subprocess.Popen:
         """A child in its own session, killed and reaped by this test."""
-        process = subprocess.Popen([sys.executable, "-c", code], cwd=cwd, start_new_session=True)
+        return self.spawn_via(sys.executable, code=code, cwd=cwd)
+
+    def spawn_via(self, interpreter: Path | str, *, code: str = "import time; time.sleep(60)",
+                  cwd: Path | None = None) -> subprocess.Popen:
+        """A child started through `interpreter`, so its kernel `comm` is `interpreter`'s basename."""
+        process = subprocess.Popen([str(interpreter), "-c", code], cwd=cwd, start_new_session=True)
         self.addCleanup(process.wait)
         self.addCleanup(process.kill)
         return process
+
+    def interpreter_named(self, name: str) -> Path:
+        """A symlink to this interpreter whose basename is `name` — a fixture's kernel `comm`.
+
+        `/proc/<pid>/stat` carries the executed file's basename as its second field, so a fixture
+        started through this link is exactly the input a `comm` containing stat-shaped text
+        (`) `, a bare `(`) produces; the link is made inside this test's artifact tree.
+        """
+        directory = ARTIFACTS / "interpreters"
+        directory.mkdir(parents=True, exist_ok=True)
+        link = directory / name
+        if not link.exists():
+            link.symlink_to(sys.executable)
+        return link
 
     @unittest.skipUnless(can_deliver_signals(), "the spy needs one real pidfd delivery")
     def test_the_spy_reads_the_start_time_itself_not_through_the_runner(self):
@@ -1993,12 +2012,13 @@ class StartTimeOracleTests(PatchingTestCase):
 
     @unittest.skipUnless(can_deliver_signals(), "the record's identity needs one real delivery")
     def test_the_start_time_every_reading_reports_is_the_readers_own_field_22(self):
-        """Five readings of one identity must be the file's own field 22, parsed here.
+        """Every reading is compared with this test's own parse of its own target's field 22.
 
-        The value `_spawned` records, what `_start_time` re-reads, what the group report and the
-        scratch report carry, and what the delivered entry publishes are each compared against this
-        test's independent parse of `/proc/<pid>/stat`: a runner that indexed another field could
-        not publish any of them.
+        The value `_spawned` records, what `_start_time` re-reads, what the group report carries
+        and what the delivered entry publishes are readings of the spawned child, each compared
+        against this test's independent parse of the child's `/proc/<pid>/stat`; the scratch
+        report's reading is of the holder, and is compared against this test's independent parse of
+        the holder's file.  A runner that indexed another field could not publish any of them.
         """
         child = self.spawn()
         independent = proc_start_time(child.pid)
@@ -2021,9 +2041,55 @@ class StartTimeOracleTests(PatchingTestCase):
         self.assertEqual([item["start"] for item in runner._teardown_record(teardown)["delivered"]],
                          [independent], "the published delivery's start time is not field 22")
 
+    @unittest.skipUnless(runner.PROC_ROOT.is_dir(), "the field 22 readings need /proc")
+    def test_a_command_name_containing_a_paren_and_a_space_does_not_shift_the_parsed_field_22(self):
+        """A `comm` containing `) ` or `(` must leave every parsed reading on field 22.
+
+        The file is parsed by cutting after the *last* `) `; a command name that itself contains
+        that sequence is the input a first-occurrence cut would corrupt, so every reading must
+        still equal this test's own parse of the same file: a parser that stopped at the first
+        `) ` would carry field 21 (the unused `itrealvalue`, always 0) as the start time instead.
+        """
+        scratch = ARTIFACTS / "start-time-parens-scratch"
+        scratch.mkdir(parents=True, exist_ok=True)
+        for name in ("a) b", "a(b"):
+            with self.subTest(command_name=name):
+                child = self.spawn_via(self.interpreter_named(name), cwd=scratch)
+                raw = (runner.PROC_ROOT / str(child.pid) / "stat").read_bytes()
+                self.assertEqual(raw[raw.index(b"(") + 1:raw.rindex(b")")], name.encode(),
+                                 "the fixture no longer runs under the name it stands for")
+                independent = proc_start_time(child.pid)
+                self.assertIsNotNone(independent, "the test could not read the fixture's field 22")
+                self.assertEqual(runner._start_time(child.pid), independent,
+                                 "the runner's own start-time read is not field 22")
+                self.assertEqual(runner._spawned(child).start, independent,
+                                 "the spawn record is not field 22")
+                self.assertEqual(dict(runner._group_members(child.pid)).get(child.pid), independent,
+                                 "the group report's start time is not field 22")
+                self.assertEqual(dict(runner._scratch_processes(scratch)).get(child.pid),
+                                 independent, "the scratch report's start time is not field 22")
+
+    @unittest.skipUnless(can_deliver_signals(), "the record's identity needs one real delivery")
+    def test_a_command_name_containing_a_paren_and_a_space_does_not_shift_the_published_field_22(
+            self):
+        """The record's published start time must be this test's own parse of the file.
+
+        The child runs under a name containing `) `: the record is driven through a real delivery,
+        and the value it publishes is compared against this test's independent parse of the same
+        `/proc/<pid>/stat` — a parser that cut at the first `) ` would publish field 21's value.
+        """
+        child = self.spawn_via(self.interpreter_named("a) b"))
+        independent = proc_start_time(child.pid)
+        self.assertIsNotNone(independent, "the test could not read the fixture's own start time")
+        spawned = runner._spawned(child)
+        with self.log_path.open("ab") as log:
+            teardown = runner._stop_spawned(spawned, log)
+        self.assertEqual([item["start"] for item in runner._teardown_record(teardown)["delivered"]],
+                         [independent], "the published delivery's start time is not field 22")
+
 
 class EscalationMachineTests(PatchingTestCase):
-    """Every reachable path of the escalation, one row per path, over the machine itself.
+    """One pinned row per ending the decision-point walk below lists, over the machine itself.
 
     Each row drives the real `_stop_spawned`/`_attempt_delivery` with the kernel boundary stubbed (a
     real pidfd and a real signal would end the fixture before the next round) and states what the
@@ -2033,14 +2099,15 @@ class EscalationMachineTests(PatchingTestCase):
     gates, resolves the platform constant, pins identity at delivery, observes an already-terminated
     target, sends through the pidfd and commits the attempt; the escalation ends at the first round
     that stopped the target, refused, or found it already terminated; and `ESCALATION_NAMES` bounds
-    the rounds.  That derivation yields one row per decision a round can end on — not one per
-    refusal wording: the ownership gate, an undefined signal name and a refused pin (either round),
-    the missing start time only a first round can see, a send the kernel refused (target gone, and
-    any other `OSError`, apart), and the non-refusal endings (delivered-and-stopped,
-    found-already-terminated before or after a delivery, survived the final signal).  A second round
-    cannot end on the gate or on a missing start time: the gate is a live read of state only the
-    run's own startup changes, and a first-round delivery proves the start time was there.  Some
-    rows are pinned a second time over a whole harness (`main`, real processes, real signals): the
+    the rounds.  That walk is where every row below comes from — the ownership gate (either round:
+    it is re-read live, so it can also refuse a round that follows a delivery), an undefined signal
+    name and a refused pin (either round), the missing start time only a first round can see, a
+    send the kernel refused (target gone, and any other `OSError`, apart), and the non-refusal
+    endings (delivered-and-stopped, found-already-terminated before or after a delivery, survived
+    the final signal) — one row each.  The table is the walk's output as it stands, not a claim
+    about the machine: a shape the table does not list is a gap to be added as a row, not something
+    the table denies.  Some rows are pinned a second time over a whole harness (`main`, real
+    processes, real signals): the
     ownership-gate refusal by
     `EndToEndTests.test_a_refused_delivery_claims_no_sigkill_and_records_no_survivor`, the
     already-terminated first round by
@@ -2060,7 +2127,8 @@ class EscalationMachineTests(PatchingTestCase):
     TERM, FINAL = runner.ESCALATION_NAMES
 
     # (name, boundary stubs, what the record must say).  Stubs: `limit` (the ownership gate's
-    # answer), `start=False` (no start time recorded at spawn), `pins` (per round: "ok" or the
+    # answer for every round), `limits` (per round: the gate's answer — None or the reason it
+    # refused), `start=False` (no start time recorded at spawn), `pins` (per round: "ok" or the
     # reason the pin refused), `states` (per read: "alive" or "zombie"), `sends` (per round: "ok",
     # "gone" or "emfile"), `stops` (per delivered round: whether the grace observed the exit),
     # `drop_constant` (a signal name removed from the platform for the row).
@@ -2120,6 +2188,14 @@ class EscalationMachineTests(PatchingTestCase):
           "clauses": False, "survivors": False,
           "refused": ("this platform defines no SIGKILL",), "verified": False,
           "describe": ("unverified",)}),
+        ("delivered-then-the-ownership-gate-refuses-the-second-round",
+         {"stops": (False,),
+          "limits": (None, "this run has no child-reaping SIGCHLD disposition of its own, so no "
+                          "process can be proven this run's")},
+         {"attempts": (("delivered", TERM, False), ("refused", FINAL)), "lines": (TERM,),
+          "clauses": False, "survivors": False,
+          "refused": ("was not sent SIGKILL: this run has no child-reaping SIGCHLD disposition",),
+          "verified": False, "describe": ("unverified",)}),
         ("delivered-then-already-terminated",
          {"stops": (False,), "states": ("alive", "zombie")},
          {"attempts": (("delivered", TERM, True),), "lines": (TERM,), "clauses": True,
@@ -2159,7 +2235,8 @@ class EscalationMachineTests(PatchingTestCase):
         """Drive `_stop_spawned` once with the boundary stubbed as the row states."""
         log_path = ARTIFACTS / f"machine-{time.monotonic_ns()}.log"
         sends: list[str] = []
-        plans = {key: list(stubs.get(key, ())) for key in ("pins", "states", "sends", "stops")}
+        plans = {key: list(stubs.get(key, ()))
+                 for key in ("pins", "states", "sends", "stops", "limits")}
 
         def step(key: str, default):
             return plans[key].pop(0) if plans[key] else default
@@ -2183,7 +2260,12 @@ class EscalationMachineTests(PatchingTestCase):
         def stopped(spawned, seconds: float) -> bool:
             return bool(step("stops", False))
 
-        self.patch(runner, "_ownership_limit", lambda: stubs.get("limit"))
+        def limit() -> str | None:
+            # The gate is re-read live every round (`_attempt_delivery`), so a row can change its
+            # answer between rounds; `limit` alone answers every round the same way.
+            return step("limits", stubs.get("limit"))
+
+        self.patch(runner, "_ownership_limit", limit)
         self.patch(runner, "_group_members", lambda group: [])  # nothing left behind: no limits
         self.patch(runner, "_pin_identity", pin)
         self.patch(runner, "_proc_state", state)
@@ -2209,7 +2291,7 @@ class EscalationMachineTests(PatchingTestCase):
     @unittest.skipUnless(can_deliver_signals(),
                          "the machine's delivery path needs a pinnable identity")
     def test_every_reachable_escalation_path_is_recorded_as_its_attempts(self):
-        """One row per path: the attempts, the lines, the sends and the record must all agree."""
+        """Each listed row: the attempts, the lines, the sends and the record must all agree."""
         for name, stubs, expected in self.PATHS:
             with self.subTest(path=name):
                 teardown, logged, sends = self.run_path(stubs)
