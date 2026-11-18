@@ -330,20 +330,24 @@ git clone https://github.com/wxxb789/hoa   # 用 skill / 跑测试都不需要�
 [`skills`](https://github.com/vercel-labs/skills) CLI 安装：
 
 ```bash
-# 1. 先看有哪些
-npx skills add wxxb789/hoa --list
+# 默认：装全部 skill（用 -a <agent> 选择 runtime）
+npx skills add wxxb789/hoa -g -s '*'
 
-# 2. 只装你需要的 skill，装到你用的 runtime
-npx skills add wxxb789/hoa -g -s <skill> -s <other-skill> -a claude-code -a codex
+# 看有哪些
+npx skills add wxxb789/hoa --list
 
 # 更新 / 移除
 npx skills update
-npx skills remove <skill>
+npx skills remove -g <skill>
 ```
 
-**只装你需要的。** 不要整库安装（`--all` 或 `-s '*'`）：每个已安装 skill 的描述都会在每次会话里
-争夺路由，而这里很多 skill 很专门（与 Hermes 耦合的 `hermes-*`、`gdd` 及其 launcher、仓库维护）。
-先看 [`index.zh-CN.md`](./index.zh-CN.md)，挑几个对得上你工作的，以后再加。
+**默认整库安装。** `npx skills` 只安装你点名的 skill，不跟随它们之间的 `../` 链接，所以单写
+`-s <skill>` 可能缺少它串联的同级 skill。要单装，从 [`index.zh-CN.md`](./index.zh-CN.md#安装) 的
+“安装”一节复制该 skill 的命令：它由链接生成，列出该 skill 的整个闭包。表中没有的 skill 没有依赖。
+
+**升级已有安装。** 在本仓库改名或退役的 skill 仍以旧名留在安装目录里。用同一节里生成的
+`npx skills remove -g …` 命令移除旧名；该名单的来源是 `scripts/retired_skills.toml`，其中写明每个
+替代者。先把你从其它来源安装的同名 skill 从命令中去掉，否则它也会被移除。
 
 - 全局（`-g`）装到 `~/<agent>/skills/`（`~/.claude/skills`、
   `~/.config/opencode/skills`、`~/.agents/skills` …）；默认 scope 装到当前项目。
@@ -453,7 +457,7 @@ phase 收尾前产出第一个自产 skill。
 
 ## 如何使用
 
-- **任何人：** 先 `npx skills add wxxb789/hoa --list`，再用 `-s <skill>` 只装需要的
-  几个，或 fork 拿走对你有用的部件。
+- **任何人：** `npx skills add wxxb789/hoa -g -s '*'`，或用
+  [`index.zh-CN.md`](./index.zh-CN.md#安装) 里的命令单装某个 skill，或 fork 拿走对你有用的部件。
 - **我：** 在这里写 skill → `npx skills add wxxb789/hoa -g -s <skill> -a '*'` → 落到每个 runtime；
   设置随 chezmoi 一起走。

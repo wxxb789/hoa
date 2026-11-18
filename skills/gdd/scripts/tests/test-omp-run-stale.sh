@@ -10,7 +10,7 @@ set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ADAPTER="$(cd "$HERE/../adapters" && pwd)/omp-run.sh"
-FORWARDER="$(cd "$HERE/../../../omp-headless-orchestration/scripts" && pwd)/omp-run.sh"
+FORWARDER="$(cd "$HERE/../../../gdd-route-omp/scripts" && pwd)/omp-run.sh"
 TODAY="$(date +%F)"
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/omp-run-stale.XXXXXX")"
 RUN_ROOT="$TMP/runs"
@@ -144,7 +144,7 @@ ok "forwarder finds the sibling launcher with OMP_RUN_SH unset"
 
 # A categorized install: only the third candidate exists.
 TREE="$TMP/tree"
-COPY="$TREE/skills/omp-headless-orchestration/scripts/omp-run.sh"
+COPY="$TREE/skills/gdd-route-omp/scripts/omp-run.sh"
 CAT_STUB="$TREE/skills/software-development/gdd/scripts/adapters/omp-run.sh"
 mkdir -p "$(dirname "$COPY")" "$(dirname "$CAT_STUB")"
 cp "$FORWARDER" "$COPY"

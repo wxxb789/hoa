@@ -1,13 +1,13 @@
 ---
-name: omp-headless-orchestration
+name: gdd-route-omp
 description: >-
-  Run long OMP (`omp -p`) jobs headlessly so they survive the session that dispatched them — detached
-  tmux, NDJSON event log, polled completion, session-id recovery. Use when delegating a repo task that
-  will run more than a couple of minutes, when the orchestrating chat/session may restart, or when
-  recovering a run that was killed mid-turn. Do not use for a two-minute command (run it inline) or for
-  work that needs live steering (that is a TUI session).
+  Use when delegating a repo task to OMP (`omp -p`) that will run more than a couple of minutes —
+  standalone or as `gdd`'s OMP route — when the orchestrating chat/session may restart, or when
+  recovering a run that was killed mid-turn. Runs it headlessly so it survives the session that
+  dispatched it: detached tmux, NDJSON event log, polled completion, session-id recovery. Do not use
+  for a two-minute command (run it inline) or for work that needs live steering (that is a TUI session).
 metadata:
-  revision: "2"
+  revision: "1"
   areas: "software-development,work-management"
   targets: "pi"
   summary: "detached tmux launcher for long `omp -p` runs; polled completion, session-id recovery"
@@ -15,7 +15,7 @@ metadata:
   kind: "entry"
 ---
 
-# OMP headless orchestration
+# gdd-route-omp
 
 Delegate bounded work to OMP (`omp -p`) without losing runs when the dispatching session, gateway or
 terminal goes down.
@@ -45,8 +45,8 @@ A detached run hangs off init (POSIX) or off the process tree Windows keeps aliv
 your session, so it survives session and gateway restarts. Verify with the ancestor chain of the omp
 pid, not by assumption.
 
-The implementation is maintained once, with skill `gdd` (`scripts/adapters/omp-run.py`, cross-platform,
-with `adapters/omp-run.sh` beside it as the POSIX reference), because that skill's `gdd.py` defaults to
+The implementation is maintained once, with skill `gdd` (`../gdd/scripts/adapters/omp-run.py`,
+cross-platform, with `../gdd/scripts/adapters/omp-run.sh` beside it as the POSIX reference), because that skill's `gdd.py` defaults to
 it; the copy here (`scripts/omp-run.sh`) is a forwarder, so manual and dispatched runs share one code
 path.
 

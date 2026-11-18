@@ -13,7 +13,7 @@ Paths below are relative to the installed `gdd` skill directory.
 | Route | Launcher | Runtime requirement |
 |---|---|---|
 | Headless CLI (default) | `scripts/adapters/omp-run.py` | An OMP-style `-p` CLI hosted in a detached process; stdlib Python 3, no bash, `setsid`, or `tmux` dependency |
-| Headless CLI — DeepSeek Harness (opt-in) | Set `GDD_LAUNCHER` to `scripts/adapters/dsh-run.py` | An installed `dsh` CLI with a `headless` profile; each stage is one `dsh --profile headless` task in a detached runner. Operating method for this route: the [`dsh-headless-gdd`](../../dsh-headless-gdd/SKILL.md) mechanism skill |
+| Headless CLI — DeepSeek Harness (opt-in) | Set `GDD_LAUNCHER` to `scripts/adapters/dsh-run.py` | An installed `dsh` CLI with a `headless` profile; each stage is one `dsh --profile headless` task in a detached runner. Operating method for this route: the [`gdd-route-dsh`](../../gdd-route-dsh/SKILL.md) mechanism skill |
 | Native Paseo (opt-in) | Set `GDD_LAUNCHER` to `scripts/adapters/paseo-run.py` | An installed Paseo CLI and a reachable Paseo daemon; each stage is a native Paseo agent |
 
 Select the route as configuration, never from a daemon reachability probe. An unreachable daemon
@@ -168,7 +168,7 @@ adopts the one id, dies immediately with exit `1` and
 passes the resolved id to dsh as `--session-id`; with neither, dsh starts a fresh session.
 
 The operating method for this route — session/worktree rules, the completion judgement, recovery and the
-harness traps — is the [`dsh-headless-gdd`](../../dsh-headless-gdd/SKILL.md) mechanism skill, which
+harness traps — is the [`gdd-route-dsh`](../../gdd-route-dsh/SKILL.md) mechanism skill, which
 operates the contract below.
 
 Two rules are specific to this route:
@@ -187,7 +187,7 @@ Two rules are specific to this route:
    boundary. Changing the profile or `DSH_PERMISSION_MODE` changes that boundary, so re-confirm it on
    the target host before dispatching rather than assuming the working directory alone confines the
    worker, and do not reach for `danger-full-access` to "unblock" a task. The operating method states
-   the same precondition ([`dsh-headless-gdd`](../../dsh-headless-gdd/SKILL.md), "Harness facts that
+   the same precondition ([`gdd-route-dsh`](../../gdd-route-dsh/SKILL.md), "Harness facts that
    bite").
 
 Completion is `exit 0` **and** the last `final` event carrying `reason.kind == "completed"`; a

@@ -34,6 +34,17 @@ CONSUMERS: dict[str, list[str]] = {
         "skills/hoa-introspect/scripts",
         "skills/hoa-introspect-distill/scripts",
     ],
+    # The configuration resolution order; skills that document configuration keys.
+    "configuration.md": [
+        "skills/ai-coding-agent-delegation/references",
+        "skills/contract-bound-deliverables/references",
+        "skills/evidence-boundary-discipline/references",
+        "skills/gdd/references",
+        "skills/git-auto-sync-pipelines/references",
+        "skills/hoa-skill-curate/references",
+        "skills/hoa-skill-port/references",
+        "skills/spec-convergence/references",
+    ],
     # Read on failure only; skills whose docs run their own scripts with `uv run`.
     "troubleshooting.md": [
         "skills/agent-operating-contract-evolution/references",

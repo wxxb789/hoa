@@ -6,12 +6,9 @@ package points at a template instead.
 
 ## Resolution rule behind every row
 
-One order, everywhere: **CLI flag → environment variable → operator config file → documented
-default**. It is implemented once in [`scripts/skill_config.py`](../../../scripts/skill_config.py),
-not restated per skill. The config file is `$XDG_CONFIG_HOME/<skill>/config.yaml`, falling back to
-`~/.config/<skill>/config.yaml`; a single env var overrides a single key. Reading that file to
-customise the skill is the preferred shape, not a workaround. A value with no defensible default is
-documented as "must be supplied", never silently invented.
+Every row applies the one resolution order defined in [configuration.md](configuration.md); this
+checklist does not restate it. A value with no defensible default is documented as "must be
+supplied", never silently invented.
 
 Rule of thumb: every path and every vendor-specific value must be answerable from `--help` or the
 skill's Configuration section. If a stranger cannot resolve it, it does not exist.

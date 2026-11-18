@@ -7,7 +7,7 @@ description: >-
   pruning analysis of the loaded set (the user-run hoa-skill-set-audit command), creating or editing a
   skill, or porting one into a shared repo.
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "software-development,self-management"
   targets: "runtime-agnostic"
   summary: "trace installed skills' provenance and upstream freshness, apply the upstream-retirement rule, and execute only owner-confirmed library changes"
@@ -25,8 +25,8 @@ metadata:
 | `SKILLS_ROOT` | directory the runtime loads skills from | `<hub>/skills` |
 | `SKILL_RUNTIME_CONFIG` | operator config file used for the `skills.disabled` label | `${XDG_CONFIG_HOME:-~/.config}/agent/config.yaml` |
 
-Resolution order and the config-file path are defined once in
-[hoa-skill-port § Configuration](../hoa-skill-port/SKILL.md).
+Resolution order and the config-file path are defined in
+[references/configuration.md](references/configuration.md).
 Nothing above has a machine-specific default: point `SKILLS_HUB` at the store and the rest follows.
 
 Use this for installer provenance, upstream freshness, the retirement sweep, usage-based skill

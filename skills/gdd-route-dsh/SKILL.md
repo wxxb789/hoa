@@ -1,13 +1,14 @@
 ---
-name: dsh-headless-gdd
+name: gdd-route-dsh
 description: >-
-  Run one GDD stage on a DeepSeek Harness (`dsh`) headless worker instead of, or beside, the OMP
-  route, with NDJSON events and completion decided from the exit code plus the final turn event, not
-  the worker's own report. Use when a stage is dispatched to dsh headless, a dsh run reports success
-  without doing the work, a run must be resumed, stopped or recovered, or the DSH launcher route needs
-  configuring. Not for deciding what to build (the goal contract) or the delivery protocol (`gdd`).
+  Use when a bounded task is dispatched to a DeepSeek Harness (`dsh`) headless worker — standalone
+  through the adapter or as one `gdd` stage, instead of or beside the OMP route — a dsh run reports
+  success without doing the work, a run must be resumed, stopped or recovered, or the DSH launcher
+  route needs configuring. Completion comes from the exit code plus the final NDJSON turn event,
+  not the worker's own report. Not for deciding what to build (the goal contract) or the delivery
+  protocol (`gdd`).
 metadata:
-  revision: "2"
+  revision: "1"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "dispatch and supervise a GDD stage on dsh headless: session/worktree rules, completion judgement, recovery, harness traps"
@@ -15,7 +16,7 @@ metadata:
   kind: "mechanism"
 ---
 
-# DSH headless as a GDD worker
+# gdd-route-dsh
 
 A second headless route for goal-driven delivery: `dsh --profile headless` answers one task per
 invocation, streams NDJSON events, and resumes a persisted session. Model tool writes are constrained by

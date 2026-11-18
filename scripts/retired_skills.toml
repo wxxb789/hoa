@@ -45,6 +45,14 @@ reason = "renamed into the hoa-skill-<verb> family after narrowing to provenance
 replacement = "hoa-skill-port"
 reason = "renamed into the hoa-skill-<verb> family; publishing stays in its description (2026-11-17)"
 
+[retired.dsh-headless-gdd]
+replacement = "gdd-route-dsh"
+reason = "renamed into the gdd- route family (2026-11-18)"
+
+[retired.omp-headless-orchestration]
+replacement = "gdd-route-omp"
+reason = "renamed into the gdd- route family (2026-11-18)"
+
 [retired.teams-cdp]
 replacement = "an MCP server"
 reason = "replaced by MCP (#72)"

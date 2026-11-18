@@ -11,6 +11,11 @@ falls back to the first sentence of the frontmatter description, and a
 missing Chinese summary falls back to the English one. Missing or invalid
 catalog metadata is a hard error.
 
+Each skill's transitive `../` sibling closure (as `check_skill_links.py` finds
+it) becomes one `npx skills add` command, and `scripts/retired_skills.toml`
+becomes one `npx skills remove` command: `npx skills` neither follows the
+links nor removes renamed skills, and `--check` keeps both commands current.
+
 Usage:
     python scripts/generate_index.py          # write both files
     python scripts/generate_index.py --check  # exit 1 on drift (CI)
@@ -26,6 +31,8 @@ from pathlib import Path
 # Keep --check read-only, including helper/dependency import caches.
 sys.dont_write_bytecode = True
 import yaml
+import check_skill_links as links
+import install_host_skills as hosts
 import skill_metadata as sm
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -44,6 +51,7 @@ LIBRARY_FOLDERS = {
 }
 
 AREAS = ("software-development", "work-management", "self-management")
+NPX_ADD = "npx skills add wxxb789/hoa -g"
 TARGETS = ("runtime-agnostic", "repo-only", "claude-code", "codex", "opencode",
            "hermes", "pi", "kimi-code")
 
@@ -182,6 +190,17 @@ def _resolve_notes(meta: dict[str, str], doc: Path, kind: str, name: str) -> tup
     return note_en, note_zh
 
 
+def closure(skill_dir: Path) -> list[str]:
+    """Sorted transitive `../` sibling closure of one skill, the skill itself excluded."""
+    found, pending = set(), [skill_dir.name]
+    while pending:
+        for name in links.siblings(skill_dir.parent / pending.pop()):
+            if name != skill_dir.name and name not in found:
+                found.add(name)
+                pending.append(name)
+    return sorted(found)
+
+
 def collect() -> list[dict]:
     rows = []
     skill_dirs = sorted(p for p in SKILLS.iterdir() if p.is_dir())
@@ -195,7 +214,8 @@ def collect() -> list[dict]:
         for key in ("summary", "summary_zh"):
             meta.pop(key, None)
         rows.append({"name": name, "type": "skill", "path": f"skills/{name}/",
-                     "note_en": note_en, "note_zh": note_zh, **meta})
+                     "note_en": note_en, "note_zh": note_zh, "closure": closure(skill_dir),
+                     **meta})
     rows.extend(_collect_library())
     names: dict[str, str] = {}
     for row in rows:
@@ -282,6 +302,25 @@ targets:  runtime-agnostic | repo-only |
 |---|---|---|---|---|---|
 """
 
+INSTALL_EN = """
+## Install
+
+`npx skills` installs only the skills you name and does not follow the `../` links between them.
+Install everything with `npx skills add wxxb789/hoa -g -s '*'`, or one skill with its row's command
+below. A skill without a row has no dependencies: `npx skills add wxxb789/hoa -g -s <skill>`.
+
+| Skill | Needs (transitive `../` closure) | Install command |
+|---|---|---|
+"""
+
+RETIRED_EN = """
+Upgrading an older install: remove the names this repo no longer ships (generated from
+`scripts/retired_skills.toml`, which names each replacement). Check `npx skills list -g` first and
+drop any name you installed from another source; this command removes it too.
+
+```bash
+"""
+
 FOOTER_EN = """
 > Reflections and eval results are prose/knowledge, not indexed here.
 """
@@ -317,12 +356,33 @@ targets:  runtime-agnostic | repo-only |
 |---|---|---|---|---|---|
 """
 
+INSTALL_ZH = """
+## 安装
+
+`npx skills` 只安装你点名的 skill，不跟随它们之间的 `../` 链接。
+整库安装用 `npx skills add wxxb789/hoa -g -s '*'`；单装某个 skill 用下表该行的命令。
+表中没有的 skill 没有依赖：`npx skills add wxxb789/hoa -g -s <skill>`。
+
+| Skill | 依赖（`../` 传递闭包） | 安装命令 |
+|---|---|---|
+"""
+
+RETIRED_ZH = """
+升级旧安装：移除本仓库已不再提供的名称（由 `scripts/retired_skills.toml` 生成，
+其中写明每个名称的替代者）。先看 `npx skills list -g`，把你从其它来源安装的同名 skill
+从命令中去掉，否则它也会被移除：
+
+```bash
+"""
+
 FOOTER_ZH = """
 > reflections 与 eval 结果属于文章 / 知识类，不在此索引。
 """
 
-def render(rows: list[dict], lang: str) -> str:
-    header, footer = (HEADER_EN, FOOTER_EN) if lang == "en" else (HEADER_ZH, FOOTER_ZH)
+def render(rows: list[dict], lang: str, retired: list[str] = ()) -> str:
+    header, install, removal, footer = (
+        (HEADER_EN, INSTALL_EN, RETIRED_EN, FOOTER_EN) if lang == "en"
+        else (HEADER_ZH, INSTALL_ZH, RETIRED_ZH, FOOTER_ZH))
     out = [header]
     for r in rows:  # collect() already sorted by name
         note = r["note_en"] if lang == "en" else r["note_zh"]
@@ -330,6 +390,13 @@ def render(rows: list[dict], lang: str) -> str:
             f"| {r['name']} | {r['type']} | {r['areas']} | {r['targets']} | "
             f"`{r['path']}` | {note} |\n"
         )
+    out.append(install)
+    for r in rows:
+        if r.get("closure"):
+            command = " ".join([NPX_ADD] + [f"-s {name}" for name in [r["name"], *r["closure"]]])
+            out.append(f"| {r['name']} | {', '.join(r['closure'])} | `{command}` |\n")
+    if retired:
+        out.append(f"{removal}npx skills remove -g {' '.join(retired)}\n```\n")
     out.append(footer)
     return "".join(out)
 
@@ -342,13 +409,16 @@ def main(argv=None) -> int:
 
     try:
         rows = collect()
+        retired = sorted(hosts.retired_names(
+            ROOT / "scripts" / "retired_skills.toml",
+            [SKILLS / r["name"] for r in rows if r["type"] == "skill"]))
     except ValueError as e:
         print(f"generate_index: {e}", file=sys.stderr)
         return 1
 
     status = 0
     for lang, filename in (("en", "index.md"), ("zh", "index.zh-CN.md")):
-        content = render(rows, lang)
+        content = render(rows, lang, retired)
         target = ROOT / filename
         if args.check:
             if target.read_text(encoding="utf-8") != content:

@@ -7,7 +7,7 @@ description: >-
   when verifying a cron result, a "fixed" claim, a CI/review-bot gate, or a batch status report about
   an environment. Not for auditing a written report's contents or accepting a teammate's delivery.
 metadata:
-  revision: "2"
+  revision: "3"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "turn a scheduled-job, repair or deployment claim into evidence: find the recording surface, separate manual from scheduled runs, audit the auditor"

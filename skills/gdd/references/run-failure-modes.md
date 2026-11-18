@@ -74,7 +74,7 @@ a relative path typed from the orchestrator's directory silently read a differen
 while the run still exited 0 and reported a review of the increment. A tool may resolve a path argument
 against a base of its own choosing — its repo root, its own cwd, or the caller's cwd — and it is the
 tool's documented resolution rule, not whether the tool is out-of-tree, that decides: the launcher
-bundled with skill `omp-headless-orchestration` resolves `--prompt` against the caller's cwd, not the
+bundled with skill `gdd-route-omp` resolves `--prompt` against the caller's cwd, not the
 run's own `--cwd`.
 
 - Resolve each intended input against that documented base yourself and verify it exists and is

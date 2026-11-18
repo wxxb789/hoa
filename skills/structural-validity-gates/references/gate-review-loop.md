@@ -248,8 +248,8 @@ not broken.
   the exact full 40-hex current head with a matching report digest; custom markers use the same
   schema, and malformed newest evidence cannot fall back to an older clean comment. Recheck the
   head before/after review, after readback, and before merge. See
-  [`gdd/references/bot-review-loop.md`](../../gdd/references/bot-review-loop.md) for the complete
-  reference commands and finding-disposition contract. The hash binds report bytes, not reviewer
+  the `gdd` skill's `references/bot-review-loop.md` for the complete reference commands and
+  finding-disposition contract. The hash binds report bytes, not reviewer
   identity or the truth of the verdict; keep the invocation provenance too.
 - **Reply, resolve, then read back the exact thread and paginated count.** A thread resolved with "done" is
   indistinguishable from one closed to satisfy the gate, so the reply carries the fixing sha and the

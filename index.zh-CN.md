@@ -38,10 +38,11 @@ targets:  runtime-agnostic | repo-only |
 | design-an-interface | skill | software-development | runtime-agnostic | `skills/design-an-interface/` | 设计软件接口或公开 API：签名草稿、OpenAPI 片段、用法示例 |
 | discord-rich-message | skill | software-development,work-management | runtime-agnostic | `skills/discord-rich-message/` | 在平台限制内发送结构化 Discord 消息：Components V2、等宽对齐表格、附件兜底 |
 | dotnet-repo-workflow | skill | software-development | runtime-agnostic | `skills/dotnet-repo-workflow/` | 走仓库自带 .NET gate 而非手搓 `dotnet test`；lock 文件、Roslyn 编译陷阱、merge-ready 清单 |
-| dsh-headless-gdd | skill | software-development,work-management | runtime-agnostic | `skills/dsh-headless-gdd/` | 把 GDD 阶段派发给 dsh headless 并监督：会话/worktree 规则、完成判定、恢复、harness 陷阱 |
 | evidence-backed-analytical-writing | skill | work-management | runtime-agnostic | `skills/evidence-backed-analytical-writing/` | 中文分析报告：证据地图与「主张 → 证据 → 机制 → 局限」骨架；时效边界、状态阶梯、否定性结论 |
 | evidence-boundary-discipline | skill | work-management | runtime-agnostic | `skills/evidence-boundary-discipline/` | 只陈述有日期的来源所能支持的事实：时态对齐日期、来源标签全链路一致、缺失不升级为不存在 |
 | gdd | skill | software-development,work-management | runtime-agnostic | `skills/gdd/` | 目标契约 → agent 分阶段产出 → operator 验收 → 脚本化合并门禁 → 可续跑账本；随附 `gdd.py`、`delivery-state.py`、`pr-merge-check.py` |
+| gdd-route-dsh | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-dsh/` | 把 GDD 阶段派发给 dsh headless 并监督：会话/worktree 规则、完成判定、恢复、harness 陷阱 |
+| gdd-route-omp | skill | software-development,work-management | pi | `skills/gdd-route-omp/` | 脱离会话的 tmux 启动器跑 `omp -p` 长任务；轮询完成、按 session id 恢复 |
 | generated-runtime-repairs | skill | software-development,work-management | runtime-agnostic | `skills/generated-runtime-repairs/` | 修模板/生成器、验证暂存产物，再部署并回读线上运行时 |
 | ghc-search | skill | software-development | runtime-agnostic | `skills/ghc-search/` | 经本机 `ghc-proxy` Responses API 做 web 与 X/Twitter 搜索；返回答案加去重来源 |
 | git-auto-sync-pipelines | skill | software-development,work-management | runtime-agnostic | `skills/git-auto-sync-pipelines/` | 手改仓库的定时提交推送：固定门序、白名单与体积上限、暂存区密钥扫描、心跳与去重告警 |
@@ -60,7 +61,6 @@ targets:  runtime-agnostic | repo-only |
 | measurement-campaign-evidence | skill | software-development,work-management | runtime-agnostic | `skills/measurement-campaign-evidence/` | 测量运动：先钉候选身份、串行跑、一致报告集，不让基线伪造延迟对比 |
 | notes-to-prd | skill | work-management | runtime-agnostic | `skills/notes-to-prd/` | 把笔记或想法转成结构化 PRD 草稿 |
 | official-document-verification | skill | work-management | runtime-agnostic | `skills/official-document-verification/` | 用文档的确切版本核验结论，含只能用真浏览器取到的被封来源 |
-| omp-headless-orchestration | skill | software-development,work-management | pi | `skills/omp-headless-orchestration/` | 脱离会话的 tmux 启动器跑 `omp -p` 长任务；轮询完成、按 session id 恢复 |
 | ops-claim-verification | skill | software-development,work-management | runtime-agnostic | `skills/ops-claim-verification/` | 把定时任务、修复或部署的说法变成证据：找准记录面、区分手动与调度运行、审查审计者 |
 | package-release-verification | skill | software-development | runtime-agnostic | `skills/package-release-verification/` | 发版：先补 changelog、同一 commit 的门禁、分派、按版本号核 registry、单独获批的清理 |
 | plan-to-issues | skill | work-management | runtime-agnostic | `skills/plan-to-issues/` | 把 PRD 或计划拆成 issue 级任务：标题、正文、标签 |
@@ -86,5 +86,26 @@ targets:  runtime-agnostic | repo-only |
 | skill-composition | rule | software-development | repo-only | `rules/skill-composition.md` | 隐藏子技能：一个可见性标记加 Codex 旁路文件，以 Read 链接串联扁平同级目录且只下一层，必守规则留在父技能，隐藏不等于授权 |
 | skill-naming | rule | software-development | repo-only | `rules/skill-naming.md` | 技能名是稳定 ID 和兜底路由信号：kebab-case 且与目录同名、族内按“族-对象-动词”排列、动词全库一义、禁用泛词、hoa- 只给技能库元技能族、改名走退役登记 |
 | adopt-a-pattern | workflow | software-development | repo-only | `workflows/adopt-a-pattern.md` | 把 ref 地图里的 what-to-steal 笔记变成落地、归类、带署名 artifact 的有限步骤 |
+
+## 安装
+
+`npx skills` 只安装你点名的 skill，不跟随它们之间的 `../` 链接。
+整库安装用 `npx skills add wxxb789/hoa -g -s '*'`；单装某个 skill 用下表该行的命令。
+表中没有的 skill 没有依赖：`npx skills add wxxb789/hoa -g -s <skill>`。
+
+| Skill | 依赖（`../` 传递闭包） | 安装命令 |
+|---|---|---|
+| gdd | delegated-work-acceptance, gdd-route-dsh | `npx skills add wxxb789/hoa -g -s gdd -s delegated-work-acceptance -s gdd-route-dsh` |
+| gdd-route-dsh | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-dsh -s delegated-work-acceptance -s gdd` |
+| gdd-route-omp | delegated-work-acceptance, gdd, gdd-route-dsh | `npx skills add wxxb789/hoa -g -s gdd-route-omp -s delegated-work-acceptance -s gdd -s gdd-route-dsh` |
+| hoa-skill-set-audit | hoa-skill-create | `npx skills add wxxb789/hoa -g -s hoa-skill-set-audit -s hoa-skill-create` |
+
+升级旧安装：移除本仓库已不再提供的名称（由 `scripts/retired_skills.toml` 生成，
+其中写明每个名称的替代者）。先看 `npx skills list -g`，把你从其它来源安装的同名 skill
+从命令中去掉，否则它也会被移除：
+
+```bash
+npx skills remove -g design-md dsh-headless-gdd find-nearby git-worktree-workflow github-code-review github-repo-management grounded-citations hoa-agent-retrieve hoa-skill-work html-artifact improve-codebase-architecture jupyter-live-kernel m365-copilot-cdp microsoft-office my-ado-cppr ocr-and-documents omp-headless-orchestration rss-feeds skill-library-curation skill-porting-and-publishing subagent-driven-development systematic-debugging teams-cdp to-issues to-prd whisper writing-plans
+```
 
 > reflections 与 eval 结果属于文章 / 知识类，不在此索引。

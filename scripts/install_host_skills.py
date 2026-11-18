@@ -4,7 +4,8 @@
 The host side is a directory of skill entries (the shape `npx skills` and the
 agent runtimes use). An entry is either flat (`<root>/<name>`) or categorized
 (`<root>/<category>/<name>`); exactly one category level is searched. It should
-be a symlink to `skills/<name>` here, or a byte-identical real directory copy.
+be a symlink to `skills/<name>` here, or a byte-identical real directory copy
+(`__pycache__` directories and `*.pyc` files are ignored on both sides).
 The script never writes in `--check` mode, never deletes anything, and only
 creates symlinks in `--link` mode; a real directory is never replaced.
 
@@ -70,10 +71,16 @@ def repo_skills(skills_root: Path) -> list[Path]:
 
 
 def _tree(root: Path) -> dict[str, tuple[str, str]]:
-    """Relative path -> (kind, content); symlinks compare by target, files by bytes."""
+    """Relative path -> (kind, content); symlinks compare by target, files by bytes.
+
+    `__pycache__` directories and `*.pyc` files are bytecode caches a copy installer
+    never carries, so they are left out on both sides.
+    """
     entries = {}
     for path in sorted(root.rglob("*")):
         relative = path.relative_to(root).as_posix()
+        if "__pycache__" in relative.split("/") or path.suffix == ".pyc":
+            continue
         if path.is_symlink():
             entries[relative] = ("link", os.readlink(path))
         elif path.is_file():
