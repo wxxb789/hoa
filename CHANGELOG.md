@@ -3,6 +3,16 @@
 Notable changes to this repo. `VERSION` is the one project version; each skill counts its own
 iterations in `metadata.revision`. Earlier entries retain historical per-skill versions.
 
+## [0.1.68] — 2026-11-18
+
+### Added
+
+- `omp-headless-orchestration/SKILL.md` pitfall 16: a lane dispatched inside the model endpoint's
+  restart window fails with `ECONNREFUSED` — a suspected transport fault, not a model defect: confirm
+  the window, retry once against the same route, then switch pool model or fall back to the primary
+  route. A report-only stage can still exit 0 with an empty or truncated report, so `exit 0` plus a
+  short report is a suspected failure to re-verify, not a completed stage.
+
 ## [0.1.67] — 2026-11-17
 
 ### Changed
