@@ -179,6 +179,6 @@ not success. Finally let the merge gate recount **all** threads before accepting
 - `gh pr checks <PR>` lists status/duration. A fast failed download step with a 5xx may be infra;
   inspect its log rather than labeling every fast failure a flake.
 - Re-run only failed jobs on the **same commit**: `gh run rerun <run-id> --failed`.
-- `uv run scripts/watch-pr-checks.py <PR>` bounds infra-only reruns and logs polls; its `.sh` twin has
-  the same exit codes. Bound retries instead of turning a broken job green-adjacent by attrition.
+- `uv run scripts/watch-pr-checks.py <PR>` bounds infra-only reruns and logs polls.
+  Bound retries instead of turning a broken job green-adjacent by attrition.
 - A new commit does not repair a mirror outage and invalidates the review already measured.

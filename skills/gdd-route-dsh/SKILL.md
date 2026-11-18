@@ -159,9 +159,10 @@ a detached run never notifies.
 
 ## Configuration
 
-Resolution order per setting: environment variable → documented default. The runner's flags are the
-contract's (`start --name --prompt --cwd --agent --max-time --resume --extra --replace`, plus the other
-subcommand arguments), so the keys below are environment-only. No environment-specific value belongs in
+Resolution order per setting: environment variable → `gdd.py` config file (`GDD_AGENT` and
+`GDD_RUN_ROOT` only) → documented default. The runner's flags are the contract's (`start --name --prompt
+--cwd --agent --max-time --resume --extra --replace`, plus the other subcommand arguments), so the runner
+itself reads the keys below from the environment only. No environment-specific value belongs in
 the runner, the skill body, or the goal contract.
 
 | Key | Resolves | Default |

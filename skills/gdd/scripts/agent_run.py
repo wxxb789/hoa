@@ -192,6 +192,8 @@ def _probe(send, target):
 
 def pid_alive(pid):
     """Windows: OpenProcess + GetExitCodeProcess (os.kill reads AccessDenied as dead)."""
+    if isinstance(pid, str) and pid.isdigit():
+        pid = int(pid)
     if not isinstance(pid, int) or isinstance(pid, bool) or pid <= 0:
         return False
     if IS_WINDOWS:
@@ -254,9 +256,11 @@ def is_starting(state):
 
 def observed_state(run_dir, state):
     """Read-only view for gdd.py and delivery-state.py: the recorded state, or "stale" for a
-    `running` run with nothing alive, no `finalized` marker and no startup grace left."""
+    `running` run with nothing alive, no `finalized` marker and no startup grace left. A custom
+    launcher that records no pid keys at all cannot be probed, so its recorded state stands."""
     recorded = str(state.get("state") or "?")
-    if (recorded != "running" or os.path.exists(os.path.join(run_dir, "finalized"))
+    if (recorded != "running" or not {"pid", "agent_pid"} & state.keys()
+            or os.path.exists(os.path.join(run_dir, "finalized"))
             or run_alive(run_dir, state) or is_starting(state)):
         return recorded
     return "stale"
@@ -497,6 +501,8 @@ def effective_state(run_dir):
     state = read_state(run_dir)
     if os.path.exists(os.path.join(run_dir, "finalized")) or state.get("state") not in STATES:
         return state, False
+    if state.get("backend") == "paseo" or not {"pid", "agent_pid"} & state.keys():
+        return state, False  # another launcher's run: its liveness is not ours to settle
     if run_alive(run_dir, state) or is_starting(state):
         return state, False
     if state["state"] != "running":  # terminal state published but the marker is missing

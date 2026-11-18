@@ -273,6 +273,13 @@ class ContractTests(RunnerCase):
         out = self.cli("status", "old").stdout
         self.assertIn("stale_recovered: true", out)
         self.assertEqual((self.state("old")["state"], self.state("old")["exit"]), ("failed", -1))
+        foreign = {"name": "s", "state": "running", "exit": None, "started": old}
+        for name, state in (("paseo", {**base, **foreign, "backend": "paseo"}), ("custom", foreign)):
+            with self.subTest(name=name):  # another launcher's run is never settled here
+                run_dir = self.craft(name, state)
+                self.cli("list")
+                self.assertEqual(self.state(name)["state"], "running")
+                self.assertFalse(os.path.exists(os.path.join(run_dir, "finalized")))
 
     def test_t8_missing_or_garbage_state_is_unknown(self):
         self.craft("missing")

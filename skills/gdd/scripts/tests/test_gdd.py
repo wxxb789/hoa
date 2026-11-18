@@ -214,6 +214,15 @@ class LaunchTests(GddCase):
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertEqual(len(glob.glob(stale + ".prev-*")), 1)
 
+    def test_custom_launcher_without_pids_keeps_its_recorded_state(self):
+        old = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+        run_dir = self.craft_run("workrepo-0001-implement", started=old)
+        state = json.loads(read(os.path.join(run_dir, "state.json")))
+        write(os.path.join(run_dir, "state.json"), json.dumps({k: v for k, v in state.items() if "pid" not in k}))
+        refused = self.stage("implement")
+        self.assertEqual(refused.returncode, 3, refused.stdout)
+        self.assertIn("still active", refused.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

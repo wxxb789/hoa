@@ -34,8 +34,8 @@ Run artifacts include prompt.md, run.json (exact argv), state.json (monitor pid
 and agent_id), events.ndjson (observed lifecycle transitions), stderr.log,
 cli.ndjson (raw command evidence), answer.md when addressable, answer.partial.md
 while a pre-delete capture awaits confirmation, exit.code and finalized. The run
-dir's os.mkdir claims the slug; an O_EXCL `refresh` file serializes readers (a
-holder older than 60 s is taken over). A finalized marker is immutable. An
+dir's os.mkdir claims the slug; an O_EXCL `refresh` file holding the holder's pid
+serializes readers (a dead holder's file is taken over). A finalized marker is immutable. An
 existing slug is refused rather than silently reused or replaced. Unsupported
 --max-time is refused: Paseo's --wait-timeout is not an execution deadline.
 """
@@ -65,7 +65,7 @@ EXITS = {"done": 0, "failed": 1, "killed": 143}
 # the detached monitor retries every timeout until terminal evidence exists.
 CLI_TIMEOUT_SECONDS = 60
 CLAIM_WAIT_SECONDS = CLI_TIMEOUT_SECONDS / 2
-STALE_CLAIM_SECONDS = 60  # a holder this old died mid-refresh
+STALE_CLAIM_SECONDS = 60  # a claim file still empty this long lost its holder before the pid write
 
 
 class ClaimTimeout(RuntimeError):
@@ -109,16 +109,29 @@ def text_file(run_dir, name, text):
         handle.write(text)
 
 
+def claim_holder(path):
+    with open(path, encoding="utf-8") as handle:
+        return handle.read().strip()
+
+
 @contextmanager
 def claim(path):
+    """Held for as long as the holder lives (it may make several CLI calls); only a dead
+    holder's file is taken over, and release removes the file only while it is still ours."""
     deadline = time.monotonic() + CLAIM_WAIT_SECONDS
+    mine = str(os.getpid())
     while True:
         try:
-            os.close(os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+            handle = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.write(handle, mine.encode())
+            os.close(handle)
             break
         except FileExistsError:
             with suppress(OSError):
-                if time.time() - os.path.getmtime(path) > STALE_CLAIM_SECONDS:
+                holder = claim_holder(path)
+                dead = (not support.pid_alive(holder) if holder
+                        else time.time() - os.path.getmtime(path) > STALE_CLAIM_SECONDS)
+                if dead and claim_holder(path) == holder:
                     os.unlink(path)
                     continue
         if time.monotonic() >= deadline:
@@ -128,7 +141,8 @@ def claim(path):
         yield
     finally:
         with suppress(OSError):
-            os.unlink(path)
+            if claim_holder(path) == mine:
+                os.unlink(path)
 
 
 def cli(state, argv):

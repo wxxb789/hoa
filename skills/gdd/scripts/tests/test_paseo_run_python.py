@@ -288,6 +288,27 @@ class PaseoLauncherTests(unittest.TestCase):
                 self.assertIsNone(state["exit"])
                 self.assertFalse((self.run_dir() / "finalized").exists())
 
+    def test_refresh_claim_is_held_while_its_holder_lives(self):
+        spec = importlib.util.spec_from_file_location("paseo_under_test", ADAPTER)
+        adapter = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(adapter)
+        path = self.home / "refresh"
+        dead = subprocess.Popen([sys.executable, "-c", "pass"])
+        dead.wait()
+        path.write_text(str(dead.pid), encoding="utf-8")
+        with adapter.claim(str(path)):
+            self.assertEqual(path.read_text(encoding="utf-8"), str(os.getpid()))
+        self.assertFalse(path.exists())
+        live = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+        self.addCleanup(live.wait)
+        self.addCleanup(live.kill)
+        path.write_text(str(live.pid), encoding="utf-8")
+        os.utime(path, (time.time() - 3600,) * 2)  # age alone never frees a live holder's claim
+        with mock.patch.object(adapter, "CLAIM_WAIT_SECONDS", 0.3), self.assertRaises(adapter.ClaimTimeout):
+            with adapter.claim(str(path)):
+                pass
+        self.assertEqual(path.read_text(encoding="utf-8"), str(live.pid))
+
     def test_unknown_native_run_reserves_worktree_until_confirmed_termination(self):
         spec = importlib.util.spec_from_file_location("gdd_under_test", ADAPTER.parent.parent / "gdd.py")
         gdd = importlib.util.module_from_spec(spec)

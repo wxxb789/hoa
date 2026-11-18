@@ -46,7 +46,8 @@ The launcher owns <run_root>/<date>/<SLUG>/state.json with at least
 {"name","state","exit","cwd","started","ended","duration_s"} (state is one of
 running|done|killed|failed|unknown) and answer.md holding the final assistant text.
 This tool polls that file and treats a missing file as unknown, never success; a
-`running` run whose runner and agent pids are both gone reads as `stale`.
+`running` run whose recorded runner and agent pids are both gone reads as `stale`; a
+launcher that records neither `pid` nor `agent_pid` is trusted as recorded.
 Native Paseo runs reserve their worktree while running or unknown, regardless
 of local monitor liveness, until a terminal state or finalized marker is recorded.
 """
