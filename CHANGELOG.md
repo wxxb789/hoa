@@ -27,12 +27,23 @@ iterations in `metadata.revision`. Earlier entries retain historical per-skill v
   `ops-claim-verification` and `structural-validity-gates` name `gdd`'s
   `references/bot-review-loop.md` as plain text instead of linking it. Kept, because the agent reads or runs them
   to do the task: `gdd` → `delegated-work-acceptance` (default `GDD_WORKTREE_SCOPE` script) and
-  `dsh-headless-gdd` (the DSH route's operating method), `dsh-headless-gdd` → `gdd` (its adapter
+  `gdd-route-dsh` (the DSH route's operating method), `gdd-route-dsh` → `gdd` (its adapter
   script and transport contract), `hoa-skill-set-audit` → `hoa-skill-create` (skill family
-  integrity, read and followed). Added: `omp-headless-orchestration` → `gdd`, whose
+  integrity, read and followed). Added: `gdd-route-omp` → `gdd`, whose
   `scripts/omp-run.sh` only forwards to `gdd`'s launcher adapter; its SKILL.md now links that
   adapter, so the closure, the generated install command and `install_host_skills.py --check` see
   the dependency.
+- Renamed `dsh-headless-gdd` → `gdd-route-dsh` and `omp-headless-orchestration` →
+  `gdd-route-omp`, with no behaviour change: the `gdd-` prefix groups the two stage routes, and both
+  stay usable on their own (each description now opens with when to use it and names `gdd` as one
+  consumer; `gdd-route-dsh` stays `kind: mechanism`, `gdd-route-omp` stays `kind: entry`). Both old
+  names are in `scripts/retired_skills.toml`, so the generated `npx skills remove -g` command and
+  `install_host_skills.py --check` report the old copies; `/dsh-headless-gdd`,
+  `/omp-headless-orchestration` and their `$`/`@` forms stop working.
+  Paired routing eval (`evals/judge_trigger_evals.py`, `gemini-4-carbon`, effort `low`, before =
+  the pre-rename tree, after = this tree): both `gdd` cases, with `route-explicit-gdd` as the
+  positive control, picked `gdd` in every answered run; each side scored 19/20 on clean runs with
+  the miss the recorded baseline has (`route-boundaryless-goal-to-spec-first` → `define-goal`).
 - README: the default install is `npx skills add wxxb789/hoa -g -s '*'`; single skills use the
   generated command from the index, and existing installs remove retired names with the generated
   `npx skills remove -g` command.

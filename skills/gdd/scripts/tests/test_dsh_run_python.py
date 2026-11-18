@@ -4372,7 +4372,7 @@ class AdapterUnitTests(ProcessFixtures):
     def test_the_documents_state_the_same_exit_mapping(self):
         """R6: goal, transport and the record state the full exit→state mapping.
 
-        The operating-method skill (`skills/dsh-headless-gdd/SKILL.md`) states the
+        The operating-method skill (`skills/gdd-route-dsh/SKILL.md`) states the
         two endings an operator meets there — `killed`/143 for the adapter's own
         stop and `failed`/−1 with `stale_recovered` for an unfinalized death — and
         does not contradict the full mapping; the signal-convention clause is
@@ -4394,14 +4394,14 @@ class AdapterUnitTests(ProcessFixtures):
                 # its own conditions (see
                 # `test_q3_the_document_mapping_check_catches_a_swapped_mapping`).
                 check_exit_mapping(exit_mapping_entries(text), name)
-        skill = (REPO / "skills/dsh-headless-gdd/SKILL.md").read_text(encoding="utf-8")
+        skill = (REPO / "skills/gdd-route-dsh/SKILL.md").read_text(encoding="utf-8")
         self.assertIn("A stopped run is `killed` with exit 143", skill)
         self.assertIn("`failed` with exit −1 and `stale_recovered: true`", skill)
 
     def test_transport_and_the_skill_state_the_same_isolation_precondition(self):
         """R6: the write boundary is the permission policy, not the cwd."""
         transport = (REPO / "skills/gdd/references/transport.md").read_text(encoding="utf-8")
-        skill = (REPO / "skills/dsh-headless-gdd/SKILL.md").read_text(encoding="utf-8")
+        skill = (REPO / "skills/gdd-route-dsh/SKILL.md").read_text(encoding="utf-8")
         for name, text in (("transport.md", transport), ("SKILL.md", skill)):
             with self.subTest(document=name):
                 self.assertIn("enforces a sandbox", text)
@@ -6128,7 +6128,7 @@ class HardeningRuleTests(ProcessFixtures):
             "goal": REPO / "docs/goals/archive/2026-11-15-dsh-headless-launcher.md",
             "transport": REPO / "skills/gdd/references/transport.md",
             "record": REPO / "docs/evidence/2026-11-15-dsh-headless-launcher.md",
-            "skill": REPO / "skills/dsh-headless-gdd/SKILL.md",
+            "skill": REPO / "skills/gdd-route-dsh/SKILL.md",
         }
         for name, path in documents.items():
             with self.subTest(document=name):
@@ -6218,7 +6218,7 @@ class HardeningRuleTests(ProcessFixtures):
             assert "same worktree" in plain, source
             assert "The same repository never has two writers" not in plain, source
 
-        skill_path = REPO / "skills/dsh-headless-gdd/SKILL.md"
+        skill_path = REPO / "skills/gdd-route-dsh/SKILL.md"
         text = skill_path.read_text(encoding="utf-8")
         check_isolation(text, "SKILL.md")
         mutations = {
@@ -6264,7 +6264,7 @@ class HardeningRuleTests(ProcessFixtures):
 
         documents = {
             "transport": REPO / "skills/gdd/references/transport.md",
-            "skill": REPO / "skills/dsh-headless-gdd/SKILL.md",
+            "skill": REPO / "skills/gdd-route-dsh/SKILL.md",
         }
         mutations = {
             "transport": (

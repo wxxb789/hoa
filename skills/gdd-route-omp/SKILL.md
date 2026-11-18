@@ -1,13 +1,13 @@
 ---
-name: omp-headless-orchestration
+name: gdd-route-omp
 description: >-
-  Run long OMP (`omp -p`) jobs headlessly so they survive the session that dispatched them — detached
-  tmux, NDJSON event log, polled completion, session-id recovery. Use when delegating a repo task that
-  will run more than a couple of minutes, when the orchestrating chat/session may restart, or when
-  recovering a run that was killed mid-turn. Do not use for a two-minute command (run it inline) or for
-  work that needs live steering (that is a TUI session).
+  Use when delegating a repo task to OMP (`omp -p`) that will run more than a couple of minutes —
+  standalone or as `gdd`'s OMP route — when the orchestrating chat/session may restart, or when
+  recovering a run that was killed mid-turn. Runs it headlessly so it survives the session that
+  dispatched it: detached tmux, NDJSON event log, polled completion, session-id recovery. Do not use
+  for a two-minute command (run it inline) or for work that needs live steering (that is a TUI session).
 metadata:
-  revision: "3"
+  revision: "1"
   areas: "software-development,work-management"
   targets: "pi"
   summary: "detached tmux launcher for long `omp -p` runs; polled completion, session-id recovery"
@@ -15,7 +15,7 @@ metadata:
   kind: "entry"
 ---
 
-# OMP headless orchestration
+# gdd-route-omp
 
 Delegate bounded work to OMP (`omp -p`) without losing runs when the dispatching session, gateway or
 terminal goes down.

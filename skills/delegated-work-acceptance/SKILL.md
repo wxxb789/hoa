@@ -7,7 +7,7 @@ description: >-
   when deciding what to authorize and what to send back. Do not use for grading your own work, or when
   no artifact exists to inspect.
 metadata:
-  revision: "2"
+  revision: "3"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
   summary: "verify a delegated \"done\" against the artifact, the re-derived numbers and the write boundary"
@@ -42,7 +42,7 @@ sender works from a fixed scope and the acceptance criteria exist before the wor
   clauses, rollback expectations) → Deliver (numbered, each item with its gate and the real baseline
   numbers) → output artifact requirements (`result.md`, backups, diffs, ledger).
 - Dispatch it headless and in the background — it runs for minutes; use the transport your harness
-  provides (see `omp-headless-orchestration` for the OMP path) and keep the log plus the produced
+  provides (see `gdd-route-omp` for the OMP path) and keep the log plus the produced
   artifacts in the task dir.
 - A line like `open terminal failed: not a terminal` is the CLI failing to open an interactive terminal
   under a headless flag — not a run failure. Judge by exit code and produced artifacts.

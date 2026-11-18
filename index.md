@@ -40,10 +40,11 @@ targets:  runtime-agnostic | repo-only |
 | design-an-interface | skill | software-development | runtime-agnostic | `skills/design-an-interface/` | sketch a software interface or public API: signatures, OpenAPI snippet, usage examples |
 | discord-rich-message | skill | software-development,work-management | runtime-agnostic | `skills/discord-rich-message/` | structured Discord messages within platform limits: Components V2, aligned code-block tables, attachment fallback |
 | dotnet-repo-workflow | skill | software-development | runtime-agnostic | `skills/dotnet-repo-workflow/` | run the repo's own .NET gate harness instead of a hand-rolled `dotnet test`; lock files, Roslyn harness traps, merge-ready checklist |
-| dsh-headless-gdd | skill | software-development,work-management | runtime-agnostic | `skills/dsh-headless-gdd/` | dispatch and supervise a GDD stage on dsh headless: session/worktree rules, completion judgement, recovery, harness traps |
 | evidence-backed-analytical-writing | skill | work-management | runtime-agnostic | `skills/evidence-backed-analytical-writing/` | evidence map plus a claim → evidence → mechanism → limitation spine for Chinese analytical reports; recency window, status ladder, negative findings |
 | evidence-boundary-discipline | skill | work-management | runtime-agnostic | `skills/evidence-boundary-discipline/` | state only what a dated source supports: tense to dateline, provenance-label parity, absence never escalates |
 | gdd | skill | software-development,work-management | runtime-agnostic | `skills/gdd/` | goal contract → agent-authored stages → operator-run gates → scripted merge gate → resumable ledger; ships `gdd.py`, `delivery-state.py`, `pr-merge-check.py` |
+| gdd-route-dsh | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-dsh/` | dispatch and supervise a GDD stage on dsh headless: session/worktree rules, completion judgement, recovery, harness traps |
+| gdd-route-omp | skill | software-development,work-management | pi | `skills/gdd-route-omp/` | detached tmux launcher for long `omp -p` runs; polled completion, session-id recovery |
 | generated-runtime-repairs | skill | software-development,work-management | runtime-agnostic | `skills/generated-runtime-repairs/` | repair the template/generator, prove the staged artifact, then deploy and read back the live runtime |
 | ghc-search | skill | software-development | runtime-agnostic | `skills/ghc-search/` | web and X/Twitter search via a local ghc-proxy Responses API; answer plus deduped sources |
 | git-auto-sync-pipelines | skill | software-development,work-management | runtime-agnostic | `skills/git-auto-sync-pipelines/` | scheduled commit/push for hand-edited repos: ordered gates, allowlist and size caps, staged secret scan, heartbeat and deduped alerts |
@@ -62,7 +63,6 @@ targets:  runtime-agnostic | repo-only |
 | measurement-campaign-evidence | skill | software-development,work-management | runtime-agnostic | `skills/measurement-campaign-evidence/` | bind the candidate, measure serially, keep one report set, never let a comparator fake a latency |
 | notes-to-prd | skill | work-management | runtime-agnostic | `skills/notes-to-prd/` | turn notes or an idea into a structured PRD draft |
 | official-document-verification | skill | work-management | runtime-agnostic | `skills/official-document-verification/` | verify a claim against the exact print of the document, including artifacts a plain client cannot fetch |
-| omp-headless-orchestration | skill | software-development,work-management | pi | `skills/omp-headless-orchestration/` | detached tmux launcher for long `omp -p` runs; polled completion, session-id recovery |
 | ops-claim-verification | skill | software-development,work-management | runtime-agnostic | `skills/ops-claim-verification/` | turn a scheduled-job, repair or deployment claim into evidence: find the recording surface, separate manual from scheduled runs, audit the auditor |
 | package-release-verification | skill | software-development | runtime-agnostic | `skills/package-release-verification/` | changelog → gate-on-the-same-commit → dispatch → per-version registry check → approved cleanup |
 | plan-to-issues | skill | work-management | runtime-agnostic | `skills/plan-to-issues/` | break a PRD or plan into issue-level tasks with titles, bodies and labels |
@@ -97,17 +97,17 @@ below. A skill without a row has no dependencies: `npx skills add wxxb789/hoa -g
 
 | Skill | Needs (transitive `../` closure) | Install command |
 |---|---|---|
-| dsh-headless-gdd | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s dsh-headless-gdd -s delegated-work-acceptance -s gdd` |
-| gdd | delegated-work-acceptance, dsh-headless-gdd | `npx skills add wxxb789/hoa -g -s gdd -s delegated-work-acceptance -s dsh-headless-gdd` |
+| gdd | delegated-work-acceptance, gdd-route-dsh | `npx skills add wxxb789/hoa -g -s gdd -s delegated-work-acceptance -s gdd-route-dsh` |
+| gdd-route-dsh | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-dsh -s delegated-work-acceptance -s gdd` |
+| gdd-route-omp | delegated-work-acceptance, gdd, gdd-route-dsh | `npx skills add wxxb789/hoa -g -s gdd-route-omp -s delegated-work-acceptance -s gdd -s gdd-route-dsh` |
 | hoa-skill-set-audit | hoa-skill-create | `npx skills add wxxb789/hoa -g -s hoa-skill-set-audit -s hoa-skill-create` |
-| omp-headless-orchestration | delegated-work-acceptance, dsh-headless-gdd, gdd | `npx skills add wxxb789/hoa -g -s omp-headless-orchestration -s delegated-work-acceptance -s dsh-headless-gdd -s gdd` |
 
 Upgrading an older install: remove the names this repo no longer ships (generated from
 `scripts/retired_skills.toml`, which names each replacement). Check `npx skills list -g` first and
 drop any name you installed from another source; this command removes it too.
 
 ```bash
-npx skills remove -g design-md find-nearby git-worktree-workflow github-code-review github-repo-management grounded-citations hoa-agent-retrieve hoa-skill-work html-artifact improve-codebase-architecture jupyter-live-kernel m365-copilot-cdp microsoft-office my-ado-cppr ocr-and-documents rss-feeds skill-library-curation skill-porting-and-publishing subagent-driven-development systematic-debugging teams-cdp to-issues to-prd whisper writing-plans
+npx skills remove -g design-md dsh-headless-gdd find-nearby git-worktree-workflow github-code-review github-repo-management grounded-citations hoa-agent-retrieve hoa-skill-work html-artifact improve-codebase-architecture jupyter-live-kernel m365-copilot-cdp microsoft-office my-ado-cppr ocr-and-documents omp-headless-orchestration rss-feeds skill-library-curation skill-porting-and-publishing subagent-driven-development systematic-debugging teams-cdp to-issues to-prd whisper writing-plans
 ```
 
 > Reflections and eval results are prose/knowledge, not indexed here.

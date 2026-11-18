@@ -39,7 +39,7 @@ A standing constraint for naming a new skill and for renaming one. Visibility an
    description's first sentence); `port` moves a skill out of one runtime into a shared repository.
    A new verb gets one meaning, added here.
 5. **Prefixes.** `hoa-` is only for the skill-library family (skills that act on skills or on the
-   agent's own usage history). A domain skill takes its tool or domain as prefix (`omp-`, `dsh-`); a
+   agent's own usage history). A domain skill takes its tool or domain as prefix (`tmux-`, `ghc-`); a
    skill coupled to the Hermes runtime takes `hermes-` and may keep a `hermes-<topic>` noun form, as
    `AGENTS.md` requires. `hoa-introspect` and `hoa-introspect-distill` keep their names as an
    existing parent/child pair outside the `<family>-<object>-<verb>` form.
