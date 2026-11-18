@@ -134,7 +134,6 @@ floor = [
   "scripts/test_check_frontmatter.py",
   "scripts/test_check_skill_links.py",
   "scripts/test_generate_index.py",
-  "scripts/test_install_host_skills.py",
   "scripts/test_run_all_tests.py",
   "scripts/test_skill_config.py",
   "scripts/test_version.py",
@@ -304,11 +303,6 @@ notes = "preserved invocation of the CI step 'Changelog rule tests'"
 path = "scripts/test_check_frontmatter.py"
 command = [["{python}", "-B", "-m", "unittest", "scripts.test_check_frontmatter"]]
 notes = "preserved invocation of the CI step 'Frontmatter checker tests'"
-
-[[suite]]
-path = "scripts/test_install_host_skills.py"
-command = [["{python}", "-B", "-m", "unittest", "scripts.test_install_host_skills"]]
-notes = "preserved invocation of the CI step 'Host install parity tests'"
 
 [[suite]]
 path = "scripts/test_skill_config.py"

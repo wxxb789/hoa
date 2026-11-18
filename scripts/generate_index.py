@@ -26,13 +26,13 @@ import argparse
 import json
 import re
 import sys
+import tomllib
 from pathlib import Path
 
 # Keep --check read-only, including helper/dependency import caches.
 sys.dont_write_bytecode = True
 import yaml
 import check_skill_links as links
-import install_host_skills as hosts
 import skill_metadata as sm
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -201,6 +201,26 @@ def closure(skill_dir: Path) -> list[str]:
     return sorted(found)
 
 
+def retired_names(path: Path, current: set[str]) -> list[str]:
+    """Sorted names in the retired registry; absent file is empty."""
+    if not path.is_file():
+        return []
+    try:
+        with path.open("rb") as handle:
+            table = tomllib.load(handle).get("retired", {})
+    except tomllib.TOMLDecodeError as error:
+        raise ValueError(f"{path}: invalid TOML ({error})") from error
+    for name, entry in table.items():
+        if name in current:
+            raise ValueError(f"{path}: retired.{name} is a current skill")
+        fields = entry if isinstance(entry, dict) else {}
+        if not all(isinstance(fields.get(key), str) and fields[key].strip()
+                   for key in ("replacement", "reason")):
+            raise ValueError(f"{path}: retired.{name} needs non-empty replacement and reason, "
+                             f"got {entry!r}")
+    return sorted(table)
+
+
 def collect() -> list[dict]:
     rows = []
     skill_dirs = sorted(p for p in SKILLS.iterdir() if p.is_dir())
@@ -306,17 +326,20 @@ INSTALL_EN = """
 ## Install
 
 `npx skills` installs only the skills you name and does not follow the `../` links between them.
-Install everything with `npx skills add wxxb789/hoa -g -s '*'`, or one skill with its row's command
-below. A skill without a row has no dependencies: `npx skills add wxxb789/hoa -g -s <skill>`.
+Install everything with `npx skills add wxxb789/hoa -g -s '*' -y`, or one skill with its row's command
+below. A skill without a row has no dependencies: `npx skills add wxxb789/hoa -g -s <skill> -y`.
 
 | Skill | Needs (transitive `../` closure) | Install command |
 |---|---|---|
 """
 
 RETIRED_EN = """
-Upgrading an older install: remove the names this repo no longer ships (generated from
-`scripts/retired_skills.toml`, which names each replacement). Check `npx skills list -g` first and
-drop any name you installed from another source; this command removes it too.
+After a release that renames or retires skills, remove the names this repo no longer ships
+(generated from `scripts/retired_skills.toml`, which names each replacement), then re-run the
+install-all command or the current row above for each skill (a saved command may still name the old
+skill): `npx skills update` never installs a new name. Removing a name you never installed is a
+no-op, but removal matches names across sources, so check `npx skills ls -g` first and drop any
+name you installed from elsewhere.
 
 ```bash
 """
@@ -360,17 +383,19 @@ INSTALL_ZH = """
 ## 安装
 
 `npx skills` 只安装你点名的 skill，不跟随它们之间的 `../` 链接。
-整库安装用 `npx skills add wxxb789/hoa -g -s '*'`；单装某个 skill 用下表该行的命令。
-表中没有的 skill 没有依赖：`npx skills add wxxb789/hoa -g -s <skill>`。
+整库安装用 `npx skills add wxxb789/hoa -g -s '*' -y`；单装某个 skill 用下表该行的命令。
+表中没有的 skill 没有依赖：`npx skills add wxxb789/hoa -g -s <skill> -y`。
 
 | Skill | 依赖（`../` 传递闭包） | 安装命令 |
 |---|---|---|
 """
 
 RETIRED_ZH = """
-升级旧安装：移除本仓库已不再提供的名称（由 `scripts/retired_skills.toml` 生成，
-其中写明每个名称的替代者）。先看 `npx skills list -g`，把你从其它来源安装的同名 skill
-从命令中去掉，否则它也会被移除：
+某次发布改名或退役了 skill 时：移除本仓库已不再提供的名称（由 `scripts/retired_skills.toml`
+生成，其中写明每个名称的替代者），再重新运行整库安装命令或上表中该 skill 的当前行（之前保存的命令可能仍含旧名称）——
+`npx skills update` 从不安装新名称。
+移除从未安装的名称不会有任何影响；但移除按名称匹配所有来源，所以先看 `npx skills ls -g`，
+把你从其它来源安装的同名 skill 从命令中去掉：
 
 ```bash
 """
@@ -393,7 +418,7 @@ def render(rows: list[dict], lang: str, retired: list[str] = ()) -> str:
     out.append(install)
     for r in rows:
         if r.get("closure"):
-            command = " ".join([NPX_ADD] + [f"-s {name}" for name in [r["name"], *r["closure"]]])
+            command = " ".join([NPX_ADD] + [f"-s {name}" for name in [r["name"], *r["closure"]]] + ["-y"])
             out.append(f"| {r['name']} | {', '.join(r['closure'])} | `{command}` |\n")
     if retired:
         out.append(f"{removal}npx skills remove -g {' '.join(retired)}\n```\n")
@@ -409,9 +434,8 @@ def main(argv=None) -> int:
 
     try:
         rows = collect()
-        retired = sorted(hosts.retired_names(
-            ROOT / "scripts" / "retired_skills.toml",
-            [SKILLS / r["name"] for r in rows if r["type"] == "skill"]))
+        retired = retired_names(ROOT / "scripts" / "retired_skills.toml",
+                                {r["name"] for r in rows if r["type"] == "skill"})
     except ValueError as e:
         print(f"generate_index: {e}", file=sys.stderr)
         return 1

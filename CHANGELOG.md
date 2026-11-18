@@ -3,6 +3,44 @@
 Notable changes to this repo. `VERSION` is the one project version; each skill counts its own
 iterations in `metadata.revision`. Earlier entries retain historical per-skill versions.
 
+## [0.1.71] — 2026-11-18
+
+### Removed
+
+- `scripts/install_host_skills.py` and its tests. `npx skills` is the one install route: install
+  everything with `npx skills add wxxb789/hoa -g -s '*' -y`, update with `npx skills update -g -y`,
+  and install single skills with the generated rows in `index.md`. The `--link` symlink route, the
+  `--category` layout and the copy comparison go with it; hoa-skill-set-audit's `inventory.py`
+  already diagnoses an installed set (`../` closure with lexical and physical status, duplicates).
+
+### Changed
+
+- `scripts/generate_index.py` reads `scripts/retired_skills.toml` itself (it was the installer's
+  only other caller) and keeps the same validation: valid TOML, no current skill as a retired name,
+  non-empty `replacement` and `reason`. `scripts/test_generate_index.py` covers the generated
+  remove line and each rejection through the CLI.
+- The generated retired-names paragraph and both READMEs give the measured `npx skills` 1.8.1
+  upgrade path: `update` keeps a renamed or retired skill under its old name and never installs a
+  new name, so after such a release run the generated `npx skills remove -g …` line (a no-op for
+  names never installed; it matches names across sources, so check `npx skills ls -g` first) and
+  re-run the add command. The READMEs add the author loop: `npx skills add <local checkout> -g -s
+  <skill> -y`, re-run after each edit because `update` skips local sources, then reinstall from
+  `wxxb789/hoa` after pushing.
+- `AGENTS.md`, `rules/cross-platform-skills.md`, `rules/skill-composition.md` and
+  `rules/skill-naming.md`: closure is delivered by the generated `npx skills` commands, kept current
+  by `generate_index.py --check`, and diagnosed on a machine by hoa-skill-set-audit; the rename
+  procedure is a registry entry, the regenerated remove line, and users re-running add. The
+  measured `../` lexical/physical facts are unchanged.
+- Generated `npx skills add` commands (rows and the section intro) end in `-y`, so an agent can run
+  them without a prompt. The generated `npx skills remove` line keeps its confirmation: it matches
+  names across sources, and several retired names (`writing-plans`, `systematic-debugging`) are common in other collections.
+
+### Fixed
+
+- hoa-skill-port (revision 3): the configuration paragraph no longer links the repo-level
+  `skill_config.py` from inside the skill or names the shared directory as a skill-relative path;
+  both broke in an installed copy, and `inventory.py` flagged the latter on a correct install.
+
 ## [0.1.70] — 2026-11-18
 
 ### Added

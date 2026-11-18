@@ -79,7 +79,7 @@ hoa/
 ├── evals/         # 可重复的 benchmark、cases、fixtures、rubrics、脱敏 datasets
 ├── reflections/   # 人写的比较、决策、retro、post-mortem
 ├── ref/           # 外部参考
-└── scripts/       # 仓库工具：generate_index.py（索引）、install_host_skills.py（主机一致性）、vendor_shared.py（共享 skill 脚本分发）
+└── scripts/       # 仓库工具：generate_index.py（索引与安装命令）、vendor_shared.py（共享 skill 脚本分发）
 ```
 
 `skills/` 遵循 `npx skills` 的布局：`skills/<name>/SKILL.md`（扁平）或
@@ -95,13 +95,6 @@ Artifact 包括 skill（`skills/<name>/SKILL.md`）与库文件
 每个配置的库目录至少要有一个 artifact,索引备注取 artifact 自身的元数据：
 skill 用 `metadata.summary` / `metadata.summary_zh`，库 artifact 用索引注释里的
 `summary` / `summary_zh`；缺失时回退到 description 首句,中文缺失时回退到英文备注。
-
-主机安装一致性独立于目录：
-`python scripts/install_host_skills.py --root <host-skills-dir> --check`
-会搜索 `<root>/<name>` 与 `<root>/<category>/<name>`，逐条列出缺失、内容漂移、
-链接错误或存在两个条目的 skill；`--link` 默认在 `<root>/<name>` 平铺创建缺失的符号链接，
-传 `--category` 时放在 `<root>/<category>/<name>`，因此父 skill 与它通过 `../` 链接的兄弟 skill
-位于同一目录。它不会替换真实目录，也不会为同一个 skill 添加第二个条目。
 
 ## 这个仓库的形状
 
@@ -134,7 +127,7 @@ skill 用 `metadata.summary` / `metadata.summary_zh`，库 artifact 用索引注
 | `workflows/` | 1 个面向结果的有限 recipe（`adopt-a-pattern`）。 | 否——库 |
 | `evals/` | 两个 case suite（`trigger-cases.json`、`skill-method-cases.json`）及其离线校验器。 | 否——仅仓库 |
 | `reflections/`、`ref/` | 人写的复盘与外部参考子模块；研究材料，从不下发。 | 否 |
-| `scripts/` | 仓库维护：目录、主机一致性、版本/revision 检查、契约图、配置解析器。 | 否 |
+| `scripts/` | 仓库维护：目录与安装命令、版本/revision 检查、契约图、配置解析器。 | 否 |
 
 skill 的 frontmatter 同时携带目录字段与组合字段：`revision`、`kind`、可选的逗号分隔
 `consumes` / `produces`、`areas`、`targets`、`summary`、`summary_zh`。库 artifact 把元数据
@@ -209,8 +202,7 @@ unverified；既不退回 `Popen` 缓存的 `returncode`（它看不见 reap）�
 | `python -m unittest scripts.test_check_skill_links` | 链接检查器自身的测试。 |
 | `python scripts/test_check_contract_graph.py` | 契约图检查器自身的规则测试。 |
 | `python -m unittest scripts.test_skill_config` | 配置解析顺序与畸形配置行为。 |
-| `python scripts/test_generate_index.py` | 目录收集、summary、中文回退、漂移。 |
-| `python -m unittest scripts.test_install_host_skills` | 主机安装一致性（`--check` / `--link`）、`../` 闭包、退役名称。 |
+| `python scripts/test_generate_index.py` | 目录收集、summary、中文回退、漂移、生成的安装与移除命令、退役登记校验。 |
 | `python -m unittest scripts.test_check_changelog` | changelog 规则自身的测试。 |
 | `python scripts/check_frontmatter.py` | 每个 `SKILL.md` 的 frontmatter 与目录字段；description 上限 1024 字符；隐藏标记与 `agents/openai.yaml` 一致。 |
 | `python -m unittest scripts.test_check_frontmatter` | frontmatter 检查器自身的测试。 |
@@ -327,37 +319,41 @@ git clone https://github.com/wxxb789/hoa   # 用 skill / 跑测试都不需要�
 ## 下发
 
 **Skills**——唯一可下发的 artifact——用 Vercel 的
-[`skills`](https://github.com/vercel-labs/skills) CLI 安装：
+[`skills`](https://github.com/vercel-labs/skills) CLI（`npx skills`）安装；本仓库不另带安装器。
 
 ```bash
-# 默认：装全部 skill（用 -a <agent> 选择 runtime）
-npx skills add wxxb789/hoa -g -s '*'
+# 装全部 skill（用 -a <agent> 选择 runtime）
+npx skills add wxxb789/hoa -g -s '*' -y
 
 # 看有哪些
 npx skills add wxxb789/hoa --list
 
-# 更新 / 移除
-npx skills update
-npx skills remove -g <skill>
+# 重装上游有变化的 skill
+npx skills update -g -y
 ```
 
-**默认整库安装。** `npx skills` 只安装你点名的 skill，不跟随它们之间的 `../` 链接，所以单写
-`-s <skill>` 可能缺少它串联的同级 skill。要单装，从 [`index.zh-CN.md`](./index.zh-CN.md#安装) 的
-“安装”一节复制该 skill 的命令：它由链接生成，列出该 skill 的整个闭包。表中没有的 skill 没有依赖。
+**默认整库安装。** `npx skills` 没有依赖概念：只安装你点名的 skill，不跟随它们之间的 `../` 链接，
+所以单写 `-s <skill>` 可能缺少它串联的同级 skill。要单装，从 [`index.zh-CN.md`](./index.zh-CN.md#安装)
+的“安装”一节复制该 skill 的命令：它由链接生成，列出该 skill 的整个闭包。表中没有的 skill 没有依赖。
 
-**升级已有安装。** 在本仓库改名或退役的 skill 仍以旧名留在安装目录里。用同一节里生成的
-`npx skills remove -g …` 命令移除旧名；该名单的来源是 `scripts/retired_skills.toml`，其中写明每个
-替代者。先把你从其它来源安装的同名 skill 从命令中去掉，否则它也会被移除。
+**某次发布改名或退役了 skill 之后。** `npx skills update` 会把改名或退役的 skill 以旧名保留（只警告
+上游已删除），也从不安装新名称。运行 `index.zh-CN.md` 同一节里生成的 `npx skills remove -g …` 命令
+（来源是 `scripts/retired_skills.toml`，其中写明每个替代者），再重新运行整库安装命令，
+或该节里每个 skill 的当前行（之前保存的单装命令可能仍含旧名称），装上新名称。
+移除从未安装的名称不会有任何影响；但移除按名称匹配所有来源，所以先看 `npx skills ls -g`，
+把你从其它来源安装的同名 skill 从命令中去掉。
+
+**开发某个 skill。** `npx skills add <本地 checkout> -g -s <skill> -y` 安装工作区中的版本。
+`npx skills update` 会跳过本地来源，所以每次修改后重新运行这条 add；推送之后，从 `wxxb789/hoa`
+重新安装，让 `update` 重新跟踪它。
 
 - 全局（`-g`）装到 `~/<agent>/skills/`（`~/.claude/skills`、
   `~/.config/opencode/skills`、`~/.agents/skills` …）；默认 scope 装到当前项目。
 - 默认 **symlink**（单一权威副本，好更新）或 `--copy`（Windows / 不支持 symlink 时）。
-- 部分 skill 通过 `../<child>/SKILL.md` 串联同级 skill。copy 安装（`--copy`、Codex 的
-  skill-installer）必须把整个 `../` 依赖闭包装进同一个 skills 根目录，否则链路断开。Windows 上
-  仓库安装器（`python scripts/install_host_skills.py --root <host-skills-dir> --link`，再跑
-  `--check`；默认平铺，传一个 `--category` 也会让父 skill 与其子 skill 同处一处）以绝对目标 symlink
-  链接整个目录，需要开发者模式或管理员权限；`--check` 报告缺失或分裂的闭包，以及仍安装着的退役名称。
-  详见 [`rules/cross-platform-skills.md`](./rules/cross-platform-skills.md)。
+- 部分 skill 通过 `../<child>/SKILL.md` 串联同级 skill，因此父 skill 的整个 `../` 闭包必须位于同一个
+  skills 根目录；上面的命令会装齐它。要诊断已安装的集合（闭包缺失或分裂、重复、遮蔽），运行由用户调用的
+  [`hoa-skill-set-audit`](./skills/hoa-skill-set-audit/SKILL.md)。详见
+  [`rules/cross-platform-skills.md`](./rules/cross-platform-skills.md)。
 - `hoa` 里其它东西都是**库 / 知识**——不自动下发。拼进某个 skill，或手动取用。
 - runtime **设置**由 `chezmoi apply` 另行下发。
 

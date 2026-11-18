@@ -90,19 +90,21 @@ targets:  runtime-agnostic | repo-only |
 ## 安装
 
 `npx skills` 只安装你点名的 skill，不跟随它们之间的 `../` 链接。
-整库安装用 `npx skills add wxxb789/hoa -g -s '*'`；单装某个 skill 用下表该行的命令。
-表中没有的 skill 没有依赖：`npx skills add wxxb789/hoa -g -s <skill>`。
+整库安装用 `npx skills add wxxb789/hoa -g -s '*' -y`；单装某个 skill 用下表该行的命令。
+表中没有的 skill 没有依赖：`npx skills add wxxb789/hoa -g -s <skill> -y`。
 
 | Skill | 依赖（`../` 传递闭包） | 安装命令 |
 |---|---|---|
-| gdd | delegated-work-acceptance, gdd-route-dsh | `npx skills add wxxb789/hoa -g -s gdd -s delegated-work-acceptance -s gdd-route-dsh` |
-| gdd-route-dsh | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-dsh -s delegated-work-acceptance -s gdd` |
-| gdd-route-omp | delegated-work-acceptance, gdd, gdd-route-dsh | `npx skills add wxxb789/hoa -g -s gdd-route-omp -s delegated-work-acceptance -s gdd -s gdd-route-dsh` |
-| hoa-skill-set-audit | hoa-skill-create | `npx skills add wxxb789/hoa -g -s hoa-skill-set-audit -s hoa-skill-create` |
+| gdd | delegated-work-acceptance, gdd-route-dsh | `npx skills add wxxb789/hoa -g -s gdd -s delegated-work-acceptance -s gdd-route-dsh -y` |
+| gdd-route-dsh | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-dsh -s delegated-work-acceptance -s gdd -y` |
+| gdd-route-omp | delegated-work-acceptance, gdd, gdd-route-dsh | `npx skills add wxxb789/hoa -g -s gdd-route-omp -s delegated-work-acceptance -s gdd -s gdd-route-dsh -y` |
+| hoa-skill-set-audit | hoa-skill-create | `npx skills add wxxb789/hoa -g -s hoa-skill-set-audit -s hoa-skill-create -y` |
 
-升级旧安装：移除本仓库已不再提供的名称（由 `scripts/retired_skills.toml` 生成，
-其中写明每个名称的替代者）。先看 `npx skills list -g`，把你从其它来源安装的同名 skill
-从命令中去掉，否则它也会被移除：
+某次发布改名或退役了 skill 时：移除本仓库已不再提供的名称（由 `scripts/retired_skills.toml`
+生成，其中写明每个名称的替代者），再重新运行整库安装命令或上表中该 skill 的当前行（之前保存的命令可能仍含旧名称）——
+`npx skills update` 从不安装新名称。
+移除从未安装的名称不会有任何影响；但移除按名称匹配所有来源，所以先看 `npx skills ls -g`，
+把你从其它来源安装的同名 skill 从命令中去掉：
 
 ```bash
 npx skills remove -g design-md dsh-headless-gdd find-nearby git-worktree-workflow github-code-review github-repo-management grounded-citations hoa-agent-retrieve hoa-skill-work html-artifact improve-codebase-architecture jupyter-live-kernel m365-copilot-cdp microsoft-office my-ado-cppr ocr-and-documents omp-headless-orchestration rss-feeds skill-library-curation skill-porting-and-publishing subagent-driven-development systematic-debugging teams-cdp to-issues to-prd whisper writing-plans

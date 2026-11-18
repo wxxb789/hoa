@@ -86,7 +86,7 @@ hoa/
 ├── evals/         # repeatable benchmarks, cases, fixtures, rubrics, sanitized datasets
 ├── reflections/   # human write-ups: comparisons, decisions, retros, post-mortems
 ├── ref/           # external references
-└── scripts/       # repo tooling: generate_index.py (index), install_host_skills.py (host parity), vendor_shared.py (shared skill scripts)
+└── scripts/       # repo tooling: generate_index.py (index and install commands), vendor_shared.py (shared skill scripts)
 ```
 
 `skills/` follows the `npx skills` layout: `skills/<name>/SKILL.md` (flat) or
@@ -105,15 +105,6 @@ index note comes from its own metadata: `metadata.summary` /
 `metadata.summary_zh` for skills, `summary` / `summary_zh` in the index comment
 for library artifacts, falling back to the first sentence of the description
 (and, for Chinese, to the English note).
-
-Host install parity is separate from the catalog: `python
-scripts/install_host_skills.py --root <host-skills-dir> --check` searches
-`<root>/<name>` and `<root>/<category>/<name>`, names every skill that is
-absent, drifted, wrongly linked or has two entries, and `--link` creates the
-missing symlinks flat at `<root>/<name>`, or at `<root>/<category>/<name>` with
-`--category`, so a parent and the siblings it chains to through `../` share one
-directory. It never replaces a real directory and never adds a second entry for
-one skill.
 
 ## How this repository is shaped
 
@@ -146,7 +137,7 @@ the layer is a fact about the tree, not a label someone remembers to add.
 | `workflows/` | 1 finite outcome-oriented recipe (`adopt-a-pattern`). | no — library |
 | `evals/` | Two case suites (`trigger-cases.json`, `skill-method-cases.json`) and their offline validators. | no — repo only |
 | `reflections/`, `ref/` | Write-ups and external reference submodules; study material, never deployed. | no |
-| `scripts/` | Repo maintenance: catalog, host parity, version/revision gates, contract graph, config resolver. | no |
+| `scripts/` | Repo maintenance: catalog and install commands, version/revision gates, contract graph, config resolver. | no |
 
 A skill's frontmatter carries the catalog and composition fields together: `revision`, `kind`,
 optional comma-separated `consumes` / `produces`, `areas`, `targets`, `summary`, `summary_zh`.
@@ -237,8 +228,7 @@ on Linux the same run gates every delivery as described above.
 | `python -m unittest scripts.test_check_skill_links` | The link checker's own tests. |
 | `python scripts/test_check_contract_graph.py` | The graph checker's own rule tests. |
 | `python -m unittest scripts.test_skill_config` | Config resolution order and malformed-config behavior. |
-| `python scripts/test_generate_index.py` | Catalog collection, summaries, bilingual fallback, drift. |
-| `python -m unittest scripts.test_install_host_skills` | Host install parity (`--check` / `--link`), `../` closure, retired names. |
+| `python scripts/test_generate_index.py` | Catalog collection, summaries, bilingual fallback, drift, generated install and remove commands, retired-registry validation. |
 | `python -m unittest scripts.test_check_changelog` | The changelog rule's own tests. |
 | `python scripts/check_frontmatter.py` | Every `SKILL.md` frontmatter and catalog field; 1024-char description cap; hidden flag agrees with `agents/openai.yaml`. |
 | `python -m unittest scripts.test_check_frontmatter` | The frontmatter checker's own tests. |
@@ -369,44 +359,48 @@ internally.
 ## Deploy
 
 **Skills** — the only deployable artifacts — install with the Vercel
-[`skills`](https://github.com/vercel-labs/skills) CLI:
+[`skills`](https://github.com/vercel-labs/skills) CLI (`npx skills`); this repo ships no installer
+of its own.
 
 ```bash
-# default: every skill (add -a <agent> to choose runtimes)
-npx skills add wxxb789/hoa -g -s '*'
+# install every skill (add -a <agent> to choose runtimes)
+npx skills add wxxb789/hoa -g -s '*' -y
 
 # see what is available
 npx skills add wxxb789/hoa --list
 
-# update / remove
-npx skills update
-npx skills remove -g <skill>
+# reinstall skills that changed upstream
+npx skills update -g -y
 ```
 
-**Install everything by default.** `npx skills` installs only the skills you name and does not
-follow the `../` links between them, so `-s <skill>` alone can leave a skill without the siblings it
-chains to. To install single skills, copy that skill's command from the Install section of
-[`index.md`](./index.md#install): it is generated from the links and names the skill's whole
-closure. A skill not listed there has no dependencies.
+**Install everything by default.** `npx skills` has no dependency concept: it installs only the
+skills you name and does not follow the `../` links between them, so `-s <skill>` alone can leave a
+skill without the siblings it chains to. To install single skills, copy that skill's command from
+the Install section of [`index.md`](./index.md#install): it is generated from the links and names the
+skill's whole closure. A skill not listed there has no dependencies.
 
-**Upgrading an existing install.** A skill renamed or retired here stays installed under its old
-name. Remove the old names with the generated `npx skills remove -g …` command in the same section;
-`scripts/retired_skills.toml` is the source of that list and names each replacement. First drop any
-name you installed from another source, because the command removes it too.
+**After a release that renames or retires skills.** `npx skills update` keeps a renamed or retired
+skill under its old name (it only warns that it was deleted upstream) and never installs a new name.
+Run the generated `npx skills remove -g …` line from the same section of `index.md`
+(`scripts/retired_skills.toml` is its source and names each replacement), then re-run the
+install-all command, or each skill's current row from that section (a saved single-skill command may
+still name the old skill), to get the new names. Removing a name you never installed is a no-op, but removal matches
+names across sources, so check `npx skills ls -g` first and drop any name you installed elsewhere.
+
+**Working on a skill.** `npx skills add <local checkout> -g -s <skill> -y` installs the working
+tree. `npx skills update` skips local sources, so re-run that add after each edit; after pushing,
+reinstall from `wxxb789/hoa` so `update` tracks it again.
 
 - Global (`-g`) installs to `~/<agent>/skills/` (`~/.claude/skills`,
   `~/.config/opencode/skills`, `~/.agents/skills`, …); default scope installs to
   the current project.
 - **Symlink** by default (one canonical copy, easy updates) or `--copy` (Windows
   / no-symlink environments).
-- Some skills chain to sibling skills through `../<child>/SKILL.md`. A copy install
-  (`--copy`, Codex's skill-installer) must put that whole `../` dependency closure
-  in the same skills root, or the chain breaks. On Windows the repo installer
-  (`python scripts/install_host_skills.py --root <host-skills-dir> --link`, then
-  `--check`; it links flat by default, and one `--category` keeps a parent and its children together)
-  links whole directories with absolute-target symlinks, which need Developer Mode or
-  admin; `--check` reports a missing or split closure and retired names still
-  installed. See [`rules/cross-platform-skills.md`](./rules/cross-platform-skills.md).
+- Some skills chain to sibling skills through `../<child>/SKILL.md`, so a parent's whole `../`
+  closure must sit in the same skills root; the commands above install it. To diagnose an installed
+  set (missing or split closure, duplicates, shadowing), run the user-invoked
+  [`hoa-skill-set-audit`](./skills/hoa-skill-set-audit/SKILL.md). See
+  [`rules/cross-platform-skills.md`](./rules/cross-platform-skills.md).
 - Everything else in `hoa` is **library / knowledge** — not auto-deployed. Fold
   it into a skill, or reference it by hand.
 - Runtime **settings** deploy separately via `chezmoi apply`.

@@ -1,9 +1,9 @@
-# scripts/retired_skills.toml — data for scripts/install_host_skills.py --check
+# scripts/retired_skills.toml — data for scripts/generate_index.py
 #
 # Skill names this repository no longer ships: renamed, split, merged or retired.
-# `--check` reports a host entry under a retired name and never deletes it; the
-# operator removes it (keep a backup).  A retired name must not be a current
-# skill.  Add an entry in the same change that renames or removes a skill.
+# generate_index.py turns them into the `npx skills remove -g …` line in index.md;
+# users run it and then re-run their add command.  A retired name must not be a
+# current skill.  Add an entry in the same change that renames or removes a skill.
 #
 #   [retired.<old-name>]
 #   replacement  current skill name, the repo path or the tool that replaces it

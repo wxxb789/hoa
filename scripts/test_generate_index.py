@@ -10,6 +10,7 @@ from frontmatter, and --check drift detection.
 from __future__ import annotations
 
 import importlib.util
+import io
 import shutil
 import sys
 import tempfile
@@ -296,13 +297,36 @@ class CheckDriftTests(unittest.TestCase):
             "Run ../../c/scripts/ and ../../a/SKILL.md.\n", encoding="utf-8")
         self.assertEqual(self._run(check=False), 0)
         index = (self.tmp / "index.md").read_text(encoding="utf-8").split("## Install")[1]
-        self.assertIn("`npx skills add wxxb789/hoa -g -s a -s b -s c`", index)
-        self.assertIn("`npx skills add wxxb789/hoa -g -s b -s a -s c`", index)
+        self.assertIn("`npx skills add wxxb789/hoa -g -s a -s b -s c -y`", index)
+        self.assertIn("`npx skills add wxxb789/hoa -g -s b -s a -s c -y`", index)
         self.assertNotIn("| c |", index)
         self.assertNotIn("| solo |", index)
 
         append(self.tmp / "skills" / "solo" / "SKILL.md", "Read ../c/SKILL.md.\n")
         self.assertEqual(self._run(check=True), 1)
+
+    def test_retired_registry_becomes_one_remove_command_and_is_validated(self):
+        make_skill(self.tmp, "alpha")
+        registry = self.tmp / "scripts" / "retired_skills.toml"
+        registry.parent.mkdir()
+        registry.write_text('[retired.old-b]\nreplacement = "alpha"\nreason = "x"\n'
+                            '[retired.old-a]\nreplacement = "alpha"\nreason = "y"\n',
+                            encoding="utf-8")
+        self.assertEqual(self._run(check=False), 0)
+        for name in ("index.md", "index.zh-CN.md"):
+            self.assertIn("npx skills remove -g old-a old-b\n",
+                          (self.tmp / name).read_text(encoding="utf-8"))
+        for text, error in (
+                ('[retired.alpha]\nreplacement = "beta"\nreason = "x"\n',
+                 "retired.alpha is a current skill"),
+                ('[retired.old]\nreplacement = "alpha"\nreason = " "\n',
+                 "retired.old needs non-empty replacement and reason"),
+                ('[retired', "invalid TOML")):
+            with self.subTest(error=error):
+                registry.write_text(text, encoding="utf-8")
+                with patch("sys.stderr", new_callable=io.StringIO) as stderr:
+                    self.assertEqual(self._run(check=True), 1)
+                self.assertIn(error, stderr.getvalue())
 
 class LibraryCollectTests(unittest.TestCase):
     FOLDERS = {"agents": "agent", "mcps": "mcp"}

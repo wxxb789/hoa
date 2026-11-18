@@ -67,12 +67,14 @@ prefix. A clash with an upstream skill the owner has not installed is not a reas
    descriptions that name it, `evals/trigger-cases.json`, `evals/baseline.json` picks, config paths
    named after the skill, and the generated indexes. Leave dated history (past CHANGELOG entries,
    `reflections/`, `docs/evidence/`, `docs/plans/`) as written.
-2. Add `[retired.<old>]` to `scripts/retired_skills.toml` with `replacement` and `reason`. A name that
+2. Add `[retired.<old>]` to `scripts/retired_skills.toml` with `replacement` and `reason`, and
+   regenerate the indexes: the entry joins the generated `npx skills remove -g …` line. A name that
    was never released gets no entry.
 3. The renamed directory restarts at `metadata.revision: "1"` (`scripts/version.py check-revisions`
    treats it as a new skill); bump the revision of every other skill whose directory the rename
    touched.
-4. On each device, reinstall and run `python scripts/install_host_skills.py --root <dir> --check`; it
-   reports the retired copy and the owner deletes it. No host supports aliases, so `/old`, `$old`,
+4. On each device, users run the generated remove line and then re-run the install-all command or
+   the skill's current generated row (a saved command still names the old skill): `npx skills update`
+   keeps the old name and never installs the new one. No host supports aliases, so `/old`, `$old`,
    `/skill:old` and `@old` stop working.
 5. Run the paired routing eval before and after, with a positive control that must hit 100% first.

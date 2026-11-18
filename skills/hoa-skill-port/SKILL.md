@@ -8,7 +8,7 @@ description: >-
   behaviour, hoa-skill-curate for provenance and freshness; whole-set audits are the user-run
   hoa-skill-set-audit.
 metadata:
-  revision: "2"
+  revision: "3"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "de-couple a private skill for publication: canonical side, five axes, config resolution, catalog/CI validation, branch-and-PR release"
@@ -82,11 +82,11 @@ Full before/after table: [`references/de-coupling-checklist.md`](references/de-c
 
 Every value that differs between installs resolves in the order defined in
 [references/configuration.md](references/configuration.md); read it before reviewing a package.
-In the shared repository that rule is implemented once, in
-[`scripts/skill_config.py`](../../scripts/skill_config.py), and the reference itself is one file in
-`scripts/shared/`. A skill whose scripts resolve values vendors `skill_config.py`, and a skill that
-only documents the rule vendors `configuration.md` and links it instead of restating it, both with
-`python scripts/vendor_shared.py`, so the installed package stays self-contained.
+In the shared repository that rule is implemented once, in the repo-level scripts/skill_config.py,
+and the reference itself is one file in the repo-level scripts/shared directory. A skill whose
+scripts resolve values vendors `skill_config.py`, and a skill that only documents the rule vendors
+`configuration.md` and links it instead of restating it, both with `python scripts/vendor_shared.py`,
+so the installed package stays self-contained.
 
 Review each ported package against this list and record the outcome in the report:
 
