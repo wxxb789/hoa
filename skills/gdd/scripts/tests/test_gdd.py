@@ -44,7 +44,7 @@ class GddCase(unittest.TestCase):
         drop = ("GDD_", "STUB_", "DSH_", "OMP_", "XDG_")
         self.env = {k: v for k, v in os.environ.items() if not k.startswith(drop)}
         self.env.update(XDG_STATE_HOME=self.state_home, XDG_CONFIG_HOME=os.path.join(self.tmp, "config"),
-                        OMP_BIN=STUB, DSH_BIN=STUB, STUB_FIXTURE=OK_FIXTURE, STUB_RECORD=self.record,
+                        OMP_BIN=STUB, DSH_BIN=STUB, CLAUDE_BIN=STUB, STUB_FIXTURE=OK_FIXTURE, STUB_RECORD=self.record,
                         PYTHONDONTWRITEBYTECODE="1", GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@example.invalid",
                         GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@example.invalid")
         self.repo = os.path.realpath(os.path.join(self.tmp, "workrepo"))
@@ -153,12 +153,23 @@ class LaunchTests(GddCase):
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertIn("finished: state=done", done.stdout)
         self.assertIn("answer: ", done.stdout)
-        self.assertEqual(done.stdout.rstrip().splitlines()[-1], "done")
+        self.assertEqual(done.stdout.rstrip().splitlines()[-2:], ["done", "result: missing"])
         rows = self.ledger()
         self.assertEqual([(r["stage"], r["next_action"]) for r in rows], [("implement", "implement"), ("implement", "-")])
         self.assertTrue(rows[1]["note"].startswith("exit=0 "), rows[1])
         state = json.loads(read(os.path.join(self.run_dirs()[0], "state.json")))
         self.assertEqual((state["agent"], state["state"], state["cwd"]), ("omp", "done", self.repo))
+
+    def test_stage_result_reaches_the_agent_and_the_ledger(self):
+        env = {"GDD_AGENT": "claude", "STUB_FIXTURE": OK_FIXTURE.replace("omp.", "claude.")}
+        done = self.stage("implement", "--wait", env=env)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertEqual(done.stdout.rstrip().splitlines()[-1], "result: DONE")
+        self.assertTrue(self.ledger()[-1]["note"].endswith(" verdict=DONE"), self.ledger()[-1])
+        record = json.loads(read(self.record))
+        schema = os.path.join(os.path.dirname(SCRIPTS), "references", "stage-result.schema.json")
+        self.assertEqual(json.loads(record["argv"][record["argv"].index("--json-schema") + 1]), json.loads(read(schema)))
+        self.assertIn(f"`{schema}`", record["stdin"])  # the template names the schema for prompt-instructed agents
 
     def test_model_thinking_max_time_pass_through_without_defaults(self):
         self.assertEqual(self.stage("implement", "--wait").returncode, 0)

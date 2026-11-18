@@ -1,0 +1,41 @@
+{
+  "title": "gdd stage result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["stage", "verdict", "summary", "changed_files", "gates", "findings", "unmet_criteria"],
+  "properties": {
+    "stage": {"type": "string", "enum": ["implement", "verify", "simplify", "apply", "review", "fix"]},
+    "verdict": {"type": "string", "enum": ["DONE", "APPROVE", "MUST_FIX", "DECISION_NEEDED", "BLOCKED"]},
+    "summary": {"type": "string"},
+    "changed_files": {"type": "array", "items": {"type": "string"}},
+    "gates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["command", "exit_code", "counts"],
+        "properties": {
+          "command": {"type": "string"},
+          "exit_code": {"type": "integer"},
+          "counts": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "severity", "location", "claim", "fix"],
+        "properties": {
+          "id": {"type": "string"},
+          "severity": {"type": "string", "enum": ["P0", "P1", "P2", "P3"]},
+          "location": {"type": "string"},
+          "claim": {"type": "string"},
+          "fix": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "unmet_criteria": {"type": "array", "items": {"type": "string"}}
+  }
+}

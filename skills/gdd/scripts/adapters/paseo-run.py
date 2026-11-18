@@ -32,7 +32,8 @@ argv recorded, never a fabricated assistant response.
 
 Run artifacts include prompt.md, run.json (exact argv), state.json (monitor pid
 and agent_id), events.ndjson (observed lifecycle transitions), stderr.log,
-cli.ndjson (raw command evidence), answer.md when addressable, answer.partial.md
+cli.ndjson (raw command evidence), answer.md when addressable, result.json when
+the answer carries a stage result valid against --schema, answer.partial.md
 while a pre-delete capture awaits confirmation, exit.code and finalized. The run
 dir's os.mkdir claims the slug; an O_EXCL `refresh` file holding the holder's pid
 serializes readers (a dead holder's file is taken over). A finalized marker is immutable. An
@@ -56,6 +57,7 @@ ADAPTER = os.path.abspath(__file__)
 sys.path.insert(0, os.path.dirname(os.path.dirname(ADAPTER)))
 sys.dont_write_bytecode = True  # no __pycache__ inside an installed skill
 import agent_run as support
+import stage_result
 
 STATES = {"initializing": "running", "running": "running", "idle": "done",
           "error": "failed", "closed": "killed"}
@@ -219,6 +221,11 @@ def cwd_matches(actual, requested):
 
 def finalize(state):
     run_dir = state["run_dir"]
+    if state.get("result_schema"):
+        text = ""
+        with suppress(OSError), open(os.path.join(run_dir, "answer.md"), encoding="utf-8") as handle:
+            text = handle.read()
+        state.update(stage_result.record(run_dir, text, None, state["result_schema"]))
     state["ended"] = support.now_iso()
     state["duration_s"] = round(support.state_age_seconds(state), 1)
     text_file(run_dir, "exit.code", str(state["exit"]) + "\n")
@@ -316,7 +323,8 @@ def start(args):
                  "backend": "paseo", "launcher": ADAPTER, "agent": binary,
                  "paseo_argv": prefix,
                  "run_dir": run_dir, "pid": None, "agent_id": None,
-                 "session_id": "", "model": args.model, "thinking": args.thinking}
+                 "session_id": "", "model": args.model, "thinking": args.thinking,
+                 "result_schema": args.schema and os.path.abspath(args.schema)}
         text_file(run_dir, "prompt.md", prompt)
         text_file(run_dir, "stderr.log", "")
         text_file(run_dir, "events.ndjson", "")
@@ -416,6 +424,7 @@ def main(argv=None):
     launch.add_argument("--model", default=os.environ.get("GDD_MODEL") or None)
     launch.add_argument("--thinking", default=os.environ.get("GDD_THINKING") or None)
     launch.add_argument("--max-time")
+    launch.add_argument("--schema", help="stage-result schema; the answer's ```json block is checked against it")
     monitor = commands.add_parser("_watch", help=argparse.SUPPRESS)
     monitor.add_argument("--run-dir", required=True)
     for name in ("status", "result", "answer", "kill"):

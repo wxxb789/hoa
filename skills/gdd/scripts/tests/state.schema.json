@@ -55,6 +55,8 @@
     "events_dropped_bytes": {"type": "integer"},
     "turns_partial": {"type": "boolean"},
     "tool_calls_partial": {"type": "boolean"},
-    "cost_partial": {"type": "boolean"}
+    "cost_partial": {"type": "boolean"},
+    "result": {"type": "string", "enum": ["valid", "invalid", "missing"]},
+    "result_error": {"type": "string"}
   }
 }

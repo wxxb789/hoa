@@ -6,20 +6,24 @@
 """agent_run.py — one detached runner for every headless agent CLI gdd dispatches.
 
     agent_run.py start --name SLUG --prompt FILE [--cwd DIR] [--agent NAME] [--model M]
-                       [--thinking L] [--max-time D] [--resume ID] [--extra "FLAGS"] [--replace]
+                       [--thinking L] [--max-time D] [--resume ID] [--schema FILE] [--extra "FLAGS"]
+                       [--replace]
     agent_run.py list | status [SLUG] | tail SLUG [N] | result SLUG | answer SLUG | kill SLUG
     agent_run.py _run --run-dir DIR        (internal: the detached runner)
 
-Agent: --agent, then GDD_AGENT (env, then the gdd config file), then omp. Binary:
-<AGENT>_BIN (e.g. OMP_BIN, DSH_BIN), else the agent's name on PATH; a `.py` binary runs
+Agent (omp, dsh, codex, claude): --agent, then GDD_AGENT (env, then the gdd config file), then
+omp. Binary: <AGENT>_BIN (e.g. CODEX_BIN), else the agent's name on PATH; a `.py` binary runs
 through this interpreter, a Windows `.cmd`/`.bat` shim through %COMSPEC%.
 
 Run dir: <run_root>/<YYYY-MM-DD>/<SLUG>/ = prompt.md, run.json (exact argv), state.json (the
 single record), events.ndjson (+ events.1.ndjson after rotation), stderr.log, runner.log,
-answer.md, exit.code, finalized (marker), stop (kill request). run_root: GDD_RUN_ROOT (env,
+answer.md, result.json (a valid stage result), exit.code, finalized (marker), stop (kill request). run_root: GDD_RUN_ROOT (env,
 then config), else ${XDG_STATE_HOME:-~/.local/state}/gdd/runs.
 
 state: running|done|failed|killed|unknown. done = exit 0 plus the agent's own success marker.
+--schema FILE: codex and claude enforce it natively; other agents are asked by the prompt. The
+result (native structured output, else the whole answer as JSON, else its last ```json block)
+sets state.result valid|invalid|missing and never changes the run's state.
 --max-time is enforced here (exit 124, failed). A `running` run with neither pid nor
 agent_pid alive, no marker and no stop request is finalized failed/-1, stale_recovered, by
 the next reader; a pid-less run younger than GDD_RUN_START_GRACE_SECONDS (60) is starting.
@@ -52,12 +56,14 @@ import signal
 import subprocess
 import threading
 import time
+import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Callable
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import skill_config
+import stage_result
 
 IS_WINDOWS = os.name == "nt"
 if IS_WINDOWS:
@@ -269,7 +275,7 @@ def observed_state(run_dir, state):
 def new_acc():
     return {"session_id": "", "answer": "", "turns": 0, "tool_calls": 0, "cost_usd": None,
             "usage": {"input_tokens": 0, "output_tokens": 0, "cache_read_tokens": 0, "total_tokens": 0},
-            "error": "", "success_marker": None}
+            "error": "", "success_marker": None, "structured": None}
 
 
 def text_parts(content):
@@ -325,11 +331,57 @@ def fold_dsh(acc, event):
         acc["error"] = str(event.get("message") or "error event")
 
 
+def fold_codex(acc, event):
+    kind, item = event.get("type"), event.get("item") if isinstance(event.get("item"), dict) else {}
+    if kind == "thread.started":
+        acc["session_id"] = event.get("thread_id") or acc["session_id"]
+    elif kind == "item.completed":
+        acc["answer"] = str(item.get("text") or "") if item.get("type") == "agent_message" else acc["answer"]
+        acc["tool_calls"] += item.get("type") in ("command_execution", "file_change", "mcp_tool_call", "web_search")
+    elif kind == "turn.completed":
+        acc["turns"], acc["success_marker"] = acc["turns"] + 1, kind
+        usage = tokens(event.get("usage"), "input_tokens", "output_tokens", "cached_input_tokens")
+        acc["usage"] = {key: acc["usage"][key] + usage[key] for key in usage}
+    elif kind in ("turn.failed", "error"):
+        acc["success_marker"] = kind
+        acc["error"] = str(event.get("message") or (event.get("error") or {}).get("message") or kind)
+
+
+def fold_claude(acc, event):
+    kind, message = event.get("type"), event.get("message") if isinstance(event.get("message"), dict) else {}
+    if kind == "system" and event.get("subtype") == "init":
+        acc["session_id"] = event.get("session_id") or acc["session_id"]
+    elif kind == "assistant":
+        blocks = [b for b in message.get("content") or [] if isinstance(b, dict)]
+        acc["tool_calls"] += sum(b.get("type") == "tool_use" and b.get("name") != "StructuredOutput" for b in blocks)
+        acc["answer"] = text_parts(blocks) or acc["answer"]
+    elif kind == "result":
+        ok = event.get("subtype") == "success" and event.get("is_error") is False
+        acc["success_marker"] = "success" if ok else str(event.get("terminal_reason") or event.get("subtype"))
+        acc["answer"], acc["structured"] = str(event.get("result") or acc["answer"]), event.get("structured_output")
+        acc["turns"], acc["error"] = int(event.get("num_turns") or 0), "" if ok else acc["answer"]
+        acc["usage"] = tokens(event.get("usage"), "input_tokens", "output_tokens", "cache_read_input_tokens",
+                              "cache_read_input_tokens", "cache_creation_input_tokens")
+        cost = event.get("total_cost_usd")
+        acc["cost_usd"] = round(cost, 6) if isinstance(cost, (int, float)) else acc["cost_usd"]
+
+
+def tokens(usage, input_key, output_key, cache_key, *also_total):
+    """Normalized usage; total = input + output + the `also_total` keys (codex input includes its cache)."""
+    usage = usage if isinstance(usage, dict) else {}
+    count = {key: int(usage.get(key) or 0) for key in (input_key, output_key, cache_key, *also_total)}
+    return {"input_tokens": count[input_key], "output_tokens": count[output_key], "cache_read_tokens": count[cache_key],
+            "total_tokens": count[input_key] + count[output_key] + sum(count[key] for key in also_total)}
+
+
+def flags(*pairs):
+    """[flag, value, ...] for every pair whose value is set: unset options are never passed."""
+    return [token for flag, value in pairs if value for token in (flag, value)]
+
+
 def omp_argv(args, extra):
-    argv = ["-p", "--mode=json", "--approval-mode", "yolo"]
-    for flag, value in (("--model", args.model), ("--thinking", args.thinking), ("-r", args.resume)):
-        argv += [flag, value] if value else []
-    return argv + extra
+    return ["-p", "--mode=json", "--approval-mode", "yolo",
+            *flags(("--model", args.model), ("--thinking", args.thinking), ("-r", args.resume)), *extra]
 
 
 def dsh_argv(args, extra):
@@ -340,6 +392,22 @@ def dsh_argv(args, extra):
     argv += ["--session-id", args.resume] if args.resume else []
     mode = os.environ.get("DSH_PERMISSION_MODE") or "workspace-write"
     return argv + ["--permission-mode", mode, "--approval-policy", "never", "-"]
+
+
+def codex_argv(args, extra):
+    """Unquoted -c values parse as literal strings, so a Windows `.cmd` shim can carry them too."""
+    effort = args.thinking and f"model_reasoning_effort={args.thinking}"
+    return ["exec", *(["resume"] if args.resume else []), "--json", "-c", "approval_policy=never",
+            "-c", "sandbox_mode=workspace-write", "-c", "sandbox_workspace_write.network_access=true",
+            *flags(("-m", args.model), ("-c", effort), ("--output-schema", args.schema)), *extra,
+            *([args.resume] if args.resume else []), "-"]
+
+
+def claude_argv(args, extra):
+    session = ["--resume", args.resume] if args.resume else ["--session-id", str(uuid.uuid4())]
+    schema = args.schema and json.dumps(read_json(args.schema), separators=(",", ":"))
+    return ["-p", "--output-format", "stream-json", "--verbose", "--permission-mode", "bypassPermissions", *session,
+            *flags(("--model", args.model), ("--effort", args.thinking), ("--json-schema", schema)), *extra]
 
 
 @dataclass(frozen=True)
@@ -359,6 +427,10 @@ AGENTS = {
                  lambda marker: marker not in (None, "error", "aborted", "length")),
     "dsh": Agent("dsh", "stdin", dsh_argv, fold_dsh, "the last final.reason.kind", lambda marker: marker == "completed",
                  scrub_env=("DSH_PROFILE", "DSH_PROFILE_DIR", "DSH_SESSION_ID"), refuse=("model", "thinking")),
+    "codex": Agent("codex", "stdin", codex_argv, fold_codex, "the last turn event",
+                   lambda marker: marker == "turn.completed"),
+    "claude": Agent("claude", "stdin", claude_argv, fold_claude, "the result event outcome",
+                    lambda marker: marker == "success"),
 }
 
 
@@ -481,7 +553,7 @@ def finalize(run_dir, exit_code, acc=None, note=None, recovered=False, extra=Non
     duration = state_age_seconds(state)
     state["duration_s"] = round(duration, 1) if duration != float("inf") else None
     if failure or (verdict != "done" and acc["error"]):
-        state["error"] = failure or acc["error"]
+        state["error"] = ": ".join(filter(None, (failure, acc["error"])))
         state["errors"] = [state["error"]]  # the observer reads `errors`
     if refolded and stats["events_truncated"]:
         state.update(turns_partial=True, tool_calls_partial=True, cost_partial=True)
@@ -489,6 +561,8 @@ def finalize(run_dir, exit_code, acc=None, note=None, recovered=False, extra=Non
         state["stale_recovered"] = True
         note = f"runner/agent pids {state.get('pid')}/{state.get('agent_pid')} died without finalizing"
     state.update({"note": note} if note else {}, **(extra or {}))
+    if schema := read_json(os.path.join(run_dir, "run.json"), {}).get("schema"):
+        state.update(stage_result.record(run_dir, acc["answer"], acc["structured"], schema))
     write_text(os.path.join(run_dir, "answer.md"), acc["answer"])
     write_json(os.path.join(run_dir, "state.json"), state)
     write_text(os.path.join(run_dir, "exit.code"), f"{exit_code}\n")
@@ -581,6 +655,10 @@ def cmd_start(args):
     if not os.path.isdir(cwd):
         die(f"start: --cwd {cwd} is not a directory")
     max_time = max_time_seconds(args.max_time) if args.max_time else None
+    if args.schema:
+        args.schema = os.path.abspath(os.path.expanduser(args.schema))
+        if not isinstance(read_json(args.schema), dict):
+            die(f"start: --schema {args.schema} is not a readable JSON object")
     command = resolve_binary(spec) + spec.argv(args, shlex.split(args.extra or ""))
     shim = command[2] if command[1:2] == ["/c"] else command[0]
     checked = command[command.index(shim) + 1:] + ([prompt.decode("utf-8", "replace")] if spec.prompt == "argv" else [])
@@ -607,7 +685,8 @@ def cmd_start(args):
     with open(os.path.join(run_dir, "prompt.md"), "wb") as handle:
         handle.write(prompt)
     write_json(os.path.join(run_dir, "run.json"), {"agent": agent, "argv": command, "prompt": spec.prompt,
-                                                   "cwd": cwd, "scrub_env": spec.scrub_env, "max_time_s": max_time})
+                                                   "cwd": cwd, "scrub_env": spec.scrub_env, "max_time_s": max_time,
+                                                   "schema": args.schema})
     write_json(os.path.join(run_dir, "state.json"), {
         "name": slug, "agent": agent, "state": "running", "exit": None, "cwd": cwd, "started": now_iso(),
         "ended": None, "duration_s": None, "run_dir": run_dir, "pid": None, "agent_pid": None,
@@ -784,7 +863,7 @@ def main(argv=None):
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
     start = sub.add_parser("start", help="start one detached run")
-    for flag in ("--cwd", "--agent", "--model", "--thinking", "--max-time", "--resume", "--extra"):
+    for flag in ("--cwd", "--agent", "--model", "--thinking", "--max-time", "--resume", "--schema", "--extra"):
         start.add_argument(flag)
     start.add_argument("--name", required=True)
     start.add_argument("--prompt", required=True)

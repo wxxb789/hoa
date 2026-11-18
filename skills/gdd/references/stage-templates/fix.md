@@ -27,3 +27,11 @@ Findings file: `${FINDINGS_FILE}`
 
 A per-finding table: id, file, what changed or why invalid, test/gate result. Plus the gate table
 with exit codes and the count of tests before/after.
+
+## Stage result
+
+After the report, end your final message with one fenced ```json block matching the schema at
+`${RESULT_SCHEMA}`: `"stage": "fix"`, `"verdict": "DONE"` (or `"BLOCKED"` with the reason in
+`summary`); each finding you judged invalid goes in `findings` with its reason as `claim`. Gate exit
+codes are integers. If your runtime enforces that schema itself, the final message is that JSON
+object alone.

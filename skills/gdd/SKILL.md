@@ -101,7 +101,7 @@ matching the current stage directly — do not create per-phase skills.
 | `GDD_STATE_FILE` | ledger path | `${XDG_STATE_HOME:-$HOME/.local/state}/gdd/ledger.tsv` |
 | `GDD_TASK_ROOT` | task/state root | `${XDG_STATE_HOME:-$HOME/.local/state}/gdd/tasks` |
 | `GDD_RUN_ROOT` | launcher run root | `${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs` |
-| `GDD_LAUNCHER`, `GDD_AGENT` | explicit launcher selection; the headless agent CLI, exported to the launcher when set | bundled `scripts/agent_run.py`, agent `omp` (or `dsh`); opt in to native Paseo with `scripts/adapters/paseo-run.py` |
+| `GDD_LAUNCHER`, `GDD_AGENT` | explicit launcher selection; the headless agent CLI, exported to the launcher when set | bundled `scripts/agent_run.py`, agent `omp` (or `dsh`, `codex`, `claude`); opt in to native Paseo with `scripts/adapters/paseo-run.py` |
 | `GDD_TEMPLATES` | stage-template root | the bundled `references/stage-templates` |
 | `GDD_GOAL_GLOB` | goal-contract glob | `docs/goals/*<goal>*.md` |
 | round caps | `implement` / `simplify` / `review` run at most **2x** — enforced by `gdd.py stage`, override with `--over-budget` | `scripts/gdd.py` |

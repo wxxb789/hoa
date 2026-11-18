@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Contract tests for agent_run.py: a stub agent stands in for each CLI (`<AGENT>_BIN`).
 
-Opt-in smoke against real CLIs (costs tokens): GDD_SMOKE_AGENTS=omp python -B test_agent_run.py SmokeTests
+Opt-in smoke against real CLIs (costs tokens): GDD_SMOKE_AGENTS=omp,codex,claude python -B test_agent_run.py SmokeTests
 """
 import glob
 import json
@@ -13,12 +13,16 @@ import sys
 import tempfile
 import time
 import unittest
+import uuid
 from datetime import datetime, timedelta, timezone
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 RUNNER = os.path.join(os.path.dirname(HERE), "agent_run.py")
 STUB = os.path.join(HERE, "stub_agent.py")
 FIXTURES = os.path.join(HERE, "fixtures", "events")
+RESULT_SCHEMA = os.path.join(os.path.dirname(os.path.dirname(HERE)), "references", "stage-result.schema.json")
+STAGE_RESULT = {"stage": "implement", "verdict": "DONE", "summary": "done", "changed_files": [], "gates": [],
+                "findings": [], "unmet_criteria": []}
 IS_WINDOWS = os.name == "nt"
 PROMPT = "Do the task.\nReply with the word done.\n"
 EXPECTED = {
@@ -28,13 +32,36 @@ EXPECTED = {
     "dsh": {"answer": "done", "session_id": "dsh-session-0001", "turns": 1, "tool_calls": 2,
             "usage": {"input_tokens": 250, "output_tokens": 40, "cache_read_tokens": 80, "total_tokens": 290},
             "cost_usd": None, "fail_error": "the last final.reason.kind is 'aborted'"},
+    "codex": {"answer": json.dumps(STAGE_RESULT, separators=(",", ":")), "session_id": "00000000-0000-7000-8000-000000000002",
+              "turns": 1, "tool_calls": 1, "cost_usd": None,
+              "usage": {"input_tokens": 25409, "output_tokens": 72, "cache_read_tokens": 0, "total_tokens": 25481},
+              "fail_error": "the last turn event is 'turn.failed': {\"error\":{\"message\":\"The selected model"},
+    "claude": {"answer": json.dumps(STAGE_RESULT, separators=(",", ":")), "session_id": "00000000-0000-4000-8000-000000000004",
+               "turns": 3, "tool_calls": 1, "cost_usd": 0.236953,
+               "usage": {"input_tokens": 4, "output_tokens": 273, "cache_read_tokens": 44437, "total_tokens": 89232},
+               "fail_error": "the result event outcome is 'api_error': API Error: 400 Model"},
 }
+CODEX = ["exec", "--json", "-c", "approval_policy=never", "-c", "sandbox_mode=workspace-write",
+         "-c", "sandbox_workspace_write.network_access=true"]
+CLAUDE = ["-p", "--output-format", "stream-json", "--verbose", "--permission-mode", "bypassPermissions"]
 ARGV = {  # (new session, resumed session S1); the prompt follows for argv-prompt agents
     "omp": (["-p", "--mode=json", "--approval-mode", "yolo"], ["-p", "--mode=json", "--approval-mode", "yolo", "-r", "S1"]),
     "dsh": (["--profile", "headless", "--json", "--permission-mode", "workspace-write", "--approval-policy", "never", "-"],
             ["--profile", "headless", "--json", "--session-id", "S1", "--permission-mode", "workspace-write",
              "--approval-policy", "never", "-"]),
+    "codex": (CODEX + ["-"], CODEX[:1] + ["resume"] + CODEX[1:] + ["S1", "-"]),
+    "claude": (CLAUDE + ["--session-id", "<uuid>"], CLAUDE + ["--resume", "S1"]),
 }
+
+
+def uuid_masked(argv):
+    """The claude route pre-assigns a fresh uuid4 session id: mask a valid one so goldens can compare."""
+    index = argv.index("--session-id") + 1 if "--session-id" in argv else None
+    try:
+        fresh = index is not None and uuid.UUID(argv[index]).version == 4
+    except ValueError:
+        fresh = False
+    return argv[:index] + ["<uuid>"] + argv[index + 1:] if fresh else argv
 
 
 def read(path):
@@ -111,7 +138,8 @@ class RunnerCase(unittest.TestCase):
         drop = ("GDD_", "STUB_", "DSH_", "OMP_")
         self.env = {k: v for k, v in os.environ.items() if not k.startswith(drop)}
         self.env.update(GDD_RUN_ROOT=self.root, XDG_CONFIG_HOME=os.path.join(self.tmp, "config"),
-                        OMP_BIN=STUB, DSH_BIN=STUB, STUB_RECORD=self.record, PYTHONDONTWRITEBYTECODE="1")
+                        OMP_BIN=STUB, DSH_BIN=STUB, CODEX_BIN=STUB, CLAUDE_BIN=STUB, STUB_RECORD=self.record,
+                        PYTHONDONTWRITEBYTECODE="1")
 
     def tearDown(self):
         for path in glob.glob(os.path.join(self.root, "*", "*", "state.json")):
@@ -164,15 +192,21 @@ class ContractTests(RunnerCase):
                     self.start(f"{agent}-{label}", agent, "ok", "--max-time", "10m", *extra)
                     record = self.recorded()
                     prompt_in_argv = agent == "omp"
-                    self.assertEqual(record["argv"], golden + ([PROMPT] if prompt_in_argv else []))
+                    self.assertEqual(uuid_masked(record["argv"]), golden + ([PROMPT] if prompt_in_argv else []))
                     self.assertEqual(record["stdin"], "" if prompt_in_argv else PROMPT)
                     self.assertEqual(os.path.realpath(record["cwd"]), os.path.realpath(self.work))
                     self.finished(f"{agent}-{label}")
 
-    def test_t1_model_thinking_and_extra_reach_omp(self):
-        self.start("flags", "omp", "ok", "--model", "m1", "--thinking", "high", "--extra", "--no-tools -x")
-        self.assertEqual(self.recorded()["argv"], ["-p", "--mode=json", "--approval-mode", "yolo", "--model", "m1",
-                                                   "--thinking", "high", "--no-tools", "-x", PROMPT])
+    def test_t1_model_thinking_and_extra_reach_the_agent(self):
+        tails = {"omp": ["--model", "m1", "--thinking", "high", "--no-tools", "-x", PROMPT],
+                 "codex": ["-m", "m1", "-c", "model_reasoning_effort=high", "--no-tools", "-x", "-"],
+                 "claude": ["--model", "m1", "--effort", "high", "--no-tools", "-x"]}
+        for agent, tail in tails.items():
+            with self.subTest(agent=agent):
+                os.path.exists(self.record) and os.unlink(self.record)
+                self.start(f"flags-{agent}", agent, "ok", "--model", "m1", "--thinking", "high", "--extra", "--no-tools -x")
+                self.assertEqual(self.recorded()["argv"][-len(tail):], tail)
+                self.finished(f"flags-{agent}")
 
     def test_t2_ok_fixture_is_done(self):
         for agent, want in EXPECTED.items():
@@ -366,6 +400,45 @@ class ContractTests(RunnerCase):
         self.assertFalse(seen & set(scrubbed), seen)
         self.finished("scrub")
 
+    def omp_fixture(self, answer):
+        """omp.ok with every assistant message_end answering `answer`."""
+        events = [json.loads(line) for line in read(os.path.join(FIXTURES, "omp.ok.ndjson")).splitlines()
+                  if line.strip() and not line.startswith("#")]
+        for event in events:
+            if event["type"] == "message_end" and event["message"]["role"] == "assistant":
+                event["message"]["content"] = [{"type": "text", "text": answer}]
+        path = os.path.join(self.tmp, f"omp-{len(os.listdir(self.tmp))}.ndjson")
+        write(path, "".join(json.dumps(event) + "\n" for event in events))
+        return path
+
+    def test_t14_structured_result(self):
+        native = {"codex": ("--output-schema", RESULT_SCHEMA), "claude": ("--json-schema", None)}
+        for agent, (flag, value) in native.items():
+            with self.subTest(agent=agent):
+                os.path.exists(self.record) and os.unlink(self.record)
+                self.start(f"native-{agent}", agent, "ok", "--schema", RESULT_SCHEMA)
+                argv = self.recorded()["argv"]
+                carried = argv[argv.index(flag) + 1]
+                self.assertEqual(carried if value else json.loads(carried), value or json.loads(read(RESULT_SCHEMA)))
+                state = self.finished(f"native-{agent}")
+                self.assertEqual((state["state"], state["result"]), ("done", "valid"), state)
+                self.assertEqual(json.loads(read(os.path.join(self.run_dir(f"native-{agent}"), "result.json"))), STAGE_RESULT)
+        bad = {**STAGE_RESULT, "gates": [{"command": "make test", "exit_code": "0", "counts": None}]}
+        cases = (("fenced", f"Report.\n```json\n{json.dumps(STAGE_RESULT)}\n```\n", "valid", None),
+                 ("invalid", f"```json\n{json.dumps(bad)}\n```", "invalid",
+                  '$.gates[0].exit_code: expected integer, got "0"'),
+                 ("missing", "done", "missing", None))
+        for name, answer, verdict, error in cases:
+            with self.subTest(case=name):
+                self.start(name, "omp", "ok", "--schema", RESULT_SCHEMA, env={"STUB_FIXTURE": self.omp_fixture(answer)})
+                state = self.finished(name)
+                self.assertEqual((state["state"], state["result"], state.get("result_error")), ("done", verdict, error))
+                self.assertEqual(os.path.exists(os.path.join(self.run_dir(name), "result.json")), verdict == "valid")
+                self.assertEqual(schema_errors(state), [])
+        refused = self.cli("start", "--name", "noschema", "--prompt", self.prompt, "--schema", os.path.join(self.tmp, "nope"))
+        self.assertEqual(refused.returncode, 1)
+        self.assertIn("is not a readable JSON object", refused.stderr)
+
     @unittest.skipIf(IS_WINDOWS or not shutil.which("bash"), "the omp-headless-orchestration forwarder is bash")
     def test_t15_omp_headless_forwarder_resolves_the_sibling_runner(self):
         forwarder = os.path.join(HERE, "..", "..", "..", "omp-headless-orchestration", "scripts", "omp-run.sh")
@@ -401,16 +474,22 @@ class ContractTests(RunnerCase):
 @unittest.skipUnless(os.environ.get("GDD_SMOKE_AGENTS"), "set GDD_SMOKE_AGENTS=omp,... to run real CLIs")
 class SmokeTests(RunnerCase):
     def test_real_agents(self):
+        """A new session, then a resume of it, per agent; each must end done with a valid stage result."""
+        subprocess.run(["git", "init", "-q", self.work], check=True)  # codex refuses a non-repo cwd
+        write(self.prompt, f"Change nothing. Reply with one line saying done, then exactly this block:\n"
+                           f"```json\n{json.dumps(STAGE_RESULT)}\n```\n")
         for agent in os.environ["GDD_SMOKE_AGENTS"].split(","):
-            with self.subTest(agent=agent):
-                env = {f"{agent.upper()}_BIN": os.environ.get(f"{agent.upper()}_BIN") or agent}
-                proc = self.cli("start", "--name", f"smoke-{agent}", "--prompt", self.prompt, "--agent", agent,
-                                "--cwd", self.work, env=env)
-                self.assertEqual(proc.returncode, 0, proc.stderr)
-                state = self.finished(f"smoke-{agent}", 300)
-                print(f"smoke {agent}: state={state['state']} exit={state['exit']} turns={state['turns']} "
-                      f"answer={read(os.path.join(self.run_dir(f'smoke-{agent}'), 'answer.md'))!r}")
-                self.assertEqual(state["state"], "done", state)
+            env, resume = {f"{agent.upper()}_BIN": os.environ.get(f"{agent.upper()}_BIN") or agent}, ()
+            for name in (f"smoke-{agent}", f"smoke-{agent}-resume"):
+                with self.subTest(run=name):
+                    proc = self.cli("start", "--name", name, "--prompt", self.prompt, "--agent", agent, "--cwd",
+                                    self.work, "--schema", RESULT_SCHEMA, *resume, env=env)
+                    self.assertEqual(proc.returncode, 0, proc.stderr)
+                    state = self.finished(name, 300)
+                    print(f"smoke {name}: state={state['state']} exit={state['exit']} turns={state['turns']} "
+                          f"result={state.get('result')} session={state['session_id']}")
+                    self.assertEqual((state["state"], state.get("result")), ("done", "valid"), state)
+                    resume = ("--resume", state["session_id"])
 
 
 if __name__ == "__main__":

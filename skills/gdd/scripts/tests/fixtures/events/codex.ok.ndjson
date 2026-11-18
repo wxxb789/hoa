@@ -1,0 +1,9 @@
+# Trimmed from real `codex exec --json ... --output-schema stage-result.schema.json -` runs (codex-cli
+# 0.169.1, 2026-11-17); the command_execution items come from a resumed run of the same thread;
+# thread id and the shell command line sanitized.
+{"type": "thread.started", "thread_id": "00000000-0000-7000-8000-000000000002"}
+{"type": "turn.started"}
+{"type": "item.started", "item": {"id": "item_0", "type": "command_execution", "command": "echo hi", "aggregated_output": "", "exit_code": null, "status": "in_progress"}}
+{"type": "item.completed", "item": {"id": "item_0", "type": "command_execution", "command": "echo hi", "aggregated_output": "hi\r\n", "exit_code": 0, "status": "completed"}}
+{"type": "item.completed", "item": {"id": "item_1", "type": "agent_message", "text": "{\"stage\":\"implement\",\"verdict\":\"DONE\",\"summary\":\"done\",\"changed_files\":[],\"gates\":[],\"findings\":[],\"unmet_criteria\":[]}"}}
+{"type": "turn.completed", "usage": {"input_tokens": 25409, "cached_input_tokens": 0, "cache_write_input_tokens": 25406, "output_tokens": 72, "reasoning_output_tokens": 28}}

@@ -43,3 +43,10 @@ contract is satisfied and the gates have actually run.
 
 Files written (grouped), gate results with counts and exit codes, contract clauses you consider
 covered and how, residual risks and known limits. No adjectives in place of numbers.
+
+## Stage result
+
+After the report, end your final message with one fenced ```json block matching the schema at
+`${RESULT_SCHEMA}`: `"stage": "implement"`, `"verdict": "DONE"` (or `"BLOCKED"` with the reason in
+`summary`). Gate exit codes are integers. If your runtime enforces that schema itself, the final
+message is that JSON object alone.

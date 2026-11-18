@@ -43,6 +43,9 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
   Retire the separate OMP/DSH adapters, tmux backend and shell watcher in favor of the shared
   runner and Python watcher. Runner and dispatch contracts run through pytest on Ubuntu,
   macOS and Windows.
+- gdd: support Codex and Claude Code and record structured stage results. Codex and Claude
+  validate the schema natively; other routes request JSON in the prompt. The runner records
+  validation in state and saves valid results to `result.json`; `stage --wait` prints the verdict.
 
 - Trigger evals now route on visible skills' frontmatter descriptions, accept `none` when no
   artifact fits, and include three no-trigger cases.

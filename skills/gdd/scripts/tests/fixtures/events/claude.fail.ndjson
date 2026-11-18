@@ -1,0 +1,6 @@
+# Trimmed from a real `claude -p --output-format stream-json --verbose --model <unknown>` run (Claude
+# Code 2.1.327, 2026-11-17): the result event is subtype success but is_error true; that run exited 1,
+# the contract test replays it with exit 0. Hook events removed, session id sanitized.
+{"type": "system", "subtype": "init", "cwd": "/work/repo", "session_id": "00000000-0000-4000-8000-000000000005", "model": "no-such-model-xyz", "permissionMode": "bypassPermissions"}
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "text", "text": "API Error: 400 Model 'no-such-model-xyz' does not belong to a supported model family."}], "model": "<synthetic>", "stop_reason": "stop_sequence", "type": "message"}, "session_id": "00000000-0000-4000-8000-000000000005"}
+{"type": "result", "subtype": "success", "is_error": true, "api_error_status": 400, "duration_ms": 915, "num_turns": 1, "result": "API Error: 400 Model 'no-such-model-xyz' does not belong to a supported model family.", "stop_reason": "stop_sequence", "terminal_reason": "api_error", "session_id": "00000000-0000-4000-8000-000000000005", "total_cost_usd": 0, "usage": {"input_tokens": 0, "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0, "output_tokens": 0}}

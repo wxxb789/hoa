@@ -424,6 +424,16 @@ class PaseoLauncherTests(unittest.TestCase):
                       self.calls())
         self.assertEqual((self.run_dir() / "finalized").read_text().strip(), "0")
 
+    def test_stage_result_in_the_answer_is_checked_against_the_schema(self):
+        schema = ADAPTER.parent.parent.parent / "references" / "stage-result.schema.json"
+        result = {"stage": "review", "verdict": "APPROVE", "summary": "ok", "changed_files": [], "gates": [],
+                  "findings": [], "unmet_criteria": []}
+        self.start("--schema", str(schema))
+        self.save_fixture(status="idle", answer=f"Report.\n```json\n{json.dumps(result)}\n```")
+        state = self.wait_state("done")
+        self.assertEqual(state["result"], "valid", state)
+        self.assertEqual(json.loads((self.run_dir() / "result.json").read_text(encoding="utf-8")), result)
+
     def test_kill_records_confirmed_agent_deletion(self):
         self.start()
         result = self.run_adapter("kill", "stage")

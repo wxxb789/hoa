@@ -29,3 +29,10 @@ Findings file: `${FINDINGS_FILE}`
 ## Finish with
 
 A per-finding table: number, file, what changed, gate result. Plus the gate table with exit codes.
+
+## Stage result
+
+After the report, end your final message with one fenced ```json block matching the schema at
+`${RESULT_SCHEMA}`: `"stage": "apply"`, `"verdict": "DONE"` (or `"BLOCKED"` with the reason in
+`summary`). Gate exit codes are integers. If your runtime enforces that schema itself, the final
+message is that JSON object alone.

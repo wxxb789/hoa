@@ -27,7 +27,7 @@ Environment or operator config file:
                     run dir (default ${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs)
     GDD_LAUNCHER    launcher command (default <script dir>/agent_run.py)
     GDD_AGENT       agent CLI exported to the launcher when set
-                    (agent_run.py: omp, dsh; its default is omp)
+                    (agent_run.py: omp, dsh, codex, claude; its default is omp)
     GDD_TEMPLATES   template root
                     (default <script dir>/../references/stage-templates)
     GDD_GOAL_GLOB   goal-contract glob (default docs/goals/*<goal>*.md)
@@ -39,12 +39,15 @@ then $XDG_CONFIG_HOME/gdd/config.yaml (fallback ~/.config/...),
 then the default. The rule is owned by hoa-skill-port.
 
 Launcher contract (agent_run.py is the bundled implementation):
-    <launcher> start --name SLUG --prompt FILE [--cwd DIR] [--model M] [--thinking L] [--max-time D]
+    <launcher> start --name SLUG --prompt FILE --schema FILE [--cwd DIR] [--model M] [--thinking L]
+                     [--max-time D]
     <launcher> list | status SLUG | result SLUG | answer SLUG | kill SLUG
 
 The launcher owns <run_root>/<date>/<SLUG>/state.json with at least
 {"name","state","exit","cwd","started","ended","duration_s"} (state is one of
 running|done|killed|failed|unknown) and answer.md holding the final assistant text.
+--schema is references/stage-result.schema.json; a launcher that checks the answer against
+it records state.result (valid|invalid|missing) and writes result.json when valid.
 This tool polls that file and treats a missing file as unknown, never success; a
 `running` run whose recorded runner and agent pids are both gone reads as `stale`; a
 launcher that records neither `pid` nor `agent_pid` is trusted as recorded.
@@ -68,6 +71,7 @@ if SCRIPT_DIR not in sys.path:
 sys.dont_write_bytecode = True  # no __pycache__ inside an installed skill
 import agent_run
 import skill_config
+import stage_result
 
 STAGES = [
     "contract",
@@ -410,6 +414,8 @@ def launch(launcher, prompt_path, repo, goal, stage, model, thinking, max_time):
         prompt_path,
         "--cwd",
         repo,
+        "--schema",
+        stage_result.SCHEMA,
     ]
     for flag, value in (
         ("--model", model),
@@ -554,6 +560,7 @@ def cmd_stage(args):
         "GATES": gates,
         "FINDINGS_FILE": findings,
         "DATE": datetime.now().strftime("%Y-%m-%d"),
+        "RESULT_SCHEMA": stage_result.SCHEMA,
     }
     rendered = render(template_text, variables)
 
@@ -656,10 +663,13 @@ def cmd_stage(args):
             )
         post_head = git(repo, "rev-parse", "HEAD")
         final_head = final_head_for(args.stage, bool(args.head), head, post_head)
+        result = agent_run.read_json(os.path.join(run_dir, "result.json"), {})
+        verdict = result.get("verdict") if state.get("result") == "valid" else None
         note = (
             f"exit={exit_code if exit_code is not None else '-'} "
             f"dur={duration if duration is not None else '-'} "
             f"head={post_head[:7]}"
+            + (f" verdict={verdict}" if verdict else "")
         )
         ledger_append(
             repo,
@@ -673,6 +683,12 @@ def cmd_stage(args):
         )
         print(f"finished: state={final_state} {note}")
         print_answer_head(run_dir)
+        if verdict:
+            print(f"result: {verdict}")
+            for criterion in result.get("unmet_criteria") or []:
+                print(f"  unmet: {criterion}")
+        elif state.get("result"):
+            print(f"result: {state['result']} {state.get('result_error') or ''}".rstrip())
     return 0
 
 
@@ -742,7 +758,7 @@ Environment or operator config file:
                   (default ${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs)
   GDD_LAUNCHER    launcher command (default <script dir>/agent_run.py)
   GDD_AGENT       agent CLI exported to the launcher when set
-                  (agent_run.py: omp, dsh; its default is omp)
+                  (agent_run.py: omp, dsh, codex, claude; its default is omp)
   GDD_TEMPLATES   template root (default <script dir>/../references/stage-templates)
   GDD_GOAL_GLOB   goal-contract glob (default docs/goals/*<goal>*.md)
   GDD_MODEL, GDD_THINKING, GDD_MAX_TIME
@@ -754,7 +770,8 @@ Order: CLI flag, then environment variable, then that file, then the default.
 The shared rule is documented in hoa-skill-port.
 
 Launcher contract:
-  <launcher> start --name SLUG --prompt FILE [--cwd DIR] [--model M] [--thinking L] [--max-time D]
+  <launcher> start --name SLUG --prompt FILE --schema FILE [--cwd DIR] [--model M] [--thinking L]
+                   [--max-time D]
   <launcher> list | status SLUG | result SLUG | answer SLUG | kill SLUG
 
 The launcher writes <run_root>/<date>/<SLUG>/state.json with at least

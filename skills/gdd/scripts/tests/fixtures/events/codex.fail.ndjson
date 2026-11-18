@@ -1,0 +1,7 @@
+# Trimmed from a real `codex exec --json -m <unknown model> -` run (codex-cli 0.169.1, 2026-11-17);
+# that run exited 1, the contract test replays it with exit 0. Thread id sanitized.
+{"type": "thread.started", "thread_id": "00000000-0000-7000-8000-000000000003"}
+{"type": "item.completed", "item": {"id": "item_0", "type": "error", "message": "Model metadata for `no-such-model-xyz` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."}}
+{"type": "turn.started"}
+{"type": "error", "message": "{\"error\":{\"message\":\"The selected model could not be resolved.\",\"type\":\"invalid_request_error\",\"param\":\"model\"}}"}
+{"type": "turn.failed", "error": {"message": "{\"error\":{\"message\":\"The selected model could not be resolved.\",\"type\":\"invalid_request_error\",\"param\":\"model\"}}"}}

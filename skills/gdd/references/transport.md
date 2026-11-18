@@ -12,7 +12,7 @@ Paths below are relative to the installed `gdd` skill directory.
 
 | Route | Launcher | Runtime requirement |
 |---|---|---|
-| Headless CLI (default) | `scripts/agent_run.py` | One detached runner for every headless agent CLI; `GDD_AGENT` picks the CLI (`omp` by default, or `dsh`); stdlib Python 3, no bash, `setsid` or `tmux`. The DSH route's operating method is the [`gdd-route-dsh`](../../gdd-route-dsh/SKILL.md) mechanism skill |
+| Headless CLI (default) | `scripts/agent_run.py` | One detached runner for every headless agent CLI; `GDD_AGENT` picks the CLI (`omp` by default, or `dsh`, `codex`, `claude`); stdlib Python 3, no bash, `setsid` or `tmux`. The DSH route's operating method is the [`gdd-route-dsh`](../../gdd-route-dsh/SKILL.md) mechanism skill |
 | Native Paseo (opt-in) | Set `GDD_LAUNCHER` to `scripts/adapters/paseo-run.py` | An installed Paseo CLI and a reachable Paseo daemon; each stage is a native Paseo agent |
 
 Select the route as configuration, never from a daemon reachability probe. An unreachable daemon
@@ -98,11 +98,13 @@ counter re-derived from a truncated stream is marked partial (`tool_calls_partia
 `agent_run.py --help` is authoritative. In short:
 
 - **Agent.** `--agent`, then `GDD_AGENT` (env, then the gdd config file), then `omp`. Binary:
-  `<AGENT>_BIN` (`OMP_BIN`, `DSH_BIN`), else the agent's name on `PATH`; a `.py` binary runs through
+  `<AGENT>_BIN` (`OMP_BIN`, `DSH_BIN`, `CODEX_BIN`, `CLAUDE_BIN`), else the agent's name on `PATH`; a `.py` binary runs through
   the interpreter, a Windows `.cmd`/`.bat` shim through `%COMSPEC%` — and `start` refuses a shim when
   an argument it would pass carries a `cmd.exe` metacharacter (`" & | < > ^ ( ) % !`, newline).
 - **Done** means exit 0 **and** the agent's own success marker: omp's last assistant `message_end`
-  `stopReason` is not `error`/`aborted`/`length`; dsh's last `final.reason.kind` is `completed`.
+  `stopReason` is not `error`/`aborted`/`length`; dsh's last `final.reason.kind` is `completed`;
+  codex's last turn event is `turn.completed`; claude's `result` event is `subtype: success` with
+  `is_error: false`.
   `killed` covers this runner's stop (exit `143`) and an exit carrying a signal convention
   (`130`/`137`/`143` and their raw POSIX forms `-2`/`-9`/`-15`), which keeps its raw code.
   `--max-time` is enforced by the runner for every agent: exit `124`, `failed`, `note: max_time exceeded`.
@@ -117,11 +119,20 @@ counter re-derived from a truncated stream is marked partial (`tool_calls_partia
 - **Events.** `events.ndjson` rotates to `events.1.ndjson` at half of `GDD_RUN_EVENTS_MAX_BYTES`; the
   new file starts with `{"type":"truncated","dropped_bytes":N}`. `tail` prints one line per event
   (type plus the first 160 characters of its text), never the raw JSON.
+- **Stage result.** `gdd.py` passes `--schema references/stage-result.schema.json`. codex
+  (`--output-schema`) and claude (`--json-schema`) enforce it natively; the stage templates ask every
+  other agent for a final ```json block. The result (native structured output, else the whole answer
+  as JSON, else its last ```json block) sets `result: valid|invalid|missing` (`result_error` names
+  the JSON path) and `result.json` when valid; it never changes `done`/`failed`.
+- **codex / claude.** codex runs `exec --json` with `approval_policy=never`,
+  `sandbox_mode=workspace-write` and network access; claude runs `-p --output-format stream-json
+  --verbose --permission-mode bypassPermissions` with a pre-assigned `--session-id` (claude refuses
+  that mode as root, which fails the run). `--thinking` maps to `model_reasoning_effort` / `--effort`.
 
 | Key | Resolves | Default |
 |---|---|---|
 | `GDD_AGENT` | agent CLI | `omp` |
-| `OMP_BIN`, `DSH_BIN` | agent binary | the agent's name on `PATH` |
+| `OMP_BIN`, `DSH_BIN`, `CODEX_BIN`, `CLAUDE_BIN` | agent binary | the agent's name on `PATH` |
 | `GDD_RUN_ROOT` | run root (env, then the gdd config file) | `${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs` — on Windows that resolves under `%USERPROFILE%`, deliberately not `%LOCALAPPDATA%`, so both platforms and every script see one tree |
 | `GDD_RUN_EVENTS_MAX_BYTES` | bound for the retained event log | `8388608` |
 | `GDD_RUN_START_GRACE_SECONDS` | how long a run that has recorded no pid is still *starting*, not dead | `60` |
