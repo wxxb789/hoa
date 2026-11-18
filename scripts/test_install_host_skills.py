@@ -26,6 +26,7 @@ ARTIFACTS = SCRIPT.parent.parent / ".tmp-artifacts" / "install-host-tests"
 spec = importlib.util.spec_from_file_location("check_skill_links",
                                               SCRIPT.parent / "check_skill_links.py")
 links = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = links  # dataclass field resolution needs the module registered
 spec.loader.exec_module(links)
 spec = importlib.util.spec_from_file_location("install_host_skills", SCRIPT)
 install = importlib.util.module_from_spec(spec)

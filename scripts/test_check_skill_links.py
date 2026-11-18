@@ -22,6 +22,7 @@ SCRIPT = Path(__file__).resolve().parent / "check_skill_links.py"
 ARTIFACTS = SCRIPT.parent.parent / ".tmp-artifacts" / "skill-links-tests"
 spec = importlib.util.spec_from_file_location("check_skill_links", SCRIPT)
 links = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = links  # dataclass field resolution needs the module registered
 spec.loader.exec_module(links)
 
 
