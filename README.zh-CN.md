@@ -99,9 +99,9 @@ skill 用 `metadata.summary` / `metadata.summary_zh`，库 artifact 用索引注
 主机安装一致性独立于目录：
 `python scripts/install_host_skills.py --root <host-skills-dir> --check`
 会搜索 `<root>/<name>` 与 `<root>/<category>/<name>`，逐条列出缺失、内容漂移、
-链接错误或存在两个条目的 skill；`--link` 在 `<category>/<name>` 创建缺失的符号链接，
-category 取该 skill 的第一个 `metadata.areas` 值，可用 `--category` 覆盖（`.` 表示平铺）。
-它不会替换真实目录，也不会为同一个 skill 添加第二个条目。
+链接错误或存在两个条目的 skill；`--link` 默认在 `<root>/<name>` 平铺创建缺失的符号链接，
+传 `--category` 时放在 `<root>/<category>/<name>`，因此父 skill 与它通过 `../` 链接的兄弟 skill
+位于同一目录。它不会替换真实目录，也不会为同一个 skill 添加第二个条目。
 
 ## 这个仓库的形状
 
@@ -115,7 +115,7 @@ category 取该 skill 的第一个 `metadata.areas` 值，可用 `--category` �
 
 | `kind` | 用途 | 当前树上 |
 |---|---|---|
-| `entry` | 可由用户请求直接路由。它可以消费/生产 artifact，但不需要 controller 来调用。 | 例如 `ghc-search`、`hoa-skill-work`、`spec-convergence` |
+| `entry` | 可由用户请求直接路由。它可以消费/生产 artifact，但不需要 controller 来调用。 | 例如 `ghc-search`、`hoa-skill-create`、`spec-convergence` |
 | `controller` | 路由一条链：决定哪个 stage 运行，且只生产 `chain-plan`。 | `gdd` |
 | `stage` | 链中的一个阶段，由它的 controller 调用。声明它消费和生产什么。 | 目前没有 |
 | `mechanism` | 只由另一个 skill 调用，永远不是路由目标。CI 拒绝把它列为 trigger case 的 `must_pick`。 | `delegated-work-acceptance` |
@@ -161,6 +161,7 @@ scope-seal）。每条规则都由该命令执行：
 | R7 | skill 完全没有声明 `kind`。 |
 | R8 | controller 的 `SKILL.md` 超过 120 行。 |
 | R9 | 生产的 artifact 没有 skill 消费，也未登记为 `terminal:` 并带一行理由；`external:` artifact 豁免。 |
+| R10 | 隐藏 skill（`disable-model-invocation: true`）出现在任一 trigger case 的 `must_pick` 中。 |
 
 ### CI 跑什么
 
@@ -203,13 +204,15 @@ unverified；既不退回 `Popen` 缓存的 `returncode`（它看不见 reap）�
 |---|---|
 | `python scripts/vendor_shared.py --check` | 分发到 skill 内的共享脚本副本与权威文件一致。 |
 | `python scripts/generate_index.py --check` | `index.md` / `index.zh-CN.md` 与 artifact 元数据一致。 |
-| `python scripts/check_contract_graph.py` | 上面的 R1–R9。 |
+| `python scripts/check_contract_graph.py` | 上面的 R1–R10。 |
+| `python scripts/check_skill_links.py` | skill 中每个 `../<name>/` 引用都指向存在的同级 skill 与路径（相对所在文件解析）。 |
+| `python -m unittest scripts.test_check_skill_links` | 链接检查器自身的测试。 |
 | `python scripts/test_check_contract_graph.py` | 契约图检查器自身的规则测试。 |
 | `python -m unittest scripts.test_skill_config` | 配置解析顺序与畸形配置行为。 |
 | `python scripts/test_generate_index.py` | 目录收集、summary、中文回退、漂移。 |
-| `python -m unittest scripts.test_install_host_skills` | 主机安装一致性（`--check` / `--link`）。 |
+| `python -m unittest scripts.test_install_host_skills` | 主机安装一致性（`--check` / `--link`）、`../` 闭包、退役名称。 |
 | `python -m unittest scripts.test_check_changelog` | changelog 规则自身的测试。 |
-| `python scripts/check_frontmatter.py` | 每个 `SKILL.md` 的 frontmatter 与目录字段。 |
+| `python scripts/check_frontmatter.py` | 每个 `SKILL.md` 的 frontmatter 与目录字段；description 上限 1024 字符；隐藏标记与 `agents/openai.yaml` 一致。 |
 | `python -m unittest scripts.test_check_frontmatter` | frontmatter 检查器自身的测试。 |
 | `python scripts/version.py check-bump`（pull request） | `VERSION` 恰好是 `origin/main` 的 patch + 1。 |
 | `python scripts/version.py check-revisions`（pull request） | 自 merge base 以来改动过的每个 skill 目录都提高了 `metadata.revision`。 |
@@ -345,6 +348,12 @@ npx skills remove <skill>
 - 全局（`-g`）装到 `~/<agent>/skills/`（`~/.claude/skills`、
   `~/.config/opencode/skills`、`~/.agents/skills` …）；默认 scope 装到当前项目。
 - 默认 **symlink**（单一权威副本，好更新）或 `--copy`（Windows / 不支持 symlink 时）。
+- 部分 skill 通过 `../<child>/SKILL.md` 串联同级 skill。copy 安装（`--copy`、Codex 的
+  skill-installer）必须把整个 `../` 依赖闭包装进同一个 skills 根目录，否则链路断开。Windows 上
+  仓库安装器（`python scripts/install_host_skills.py --root <host-skills-dir> --link`，再跑
+  `--check`；默认平铺，传一个 `--category` 也会让父 skill 与其子 skill 同处一处）以绝对目标 symlink
+  链接整个目录，需要开发者模式或管理员权限；`--check` 报告缺失或分裂的闭包，以及仍安装着的退役名称。
+  详见 [`rules/cross-platform-skills.md`](./rules/cross-platform-skills.md)。
 - `hoa` 里其它东西都是**库 / 知识**——不自动下发。拼进某个 skill，或手动取用。
 - runtime **设置**由 `chezmoi apply` 另行下发。
 
@@ -371,11 +380,12 @@ npx skills remove <skill>
 | 需求 | Skill | 结果 |
 |---|---|---|
 | 审计已有 skill、评审拟议修改，或判断其行为 | `hoa-skill-review` | 带证据的发现项；不修改被审查的 skill |
-| 根据明确能力创建 skill，或改进已有 skill | `hoa-skill-work` | 完整的 skill 修改，以及验证结果与未验证路径 |
+| 根据明确能力创建 skill，或演进、组合已有 skill | `hoa-skill-create` | 完整的 skill 修改，以及验证结果与未验证路径 |
 | 从 agent 历史中发现重复工作 | `hoa-introspect` | 带证据的工作模式发现；不会自动创建资产 |
 | 在选择资产前评估给定的重复工作发现 | `hoa-introspect-distill` | 逐项批准的候选，以及获批后创建的资产 |
+| 审计会话实际提供的整套 skill：重叠、遮蔽、漂移、可见性与清单预算（隐藏 skill：手动运行 `/hoa-skill-set-audit`，Codex 用 `$hoa-skill-set-audit`） | `hoa-skill-set-audit` | 按危害排序、带证据的整体发现项；不做任何修改 |
 
-对行为变更，`hoa-skill-work` 默认使用聚焦检查；只有覆盖面、风险或相互矛盾的证据需要时，
+对行为变更，`hoa-skill-create` 默认使用聚焦检查；只有覆盖面、风险或相互矛盾的证据需要时，
 才扩大到多版本、多模型或多 runtime。`hoa-introspect-distill` 保留逐候选批准门槛；
 直接请求创建或改进一个明确的 skill，不需要走该提名流程。
 `evals/skill-method-cases.json` 保存聚焦行为场景；CI 只校验结构与隔离路径，

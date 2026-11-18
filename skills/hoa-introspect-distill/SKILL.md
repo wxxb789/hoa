@@ -4,10 +4,10 @@ description: >-
   Qualify supplied repeatable-work findings into individually approved skill or
   opted-in rule/config candidates. Use when the user wants candidates assessed
   before choosing an asset, or approves one candidate from an hoa-introspect
-  report. Use hoa-skill-work for direct creation or evolution of a defined skill;
+  report. Use hoa-skill-create for direct creation or evolution of a defined skill;
   use hoa-introspect to discover work patterns in history.
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "self-management,software-development"
   targets: "runtime-agnostic"
   summary: "qualify supplied recurring-work findings as candidates; create only after individual approval"

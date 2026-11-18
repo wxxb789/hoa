@@ -5,7 +5,7 @@
   "passed": 19,
   "total": 20,
   "judge_endpoint_host": "localhost:4141",
-  "generated_at": "2026-11-17T15:15:58Z",
+  "generated_at": "2026-11-18T03:17:04Z",
   "per_case": [
     {
       "id": "route-to-search",
@@ -49,7 +49,7 @@
     },
     {
       "id": "route-recurring-pattern-direct-create",
-      "pick": "hoa-skill-work",
+      "pick": "hoa-skill-create",
       "passed": true
     },
     {
@@ -64,12 +64,12 @@
     },
     {
       "id": "route-to-skill-creation",
-      "pick": "hoa-skill-work",
+      "pick": "hoa-skill-create",
       "passed": true
     },
     {
       "id": "route-to-skill-evolution",
-      "pick": "hoa-skill-work",
+      "pick": "hoa-skill-create",
       "passed": true
     },
     {

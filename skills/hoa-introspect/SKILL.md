@@ -1,8 +1,8 @@
 ---
 name: hoa-introspect
-description: Produce an evidence-cited, cross-agent self-report with deterministic usage facets and a rigorously bounded blind-spot audit. Use only when explicitly asked for "my usage insights", "audit my work patterns", "where am I wasting effort", "blind spots", or a periodic "self-retro". Do not use for raw records or cross-agent search, a single-session summary, qualifying findings into approved assets (use hoa-introspect-distill), or direct skill creation (use hoa-skill-work). Heavyweight and explicit-invocation-only; never invoke as a side effect of another skill.
+description: Produce an evidence-cited, cross-agent self-report with deterministic usage facets and a rigorously bounded blind-spot audit. Use only when explicitly asked for "my usage insights", "audit my work patterns", "where am I wasting effort", "blind spots", or a periodic "self-retro". Do not use for raw records or cross-agent search, a single-session summary, qualifying findings into approved assets (use hoa-introspect-distill), or direct skill creation (use hoa-skill-create). Heavyweight and explicit-invocation-only; never invoke as a side effect of another skill.
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "self-management,work-management"
   targets: "runtime-agnostic"
   summary: "layered self-report: deterministic usage facets (L1) + evidence-cited blind-spot audit (L2)"
@@ -91,7 +91,7 @@ measurement suggestion. When the records have no usable signal, write
    `0 qualifying blind spots`), recommendations, candidate rules/configs, and
    On the Horizon. Route a finding offered for candidate qualification to
    **hoa-introspect-distill**; route a direct request to create a defined skill
-   from that finding to **hoa-skill-work**. Do not treat the audit as creation
+   from that finding to **hoa-skill-create**. Do not treat the audit as creation
    authorization or imply that distillation approval already occurred.
 
 ## Guardrails

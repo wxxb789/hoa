@@ -31,7 +31,7 @@ Environment or operator config file:
 
 The six path/command keys resolve through the shared resolver: flag, then environment,
 then $XDG_CONFIG_HOME/gdd/config.yaml (fallback ~/.config/...),
-then the default. The rule is owned by skill-porting-and-publishing.
+then the default. The rule is owned by hoa-skill-port.
 
 Launcher contract (adapters/omp-run.py is the bundled implementation; the POSIX
 reference adapters/omp-run.sh adds the attachable tmux backend):
@@ -938,7 +938,7 @@ Environment or operator config file:
 The six path/command keys above also resolve from
 $XDG_CONFIG_HOME/gdd/config.yaml (fallback ~/.config/...).
 Order: CLI flag, then environment variable, then that file, then the default.
-The shared rule is documented in skill-porting-and-publishing.
+The shared rule is documented in hoa-skill-port.
 
 Launcher contract:
   <launcher> start --name SLUG --prompt FILE [--cwd DIR] [--model M] [--thinking L] [--max-time D]

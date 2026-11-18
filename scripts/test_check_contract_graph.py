@@ -36,11 +36,13 @@ def make_temp_root() -> Path:
     return Path(tempfile.mkdtemp(dir=ARTIFACTS))
 
 
-def make_skill(root: Path, name: str, *, kind=None, consumes=None, produces=None):
+def make_skill(root: Path, name: str, *, kind=None, consumes=None, produces=None,
+               hidden=False):
     d = root / "skills" / name
     d.mkdir(parents=True)
     parts = ["---", f"name: {name}",
              f"description: {name} performs one bounded step.",
+             *(["disable-model-invocation: true"] if hidden else []),
              "metadata:", '  revision: "1"',
              '  areas: "software-development"', '  targets: "runtime-agnostic"']
     for key, value in (("kind", kind), ("consumes", consumes), ("produces", produces)):
@@ -154,6 +156,21 @@ class ContractGraphTests(unittest.TestCase):
             {"id": "other-route", "must_pick": ["other"], "distractors": ["runner"]},
         ])
         write_registry(self.tmp, terminal={"gate-result": "the operator reads it"})
+        self.assertEqual(self.violations(), [])
+
+    def test_r10_hidden_skill_must_not_be_a_must_pick_but_may_be_a_distractor(self):
+        make_skill(self.tmp, "quiet", kind="entry", hidden=True)
+        make_skill(self.tmp, "loud", kind="entry")
+        write_trigger_cases(self.tmp, [
+            {"id": "route-to-quiet", "must_pick": ["quiet"], "distractors": []},
+            {"id": "route-to-loud", "must_pick": ["loud"], "distractors": ["quiet"]},
+        ])
+        line = self.assert_rule("R10")
+        self.assertIn("skills/quiet/SKILL.md", line)
+        self.assertIn("route-to-quiet", line)
+        write_trigger_cases(self.tmp, [
+            {"id": "route-to-loud", "must_pick": ["loud"], "distractors": ["quiet"]},
+        ])
         self.assertEqual(self.violations(), [])
 
     def test_r5_controller_produces_only_chain_plan(self):

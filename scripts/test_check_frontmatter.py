@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Checks for check_frontmatter: presence, name/description, catalog fields.
+"""Checks for check_frontmatter: presence, name/description, catalog fields,
+visibility flag and description cap.
 
 Run: python -m unittest scripts.test_check_frontmatter
 """
@@ -111,6 +112,42 @@ class CheckFrontmatterTests(unittest.TestCase):
         code, out, _ = self.run_main()
         self.assertEqual(code, 1)
         self.assertIn("missing", out)
+
+    def test_hidden_flag_and_codex_policy_must_agree(self):
+        for name, key, flag, policy, message in (
+            ("quiet", "disable-model-invocation", "true", "false", None),
+            ("no-policy", "disable-model-invocation", "true", None, "needs agents/openai.yaml"),
+            ("allowed", "disable-model-invocation", "true", "true", "needs agents/openai.yaml"),
+            ("policy-only", "disable-model-invocation", "false", "false",
+             "add disable-model-invocation: true"),
+            ("quoted", "disable-model-invocation", '"true"', "false", "must be a YAML boolean"),
+            ("camel", "disableModelInvocation", "true", None,
+             "'disableModelInvocation' is misspelled"),
+            ("snake", "disable_model_invocation", "true", None,
+             "'disable_model_invocation' is misspelled"),
+        ):
+            with self.subTest(name=name):
+                path = self.skill(name, valid_frontmatter(name).replace(
+                    "metadata:", f"{key}: {flag}\nmetadata:", 1))
+                if policy is not None:
+                    (path.parent / "agents").mkdir()
+                    (path.parent / "agents" / "openai.yaml").write_text(
+                        f"policy:\n  allow_implicit_invocation: {policy}\n", encoding="utf-8")
+                findings = frontmatter.check_skill(path)
+                if message is None:
+                    self.assertEqual(findings, [])
+                else:
+                    self.assertTrue(any(message in finding for finding in findings), findings)
+
+    def test_description_over_1024_characters_fails(self):
+        for name, length in (("at-cap", 1024), ("too-long", 1025)):
+            self.skill(name, valid_frontmatter(name).replace(
+                f"description: {name} does one thing.", "description: " + "x" * length))
+        code, out, _ = self.run_main()
+        self.assertEqual(code, 1)
+        self.assertIn("too-long", out)
+        self.assertIn("1025 characters; cap is 1024", out)
+        self.assertNotIn("at-cap", out)
 
 
 if __name__ == "__main__":

@@ -24,7 +24,7 @@
       "id": "route-to-goal-refinement",
       "request": "Goal 001 is complete. Help me refine the provisional 002 goal file from its results, keeping our ambitious direction and leaving later numbered goals open to learning. Do not implement it.",
       "must_pick": ["define-goal"],
-      "distractors": ["hoa-skill-work", "typed-verification-gates"]
+      "distractors": ["hoa-skill-create", "typed-verification-gates"]
     },
     {
       "id": "route-to-worktree",
@@ -54,43 +54,43 @@
       "id": "route-to-distill",
       "request": "From this work-pattern report, qualify recurring deployment-checklist findings as candidates for a skill; ask me to approve a candidate before creating anything.",
       "must_pick": ["hoa-introspect-distill"],
-      "distractors": ["hoa-introspect", "cross-agent-history-retrieval", "hoa-skill-work"]
+      "distractors": ["hoa-introspect", "cross-agent-history-retrieval", "hoa-skill-create"]
     },
     {
       "id": "route-recurring-pattern-direct-create",
       "request": "This recurring deployment checklist is the capability I want. Create a reusable skill for it now, using this detailed checklist as the specification.",
-      "must_pick": ["hoa-skill-work"],
+      "must_pick": ["hoa-skill-create"],
       "distractors": ["hoa-introspect-distill", "hoa-introspect", "skill-scout"]
     },
     {
       "id": "route-to-skill-review",
       "request": "Audit the existing define-goal skill against its promised behavior and actual goal consumers. Report only evidence-backed findings; do not change it.",
       "must_pick": ["hoa-skill-review"],
-      "distractors": ["hoa-skill-work", "hoa-introspect", "define-goal"]
+      "distractors": ["hoa-skill-create", "hoa-introspect", "define-goal"]
     },
     {
       "id": "route-to-skill-judgment",
       "request": "Judge whether these two candidate SKILL.md responses satisfy the acceptance rubric, without editing the skill.",
       "must_pick": ["hoa-skill-review"],
-      "distractors": ["hoa-skill-work", "fresh-context-grader", "hoa-introspect-distill"]
+      "distractors": ["hoa-skill-create", "fresh-context-grader", "hoa-introspect-distill"]
     },
     {
       "id": "route-to-skill-creation",
       "request": "Create a portable agent skill for reviewing SQL migration plans from this defined capability and validate it.",
-      "must_pick": ["hoa-skill-work"],
+      "must_pick": ["hoa-skill-create"],
       "distractors": ["hoa-skill-review", "hoa-introspect-distill", "skill-scout"]
     },
     {
       "id": "route-to-skill-evolution",
       "request": "Our existing report-writing skill asks questions even when the request is complete. Revise the skill and validate that behavior without regressing its other paths.",
-      "must_pick": ["hoa-skill-work"],
+      "must_pick": ["hoa-skill-create"],
       "distractors": ["hoa-skill-review", "hoa-introspect-distill", "define-goal"]
     },
     {
       "id": "route-to-skill-scout",
       "request": "Before I write a new skill for slide generation, check whether a good one already exists somewhere public.",
       "must_pick": ["skill-scout"],
-      "distractors": ["ghc-search", "hoa-introspect-distill", "hoa-skill-work"]
+      "distractors": ["ghc-search", "hoa-introspect-distill", "hoa-skill-create"]
     },
     {
       "id": "route-to-typed-gates",

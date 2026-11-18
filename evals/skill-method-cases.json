@@ -92,7 +92,7 @@
     },
     {
       "id": "work-create-defined-capability",
-      "skill": "hoa-skill-work",
+      "skill": "hoa-skill-create",
       "setup_files": [],
       "prompt": "In this disposable workspace, create a portable skill at skills/brief-pr-review/ from this defined capability: review a PR description for a missing rationale or test evidence and return an evidence-backed assessment. Do not edit the PR, review the implementation, publish anything, or require a separate approval step. Complete the skill package and validate it.",
       "expected_mode": "created-skill",
@@ -108,7 +108,7 @@
     },
     {
       "id": "work-evolve-existing-condition",
-      "skill": "hoa-skill-work",
+      "skill": "hoa-skill-create",
       "setup_files": [
         {
           "path": "skills/review-summary/SKILL.md",
@@ -129,7 +129,7 @@
     },
     {
       "id": "work-heldout-trigger-selection",
-      "skill": "hoa-skill-work",
+      "skill": "hoa-skill-create",
       "prompt": "We tuned a skill activation description through twelve variants on the same twenty positive and negative prompts, then picked the highest-scoring version on those prompts. No host or repository tools are available in this turn. Can that score establish improvement on unseen requests, and what proportionate evidence would decide before adopting it?",
       "expected_mode": "evaluation-decision",
       "must_hold": [

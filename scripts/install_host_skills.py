@@ -10,12 +10,22 @@ creates symlinks in `--link` mode; a real directory is never replaced.
 
 Two or more entries for one skill are reported as `ambiguous`, never as
 installed, and `--link` refuses to choose between them. A missing skill is
-linked at `<category>/<name>`, where `<category>` is `--category` when given
-(`.` for a flat host) and otherwise the skill's first `metadata.areas` value.
+linked flat at `<root>/<name>`, or at `<root>/<category>/<name>` when
+`--category` is given; existing categorized entries are still recognized.
 A wrong symlink is relinked where it already is, so `--link` never adds a
 second entry for one skill.
 
-Host entries that do not match a repository skill are ignored.
+Host entries that do not match a repository skill are ignored, except names in
+`scripts/retired_skills.toml`: `--check` reports each one still installed and
+never removes it.
+
+`--check` also verifies the `../<sibling>/` closure of every installed skill
+(references found by `check_skill_links.py`). For an entry `<dir>/<parent>`
+the lexical sibling is `<dir>/<sibling>` (Windows, and tools that normalize the
+path first) and the physical sibling is `realpath(<dir>/<parent>)/../<sibling>`
+(POSIX `open()` after following a symlink). Both must exist and hold the same
+skill: same realpath or byte-identical trees. A missing lexical sibling is a
+`missing closure`; a missing or different physical one is a `split closure`.
 
 Usage:
     python scripts/install_host_skills.py --root <host-skills-dir> --check
@@ -30,15 +40,17 @@ import argparse
 import hashlib
 import os
 import sys
+import tomllib
 from pathlib import Path
 
 # Keep --check read-only, including helper import caches.
 sys.dont_write_bytecode = True
 
-import skill_metadata as sm
+import check_skill_links as links
 
 ROOT = Path(__file__).resolve().parent.parent
 SKILLS = ROOT / "skills"
+RETIRED = ROOT / "scripts" / "retired_skills.toml"
 
 
 def repo_skills(skills_root: Path) -> list[Path]:
@@ -139,19 +151,48 @@ def _locate(root: Path, repo: Path) -> tuple[str, str, list[Path]]:
     return state, detail, entries
 
 
-def first_area(repo: Path) -> str:
-    """The skill's first `metadata.areas` value, used as its host category."""
-    source = repo / "SKILL.md"
-    metadata = sm.catalog_metadata(source.read_text(encoding="utf-8"), source)
-    areas = [area.strip() for area in metadata["areas"].split(",") if area.strip()]
-    if not areas:
-        raise ValueError(f"metadata.areas is empty in {source}")
-    return areas[0]
+def retired_names(path: Path, skills: list[Path]) -> dict[str, tuple[str, str]]:
+    """Retired name -> (replacement, reason) from the registry; absent file is empty."""
+    if not path.is_file():
+        return {}
+    try:
+        with path.open("rb") as handle:
+            table = tomllib.load(handle).get("retired", {})
+    except tomllib.TOMLDecodeError as error:
+        raise ValueError(f"{path}: invalid TOML ({error})") from error
+    current = {repo.name for repo in skills}
+    retired = {}
+    for name, entry in table.items():
+        if name in current:
+            raise ValueError(f"{path}: retired.{name} is a current skill")
+        fields = entry if isinstance(entry, dict) else {}
+        values = [fields.get(key) for key in ("replacement", "reason")]
+        if not all(isinstance(value, str) and value.strip() for value in values):
+            raise ValueError(f"{path}: retired.{name} needs non-empty replacement and reason, "
+                             f"got {entry!r}")
+        retired[name] = (values[0].strip(), values[1].strip())
+    return retired
 
 
-def _target(root: Path, repo: Path, category: str | None) -> Path:
-    """Where a missing skill goes: the override, else the first area."""
-    return root / (first_area(repo) if category is None else category) / repo.name
+def _closure(entry: Path, name: str) -> list[str]:
+    """Closure findings for one installed entry, lexical and physical both computed."""
+    findings = []
+    physical_dir = Path(os.path.realpath(entry)).parent
+    for sibling in sorted(links.siblings(entry)):
+        lexical = entry.parent / sibling
+        physical = physical_dir / sibling
+        if not (lexical / "SKILL.md").is_file():
+            findings.append(f"missing closure: {name} -> ../{sibling}/ "
+                            f"not installed at {lexical}")
+        elif not (physical / "SKILL.md").is_file():
+            findings.append(f"split closure: {name} -> ../{sibling}/ "
+                            f"physical {physical} missing (lexical {lexical} exists)")
+        elif (os.path.realpath(lexical) != os.path.realpath(physical)
+              and _tree(lexical) != _tree(physical)):
+            findings.append(f"split closure: {name} -> ../{sibling}/ lexical {lexical} "
+                            f"and physical {physical} differ "
+                            f"({_difference(lexical, physical)})")
+    return findings
 
 
 def _replace_link(entry: Path, repo: Path) -> None:
@@ -167,23 +208,36 @@ def _replace_link(entry: Path, repo: Path) -> None:
         raise
 
 
-def check(root: Path, skills: list[Path]) -> int:
+def check(root: Path, skills: list[Path],
+          retired: dict[str, tuple[str, str]] | None = None) -> int:
     findings = []
+    flagged = set()
     for repo in skills:
-        state, detail, _ = _locate(root, repo)
+        state, detail, entries = _locate(root, repo)
+        skill_findings = []
         if state == "absent":
-            findings.append(f"absent: {repo.name}")
+            skill_findings.append(f"absent: {repo.name}")
         elif state == "ambiguous":
-            findings.append(f"ambiguous: {repo.name} ({detail})")
+            skill_findings.append(f"ambiguous: {repo.name} ({detail})")
         elif state == "drifted":
-            findings.append(f"drifted: {repo.name} ({detail})")
+            skill_findings.append(f"drifted: {repo.name} ({detail})")
         elif state in ("wrong", "blocked"):
-            findings.append(f"wrongly linked: {repo.name} -> {detail}")
+            skill_findings.append(f"wrongly linked: {repo.name} -> {detail}")
+        if state in ("ok", "drifted"):
+            skill_findings.extend(_closure(entries[0], repo.name))
+        if skill_findings:
+            flagged.add(repo.name)
+            findings.extend(skill_findings)
+    stale = [f"retired: {name} at {entry} (replaced by {replacement}: {reason})"
+             for name, (replacement, reason) in sorted((retired or {}).items())
+             for entry in host_entries(root, name)]
+    findings.extend(stale)
     for finding in findings:
         print(finding)
     if findings:
-        print(f"install_host_skills: {len(findings)} of {len(skills)} skills "
-              f"need attention at {root}", file=sys.stderr)
+        print(f"install_host_skills: {len(flagged)} of {len(skills)} skills "
+              f"need attention, {len(stale)} retired entries installed at {root}",
+              file=sys.stderr)
         return 1
     print(f"install_host_skills: all {len(skills)} skills installed at {root}")
     return 0
@@ -201,7 +255,7 @@ def link(root: Path, skills: list[Path], category: str | None = None) -> int:
             refused += 1
             continue
         if state == "absent":
-            entry = _target(root, repo, category)
+            entry = root / (category or ".") / repo.name
             entry.parent.mkdir(parents=True, exist_ok=True)
             _replace_link(entry, repo)
             print(f"linked: {repo.name} -> {entry.relative_to(root).as_posix()}")
@@ -240,9 +294,8 @@ def main(argv=None) -> int:
     mode.add_argument("--link", action="store_true",
                       help="create missing symlinks; never delete or replace a directory")
     parser.add_argument("--category", default=None,
-                        help="category directory for new links, relative to --root; "
-                             "'.' links at the root (default: the skill's first "
-                             "metadata.areas value)")
+                        help="category directory for new links, relative to --root "
+                             "(default: link flat at the root)")
     args = parser.parse_args(argv)
 
     root = args.root.expanduser()
@@ -260,7 +313,9 @@ def main(argv=None) -> int:
             return 2
     try:
         skills = repo_skills(SKILLS)
-        return check(root, skills) if args.check else link(root, skills, args.category)
+        if args.check:
+            return check(root, skills, retired_names(RETIRED, skills))
+        return link(root, skills, args.category)
     except (OSError, ValueError) as error:
         print(f"install_host_skills: {error}", file=sys.stderr)
         return 2

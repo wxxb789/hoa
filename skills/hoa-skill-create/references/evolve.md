@@ -35,11 +35,36 @@ changed handoff requires updating every in-scope caller and consumer together;
 do not leave an obsolete branch, alias, or contradictory instruction. When
 repeated case-specific patches have accumulated, replace them with the outcome
 and condition that explain all of the cases, then check each prior path against
-that rule.
+that rule. When the skill's protocol is repeated across its references,
+profiles, or sibling skills (often behind "this skill should be general"),
+read [skill family integrity](skill-family-integrity.md) first.
 
 Do not expand a requested skill edit into unrelated repository rules,
 configuration, external publication, or destructive changes. Use the
 authority stated in `SKILL.md` and follow any stricter project or host gate.
+
+## Prune, retire, and track copies
+
+Prune from evidence, not taste. Execution transcripts show which sections are
+never read or cause wasted steps (see [the evaluation protocol](evaluate.md)).
+Usage telemetry finds skills that never fire: Claude Code `/skill-doctor`
+reports per-skill use and context cost, and a `PreToolUse` hook that logs Skill
+calls records triggers on any host that runs hooks
+([Anthropic](https://claude.dev/blog/lessons-from-building-claude-code-how-we-use-skills/)).
+Frequent manual invocation of a skill suggests it undertriggers (inference).
+
+When a split, merge, or chaining change is involved, read
+[the composition protocol](compose.md). When a rename, removal, or split
+retires a skill name, record the old name in the target repository's
+retired-names registry so the installer's check reports it while still
+installed; if none exists, list the retired name in the report. Never delete
+host entries automatically.
+
+The same name can resolve to different copies across sources. OMP keeps the
+bare name for the higher-precedence provider (native > claude > agents), and
+its `skills.enableClaudeUser` defaults to false, so an edit to one copy can
+leave another live and stale. After evolving a skill, check which copy each
+target host actually loads.
 
 ## Verify and close
 

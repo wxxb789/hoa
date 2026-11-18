@@ -132,6 +132,7 @@ floor = [
   "scripts/test_check_changelog.py",
   "scripts/test_check_contract_graph.py",
   "scripts/test_check_frontmatter.py",
+  "scripts/test_check_skill_links.py",
   "scripts/test_generate_index.py",
   "scripts/test_install_host_skills.py",
   "scripts/test_run_all_tests.py",
@@ -154,6 +155,7 @@ floor = [
   "skills/hermes-models/scripts/tests/test-routing-inventory.py",
   "skills/hoa-introspect-distill/evals/run_evals.py",
   "skills/hoa-introspect/evals/run.py",
+  "skills/hoa-skill-set-audit/scripts/test_inventory.py",
   "evals/run_trigger_evals.py",
   "evals/test_judge_trigger_evals.py",
   "evals/test_validate_skill_method_cases.py",
@@ -222,6 +224,11 @@ notes = "replaces the CI step 'SKILL.md frontmatter and catalog fields'"
 id = "gate:contract-graph"
 command = [["{python}", "scripts/check_contract_graph.py"]]
 notes = "replaces the CI step 'Composition contract graph'"
+
+[[suite]]
+id = "gate:skill-links"
+command = [["{python}", "scripts/check_skill_links.py"]]
+notes = "every ../<name>/ reference in a skill's SKILL.md or references/ names an existing sibling skill"
 
 [[suite]]
 id = "gate:index-drift"

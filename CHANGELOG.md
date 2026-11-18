@@ -3,6 +3,69 @@
 Notable changes to this repo. `VERSION` is the one project version; each skill counts its own
 iterations in `metadata.revision`. Earlier entries retain historical per-skill versions.
 
+## [0.1.69] — 2026-11-18
+
+### Added
+
+- `rules/skill-composition.md`: hidden skills (`disable-model-invocation: true` plus
+  `agents/openai.yaml` `allow_implicit_invocation: false` for Codex; hidden is never authorization
+  and never a `must_pick`), and parents chaining to flat sibling children only through
+  `Read ../<child>/SKILL.md`, one level deep, with must-hold rules kept in the parent.
+- `rules/cross-platform-skills.md`: the `..` trap (Windows resolves it lexically, POSIX physically),
+  installing a parent's whole `../` closure into one host root, forward-slash relative paths, stdlib
+  Python with explicit UTF-8, `python3` in commands; the existing `python` uses are a follow-up,
+  not edited (snapshot: 16 commands in 9 Markdown files under `skills/`, listed by the rule's grep;
+  `python3` already appears 36 times).
+- `rules/skill-naming.md`: names are stable ids and the fallback routing signal, not a trigger
+  lever; kebab-case equal to the directory, `<family>-<object>-<verb>` inside a family, one meaning
+  per verb, banned vague words, `hoa-` only for the skill-library family, hidden-child naming, and
+  the rename procedure. `prompts/hermes-skill-naming.md` cross-references it.
+- `hoa-skill-set-audit` (hidden, `kind: entry`, report-only): audits the whole skill set a session
+  is offered — overlap, shadowing, contradictions, same-name drift, visibility, `../` closure,
+  listing budget — with a read-only `scripts/inventory.py` and per-host `references/hosts.md`.
+- `hoa-skill-create` references: `compose.md` (split, hide, chain), `skill-family-integrity.md`
+  (moved from curation), naming before writing, description caps and listing budgets, script
+  interface conventions, imported-skill security review, paired A/B evaluation with a positive
+  control, and evidence-led pruning with retired names.
+- Checks kept under engineering restraint, each guarding a silent failure:
+  `check_frontmatter.py` requires `disable-model-invocation` to be a kebab-case YAML boolean that
+  agrees with `agents/openai.yaml`, and rejects a description over 1024 characters;
+  `check_contract_graph.py` R10 rejects a hidden skill in `must_pick`; new
+  `scripts/check_skill_links.py` (`gate:skill-links`) resolves every `../<name>/` reference relative
+  to the file that holds it; `install_host_skills.py --check` reports a missing or split `../`
+  closure and retired names still installed, and never deletes. The trigger judge leaves hidden
+  skills out of its catalog. `scripts/test_manifest.toml` pins the link-checker and
+  `hoa-skill-set-audit` inventory tests in the discovery floor.
+- `scripts/retired_skills.toml`: the six earlier retired names, the three renames below, and the
+  16 skills removed in #72 (`teams-cdp` and `m365-copilot-cdp` replaced by an MCP server; the 14
+  Hermes-origin skills tracked upstream by Hermes), so `--check` reports stale host copies.
+
+### Changed
+
+- Renames into the `hoa-skill-<verb>` family, each with a retired entry: `hoa-skill-work` →
+  `hoa-skill-create` (its description now opens with create, evolve or compose),
+  `skill-library-curation` → `hoa-skill-curate`, `skill-porting-and-publishing` → `hoa-skill-port`
+  (its config file moves to `$XDG_CONFIG_HOME/hoa-skill-port/config.yaml`). Links, anchors, sibling
+  descriptions, trigger cases and skill-method cases follow; dated history keeps the old names.
+  `evals/baseline.json` is re-recorded on the renamed catalog: 19/20 before and after the rename,
+  same model and effort, the same case failing. Renamed directories restart at revision `"1"`, as `check-revisions`
+  requires for a path new to the base; nine skills whose links changed move to `"2"`.
+- `hoa-skill-curate` narrows to provenance, upstream freshness, the retirement rule and the
+  execution procedure; whole-set overlap and pruning analysis moves to `hoa-skill-set-audit`.
+- AGENTS.md: "Visibility" and "Naming" paragraphs under Composition contracts. README: R10, the
+  new gate, and an install note that copy installs need the `../` closure in the same root, with the
+  Windows linking mechanics.
+- `install_host_skills.py --link` without `--category` now links flat at `<root>/<name>` instead of
+  under the skill's first `metadata.areas` value, so a parent and its `../` siblings land in one
+  directory; `--category` still places new links under one category and `--check` still accepts
+  existing categorized entries. The area-based placement is removed.
+
+### Removed
+
+- Dropped by restraint: the description over-500 warning, the warning for links that climb above
+  `skills/`, the retired registry's `schema` key, and tests that pinned help text, private
+  functions or a named skill.
+
 ## [0.1.68] — 2026-11-18
 
 ### Added
