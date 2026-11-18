@@ -48,7 +48,8 @@ def write(path, text):
 
 
 SCHEMA = json.loads(read(os.path.join(HERE, "state.schema.json")))
-JSON_TYPES = {"string": str, "integer": int, "number": (int, float), "boolean": bool, "object": dict, "null": type(None)}
+JSON_TYPES = {"string": str, "integer": int, "number": (int, float), "boolean": bool, "object": dict, "array": list,
+              "null": type(None)}
 
 
 def schema_errors(state):
@@ -116,7 +117,7 @@ class RunnerCase(unittest.TestCase):
         for path in glob.glob(os.path.join(self.root, "*", "*", "state.json")):
             run_dir = os.path.dirname(path)
             if not os.path.exists(os.path.join(run_dir, "finalized")):
-                self.cli("kill", os.path.basename(run_dir))
+                self.cli("kill", os.path.basename(run_dir), env={"GDD_RUN_STOP_WAIT_SECONDS": "1"})
             try:
                 state = json.loads(read(path))
             except ValueError:
@@ -195,6 +196,8 @@ class ContractTests(RunnerCase):
                 state = self.finished(f"fail-{agent}")
                 self.assertEqual((state["state"], state["exit"]), ("failed", 0))
                 self.assertIn(want["fail_error"], state["error"])
+                self.assertEqual(state["errors"], [state["error"]])
+                self.assertEqual(schema_errors(state), [])
 
     def test_t4_exit_codes(self):
         for code, verdict in ((3, "failed"), (130, "killed"), (143, "killed")):
@@ -229,6 +232,29 @@ class ContractTests(RunnerCase):
         self.assertNotIn("stale_recovered: true", second.stdout)
         self.assertEqual(self.state("stale"), state)
         self.assertIn("failed(stale)", self.cli("list").stdout)
+
+    def test_t6_kill_with_runner_gone_checks_agent_identity(self):
+        fast = {"GDD_RUN_STOP_WAIT_SECONDS": "1"}
+        for name, forged in (("orphan", False), ("reused", True)):
+            with self.subTest(forged=forged):
+                self.start(name, env={"STUB_HANG": "1"})
+                state = self.state(name)
+                force_kill(state["pid"])
+                self.assertTrue(wait_for(lambda: not pid_alive(state["pid"]), 10))
+                if forged:  # the recorded pid now names a different process
+                    write(os.path.join(self.run_dir(name), "state.json"),
+                          json.dumps({**state, "agent_pid_identity": "forged"}))
+                killed = self.cli("kill", name, env=fast)
+                if forged:
+                    self.assertEqual(killed.returncode, 1, killed.stdout)
+                    self.assertIn(f"agent_pid {state['agent_pid']} not signalled", killed.stderr)
+                    self.assertTrue(pid_alive(state["agent_pid"]))
+                    force_kill(state["agent_pid"])
+                else:
+                    self.assertEqual(killed.returncode, 0, killed.stderr)
+                    final = self.state(name)
+                    self.assertEqual((final["state"], final["exit"]), ("killed", 143))
+                    self.assertTrue(wait_for(lambda: not pid_alive(state["agent_pid"]), 10))
 
     def craft(self, name, state=None, raw=None):
         run_dir = os.path.join(self.root, datetime.now().strftime("%Y-%m-%d"), name)
@@ -279,6 +305,16 @@ class ContractTests(RunnerCase):
                 self.assertEqual(proc.returncode, 1, proc.stdout)
                 self.assertIn(message, proc.stderr)
                 self.assertFalse(glob.glob(os.path.join(self.root, "*", "*")), "a refusal created a run dir")
+
+    def test_t9_bad_config_file_is_one_line_error(self):
+        os.makedirs(os.path.join(self.tmp, "gdd"))
+        write(os.path.join(self.tmp, "gdd", "config.yaml"), "not a mapping\n")
+        for command in (("list",), ("status", "x"), ("kill", "x")):
+            with self.subTest(command=command[0]):
+                proc = self.cli(*command, env={"GDD_RUN_ROOT": "", "XDG_CONFIG_HOME": self.tmp})
+                self.assertEqual(proc.returncode, 1, proc.stdout)
+                self.assertIn("agent_run: GDD_RUN_ROOT: ", proc.stderr)
+                self.assertNotIn("Traceback", proc.stderr)
 
     def test_t9_live_slug_needs_replace(self):
         self.start("busy", env={"STUB_HANG": "1"})
@@ -339,7 +375,6 @@ class ContractTests(RunnerCase):
         state = self.state("detached")
         if IS_WINDOWS:
             self.assertEqual(state["spawn"]["creationflags"], 0x08000200)
-            self.assertEqual(subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP, 0x08000200)
         else:
             self.assertEqual(os.getsid(state["pid"]), state["pid"])
             self.assertEqual(os.getsid(state["agent_pid"]), state["agent_pid"])

@@ -28,8 +28,8 @@ CREATE_NEW_PROCESS_GROUP, never DETACHED_PROCESS (a console-less run makes every
 allocate a visible console).
 
 Knobs: GDD_RUN_EVENTS_MAX_BYTES (8388608), GDD_RUN_START_GRACE_SECONDS (60),
-GDD_RUN_STOP_WAIT_SECONDS (20), GDD_RUN_DRAIN_TIMEOUT_SECONDS (30). dsh: DSH_RUN_PROFILE
-(headless), DSH_PERMISSION_MODE (workspace-write), DSH_APPROVAL_POLICY (only `never`).
+GDD_RUN_STOP_WAIT_SECONDS (20), GDD_RUN_DRAIN_TIMEOUT_SECONDS (30; 5 after a stop).
+dsh: DSH_RUN_PROFILE (headless), DSH_PERMISSION_MODE (workspace-write), DSH_APPROVAL_POLICY (only `never`).
 """
 from __future__ import annotations
 
@@ -96,7 +96,10 @@ def knob(name, default):
 
 def run_root():
     home = os.environ.get("XDG_STATE_HOME") or os.path.join(os.path.expanduser("~"), ".local", "state")
-    root = skill_config.resolve("gdd", "GDD_RUN_ROOT", default=os.path.join(home, "gdd", "runs"))
+    try:
+        root = skill_config.resolve("gdd", "GDD_RUN_ROOT", default=os.path.join(home, "gdd", "runs"))
+    except skill_config.ConfigError as exc:
+        die(f"GDD_RUN_ROOT: {exc}")
     return os.path.abspath(os.path.expanduser(root))
 
 
@@ -456,6 +459,7 @@ def finalize(run_dir, exit_code, acc=None, note=None, recovered=False, extra=Non
     state["duration_s"] = round(duration, 1) if duration != float("inf") else None
     if failure or (verdict != "done" and acc["error"]):
         state["error"] = failure or acc["error"]
+        state["errors"] = [state["error"]]  # the observer reads `errors`
     if refolded and stats["events_truncated"]:
         state.update(turns_partial=True, tool_calls_partial=True, cost_partial=True)
     if recovered:
@@ -645,7 +649,7 @@ def runner_main(args):
             if hasattr(signal, name):
                 signal.signal(getattr(signal, name), lambda *_: requested.set())
         deadline = time.monotonic() + plan["max_time_s"] if plan.get("max_time_s") else None
-        note, next_write = None, 0.0
+        note, next_write, stop = None, 0.0, False
         while (exit_code := process.poll()) is None:
             stop = requested.is_set() or os.path.exists(os.path.join(run_dir, "stop"))
             if stop or (deadline is not None and time.monotonic() >= deadline):
@@ -660,8 +664,10 @@ def runner_main(args):
                 write_json(state_path, state)
                 next_write = time.monotonic() + PROGRESS_SECONDS
             time.sleep(POLL)
-        # A descendant still holding stdout must not wedge the runner (measured on Windows).
-        reader.join(knob("GDD_RUN_DRAIN_TIMEOUT_SECONDS", 30))
+        # A descendant still holding stdout must not wedge the runner (measured on Windows). After a
+        # stop, drain at most 5 s so TERM 5 + KILL 5 + drain finalize inside kill's 20 s stop wait.
+        drain = knob("GDD_RUN_DRAIN_TIMEOUT_SECONDS", 30)
+        reader.join(min(drain, 5) if stop else drain)
         with lock:
             extra = {"stream_incomplete": True} if reader.is_alive() else {}
             final = finalize(run_dir, exit_code, dict(acc), note=note, extra=extra)

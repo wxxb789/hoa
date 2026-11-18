@@ -1,5 +1,5 @@
 # SYNTHETIC: dsh is not installed on the recording host. Built from the event shapes recorded in the
-# retired dsh-run.py docstring: a run that exits 0 but whose last `final` is not `completed`.
+# dsh-run.py docstring: a run that exits 0 but whose last `final` is not `completed`.
 {"type": "session", "sessionId": "dsh-session-0002", "cwd": "/work/repo"}
 {"type": "status", "turn": 1, "step": 1, "phase": "turn_start"}
 {"type": "tool_call", "callId": "c1", "tool": "bash", "input": {"command": "echo hi"}}

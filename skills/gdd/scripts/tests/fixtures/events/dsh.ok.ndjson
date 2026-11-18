@@ -1,5 +1,5 @@
 # SYNTHETIC: dsh is not installed on the recording host. Built from the event shapes measured and
-# recorded in the retired dsh-run.py docstring (`dsh --profile headless --json ... -`).
+# recorded in the dsh-run.py docstring (`dsh --profile headless --json ... -`).
 {"type": "session", "sessionId": "dsh-session-0001", "cwd": "/work/repo"}
 {"type": "status", "turn": 1, "step": 1, "phase": "turn_start"}
 {"type": "status", "turn": 1, "step": 1, "phase": "step_start"}

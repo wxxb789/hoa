@@ -45,6 +45,7 @@
     "cost_usd": {"type": ["number", "null"]},
     "answer_chars": {"type": "integer"},
     "error": {"type": "string"},
+    "errors": {"type": "array"},
     "note": {"type": "string"},
     "stale_recovered": {"type": "boolean"},
     "stream_incomplete": {"type": "boolean"},
