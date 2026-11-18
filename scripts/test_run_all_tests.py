@@ -930,7 +930,6 @@ class RealTreePlanTests(unittest.TestCase):
     def test_unittest_suites_keep_their_declared_module_invocation(self):
         for path, module in (
             ("scripts/test_skill_config.py", "scripts.test_skill_config"),
-            ("scripts/test_install_host_skills.py", "scripts.test_install_host_skills"),
             ("scripts/test_check_changelog.py", "scripts.test_check_changelog"),
             ("scripts/test_check_frontmatter.py", "scripts.test_check_frontmatter"),
             ("evals/test_judge_trigger_evals.py", "evals.test_judge_trigger_evals"),

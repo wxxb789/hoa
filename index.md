@@ -92,19 +92,22 @@ targets:  runtime-agnostic | repo-only |
 ## Install
 
 `npx skills` installs only the skills you name and does not follow the `../` links between them.
-Install everything with `npx skills add wxxb789/hoa -g -s '*'`, or one skill with its row's command
-below. A skill without a row has no dependencies: `npx skills add wxxb789/hoa -g -s <skill>`.
+Install everything with `npx skills add wxxb789/hoa -g -s '*' -y`, or one skill with its row's command
+below. A skill without a row has no dependencies: `npx skills add wxxb789/hoa -g -s <skill> -y`.
 
 | Skill | Needs (transitive `../` closure) | Install command |
 |---|---|---|
-| gdd | delegated-work-acceptance, gdd-route-dsh | `npx skills add wxxb789/hoa -g -s gdd -s delegated-work-acceptance -s gdd-route-dsh` |
-| gdd-route-dsh | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-dsh -s delegated-work-acceptance -s gdd` |
-| gdd-route-omp | delegated-work-acceptance, gdd, gdd-route-dsh | `npx skills add wxxb789/hoa -g -s gdd-route-omp -s delegated-work-acceptance -s gdd -s gdd-route-dsh` |
-| hoa-skill-set-audit | hoa-skill-create | `npx skills add wxxb789/hoa -g -s hoa-skill-set-audit -s hoa-skill-create` |
+| gdd | delegated-work-acceptance, gdd-route-dsh | `npx skills add wxxb789/hoa -g -s gdd -s delegated-work-acceptance -s gdd-route-dsh -y` |
+| gdd-route-dsh | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-dsh -s delegated-work-acceptance -s gdd -y` |
+| gdd-route-omp | delegated-work-acceptance, gdd, gdd-route-dsh | `npx skills add wxxb789/hoa -g -s gdd-route-omp -s delegated-work-acceptance -s gdd -s gdd-route-dsh -y` |
+| hoa-skill-set-audit | hoa-skill-create | `npx skills add wxxb789/hoa -g -s hoa-skill-set-audit -s hoa-skill-create -y` |
 
-Upgrading an older install: remove the names this repo no longer ships (generated from
-`scripts/retired_skills.toml`, which names each replacement). Check `npx skills list -g` first and
-drop any name you installed from another source; this command removes it too.
+After a release that renames or retires skills, remove the names this repo no longer ships
+(generated from `scripts/retired_skills.toml`, which names each replacement), then re-run the
+install-all command or the current row above for each skill (a saved command may still name the old
+skill): `npx skills update` never installs a new name. Removing a name you never installed is a
+no-op, but removal matches names across sources, so check `npx skills ls -g` first and drop any
+name you installed from elsewhere.
 
 ```bash
 npx skills remove -g design-md dsh-headless-gdd find-nearby git-worktree-workflow github-code-review github-repo-management grounded-citations hoa-agent-retrieve hoa-skill-work html-artifact improve-codebase-architecture jupyter-live-kernel m365-copilot-cdp microsoft-office my-ado-cppr ocr-and-documents omp-headless-orchestration rss-feeds skill-library-curation skill-porting-and-publishing subagent-driven-development systematic-debugging teams-cdp to-issues to-prd whisper writing-plans

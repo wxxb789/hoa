@@ -69,8 +69,10 @@ and never an authorization gate. A hidden skill must not appear in `must_pick`. 
 flat sibling child only with `Read ../<child>/SKILL.md`, one level deep, and keeps must-hold rules
 itself; installing it installs its whole `../` closure. CI enforces the flag/sidecar pair
 (`check_frontmatter.py`), hidden-not-`must_pick` (`R10`), and sibling links
-(`check_skill_links.py`); `install_host_skills.py --check` reports closure gaps and names in
-`scripts/retired_skills.toml`. Binding detail:
+(`check_skill_links.py`). `npx skills` has no dependency concept, so closure is delivered by the
+generated `npx skills add` commands in `index.md` and retired names by its generated
+`npx skills remove` line (`generate_index.py --check` keeps both current); hoa-skill-set-audit
+diagnoses an installed set on a machine. Binding detail:
 [`rules/skill-composition.md`](rules/skill-composition.md) and
 [`rules/cross-platform-skills.md`](rules/cross-platform-skills.md).
 

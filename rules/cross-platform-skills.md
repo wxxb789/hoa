@@ -32,19 +32,21 @@ and are the same skill (same realpath, or byte-identical). Installing a parent m
 whole `../` dependency closure into the same host root. On a categorized host (`<root>/<category>/<name>`)
 the host root is the parent's category directory, so the closure shares the parent's category.
 
-- Linking every skill from one checkout into one host root satisfies both sides.
-- `install_host_skills.py --link` links every skill flat at `<root>/<name>`, or under one
-  `--category`, so a parent and its closure share a directory; `--check` lists every
-  `missing closure` left by entries placed some other way.
-- Copy installers (`npx skills --copy`, Codex's skill-installer `copytree`) copy one directory; the
-  chain breaks unless the closure is copied into the same root too.
+- `npx skills` has no dependency concept and installs only the names it is given. The closure is
+  delivered by the generated commands in `index.md` (`-s '*'`, or a skill's row naming its whole
+  closure); `scripts/generate_index.py --check` keeps them current. One `npx skills add` puts every
+  named skill in the same layout (one canonical copy per skill, linked into each agent's root, or
+  copied with `--copy`), so a closure installed together satisfies both sides.
+- Other copy installers (Codex's skill-installer `copytree`) copy one directory; the chain breaks
+  unless the closure is copied into the same root too.
+- On a machine, hoa-skill-set-audit's `inventory.py` diagnoses the installed set: its `closure-*`
+  findings report a missing lexical or physical sibling, or two that differ.
 
 ## Link mechanics
 
 - Link whole skill directories, never a single `SKILL.md`.
 - Windows: a directory junction needs no privilege but takes an absolute local target; a directory
-  symlink needs Developer Mode or admin. `scripts/install_host_skills.py --link` creates directory
-  symlinks with an absolute target.
+  symlink needs Developer Mode or admin.
 - Never commit a symlink inside the repo tree: a Windows clone with `core.symlinks=false` checks it
   out as a text file.
 
@@ -54,8 +56,8 @@ Paths in SKILL.md and `references/` use forward slashes and resolve relative to 
 them, as Markdown links do; in SKILL.md that is the skill directory. A sibling link is therefore
 `../<sibling>/` from SKILL.md and `../../<sibling>/` from `references/x.md`; the composition shape
 "Read `../<child>/SKILL.md` (relative to this skill's directory)" belongs in SKILL.md only, where
-both bases agree. `scripts/check_skill_links.py`, `install_host_skills.py --check` and
-hoa-skill-set-audit's `inventory.py` all resolve this way. No drive letters, no backslashes, no `~` or
+both bases agree. `scripts/check_skill_links.py` and
+hoa-skill-set-audit's `inventory.py` both resolve this way. No drive letters, no backslashes, no `~` or
 `$HOME` expansion assumptions. `../` appears only in a sibling-skill link.
 
 ## Scripts
