@@ -7,7 +7,7 @@ description: >-
   recovering a run that was killed mid-turn. Do not use for a two-minute command (run it inline) or for
   work that needs live steering (that is a TUI session).
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "software-development,work-management"
   targets: "pi"
   summary: "detached tmux launcher for long `omp -p` runs; polled completion, session-id recovery"
@@ -120,6 +120,18 @@ path.
     running. Require the exit code before treating the verification as done — a gate awaited to
     completion is fine, a gate left behind is not. The stage-side rule lives in skill `gdd` →
     `references/run-failure-modes.md` §8.
+
+16. **A model-endpoint restart window is a transport fault, not a model defect — and a report-only
+    stage can hide it behind `exit 0`.** An endpoint that fronts the models restarts on a schedule the
+    operator's runtime configuration declares (the timer, its unit name and its clock time are
+    install-specific — read them from that configuration, never assume them): a lane dispatched inside
+    the window fails with `ECONNREFUSED`. Classify that as suspected transport, not as a model
+    failure: confirm the window, retry **once** against the same route, and on a second failure switch
+    to another model in the pool or fall back to the primary route — a third attempt on the same
+    assumption is wasted budget. The window is doubly easy to miss because a report-only stage
+    (simplify / review) can still exit 0 while writing an empty or truncated report: read `exit 0`
+    plus an empty or short report as a suspected failure to re-verify before treating the stage as
+    done (pitfalls 8 and 11 are the same rule at the run level).
 
 ## Recovery after a session restart
 
