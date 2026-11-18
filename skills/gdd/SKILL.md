@@ -101,7 +101,7 @@ matching the current stage directly — do not create per-phase skills.
 | `GDD_STATE_FILE` | ledger path | `${XDG_STATE_HOME:-$HOME/.local/state}/gdd/ledger.tsv` |
 | `GDD_TASK_ROOT` | task/state root | `${XDG_STATE_HOME:-$HOME/.local/state}/gdd/tasks` |
 | `GDD_RUN_ROOT` | launcher run root | `${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs` |
-| `GDD_LAUNCHER` | explicit launcher selection | bundled `scripts/adapters/omp-run.py`; opt in to native Paseo with `scripts/adapters/paseo-run.py` |
+| `GDD_LAUNCHER`, `GDD_AGENT` | explicit launcher selection; the headless agent CLI, exported to the launcher when set | bundled `scripts/agent_run.py`, agent `omp` (or `dsh`); opt in to native Paseo with `scripts/adapters/paseo-run.py` |
 | `GDD_TEMPLATES` | stage-template root | the bundled `references/stage-templates` |
 | `GDD_GOAL_GLOB` | goal-contract glob | `docs/goals/*<goal>*.md` |
 | round caps | `implement` / `simplify` / `review` run at most **2x** — enforced by `gdd.py stage`, override with `--over-budget` | `scripts/gdd.py` |
@@ -110,8 +110,10 @@ matching the current stage directly — do not create per-phase skills.
 Resolution order and the config-file path are defined in
 [references/configuration.md](references/configuration.md).
 `gdd.py` implements it through the vendored `scripts/skill_config.py`; the config-file keys are the
-six names in the table. Nothing about one install lives in the protocol: a profile may point at its own
-files, but no path is inlined. Commands run the bundled scripts with `uv run <path>`. Only if a script command fails (for example `uv` is not found), read [references/troubleshooting.md](references/troubleshooting.md).
+`GDD_*` names in the table except the profile's `GDD_WORKTREE_SCOPE` override. Nothing about one
+install lives in the protocol: a profile may point at its own files, but no path is inlined.
+Commands run the bundled scripts with `uv run <path>`. Only if a script command fails (for example
+`uv` is not found), read [references/troubleshooting.md](references/troubleshooting.md).
 
 Read [`references/transport.md`](references/transport.md) before selecting or dispatching a launcher:
 it defines both routes, model/thinking mapping, artifact polling, and platform-specific evidence.

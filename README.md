@@ -183,7 +183,6 @@ UI; a newer push to a pull request cancels the older run.
 | PR bumps changed skills' revision (pull requests) | `python scripts/version.py check-revisions` | Every skill directory changed since the merge base raises its `metadata.revision`. |
 | pytest | `python -m pytest` | Every `test_*.py` unittest/pytest file under `scripts/`, `evals/` and `skills/` (`pytest.ini`); 120 s per test. |
 | Script checks | `python evals/run_trigger_evals.py`, `evals/validate_skill_method_cases.py`, `skills/define-goal/evals/validate_fixtures.py`, `skills/hermes-models/scripts/tests/test-*.py`, `skills/gdd/scripts/tests/test_verdict_matrix.py`, `mutate_verdict_matrix.py` | Standalone checks whose exit code is the contract; one step each. |
-| gdd shell suites | `bash skills/gdd/scripts/tests/run-gdd-selftest.sh`, `test-omp-run-stale.sh`, `test-omp-run-setsid.sh` | The gdd loop end to end (including `test-dispatch-guards.py`) and the `omp-run.sh` forwarder. |
 | Paseo gdd-run-observer | `npm ci && npm run typecheck && npm test` in `paseo-plugins/gdd-run-observer` | The plugin's typecheck and Vitest suite. |
 
 Run the Python tests locally with
@@ -354,7 +353,7 @@ reinstall from `wxxb789/hoa` so `update` tracks it again.
 
 ### GDD transport and optional Paseo observer
 
-[`gdd`](./skills/gdd/SKILL.md) keeps the bundled `omp-run.py` headless launcher as its default.
+[`gdd`](./skills/gdd/SKILL.md) defaults to the bundled `agent_run.py` headless runner (`GDD_AGENT` picks the CLI).
 Explicitly set `GDD_LAUNCHER` to the bundled `paseo-run.py` to make stages native Paseo agents;
 that route requires a reachable daemon. Reachability never switches launchers automatically.
 Read the [transport contract](./skills/gdd/references/transport.md) for configuration, answer

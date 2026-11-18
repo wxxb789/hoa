@@ -66,15 +66,6 @@ jobs:
       - name: gdd merge-gate mutation harness
         timeout-minutes: 5
         run: python skills/gdd/scripts/tests/mutate_verdict_matrix.py
-      - name: gdd selftest (also runs test-dispatch-guards.py)
-        timeout-minutes: 5
-        run: bash skills/gdd/scripts/tests/run-gdd-selftest.sh
-      - name: gdd omp-run.sh stale lock
-        timeout-minutes: 5
-        run: bash skills/gdd/scripts/tests/test-omp-run-stale.sh
-      - name: gdd omp-run.sh setsid and tmux backends
-        timeout-minutes: 5
-        run: bash skills/gdd/scripts/tests/test-omp-run-setsid.sh
 
       # Paseo run-observer plugin
       - uses: actions/setup-node@v4
@@ -100,5 +91,5 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m pip install -r scripts/requirements.txt
-      - name: Shared gdd runner contract
-        run: python -m pytest skills/gdd/scripts/tests/test_agent_run.py -q
+      - name: Shared gdd runner and dispatch contracts
+        run: python -m pytest skills/gdd/scripts/tests/test_agent_run.py skills/gdd/scripts/tests/test_gdd.py skills/gdd/scripts/tests/test_paseo_run_python.py -q

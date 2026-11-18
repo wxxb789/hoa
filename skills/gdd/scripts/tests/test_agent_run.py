@@ -359,6 +359,17 @@ class ContractTests(RunnerCase):
         self.assertFalse(seen & set(scrubbed), seen)
         self.finished("scrub")
 
+    @unittest.skipIf(IS_WINDOWS or not shutil.which("bash"), "the omp-headless-orchestration forwarder is bash")
+    def test_t15_omp_headless_forwarder_resolves_the_sibling_runner(self):
+        forwarder = os.path.join(HERE, "..", "..", "..", "omp-headless-orchestration", "scripts", "omp-run.sh")
+        env = {**self.env, "STUB_FIXTURE": os.path.join(FIXTURES, "omp.ok.ndjson"), "GDD_AGENT": "dsh"}
+        proc = subprocess.run(["bash", forwarder, "start", "--name", "fwd", "--prompt", self.prompt, "--cwd", self.work],
+                              capture_output=True, text=True, env=env, timeout=90)
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        self.assertEqual(self.finished("fwd")["agent"], "omp")  # the forwarder pins GDD_AGENT=omp
+        listed = subprocess.run(["bash", forwarder, "list"], capture_output=True, text=True, env=env, timeout=90)
+        self.assertIn("fwd", listed.stdout)
+
     def test_t16_tail_renders_one_line_per_event(self):
         self.start("tail")
         self.finished("tail")

@@ -1,0 +1,219 @@
+#!/usr/bin/env python3
+"""Contract tests for gdd.py and delivery-state.py, launching through agent_run.py and the stub agent."""
+import glob
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+from datetime import datetime, timedelta, timezone
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+SCRIPTS = os.path.dirname(HERE)
+GDD = os.path.join(SCRIPTS, "gdd.py")
+DELIVERY = os.path.join(SCRIPTS, "delivery-state.py")
+STUB = os.path.join(HERE, "stub_agent.py")
+OK_FIXTURE = os.path.join(HERE, "fixtures", "events", "omp.ok.ndjson")
+
+
+def read(path):
+    with open(path, encoding="utf-8") as handle:
+        return handle.read()
+
+
+def write(path, text):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(text)
+
+
+def dead_pid():
+    proc = subprocess.Popen([sys.executable, "-c", "pass"])
+    proc.wait()
+    return proc.pid
+
+
+class GddCase(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="gdd-test-")
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.state_home = os.path.join(self.tmp, "state")
+        self.record = os.path.join(self.tmp, "record.json")
+        drop = ("GDD_", "STUB_", "DSH_", "OMP_", "XDG_")
+        self.env = {k: v for k, v in os.environ.items() if not k.startswith(drop)}
+        self.env.update(XDG_STATE_HOME=self.state_home, XDG_CONFIG_HOME=os.path.join(self.tmp, "config"),
+                        OMP_BIN=STUB, DSH_BIN=STUB, STUB_FIXTURE=OK_FIXTURE, STUB_RECORD=self.record,
+                        PYTHONDONTWRITEBYTECODE="1", GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@example.invalid",
+                        GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@example.invalid")
+        self.repo = os.path.realpath(os.path.join(self.tmp, "workrepo"))
+        os.makedirs(self.repo)
+        self.git("init", "-q", "-b", "main")
+        write(os.path.join(self.repo, "docs", "goals", "0001-first.md"), "# Goal 0001\nState: active\n")
+        self.commit("contract")
+        self.base = self.git("rev-parse", "HEAD")
+        self.git("update-ref", "refs/remotes/origin/main", self.base)
+        write(os.path.join(self.repo, "a.txt"), "a\n")
+        self.head = self.commit("work")
+
+    def git(self, *args):
+        return subprocess.run(["git", "-C", self.repo, *args], env=self.env, capture_output=True, text=True,
+                              check=True).stdout.strip()
+
+    def commit(self, message):
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", message)
+        return self.git("rev-parse", "HEAD")
+
+    def run_tool(self, script, *args, env=None):
+        return subprocess.run([sys.executable, "-B", script, *args], capture_output=True, text=True,
+                              env={**self.env, **(env or {})}, timeout=120)
+
+    def stage(self, stage, *args, env=None):
+        return self.run_tool(GDD, "stage", "--repo", self.repo, "--goal", "0001", "--stage", stage, *args, env=env)
+
+    def ledger(self, path=None):
+        path = path or os.path.join(self.state_home, "gdd", "ledger.tsv")
+        lines = read(path).splitlines() if os.path.exists(path) else []
+        header = lines[0].split("\t") if lines else []
+        return [dict(zip(header, line.split("\t"))) for line in lines[1:]]
+
+    def run_dirs(self, root=None):
+        return glob.glob(os.path.join(root or os.path.join(self.state_home, "gdd", "runs"), "*", "*"))
+
+    def craft_run(self, name, **state):
+        run_dir = os.path.join(self.state_home, "gdd", "runs", datetime.now().strftime("%Y-%m-%d"), name)
+        write(os.path.join(run_dir, "state.json"), json.dumps(
+            {"name": name, "agent": "omp", "state": "running", "exit": None, "cwd": self.repo,
+             "started": datetime.now(timezone.utc).isoformat(), "pid": None, "agent_pid": None, **state}))
+        return run_dir
+
+
+class LedgerAndRenderTests(GddCase):
+    def test_ledger_append_show_and_invalid_stage(self):
+        ledger = os.path.join(self.tmp, "ledger.tsv")
+        appended = self.run_tool(DELIVERY, "append", "--repo", self.repo, "--goal", "0001", "--stage", "implement",
+                                 "--base", self.base, "--head", self.head, "--next", "review", "--state-file", ledger)
+        self.assertEqual(appended.returncode, 0, appended.stderr)
+        show = self.run_tool(DELIVERY, "show", "--repo", self.repo, "--goal", "0001", "--state-file", ledger,
+                             "--task-root", os.path.join(self.tmp, "tasks"), "--run-root", os.path.join(self.tmp, "r"))
+        self.assertEqual(show.returncode, 0, show.stderr)
+        for line in ("stage: implement", "next_action: review", "ahead_of_origin_main: 1", "behind_origin_main: 0",
+                     "base_is_origin_main: yes", "last_run: none (no runs for this repo)"):
+            self.assertIn(line, show.stdout.splitlines())
+        bad = self.run_tool(DELIVERY, "append", "--repo", self.repo, "--goal", "0001", "--stage", "bogus",
+                            "--state-file", ledger)
+        self.assertEqual(bad.returncode, 2)
+        self.assertEqual(self.stage("bogus").returncode, 2)
+        self.assertEqual(self.stage("gates").returncode, 2)  # mechanical stage
+
+    def test_dry_run_uses_xdg_defaults_and_findings_are_required(self):
+        dry = self.stage("implement", "--dry-run")
+        self.assertEqual(dry.returncode, 0, dry.stderr)
+        prompt = dry.stdout.splitlines()[0].removeprefix("prompt: ")
+        self.assertTrue(prompt.startswith(os.path.join(self.state_home, "gdd", "tasks")), prompt)
+        self.assertIn(self.head, read(prompt))
+        self.assertIn("0001-first.md", read(prompt))
+        missing = self.stage("apply", "--dry-run")
+        self.assertEqual(missing.returncode, 2)
+        self.assertIn("--findings is required", missing.stderr)
+        self.assertEqual(self.run_dirs(), [])
+
+    def test_dispatch_guards(self):
+        write(os.path.join(self.repo, "dirty.txt"), "x\n")
+        cases = [
+            (("implement",), "worktree is dirty"),
+            (("review", "--base", self.head, "--head", "HEAD"), "base == head"),
+        ]
+        for args, message in cases:
+            with self.subTest(message=message):
+                refused = self.stage(*args, "--dry-run")
+                self.assertEqual(refused.returncode, 3, refused.stdout)
+                self.assertIn(message, refused.stderr)
+        self.assertEqual(self.stage("implement", "--dry-run", "--force").returncode, 0)
+        os.remove(os.path.join(self.repo, "dirty.txt"))
+        for header, message in (("State: draft", "declares state 'draft'"), (None, "is archived")):
+            with self.subTest(message=message):
+                goal = os.path.join(self.repo, "docs", "goals", "0001-first.md")
+                if header:
+                    write(goal, f"# Goal 0001\n{header}\n")
+                else:
+                    os.makedirs(os.path.join(self.repo, "docs", "goals", "archive"), exist_ok=True)
+                    os.replace(goal, os.path.join(self.repo, "docs", "goals", "archive", "0001-first.md"))
+                self.commit(message)
+                refused = self.stage("implement", "--dry-run")
+                self.assertEqual(refused.returncode, 3, refused.stdout)
+                self.assertIn(message, refused.stderr)
+
+
+class LaunchTests(GddCase):
+    def test_stage_wait_through_agent_run(self):
+        done = self.stage("implement", "--wait")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("finished: state=done", done.stdout)
+        self.assertIn("answer: ", done.stdout)
+        self.assertEqual(done.stdout.rstrip().splitlines()[-1], "done")
+        rows = self.ledger()
+        self.assertEqual([(r["stage"], r["next_action"]) for r in rows], [("implement", "implement"), ("implement", "-")])
+        self.assertTrue(rows[1]["note"].startswith("exit=0 "), rows[1])
+        state = json.loads(read(os.path.join(self.run_dirs()[0], "state.json")))
+        self.assertEqual((state["agent"], state["state"], state["cwd"]), ("omp", "done", self.repo))
+
+    def test_model_thinking_max_time_pass_through_without_defaults(self):
+        self.assertEqual(self.stage("implement", "--wait").returncode, 0)
+        argv = json.loads(read(self.record))["argv"]
+        self.assertFalse({"--model", "--thinking"} & set(argv), argv)
+        self.assertIsNone(json.loads(read(os.path.join(self.run_dirs()[0], "state.json")))["max_time"])
+        flags = {"GDD_MODEL": "m1", "GDD_THINKING": "high", "GDD_MAX_TIME": "5m"}
+        done = self.stage("review", "--base", self.base, "--wait", env=flags)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        argv = json.loads(read(self.record))["argv"]
+        self.assertEqual(argv[argv.index("--model"):argv.index("--model") + 4], ["--model", "m1", "--thinking", "high"])
+        review = [d for d in self.run_dirs() if d.endswith("-review")][0]
+        self.assertEqual(json.loads(read(os.path.join(review, "state.json")))["max_time"], "5m")
+
+    def test_config_file_run_root_and_agent_reach_the_launcher(self):
+        root = os.path.join(self.tmp, "configured-runs")
+        write(os.path.join(self.tmp, "config", "gdd", "config.yaml"), f"GDD_RUN_ROOT: {json.dumps(root)}\nGDD_AGENT: dsh\n")
+        done = self.stage("implement", "--wait", env={"STUB_FIXTURE": OK_FIXTURE.replace("omp.", "dsh.")})
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        [run_dir] = self.run_dirs(root)
+        self.assertEqual(json.loads(read(os.path.join(run_dir, "state.json")))["agent"], "dsh")
+        self.assertEqual(json.loads(read(self.record))["stdin"].split("\n")[0], "# Stage template — implement")
+
+    def test_report_only_stage_keeps_the_supplied_head(self):
+        write(os.path.join(self.repo, "b.txt"), "b\n")
+        moved = self.commit("moved on")
+        done = self.stage("review", "--base", self.base, "--head", self.head, "--wait")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(self.ledger()[-1]["head_sha"], self.head)
+        done = self.stage("implement", "--wait")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(self.ledger()[-1]["head_sha"], moved)  # authoring stage: the post-run HEAD
+
+    def test_failed_launch_records_one_blocked_row_and_no_run_dir(self):
+        failed = self.stage("implement", env={"OMP_BIN": os.path.join(self.tmp, "missing-omp")})
+        self.assertEqual(failed.returncode, 3)
+        self.assertIn("launch failed: agent_run: start: agent binary not found", failed.stderr)
+        rows = self.ledger()
+        self.assertEqual([r["stage"] for r in rows], ["blocked"])
+        self.assertIn("launch-failed:", rows[0]["note"])
+        self.assertEqual(self.run_dirs(), [])
+
+    def test_live_run_blocks_and_stale_run_does_not(self):
+        self.craft_run("workrepo-0001-implement", pid=os.getpid())
+        refused = self.stage("implement")
+        self.assertEqual(refused.returncode, 3)
+        self.assertIn("still active", refused.stderr)
+        old = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+        stale = self.craft_run("workrepo-0001-implement", pid=dead_pid(), started=old)
+        show = self.run_tool(GDD, "status", "--repo", self.repo, "--goal", "0001")
+        self.assertIn("last_run: workrepo-0001-implement stale exit=- dur=-", show.stdout.splitlines())
+        done = self.stage("implement", "--wait")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertEqual(len(glob.glob(stale + ".prev-*")), 1)
+
+
+if __name__ == "__main__":
+    unittest.main()

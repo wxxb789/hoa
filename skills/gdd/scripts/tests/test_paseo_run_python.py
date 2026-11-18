@@ -92,7 +92,7 @@ class PaseoLauncherTests(unittest.TestCase):
         self.fixture = {"id": str(uuid.uuid4()), "status": "running", "answer": "STAGE OK"}
         self.save_fixture()
         self.env = dict(os.environ)
-        for key in ("PASEO_BIN", "GDD_MODEL", "GDD_THINKING", "OMP_RUN_ROOT"):
+        for key in ("PASEO_BIN", "GDD_MODEL", "GDD_THINKING"):
             self.env.pop(key, None)
         self.env.update(GDD_RUN_ROOT=str(self.root), STUB_HOME=str(self.home),
                         PATH=str(self.bin) + os.pathsep + os.environ.get("PATH", ""))
@@ -180,8 +180,6 @@ class PaseoLauncherTests(unittest.TestCase):
         self.assertEqual(state["session_id"], self.fixture["id"])
         self.assertEqual(state["backend"], "paseo")
         self.assertIsInstance(state["pid"], int)
-        lock = json.loads((self.run_dir() / "lock").read_text(encoding="utf-8"))
-        self.assertEqual(lock["agent_id"], self.fixture["id"])
         for filename in ("prompt.md", "run.json", "stderr.log", "events.ndjson"):
             self.assertTrue((self.run_dir() / filename).exists(), filename)
 
@@ -225,7 +223,6 @@ class PaseoLauncherTests(unittest.TestCase):
                     self.assertIn("cwd", state["error"])
                     for name in ("finalized", "exit.code", "answer.md"):
                         self.assertFalse((self.run_dir() / name).exists(), name)
-                    self.assertFalse((self.root / "ledger.tsv").exists())
 
         self.save_fixture(inspect_cwd=str(self.home))
         verified = self.status()
@@ -307,8 +304,7 @@ class PaseoLauncherTests(unittest.TestCase):
                          "cwd": str(self.home), "cwd_verified": True, "pid": None,
                          "started": datetime.now().astimezone().isoformat(),
                          "run_dir": str(run_dir), "agent_id": self.fixture["id"],
-                         "paseo_argv": [sys.executable, str(self.bin / "paseo.py")],
-                         "ledger": str(self.root / "ledger.tsv")}
+                         "paseo_argv": [sys.executable, str(self.bin / "paseo.py")]}
                 (run_dir / "state.json").write_text(json.dumps(state), encoding="utf-8")
                 expected = [(name, str(run_dir))]
                 self.assertEqual(gdd.active_runs(repo), expected)
@@ -318,7 +314,7 @@ class PaseoLauncherTests(unittest.TestCase):
                 self.assertEqual(refreshed["state"], "unknown")
                 self.assertIsNone(refreshed["exit"])
                 self.assertFalse((run_dir / "finalized").exists())
-                self.assertEqual(gdd.effective_state(str(run_dir), refreshed), "unknown")
+                self.assertEqual(gdd.agent_run.observed_state(str(run_dir), refreshed), "unknown")
                 self.assertEqual(gdd.active_runs(repo), expected,
                                  "offline inspect must not release the native worktree reservation")
 
@@ -357,18 +353,18 @@ class PaseoLauncherTests(unittest.TestCase):
         expected = [("stage", str(run_dir))]
         with mock.patch.dict(os.environ, env, clear=True):
             (run_dir / "state.json").write_text(json.dumps(state), encoding="utf-8")
-            self.assertEqual(gdd.effective_state(str(run_dir), state), "stale lock")
+            self.assertEqual(gdd.agent_run.observed_state(str(run_dir), state), "stale")
             self.assertEqual(gdd.active_runs(os.path.realpath(self.home)), expected)
             (run_dir / "finalized").write_text("143\n", encoding="utf-8")
             self.assertEqual(gdd.active_runs(os.path.realpath(self.home)), [])
             (run_dir / "finalized").unlink()
 
-            state.update(backend="windows", pid=None)
+            state.update(backend="windows", pid=None, started=datetime.now().astimezone().isoformat())
             for word in ("running", "done", "failed", "killed"):
                 with self.subTest(headless_state=word):
                     state["state"] = word
                     (run_dir / "state.json").write_text(json.dumps(state), encoding="utf-8")
-                    self.assertEqual(gdd.effective_state(str(run_dir), state), word)
+                    self.assertEqual(gdd.agent_run.observed_state(str(run_dir), state), word)
                     self.assertEqual(gdd.active_runs(os.path.realpath(self.home)),
                                      expected if word == "running" else [])
 
@@ -406,75 +402,6 @@ class PaseoLauncherTests(unittest.TestCase):
         self.assertIn(["logs", self.fixture["id"], "--filter", "assistant_message", "--tail", "1"],
                       self.calls())
         self.assertEqual((self.run_dir() / "finalized").read_text().strip(), "0")
-        self.assertEqual(len((self.root / "ledger.tsv").read_text().splitlines()), 2)
-        self.status()
-        self.assertEqual(len((self.root / "ledger.tsv").read_text().splitlines()), 2)
-
-    def test_monitor_retries_refresh_claim_after_thirty_seconds_for_file_only_waiter(self):
-        spec = importlib.util.spec_from_file_location("paseo_under_test", ADAPTER)
-        adapter = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(adapter)
-        spec = importlib.util.spec_from_file_location("gdd_under_test", ADAPTER.parent.parent / "gdd.py")
-        gdd = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(gdd)
-        self.start()
-        run_dir = str(self.run_dir())
-        pid = gdd.read_state(run_dir)["pid"]
-        with adapter.claim(os.path.join(run_dir, "refresh")):
-            # A legal 60-second CLI call can hold this claim past the monitor's
-            # 30-second acquisition budget. Exercise the real detached process.
-            time.sleep(33)
-            state = gdd.read_state(run_dir)
-            self.assertEqual(state["state"], "running")
-            self.assertIsNone(state["exit"])
-            self.assertFalse((self.run_dir() / "finalized").exists())
-            self.assertTrue(adapter.support.pid_alive(pid),
-                            "detached monitor exited during refresh contention:\n" +
-                            (self.run_dir() / "runner.log").read_text(encoding="utf-8"))
-            self.assertEqual(gdd.effective_state(run_dir, state), "running")
-            self.save_fixture(status="idle")
-
-        # These are the file-only reads used by gdd.py stage --wait, not an
-        # adapter status/result call that could repair a dead monitor for us.
-        deadline = time.monotonic() + 15
-        while time.monotonic() < deadline:
-            state = gdd.read_state(run_dir)
-            if (gdd.effective_state(run_dir, state) == "done" and
-                    (self.run_dir() / "finalized").exists()):
-                break
-            time.sleep(0.1)
-        else:
-            self.fail(f"file-only waiter never observed finalized completion: {state}")
-        self.assertEqual(state["exit"], 0)
-        self.assertEqual((self.run_dir() / "finalized").read_text().strip(), "0")
-
-    def test_monitor_retries_until_terminal_state_or_finalized_marker(self):
-        spec = importlib.util.spec_from_file_location("paseo_under_test", ADAPTER)
-        adapter = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(adapter)
-        for outcome in ("done", "failed", "killed", "finalized"):
-            with self.subTest(outcome=outcome):
-                terminal = {"state": "unknown" if outcome == "finalized" else outcome}
-                observations = [adapter.ClaimTimeout("busy"), adapter.ClaimTimeout("still busy"),
-                                {}, terminal]
-                with mock.patch.object(adapter, "refresh", side_effect=observations) as refresh, \
-                        mock.patch.object(adapter.support, "read_state_file",
-                                          side_effect=[{}, {"state": "unknown"}]), \
-                        mock.patch.object(adapter.os.path, "exists", side_effect=[False, False, False, True]), \
-                        mock.patch.object(adapter.time, "sleep") as sleep, \
-                        mock.patch.object(adapter, "publish") as publish:
-                    self.assertEqual(adapter.watch(mock.Mock(run_dir=str(self.run_dir()))), 0)
-                self.assertEqual(refresh.call_count, 4)
-                self.assertEqual(sleep.call_args_list, [mock.call(1)] * 3)
-                publish.assert_not_called()
-
-    def test_monitor_does_not_swallow_unexpected_refresh_errors(self):
-        spec = importlib.util.spec_from_file_location("paseo_under_test", ADAPTER)
-        adapter = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(adapter)
-        with mock.patch.object(adapter, "refresh", side_effect=RuntimeError("unexpected failure")):
-            with self.assertRaisesRegex(RuntimeError, "unexpected failure"):
-                adapter.watch(mock.Mock(run_dir=str(self.run_dir())))
 
     def test_kill_records_confirmed_agent_deletion(self):
         self.start()

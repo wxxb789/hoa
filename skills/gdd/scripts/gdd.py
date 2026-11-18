@@ -25,45 +25,47 @@ Environment or operator config file:
                     (default ${XDG_STATE_HOME:-$HOME/.local/state}/gdd/tasks)
     GDD_RUN_ROOT    run root exported to the launcher and used when it prints no
                     run dir (default ${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs)
-    GDD_LAUNCHER    launcher command
-                    (default <script dir>/adapters/omp-run.py)
+    GDD_LAUNCHER    launcher command (default <script dir>/agent_run.py)
+    GDD_AGENT       agent CLI exported to the launcher when set
+                    (agent_run.py: omp, dsh; its default is omp)
     GDD_TEMPLATES   template root
                     (default <script dir>/../references/stage-templates)
     GDD_GOAL_GLOB   goal-contract glob (default docs/goals/*<goal>*.md)
     GDD_MODEL, GDD_THINKING, GDD_MAX_TIME
                     passed to the launcher only when set; never defaulted here
 
-The six path/command keys resolve through the shared resolver: flag, then environment,
+The seven keys above GDD_MODEL resolve through the shared resolver: flag, then environment,
 then $XDG_CONFIG_HOME/gdd/config.yaml (fallback ~/.config/...),
 then the default. The rule is owned by hoa-skill-port.
 
-Launcher contract (adapters/omp-run.py is the bundled implementation; the POSIX
-reference adapters/omp-run.sh adds the attachable tmux backend):
+Launcher contract (agent_run.py is the bundled implementation):
     <launcher> start --name SLUG --prompt FILE [--cwd DIR] [--model M] [--thinking L] [--max-time D]
     <launcher> list | status SLUG | result SLUG | answer SLUG | kill SLUG
 
 The launcher owns <run_root>/<date>/<SLUG>/state.json with at least
 {"name","state","exit","cwd","started","ended","duration_s"} (state is one of
 running|done|killed|failed|unknown) and answer.md holding the final assistant text.
-This tool polls that file and treats a missing file as unknown, never success.
+This tool polls that file and treats a missing file as unknown, never success; a
+`running` run whose runner and agent pids are both gone reads as `stale`.
 Native Paseo runs reserve their worktree while running or unknown, regardless
 of local monitor liveness, until a terminal state or finalized marker is recorded.
 """
 
 import argparse
 import glob
-import json
 import os
 import re
 import shlex
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
+sys.dont_write_bytecode = True  # no __pycache__ inside an installed skill
+import agent_run
 import skill_config
 
 STAGES = [
@@ -87,10 +89,7 @@ NEEDS_FINDINGS = {"apply", "fix"}
 SKILL = "gdd"
 DEFAULT_GOAL_GLOB = "docs/goals/*<goal>*.md"
 DELIVERY_STATE = os.path.join(SCRIPT_DIR, "delivery-state.py")
-# The bundled adapter is Python so the loop runs where bash, setsid and tmux do
-# not (Windows above all). adapters/omp-run.sh stays as the POSIX reference,
-# which is also the one that offers the attachable tmux backend.
-DEFAULT_LAUNCHER = os.path.join(SCRIPT_DIR, "adapters", "omp-run.py")
+DEFAULT_LAUNCHER = os.path.join(SCRIPT_DIR, "agent_run.py")
 DEFAULT_TEMPLATES = os.path.normpath(
     os.path.join(SCRIPT_DIR, "..", "references", "stage-templates")
 )
@@ -190,205 +189,18 @@ def resolve_goal_file(repo, goal):
     return matches[0] if matches else "-"
 
 
-def read_lock(run_dir):
-    """(lock dict or None, lock file exists). Accepts JSON or a bare pid file."""
-    for name in ("lock", ".lock"):
-        path = os.path.join(run_dir, name)
-        if not os.path.isfile(path):
-            continue
-        try:
-            with open(path, encoding="utf-8", errors="replace") as handle:
-                raw = handle.read().strip()
-        except OSError:
-            return None, True
-        if not raw:
-            return None, True
-        if raw.startswith("{"):
-            try:
-                data = json.loads(raw)
-            except ValueError:
-                return None, True
-            if isinstance(data, dict):
-                return (
-                    {
-                        "pid": data.get("pid"),
-                        "agent_pid": data.get("agent_pid"),
-                        "tmux": data.get("tmux"),
-                    },
-                    True,
-                )
-            return None, True
-        try:
-            return {"pid": int(raw.split()[0]), "agent_pid": None, "tmux": None}, True
-        except (ValueError, IndexError):
-            return None, True
-    return None, False
-
-
-def pid_alive(pid):
-    """True/False, or None when the pid is unusable.
-
-    Windows needs a process query rather than os.kill(pid, 0): measured on Windows 11,
-    os.kill on a live console process raises (a live run read as `stale lock`) and on
-    an exited one whose handle is still open it succeeds (a dead run read as live). A
-    dispatcher that polls must get both answers right. Keep in step with
-    adapters/omp-run.py and delivery-state.py.
-    """
-    try:
-        pid = int(pid)
-    except (TypeError, ValueError):
-        return None
-    if pid <= 0:
-        return None
-    if os.name == "nt":
-        import ctypes
-
-        SYNCHRONIZE = 0x00100000
-        QUERY_LIMITED = 0x1000
-        STILL_ACTIVE = 259
-        kernel32 = ctypes.windll.kernel32
-        handle = kernel32.OpenProcess(SYNCHRONIZE | QUERY_LIMITED, False, pid)
-        if not handle:
-            return False
-        try:
-            code = ctypes.c_ulong()
-            if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
-                return None
-            return code.value == STILL_ACTIVE
-        finally:
-            kernel32.CloseHandle(handle)
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    except OSError:
-        return None
-    return True
-
-
-def tmux_alive(session):
-    if not session:
-        return None
-    try:
-        proc = subprocess.run(
-            ["tmux", "has-session", "-t", str(session)],
-            capture_output=True,
-            text=True,
-        )
-    except OSError:
-        return None
-    return proc.returncode == 0
-
-
-def effective_state(run_dir, state):
-    """Recorded run state, with `stale lock` for a lock whose processes are gone.
-
-    Liveness follows the launcher's rule instead of forming a second opinion: a run is
-    live while either the runner or the agent it started is alive (the cross-platform
-    adapter records both, and the agent can outlive its runner), and a run inside the
-    startup grace has not recorded a pid yet, so it is starting rather than stale.
-    Without that, a live Windows run read as `stale lock`, `--wait` failed on it, and
-    the one-writer guard let a second agent into the same worktree.
-    """
-    recorded = str((state or {}).get("state") or "?")
-    if recorded != "running":
-        return recorded
-    lock, has_lock = read_lock(run_dir)
-    if not has_lock:
-        lock, has_lock = recorded_lock(state)
-    if not has_lock:
-        return recorded
-    if not lock:
-        return "stale lock"
-    verdicts = [pid_alive(lock.get("pid")), pid_alive(lock.get("agent_pid"))]
-    if any(verdict is True for verdict in verdicts):
-        return "running"
-    if all(verdict is None for verdict in verdicts):
-        alive = tmux_alive(lock.get("tmux"))
-        if alive is None:
-            return "running" if run_is_young(state) else "stale lock"
-        return "running" if alive else "stale lock"
-    return "stale lock"
-
-
-def startup_grace_seconds():
-    """The launcher's OMP_RUN_START_GRACE_SECONDS, so both sides agree on "starting"."""
-    try:
-        value = float((os.environ.get("OMP_RUN_START_GRACE_SECONDS") or "").strip())
-    except ValueError:
-        return 60.0
-    return value if value > 0 else 60.0
-
-
-def run_is_young(state):
-    """Was this run started inside the grace window (so it may still be claiming a pid)?"""
-    started = (state or {}).get("started")
-    if not started:
-        return False
-    try:
-        age = (
-            datetime.now(timezone.utc) - datetime.fromisoformat(str(started))
-        ).total_seconds()
-    except ValueError:
-        return False
-    return age < startup_grace_seconds()
-
-
-def recorded_lock(state):
-    """Launcher identity from state.json, for launchers that never write a lock file.
-
-    omp-run.sh records `pid` (null under tmux) and `tmux` in state.json but writes no lock, so
-    `read_lock` found nothing and a run that died kept reading as "running" until the 6h deadline.
-    Both adapters also record the agent's own pid; treating only the runner as proof of
-    life would read a run as stale while the agent it started is still editing.
-    """
-    text = state or {}
-    pid, agent_pid, tmux = text.get("pid"), text.get("agent_pid"), text.get("tmux")
-    if not pid and not agent_pid and not tmux:
-        return None, False
-    return {"pid": pid, "agent_pid": agent_pid, "tmux": tmux}, True
-
-
-def run_state_paths(task_root_dir, run_root_dir):
-    """state.json candidates across the canonical and legacy run layouts."""
-    patterns = [
-        os.path.join(run_root_dir, "*", "*", "state.json"),
-        os.path.join(task_root_dir, "*", "*", "state.json"),
-        os.path.join(task_root_dir, "*", "runs", "*", "state.json"),
-        os.path.join(task_root_dir, "*", "omp-runs", "*", "state.json"),
-        os.path.join(task_root_dir, "*", "*-*", "*", "state.json"),
-        os.path.join(task_root_dir, "*", "*-*", "*", "*", "state.json"),
-    ]
-    seen = set()
-    paths = []
-    for pattern in patterns:
-        for path in glob.glob(pattern):
-            real = os.path.realpath(path)
-            if real in seen:
-                continue
-            seen.add(real)
-            paths.append(path)
-    return paths
-
-
 def active_runs(repo_path):
     """(name, run_dir) for runs reserving repo_path, including unresolved native runs."""
     active = []
-    for state_path in run_state_paths(task_root(), run_root()):
-        try:
-            with open(state_path, encoding="utf-8") as handle:
-                state = json.load(handle)
-        except (OSError, ValueError):
-            continue
+    for state_path in glob.glob(os.path.join(run_root(), "*", "*", "state.json")):
         run_dir = os.path.dirname(state_path)
+        state = agent_run.read_state(run_dir)
         if state.get("backend") == "paseo":
             # The daemon owns execution; a dead/offline monitor cannot release its worktree.
             if (state.get("state") not in ("running", "unknown") or
                     os.path.exists(os.path.join(run_dir, "finalized"))):
                 continue
-        elif effective_state(run_dir, state) != "running":
+        elif agent_run.observed_state(run_dir, state) != "running":
             continue
         cwd = state.get("cwd")
         if not cwd:
@@ -605,10 +417,13 @@ def launch(launcher, prompt_path, repo, goal, stage, model, thinking, max_time):
     ):
         if value:
             cmd += [flag, str(value)]
-    # The launcher resolves its run root from GDD_RUN_ROOT; export the value this
-    # process resolved so a config-file run root lands where discovery looks.
+    # The launcher resolves its run root and agent from GDD_RUN_ROOT / GDD_AGENT; export
+    # what this process resolved so a config-file value reaches it too.
     child_env = dict(os.environ)
     child_env["GDD_RUN_ROOT"] = resolved_run_root
+    agent = config("GDD_AGENT")
+    if agent:
+        child_env["GDD_AGENT"] = agent
     try:
         proc = subprocess.run(
             cmd,
@@ -635,15 +450,6 @@ def launch(launcher, prompt_path, repo, goal, stage, model, thinking, max_time):
             resolved_run_root, datetime.now().strftime("%Y-%m-%d"), run_name
         )
     return run_name, run_dir, resolved_run_root
-
-
-def read_state(run_dir):
-    path = os.path.join(run_dir, "state.json")
-    try:
-        with open(path, encoding="utf-8") as handle:
-            return json.load(handle)
-    except (OSError, ValueError):
-        return None
 
 
 def print_answer_head(run_dir, limit=40):
@@ -826,17 +632,17 @@ def cmd_stage(args):
     print(f"poll: GDD_RUN_ROOT={shlex.quote(launch_run_root)} {launcher} status {run_name}")
 
     if args.wait:
-        deadline = time.time() + 6 * 3600
-        state = None
+        deadline, delay = time.time() + 6 * 3600, 1
         while True:
-            state = read_state(run_dir)
-            if state and effective_state(run_dir, state) != "running":
+            state = agent_run.read_state(run_dir)
+            if state and agent_run.observed_state(run_dir, state) != "running":
                 break
             if time.time() > deadline:
                 fail(f"wait: run still not finished after 6h: {run_name}", 1)
-            time.sleep(30)
+            time.sleep(delay)
+            delay = min(delay * 2, 30)  # a short stage returns in seconds, a long one polls every 30 s
 
-        final_state = effective_state(run_dir, state)
+        final_state = agent_run.observed_state(run_dir, state)
         exit_code = state.get("exit")
         duration = state.get("duration_s")
         if final_state != "done":
@@ -864,7 +670,7 @@ def cmd_stage(args):
             note=note,
             rounds=rounds_seen + 1 if args.stage in ("simplify", "review") else None,
         )
-        print(f"finished: state={effective_state(run_dir, state)} {note}")
+        print(f"finished: state={final_state} {note}")
         print_answer_head(run_dir)
     return 0
 
@@ -933,13 +739,15 @@ Environment or operator config file:
   GDD_RUN_ROOT    run root exported to the launcher, and the fallback when it
                   prints no run dir
                   (default ${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs)
-  GDD_LAUNCHER    launcher command (default <script dir>/adapters/omp-run.py)
+  GDD_LAUNCHER    launcher command (default <script dir>/agent_run.py)
+  GDD_AGENT       agent CLI exported to the launcher when set
+                  (agent_run.py: omp, dsh; its default is omp)
   GDD_TEMPLATES   template root (default <script dir>/../references/stage-templates)
   GDD_GOAL_GLOB   goal-contract glob (default docs/goals/*<goal>*.md)
   GDD_MODEL, GDD_THINKING, GDD_MAX_TIME
                   passed to the launcher only when set; never defaulted here
 
-The six path/command keys above also resolve from
+The seven keys above GDD_MODEL also resolve from
 $XDG_CONFIG_HOME/gdd/config.yaml (fallback ~/.config/...).
 Order: CLI flag, then environment variable, then that file, then the default.
 The shared rule is documented in hoa-skill-port.

@@ -171,7 +171,6 @@ scope-seal）。每条规则都由该命令执行：
 | PR bumps changed skills' revision（pull request） | `python scripts/version.py check-revisions` | 自 merge base 以来改动过的每个 skill 目录都提高了 `metadata.revision`。 |
 | pytest | `python -m pytest` | `scripts/`、`evals/`、`skills/` 下每个 `test_*.py` unittest/pytest 文件（`pytest.ini`）；每个测试 120 秒上限。 |
 | 脚本检查 | `python evals/run_trigger_evals.py`、`evals/validate_skill_method_cases.py`、`skills/define-goal/evals/validate_fixtures.py`、`skills/hermes-models/scripts/tests/test-*.py`、`skills/gdd/scripts/tests/test_verdict_matrix.py`、`mutate_verdict_matrix.py` | 以退出码为契约的独立检查；每个一个 step。 |
-| gdd shell 套件 | `bash skills/gdd/scripts/tests/run-gdd-selftest.sh`、`test-omp-run-stale.sh`、`test-omp-run-setsid.sh` | gdd 端到端循环（含 `test-dispatch-guards.py`）与 `omp-run.sh` forwarder。 |
 | Paseo gdd-run-observer | 在 `paseo-plugins/gdd-run-observer` 中 `npm ci && npm run typecheck && npm test` | 插件的 typecheck 与 Vitest 套件。 |
 
 本地运行 Python 测试：
@@ -319,7 +318,7 @@ OpenCode 用 `@hermes-models-cutover`。
 
 ### GDD transport 与可选 Paseo observer
 
-[`gdd`](./skills/gdd/SKILL.md) 默认仍使用随附的 `omp-run.py` headless launcher。
+[`gdd`](./skills/gdd/SKILL.md) 默认使用随附的 `agent_run.py` headless runner（`GDD_AGENT` 选择 CLI）。
 显式把 `GDD_LAUNCHER` 指向随附的 `paseo-run.py`，才会让 stage 成为原生 Paseo agent；
 这条路要求 daemon 可达。可达性绝不触发 launcher 自动替换。
 [Transport 契约](./skills/gdd/references/transport.md) 说明配置、答案读取、完成判定，

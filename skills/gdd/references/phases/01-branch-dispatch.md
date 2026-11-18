@@ -58,10 +58,8 @@ failure. Launcher contract, artifacts, recovery and liveness: [`references/trans
 - `references/profiles/_template.md` — per-repo profile template.
 - `scripts/` — `gdd.py` (dispatch), `delivery-state.py` (ledger/resume), `pr-merge-check.py`
   (merge gate), `review-evidence.py` (full report evidence generator), `watch-pr-checks.py`
-  (bounded CI poller with infra-only rerun; the `.sh` twin has the
-  same semantics),
-  `adapters/omp-run.py` (bundled cross-platform launcher), `adapters/omp-run.sh` (POSIX reference
-  launcher, the one with the attachable `tmux` backend), `adapters/events-writer.py` (bounded NDJSON
-  writer shared by both adapters), `tests/run-gdd-selftest.sh`,
-  `tests/test_omp_run_python.py` (the launcher suite that runs on any platform),
+  (bounded CI poller with infra-only rerun),
+  `agent_run.py` (bundled cross-platform headless runner, one for every agent CLI),
+  `adapters/paseo-run.py` (opt-in native Paseo launcher), `tests/test_gdd.py` (dispatch and ledger),
+  `tests/test_agent_run.py` (the runner suite that runs on any platform),
   `tests/test_watch_pr_checks.py` (the CI watcher's state machine, against a scripted `gh`).

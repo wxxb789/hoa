@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.10"
+# dependencies = []
+# ///
 """agent_run.py — one detached runner for every headless agent CLI gdd dispatches.
 
     agent_run.py start --name SLUG --prompt FILE [--cwd DIR] [--agent NAME] [--model M]
@@ -248,6 +252,16 @@ def is_starting(state):
     return state.get("pid") is None and state_age_seconds(state) < knob("GDD_RUN_START_GRACE_SECONDS", 60)
 
 
+def observed_state(run_dir, state):
+    """Read-only view for gdd.py and delivery-state.py: the recorded state, or "stale" for a
+    `running` run with nothing alive, no `finalized` marker and no startup grace left."""
+    recorded = str(state.get("state") or "?")
+    if (recorded != "running" or os.path.exists(os.path.join(run_dir, "finalized"))
+            or run_alive(run_dir, state) or is_starting(state)):
+        return recorded
+    return "stale"
+
+
 def new_acc():
     return {"session_id": "", "answer": "", "turns": 0, "tool_calls": 0, "cost_usd": None,
             "usage": {"input_tokens": 0, "output_tokens": 0, "cache_read_tokens": 0, "total_tokens": 0},
@@ -359,6 +373,11 @@ def resolve_binary(spec):
     path = name if os.path.dirname(name) else shutil.which(name)
     if not path or not os.path.isfile(path):
         die(f"start: agent binary not found: {key}={name}")
+    return command_prefix(path)
+
+
+def command_prefix(path):
+    """argv that runs `path`: a `.py` through this interpreter, a Windows `.cmd`/`.bat` shim through %COMSPEC%."""
     path, ext = os.path.abspath(path), os.path.splitext(path)[1].lower()
     if ext == ".py":
         return [interpreter(), path]
@@ -775,14 +794,19 @@ def main(argv=None):
         if name == "tail":
             command.add_argument("lines", nargs="?", type=int)
         command.set_defaults(func=func)
-    tokens, normalized = list(sys.argv[1:] if argv is None else argv), []
-    while tokens:  # `--extra --flag`: argparse refuses a value that starts with "-"
+    args = parser.parse_args(normalize_argv(sys.argv[1:] if argv is None else argv))
+    return args.func(args)
+
+
+def normalize_argv(argv):
+    """`--extra --flag` becomes `--extra=--flag`: argparse refuses a value that starts with "-"."""
+    tokens, normalized = list(argv), []
+    while tokens:
         token = tokens.pop(0)
         if token in ("--extra", "--model", "--thinking", "--resume") and tokens and tokens[0].startswith("-"):
             token = f"{token}={tokens.pop(0)}"
         normalized.append(token)
-    args = parser.parse_args(normalized)
-    return args.func(args)
+    return normalized
 
 
 if __name__ == "__main__":

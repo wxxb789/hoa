@@ -5,8 +5,7 @@
 # ///
 """watch-pr-checks.py — bounded CI poller for one PR, with infra-only auto-rerun.
 
-Cross-platform port of `watch-pr-checks.sh`; same semantics, same exit codes, no
-bash. Why it exists at all: a job that dies in under a minute on a download step
+Cross-platform, no bash. Why it exists at all: a job that dies in under a minute on a download step
 (curl 5xx while installing a pinned binary) is infra, not your diff. Rerunning it
 by hand costs a round trip per occurrence; rerunning it unbounded turns a broken
 job green-adjacent by attrition. This bounds both.

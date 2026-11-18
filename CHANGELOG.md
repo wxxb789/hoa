@@ -39,6 +39,10 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
   and unreadable sources. Documented the shared audit state namespace and retro config overrides.
 - gdd: add a shared headless runner for OMP and DSH, with event fixtures and pytest coverage
   on Ubuntu, macOS and Windows.
+- gdd: make the shared OMP and DSH runner the default (`GDD_AGENT` selects the CLI).
+  Retire the separate OMP/DSH adapters, tmux backend and shell watcher in favor of the shared
+  runner and Python watcher. Runner and dispatch contracts run through pytest on Ubuntu,
+  macOS and Windows.
 
 - Trigger evals now route on visible skills' frontmatter descriptions, accept `none` when no
   artifact fits, and include three no-trigger cases.
