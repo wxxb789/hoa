@@ -2,7 +2,7 @@
 name: ghc-search
 description: Open-ended web search and X/Twitter search through a local ghc-proxy (OpenAI-compatible Responses API). Use when you need to find something on the web and do not already have a URL, or when you need posts from X/Twitter. Fetch pages directly when you already have the URL; prefer a documentation MCP (e.g. context7) for library/API docs.
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "software-development"
   targets: "runtime-agnostic"
   summary: "web and X/Twitter search via a local ghc-proxy Responses API; answer plus deduped sources"
@@ -24,14 +24,15 @@ X/Twitter. They hit different corpora, so there is no default.
 The script is `scripts/ghc_search.py` in this skill's own directory — under
 `~/.claude/skills/ghc-search/` for a global Claude Code install, and the
 equivalent `skills/` dir for any other runtime `npx skills` installed it into.
+Only if a script command fails (for example `uv` is not found), read [references/troubleshooting.md](references/troubleshooting.md).
 
 ```bash
 S=~/.claude/skills/ghc-search/scripts/ghc_search.py   # adjust per runtime
 
-python "$S" gpt "what is the current stable .NET SDK version"
-python "$S" x --handle SpaceXAI "newest post"
-python "$S" gpt --domain dotnet.microsoft.com --json "latest .NET SDK version"
-python "$S" x --handle dotnet --from-date 2026-08-01 "what shipped this month"
+uv run "$S" gpt "what is the current stable .NET SDK version"
+uv run "$S" x --handle SpaceXAI "newest post"
+uv run "$S" gpt --domain dotnet.microsoft.com --json "latest .NET SDK version"
+uv run "$S" x --handle dotnet --from-date 2026-08-01 "what shipped this month"
 ```
 
 | Flag | Engine | |
@@ -103,5 +104,5 @@ MCP) over general search when looking up a named library or API.
 ## Check
 
 ```bash
-python "$(dirname "$S")/test_ghc_search.py"   # offline, no network required
+uv run "$(dirname "$S")/test_ghc_search.py"   # offline, no network required
 ```

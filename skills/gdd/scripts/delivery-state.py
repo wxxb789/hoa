@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.7"
+# dependencies = []
+# ///
 """Append-only ledger for goal-driven delivery increments.
 
 Records where each increment is (stage, shas, rounds, next action) so a fresh

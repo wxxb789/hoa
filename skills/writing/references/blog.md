@@ -108,7 +108,7 @@ For dev blogs, engineering write-ups, deep-dives.
 
 **改写旧稿时，原稿里的每个数字都当成未验证的**：改写是错误统计被原样继承的高危场景。核对要脚本化
 ——抽出新稿所有数字 token，逐个在原始 run-log / ledger / 报告里检索，缺一个就回源查。直接跑
-`scripts/fact_check.py <draft.md> --corpus <dir-or-file> …`，输出里出现 MISS 就说明有一个数字说不清出处。
+`uv run scripts/fact_check.py <draft.md> --corpus <dir-or-file> …`，输出里出现 MISS 就说明有一个数字说不清出处。
 
 ## 数字：先分性质，再谈密度
 
@@ -220,7 +220,7 @@ markdownlint、站点的本地构建。
 用这套外部方法的 content-value 检查（开头能否留人 / 这件事和谁有关 / 观看回报 / 停留与转发）与
 JTBD（任务陈述、切换的推力与焦虑）做诊断，只借框架，不搬文案。
 
-流水账的可测量信号（`scripts/flow_check.py` 直接跑，四项里命中两项以上就先去改结构）：
+流水账的可测量信号（`uv run scripts/flow_check.py` 直接跑，四项里命中两项以上就先去改结构）：
 
 - `sent_per_para` 长期 < 3：论证被切碎，一段只装半个主意；
 - `scene_markers` = 0：全篇没有具体时刻/动作，读者没有代入位置；
@@ -251,7 +251,7 @@ JTBD（任务陈述、切换的推力与焦虑）做诊断，只借框架，不�
 
 验证（每项都跑）：
 
-- `scripts/zh_draft_check.py draft.md --old old.md` → 相似度、逐字复用句、句长、禁写计数。
+- `uv run scripts/zh_draft_check.py draft.md --old old.md` → 相似度、逐字复用句、句长、禁写计数。
 - 复用句逐条看：只该是推断句、引用块、文末固定三条。出现旧稿叙述句 = 没洗干净。
 - `scripts/fact_check.py` 追每个数字；重写不会让旧数字变对。
 - 标题数字精确优先；用量级（「一万行」代 10,866）时，正文第一屏必须给精确值。

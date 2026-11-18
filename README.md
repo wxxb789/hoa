@@ -233,7 +233,7 @@ on Linux the same run gates every delivery as described above.
 | `python scripts/vendor_shared.py --check` | Vendored copies of shared scripts match their canonical file. |
 | `python scripts/generate_index.py --check` | `index.md` / `index.zh-CN.md` match artifact metadata. |
 | `python scripts/check_contract_graph.py` | Rules R1–R10 above. |
-| `python scripts/check_skill_links.py` | Every `../<name>/` reference in a skill names an existing sibling skill and path, relative to the file that holds it. |
+| `python scripts/check_skill_links.py` | Every `../<name>/` reference in a skill names an existing sibling skill and path, relative to the file that holds it; every `uv run <path>.py` in skill Markdown runs a script with a PEP 723 block, `uv run python` carries `--no-project`, and no bare `python`/`python3` runs a skill script. |
 | `python -m unittest scripts.test_check_skill_links` | The link checker's own tests. |
 | `python scripts/test_check_contract_graph.py` | The graph checker's own rule tests. |
 | `python -m unittest scripts.test_skill_config` | Config resolution order and malformed-config behavior. |

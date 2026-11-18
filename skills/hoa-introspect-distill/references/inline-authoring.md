@@ -25,6 +25,6 @@ Inline authoring must produce a complete portable skill rather than a stub.
 5. Keep tracked content sanitized. Put machine-specific paths, credentials, raw history,
    and user-private examples in untracked locations instead.
 
-Run `python scripts/validate_skill.py <new-skill>/SKILL.md` after authoring. Resolve every
+Run `uv run scripts/validate_skill.py <new-skill>/SKILL.md` after authoring. Resolve every
 validation error before reporting completion, then compare the approved identity,
 contract, workflow, and basis against the created artifact and report any differences.

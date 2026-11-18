@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.7"
+# dependencies = []
+# ///
 """Native Paseo launcher: start|status|result|answer|kill|list (stdlib only).
 
 Explicitly opt in with GDD_LAUNCHER; daemon failure never selects another

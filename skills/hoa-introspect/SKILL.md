@@ -1,6 +1,6 @@
 ---
 name: hoa-introspect
-description: Produce an evidence-cited, cross-agent self-report with deterministic usage facets and a rigorously bounded blind-spot audit. Use only when explicitly asked for "my usage insights", "audit my work patterns", "where am I wasting effort", "blind spots", or a periodic "self-retro". Do not use for raw records or cross-agent search, a single-session summary, qualifying findings into approved assets (use hoa-introspect-distill), or direct skill creation (use hoa-skill-create). Heavyweight and explicit-invocation-only; never invoke as a side effect of another skill.
+description: Produce an evidence-cited, cross-agent self-report with deterministic usage facets and a bounded blind-spot audit. Use only when explicitly asked for "my usage insights", "audit my work patterns", "where am I wasting effort", "blind spots", or a periodic "self-retro". Not for raw records or cross-agent search, a single-session summary, qualifying findings into approved assets (use hoa-introspect-distill), or direct skill creation (use hoa-skill-create). Heavyweight and explicit-invocation-only.
 metadata:
   revision: "2"
   areas: "self-management,work-management"
@@ -60,7 +60,7 @@ measurement suggestion. When the records have no usable signal, write
 2. **Generate L1 deterministically.** Run:
 
    ```text
-   python scripts/aggregate.py --bundle <bundle> --output <facets.json>
+   uv run scripts/aggregate.py --bundle <bundle> --output <facets.json>
    ```
 
    The resulting JSON is the sole authority for L1 numbers. Narrate those
@@ -76,7 +76,7 @@ measurement suggestion. When the records have no usable signal, write
    JSON file, then run:
 
    ```text
-   python scripts/audit.py --bundle <bundle> --claims <claims.json> --output <verified-claims.json>
+   uv run scripts/audit.py --bundle <bundle> --claims <claims.json> --output <verified-claims.json>
    ```
 
    This drops claims with missing records, invalid locators, or fewer than two
@@ -93,6 +93,8 @@ measurement suggestion. When the records have no usable signal, write
    **hoa-introspect-distill**; route a direct request to create a defined skill
    from that finding to **hoa-skill-create**. Do not treat the audit as creation
    authorization or imply that distillation approval already occurred.
+
+Only if a script command fails (for example `uv` is not found), read [references/troubleshooting.md](references/troubleshooting.md).
 
 ## Guardrails
 

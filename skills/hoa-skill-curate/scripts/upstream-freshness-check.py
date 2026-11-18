@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.7"
+# dependencies = ["pyyaml"]
+# ///
 """Check whether installed, GitHub-backed skills match upstream HEAD.
 
 Answers "are my skills up to date?" by byte-for-byte diffing each skill's local
@@ -26,8 +30,8 @@ Prints only DIFF/ERR rows + a SAME/DIFF/ERR tally. Exit 1 if any DIFF or ERR
 (so it can gate). Nothing to do on a clean library.
 
 Usage:
-  python3 upstream-freshness-check.py            # all github-backed skills
-  python3 upstream-freshness-check.py --enabled  # only skills not disabled
+  uv run upstream-freshness-check.py            # all github-backed skills
+  uv run upstream-freshness-check.py --enabled  # only skills not disabled
 """
 from __future__ import annotations
 

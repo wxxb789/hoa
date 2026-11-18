@@ -80,7 +80,7 @@ targets:  runtime-agnostic | repo-only |
 | fresh-context-grader | prompt | software-development,work-management | repo-only | `prompts/fresh-context-grader.md` | 一次性评审 prompt：用先于回答写好的 rubric 在全新上下文里评分 |
 | hermes-skill-naming | prompt | software-development,self-management | hermes | `prompts/hermes-skill-naming.md` | 交给 Hermes 的创建/演化 skill 须知：判定耦合、耦合 skill 加 hermes- 前缀、不分叉内置 skill、可移植 skill 走 hoa 的移植评审 |
 | parallel-agent-worktrees | prompt | software-development,work-management | repo-only | `prompts/parallel-agent-worktrees.md` | 一次性为每个 agent CLI 建独立 git worktree：布局、env/端口隔离、fail-closed 初始化、安全清理 |
-| cross-platform-skills | rule | software-development | repo-only | `rules/cross-platform-skills.md` | 技能在 Windows、Linux、macOS 上原样可跑：安装完整 ../ 依赖闭包、正斜杠相对路径、标准库 Python 显式 UTF-8、命令写 python3 |
+| cross-platform-skills | rule | software-development | repo-only | `rules/cross-platform-skills.md` | 技能在 Windows、Linux、macOS 上原样可跑：安装完整 ../ 依赖闭包、正斜杠相对路径、标准库 Python 显式 UTF-8、技能脚本用 uv run 且带 PEP 723 块 |
 | generalization-rubric | rule | software-development,work-management | repo-only | `rules/generalization-rubric.md` | 技能进入公开目录的唯一标准：陌生人在全新机器上能跑通——六道门槛、硬性失败项、回灌不变量 |
 | generated-means-generated | rule | software-development,work-management,self-management | repo-only | `rules/generated-means-generated.md` | 生成文件绝不手改；再生成随同一提交，漂移即 CI 失败 |
 | skill-composition | rule | software-development | repo-only | `rules/skill-composition.md` | 隐藏子技能：一个可见性标记加 Codex 旁路文件，以 Read 链接串联扁平同级目录且只下一层，必守规则留在父技能，隐藏不等于授权 |

@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.9"
+# dependencies = ["pyyaml"]
+# ///
 """Read-only provider/model metadata audit for a Hermes install.
 
 Compares every declared `providers.<name>.models.<id>` entry (root + served profiles) against the

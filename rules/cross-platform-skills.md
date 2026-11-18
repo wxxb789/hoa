@@ -1,4 +1,4 @@
-<!-- index: areas=software-development; targets=repo-only; summary="a skill runs unchanged on Windows, Linux and macOS: install the whole ../ closure, forward-slash relative paths, stdlib Python with explicit UTF-8, python3 in commands"; summary_zh="技能在 Windows、Linux、macOS 上原样可跑：安装完整 ../ 依赖闭包、正斜杠相对路径、标准库 Python 显式 UTF-8、命令写 python3" -->
+<!-- index: areas=software-development; targets=repo-only; summary="a skill runs unchanged on Windows, Linux and macOS: install the whole ../ closure, forward-slash relative paths, stdlib Python with explicit UTF-8, skill scripts run with uv run and a PEP 723 block"; summary_zh="技能在 Windows、Linux、macOS 上原样可跑：安装完整 ../ 依赖闭包、正斜杠相对路径、标准库 Python 显式 UTF-8、技能脚本用 uv run 且带 PEP 723 块" -->
 
 # Cross-platform skills
 
@@ -63,31 +63,55 @@ hoa-skill-set-audit's `inventory.py` all resolve this way. No drive letters, no 
 - Python stdlib and `pathlib`; no bash-only logic for core behavior.
 - Explicit `encoding="utf-8"` on every text read, write and subprocess text stream; never the locale
   default (cp1252 or cp936 on Windows).
-- Invoke through the interpreter (`python3 scripts/x.py`); never rely on an executable bit or shebang.
+- Run through `uv run` (next section); never rely on an executable bit or shebang.
 - Tolerate CRLF: the repo has no `.gitattributes`, so a Windows checkout may convert line endings;
   frontmatter parsers and file readers accept `\r\n`.
 
-## Interpreter name
+## Interpreter: `uv run`
 
-Commands in SKILL.md and `references/` spell **`python3`**. A skill that ships such commands states
-once, before its first one: "On Windows, run `python` where this says `python3`."
+A command in SKILL.md or `references/` that runs a skill's Python script spells **`uv run <path>`**
+with the path and arguments it would otherwise take. Every entry point such a command runs starts
+with a PEP 723 block, after the shebang:
 
-Why: Linux distributions ship `python3` and leave `python` to an optional package
-([`python-is-python3`](https://packages.ubuntu.com/noble/python-is-python3)); macOS has had no
-`python` since 12.3 ([release notes](https://developer.apple.com/documentation/macos-release-notes/macos-12_3-release-notes)).
-On Windows the python.org and Store installs provide `python.exe`, and `python3.exe` may be only the
-App Execution Alias that opens the Store. `py -3` is Windows-only and absent with some installers.
-One spelling plus one stated exception beats a per-command menu. Repo tooling (`scripts/`, CI,
-README commands) runs in a venv where `python` exists and is out of scope.
-
-## Follow-up
-
-Existing skills predate this rule and are not edited here. List the commands that still spell
-`python` (SKILL.md and other Markdown under `skills/`) with:
-
-```bash
-grep -rnoE --include='*.md' '(^|[`[:space:](;&|])python[[:space:]]+(-|[^[:space:]]*\.py\b|[^[:space:]]*scripts/)' skills/
+```python
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.7"
+# dependencies = []
+# ///
 ```
 
-Convert those files and add the Windows line to every skill with Python commands in one change,
-with the rerun output as evidence.
+`requires-python` is what the code needs; `dependencies` lists every third-party import and is `[]`
+for stdlib-only code. Inline Python and stdlib modules run as `uv run --no-project python -c …` or
+`uv run --no-project python -m …`, with `--with <package>` for a third-party import. A script that
+bundled tooling executes through its shebang where uv may be absent keeps `#!/usr/bin/env python3`
+and still carries the block (gdd's `gdd.py`, `delivery-state.py`, `pr-merge-check.py` and its
+launcher adapters, which its selftest runs in CI and `gdd.py` starts with its own interpreter).
+
+uv is a prerequisite for skills with scripts. A missing uv is handled on demand, not in SKILL.md:
+`scripts/shared/troubleshooting.md` is vendored by `scripts/vendor_shared.py` to
+`references/troubleshooting.md` in every skill whose docs run its own scripts with `uv run`, and
+SKILL.md carries one line: "Only if a script command fails (for example `uv` is not found), read
+[references/troubleshooting.md](references/troubleshooting.md)." The reference asks the user before
+installing uv and never auto-installs; a script with no dependencies may then run with `python3`
+(`python` on Windows). A skill whose script declares dependencies still says uv is required.
+
+Why: measured on 2026-11-17 (uv 0.13.9 on Windows, 0.13.8 on Linux) with the working directory
+inside a user's project that has a `pyproject.toml` and the script inside that project, as a
+project-scoped skill is:
+
+| Command | Effect on the user's project |
+|---|---|
+| `uv run script.py`, no inline metadata | creates `.venv` in the project and installs the project's dependencies |
+| `uv run script.py` with a PEP 723 block, even `dependencies = []` | none: runs in an isolated cached environment |
+| `uv run --no-project …` | none |
+
+A script outside the project was not affected. The block is therefore what keeps `uv run` from
+mutating a user's environment, and `scripts/check_skill_links.py` fails on a `uv run <path>.py`
+target without one, on `uv run python` without `--no-project`, and on a bare `python`/`python3`
+command that runs a script under `skills/`.
+`uv run` also ends the interpreter-name split: Linux distributions ship `python3` and leave `python`
+to an optional package ([`python-is-python3`](https://packages.ubuntu.com/noble/python-is-python3));
+macOS has had no `python` since 12.3 ([release notes](https://developer.apple.com/documentation/macos-release-notes/macos-12_3-release-notes));
+on Windows `python3.exe` may be only the App Execution Alias that opens the Store. That is why the
+fallback names both spellings. Repo tooling (`scripts/`, CI, README commands) is out of scope.

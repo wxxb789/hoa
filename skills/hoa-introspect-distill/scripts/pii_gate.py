@@ -1,9 +1,9 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.11"
 # ///
 # ─── How to run ───
-# python scripts/pii_gate.py path/to/proposed-rule-or-config
+# uv run scripts/pii_gate.py path/to/proposed-rule-or-config
 """Prove whether a non-skill output path is safe to write without tracking it."""
 
 from __future__ import annotations

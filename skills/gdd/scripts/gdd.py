@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.9"
+# dependencies = []
+# ///
 """Goal-driven delivery stage dispatcher.
 
 Renders one stage prompt from a template, guards against two writers in one

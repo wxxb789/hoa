@@ -13,9 +13,22 @@ iterations in `metadata.revision`. Earlier entries retain historical per-skill v
   `Read ../<child>/SKILL.md`, one level deep, with must-hold rules kept in the parent.
 - `rules/cross-platform-skills.md`: the `..` trap (Windows resolves it lexically, POSIX physically),
   installing a parent's whole `../` closure into one host root, forward-slash relative paths, stdlib
-  Python with explicit UTF-8, `python3` in commands; the existing `python` uses are a follow-up,
-  not edited (snapshot: 16 commands in 9 Markdown files under `skills/`, listed by the rule's grep;
-  `python3` already appears 36 times).
+  Python with explicit UTF-8, and `uv run <path>` for skill scripts with a PEP 723 block in every
+  entry point: measured with uv 0.13.9 (Windows) and 0.13.8 (Linux), a plain `uv run script.py`
+  inside a user's project creates its `.venv` and installs its dependencies, while a script with
+  the block (even `dependencies = []`) or `uv run --no-project` leaves the project untouched. uv is
+  a prerequisite for skills with scripts; a missing uv is handled by an on-demand troubleshooting
+  reference, never by auto-installing.
+- `scripts/shared/troubleshooting.md`, vendored by `scripts/vendor_shared.py` (and covered by
+  `gate:vendor-shared`) to `references/troubleshooting.md` in the nine skills whose docs run their
+  own scripts with `uv run`: `agent-operating-contract-evolution`, `gdd`, `ghc-search`,
+  `hermes-models`, `hoa-introspect`, `hoa-introspect-distill`, `hoa-skill-curate`,
+  `hoa-skill-set-audit`, `writing`. Each SKILL.md gains one line telling the agent to read it only
+  when a script command fails, replacing the inline "Without uv" fallback. When uv is missing the
+  agent asks the user to approve the official installer command for their OS and never installs
+  silently; if the user declines, only a script whose PEP 723 block lists no dependencies runs with
+  `python3` (`python` on Windows). A uv download failure (offline, proxy, registry policy) is
+  reported verbatim; the agent does not change indexes or proxies.
 - `rules/skill-naming.md`: names are stable ids and the fallback routing signal, not a trigger
   lever; kebab-case equal to the directory, `<family>-<object>-<verb>` inside a family, one meaning
   per verb, banned vague words, `hoa-` only for the skill-library family, hidden-child naming, and
@@ -32,8 +45,12 @@ iterations in `metadata.revision`. Earlier entries retain historical per-skill v
   agrees with `agents/openai.yaml`, and rejects a description over 1024 characters;
   `check_contract_graph.py` R10 rejects a hidden skill in `must_pick`; new
   `scripts/check_skill_links.py` (`gate:skill-links`) resolves every `../<name>/` reference relative
-  to the file that holds it; `install_host_skills.py --check` reports a missing or split `../`
-  closure and retired names still installed, and never deletes. The trigger judge leaves hidden
+  to the file that holds it, requires every `uv run <path>.py` in skill Markdown to name a script
+  with a PEP 723 block (else `uv run` mutates the user's project environment), including one nested
+  in `$(...)` or chained after `&&`, requires `--no-project` on `uv run python`, and rejects a bare
+  `python`/`python3` that runs a skill script (the recurring interpreter-name drift);
+  `install_host_skills.py --check` reports a missing or split `../` closure and retired names still
+  installed, and never deletes. The trigger judge leaves hidden
   skills out of its catalog. `scripts/test_manifest.toml` pins the link-checker and
   `hoa-skill-set-audit` inventory tests in the discovery floor.
 - `scripts/retired_skills.toml`: the six earlier retired names, the three renames below, and the
@@ -50,6 +67,21 @@ iterations in `metadata.revision`. Earlier entries retain historical per-skill v
   `evals/baseline.json` is re-recorded on the renamed catalog: 19/20 before and after the rename,
   same model and effort, the same case failing. Renamed directories restart at revision `"1"`, as `check-revisions`
   requires for a path new to the base; nine skills whose links changed move to `"2"`.
+- Skill scripts run with `uv run`: the 14 `python`/`python3` commands that ran a skill script and
+  the path-only commands (gdd's dispatch, ledger, scope and merge-gate commands,
+  `dsh-headless-gdd`'s adapter commands, `writing`, `agent-operating-contract-evolution`,
+  `hoa-skill-curate`) now spell `uv run <path>`; inline Python
+  spells `uv run --no-project python` (`--with pyyaml` where it imports yaml). 25 entry points gain
+  a PEP 723 block (four already had one) and 22 switch to the `#!/usr/bin/env -S uv run --script`
+  shebang; gdd's `gdd.py`, `delivery-state.py`, `pr-merge-check.py` and launcher adapters keep
+  `python3` because its selftest executes them in CI, where uv is absent, and `gdd.py` declares
+  `>=3.9`, the newest minimum among the launchers it starts with its own interpreter. Eleven
+  skills move to revision `"2"` for the `uv run` and description edits. `hermes-models` and
+  `hoa-skill-curate` scripts declare PyYAML and say uv is required. `hoa-skill-create`'s script-interface conventions follow, including the on-demand troubleshooting reference.
+- Descriptions over 500 characters trimmed with meaning and sibling routing kept: `hoa-skill-port`
+  (703 → 499), `dsh-headless-gdd` (591 → 491), `hoa-introspect` (565 → 499),
+  `ops-claim-verification` (530 → 487), `evidence-backed-analytical-writing` (529 → 498),
+  `evidence-boundary-discipline` (512 → 487).
 - `hoa-skill-curate` narrows to provenance, upstream freshness, the retirement rule and the
   execution procedure; whole-set overlap and pruning analysis moves to `hoa-skill-set-audit`.
 - AGENTS.md: "Visibility" and "Naming" paragraphs under Composition contracts. README: R10, the

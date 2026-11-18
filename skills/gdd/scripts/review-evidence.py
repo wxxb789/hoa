@@ -1,8 +1,12 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.6"
+# dependencies = []
+# ///
 """Generate a PR comment from a real completed UTF-8 machine-review report.
 
 Usage:
-  python review-evidence.py --report REPORT --head FULL_SHA --model MODEL_ID \
+  uv run review-evidence.py --report REPORT --head FULL_SHA --model MODEL_ID \
       --provider PROVIDER_ID --findings false --output COMMENT
 
 All provenance/findings inputs are explicit flags, with no environment or model

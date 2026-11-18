@@ -3,12 +3,12 @@ name: evidence-backed-analytical-writing
 description: >-
   Write an evidence-backed analytical report — Chinese policy briefs, capability assessments, or
   technical arguments that combine supplied claims with retrieved sources — by classifying every
-  load-bearing number, building an evidence map, and drafting a uniform claim → evidence → mechanism
-  → limitation spine. Use when the deliverable is prose whose every figure must survive an audit.
-  Not for citation-ledger mechanics, social posts, changelogs, or any piece
-  where the claims are already verified and only the wording needs work.
+  load-bearing number, building an evidence map, and drafting a uniform claim → evidence → mechanism →
+  limitation spine. Use when the deliverable is prose whose every figure must survive an audit. Not
+  for citation-ledger mechanics, social posts, changelogs, or claims already verified that only need
+  rewording.
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "work-management"
   targets: "runtime-agnostic"
   summary: "evidence map plus a claim → evidence → mechanism → limitation spine for Chinese analytical reports; recency window, status ladder, negative findings"

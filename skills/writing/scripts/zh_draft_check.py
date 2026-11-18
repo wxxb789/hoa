@@ -1,8 +1,12 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.6"
+# dependencies = []
+# ///
 """Chinese draft self-check: sentence length, structure-level AI counters, rewrite similarity.
 
 Usage:
-    python3 zh_draft_check.py draft.md [--old previous.md] [--limit 55]
+    uv run zh_draft_check.py draft.md [--old previous.md] [--limit 55]
 
 Why script it: sentence length, banned-pattern counts and "is this a real rewrite or the old
 article in new clothes" are all measurable. Eyeballing them is how uniform, machine-smooth prose

@@ -1,14 +1,12 @@
 ---
 name: hoa-skill-port
 description: >-
-  Port a skill that grew inside one private runtime into a shared, publishable repository, and keep
-  that repository canonical afterwards: choose the canonical side, de-couple on five axes, demote
-  every literal to configuration, validate with the repo's own gates, and publish through a branch.
-  Use when a skill names a person, a home path, a model id, a private repo or one vendor's CLI, or
-  when a batch of such skills must be reviewed before it lands.
-  Use hoa-skill-create to change a skill's methodology or behaviour and hoa-skill-curate for
-  provenance and upstream freshness; whole-set audits are the user-run hoa-skill-set-audit command.
-  Not for a prose-only edit in a repo that already owns the file.
+  Port a skill from one private runtime into a shared, publishable repository and keep it canonical:
+  de-couple it, demote every literal to configuration, publish through a branch. Use when a skill
+  names a person, home path, model id, private repo or vendor CLI, or a batch of such skills needs
+  review. Not for a prose-only edit in a repo that owns the file. Use hoa-skill-create to change
+  behaviour, hoa-skill-curate for provenance and freshness; whole-set audits are the user-run
+  hoa-skill-set-audit.
 metadata:
   revision: "1"
   areas: "software-development,work-management"

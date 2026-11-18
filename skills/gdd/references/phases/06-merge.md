@@ -1,7 +1,7 @@
 # Phase 6 — merge gate (mechanical, not remembered)
 
 ```bash
-<gdd-skill>/scripts/pr-merge-check.py <pr> --repo <path> --verified-head <sha> --gates-rc <rc> [--marker TEXT]
+uv run <gdd-skill>/scripts/pr-merge-check.py <pr> --repo <path> --verified-head <sha> --gates-rc <rc> [--marker TEXT]
 ```
 
 Boolean lines and a verdict; exit 0 = merge allowed. `--verified-head` is the SHA you actually ran
@@ -49,7 +49,7 @@ check, with or without the other.
 `--marker TEXT` changes only the token, not the required evidence schema. The newest malformed,
 incomplete, stale, or hash-invalid marker blocks older clean evidence and cannot be overridden by
 the no-review opt-out. Generate evidence from the actual completed report with
-`<gdd-skill>/scripts/review-evidence.py --report <file> --head <full-sha> --model <selected-model>
+`uv run <gdd-skill>/scripts/review-evidence.py --report <file> --head <full-sha> --model <selected-model>
 --provider <configured-provider> --findings false --output <comment-file>`; post via `--body-file`
 and read back the exact comment before accepting it. Never turn a dirty report into a clean flag.
 
@@ -84,7 +84,7 @@ A PR that reads `MERGED` while `origin/main` still shows the old head means main
 not that the merge failed. **Done** is merged *and* the next goal branched off the merged head — an
 open PR is not done.
 
-Bounded CI watching: `scripts/watch-pr-checks.py <PR> [max_reruns] [max_polls] [logfile]` waits for a
+Bounded CI watching: `uv run scripts/watch-pr-checks.py <PR> [max_reruns] [max_polls] [logfile]` waits for a
 settled verdict — checks done *and* the PR `MERGEABLE CLEAN` at the head it started on — reruns only
 jobs that died on an infra step (<60 s fail), and logs every poll. A download step failing in under a
 minute is infra — `gh run rerun <run-id> --failed` first, then look at the code.

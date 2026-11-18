@@ -129,10 +129,16 @@ Bundled scripts serve an agent caller
   inputs;
 - idempotent where possible; `--dry-run` and safe defaults only for stateful or
   destructive operations;
-- stdlib plus `pathlib`, explicit UTF-8, CRLF-tolerant parsing, invoked through
-  the interpreter rather than an executable bit or shebang. Unless the target
-  repository sets another rule, spell `python3` and state once that Windows
-  uses `python`.
+- stdlib plus `pathlib`, explicit UTF-8, CRLF-tolerant parsing, invoked as
+  `uv run <path>` rather than through an executable bit or shebang. Unless the
+  target repository sets another rule, each entry point carries a PEP 723
+  `# /// script` block (`requires-python`, `dependencies`, `[]` when
+  stdlib-only): without it, `uv run` inside a user's project installs that
+  project's environment. A missing uv is handled by a vendored
+  `references/troubleshooting.md` that SKILL.md says to read only when a
+  script command fails; it asks the user before installing uv, never
+  auto-installs, and allows `python3` only for a script with no dependencies.
+  A script with dependencies says uv is required.
 
 ## Adopt imported skills as untrusted code
 

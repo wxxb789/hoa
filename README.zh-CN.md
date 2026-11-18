@@ -205,7 +205,7 @@ unverified；既不退回 `Popen` 缓存的 `returncode`（它看不见 reap）�
 | `python scripts/vendor_shared.py --check` | 分发到 skill 内的共享脚本副本与权威文件一致。 |
 | `python scripts/generate_index.py --check` | `index.md` / `index.zh-CN.md` 与 artifact 元数据一致。 |
 | `python scripts/check_contract_graph.py` | 上面的 R1–R10。 |
-| `python scripts/check_skill_links.py` | skill 中每个 `../<name>/` 引用都指向存在的同级 skill 与路径（相对所在文件解析）。 |
+| `python scripts/check_skill_links.py` | skill 中每个 `../<name>/` 引用都指向存在的同级 skill 与路径（相对所在文件解析）；skill Markdown 里每个 `uv run <path>.py` 指向带 PEP 723 块的脚本，`uv run python` 带 `--no-project`，且不用裸 `python`/`python3` 运行 skill 脚本。 |
 | `python -m unittest scripts.test_check_skill_links` | 链接检查器自身的测试。 |
 | `python scripts/test_check_contract_graph.py` | 契约图检查器自身的规则测试。 |
 | `python -m unittest scripts.test_skill_config` | 配置解析顺序与畸形配置行为。 |

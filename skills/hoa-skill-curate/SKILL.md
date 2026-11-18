@@ -107,10 +107,11 @@ This applies to the `skills` CLI install model and its lock layout in detail —
   normalized. (Prefer this over `gh api .../contents` here — raw HEAD is one fetch per skill.)
 - Cover DISABLED skills too — they still sit on disk and can be re-enabled; a stale one is a
   latent surprise.
-- Run `scripts/upstream-freshness-check.py` (reads the optional disabled list + the installer
+- Run `uv run scripts/upstream-freshness-check.py` (requires uv: it declares PyYAML; reads the optional disabled list + the installer
   lock, threads the fetches, prints only DIFF/ERR rows plus a SAME/DIFF/ERR tally; exits non-zero
   on any DIFF so it can gate). `--enabled` limits the sweep to non-disabled skills; `--lock`,
   `--skills-root`, and `--config` override the XDG-based defaults.
+- Only if a script command fails (for example `uv` is not found), read [references/troubleshooting.md](references/troubleshooting.md).
 
 ## Execution procedure after explicit confirmation
 

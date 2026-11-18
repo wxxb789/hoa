@@ -1,9 +1,13 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.6"
+# dependencies = []
+# ///
 """Check that every number in a draft traces back to the source corpus.
 
 Usage:
-    python3 fact_check.py draft.md --corpus path/to/run-logs \
-                                   --corpus path/to/ledger.jsonl
+    uv run fact_check.py draft.md --corpus path/to/run-logs \
+                                  --corpus path/to/ledger.jsonl
 
 Why: rewriting an old draft is the highest-risk path for inheriting a wrong
 statistic. Eyeballing numbers does not work; token-by-token lookup does.

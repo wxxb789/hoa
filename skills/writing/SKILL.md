@@ -7,7 +7,7 @@ description: >-
   destination and a reader whose decision it must move. Not for chat replies, commit messages, or
   any piece where the content is still missing and only the packaging is being polished.
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "work-management,self-management"
   targets: "runtime-agnostic"
   summary: "per-channel prose contracts behind one content-first layer: blog, academic, X, Reddit, 小红书, 公众号, tutorial, changelog; plus a measurable AI-smell audit"
@@ -83,12 +83,12 @@ Decide the mode before you touch the model; they take different inputs and give 
   (code blocks, quoted contracts, log lines) + the structural directives; never the old prose.
   Lands well under 40% overlap with reuse confined to quoted material and fixed trailing links.
 
-Measure, don't assert: `python3 scripts/zh_draft_check.py draft.md --old previous.md` reports
+Measure, don't assert: `uv run scripts/zh_draft_check.py draft.md --old previous.md` reports
 similarity and lists every verbatim-reused sentence. A reused narrative sentence means the draft
-was not actually rewritten; `[材料/固定句]` is fine.
+was not actually rewritten; `[材料/固定句]` is fine. Only if a script command fails (for example `uv` is not found), read [references/troubleshooting.md](references/troubleshooting.md).
 
 Every number in the new draft is unverified again — rewriting does not launder inherited statistics.
-Run `scripts/fact_check.py` and trace each MISS.
+Run `uv run scripts/fact_check.py` and trace each MISS.
 
 ## Step 3 — cross-channel hard rules (always apply)
 
@@ -108,7 +108,7 @@ Run `scripts/fact_check.py` and trace each MISS.
 - **Don't fabricate** data, quotes, citations, benchmarks. Mark gaps as `[TODO]`.
 - **Re-check every number before publishing** when the draft builds on existing material: numbers
   inherited from an older draft are the highest-risk kind. Run
-  `python3 scripts/fact_check.py <draft.md> --corpus <dir> --corpus <file>` and trace every MISS
+  `uv run scripts/fact_check.py <draft.md> --corpus <dir> --corpus <file>` and trace every MISS
   to a source line or delete it.
 - **发布不是 push 完就算**：站点对"已发布集合"常有复核闸门，带 release 标记的构建在集合变化时拒绝；
   先跑站点的 review 步骤、看集合锁文件的 diff、再提交，然后带 cache-buster 回读线上页。CI 失败先分辨

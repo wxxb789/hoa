@@ -86,6 +86,50 @@ class CheckSkillLinksTests(unittest.TestCase):
                       "sibling is ../../../child/", out)
         self.assertIn("4 error(s)", err)
 
+    PEP_723 = "# /// script\n# requires-python = \">=3.9\"\n# dependencies = []\n# ///\n"
+
+    def test_script_commands_that_follow_the_uv_convention_pass(self):
+        self.skill("other", files={"scripts/shared.py": self.PEP_723})
+        self.skill("tool", "Without uv: run the script with `python3` (`python` on Windows).\n"
+                           "```bash\nuv run scripts/run.py --flag\n"
+                           "uv run \"$TOOL_DIR/scripts/run.py\" x\n"
+                           "uv run --no-project --with pyyaml python - <<'PY'\n"
+                           "uv run --no-project python scripts/plain.py\n"
+                           "python3 -c 'import sys'\npython3 scripts/test_run.py\n"
+                           "python3 <repo>/tools/own.py\n```\n"
+                           "Run `uv run ../other/scripts/shared.py`; prose python3 scripts/plain.py.",
+                   files={"scripts/run.py": "#!/usr/bin/env -S uv run --script\n" + self.PEP_723,
+                          "scripts/plain.py": "print()\n", "scripts/test_run.py": "",
+                          "references/x.md": "`uv run scripts/run.py`"})
+        code, out, err = self.run_main()
+        self.assertEqual(code, 0, out + err)
+        self.assertIn("script commands OK", out)
+
+    def test_script_commands_that_break_the_uv_convention_fail(self):
+        self.skill("tool", "```bash\nuv run --with pyyaml scripts/plain.py\n"
+                           "uv run scripts/gone.py\npython -B scripts/run.py --x\n"
+                           "uv run scripts/run.py && uv run \"$(uv run scripts/plain.py scope)\"\n"
+                           "uv run --with pyyaml python -c 'import yaml'\n```\n"
+                           "Measure with `python3\nscripts/run.py draft.md`.",
+                   files={"scripts/run.py": self.PEP_723, "scripts/plain.py": "print()\n"})
+        code, out, err = self.run_main()
+        self.assertEqual(code, 1)
+        self.assertEqual(out.splitlines(), [
+            "skills/tool/SKILL.md:5: uv run target skills/tool/scripts/plain.py has no PEP 723 "
+            "'# /// script' block",
+            "skills/tool/SKILL.md:6: uv run target scripts/gone.py does not resolve to a file "
+            "under skills/",
+            "skills/tool/SKILL.md:7: bare python runs skills/tool/scripts/run.py; "
+            "write uv run scripts/run.py",
+            "skills/tool/SKILL.md:8: uv run target skills/tool/scripts/plain.py has no PEP 723 "
+            "'# /// script' block",
+            "skills/tool/SKILL.md:9: uv run python without --no-project syncs the user's project; "
+            "write uv run --no-project python",
+            "skills/tool/SKILL.md:11: bare python runs skills/tool/scripts/run.py; "
+            "write uv run scripts/run.py",
+        ])
+        self.assertIn("6 error(s)", err)
+
 
 if __name__ == "__main__":
     unittest.main()

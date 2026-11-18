@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.7"
+# dependencies = []
+# ///
 """Record and verify the working increment of one repository.
 
 A review dispatches at a commit range, so uncommitted work is invisible to it.

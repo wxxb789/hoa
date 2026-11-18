@@ -1,9 +1,9 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.11"
 # ///
 # ─── How to run ───
-# python scripts/validate_skill.py path/to/SKILL.md
+# uv run scripts/validate_skill.py path/to/SKILL.md
 """Validate the portable structural contract of a SKILL.md file."""
 
 from __future__ import annotations

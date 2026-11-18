@@ -63,7 +63,7 @@ gh search code "tests/fixtures/<something>" --limit 10
 gh api repos/<owner>/<repo>/contents/tests/fixtures/x/SKILL.md --jq '.content' | base64 -d
 
 # provenance and per-source counts
-python3 - <<'PY'
+uv run --no-project python - <<'PY'
 import json, os, collections
 hub = os.environ.get('SKILLS_HUB') or os.path.expanduser('~/.agents')
 d = json.load(open(os.path.join(hub, '.skill-lock.json')))

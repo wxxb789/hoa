@@ -1,10 +1,10 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
 # ─── How to run ───
-# python scripts/aggregate.py --bundle path/to/bundle.json --output path/to/facets.json
+# uv run scripts/aggregate.py --bundle path/to/bundle.json --output path/to/facets.json
 """Deterministically aggregate explicit usage fields from a Retrieval Bundle."""
 
 from __future__ import annotations

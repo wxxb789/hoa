@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.7"
+# dependencies = []
+# ///
 """Bounded writer for one launcher run's NDJSON event stream.
 
 Usage: events-writer.py RUN_DIR < agent-events.ndjson > terminal

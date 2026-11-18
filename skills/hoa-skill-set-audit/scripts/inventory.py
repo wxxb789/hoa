@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.7"
+# dependencies = []
+# ///
 """Inventory one or more skill roots as JSON for a set-level skill audit.
 
 Walks each root for skill directories (a directory holding SKILL.md; the walk

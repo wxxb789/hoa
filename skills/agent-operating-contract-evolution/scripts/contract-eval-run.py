@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.7"
+# dependencies = []
+# ///
 """Behavioral regression harness for agent instruction contracts.
 
 Runs each case as a real one-shot agent session and checks the reply against

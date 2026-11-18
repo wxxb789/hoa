@@ -52,9 +52,9 @@ budgets: [references/hosts.md](references/hosts.md).
    verbatim into a scratch file outside the repo, one `- name: description` line per entry.
    Keep entries that show no description — they are truncation evidence. If the host shows no
    listing, say so, audit disk only, and mark every offered-set claim unverified.
-2. **Enumerate disk.** On Windows, run `python` where this says `python3`. Pass every host in
+2. **Enumerate disk.** Pass every host in
    play in one run, so `duplicates.by_name` compares copies across hosts:
-   `python3 scripts/inventory.py --host <host> [--host <host> ...] [--root DIR ...] --offered <listing> > <scratch>/inventory.json`.
+   `uv run scripts/inventory.py --host <host> [--host <host> ...] [--root DIR ...] --offered <listing> > <scratch>/inventory.json`.
    Exit 1 means findings exist — the normal case; 2 means no usable root or listing.
    `offered.not_on_disk` holds namespaced plugin entries (`plugin:name`, expected: plugin skills
    come from the listing) and built-ins; for any other entry, add the missing root.
@@ -118,6 +118,7 @@ End with what was not verified and an explicit statement that nothing was change
 - [scripts/inventory.py](scripts/inventory.py) — read-only root scanner; `--help` lists flags,
   JSON fields and exit codes.
 - [scripts/test_inventory.py](scripts/test_inventory.py) — its tests on synthetic skill trees.
+- Only if a script command fails (for example `uv` is not found), read [references/troubleshooting.md](references/troubleshooting.md).
 - [references/hosts.md](references/hosts.md) — per-host roots, precedence, hiding, listing budgets,
   shadowing evidence.
 - Sibling: `../hoa-skill-create/references/skill-family-integrity.md` — auditing a protocol duplicated

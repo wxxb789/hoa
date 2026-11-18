@@ -1,10 +1,10 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
 # ─── How to run ───
-# python scripts/audit.py --bundle bundle.json --claims claims.json --output verified-claims.json
+# uv run scripts/audit.py --bundle bundle.json --claims claims.json --output verified-claims.json
 """Drop L2 claims that lack two independently resolvable origins."""
 
 from __future__ import annotations

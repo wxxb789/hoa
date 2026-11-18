@@ -3,11 +3,11 @@
 Every stage ends with one ledger row. This is the operator's job, not the agent's:
 
 ```bash
-scripts/delivery-state.py append --repo <path> --goal <id> --stage <stage> \
+uv run scripts/delivery-state.py append --repo <path> --goal <id> --stage <stage> \
   [--base SHA] [--head SHA] [--pr N] [--gates "test rc=0"] [--rounds-review N] \
   [--findings "real=3 rej=1"] [--next <stage>] [--note "…"]
-scripts/delivery-state.py show --repo <path> --goal <id>     # resume here
-scripts/gdd.py close --repo <path> --goal <id> --pr <N>       # landing row: stage=done + PR + head
+uv run scripts/delivery-state.py show --repo <path> --goal <id>  # resume here
+uv run scripts/gdd.py close --repo <path> --goal <id> --pr <N>  # landing row: stage=done + PR + head
 ```
 
 `gdd.py stage` counts the rows for this repo+goal+stage before dispatching and refuses the third

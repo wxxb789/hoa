@@ -112,7 +112,7 @@ Resolution order and the config-file path are defined once in
 [hoa-skill-port § Configuration](../hoa-skill-port/SKILL.md#configuration-is-a-gate-not-advice).
 `gdd.py` implements it through the vendored `scripts/skill_config.py`; the config-file keys are the
 six names in the table. Nothing about one install lives in the protocol: a profile may point at its own
-files, but no path is inlined.
+files, but no path is inlined. Commands run the bundled scripts with `uv run <path>`. Only if a script command fails (for example `uv` is not found), read [references/troubleshooting.md](references/troubleshooting.md).
 
 Read [`references/transport.md`](references/transport.md) before selecting or dispatching a launcher:
 it defines both routes, model/thinking mapping, artifact polling, and platform-specific evidence.

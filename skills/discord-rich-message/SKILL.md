@@ -5,7 +5,7 @@ description: >-
   monospace aligned tables, and the attachment fallback. Use when a plain Discord message would show
   raw pipes or truncate. Discord only — other platforms have their own rich-message systems.
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "structured Discord messages within platform limits: Components V2, aligned code-block tables, attachment fallback"
@@ -88,7 +88,7 @@ task, then use the id:
 ```bash
 curl -s -H "Authorization: Bot ${DISCORD_BOT_TOKEN}" \
   "https://discord.com/api/v10/guilds/${DISCORD_GUILD_ID}/channels" \
-  | python3 -c 'import sys,json
+  | uv run --no-project python -c 'import sys,json
 for c in json.load(sys.stdin): print(c.get("name"), "->", c.get("id"))'
 ```
 

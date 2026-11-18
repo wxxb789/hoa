@@ -2,11 +2,11 @@
 name: evidence-boundary-discipline
 description: >-
   State only what a dated source actually supports: fix the tense to the dateline, carry one
-  provenance label across every surface, give every factual paragraph its own citation, and never
-  let absence escalate into "does not exist". Use when writing or revising a knowledge page,
-  monitor delta, entity section, or delivery table built from reports, press releases or partial
-  legal text. Not for collecting or grading sources (that is claim auditing), and not for prose
-  whose every claim is already primary-sourced.
+  provenance label across every surface, give every factual paragraph its own citation, and never let
+  absence escalate into "does not exist". Use when writing or revising a knowledge page, monitor
+  delta, entity section, or delivery table built from reports, press releases or partial legal text.
+  Not for collecting or grading sources (claim auditing), or prose whose every claim is
+  primary-sourced.
 metadata:
   revision: "2"
   areas: "work-management"

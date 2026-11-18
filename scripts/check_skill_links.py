@@ -14,13 +14,30 @@ A parent chains to a sibling skill with a path relative to its own file, e.g.
   there (`#anchor` stripped) — otherwise an error;
 - a path that climbs above `skills/` is not a sibling link and is ignored.
 
+It also checks how skill Markdown runs a skill's own Python scripts, in fenced
+code blocks and inline code:
+
+- a `uv run <path>.py` target must resolve to a file under `skills/` that
+  carries a PEP 723 `# /// script` block; without one, `uv run` inside a user's
+  project installs that project's environment instead of an isolated one;
+- `uv run python`/`python3` must carry `--no-project` (or name its own
+  `--project`), or it syncs the user's project environment too;
+- a bare `python`/`python3` command (not `uv run ... python`) must not run a
+  file under `skills/` (write `uv run <path>`); a `test_*`/`test-*` file is
+  exempt, since dated evidence quotes how a suite was run.
+
+Script paths resolve against the skill directory, the file holding them,
+`skills/` and the repository root, after dropping a leading `$VAR/`, `${...}/`,
+`<placeholder>/` or `~/`.
+
 Usage:
     python scripts/check_skill_links.py
 
-Exit codes: 0 every sibling reference resolves, 1 at least one error.
+Exit codes: 0 every sibling reference and script command is valid, 1 at least one error.
 """
 from __future__ import annotations
 
+import os
 import re
 import sys
 from dataclasses import dataclass
@@ -34,6 +51,18 @@ SKILLS = ROOT / "skills"
 REFERENCE = re.compile(
     r"(?<![\w./-])((?:\.\./)+)([A-Za-z0-9][A-Za-z0-9._-]*)/([^\s)\]`'\"#]*)")
 PLACEHOLDER = re.compile(r"[<>*]|\.\.\.")
+FENCE = re.compile(r"^\s*(`{3,}|~{3,})")
+INLINE = re.compile(r"(`+)(.+?)\1", re.S)
+# Every `uv run`, including one nested in `$(...)` or chained after `&&`; its arguments stop at
+# the next shell separator.
+UV_RUN = re.compile(r"(?<![\w-])uv\s+run\s+(?=([^|;&)`]*))")
+PYTHON = re.compile(r"(?<![\w./$<-])python3?(?:\.exe)?((?:\s+-[A-Za-z]+)*)\s+([^\s;|&)`]+)")
+UV_PREFIX = re.compile(r"(?<![\w-])uv\s+run\b[^|;&]*$")
+TEST_FILE = re.compile(r"test[_-]")
+UV_VALUE_OPTIONS = {"--with", "--with-requirements", "--with-editable", "--project", "--directory",
+                    "--python", "-p", "--env-file", "--extra", "--group", "--index", "--package"}
+LEADING_VARIABLE = re.compile(r"^(?:\$\{[^}]*\}|\$\w+|<[^>]*>|~)/")
+PEP_723 = re.compile(r"^# /// script\s*$", re.M)
 
 
 @dataclass(frozen=True)
@@ -84,11 +113,105 @@ def siblings(skill_dir: Path) -> set[str]:
     return {ref.name for ref in references(skill_dir) if ref.scope == "sibling"}
 
 
+def code_spans(path: Path) -> list[tuple[int, str]]:
+    """(line, text) of every fenced-code line and inline code span in a Markdown file.
+
+    An inline span may wrap inside its paragraph; it is reported at its first line.
+    """
+    spans, fence, paragraph = [], None, []
+
+    def inline(paragraph):
+        text = "\n".join(line for _, line in paragraph)
+        for match in INLINE.finditer(text):
+            number = paragraph[0][0] + text.count("\n", 0, match.start())
+            spans.append((number, match.group(2).replace("\n", " ")))
+
+    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        marker = FENCE.match(line)
+        if fence:
+            if marker and marker.group(1)[0] == fence[0] and len(marker.group(1)) >= len(fence):
+                fence = None
+            else:
+                spans.append((number, line))
+        elif marker or not line.strip():
+            inline(paragraph)
+            paragraph = []
+            fence = marker.group(1) if marker else None
+        else:
+            paragraph.append((number, line))
+    inline(paragraph)
+    return sorted(spans)
+
+
+def resolve_script(token: str, source: Path, skill_dir: Path, skills_root: Path) -> Path | None:
+    """The file under skills_root a command's script token names, or None."""
+    rest = token.strip("\"'")
+    while LEADING_VARIABLE.match(rest):
+        rest = LEADING_VARIABLE.sub("", rest, count=1)
+    if not rest or "$" in rest or "<" in rest:
+        return None
+    root = skills_root.resolve()
+    for base in (skill_dir, source.parent, skills_root, skills_root.parent):
+        candidate = Path(os.path.normpath(base / rest)).resolve()
+        if candidate.is_file() and candidate.is_relative_to(root):
+            return candidate
+    return None
+
+
+def uv_run_target(command: str) -> tuple[str | None, list[str]]:
+    """The first positional argument of `uv run` and the uv options before it."""
+    tokens = command.split()
+    index = 0
+    while index < len(tokens):
+        token = tokens[index]
+        if not token.startswith("-"):
+            return token, tokens[:index]
+        index += 2 if token in UV_VALUE_OPTIONS else 1
+    return None, tokens
+
+
+def script_errors(skill_dir: Path, skills_root: Path) -> list[str]:
+    """Errors for `uv run` and bare-python commands that run scripts in skill Markdown."""
+    errors = []
+    repo = skills_root.resolve().parent
+    for path in skill_files(skill_dir):
+        where_file = path.relative_to(skills_root.parent).as_posix()
+        for number, code in code_spans(path):
+            where = f"{where_file}:{number}"
+            for match in UV_RUN.finditer(code):
+                target, options = uv_run_target(match.group(1))
+                if (target in ("python", "python3")
+                        and not {"--no-project", "--project"}.intersection(options)):
+                    errors.append(f"{where}: uv run {target} without --no-project syncs the user's "
+                                  f"project; write uv run --no-project {target}")
+                    continue
+                if target is None or not target.strip("\"'").endswith(".py"):
+                    continue
+                script = resolve_script(target, path, skill_dir, skills_root)
+                if script is None:
+                    errors.append(f"{where}: uv run target {target} does not resolve to a file "
+                                  f"under skills/")
+                elif not PEP_723.search(script.read_text(encoding="utf-8")):
+                    errors.append(f"{where}: uv run target {script.relative_to(repo).as_posix()} "
+                                  f"has no PEP 723 '# /// script' block")
+            for match in PYTHON.finditer(code):
+                target = match.group(2)
+                if (not target.strip("\"'").endswith(".py")
+                        or UV_PREFIX.search(code, 0, match.start())):
+                    continue
+                script = resolve_script(target, path, skill_dir, skills_root)
+                if script is not None and not TEST_FILE.match(script.name):
+                    errors.append(f"{where}: bare python runs {script.relative_to(repo).as_posix()}; "
+                                  f"write uv run {target}")
+    return errors
+
+
 def check(skills_root: Path) -> list[str]:
     """Return the errors for every skill under skills_root."""
     errors = []
     for skill_dir in sorted(path for path in skills_root.iterdir()
                             if path.is_dir() and not path.name.startswith(".")):
+        errors.extend(script_errors(skill_dir, skills_root))
         for ref in references(skill_dir):
             where = f"{ref.source.relative_to(skills_root.parent).as_posix()}:{ref.line}"
             if ref.scope == "skill-relative":
@@ -119,7 +242,7 @@ def main(argv=None) -> int:
     if errors:
         print(f"check_skill_links: {len(errors)} error(s)", file=sys.stderr)
         return 1
-    print("check_skill_links: sibling references OK")
+    print("check_skill_links: sibling references OK; script commands OK")
     return 0
 
 

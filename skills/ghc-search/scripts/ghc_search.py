@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.7"
+# dependencies = []
+# ///
 """Web / X search through the local ghc-proxy Responses API.
 
 Owns the mechanical work so the caller doesn't: request building, response

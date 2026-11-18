@@ -54,9 +54,11 @@ leave anything that changes scheduling behaviour or a peer harness for the owner
 
 ## Pass 1 — presence and value drift (mechanical)
 
+The script needs uv: it declares PyYAML, so plain `python3` is not a fallback.
+
 ```bash
 HERMES_HOME="${HERMES_HOME:-$HOME/.hermes}"
-python3 "${HERMES_SKILLS_DIR:-$HERMES_HOME/skills}/hermes-models/scripts/audit-config-drift.py" \
+uv run "${HERMES_SKILLS_DIR:-$HERMES_HOME/skills}/hermes-models/scripts/audit-config-drift.py" \
   --hermes-home "$HERMES_HOME" --agent-dir "$HERMES_HOME/hermes-agent"
 ```
 

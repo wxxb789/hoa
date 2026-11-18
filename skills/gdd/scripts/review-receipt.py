@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.6"
+# dependencies = []
+# ///
 """Validate one fresh pi session receipt against explicit lane identity/transport.
 
 All identity/transport inputs are required flags; no model-name inference or defaults.
