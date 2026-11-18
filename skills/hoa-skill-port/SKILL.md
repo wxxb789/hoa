@@ -1,13 +1,12 @@
 ---
-name: skill-porting-and-publishing
+name: hoa-skill-port
 description: >-
-  Port a skill that grew inside one private runtime into a shared, publishable repository, and keep
-  that repository canonical afterwards: choose the canonical side, de-couple on five axes, demote
-  every literal to configuration, validate with the repo's own gates, and publish through a branch.
-  Use when a skill names a person, a home path, a model id, a private repo or one vendor's CLI, or
-  when a batch of such skills must be reviewed before it lands.
-  Not for auditing a skill library (that is curation) and not for a prose-only edit in a repo that
-  already owns the file.
+  Port a skill from one private runtime into a shared, publishable repository and keep it canonical:
+  de-couple it, demote every literal to configuration, publish through a branch. Use when a skill
+  names a person, home path, model id, private repo or vendor CLI, or a batch of such skills needs
+  review. Not for a prose-only edit in a repo that owns the file. Use hoa-skill-create to change
+  behaviour, hoa-skill-curate for provenance and freshness; whole-set audits are the user-run
+  hoa-skill-set-audit.
 metadata:
   revision: "1"
   areas: "software-development,work-management"
@@ -17,7 +16,7 @@ metadata:
   kind: "entry"
 ---
 
-# Skill porting and publishing
+# hoa-skill-port
 
 Move a skill that grew inside a private runtime into a shared, publishable repo, and make that repo
 the single source afterwards. Applies to any skill that has to survive leaving one machine: agent
@@ -30,10 +29,12 @@ nothing.
 - Any skill whose body names a person, a machine path, a model id, a private repo, or a bot product.
 - A batch port whose reviewer needs one report: source → target, files, sections, demotions.
 
-Not for: rewriting a skill's methodology (that is curation/audit territory), or a one-off doc edit in
-a repo that already owns the file. When the destination repo's own contract governs skill ownership
-and placement, decide repo-owned vs general capability first; porting a general capability into a
-project repo pollutes it just as badly as leaving repo-bound methodology outside.
+Not for: rewriting a skill's methodology or behaviour (hoa-skill-create), provenance or upstream
+freshness (hoa-skill-curate), auditing the whole skill set (the user-run hoa-skill-set-audit
+command), or a one-off doc edit in a repo that already owns the file. When the destination repo's
+own contract governs skill ownership and placement, decide repo-owned vs general capability first;
+porting a general capability into a project repo pollutes it just as badly as leaving repo-bound
+methodology outside.
 
 ## 1. Decide the canonical side before writing a file
 
@@ -212,7 +213,7 @@ fighting its own line endings (see Pitfalls). Fix that first, or the probe train
 | `dirty_age_hours` | `PORTING_DIRTY_AGE_HOURS` | `24` |
 
 No key in this table is a repo name. These keys resolve through the shared order above; the file is
-`$XDG_CONFIG_HOME/skill-porting-and-publishing/config.yaml` (fallback `~/.config/...`).
+`$XDG_CONFIG_HOME/hoa-skill-port/config.yaml` (fallback `~/.config/...`).
 
 ## Report shape
 

@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.9"
+# dependencies = ["pyyaml"]
+# ///
 """Dump every layer that decides a model, for root + every profile home, as JSON.
 
 Read-only. Run before and after a routing change and diff the two dumps instead of trusting
@@ -7,7 +11,7 @@ Read-only. Run before and after a routing change and diff the two dumps instead 
   * agent cron jobs with provider/model = null, i.e. background work riding the hot-path model.
 
 Usage:
-    python3 audit-routing-inventory.py [--home ~/.hermes] [--out inventory.json]
+    uv run audit-routing-inventory.py [--home ~/.hermes] [--out inventory.json]
 
 Caveat: harness catalogs (pi/omp/omo/opencode/dsh) are only partly visible in files. Read the live
 list from the harness itself (`omp models`, `opencode models`) before concluding an id is missing.

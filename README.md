@@ -110,9 +110,10 @@ Host install parity is separate from the catalog: `python
 scripts/install_host_skills.py --root <host-skills-dir> --check` searches
 `<root>/<name>` and `<root>/<category>/<name>`, names every skill that is
 absent, drifted, wrongly linked or has two entries, and `--link` creates the
-missing symlinks at `<category>/<name>` — the skill's first `metadata.areas`
-value unless `--category` overrides it (`.` links flat). It never replaces a
-real directory and never adds a second entry for one skill.
+missing symlinks flat at `<root>/<name>`, or at `<root>/<category>/<name>` with
+`--category`, so a parent and the siblings it chains to through `../` share one
+directory. It never replaces a real directory and never adds a second entry for
+one skill.
 
 ## How this repository is shaped
 
@@ -126,7 +127,7 @@ the layer is a fact about the tree, not a label someone remembers to add.
 
 | `kind` | What it is for | At this tree |
 |---|---|---|
-| `entry` | Directly routable from a user request. It may consume/produce artifacts, but it needs no controller to be invoked. | e.g. `ghc-search`, `hoa-skill-work`, `spec-convergence` |
+| `entry` | Directly routable from a user request. It may consume/produce artifacts, but it needs no controller to be invoked. | e.g. `ghc-search`, `hoa-skill-create`, `spec-convergence` |
 | `controller` | Routes a chain: decides which stage runs, and produces only `chain-plan`. | `gdd` |
 | `stage` | One phase of a chain, invoked by its controller. Declares what it consumes and produces. | none at present |
 | `mechanism` | Invoked only by another skill; never a routing target. CI rejects it as a trigger-case `must_pick`. | `delegated-work-acceptance` |
@@ -173,6 +174,7 @@ spec, acceptance-verdict, scope-seal). Every rule is enforced by that command:
 | R7 | A skill that does not declare `kind` at all. |
 | R8 | A controller `SKILL.md` longer than 120 lines. |
 | R9 | A produced artifact that no skill consumes and that is not registered `terminal:` with a one-line reason; `external:` artifacts are exempt. |
+| R10 | A hidden skill (`disable-model-invocation: true`) listed in any trigger case's `must_pick`. |
 
 ### What CI runs
 
@@ -230,13 +232,15 @@ on Linux the same run gates every delivery as described above.
 |---|---|
 | `python scripts/vendor_shared.py --check` | Vendored copies of shared scripts match their canonical file. |
 | `python scripts/generate_index.py --check` | `index.md` / `index.zh-CN.md` match artifact metadata. |
-| `python scripts/check_contract_graph.py` | Rules R1–R9 above. |
+| `python scripts/check_contract_graph.py` | Rules R1–R10 above. |
+| `python scripts/check_skill_links.py` | Every `../<name>/` reference in a skill names an existing sibling skill and path, relative to the file that holds it; every `uv run <path>.py` in skill Markdown runs a script with a PEP 723 block, `uv run python` carries `--no-project`, and no bare `python`/`python3` runs a skill script. |
+| `python -m unittest scripts.test_check_skill_links` | The link checker's own tests. |
 | `python scripts/test_check_contract_graph.py` | The graph checker's own rule tests. |
 | `python -m unittest scripts.test_skill_config` | Config resolution order and malformed-config behavior. |
 | `python scripts/test_generate_index.py` | Catalog collection, summaries, bilingual fallback, drift. |
-| `python -m unittest scripts.test_install_host_skills` | Host install parity (`--check` / `--link`). |
+| `python -m unittest scripts.test_install_host_skills` | Host install parity (`--check` / `--link`), `../` closure, retired names. |
 | `python -m unittest scripts.test_check_changelog` | The changelog rule's own tests. |
-| `python scripts/check_frontmatter.py` | Every `SKILL.md` frontmatter and catalog field. |
+| `python scripts/check_frontmatter.py` | Every `SKILL.md` frontmatter and catalog field; 1024-char description cap; hidden flag agrees with `agents/openai.yaml`. |
 | `python -m unittest scripts.test_check_frontmatter` | The frontmatter checker's own tests. |
 | `python scripts/version.py check-bump` (pull requests) | `VERSION` is exactly `origin/main`'s patch + 1. |
 | `python scripts/version.py check-revisions` (pull requests) | Every skill directory changed since the merge base raises its `metadata.revision`. |
@@ -389,6 +393,14 @@ specialised (Hermes-coupled `hermes-*`, `gdd` and its launchers, repo maintenanc
   the current project.
 - **Symlink** by default (one canonical copy, easy updates) or `--copy` (Windows
   / no-symlink environments).
+- Some skills chain to sibling skills through `../<child>/SKILL.md`. A copy install
+  (`--copy`, Codex's skill-installer) must put that whole `../` dependency closure
+  in the same skills root, or the chain breaks. On Windows the repo installer
+  (`python scripts/install_host_skills.py --root <host-skills-dir> --link`, then
+  `--check`; it links flat by default, and one `--category` keeps a parent and its children together)
+  links whole directories with absolute-target symlinks, which need Developer Mode or
+  admin; `--check` reports a missing or split closure and retired names still
+  installed. See [`rules/cross-platform-skills.md`](./rules/cross-platform-skills.md).
 - Everything else in `hoa` is **library / knowledge** — not auto-deployed. Fold
   it into a skill, or reference it by hand.
 - Runtime **settings** deploy separately via `chezmoi apply`.
@@ -416,11 +428,12 @@ Choose the capability by the work you want done, not by the model running it:
 | Need | Skill | Result |
 |---|---|---|
 | Audit an existing skill, review a proposed change, or judge its behavior | `hoa-skill-review` | Evidence-backed findings; no changes to the reviewed skill |
-| Create a skill from a defined capability or improve an existing skill | `hoa-skill-work` | A complete skill change with validation results and any unverified paths |
+| Create a skill from a defined capability, or evolve or compose an existing skill | `hoa-skill-create` | A complete skill change with validation results and any unverified paths |
 | Discover recurring work in agent history | `hoa-introspect` | Evidence-cited work-pattern findings; no automatic creation |
 | Qualify a supplied recurring-work finding before choosing an asset | `hoa-introspect-distill` | Individually approved candidate and, when approved, its created asset |
+| Audit the whole skill set a session is offered for overlap, shadowing, drift, visibility and budget (hidden: run `/hoa-skill-set-audit`, Codex `$hoa-skill-set-audit`) | `hoa-skill-set-audit` | Ranked set-level findings with evidence; nothing changed |
 
-For behavior changes, `hoa-skill-work` starts with focused checks and expands to multiple
+For behavior changes, `hoa-skill-create` starts with focused checks and expands to multiple
 variants, models, or runtimes when reach, risk, or conflicting evidence warrants
 it. `hoa-introspect-distill` retains its per-candidate approval gate; a direct
 request to create or improve a defined skill does not need that intake flow.

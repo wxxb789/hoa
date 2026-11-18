@@ -62,6 +62,23 @@ unless listed under `shared:`. Every produced artifact must be consumed by some 
 `terminal:` in that registry with a one-line reason (`R9`); `external:` artifacts are exempt. CI
 enforces the graph with `python scripts/check_contract_graph.py`.
 
+**Visibility.** A hidden skill (not advertised to the model, still user-invocable) sets
+`disable-model-invocation: true` and ships `agents/openai.yaml` with
+`allow_implicit_invocation: false` for Codex; hiding is a per-skill choice, never implied by `kind`,
+and never an authorization gate. A hidden skill must not appear in `must_pick`. A parent chains to a
+flat sibling child only with `Read ../<child>/SKILL.md`, one level deep, and keeps must-hold rules
+itself; installing it installs its whole `../` closure. CI enforces the flag/sidecar pair
+(`check_frontmatter.py`), hidden-not-`must_pick` (`R10`), and sibling links
+(`check_skill_links.py`); `install_host_skills.py --check` reports closure gaps and names in
+`scripts/retired_skills.toml`. Binding detail:
+[`rules/skill-composition.md`](rules/skill-composition.md) and
+[`rules/cross-platform-skills.md`](rules/cross-platform-skills.md).
+
+**Naming.** A name is kebab-case and equal to its directory; a family uses
+`<family>-<object>-<verb>` with one meaning per verb; `hoa-` is only for the skill-library family.
+A rename goes through `scripts/retired_skills.toml` in the same change. Binding detail:
+[`rules/skill-naming.md`](rules/skill-naming.md).
+
 ## Generated Artifacts Output
 
 All HTML artifacts and their related assets **MUST** be written to `./.tmp-artifacts/`.

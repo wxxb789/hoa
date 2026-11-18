@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Offline checks for install_host_skills: flat and categorized hosts.
+"""Offline checks for install_host_skills: flat and categorized hosts, the
+`../<sibling>/` closure and the retired-names registry.
 
 Run: python -m unittest scripts.test_install_host_skills
 Builds a synthetic skills/ tree and host root in a temp dir. No live host
@@ -22,13 +23,14 @@ from unittest.mock import patch
 sys.dont_write_bytecode = True
 SCRIPT = Path(__file__).resolve().parent / "install_host_skills.py"
 ARTIFACTS = SCRIPT.parent.parent / ".tmp-artifacts" / "install-host-tests"
-spec = importlib.util.spec_from_file_location("skill_metadata",
-                                              SCRIPT.parent / "skill_metadata.py")
-sm = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(sm)
+spec = importlib.util.spec_from_file_location("check_skill_links",
+                                              SCRIPT.parent / "check_skill_links.py")
+links = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = links  # dataclass field resolution needs the module registered
+spec.loader.exec_module(links)
 spec = importlib.util.spec_from_file_location("install_host_skills", SCRIPT)
 install = importlib.util.module_from_spec(spec)
-with patch.dict(sys.modules, {"skill_metadata": sm, "install_host_skills": install}):
+with patch.dict(sys.modules, {"check_skill_links": links, "install_host_skills": install}):
     spec.loader.exec_module(install)
 
 
@@ -45,14 +47,14 @@ class InstallHostSkillsTests(unittest.TestCase):
         self.skills.mkdir()
         self.host = self.tmp / "host"
         self.host.mkdir()
+        self.retired = self.tmp / "retired_skills.toml"
 
-    def _skill(self, name: str, body: str = "v1",
-               areas: str = "software-development") -> Path:
+    def _skill(self, name: str, body: str = "v1") -> Path:
         directory = self.skills / name
         directory.mkdir()
         (directory / "SKILL.md").write_text(
             f"---\nname: {name}\ndescription: {body}\nmetadata:\n"
-            f"  revision: \"1\"\n  areas: \"{areas}\"\n"
+            f"  revision: \"1\"\n  areas: \"software-development\"\n"
             f"  targets: \"runtime-agnostic\"\n---\n# {name}\n{body}\n",
             encoding="utf-8")
         (directory / "references").mkdir()
@@ -70,6 +72,7 @@ class InstallHostSkillsTests(unittest.TestCase):
             stack.enter_context(redirect_stderr(err))
             if not real:
                 stack.enter_context(patch.object(install, "SKILLS", self.skills))
+                stack.enter_context(patch.object(install, "RETIRED", self.retired))
             code = install.main(argv)
         return code, out.getvalue(), err.getvalue()
 
@@ -88,24 +91,25 @@ class InstallHostSkillsTests(unittest.TestCase):
         self.assertIn("2 of 2 skills need attention", err)
         self.assertEqual(self._entries(), before)
 
-    def test_link_places_missing_skills_in_their_first_area(self):
-        alpha = self._skill("alpha")
+    def test_default_link_places_parent_and_sibling_flat(self):
+        self._skill("alpha", body="Read ../beta/SKILL.md and follow it.")
         self._skill("beta")
         code, out, _ = self._run("--link")
         self.assertEqual(code, 0)
-        self.assertIn("linked: alpha -> software-development/alpha", out)
+        self.assertIn("linked: alpha -> alpha", out)
+        self.assertIn("linked: beta -> beta", out)
+        self.assertEqual(self._entries(), ["alpha", "beta"])
         for name in ("alpha", "beta"):
-            entry = self.host / "software-development" / name
+            entry = self.host / name
             self.assertTrue(entry.is_symlink())
             self.assertEqual(os.path.realpath(entry), os.path.realpath(self.skills / name))
-        self.assertEqual(os.path.realpath(self.host / "software-development" / "alpha"),
-                         os.path.realpath(alpha))
-        self.assertEqual(self._run("--check")[0], 0)
+        code, out, err = self._run("--check")
+        self.assertEqual(code, 0, out + err)
 
     def test_second_link_reports_nothing_to_do_and_changes_no_inode(self):
         self._skill("alpha")
         self.assertEqual(self._run("--link")[0], 0)
-        entry = self.host / "software-development" / "alpha"
+        entry = self.host / "alpha"
         before = entry.lstat()
         code, out, _ = self._run("--link")
         self.assertEqual(code, 0)
@@ -204,21 +208,78 @@ class InstallHostSkillsTests(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn("without SKILL.md", err)
 
-    def test_real_catalog_checks_clean_in_first_area_categories(self):
-        skills = install.repo_skills(install.SKILLS)
+    def test_real_catalog_checks_clean_in_a_flat_root(self):
         code, out, err = self._run("--link", real=True)
         self.assertEqual(code, 0, err)
         code, out, err = self._run("--check", real=True)
         self.assertEqual(code, 0, out + err)
-        for repo in skills:
-            entry = self.host / install.first_area(repo) / repo.name
-            self.assertTrue(entry.is_symlink(), entry)
-            self.assertEqual(install.host_entries(self.host, repo.name), [entry])
+
+    def test_sibling_in_another_category_is_a_missing_closure(self):
+        self._skill("alpha", body="Read ../beta/SKILL.md and follow it.")
+        self._skill("beta")
+        for category, name in (("software-development", "alpha"), ("writing", "beta")):
+            (self.host / category).mkdir()
+            (self.host / category / name).symlink_to(self.skills / name,
+                                                     target_is_directory=True)
+        code, out, err = self._run("--check")
+        self.assertEqual(code, 1)
+        lexical = self.host / "software-development" / "beta"
+        self.assertIn(f"missing closure: alpha -> ../beta/ not installed at {lexical}", out)
+        self.assertIn("1 of 2 skills need attention", err)
+
+    def test_stale_lexical_copy_is_a_split_closure(self):
+        self._skill("alpha", body="Read ../beta/SKILL.md and follow it.")
+        self._skill("beta")
+        (self.host / "alpha").symlink_to(self.skills / "alpha", target_is_directory=True)
+        shutil.copytree(self.skills / "beta", self.host / "beta")
+        (self.host / "beta" / "SKILL.md").write_text("old copy\n", encoding="utf-8")
+        code, out, _ = self._run("--check")
+        self.assertEqual(code, 1)
+        physical = Path(os.path.realpath(self.skills / "alpha")).parent / "beta"
+        self.assertIn(f"split closure: alpha -> ../beta/ lexical {self.host / 'beta'} "
+                      f"and physical {physical} differ (changed SKILL.md)", out)
+        self.assertIn("drifted: beta", out)
+
+    def test_copied_closure_resolves_both_ways(self):
+        self._skill("alpha", body="Read ../beta/SKILL.md and follow it.")
+        self._skill("beta")
+        for name in ("alpha", "beta"):
+            shutil.copytree(self.skills / name, self.host / name)
+        code, out, err = self._run("--check")
+        self.assertEqual(code, 0, out + err)
+
+    def test_retired_name_still_installed_is_reported_never_removed(self):
+        self._skill("alpha")
+        self.retired.write_text('[retired.old-alpha]\nreplacement = "alpha"\n'
+                                'reason = "renamed"\n', encoding="utf-8")
+        self.assertEqual(self._run("--link")[0], 0)
+        self.assertEqual(self._run("--check")[0], 0)
+        (self.host / "writing").mkdir()
+        (self.host / "writing" / "old-alpha").mkdir()
+        code, out, err = self._run("--check")
+        self.assertEqual(code, 1)
+        self.assertIn(f"retired: old-alpha at {self.host / 'writing' / 'old-alpha'} "
+                      f"(replaced by alpha: renamed)", out)
+        self.assertIn("0 of 1 skills need attention, 1 retired entries", err)
+        self.assertTrue((self.host / "writing" / "old-alpha").is_dir())
+
+    def test_retired_registry_rejects_a_current_skill_and_bad_entries(self):
+        self._skill("alpha")
+        for text, message in (
+                ('[retired.alpha]\nreplacement = "beta"\nreason = "x"\n',
+                 "retired.alpha is a current skill"),
+                ('[retired.old]\nreplacement = "alpha"\n',
+                 "retired.old needs non-empty replacement and reason"),
+                ('[retired', "invalid TOML")):
+            self.retired.write_text(text, encoding="utf-8")
+            code, _, err = self._run("--check")
+            self.assertEqual(code, 2, text)
+            self.assertIn(message, err)
 
     def test_one_absent_skill_in_a_categorized_root_is_named(self):
         self._skill("alpha")
-        self._skill("beta", areas="writing")
-        self.assertEqual(self._run("--link")[0], 0)
+        self._skill("beta")
+        self.assertEqual(self._run("--link", category="writing")[0], 0)
         (self.host / "writing" / "beta").unlink()
         code, out, err = self._run("--check")
         self.assertEqual(code, 1)
@@ -277,19 +338,11 @@ class InstallHostSkillsTests(unittest.TestCase):
         code, out, _ = self._run("--link", category="work-management")
         self.assertEqual(code, 0)
         self.assertTrue((self.host / "work-management" / "alpha").is_symlink())
-        self.assertFalse((self.host / "software-development").exists())
+        self.assertFalse((self.host / "alpha").exists())
         code, out, _ = self._run("--link", category="writing")
         self.assertEqual(code, 0)
         self.assertIn("nothing to do", out)
         self.assertFalse((self.host / "writing").exists())
-        self.assertEqual(self._run("--check")[0], 0)
-
-    def test_flat_host_is_reachable_with_dot_category(self):
-        self._skill("alpha")
-        self.assertEqual(self._run("--link", category=".")[0], 0)
-        entry = self.host / "alpha"
-        self.assertTrue(entry.is_symlink())
-        self.assertEqual(install.host_entries(self.host, "alpha"), [entry])
         self.assertEqual(self._run("--check")[0], 0)
 
     def test_category_outside_root_is_a_usage_error(self):

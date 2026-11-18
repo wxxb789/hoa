@@ -7,7 +7,7 @@ description: >-
   an instruction file that did or did not take effect, or reasoning about subagent context and prompt
   cache stability. Not for editing the runtime source, and not for other harnesses' context files.
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "software-development"
   targets: "hermes"
   summary: "which Hermes instruction file loads from where, which project file wins, and which prompt tier a rule belongs to"
@@ -123,7 +123,7 @@ duplicating facts across those two costs tokens on *every* call. De-dup volatile
    restructure:
 
    ```bash
-   python3 - <<'PY'
+   uv run --no-project --with pyyaml python - <<'PY'
    import yaml, pathlib
    H = pathlib.Path.home()
    for f in [H/'.hermes/config.yaml', *sorted((H/'.hermes/profiles').glob('*/config.yaml'))]:

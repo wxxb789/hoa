@@ -1,0 +1,110 @@
+# scripts/retired_skills.toml — data for scripts/install_host_skills.py --check
+#
+# Skill names this repository no longer ships: renamed, split, merged or retired.
+# `--check` reports a host entry under a retired name and never deletes it; the
+# operator removes it (keep a backup).  A retired name must not be a current
+# skill.  Add an entry in the same change that renames or removes a skill.
+#
+#   [retired.<old-name>]
+#   replacement  current skill name, the repo path or the tool that replaces it
+#   reason       one line: why the name went away
+
+[retired.to-prd]
+replacement = "notes-to-prd"
+reason = "older name of the same skill (2026-11-13)"
+
+[retired.to-issues]
+replacement = "plan-to-issues"
+reason = "older name of the same skill (2026-11-13)"
+
+[retired.improve-codebase-architecture]
+replacement = "arch-improvement-plan"
+reason = "host stub whose description arch-improvement-plan already carries (2026-11-13)"
+
+[retired.my-ado-cppr]
+replacement = "prompts/ado-commit-push-pr.md"
+reason = "retired to a one-shot prompt after a necessity eval (2026-11-06)"
+
+[retired.hoa-agent-retrieve]
+replacement = "prompts/cross-agent-history-retrieval.md"
+reason = "retired to a one-shot prompt after a necessity eval (2026-11-06)"
+
+[retired.git-worktree-workflow]
+replacement = "prompts/parallel-agent-worktrees.md"
+reason = "retired to a one-shot prompt after a necessity eval (2026-11-06)"
+
+[retired.hoa-skill-work]
+replacement = "hoa-skill-create"
+reason = "renamed: vague verb `work`, joins the hoa-skill-<verb> family (2026-11-17)"
+
+[retired.skill-library-curation]
+replacement = "hoa-skill-curate"
+reason = "renamed into the hoa-skill-<verb> family after narrowing to provenance and retirement (2026-11-17)"
+
+[retired.skill-porting-and-publishing]
+replacement = "hoa-skill-port"
+reason = "renamed into the hoa-skill-<verb> family; publishing stays in its description (2026-11-17)"
+
+[retired.teams-cdp]
+replacement = "an MCP server"
+reason = "replaced by MCP (#72)"
+
+[retired.m365-copilot-cdp]
+replacement = "an MCP server"
+reason = "replaced by MCP (#72)"
+
+[retired.design-md]
+replacement = "Hermes upstream built-in skill"
+reason = "Hermes-origin; tracked upstream by Hermes (#72)"
+
+[retired.find-nearby]
+replacement = "Hermes upstream built-in skill"
+reason = "Hermes-origin; tracked upstream by Hermes (#72)"
+
+[retired.github-code-review]
+replacement = "Hermes upstream built-in skill"
+reason = "Hermes-origin; tracked upstream by Hermes (#72)"
+
+[retired.github-repo-management]
+replacement = "Hermes upstream built-in skill"
+reason = "Hermes-origin; tracked upstream by Hermes (#72)"
+
+[retired.grounded-citations]
+replacement = "Hermes upstream built-in skill"
+reason = "Hermes-origin; tracked upstream by Hermes (#72)"
+
+[retired.html-artifact]
+replacement = "Hermes upstream built-in skill"
+reason = "Hermes-origin; tracked upstream by Hermes (#72)"
+
+[retired.jupyter-live-kernel]
+replacement = "Hermes upstream built-in skill"
+reason = "Hermes-origin; tracked upstream by Hermes (#72)"
+
+[retired.microsoft-office]
+replacement = "Hermes upstream built-in skill"
+reason = "Hermes-origin; tracked upstream by Hermes (#72)"
+
+[retired.ocr-and-documents]
+replacement = "Hermes upstream built-in skill"
+reason = "Hermes-origin; tracked upstream by Hermes (#72)"
+
+[retired.rss-feeds]
+replacement = "Hermes upstream built-in skill"
+reason = "Hermes-origin; tracked upstream by Hermes (#72)"
+
+[retired.subagent-driven-development]
+replacement = "Hermes upstream built-in skill"
+reason = "Hermes-origin; tracked upstream by Hermes (#72)"
+
+[retired.systematic-debugging]
+replacement = "Hermes upstream built-in skill"
+reason = "Hermes-origin; tracked upstream by Hermes (#72)"
+
+[retired.whisper]
+replacement = "Hermes upstream built-in skill"
+reason = "Hermes-origin; tracked upstream by Hermes (#72)"
+
+[retired.writing-plans]
+replacement = "Hermes upstream built-in skill"
+reason = "Hermes-origin; tracked upstream by Hermes (#72)"

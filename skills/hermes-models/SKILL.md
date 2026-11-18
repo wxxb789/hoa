@@ -7,7 +7,7 @@ description: >-
   between root and profiles, vision or image generation errors, or a relay's effort/cost looks
   wrong. Not for another harness's own model configuration.
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "software-development"
   targets: "hermes"
   summary: "configure Hermes providers, transports and routing; prove every route with live signals, not `config get`"
@@ -227,7 +227,7 @@ validates tier *names*, so a tier left naming the old model makes that repo lie 
 hermes chat -q 'Reply with exactly: PROBE_OK'                    # 1. live answer
 hermes -p <profile> chat -q 'Reply with exactly: PROBE_OK' \
   -t clarify -Q --ignore-rules --max-turns 1                     # 1b. same, inside one home
-python3 - <<'PY'                                                 # 2. the session row
+uv run --no-project python - <<'PY'                              # 2. the session row
 import glob, os, sqlite3
 root = os.path.expanduser(os.environ.get("HERMES_HOME", "~/.hermes"))   # quoted heredoc: bash does not expand
 for home in [root] + sorted(glob.glob(root + "/profiles/*")):
@@ -271,6 +271,7 @@ Vision: one real `vision_analyze` call per profile.
 - `references/config-drift.md` — drift audit, lettered tier menu, reasoning-effort layers, auxiliary vision.
 - `references/provider-metadata-audit.md`, `references/model-endpoint-matrix.md`,
   `references/config-drift-audit.md` — audit detail.
+- Only if a script command fails (for example `uv` is not found), read [references/troubleshooting.md](references/troubleshooting.md).
 - `references/cases.md` — historical cases: Copilot fallback cleanup, ghc-proxy deployment.
 - `scripts/audit-provider-metadata.py`, `scripts/audit-config-drift.py`,
   `scripts/audit-routing-inventory.py`, `scripts/probe-provider-endpoint.sh` — runnable probes (the

@@ -31,7 +31,7 @@ curl -s https://SITE/sitemap.xml | grep -o '<loc>[^<]*</loc>' | sed 's#</\?loc>#
 
 ## 3. 先量化，再评价
 
-`python3 scripts/style_stats.py <evidence-dir> <作者>-` 出一张表；**同一脚本再跑一遍自己的目标稿**，
+`uv run scripts/style_stats.py <evidence-dir> <作者>-` 出一张表；**同一脚本再跑一遍自己的目标稿**，
 否则没有对照组，只能说“他写得好”。
 
 看四个差：
@@ -95,7 +95,7 @@ curl -s https://SITE/sitemap.xml | grep -o '<loc>[^<]*</loc>' | sed 's#</\?loc>#
 - **按语言分桶**：英文篇会同时拉高句均与 ASCII 占比。先按 `ascii_ratio > 50` 切出去，只对中文篇算句子与
   段落中位数，两个数都报，否则一个人的中文句长被英文长句带偏。
 - **首尾段抽样要单独清洗**：站点级样板（页脚版权、书籍广告、系列目录、日期+tag 行）会让 30 篇的“结尾”
-  全是同一句广告、“开头”全是 tag 串。用 `python3 scripts/first_last.py <dir> <prefix>` 取，不要手写切分。
+  全是同一句广告、“开头”全是 tag 串。用 `uv run scripts/first_last.py <dir> <prefix>` 取，不要手写切分。
 - **先按空行切段，再逐段过滤**：顺序反过来（先把空行删掉再切）整篇会塌成一个段落，首尾抽样全错。
 - **结构信号比指标更能定分型**：手册型作者常是“系列固定引言块开场（21/30）+ 结论前置 + 结尾放参考文献
   （27/30）”；随笔型作者是“无小标题（23/30）+ 长段承载 + 结尾抬一层”。先判他属于哪一型，再决定学他的

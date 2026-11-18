@@ -7,7 +7,7 @@ description: >-
   end, including the merge. Do not use for one-line fixes, exploration with no acceptance criteria, or
   work no machine can check (that is a conversation, not a delivery).
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "goal contract → agent-authored stages → operator-run gates → scripted merge gate → resumable ledger; ships `gdd.py`, `delivery-state.py`, `pr-merge-check.py`"
@@ -109,10 +109,10 @@ matching the current stage directly — do not create per-phase skills.
 | `GDD_WORKTREE_SCOPE` | `worktree-scope.py` path | `../delegated-work-acceptance/scripts/worktree-scope.py` |
 
 Resolution order and the config-file path are defined once in
-[skill-porting-and-publishing § Configuration](../skill-porting-and-publishing/SKILL.md#configuration-is-a-gate-not-advice).
+[hoa-skill-port § Configuration](../hoa-skill-port/SKILL.md#configuration-is-a-gate-not-advice).
 `gdd.py` implements it through the vendored `scripts/skill_config.py`; the config-file keys are the
 six names in the table. Nothing about one install lives in the protocol: a profile may point at its own
-files, but no path is inlined.
+files, but no path is inlined. Commands run the bundled scripts with `uv run <path>`. Only if a script command fails (for example `uv` is not found), read [references/troubleshooting.md](references/troubleshooting.md).
 
 Read [`references/transport.md`](references/transport.md) before selecting or dispatching a launcher:
 it defines both routes, model/thinking mapping, artifact polling, and platform-specific evidence.

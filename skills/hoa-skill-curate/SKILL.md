@@ -1,21 +1,21 @@
 ---
-name: skill-library-curation
+name: hoa-skill-curate
 description: >-
-  Review a reusable skill library: inventory, overlap groups, pruning and consolidation proposals,
-  installer provenance, and upstream freshness. Use when asked to audit, prune, or recommend skills,
-  or to answer where an installed skill came from and whether it is current. Not for creating or
-  editing a skill, and not for porting one into a shared repo — review and execution are separate
-  modes, and execution needs its own confirmed scope.
+  Use when asked where an installed skill came from, why an installer warns, whether skills match
+  upstream, which imported skills have abandoned upstreams, or which skills recent work suggests;
+  and to carry out an owner-confirmed retirement, merge or deletion. Not for overlap, shadowing or
+  pruning analysis of the loaded set (the user-run hoa-skill-set-audit command), creating or editing a
+  skill, or porting one into a shared repo.
 metadata:
   revision: "1"
   areas: "software-development,self-management"
   targets: "runtime-agnostic"
-  summary: "review a skill library by evidence: inventory, overlap groups, installer provenance, upstream freshness; recommendations never change state"
-  summary_zh: "按证据审查技能库：清点、重叠分组、安装来源、上游新鲜度；建议不改动状态"
+  summary: "trace installed skills' provenance and upstream freshness, apply the upstream-retirement rule, and execute only owner-confirmed library changes"
+  summary_zh: "追溯已安装技能的来源与上游新鲜度，执行上游退役规则，仅在所有者确认后变更技能库"
   kind: "entry"
 ---
 
-# Skill Library Curation
+# hoa-skill-curate
 
 ## Configuration
 
@@ -26,56 +26,27 @@ metadata:
 | `SKILL_RUNTIME_CONFIG` | operator config file used for the `skills.disabled` label | `${XDG_CONFIG_HOME:-~/.config}/agent/config.yaml` |
 
 Resolution order and the config-file path are defined once in
-[skill-porting-and-publishing § Configuration](../skill-porting-and-publishing/SKILL.md).
+[hoa-skill-port § Configuration](../hoa-skill-port/SKILL.md).
 Nothing above has a machine-specific default: point `SKILLS_HUB` at the store and the rest follows.
 
-Use this for library review, pruning/overlap/consolidation proposals, or usage-based skill discovery.
-Review and recommendation are distinct modes; execution requires its own explicitly confirmed scope.
+Use this for installer provenance, upstream freshness, the retirement sweep, usage-based skill
+discovery, and executing a confirmed library change. Recommendation and execution are distinct
+modes; execution requires its own explicitly confirmed scope.
 For recurring discovery, follow `references/usage-based-recommendations.md`, not a whole-library sweep.
+Overlap, shadowing, contradiction and pruning analysis of the whole loaded set is the user-run
+`hoa-skill-set-audit` command (hidden; e.g. `/hoa-skill-set-audit` in Claude Code, `$hoa-skill-set-audit` in Codex).
 Moving a skill *out* of the runtime into a shared/public repo is a different job — porting and
 publishing (de-coupling axes, generated catalogs, canonical-source swap), not this skill.
 
 ## Core rules
 
-- Be active: a meaningful library review should produce a reusable inventory, classification, or skill-library improvement; do not turn “no deletion yet” into “no work done.”
 - Be conservative: zero usage is evidence, not proof of low value. If the owner's scenario is unclear, classify `needs confirmation` and do not guess.
 - Keep skills class-level: prefer one reusable workflow skill with a small topical reference set over many narrow incident skills or one umbrella with a reference file per session.
-- Report overlap explicitly. Do not silently merge or delete a skill because another one looks similar.
 - For usage-based discovery, ground recommendations in the owner's actual preceding-week activity, not
   agent-generated maintenance or cumulative counters. Return at most three concise Simplified Chinese
   bullet recommendations: actual trigger, practical benefit, next use, installed/enabled/disabled/external
   status and verified source. Do not auto-install or change state; stay silent without worthwhile evidence
   and do not repeat a prior recommendation without a new reason.
-
-## Auditing one workflow skill for protocol integrity
-
-When the owner says a working skill "should be general, let's improve it", the defect is rarely
-missing prose — it is the same protocol living in several files and drifting. Probe before writing:
-
-1. **Inventory the family, not the file.** `wc -l` the umbrella `SKILL.md` plus every `references/`
-   and `profiles/` file, then read the headings of the related skills it names. A stage order or
-   gate that appears in three bodies is already a liability; 500-line profile copies of a 180-line
-   protocol mean every future edit must land in two places.
-2. **Count copies by distinctive token.** Grep a protocol-specific string across the skill tree
-   (a role marker name, the transport wrapper command, the gate script name): one hit per file =
-   one more source of truth. No judgement needed, and it is faster than reading.
-3. **Hunt claims that contradict current defaults.** The highest-value defect is a stale
-   transport/command sentence in a reference file that the umbrella already superseded (e.g. a
-   prompt template still telling you to paste into an interactive pane after the default moved to
-   headless). Fix that in place immediately — it is a factual error, not a design choice.
-4. **Diff same-purpose scripts across skills**
-   (`diff <(sed 's/[[:space:]]*$//' a) <(sed 's/[[:space:]]*$//' b)`). The weaker twin is dead
-   weight: keep the stronger one and make the other a pointer.
-5. **Check coverage against reality, not against intent.** For each repo/project the owner actually
-   works in (`ls -d <workspace>/*/`, look for the contract dir such as `docs/goals/`), ask whether a
-   profile exists. An active repo with no profile is a bigger fluency gap than any wording fix.
-6. **Check for durable state and telemetry.** Is there a per-increment state file (stage, base sha,
-   next action) and a ledger with durations/rounds? If not, interruption recovery is the real
-   bottleneck and more prose cannot fix it.
-
-Deliver: what exists (with counts), where the protocol is duplicated, which claims are already
-wrong, then 2–3 options sized by effort. Do not rewrite a methodology skill the owner depends on
-before they pick an option — the audit is the deliverable.
 
 ## Upstream-maintenance retirement rule
 
@@ -136,27 +107,16 @@ This applies to the `skills` CLI install model and its lock layout in detail —
   normalized. (Prefer this over `gh api .../contents` here — raw HEAD is one fetch per skill.)
 - Cover DISABLED skills too — they still sit on disk and can be re-enabled; a stale one is a
   latent surprise.
-- Run `scripts/upstream-freshness-check.py` (reads the optional disabled list + the installer
+- Run `uv run scripts/upstream-freshness-check.py` (requires uv: it declares PyYAML; reads the optional disabled list + the installer
   lock, threads the fetches, prints only DIFF/ERR rows plus a SAME/DIFF/ERR tally; exits non-zero
   on any DIFF so it can gate). `--enabled` limits the sweep to non-disabled skills; `--lock`,
   `--skills-root`, and `--config` override the XDG-based defaults.
-
-## Review procedure
-
-1. **Define the review scope.** Include enabled, disabled, filesystem-only, loader-only, and archived entries. Record the source/path and current runtime status for every entry.
-2. **Establish runtime truth.** Query the actual runtime loader/registry, then reconcile it with the filesystem inventory. Report loader-only and filesystem-only mismatches instead of dropping them or trusting a stale snapshot.
-3. **Collect usage evidence.** Read the available usage metadata and record use count, last-used time, and whether the evidence is recent, historical, or absent. Never invent frequency from the skill name.
-4. **Read enough content to judge quality.** Inspect each skill's description and, for candidates, its `SKILL.md`; flag empty/malformed metadata, stale instructions, dangerous permissions, unclear scope, or obsolete dependencies.
-5. **Assess every skill on four axes:**
-   - usage frequency: recent, historical, or unobserved;
-   - overlap: unique, complementary, or a concrete replacement candidate;
-   - core value: directly supports the owner's main workflows, useful on demand, or non-core;
-   - quality: clear and maintained, bulky/ambiguous, stale, risky, or malformed.
-6. **Assign exactly one recommendation:** `retain`, `merge`, `suggest delete`, or `needs confirmation`. Use `needs confirmation` whenever a personal integration, domain interest, or future workflow cannot be inferred safely.
-7. **Produce the recommendation before changing state.** For every skill, output its name, recommendation, one-sentence reason, and the four evidence dimensions. Use a CSV/JSON artifact for the full set when chat formatting is constrained; on a channel that renders tables poorly use bullets or labeled rows rather than a raw Markdown table.
-8. **Stop at the decision gate.** Do not delete files, disable skills, rewrite routing, or merge content during the review. Wait for an explicit owner confirmation that names the action scope. A vague request to “review” is not deletion approval.
+- Only if a script command fails (for example `uv` is not found), read [references/troubleshooting.md](references/troubleshooting.md).
 
 ## Execution procedure after explicit confirmation
+
+Input: a retirement-sweep list or a hoa-skill-set-audit report, plus an owner confirmation that names
+the action scope. A vague request to "review" is not deletion approval.
 
 1. Freeze the confirmed set; do not expand it from inference.
 2. Back up every skill directory and affected config before destructive edits. Preserve an audit trail of the selected set and the backup path.
@@ -174,30 +134,14 @@ This applies to the `skills` CLI install model and its lock layout in detail —
   walks the installer's hub index cache — a single-line, multi-megabyte JSON index — and buries
   the hits in tens of megabytes of one JSON line. Target the skill directory or exclude
   `index-cache`.
-- **Do not use an old inventory as runtime truth.** Skill installs, platform gates, and malformed metadata can make loader and filesystem counts differ; reconcile both before declaring totals.
-- **`node_modules` phantom skills.** A vendored npm package under a skill's `scripts/node_modules/` can ship its own `SKILL.md` (e.g. `dotenv/skills/dotenvx/SKILL.md`). A recursive filesystem scan counts it as a top-level skill, but the runtime loader skips `node_modules`, so it is NOT injected and costs no prompt. Do not add it to the disabled list (creates a phantom entry) or delete it (breaks the vendored dep) — exclude `node_modules` from the inventory and note it once. Confirm the real injected count from the live assembled prompt, not the filesystem count.
-- **Do not equate “never used” with “useless.”** Integrations and specialist skills are often intentionally dormant; keep them in `needs confirmation` unless the owner context rules them out.
-- **Do not make a deletion proposal without a replacement or scope reason.** A skill can be non-core without being safe to remove; state the replacement, overlap, or explicit irrelevance.
 - **Do not patch a user-owned, bundled, hub-installed, external, or pinned skill during autonomous curation.** Report the protection boundary and recommend adoption or foreground-owner action instead.
-- **A profile that declares itself authoritative over its umbrella is a drift machine.** Text like
-  "where the two differ, this profile wins" puts owner-level protocol in a per-repo file, so the
-  next protocol edit lands in the wrong place and the two silently disagree. Report it as
-  structural; the profile should carry repo deltas only (contract location, gate commands, branch
-  and bot conventions, frozen surfaces, resource limits).
-- **Do not propose new machinery before checking what the existing failure cost.** Stage caps,
-  extra checklists and dispatcher scripts are guesses until a ledger shows which stage burns the
-  rounds; the mechanical part worth building first is the one that runs a gate the agent keeps
-  skipping by hand.
-- **Do not make a raw Markdown table the only deliverable on a channel that renders tables poorly.** Attach a CSV/JSON artifact and provide readable bullet rows.
-- **Do not let a large inventory hide the decision.** Lead with counts and the high-confidence take, then link the complete per-skill evidence.
 
 ## Completion output
 
 Report:
 
-- total entries and runtime/archived split;
-- counts for retain/merge/suggest-delete/needs-confirmation;
-- high-confidence recommendations and the main overlap groups;
-- at most three genuinely justified new-skill candidates;
-- artifact paths for the complete review;
-- an explicit statement that no changes were made when still at the review gate.
+- provenance answers with the lock record or file that proves them;
+- freshness tally (SAME/DIFF/ERR) and the DIFF rows;
+- retirement candidates with upstream evidence (`pushed_at`, `archived`) and live-dependency checks;
+- for an execution: the frozen set, backup path, post-change verification and rollback path;
+- an explicit statement that no changes were made when still at a decision gate.

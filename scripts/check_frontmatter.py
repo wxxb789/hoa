@@ -7,6 +7,11 @@ frontmatter, `name` is a non-empty string equal to the skill directory, and
 optional summaries) go through the shared parser, so this command and the
 index generator agree on what a valid skill is.
 
+Visibility: `disable-model-invocation` (kebab-case only) must be a YAML boolean,
+and it must agree with `agents/openai.yaml` `policy.allow_implicit_invocation`:
+a hidden skill ships that key as `false`, and a `false` key needs the flag.
+A description over 1024 characters (the agentskills spec cap) is an error.
+
 Usage:
     python scripts/check_frontmatter.py
 
@@ -14,6 +19,7 @@ Exit codes: 0 every skill is valid, 1 at least one finding.
 """
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -25,6 +31,8 @@ import generate_index as gi
 
 ROOT = Path(__file__).resolve().parent.parent
 SKILLS = ROOT / "skills"
+HIDDEN = "disable-model-invocation"
+DESCRIPTION_MAX = 1024
 
 
 def _frontmatter(text: str) -> str:
@@ -39,6 +47,37 @@ def _frontmatter(text: str) -> str:
     if not end:
         raise ValueError("missing frontmatter closing ---")
     return "".join(lines[1:end])
+
+
+def _visibility(skill_md: Path, data: dict) -> list[str]:
+    findings = []
+    for key in data:
+        if (isinstance(key, str) and key != HIDDEN
+                and re.sub(r"[-_]", "", key).lower() == HIDDEN.replace("-", "")):
+            findings.append(f"{skill_md}: {key!r} is misspelled; hosts read only "
+                            f"{HIDDEN!r} (DSH drops the skill)")
+    hidden = data.get(HIDDEN)
+    if HIDDEN in data and not isinstance(hidden, bool):
+        findings.append(f"{skill_md}: {HIDDEN} must be a YAML boolean, got {hidden!r}")
+    path = skill_md.parent / "agents" / "openai.yaml"
+    implicit = None
+    if path.is_file():
+        try:
+            openai = yaml.safe_load(path.read_text(encoding="utf-8"))
+        except (OSError, yaml.YAMLError) as error:
+            return findings + [f"{path}: invalid YAML ({error})"]
+        policy = openai.get("policy") if isinstance(openai, dict) else None
+        implicit = policy.get("allow_implicit_invocation") if isinstance(policy, dict) else None
+        if implicit is not None and not isinstance(implicit, bool):
+            return findings + [f"{path}: policy.allow_implicit_invocation must be a boolean, "
+                               f"got {implicit!r}"]
+    if hidden is True and implicit is not False:
+        findings.append(f"{skill_md}: {HIDDEN}: true needs agents/openai.yaml with "
+                        f"policy.allow_implicit_invocation: false (Codex ignores the flag)")
+    elif implicit is False and hidden is not True:
+        findings.append(f"{skill_md}: agents/openai.yaml sets "
+                        f"policy.allow_implicit_invocation: false; add {HIDDEN}: true")
+    return findings
 
 
 def check_skill(skill_md: Path) -> list[str]:
@@ -64,6 +103,11 @@ def check_skill(skill_md: Path) -> list[str]:
             findings.append(f"{skill_md}: {key} must be a non-empty string")
     if isinstance(data.get("name"), str) and data["name"].strip() != name:
         findings.append(f"{skill_md}: name {data['name']!r} does not match directory {name!r}")
+    description = data.get("description")
+    if isinstance(description, str) and len(description) > DESCRIPTION_MAX:
+        findings.append(f"{skill_md}: description is {len(description)} characters; "
+                        f"cap is {DESCRIPTION_MAX}")
+    findings.extend(_visibility(skill_md, data))
     try:
         gi.parse_skill_metadata(skill_md)
     except ValueError as error:

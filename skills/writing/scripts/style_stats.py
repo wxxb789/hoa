@@ -1,8 +1,12 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.6"
+# dependencies = []
+# ///
 """Per-post style metrics for a sample of scraped blog posts.
 
 Usage:
-    python3 style_stats.py <dir> [prefix]      # files = one post each
+    uv run style_stats.py <dir> [prefix]      # files = one post each
 
 Input: plain text or markdown, one post per file (page-extractor output or cleaned curl HTML).
 Output: one markdown table row per post + column means/medians, so two corpora can be compared

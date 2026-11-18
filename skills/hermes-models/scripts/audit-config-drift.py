@@ -1,9 +1,13 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.7"
+# dependencies = ["pyyaml"]
+# ///
 """Audit config drift between the root Hermes config and every served profile.
 
 Usage:
-    python3 audit-config-drift.py [--hermes-home ~/.hermes] [--agent-dir ~/.hermes/hermes-agent]
-                                  [--show-defaults]
+    uv run audit-config-drift.py [--hermes-home ~/.hermes] [--agent-dir ~/.hermes/hermes-agent]
+                                 [--show-defaults]
 
 Per profile it prints:
   MISS  root deviates from the built-in default but the profile lacks the key  -> real miss, mirror it
@@ -11,8 +15,8 @@ Per profile it prints:
   ONLY  profile-only key                                                       -> report, usually intentional
 
 Exit code 1 when any MISS is found (usable as a check).
-Requires PyYAML; run it with an interpreter that can import it (a Hermes venv, or the toolchain python once
-its shim is installed).
+Requires PyYAML, declared in the inline script metadata that `uv run` installs. When DEFAULT_CONFIG
+cannot be imported from --agent-dir, it warns and skips the deviation-vs-default classification.
 """
 from __future__ import annotations
 

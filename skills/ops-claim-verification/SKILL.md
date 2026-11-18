@@ -3,12 +3,11 @@ name: ops-claim-verification
 description: >-
   Turn a statement about a scheduled job, a repair, or a deployment into evidence before it reaches
   the operator or a teammate: find the surface that actually records the claim, separate a manual
-  reproduction from the scheduled run, and treat an external auditor's verdict as a claim set.
-  Use when verifying a cron result, a "fixed" claim, a CI/review-bot gate, or a batch status report
-  about an environment. Not for auditing the contents of a written report, and not for accepting a
-  teammate's delivery — those are separate passes.
+  reproduction from the scheduled run, and treat an external auditor's verdict as a claim set. Use
+  when verifying a cron result, a "fixed" claim, a CI/review-bot gate, or a batch status report about
+  an environment. Not for auditing a written report's contents or accepting a teammate's delivery.
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "turn a scheduled-job, repair or deployment claim into evidence: find the recording surface, separate manual from scheduled runs, audit the auditor"

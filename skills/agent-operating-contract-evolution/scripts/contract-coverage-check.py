@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.7"
+# dependencies = []
+# ///
 """Verify an instruction-file rewrite (SOUL.md / AGENTS.md / spec) lost no rule.
 
 A compression pass must be behavior-preserving. This checks that every rule you
@@ -6,7 +10,7 @@ declared as a distinctive marker still appears in the rewritten file, and report
 measured size deltas so savings claims rest on numbers, not impressions.
 
 Usage:
-    python3 contract-coverage-check.py OLD.md NEW.md markers.txt
+    uv run contract-coverage-check.py OLD.md NEW.md markers.txt
         [--allow-missing "marker1,marker2"]
 
 markers.txt: one distinctive substring per rule; '#' starts a comment line.

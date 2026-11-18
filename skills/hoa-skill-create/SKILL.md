@@ -1,21 +1,23 @@
 ---
-name: hoa-skill-work
+name: hoa-skill-create
 description: >-
-  Build a complete skill around a defined capability, or evolve an existing
-  skill from a concrete failure or improvement target. Use when the user asks
-  to create or change a skill. Use hoa-skill-review for read-only audits and
-  candidate-output judgments; use hoa-introspect-distill for recurring-work
-  findings that need qualification and item approval, when available.
+  Create a new skill around a defined capability, or evolve or compose (split,
+  hide, chain) an existing skill from a concrete failure or improvement target.
+  Use when the user asks to create or change a skill. Use hoa-skill-review for
+  read-only reviews of one skill and candidate-output judgments; use
+  hoa-skill-port to de-couple and publish a private skill into a shared repo;
+  use hoa-introspect-distill for recurring-work findings that need
+  qualification and item approval, when available.
 metadata:
   revision: "1"
   areas: "software-development,work-management,self-management"
   targets: "runtime-agnostic"
-  summary: "directly create or evolve a defined skill with focused, risk-scaled validation"
-  summary_zh: "直接创建或演进已定义的 skill，并按风险聚焦验证"
+  summary: "directly create, evolve or compose a defined skill with focused, risk-scaled validation"
+  summary_zh: "直接创建、演进或组合已定义的 skill，并按风险聚焦验证"
   kind: "entry"
 ---
 
-# hoa-skill-work
+# hoa-skill-create
 
 ## Outcome
 
@@ -37,9 +39,15 @@ limits summary.
   justified set of skills, read [the creation protocol](references/create.md)
   before writing.
 - For an existing skill with a concrete failure or improvement target, read
-  [the evolution protocol](references/evolve.md) before editing.
+  [the evolution protocol](references/evolve.md) before editing; a protocol
+  repeated across a skill family also needs
+  [skill family integrity](references/skill-family-integrity.md).
 - Read [the evaluation protocol](references/evaluate.md) for either path before
   assessing behavior or making a validation claim.
+- When either path raises a decision to split a skill, hide one from the
+  model, or have one skill load another, read
+  [the composition protocol](references/compose.md) before choosing layout,
+  visibility, or the link.
 
 First find the current owner of the capability and inspect the target
 repository's skill layout, instructions, and nearby examples. If an existing

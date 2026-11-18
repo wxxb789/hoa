@@ -6,7 +6,8 @@ plus optional comma-separated `metadata.consumes` / `metadata.produces` artifact
 names. The graph is valid only when every consumed artifact has exactly one
 producer (or is registered external), every producer is unambiguous, and every
 produced artifact is consumed by some skill or listed under `terminal:` in the
-registry with a one-line reason.
+registry with a one-line reason. A hidden skill (`disable-model-invocation:
+true`) is never a routing target, so it must not be a `must_pick`.
 
 Usage:
     python scripts/check_contract_graph.py          # exit 1 on violations
@@ -41,6 +42,7 @@ class Skill:
     kind: str | None
     consumes: tuple[str, ...]
     produces: tuple[str, ...]
+    hidden: bool = False
 
 
 @dataclass(frozen=True)
@@ -55,8 +57,8 @@ def _artifacts(value: str) -> tuple[str, ...]:
     return tuple(dict.fromkeys(part.strip() for part in value.split(",") if part.strip()))
 
 
-def _contract_fields(text: str, source: Path) -> dict[str, str]:
-    """Read the optional contract scalars through the shared YAML parser."""
+def _contract_fields(text: str, source: Path) -> tuple[dict[str, str], bool]:
+    """Read the optional contract scalars and the hidden flag."""
     frontmatter, _ = sm._frontmatter(text, source)
     try:
         root = yaml.compose(frontmatter, Loader=yaml.SafeLoader)
@@ -73,7 +75,8 @@ def _contract_fields(text: str, source: Path) -> dict[str, str]:
         if not isinstance(value, ScalarNode) or value.tag != sm.STRING:
             raise ValueError(f"metadata.{key} must be a YAML string in {source}")
         values[key] = value.value
-    return values
+    hidden = yaml.safe_load(frontmatter).get("disable-model-invocation") is True
+    return values, hidden
 
 
 def _load_skills(root: Path) -> tuple[Skill, ...]:
@@ -87,7 +90,7 @@ def _load_skills(root: Path) -> tuple[Skill, ...]:
             continue
         text = skill_md.read_text(encoding="utf-8")
         sm.catalog_metadata(text, skill_md)  # required catalog fields and validation
-        contract = _contract_fields(text, skill_md)
+        contract, hidden = _contract_fields(text, skill_md)
         kind = contract["kind"].strip() if "kind" in contract else None
         skills.append(Skill(
             name=entry.name,
@@ -95,6 +98,7 @@ def _load_skills(root: Path) -> tuple[Skill, ...]:
             kind=kind,
             consumes=_artifacts(contract.get("consumes", "")),
             produces=_artifacts(contract.get("produces", "")),
+            hidden=hidden,
         ))
     return tuple(skills)
 
@@ -181,6 +185,12 @@ def analyze(root: Path | None = None) -> Result:
             for case_id, must_pick in cases:
                 if skill.name in must_pick:
                     violations.append(f"{skill.path}: R4: mechanism is a must_pick in "
+                                      f"trigger case {case_id!r}")
+
+        if skill.hidden:
+            for case_id, must_pick in cases:
+                if skill.name in must_pick:
+                    violations.append(f"{skill.path}: R10: hidden skill is a must_pick in "
                                       f"trigger case {case_id!r}")
 
         if skill.kind == "controller":

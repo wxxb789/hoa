@@ -4,10 +4,10 @@ description: >-
   Qualify supplied repeatable-work findings into individually approved skill or
   opted-in rule/config candidates. Use when the user wants candidates assessed
   before choosing an asset, or approves one candidate from an hoa-introspect
-  report. Use hoa-skill-work for direct creation or evolution of a defined skill;
+  report. Use hoa-skill-create for direct creation or evolution of a defined skill;
   use hoa-introspect to discover work patterns in history.
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "self-management,software-development"
   targets: "runtime-agnostic"
   summary: "qualify supplied recurring-work findings as candidates; create only after individual approval"
@@ -58,9 +58,9 @@ spec-versus-created diff.
    If no compatible creator is found, use [inline authoring](references/inline-authoring.md).
    Never describe a hand-off that did not happen.
 6. **Create and verify.** Validate each created `SKILL.md` with
-   `python scripts/validate_skill.py <path>`. For an opted-in rule/config/`AGENTS.md`
-   target outside this package, first run `python scripts/pii_gate.py <target>`; refusal
-   means no write. Do not use `git add -f`.
+   `uv run scripts/validate_skill.py <path>`. For an opted-in rule/config/`AGENTS.md`
+   target outside this package, first run `uv run scripts/pii_gate.py <target>`; refusal
+   means no write. Do not use `git add -f`. Only if a script command fails (for example `uv` is not found), read [references/troubleshooting.md](references/troubleshooting.md).
 7. **Report precisely.** State the mechanism (`runtime creator` with its actual name, or
    `inline authoring`), result location/id, remaining manual review/enablement, and every
    deviation from the approved spec. If creation fails, retain the spec and offer the

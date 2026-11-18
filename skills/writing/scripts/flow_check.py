@@ -1,7 +1,11 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.6"
+# dependencies = []
+# ///
 """流水账探测器：按节统计事实密度、结论句、段落节奏。
 
-Usage: python3 flow_check.py <draft.md>
+Usage: uv run flow_check.py <draft.md>
 
 用来回答“这篇为什么读起来像档案”：不是句子不好，是事实等权、没有场景、每节都收在判断句上。
 命中两条以上就先去改结构（写前规划 → 按冲突组织），不要在旧结构上加句。

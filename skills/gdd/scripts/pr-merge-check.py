@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.7"
+# dependencies = []
+# ///
 """Mechanical merge gate for one PR: may it be squashed right now?
 
 Answers with booleans only. Every fact comes from git/gh; nothing is inferred.

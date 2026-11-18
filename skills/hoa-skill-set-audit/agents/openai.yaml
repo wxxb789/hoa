@@ -1,0 +1,6 @@
+interface:
+  display_name: "Skill Set Audit"
+  short_description: "Audit the whole offered skill set"
+  default_prompt: "Use $hoa-skill-set-audit to audit every skill this session is offered for overlap, shadowing, drift, visibility and budget problems, report-only."
+policy:
+  allow_implicit_invocation: false

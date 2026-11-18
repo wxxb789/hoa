@@ -1,14 +1,13 @@
 ---
 name: dsh-headless-gdd
 description: >-
-  Run one GDD stage on a DeepSeek Harness (`dsh`) headless worker instead of, or beside, the OMP route:
-  one goal, one worktree, one session, NDJSON events, and completion decided from the process exit code
-  plus the final turn event rather than from the worker's own report. Use when a stage is dispatched to
-  dsh headless, when a dsh run reports success without doing the work, when a run must be resumed,
-  stopped or recovered, or when the DSH launcher route needs configuring. Not for deciding what to build
-  (that is the goal contract) and not for the delivery protocol itself (that is `gdd`).
+  Run one GDD stage on a DeepSeek Harness (`dsh`) headless worker instead of, or beside, the OMP
+  route, with NDJSON events and completion decided from the exit code plus the final turn event, not
+  the worker's own report. Use when a stage is dispatched to dsh headless, a dsh run reports success
+  without doing the work, a run must be resumed, stopped or recovered, or the DSH launcher route needs
+  configuring. Not for deciding what to build (the goal contract) or the delivery protocol (`gdd`).
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "dispatch and supervise a GDD stage on dsh headless: session/worktree rules, completion judgement, recovery, harness traps"
@@ -29,7 +28,7 @@ stays in `gdd`; this skill is the operating method for that route, invoked from 
 
 ## When to Use
 
-- Dispatching a stage to DSH: `GDD_LAUNCHER=<repo>/skills/gdd/scripts/adapters/dsh-run.py python3
+- Dispatching a stage to DSH: `GDD_LAUNCHER=<repo>/skills/gdd/scripts/adapters/dsh-run.py uv run
   skills/gdd/scripts/gdd.py stage …`, or the same adapter by hand.
 - Diagnosing a dsh stage that exited 0 but did not do the work, refused to resume, or stalled.
 - Not for choosing the increment (goal contract / `define-goal`), and not for OMP/Paseo route details
@@ -55,9 +54,10 @@ dsh --profile headless --json --permission-mode workspace-write --approval-polic
 The adapter's equivalent, which is what a GDD stage uses:
 
 ```bash
-dsh-run.py start --name <slug> --prompt <task.md> --cwd <worktree> [--session-id <id>|--resume <id>]
-dsh-run.py status <slug>     # until state != running
-dsh-run.py answer <slug>     # the final assistant text
+uv run ../gdd/scripts/adapters/dsh-run.py start --name <slug> --prompt <task.md> --cwd <worktree> \
+    [--session-id <id>|--resume <id>]
+uv run ../gdd/scripts/adapters/dsh-run.py status <slug>   # until state != running
+uv run ../gdd/scripts/adapters/dsh-run.py answer <slug>   # the final assistant text
 ```
 
 ## One goal, one worktree, one session
@@ -118,7 +118,8 @@ a detached run never notifies.
 
 ## Stopping and recovering
 
-- Stop through the adapter: `dsh-run.py kill <slug>`. It writes a generation-bound `stop` request inside
+- Stop through the adapter: `uv run ../gdd/scripts/adapters/dsh-run.py kill <slug>`. It writes a
+  generation-bound `stop` request inside
   the run directory (`<run_dir>/stop`; `{generation, request_id, requested_at, by}`), the runner polls it
   and acts only on its own generation, the run's own finalizer settles it, and only then does
   the adapter escalate — through a validated process handle, never a bare pid or group id (see the

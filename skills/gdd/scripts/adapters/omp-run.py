@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.8"
+# dependencies = []
+# ///
 """omp-run.py — cross-platform launcher adapter for an OMP-style headless agent CLI.
 
 The goal-driven delivery tools (gdd.py, delivery-state.py) never start an agent

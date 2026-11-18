@@ -41,7 +41,7 @@ python3 <lease-tool> status                     # silent = no active lease (the 
 ```bash
 git apply <candidate.patch>
 grep -n '<load-bearing marker>' <p1>        # e.g. handoff guard, receipt field, forbidden CLI
-python3 - <<'PY'                            # parse both YAML blocks, compare dicts — not eyeballing
+uv run --no-project --with pyyaml python - <<'PY'  # parse both YAML blocks, compare dicts — not eyeballing
 import re, subprocess, yaml
 def fm(t): return yaml.safe_load(re.match(r'^---\n(.*?)\n---', t, re.S).group(1))
 new = open('<p1>').read()

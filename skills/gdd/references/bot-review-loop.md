@@ -36,7 +36,7 @@ test -z "$(git status --porcelain)" || exit 2  # review only the committed PR tr
 git diff "$BASE_REF...$REVIEW_HEAD" > "$REVIEW_DIFF" || exit 2
 # Pi accepts fuzzy patterns. Require an exact provider/id registry row first.
 pi --offline --list-models > "$REVIEW_REGISTRY" || exit 2
-python - "$REVIEW_REGISTRY" "$REVIEW_PROVIDER" "$REVIEW_MODEL" <<'PY'
+uv run --no-project python - "$REVIEW_REGISTRY" "$REVIEW_PROVIDER" "$REVIEW_MODEL" <<'PY'
 import sys
 from pathlib import Path
 rows = [line.split() for line in Path(sys.argv[1]).read_text().splitlines()]
@@ -53,7 +53,7 @@ if pi -p --provider "$REVIEW_PROVIDER" --model "$REVIEW_MODEL" \
 else
   exit 2  # preserve failed-run artifacts; do not label them completed evidence
 fi
-python "$GDD_SKILL/scripts/review-receipt.py" --session-dir "$REVIEW_SESSION_DIR" \
+uv run "$GDD_SKILL/scripts/review-receipt.py" --session-dir "$REVIEW_SESSION_DIR" \
   --provider "$REVIEW_PROVIDER" --model "$REVIEW_MODEL" \
   --transport "${REVIEW_TRANSPORT:?declare lane transport}" \
   --api-id "${REVIEW_API:?declare actual API ID}" || exit 2
@@ -76,7 +76,7 @@ Read the report. Set `REVIEW_FINDINGS` to `true` or `false` explicitly according
 a completed review. The generator does not infer the verdict, invoke a model, or post anything.
 
 ```bash
-python "$GDD_SKILL/scripts/review-evidence.py" \
+uv run "$GDD_SKILL/scripts/review-evidence.py" \
   --report "$REVIEW_REPORT" --head "$REVIEW_HEAD" \
   --model "$REVIEW_MODEL" --provider "$REVIEW_PROVIDER" \
   --findings "$REVIEW_FINDINGS" --output "$REVIEW_COMMENT" || exit 2
@@ -121,7 +121,7 @@ COMMENT_URL=$(gh pr comment "$PR" --body-file "$REVIEW_COMMENT") || exit 2
 COMMENT_ID=${COMMENT_URL##*issuecomment-}
 case "$COMMENT_ID" in ''|*[!0-9]*) exit 2 ;; esac
 gh api "repos/$GH_REPO/issues/comments/$COMMENT_ID" > "$REVIEW_RECEIPT" || exit 2
-python - "$REVIEW_COMMENT" "$REVIEW_RECEIPT" <<'PY'
+uv run --no-project python - "$REVIEW_COMMENT" "$REVIEW_RECEIPT" <<'PY'
 import json, sys
 from pathlib import Path
 expected = Path(sys.argv[1]).read_bytes().decode("utf-8")
@@ -134,7 +134,7 @@ test "$?" -eq 0 || exit 2
 test "$REVIEW_HEAD" = "$(gh pr view "$PR" --json headRefOid --jq .headRefOid)" || exit 2
 ```
 
-Then run the project gates and `pr-merge-check.py <PR> --repo <worktree> --verified-head
+Then run the project gates and `uv run scripts/pr-merge-check.py <PR> --repo <worktree> --verified-head
 <full-reviewed-head> --gates-rc <actual-rc>` (with the same `--marker` if customized). A successful
 post alone is not merge permission. Require CI green on that head, valid completed clean evidence,
 zero unresolved threads, and verified local gates. Recheck the head immediately before merging.
@@ -179,6 +179,6 @@ not success. Finally let the merge gate recount **all** threads before accepting
 - `gh pr checks <PR>` lists status/duration. A fast failed download step with a 5xx may be infra;
   inspect its log rather than labeling every fast failure a flake.
 - Re-run only failed jobs on the **same commit**: `gh run rerun <run-id> --failed`.
-- `scripts/watch-pr-checks.py <PR>` bounds infra-only reruns and logs polls; its `.sh` twin has
+- `uv run scripts/watch-pr-checks.py <PR>` bounds infra-only reruns and logs polls; its `.sh` twin has
   the same exit codes. Bound retries instead of turning a broken job green-adjacent by attrition.
 - A new commit does not repair a mirror outage and invalidates the review already measured.

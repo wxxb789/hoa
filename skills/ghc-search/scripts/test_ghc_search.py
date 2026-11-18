@@ -1,5 +1,9 @@
-#!/usr/bin/env python3
-"""Offline check for ghc_search.parse — no network. Run: python test_ghc_search.py"""
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.7"
+# dependencies = []
+# ///
+"""Offline check for ghc_search.parse — no network. Run: uv run test_ghc_search.py"""
 import json
 import pathlib
 import sys

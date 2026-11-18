@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.9"
+# dependencies = []
+# ///
 """dsh-run.py — launcher adapter for DeepSeek Harness (`dsh`) headless runs.
 
 The goal-driven delivery tools (gdd.py, delivery-state.py) never start an agent

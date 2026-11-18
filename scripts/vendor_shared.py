@@ -27,12 +27,24 @@ SOURCES: dict[str, Path] = {
     "skill_config.py": ROOT / "scripts" / "skill_config.py",
 }
 
-# shared script name → destination skill script dirs
+# shared file name → destination skill dirs
 CONSUMERS: dict[str, list[str]] = {
     "skill_config.py": ["skills/gdd/scripts"],
     "safety.py": [
         "skills/hoa-introspect/scripts",
         "skills/hoa-introspect-distill/scripts",
+    ],
+    # Read on failure only; skills whose docs run their own scripts with `uv run`.
+    "troubleshooting.md": [
+        "skills/agent-operating-contract-evolution/references",
+        "skills/gdd/references",
+        "skills/ghc-search/references",
+        "skills/hermes-models/references",
+        "skills/hoa-introspect/references",
+        "skills/hoa-introspect-distill/references",
+        "skills/hoa-skill-curate/references",
+        "skills/hoa-skill-set-audit/references",
+        "skills/writing/references",
     ],
 }
 

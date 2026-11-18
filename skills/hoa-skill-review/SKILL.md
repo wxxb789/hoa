@@ -2,12 +2,12 @@
 name: hoa-skill-review
 description: >-
   Evidence-ranks skill behavior against its intended outcome and next consumer
-  without changing the subject. Use when auditing a skill or reviewing a changed
+  without changing the subject. Use when reviewing one skill or a changed
   skill block. Use when candidate skill replies need judgment against task requirements.
-  Use hoa-skill-work for requested skill creation or evolution; use
+  Use hoa-skill-create for requested skill creation or evolution; use
   hoa-introspect-distill for recurring-work candidates considered for distillation.
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "software-development,work-management,self-management"
   targets: "runtime-agnostic"
   summary: "review skill behavior and changes against consumer evidence without editing the target"
@@ -53,7 +53,7 @@ List **Verified paths** and **Unverified paths** separately. A deterministic sta
 
 ## Optional routes
 
-Use `hoa-skill-work` when the user requests skill creation or evolution; this review does not acquire write authority from that handoff. Use `hoa-introspect-distill` when the user wants recurring-work candidates assessed for distillation; its own process determines whether a candidate is approved for creation. These routes are optional; if unavailable, finish the review within this skill's boundary and report any resulting limit.
+Use `hoa-skill-create` when the user requests skill creation or evolution; this review does not acquire write authority from that handoff. Use `hoa-introspect-distill` when the user wants recurring-work candidates assessed for distillation; its own process determines whether a candidate is approved for creation. These routes are optional; if unavailable, finish the review within this skill's boundary and report any resulting limit.
 
 ## Provenance
 

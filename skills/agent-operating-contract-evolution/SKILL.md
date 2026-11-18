@@ -7,7 +7,7 @@ description: >-
   identity, routing, delegation, or persistence. Not for ordinary repo coding rules, and not for
   one-off task notes.
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "software-development,work-management,self-management"
   targets: "runtime-agnostic"
   summary: "evolve an agent's identity file and operating protocol by layer, with coverage markers, behavioral evals, and load-scope probes"
@@ -61,7 +61,7 @@ The identity file and operating protocol are injected context consumed by an LLM
 - Cut on sight: connective prose ("我的本体是…我的关系是…"), self-explanation that does not generalize to unseen cases, decorative metaphor, human-oriented section titles ("我到底是谁？"), and any rule stated twice in different words.
 - Keep: hard limits word-for-word, the minimum examples needed to stop a rule from drifting, and 1–2 voice anchors.
 - Report measured `bytes` and non-heading rule-line counts before/after — never estimated ones.
-- Prove no rule was lost: `scripts/contract-coverage-check.py OLD NEW markers.txt` (declare one distinctive substring per rule before editing, check after).
+- Prove no rule was lost: `uv run scripts/contract-coverage-check.py OLD NEW markers.txt` (declare one distinctive substring per rule before editing, check after). Only if a script command fails (for example `uv` is not found), read [references/troubleshooting.md](references/troubleshooting.md).
 
 Voice anchors are the deliberate exception. A single line like "the assistant you'd actually want at 2am" is cheap and calibrates tone in a way rule text cannot. Compress rules, not exemplars: deleting every anchor flattens the voice, and no added rule restores it.
 
@@ -162,7 +162,7 @@ The execution half — complete inventory, target-side frontmatter/link conventi
    - Add routing gates where rules could overfire.
    - Keep language operational: trigger → action → proof.
    - A compression pass is behavior-preserving by contract: same rules, shorter form. Never add a rule while compressing — the diff stops being reviewable and the owner only approved the rewrite.
-   - Before editing, enumerate every rule you must preserve as a distinctive marker substring; after writing, run `scripts/contract-coverage-check.py`. A marker per rule beats a prose read-through for proving nothing was dropped.
+   - Before editing, enumerate every rule you must preserve as a distinctive marker substring; after writing, run `uv run scripts/contract-coverage-check.py`. A marker per rule beats a prose read-through for proving nothing was dropped.
 
 6. **Back up before durable edits**
    - For Yellow edits (identity file, operating protocol, config, skills, team docs), create a timestamped backup.

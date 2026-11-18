@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.7"
+# dependencies = []
+# ///
 """watch-pr-checks.py — bounded CI poller for one PR, with infra-only auto-rerun.
 
 Cross-platform port of `watch-pr-checks.sh`; same semantics, same exit codes, no

@@ -51,8 +51,11 @@ targets:  runtime-agnostic | repo-only |
 | hermes-updates | skill | software-development | hermes | `skills/hermes-updates/` | 升级运行中的 Hermes 并诊断漂移：快照、官方更新器、更新后检查、故障索引 |
 | hoa-introspect | skill | self-management,work-management | runtime-agnostic | `skills/hoa-introspect/` | 分层自省报告：确定性使用 facets（L1）+ 带证据的盲点审计（L2） |
 | hoa-introspect-distill | skill | self-management,software-development | runtime-agnostic | `skills/hoa-introspect-distill/` | 评估给定的重复工作发现为候选；逐项批准后才创建资产 |
+| hoa-skill-create | skill | software-development,work-management,self-management | runtime-agnostic | `skills/hoa-skill-create/` | 直接创建、演进或组合已定义的 skill，并按风险聚焦验证 |
+| hoa-skill-curate | skill | software-development,self-management | runtime-agnostic | `skills/hoa-skill-curate/` | 追溯已安装技能的来源与上游新鲜度，执行上游退役规则，仅在所有者确认后变更技能库 |
+| hoa-skill-port | skill | software-development,work-management | runtime-agnostic | `skills/hoa-skill-port/` | 把私有 skill 解耦到可发布仓库：确定权威副本、五轴改造、配置解析、目录与 CI 校验、走分支与 PR 发布 |
 | hoa-skill-review | skill | software-development,work-management,self-management | runtime-agnostic | `skills/hoa-skill-review/` | 依据消费者证据审计 skill 行为与修改，不改动被审查对象 |
-| hoa-skill-work | skill | software-development,work-management,self-management | runtime-agnostic | `skills/hoa-skill-work/` | 直接创建或演进已定义的 skill，并按风险聚焦验证 |
+| hoa-skill-set-audit | skill | software-development,self-management | runtime-agnostic | `skills/hoa-skill-set-audit/` | 审计会话实际提供的整套技能：单项质量、重叠、遮蔽、指令冲突、同名漂移、可见性、../ 闭包、清单预算；只出报告 |
 | kanban-workflows | skill | work-management,software-development | runtime-agnostic | `skills/kanban-workflows/` | 多卡片看板工作：拆解、并行派发、评审门禁、卡住任务恢复 |
 | measurement-campaign-evidence | skill | software-development,work-management | runtime-agnostic | `skills/measurement-campaign-evidence/` | 测量运动：先钉候选身份、串行跑、一致报告集，不让基线伪造延迟对比 |
 | notes-to-prd | skill | work-management | runtime-agnostic | `skills/notes-to-prd/` | 把笔记或想法转成结构化 PRD 草稿 |
@@ -65,8 +68,6 @@ targets:  runtime-agnostic | repo-only |
 | report-claim-audit | skill | work-management,software-development | runtime-agnostic | `skills/report-claim-audit/` | 从各自的权威 artifact 重算每条报告声明、对账交付集合，并给待决事项定价 |
 | research-stream-consolidation | skill | work-management | runtime-agnostic | `skills/research-stream-consolidation/` | 把重复的研究流并成一个项目，并修好绑定旧路径的记录 |
 | review-revision-candidates | skill | work-management | runtime-agnostic | `skills/review-revision-candidates/` | 被驳回候选的返修轮：编号清单就是全部变更集，交的是字节不是辩解 |
-| skill-library-curation | skill | software-development,self-management | runtime-agnostic | `skills/skill-library-curation/` | 按证据审查技能库：清点、重叠分组、安装来源、上游新鲜度；建议不改动状态 |
-| skill-porting-and-publishing | skill | software-development,work-management | runtime-agnostic | `skills/skill-porting-and-publishing/` | 把私有 skill 解耦到可发布仓库：确定权威副本、五轴改造、配置解析、目录与 CI 校验、走分支与 PR 发布 |
 | spec-convergence | skill | software-development | runtime-agnostic | `skills/spec-convergence/` | 把模糊需求收敛为已确认 spec：每轮一个根问题、每轮问题数有上限、每问附事实、写前显式确认共同理解 |
 | structural-validity-gates | skill | software-development | runtime-agnostic | `skills/structural-validity-gates/` | 两面完整性门禁：拒掉坏的，接受格式合法的一切；上线前两侧都要探针 |
 | tmux-agent-control | skill | software-development,work-management | runtime-agnostic | `skills/tmux-agent-control/` | 在 tmux 中驱动运行中的 TUI agent：定位 pane、证明空闲、一次发出完整指令 |
@@ -79,8 +80,11 @@ targets:  runtime-agnostic | repo-only |
 | fresh-context-grader | prompt | software-development,work-management | repo-only | `prompts/fresh-context-grader.md` | 一次性评审 prompt：用先于回答写好的 rubric 在全新上下文里评分 |
 | hermes-skill-naming | prompt | software-development,self-management | hermes | `prompts/hermes-skill-naming.md` | 交给 Hermes 的创建/演化 skill 须知：判定耦合、耦合 skill 加 hermes- 前缀、不分叉内置 skill、可移植 skill 走 hoa 的移植评审 |
 | parallel-agent-worktrees | prompt | software-development,work-management | repo-only | `prompts/parallel-agent-worktrees.md` | 一次性为每个 agent CLI 建独立 git worktree：布局、env/端口隔离、fail-closed 初始化、安全清理 |
+| cross-platform-skills | rule | software-development | repo-only | `rules/cross-platform-skills.md` | 技能在 Windows、Linux、macOS 上原样可跑：安装完整 ../ 依赖闭包、正斜杠相对路径、标准库 Python 显式 UTF-8、技能脚本用 uv run 且带 PEP 723 块 |
 | generalization-rubric | rule | software-development,work-management | repo-only | `rules/generalization-rubric.md` | 技能进入公开目录的唯一标准：陌生人在全新机器上能跑通——六道门槛、硬性失败项、回灌不变量 |
 | generated-means-generated | rule | software-development,work-management,self-management | repo-only | `rules/generated-means-generated.md` | 生成文件绝不手改；再生成随同一提交，漂移即 CI 失败 |
+| skill-composition | rule | software-development | repo-only | `rules/skill-composition.md` | 隐藏子技能：一个可见性标记加 Codex 旁路文件，以 Read 链接串联扁平同级目录且只下一层，必守规则留在父技能，隐藏不等于授权 |
+| skill-naming | rule | software-development | repo-only | `rules/skill-naming.md` | 技能名是稳定 ID 和兜底路由信号：kebab-case 且与目录同名、族内按“族-对象-动词”排列、动词全库一义、禁用泛词、hoa- 只给技能库元技能族、改名走退役登记 |
 | adopt-a-pattern | workflow | software-development | repo-only | `workflows/adopt-a-pattern.md` | 把 ref 地图里的 what-to-steal 笔记变成落地、归类、带署名 artifact 的有限步骤 |
 
 > reflections 与 eval 结果属于文章 / 知识类，不在此索引。

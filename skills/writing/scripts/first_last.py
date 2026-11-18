@@ -1,8 +1,12 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.6"
+# dependencies = []
+# ///
 """Extract the first and last real paragraph of each post (style study).
 
 Usage:
-    python3 first_last.py <dir> [prefix]
+    uv run first_last.py <dir> [prefix]
 
 Why a separate script: raw scraped pages bury the opening under a date+tag line and the ending
 under site boilerplate (licence footer, book ad, series TOC). Splitting on blank lines and taking

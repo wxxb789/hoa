@@ -64,6 +64,8 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 import generate_index as gi  # noqa: E402
 import skill_config as sc  # noqa: E402
+import skill_metadata as sm  # noqa: E402
+import yaml  # noqa: E402
 
 try:  # `python evals/judge_trigger_evals.py` puts evals/ on sys.path
     import run_trigger_evals as gate  # noqa: E402
@@ -88,9 +90,20 @@ class RecordError(ValueError):
     """A baseline record that cannot be written without losing an earlier one."""
 
 
+def hidden(row: dict) -> bool:
+    """A `disable-model-invocation: true` skill is never offered to the model."""
+    if row["type"] != "skill":
+        return False
+    skill_md = ROOT / row["path"] / "SKILL.md"
+    frontmatter, _ = sm._frontmatter(skill_md.read_text(encoding="utf-8"), skill_md)
+    return yaml.safe_load(frontmatter).get("disable-model-invocation") is True
+
+
 def catalog_text() -> str:
+    """The catalog a host offers the model: hidden skills are left out."""
     return "\n".join(
-        f"- {row['name']} ({row['type']}): {row['note_en']}" for row in gi.collect()
+        f"- {row['name']} ({row['type']}): {row['note_en']}"
+        for row in gi.collect() if not hidden(row)
     )
 
 

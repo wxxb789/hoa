@@ -64,6 +64,9 @@ Hand-off to hoa (the operator's skill library):
   skill evolved on Hermes can be fully portable.
 - The prefix rule and the review gate are defined in hoa's `AGENTS.md` ("Hermes-evolved
   skills" and "Portability"); this prompt is the Hermes-facing copy of those rules.
+- The general naming rules (form, one meaning per verb, banned vague words, renames through the
+  retired registry) are in hoa's [`rules/skill-naming.md`](../rules/skill-naming.md); `hermes-` is
+  the domain prefix those rules reserve for Hermes-coupled skills.
 
 ## Provenance
 

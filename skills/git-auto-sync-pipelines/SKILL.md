@@ -7,7 +7,7 @@ description: >-
   auto-sync needs a safety review. Not for a repo with a review/PR workflow, and not for a one-off
   commit you can make yourself.
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "scheduled commit/push for hand-edited repos: ordered gates, allowlist and size caps, staged secret scan, heartbeat and deduped alerts"
@@ -112,6 +112,6 @@ violating it.
 | `alert_channel` | `SYNC_ALERT_CHANNEL` | the scheduler's own notification path |
 
 Resolution order and the config-file path are defined once in
-[skill-porting-and-publishing § Configuration](../skill-porting-and-publishing/SKILL.md#configuration-is-a-gate-not-advice);
+[hoa-skill-port § Configuration](../hoa-skill-port/SKILL.md#configuration-is-a-gate-not-advice);
 this skill does not restate them. The repo list and target branch belong in the operator's config,
 not in the library script.
