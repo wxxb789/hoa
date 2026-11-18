@@ -7,7 +7,7 @@ description: >-
   acceptance or test seam are still undecided. Not for work whose contract is already written,
   one-line fixes, or exploring what the system does today.
 metadata:
-  revision: "2"
+  revision: "3"
   areas: "software-development"
   targets: "runtime-agnostic"
   summary: "converge an unclear request into a confirmed spec: one root concern per round, a capped number of questions per round, every question backed by the fact that makes it real, explicit shared-understanding confirmation before writing"
@@ -115,8 +115,8 @@ unaddressed recommendation is not confirmation, and the spec is not written befo
 
 ### 6. Write the `spec` artifact
 
-Announce the path before writing it. Resolution order and the config-file path are defined once in
-[hoa-skill-port § Configuration](../hoa-skill-port/SKILL.md#configuration-is-a-gate-not-advice);
+Announce the path before writing it. Resolution order and the config-file path are defined in
+[references/configuration.md](references/configuration.md);
 this skill does not restate them. The documented default:
 
 ```bash

@@ -8,7 +8,7 @@ description: >-
   Not for open-ended prose whose quality is the only gate, and not for auditing a report already
   delivered.
 metadata:
-  revision: "2"
+  revision: "3"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
   summary: "meet a measurable brief: freeze the evidence packet, draft in parallel, assemble to the number, verify with the contract's own metric"
@@ -302,7 +302,7 @@ Assembly-script shape: [`references/evidence-packet.md`](references/evidence-pac
 | `draft_token_cap` | `DELIVERABLE_DRAFT_TOKEN_CAP` | `16000` — lower it on a 504 |
 | `stream_idle_timeout_s` | `DELIVERABLE_STREAM_IDLE_TIMEOUT_S` | `300` |
 
-Resolution order and the config-file path are defined once in
-[hoa-skill-port § Configuration](../hoa-skill-port/SKILL.md#configuration-is-a-gate-not-advice);
+Resolution order and the config-file path are defined in
+[references/configuration.md](references/configuration.md);
 this skill does not restate them. Per-project values — packet path, registry, QA script,
 measuring rule — belong in a project profile, not in this protocol.

@@ -7,7 +7,7 @@ description: >-
   compared across agents. Not for a quick bounded subtask in the current turn, and not for work with
   no written task spec or acceptance command.
 metadata:
-  revision: "2"
+  revision: "3"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "hand a bounded coding task to an external agent CLI in an isolated worktree, then verify the diff, tests and every acceptance claim yourself"
@@ -233,7 +233,7 @@ the task cannot conjure a missing fact, and a second re-encode never becomes val
 | `sandbox_mode` | `DELEGATION_SANDBOX` | none — an explicit choice, never a silent fallback |
 | `max_time` | `DELEGATION_MAX_TIME` | none — the harness's own limit, when it has one |
 
-Resolution order and the config-file path are defined once in
-[hoa-skill-port § Configuration](../hoa-skill-port/SKILL.md#configuration-is-a-gate-not-advice);
+Resolution order and the config-file path are defined in
+[references/configuration.md](references/configuration.md);
 this skill does not restate them. This skill never chooses a harness, a model or a
 sandbox level on the operator's behalf.

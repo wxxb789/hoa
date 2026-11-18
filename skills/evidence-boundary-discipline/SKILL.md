@@ -8,7 +8,7 @@ description: >-
   Not for collecting or grading sources (claim auditing), or prose whose every claim is
   primary-sourced.
 metadata:
-  revision: "2"
+  revision: "3"
   areas: "work-management"
   targets: "runtime-agnostic"
   summary: "state only what a dated source supports: tense to dateline, provenance-label parity, absence never escalates"
@@ -117,8 +117,8 @@ list that hides which is which.
 | `recheck_label` | `EVIDENCE_RECHECK_LABEL` | `not re-read` |
 | `qualifier_pattern` | `EVIDENCE_QUALIFIER_PATTERN` | none — prefer the file; a pattern is the fallback |
 
-Resolution order and the config-file path are defined once in
-[hoa-skill-port § Configuration](../hoa-skill-port/SKILL.md#configuration-is-a-gate-not-advice);
+Resolution order and the config-file path are defined in
+[references/configuration.md](references/configuration.md);
 this skill does not restate them.
 
 ## Pitfalls

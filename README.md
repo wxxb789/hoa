@@ -372,21 +372,27 @@ internally.
 [`skills`](https://github.com/vercel-labs/skills) CLI:
 
 ```bash
-# 1. see what is available
-npx skills add wxxb789/hoa --list
+# default: every skill (add -a <agent> to choose runtimes)
+npx skills add wxxb789/hoa -g -s '*'
 
-# 2. install only the skills you need, into the runtimes you use
-npx skills add wxxb789/hoa -g -s <skill> -s <other-skill> -a claude-code -a codex
+# see what is available
+npx skills add wxxb789/hoa --list
 
 # update / remove
 npx skills update
-npx skills remove <skill>
+npx skills remove -g <skill>
 ```
 
-**Install only what you need.** Do not install the whole library (`--all` or `-s '*'`): every
-installed skill's description competes for routing in every session, and many skills here are
-specialised (Hermes-coupled `hermes-*`, `gdd` and its launchers, repo maintenance). Read
-[`index.md`](./index.md), pick the few that match your work, and add more later.
+**Install everything by default.** `npx skills` installs only the skills you name and does not
+follow the `../` links between them, so `-s <skill>` alone can leave a skill without the siblings it
+chains to. To install single skills, copy that skill's command from the Install section of
+[`index.md`](./index.md#install): it is generated from the links and names the skill's whole
+closure. A skill not listed there has no dependencies.
+
+**Upgrading an existing install.** A skill renamed or retired here stays installed under its old
+name. Remove the old names with the generated `npx skills remove -g …` command in the same section;
+`scripts/retired_skills.toml` is the source of that list and names each replacement. First drop any
+name you installed from another source, because the command removes it too.
 
 - Global (`-g`) installs to `~/<agent>/skills/` (`~/.claude/skills`,
   `~/.config/opencode/skills`, `~/.agents/skills`, …); default scope installs to
@@ -509,7 +515,7 @@ External requests are also the best signal for what to build next.
 
 ## Using this repo
 
-- **Anyone:** `npx skills add wxxb789/hoa --list`, then install the few skills you
-  need with `-s <skill>`, or fork and take whichever parts help.
+- **Anyone:** `npx skills add wxxb789/hoa -g -s '*'`, or a single skill with its command from
+  [`index.md`](./index.md#install), or fork and take whichever parts help.
 - **Me:** author skills here → `npx skills add wxxb789/hoa -g -s <skill> -a '*'` →
   they land in every runtime; settings ride along via chezmoi.

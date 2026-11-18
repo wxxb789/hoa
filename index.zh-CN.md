@@ -87,4 +87,25 @@ targets:  runtime-agnostic | repo-only |
 | skill-naming | rule | software-development | repo-only | `rules/skill-naming.md` | 技能名是稳定 ID 和兜底路由信号：kebab-case 且与目录同名、族内按“族-对象-动词”排列、动词全库一义、禁用泛词、hoa- 只给技能库元技能族、改名走退役登记 |
 | adopt-a-pattern | workflow | software-development | repo-only | `workflows/adopt-a-pattern.md` | 把 ref 地图里的 what-to-steal 笔记变成落地、归类、带署名 artifact 的有限步骤 |
 
+## 安装
+
+`npx skills` 只安装你点名的 skill，不跟随它们之间的 `../` 链接。
+整库安装用 `npx skills add wxxb789/hoa -g -s '*'`；单装某个 skill 用下表该行的命令。
+表中没有的 skill 没有依赖：`npx skills add wxxb789/hoa -g -s <skill>`。
+
+| Skill | 依赖（`../` 传递闭包） | 安装命令 |
+|---|---|---|
+| dsh-headless-gdd | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s dsh-headless-gdd -s delegated-work-acceptance -s gdd` |
+| gdd | delegated-work-acceptance, dsh-headless-gdd | `npx skills add wxxb789/hoa -g -s gdd -s delegated-work-acceptance -s dsh-headless-gdd` |
+| hoa-skill-set-audit | hoa-skill-create | `npx skills add wxxb789/hoa -g -s hoa-skill-set-audit -s hoa-skill-create` |
+| omp-headless-orchestration | delegated-work-acceptance, dsh-headless-gdd, gdd | `npx skills add wxxb789/hoa -g -s omp-headless-orchestration -s delegated-work-acceptance -s dsh-headless-gdd -s gdd` |
+
+升级旧安装：移除本仓库已不再提供的名称（由 `scripts/retired_skills.toml` 生成，
+其中写明每个名称的替代者）。先看 `npx skills list -g`，把你从其它来源安装的同名 skill
+从命令中去掉，否则它也会被移除：
+
+```bash
+npx skills remove -g design-md find-nearby git-worktree-workflow github-code-review github-repo-management grounded-citations hoa-agent-retrieve hoa-skill-work html-artifact improve-codebase-architecture jupyter-live-kernel m365-copilot-cdp microsoft-office my-ado-cppr ocr-and-documents rss-feeds skill-library-curation skill-porting-and-publishing subagent-driven-development systematic-debugging teams-cdp to-issues to-prd whisper writing-plans
+```
+
 > reflections 与 eval 结果属于文章 / 知识类，不在此索引。

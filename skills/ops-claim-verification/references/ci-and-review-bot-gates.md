@@ -39,8 +39,8 @@ bullet in §1 of the parent skill; this file is the command-level detail.
   finding dispositions, and obtain a new complete clean report; do not flip a dirty report's flag.
 - Inline threads block independently of the report verdict. Answer with the fixing SHA and measured
   result, resolve after the fixing head's CI is green, and read back the exact thread and all pages.
-- Complete invocation, evidence-generation, posting/readback and thread commands:
-  [`gdd/references/bot-review-loop.md`](../../gdd/references/bot-review-loop.md).
+- Complete invocation, evidence-generation, posting/readback and thread commands: the `gdd`
+  skill's `references/bot-review-loop.md`.
 
 ## Verify the finding before dispatching a fix
 

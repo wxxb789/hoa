@@ -59,6 +59,10 @@ def make_skill(root: Path, name: str, *, index=None, frontmatter=True, quoted=Fa
     return d
 
 
+def append(path: Path, text: str) -> None:
+    path.write_text(path.read_text(encoding="utf-8") + text, encoding="utf-8")
+
+
 class ParseMetadataTests(unittest.TestCase):
     def setUp(self):
         self.tmp = make_temp_root()
@@ -221,7 +225,7 @@ class CollectTests(unittest.TestCase):
         self.assertEqual(rows, [{
             "name": "unlisted-skill", "type": "skill", "path": "skills/unlisted-skill/",
             "note_en": "unlisted-skill does one thing.",
-            "note_zh": "unlisted-skill does one thing.",
+            "note_zh": "unlisted-skill does one thing.", "closure": [],
             "areas": "software-development", "targets": "runtime-agnostic", "revision": "1"}])
 
     def test_frontmatter_summary_beats_description_for_both_languages(self):
@@ -279,6 +283,25 @@ class CheckDriftTests(unittest.TestCase):
         make_skill(self.tmp, "s1")
         self.assertEqual(self._run(check=False), 0)
         (self.tmp / "index.md").write_text("stale", encoding="utf-8")
+        self.assertEqual(self._run(check=True), 1)
+
+    def test_install_commands_carry_the_transitive_closure_and_go_stale(self):
+        make_skill(self.tmp, "a")
+        make_skill(self.tmp, "b")
+        make_skill(self.tmp, "c")
+        make_skill(self.tmp, "solo")
+        append(self.tmp / "skills" / "a" / "SKILL.md", "Read ../b/SKILL.md and follow it.\n")
+        (self.tmp / "skills" / "b" / "references").mkdir()
+        (self.tmp / "skills" / "b" / "references" / "x.md").write_text(
+            "Run ../../c/scripts/ and ../../a/SKILL.md.\n", encoding="utf-8")
+        self.assertEqual(self._run(check=False), 0)
+        index = (self.tmp / "index.md").read_text(encoding="utf-8").split("## Install")[1]
+        self.assertIn("`npx skills add wxxb789/hoa -g -s a -s b -s c`", index)
+        self.assertIn("`npx skills add wxxb789/hoa -g -s b -s a -s c`", index)
+        self.assertNotIn("| c |", index)
+        self.assertNotIn("| solo |", index)
+
+        append(self.tmp / "skills" / "solo" / "SKILL.md", "Read ../c/SKILL.md.\n")
         self.assertEqual(self._run(check=True), 1)
 
 class LibraryCollectTests(unittest.TestCase):

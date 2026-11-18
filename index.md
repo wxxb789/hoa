@@ -89,4 +89,25 @@ targets:  runtime-agnostic | repo-only |
 | skill-naming | rule | software-development | repo-only | `rules/skill-naming.md` | skill names are stable ids and the fallback routing signal: kebab-case equal to the directory, family-object-verb order inside a family, one meaning per verb, no vague words, hoa- only for the skill-library family, renames through the retired registry |
 | adopt-a-pattern | workflow | software-development | repo-only | `workflows/adopt-a-pattern.md` | finite recipe turning a ref-map what-to-steal note into a landed, classified, attributed artifact |
 
+## Install
+
+`npx skills` installs only the skills you name and does not follow the `../` links between them.
+Install everything with `npx skills add wxxb789/hoa -g -s '*'`, or one skill with its row's command
+below. A skill without a row has no dependencies: `npx skills add wxxb789/hoa -g -s <skill>`.
+
+| Skill | Needs (transitive `../` closure) | Install command |
+|---|---|---|
+| dsh-headless-gdd | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s dsh-headless-gdd -s delegated-work-acceptance -s gdd` |
+| gdd | delegated-work-acceptance, dsh-headless-gdd | `npx skills add wxxb789/hoa -g -s gdd -s delegated-work-acceptance -s dsh-headless-gdd` |
+| hoa-skill-set-audit | hoa-skill-create | `npx skills add wxxb789/hoa -g -s hoa-skill-set-audit -s hoa-skill-create` |
+| omp-headless-orchestration | delegated-work-acceptance, dsh-headless-gdd, gdd | `npx skills add wxxb789/hoa -g -s omp-headless-orchestration -s delegated-work-acceptance -s dsh-headless-gdd -s gdd` |
+
+Upgrading an older install: remove the names this repo no longer ships (generated from
+`scripts/retired_skills.toml`, which names each replacement). Check `npx skills list -g` first and
+drop any name you installed from another source; this command removes it too.
+
+```bash
+npx skills remove -g design-md find-nearby git-worktree-workflow github-code-review github-repo-management grounded-citations hoa-agent-retrieve hoa-skill-work html-artifact improve-codebase-architecture jupyter-live-kernel m365-copilot-cdp microsoft-office my-ado-cppr ocr-and-documents rss-feeds skill-library-curation skill-porting-and-publishing subagent-driven-development systematic-debugging teams-cdp to-issues to-prd whisper writing-plans
+```
+
 > Reflections and eval results are prose/knowledge, not indexed here.

@@ -8,7 +8,7 @@ description: >-
   behaviour, hoa-skill-curate for provenance and freshness; whole-set audits are the user-run
   hoa-skill-set-audit.
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "de-couple a private skill for publication: canonical side, five axes, config resolution, catalog/CI validation, branch-and-PR release"
@@ -80,24 +80,13 @@ Full before/after table: [`references/de-coupling-checklist.md`](references/de-c
 
 ### Configuration is a gate, not advice
 
-Every value that differs between installs resolves in one order:
-
-```
-CLI flag → environment variable → operator config file → documented default
-```
-
-The operator config file is `$XDG_CONFIG_HOME/<skill>/config.yaml`, falling back to
-`~/.config/<skill>/config.yaml`; one env var overrides one key. A skill may — and should — read that
-file to customise itself. What it may not do is encode one machine's answer as the only answer.
-
-The rule is implemented once, in [`scripts/skill_config.py`](../../scripts/skill_config.py):
-`resolve(skill, key, *, flag=None, env=None, default=None, root=None)` returns the value, and
-`explain(...)` also returns which step supplied it. The environment variable is
-`<SKILL_BIG_SNAKE>_<KEY_BIG_SNAKE>`, except that a key already shaped like an environment variable
-(`GDD_STATE_FILE`) is used verbatim. `python scripts/skill_config.py --skill <name> --key <KEY>`
-prints the value and its provenance. A skill whose scripts resolve values vendors the file with
-`python scripts/vendor_shared.py` so the installed package stays self-contained; a skill that only
-documents the rule points here instead of restating it.
+Every value that differs between installs resolves in the order defined in
+[references/configuration.md](references/configuration.md); read it before reviewing a package.
+In the shared repository that rule is implemented once, in
+[`scripts/skill_config.py`](../../scripts/skill_config.py), and the reference itself is one file in
+`scripts/shared/`. A skill whose scripts resolve values vendors `skill_config.py`, and a skill that
+only documents the rule vendors `configuration.md` and links it instead of restating it, both with
+`python scripts/vendor_shared.py`, so the installed package stays self-contained.
 
 Review each ported package against this list and record the outcome in the report:
 
@@ -212,7 +201,8 @@ fighting its own line endings (see Pitfalls). Fix that first, or the probe train
 | `base_branch` | `PORTING_BASE_BRANCH` | the remote HEAD branch |
 | `dirty_age_hours` | `PORTING_DIRTY_AGE_HOURS` | `24` |
 
-No key in this table is a repo name. These keys resolve through the shared order above; the file is
+No key in this table is a repo name. These keys resolve in the order in
+[references/configuration.md](references/configuration.md); the file is
 `$XDG_CONFIG_HOME/hoa-skill-port/config.yaml` (fallback `~/.config/...`).
 
 ## Report shape

@@ -7,7 +7,7 @@ description: >-
   recovering a run that was killed mid-turn. Do not use for a two-minute command (run it inline) or for
   work that needs live steering (that is a TUI session).
 metadata:
-  revision: "2"
+  revision: "3"
   areas: "software-development,work-management"
   targets: "pi"
   summary: "detached tmux launcher for long `omp -p` runs; polled completion, session-id recovery"
@@ -45,8 +45,8 @@ A detached run hangs off init (POSIX) or off the process tree Windows keeps aliv
 your session, so it survives session and gateway restarts. Verify with the ancestor chain of the omp
 pid, not by assumption.
 
-The implementation is maintained once, with skill `gdd` (`scripts/adapters/omp-run.py`, cross-platform,
-with `adapters/omp-run.sh` beside it as the POSIX reference), because that skill's `gdd.py` defaults to
+The implementation is maintained once, with skill `gdd` (`../gdd/scripts/adapters/omp-run.py`,
+cross-platform, with `../gdd/scripts/adapters/omp-run.sh` beside it as the POSIX reference), because that skill's `gdd.py` defaults to
 it; the copy here (`scripts/omp-run.sh`) is a forwarder, so manual and dispatched runs share one code
 path.
 

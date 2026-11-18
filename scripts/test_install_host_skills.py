@@ -124,6 +124,21 @@ class InstallHostSkillsTests(unittest.TestCase):
         code, out, _ = self._run("--check")
         self.assertEqual(code, 0, out)
 
+    def test_bytecode_caches_are_ignored_on_both_sides_and_nothing_else(self):
+        self._skill("alpha")
+        shutil.copytree(self.skills / "alpha", self.host / "alpha")
+        for side, payload in ((self.skills, b"repo"), (self.host, b"host")):
+            (side / "alpha" / "scripts" / "__pycache__").mkdir(parents=True)
+            (side / "alpha" / "scripts" / "__pycache__" / "x.cpython-312.pyc").write_bytes(payload)
+        (self.skills / "alpha" / "stray.pyc").write_bytes(b"repo only")
+        code, out, err = self._run("--check")
+        self.assertEqual(code, 0, out + err)
+
+        (self.host / "alpha" / "stray.pyo").write_bytes(b"not a cache we skip")
+        code, out, _ = self._run("--check")
+        self.assertEqual(code, 1)
+        self.assertIn("drifted: alpha (extra stray.pyo)", out)
+
     def test_drifted_real_directory_is_reported_and_refused(self):
         self._skill("alpha")
         shutil.copytree(self.skills / "alpha", self.host / "alpha")
