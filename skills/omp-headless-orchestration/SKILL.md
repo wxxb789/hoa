@@ -122,16 +122,15 @@ path.
     `references/run-failure-modes.md` §8.
 
 16. **A model-endpoint restart window is a transport fault, not a model defect — and a report-only
-    stage can hide it behind `exit 0`.** An endpoint that fronts the models restarts on a schedule the
-    operator's runtime configuration declares (the timer, its unit name and its clock time are
-    install-specific — read them from that configuration, never assume them): a lane dispatched inside
-    the window fails with `ECONNREFUSED`. Classify that as suspected transport, not as a model
-    failure: confirm the window, retry **once** against the same route, and on a second failure switch
-    to another model in the pool or fall back to the primary route — a third attempt on the same
-    assumption is wasted budget. The window is doubly easy to miss because a report-only stage
-    (simplify / review) can still exit 0 while writing an empty or truncated report: read `exit 0`
-    plus an empty or short report as a suspected failure to re-verify before treating the stage as
-    done (pitfalls 8 and 11 are the same rule at the run level).
+    stage can hide it behind `exit 0`.** The endpoint that fronts the models restarts on a schedule
+    the operator's runtime configuration declares — read that schedule from the configuration, never
+    assume it. A lane dispatched inside the window fails with `ECONNREFUSED`: classify that as
+    suspected transport, not as a model failure. Confirm the window, retry **once** against the same
+    route, and on a second failure switch to another model in the pool or fall back to the primary
+    route — a third attempt on the same assumption is wasted budget. The window is doubly easy to miss
+    because a report-only stage (simplify / review) can still exit 0 with an empty or truncated
+    `answer.md`; that is a suspected failure to re-verify, not a completed stage — read the artifact,
+    not just the exit code (pitfalls 8 and 11 are the same rule at the run level).
 
 ## Recovery after a session restart
 
