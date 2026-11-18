@@ -45,5 +45,5 @@ End by stating how the findings could be applied: all, specific numbers, or a de
 
 After the report, end your final message with one fenced ```json block matching the schema at
 `${RESULT_SCHEMA}`: `"stage": "simplify"`, `"verdict": "DONE"`; every finding also goes in
-`findings`. Gate exit codes are integers. If your runtime enforces that schema itself, the final
-message is that JSON object alone.
+`findings`. Gate exit codes are integers. If your runtime enforces that schema itself, send the
+report as its own message first; the final message is then that JSON object alone.

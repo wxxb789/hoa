@@ -123,11 +123,17 @@ counter re-derived from a truncated stream is marked partial (`tool_calls_partia
   (`--output-schema`) and claude (`--json-schema`) enforce it natively; the stage templates ask every
   other agent for a final ```json block. The result (native structured output, else the whole answer
   as JSON, else its last ```json block) sets `result: valid|invalid|missing` (`result_error` names
-  the JSON path) and `result.json` when valid; it never changes `done`/`failed`.
+  the JSON path) and `result.json` when valid; it never changes `done`/`failed`, except that a
+  result codex or claude rejects natively fails the turn and so the run. On those two routes the
+  final message is the JSON alone, so `answer.md` keeps the assistant message before it (the report)
+  above the JSON.
 - **codex / claude.** codex runs `exec --json` with `approval_policy=never`,
   `sandbox_mode=workspace-write` and network access; claude runs `-p --output-format stream-json
-  --verbose --permission-mode bypassPermissions` with a pre-assigned `--session-id` (claude refuses
-  that mode as root, which fails the run). `--thinking` maps to `model_reasoning_effort` / `--effort`.
+  --verbose --permission-mode bypassPermissions` with a pre-assigned `--session-id`, recorded in
+  `state.json` at start (as root, claude refuses that mode and fails the run unless `IS_SANDBOX=1`).
+  `--thinking` maps to `model_reasoning_effort` / `--effort`. claude takes the schema inline
+  (`--json-schema` has no file form), so on Windows `CLAUDE_BIN` must be a native `claude.exe`:
+  `start` refuses npm's `claude.cmd` shim because the JSON carries `"`.
 
 | Key | Resolves | Default |
 |---|---|---|

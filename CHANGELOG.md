@@ -46,6 +46,8 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 - gdd: support Codex and Claude Code and record structured stage results. Codex and Claude
   validate the schema natively; other routes request JSON in the prompt. The runner records
   validation in state and saves valid results to `result.json`; `stage --wait` prints the verdict.
+- gdd: keep the report in `answer.md` on native structured-result routes. Custom launchers
+  must accept `--schema`; failed runs retain both the runner's reason and the agent's error.
 
 - Trigger evals now route on visible skills' frontmatter descriptions, accept `none` when no
   artifact fits, and include three no-trigger cases.

@@ -433,6 +433,11 @@ class PaseoLauncherTests(unittest.TestCase):
         state = self.wait_state("done")
         self.assertEqual(state["result"], "valid", state)
         self.assertEqual(json.loads((self.run_dir() / "result.json").read_text(encoding="utf-8")), result)
+        refused = self.run_adapter("start", "--name", "noschema", "--prompt", str(self.prompt),
+                                   "--cwd", str(self.home), "--schema", str(self.home / "nope.json"))
+        self.assertEqual(refused.returncode, 1, refused.stdout + refused.stderr)
+        self.assertIn("is not a readable JSON object", refused.stderr)
+        self.assertEqual(list(self.run_dir().parent.glob("noschema*")), [])
 
     def test_kill_records_confirmed_agent_deletion(self):
         self.start()

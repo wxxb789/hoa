@@ -48,5 +48,5 @@ covered and how, residual risks and known limits. No adjectives in place of numb
 
 After the report, end your final message with one fenced ```json block matching the schema at
 `${RESULT_SCHEMA}`: `"stage": "implement"`, `"verdict": "DONE"` (or `"BLOCKED"` with the reason in
-`summary`). Gate exit codes are integers. If your runtime enforces that schema itself, the final
-message is that JSON object alone.
+`summary`). Gate exit codes are integers. If your runtime enforces that schema itself, send the
+report as its own message first; the final message is then that JSON object alone.

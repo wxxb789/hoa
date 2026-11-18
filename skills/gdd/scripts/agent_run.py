@@ -23,7 +23,8 @@ then config), else ${XDG_STATE_HOME:-~/.local/state}/gdd/runs.
 state: running|done|failed|killed|unknown. done = exit 0 plus the agent's own success marker.
 --schema FILE: codex and claude enforce it natively; other agents are asked by the prompt. The
 result (native structured output, else the whole answer as JSON, else its last ```json block)
-sets state.result valid|invalid|missing and never changes the run's state.
+sets state.result valid|invalid|missing and never changes the run's state (a result codex or
+claude rejects natively fails their turn, and so the run).
 --max-time is enforced here (exit 124, failed). A `running` run with neither pid nor
 agent_pid alive, no marker and no stop request is finalized failed/-1, stale_recovered, by
 the next reader; a pid-less run younger than GDD_RUN_START_GRACE_SECONDS (60) is starting.
@@ -275,7 +276,7 @@ def observed_state(run_dir, state):
 def new_acc():
     return {"session_id": "", "answer": "", "turns": 0, "tool_calls": 0, "cost_usd": None,
             "usage": {"input_tokens": 0, "output_tokens": 0, "cache_read_tokens": 0, "total_tokens": 0},
-            "error": "", "success_marker": None, "structured": None}
+            "error": "", "success_marker": None, "structured": None, "report": ""}
 
 
 def text_parts(content):
@@ -336,7 +337,8 @@ def fold_codex(acc, event):
     if kind == "thread.started":
         acc["session_id"] = event.get("thread_id") or acc["session_id"]
     elif kind == "item.completed":
-        acc["answer"] = str(item.get("text") or "") if item.get("type") == "agent_message" else acc["answer"]
+        if item.get("type") == "agent_message":  # under --output-schema the last one is the JSON
+            acc["report"], acc["answer"] = acc["answer"] or acc["report"], str(item.get("text") or "")
         acc["tool_calls"] += item.get("type") in ("command_execution", "file_change", "mcp_tool_call", "web_search")
     elif kind == "turn.completed":
         acc["turns"], acc["success_marker"] = acc["turns"] + 1, kind
@@ -354,7 +356,7 @@ def fold_claude(acc, event):
     elif kind == "assistant":
         blocks = [b for b in message.get("content") or [] if isinstance(b, dict)]
         acc["tool_calls"] += sum(b.get("type") == "tool_use" and b.get("name") != "StructuredOutput" for b in blocks)
-        acc["answer"] = text_parts(blocks) or acc["answer"]
+        acc["answer"] = acc["report"] = text_parts(blocks) or acc["answer"]
     elif kind == "result":
         ok = event.get("subtype") == "success" and event.get("is_error") is False
         acc["success_marker"] = "success" if ok else str(event.get("terminal_reason") or event.get("subtype"))
@@ -549,7 +551,7 @@ def finalize(run_dir, exit_code, acc=None, note=None, recovered=False, extra=Non
         verdict = "killed" if exit_code in KILLED_EXITS and not recovered else "failed"
     stats = event_stats(run_dir)
     state.update(progress(acc), **stats, state=verdict, exit=exit_code, ended=now_iso(),
-                 session_id=acc["session_id"] or state.get("session_id") or "", answer_chars=len(acc["answer"]))
+                 session_id=acc["session_id"] or state.get("session_id") or "")
     duration = state_age_seconds(state)
     state["duration_s"] = round(duration, 1) if duration != float("inf") else None
     if failure or (verdict != "done" and acc["error"]):
@@ -563,7 +565,11 @@ def finalize(run_dir, exit_code, acc=None, note=None, recovered=False, extra=Non
     state.update({"note": note} if note else {}, **(extra or {}))
     if schema := read_json(os.path.join(run_dir, "run.json"), {}).get("schema"):
         state.update(stage_result.record(run_dir, acc["answer"], acc["structured"], schema))
-    write_text(os.path.join(run_dir, "answer.md"), acc["answer"])
+    # a native structured result is the JSON alone: keep the report written before it in answer.md
+    report = acc["report"] if schema and acc["report"].strip() not in ("", acc["answer"].strip()) else ""
+    answer = f"{report.rstrip()}\n\n{acc['answer']}" if report else acc["answer"]
+    state["answer_chars"] = len(answer)
+    write_text(os.path.join(run_dir, "answer.md"), answer)
     write_json(os.path.join(run_dir, "state.json"), state)
     write_text(os.path.join(run_dir, "exit.code"), f"{exit_code}\n")
     write_text(os.path.join(run_dir, "finalized"), str(exit_code))
@@ -690,7 +696,8 @@ def cmd_start(args):
     write_json(os.path.join(run_dir, "state.json"), {
         "name": slug, "agent": agent, "state": "running", "exit": None, "cwd": cwd, "started": now_iso(),
         "ended": None, "duration_s": None, "run_dir": run_dir, "pid": None, "agent_pid": None,
-        "session_id": args.resume or "", "backend": "windows" if IS_WINDOWS else "setsid", "model": args.model,
+        "session_id": args.resume or (command[command.index("--session-id") + 1] if "--session-id" in command else ""),
+        "backend": "windows" if IS_WINDOWS else "setsid", "model": args.model,
         "thinking": args.thinking, "max_time": args.max_time, "resumed_from": args.resume,
         "spawn": {"creationflags": DETACH, "platform": sys.platform}})
     runner = [interpreter(), "-B", os.path.abspath(__file__), "_run", "--run-dir", run_dir]

@@ -58,6 +58,7 @@ clause. If a `(axis, rule, file, mechanism)` quadruple repeats a prior round, st
 ## Stage result
 
 After the report, end your final message with one fenced ```json block matching the schema at
-`${RESULT_SCHEMA}`: `"stage": "review"`, the verdict line as `"verdict"` (`BLOCKED:no_progress` is
-`"BLOCKED"`); every finding also goes in `findings`. Gate exit codes are integers. If your runtime
-enforces that schema itself, the final message is that JSON object alone.
+`${RESULT_SCHEMA}`: `"stage": "review"`, the verdict line as `"verdict"` (`nothing material` is
+`"APPROVE"`, `BLOCKED:no_progress` is `"BLOCKED"`; in dual-axis mode, the worse axis verdict); every
+finding also goes in `findings`. Gate exit codes are integers. If your runtime enforces that schema
+itself, send the report as its own message first; the final message is then that JSON object alone.

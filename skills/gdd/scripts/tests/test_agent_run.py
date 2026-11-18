@@ -411,18 +411,34 @@ class ContractTests(RunnerCase):
         write(path, "".join(json.dumps(event) + "\n" for event in events))
         return path
 
+    def reported_fixture(self, agent, report):
+        """<agent>.ok with an assistant `report` message before the structured result."""
+        lines = read(os.path.join(FIXTURES, f"{agent}.ok.ndjson")).splitlines()
+        events = [json.loads(line) for line in lines if line.strip() and not line.startswith("#")]
+        message = ({"type": "item.completed", "item": {"id": "item_r", "type": "agent_message", "text": report}}
+                   if agent == "codex" else
+                   {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "text", "text": report}]}})
+        events.insert(len(events) - (2 if agent == "codex" else 3), message)
+        path = os.path.join(self.tmp, f"{agent}-report.ndjson")
+        write(path, "".join(json.dumps(event) + "\n" for event in events))
+        return path
+
     def test_t14_structured_result(self):
         native = {"codex": ("--output-schema", RESULT_SCHEMA), "claude": ("--json-schema", None)}
+        report = "## Findings\nnothing material"
         for agent, (flag, value) in native.items():
             with self.subTest(agent=agent):
                 os.path.exists(self.record) and os.unlink(self.record)
-                self.start(f"native-{agent}", agent, "ok", "--schema", RESULT_SCHEMA)
+                self.start(f"native-{agent}", agent, "ok", "--schema", RESULT_SCHEMA,
+                           env={"STUB_FIXTURE": self.reported_fixture(agent, report)})
                 argv = self.recorded()["argv"]
                 carried = argv[argv.index(flag) + 1]
                 self.assertEqual(carried if value else json.loads(carried), value or json.loads(read(RESULT_SCHEMA)))
                 state = self.finished(f"native-{agent}")
                 self.assertEqual((state["state"], state["result"]), ("done", "valid"), state)
                 self.assertEqual(json.loads(read(os.path.join(self.run_dir(f"native-{agent}"), "result.json"))), STAGE_RESULT)
+                self.assertEqual(read(os.path.join(self.run_dir(f"native-{agent}"), "answer.md")),
+                                 f"{report}\n\n{EXPECTED[agent]['answer']}")
         bad = {**STAGE_RESULT, "gates": [{"command": "make test", "exit_code": "0", "counts": None}]}
         cases = (("fenced", f"Report.\n```json\n{json.dumps(STAGE_RESULT)}\n```\n", "valid", None),
                  ("invalid", f"```json\n{json.dumps(bad)}\n```", "invalid",

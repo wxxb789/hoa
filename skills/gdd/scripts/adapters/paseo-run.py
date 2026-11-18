@@ -307,6 +307,15 @@ def start(args):
         prompt = handle.read()
     if not prompt.strip():
         fail("empty prompt")
+    schema = args.schema and os.path.abspath(os.path.expanduser(args.schema))
+    if schema:
+        try:
+            with open(schema, encoding="utf-8") as handle:
+                readable = isinstance(json.load(handle), dict)
+        except (OSError, ValueError):
+            readable = False
+        if not readable:
+            fail(f"--schema {schema} is not a readable JSON object")
     # Validate before creating a run directory or dispatching anything. Batch
     # shims cannot carry arbitrary prompts; never send a silently shortened one.
     command_argv({"paseo_argv": prefix}, ["run", "--cwd", cwd, "--", prompt])
@@ -324,7 +333,7 @@ def start(args):
                  "paseo_argv": prefix,
                  "run_dir": run_dir, "pid": None, "agent_id": None,
                  "session_id": "", "model": args.model, "thinking": args.thinking,
-                 "result_schema": args.schema and os.path.abspath(args.schema)}
+                 "result_schema": schema}
         text_file(run_dir, "prompt.md", prompt)
         text_file(run_dir, "stderr.log", "")
         text_file(run_dir, "events.ndjson", "")
