@@ -370,6 +370,7 @@ Choose the capability by the work you want done, not by the model running it:
 | Discover recurring work in agent history | `hoa-introspect` | Evidence-cited work-pattern findings; no automatic creation |
 | Qualify a supplied recurring-work finding before choosing an asset | `hoa-introspect-distill` | Individually approved candidate and, when approved, its created asset |
 | Audit the whole skill set a session is offered for overlap, shadowing, drift, visibility and budget (hidden: run `/hoa-skill-set-audit`, Codex `$hoa-skill-set-audit`) | `hoa-skill-set-audit` | Ranked set-level findings with evidence; nothing changed |
+| Cut over Hermes model routes during a provider outage, retirement or restore (hidden; manual: `/hermes-models-cutover`, Codex `$hermes-models-cutover`, Pi/OMP `/skill:hermes-models-cutover`, OpenCode `@hermes-models-cutover`) | `hermes-models-cutover` | A reversible fleet change with live proof per affected surface |
 
 For behavior changes, `hoa-skill-create` starts with focused checks and expands to multiple
 variants, models, or runtimes when reach, risk, or conflicting evidence warrants

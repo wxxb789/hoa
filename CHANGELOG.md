@@ -8,6 +8,7 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 - Retired four stubs: `design-an-interface` (`codebase-design`), `arch-improvement-plan` and
   `notes-to-prd` (`ce-plan`), and `plan-to-issues` (`to-tickets`).
+- Add the hidden `hermes-models-cutover` mechanism for reversible fleet route changes and live verification.
 
 - Trigger evals now route on visible skills' frontmatter descriptions, accept `none` when no
   artifact fits, and include three no-trigger cases.

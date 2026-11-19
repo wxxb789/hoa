@@ -49,6 +49,7 @@ targets:  runtime-agnostic | repo-only |
 | harness-engineering | skill | software-development | runtime-agnostic | `skills/harness-engineering/` | audit and restructure harness scripts: self-containment, obligations bound to owner decisions, pure checks plus one thin runner, net-negative line budget |
 | hermes-context-file-loading | skill | software-development | hermes | `skills/hermes-context-file-loading/` | which Hermes instruction file loads from where, which project file wins, and which prompt tier a rule belongs to |
 | hermes-models | skill | software-development | hermes | `skills/hermes-models/` | configure Hermes providers, transports and routing; prove every route with live signals, not `config get` |
+| hermes-models-cutover | skill | software-development | hermes | `skills/hermes-models-cutover/` | cut over provider routes across Hermes homes and harnesses with live proof and rollback |
 | hermes-updates | skill | software-development | hermes | `skills/hermes-updates/` | upgrade a live Hermes install and diagnose drift: snapshot, official updater, post-check, failure index |
 | hoa-introspect | skill | self-management,work-management | runtime-agnostic | `skills/hoa-introspect/` | layered self-report: deterministic usage facets (L1) + evidence-cited blind-spot audit (L2) |
 | hoa-introspect-distill | skill | self-management,software-development | runtime-agnostic | `skills/hoa-introspect-distill/` | qualify supplied recurring-work findings as candidates; create only after individual approval |

@@ -336,6 +336,7 @@ npx skills update -g -y
 | 从 agent 历史中发现重复工作 | `hoa-introspect` | 带证据的工作模式发现；不会自动创建资产 |
 | 在选择资产前评估给定的重复工作发现 | `hoa-introspect-distill` | 逐项批准的候选，以及获批后创建的资产 |
 | 审计会话实际提供的整套 skill：重叠、遮蔽、漂移、可见性与清单预算（隐藏 skill：手动运行 `/hoa-skill-set-audit`，Codex 用 `$hoa-skill-set-audit`） | `hoa-skill-set-audit` | 按危害排序、带证据的整体发现项；不做任何修改 |
+| 在供应商中断、退役或恢复时切换 Hermes 路由（隐藏 skill；手动运行 `/hermes-models-cutover`，Codex 用 `$hermes-models-cutover`，Pi/OMP 用 `/skill:hermes-models-cutover`，OpenCode 用 `@hermes-models-cutover`） | `hermes-models-cutover` | 可回滚的全量切换，并逐一提供受影响运行面的实时证据 |
 
 对行为变更，`hoa-skill-create` 默认使用聚焦检查；只有覆盖面、风险或相互矛盾的证据需要时，
 才扩大到多版本、多模型或多 runtime。`hoa-introspect-distill` 保留逐候选批准门槛；
