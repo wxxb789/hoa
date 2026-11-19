@@ -40,6 +40,61 @@ PASSTHROUGH = {
     "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL",
 }
 SKIP = {".git", "__pycache__", ".pytest_cache"}
+WINDOWS_SEPARATOR = r"(?:\\+|/)"
+WINDOWS_ROOT = rf"(?:[a-zA-Z]:{WINDOWS_SEPARATOR}|(?:\\{{2,}}|//)(?=[\w?.]))"
+ABSOLUTE_PATH = re.compile(
+    rf"(?<![\w:/\\>])(?:"
+    rf"(?<=[\"'`])(?:{WINDOWS_ROOT}|/(?!/))[^\"'`\r\n]*"
+    rf"|{WINDOWS_ROOT}[^\s\"'`<>|,;)]*"
+    r"|/(?!/)[\w.~%-][^\s\"'`<>|,;)]*)"
+)
+
+
+def path_forms(path):
+    forms = {os.fspath(path), os.path.realpath(path)}
+    if os.name == "nt":
+        from ctypes import create_unicode_buffer, windll
+
+        # A volume may disable 8.3 aliases; in that case this adds no new form.
+        short_path = windll.kernel32.GetShortPathNameW
+        size = short_path(str(path), None, 0)
+        if size:
+            buffer = create_unicode_buffer(size)
+            if 0 < short_path(str(path), buffer, size) < size:
+                forms.add(buffer.value)
+    return forms
+
+
+def redact(root, value, *, windows=os.name == "nt"):
+    forms = sorted(path_forms(root), key=len, reverse=True)
+    if windows:
+        # Backslashes can already be escaped in an answer containing nested JSON.
+        trials = [WINDOWS_SEPARATOR.join(map(re.escape, re.split(r"[/\\]", form)))
+                  for form in forms]
+        prefix = rf"(?:{WINDOWS_SEPARATOR}{{2}}\?{WINDOWS_SEPARATOR})?"
+    else:
+        trials, prefix = list(map(re.escape, forms)), ""
+    trial = re.compile(prefix + "(?:" + "|".join(trials) + r")(?![\w.-])",
+                       re.IGNORECASE if windows else 0)
+    identities = [re.escape(os.environ[key]) for key in ("USERNAME", "LOGNAME", "USER")
+                  if os.environ.get(key)]
+    identity = re.compile(r"(?<!\w)(?:" + "|".join(identities) + r")(?!\w)", re.IGNORECASE)
+    credentials = [os.environ[key] for key in ("ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY")
+                   if os.environ.get(key)]
+
+    def clean(item):
+        if isinstance(item, str):
+            for secret in credentials:
+                item = item.replace(secret, "<redacted>")
+            item = ABSOLUTE_PATH.sub("<path>", trial.sub("<trial>", item))
+            return identity.sub("<redacted>", item) if identities else item
+        if isinstance(item, dict):
+            return {clean(key): clean(entry) for key, entry in item.items()}
+        if isinstance(item, list):
+            return [clean(entry) for entry in item]
+        return item
+
+    return clean(value)
 
 
 def isolated_env(root):
@@ -180,17 +235,14 @@ def trial(args, task, fixture, root, with_skill):
     output = result.get("result", "") if error is None else ""
     contaminated = not with_skill and any(event["skill_access"] for event in trace)
     scores, artifacts = judge(task["rubric"], output, workspace)
-    usage = result.get("usage", {})
-    def redact(value):
-        return value.replace(str(root), "<trial>").replace(root.as_posix(), "<trial>")
-
-    return {"error": error, "contaminated": contaminated, "trace": trace, "output": redact(output),
-            "artifacts": {name: redact(value) for name, value in artifacts.items()},
-            "checks": scores, "score": sum(scores.values()) / len(scores),
-            "passed": error is None and not contaminated and all(scores.values()),
-            "seconds": round(time.monotonic() - started, 3), "usage": usage,
-            "models": sorted(result.get("modelUsage", {})), "cost_usd": result.get("total_cost_usd"),
-            "turns": result.get("num_turns")}
+    record = {"error": error, "contaminated": contaminated, "trace": trace,
+              "output": output, "artifacts": artifacts,
+              "checks": scores, "score": sum(scores.values()) / len(scores),
+              "passed": error is None and not contaminated and all(scores.values()),
+              "seconds": round(time.monotonic() - started, 3), "usage": result.get("usage", {}),
+              "models": sorted(result.get("modelUsage", {})), "cost_usd": result.get("total_cost_usd"),
+              "turns": result.get("num_turns")}
+    return redact(root, record)
 
 
 def run_eval(args):
@@ -208,6 +260,7 @@ def run_eval(args):
         root = Path(temp)
         version = gdd_process.run([str(args.claude), "--version"], cwd=root, env=isolated_env(root),
                                   text=True, capture_output=True, check=True, timeout=args.timeout).stdout.strip()
+        version, model = redact(root, [version, args.model])
     for repeat in range(args.repeats):
         for arm in (arms if repeat % 2 == 0 else arms[::-1]):
             with tempfile.TemporaryDirectory(prefix=f"hoa-eval-{arm}-") as temp:
@@ -232,7 +285,7 @@ def run_eval(args):
                 outcome = "skill wins" if a else "baseline wins"
     record = {"schema_version": 1, "task": task["id"], "generated_at": stamp.isoformat(),
               "skill": task["skill"], "skill_revision": revision[1] if revision else None,
-              "cli_version": version, "model": args.model, "repeats": args.repeats,
+              "cli_version": version, "model": model, "repeats": args.repeats,
               "mode": "acceptance" if args.acceptance else "necessity", "order": order,
               "rubric": task["rubric"], "summary": summary, "runs": runs, "outcome": outcome,
               "limits": {"turns_per_run": args.max_turns, "usd_per_run": args.max_budget_usd,
@@ -241,7 +294,7 @@ def run_eval(args):
     with destination.with_suffix(".json").open("x", encoding="utf-8", newline="\n") as file:
         json.dump(record, file, indent=2, ensure_ascii=False)
         file.write("\n")
-    markdown = [f"# {task['id']}", "", f"Outcome: **{outcome}** ({args.model}, k={args.repeats}).", ""]
+    markdown = [f"# {task['id']}", "", f"Outcome: **{outcome}** ({model}, k={args.repeats}).", ""]
     for arm, row in summary.items():
         markdown.append(f"- {arm}: {row['passed']}/{args.repeats} passed; "
                         f"pass^k: {row['pass^k']}; mean score: {row['mean_score']}.")

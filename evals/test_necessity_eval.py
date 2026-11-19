@@ -40,7 +40,7 @@ if has_skill or LEAK_BASELINE:
     ]}}))
 print(json.dumps({"type": "result", "subtype": "success", "num_turns": 2,
                   "usage": {"output_tokens": 3},
-                  "result": json.dumps({"answer": 42 if has_skill else 0})}))
+                  "result": json.dumps({"answer": 42 if has_skill else 0, "cwd": str(Path.cwd())})}))
 """
 
 
@@ -92,7 +92,33 @@ def test_paired_results_and_process_isolation(tmp_path, monkeypatch):
     assert record["summary"]["skill"]["pass^k"] is True
     assert record["summary"]["baseline"]["pass^k"] is False
     assert record["runs"]["skill"][0]["usage"]["output_tokens"] == 3
+    assert json.loads(record["runs"]["skill"][0]["output"])["cwd"].startswith("<trial>")
     assert record["outcome"] == "skill wins"
+
+
+def test_redact_windows_paths_and_credentials(monkeypatch):
+    root = r"R:\Trials\Long Trial Name"
+    monkeypatch.setattr(runner, "path_forms", lambda path: (
+        (root, r"R:\TRIALS\LONGTR~1") if path == root else (str(path),)
+    ))
+    monkeypatch.setenv("TEMP", r"C:\Users\ExampleUser\AppData\Local\Temp")
+    monkeypatch.setenv("USERPROFILE", r"C:\Users\ExampleUser")
+    monkeypatch.setenv("USERNAME", "ExampleUser")
+    monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "test-only-secret")
+    output = json.dumps([
+        r"r:/tRiAlS\long trial NAME/work/file.md",
+        r"R:\Trials/LONGTR~1\work\file.md",
+        r"c:/users\exampleuser/AppData\Local/Temp",
+        r"C:\Users\EXAMPL~1\cache",
+        r"Z:\Other Host Path\cache",
+        "/tmp/another-trial/report.md",
+        "ExampleUser: test-only-secret",
+        "subject/README.md",
+    ])
+    clean = json.loads(runner.redact(root, output, windows=True))
+    assert all(path.startswith("<trial>") for path in clean[:2])
+    assert clean[2:6] == ["<path>"] * 4
+    assert clean[6:] == ["<redacted>: <redacted>", "subject/README.md"]
 
 
 def test_baseline_skill_access_invalidates_pair(tmp_path, monkeypatch):
