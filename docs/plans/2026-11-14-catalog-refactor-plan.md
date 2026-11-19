@@ -2,16 +2,19 @@
 
 Date: 2026-11-14 · measurement baseline: `cabf8c6` (VERSION 0.1.59) · this increment: 0.1.61
 
-This is the plan of record, not implementation of its future phases. Version 1 received two separately
+**Stale as of 2026-11-19.** This is a historical proposal, not an active roadmap. Some proposals
+were superseded by later changes; verify any remaining item against the current tree before adopting it.
+
+Version 1 received two separately
 produced read-only audit reports; version 2 received simplify and code-review reports.
-[The sanitized evidence and disposition record](../evidence/2026-11-14-catalog-refactor.md) attributes
+[The sanitized evidence and disposition record](https://github.com/wxxb789/hoa/blob/d181c40f9627aca1743ec05567fca4f996f10e11/docs/evidence/2026-11-14-catalog-refactor.md) attributes
 conclusions and records input/report fingerprints. Report contents are operator-held; reading them
 does not establish execution isolation or current host state. Raw reports remain outside this repository
 because they contain installation details.
 
-All measurements below are pinned to `cabf8c6`, not claims about an evolving latest tree. Reproduce size
-and queue measurements with `python docs/evidence/catalog_measurement.py --ref cabf8c6` from the repo
-root, with `scripts/requirements.txt` installed. Strip YAML frontmatter and exterior blank lines; use
+All measurements below are pinned to `cabf8c6`, not claims about an evolving latest tree. The
+[measurement script](https://github.com/wxxb789/hoa/blob/d181c40f9627aca1743ec05567fca4f996f10e11/docs/evidence/catalog_measurement.py)
+is retained in Git history. Strip YAML frontmatter and exterior blank lines; use
 `splitlines()` for body lines and whitespace `split()` for words, including code. Count ATX H2 outside
 matching backtick/tilde fences; p90 uses nearest rank. The evidence record specifies other static
 inventory methods. No size measurement proves behavior coverage.

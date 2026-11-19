@@ -17,9 +17,8 @@ reason = "older name of the same skill (2026-11-13)"
 replacement = "to-tickets"
 reason = "older name of the same skill (2026-11-13)"
 
-[retired.improve-codebase-architecture]
-replacement = "ce-plan"
-reason = "retired as a duplicate architecture planning stub (2026-11-13)"
+# Do not list improve-codebase-architecture: the name-only command would
+# also remove the live mattpocock/skills skill of the same name.
 
 [retired.design-an-interface]
 replacement = "codebase-design"

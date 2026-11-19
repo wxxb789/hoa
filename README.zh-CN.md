@@ -22,7 +22,7 @@ runtime；runtime 的**设置**（LLM provider、models、plugins）留在 chezm
   是包裹在模型外的一切：context、tools、control loop、memory、permissions、
   output handling。`hoa` 不存整套 harness——一套 harness 是**组装**出来的：runtime
   自己的**设置**（chezmoi 管）加上这里的**可移植部件**（`skills/` 用 `npx skills`
-  装，`agents/` `prompts/` `rules/` `mcps/` 作它取用的库）。
+  装，`agents/` `prompts/` `rules/` 作它取用的库）。
 - **Orchestration & loop engineering（编排 / 循环工程）**——驱动迭代式、多 agent
   工作的控制结构：continuation、termination、retry、handoff、fan-out / fan-in、
   best-of-N。循环只是编排的一种形态，所以归 `orchestration/`，不设 `loops/`。
@@ -71,7 +71,6 @@ hoa/
 ├── paseo-plugins/ # 可选 Paseo 插件源码；显式安装，不自动下发
 ├── agents/        # 可移植、runtime 无关的 role / persona / authority / I-O 契约
 ├── orchestration/ # 调度、handoff、retry、continuation、termination、聚合(循环、crew、fan-out/in、best-of-N)
-├── mcps/          # 可移植的 MCP server 定义与清单
 ├── prompts/       # 按任务调用的 prompt 模板
 ├── rules/         # 常驻的规范性约束 / 可复用 ruleset
 ├── workflows/     # 面向结果的有限步骤 recipe(不含 retry / termination 控制器)
@@ -89,7 +88,7 @@ hoa/
 `python scripts/generate_index.py`：自定义 skill 使用 YAML 的 `metadata.areas` /
 `metadata.targets`，库 artifact 使用 `<!-- index: ... -->` 注释（CI 会对漂移报错）。
 Artifact 包括 skill（`skills/<name>/SKILL.md`）与库文件
-（`agents/`、`mcps/`、`orchestration/`、`prompts/`、`rules/`、`workflows/`
+（`agents/`、`orchestration/`、`prompts/`、`rules/`、`workflows/`
 下的 `<folder>/<name>.md` 或 `<folder>/<name>/README.md`）。目录名全局唯一，
 每个配置的库目录至少要有一个 artifact,索引备注取 artifact 自身的元数据：
 skill 用 `metadata.summary` / `metadata.summary_zh`，库 artifact 用索引注释里的
@@ -119,12 +118,11 @@ skill 用 `metadata.summary` / `metadata.summary_zh`，库 artifact 用索引注
 | `skills/` | `SKILL.md` 包：唯一可下发的 artifact。`npx skills add wxxb789/hoa -s <skill>` 安装你选中的那些。 | 是 |
 | `paseo-plugins/` | 可选 Paseo 插件源码，包括只读的 GDD run observer。 | 仅手动选择安装 |
 | `agents/` | 1 个 role / authority / I-O 契约（`skill-scout`）。 | 否——库 |
-| `mcps/` | 1 个可移植 MCP 定义（`ghc-proxy`）。 | 否——库 |
 | `orchestration/` | 1 个调度/handoff/termination 模式（`typed-verification-gates`）。 | 否——库 |
 | `prompts/` | 5 个按任务调用的 prompt 模板。 | 否——库 |
 | `rules/` | 1 条常驻约束（`generated-means-generated`）。 | 否——库 |
 | `workflows/` | 1 个面向结果的有限 recipe（`adopt-a-pattern`）。 | 否——库 |
-| `evals/` | 两个 case suite（`trigger-cases.json`、`skill-method-cases.json`）及其离线校验器。 | 否——仅仓库 |
+| `evals/` | 触发用例与离线校验器。 | 否——仅仓库 |
 | `reflections/`、`ref/` | 人写的复盘与外部参考子模块；研究材料，从不下发。 | 否 |
 | `scripts/` | 仓库维护：目录与安装命令、版本/revision 检查、契约图、配置解析器。 | 否 |
 
@@ -171,7 +169,7 @@ Windows 的 `gdd-runner`。两者都在每次 push 到 `main`、每个 pull requ
 | Vendored shared scripts drift | `python scripts/vendor_shared.py --check` | 分发到 skill 内的共享脚本副本与权威文件一致。 |
 | PR bumps changed skills' revision（pull request） | `python scripts/version.py check-revisions` | 自 merge base 以来改动过的每个 skill 目录都提高了 `metadata.revision`。 |
 | pytest | `python -m pytest` | `scripts/`、`evals/`、`skills/` 下每个 `test_*.py` unittest/pytest 文件（`pytest.ini`）；每个测试 120 秒上限。 |
-| 脚本检查 | `python evals/run_trigger_evals.py`、`evals/validate_skill_method_cases.py`、`skills/define-goal/evals/validate_fixtures.py`、`skills/hermes-models/scripts/tests/test-*.py`、`skills/gdd/scripts/tests/test_verdict_matrix.py`、`mutate_verdict_matrix.py` | 以退出码为契约的独立检查；每个一个 step。 |
+| 脚本检查 | `python evals/run_trigger_evals.py`、`skills/define-goal/evals/validate_fixtures.py`、`skills/hermes-models/scripts/tests/test-*.py`、`skills/gdd/scripts/tests/test_verdict_matrix.py`、`mutate_verdict_matrix.py` | 以退出码为契约的独立检查；每个一个 step。 |
 | Paseo gdd-observer | 在 `paseo-plugins/gdd-observer` 中 `npm ci && npm run typecheck && npm test` | 插件的 typecheck 与 Vitest 套件。 |
 | `gdd-runner`（Ubuntu、macOS、Windows） | 对 `skills/gdd/scripts/tests/` 下的 `test_agent_run.py`、`test_detach_supervisors.py`、`test_gdd.py`、`test_no_window.py`、`test_paseo_run_python.py`、`test_watch_pr_checks.py` 运行 `python -m pytest -q` | 跨平台 runner、分离进程 supervisor、阶段派发、控制台抑制、Paseo adapter 和 PR watcher 契约。 |
 
@@ -243,8 +241,9 @@ python scripts/version.py check-revisions  # 每个改动过的 skill 都提高�
 git clone https://github.com/wxxb789/hoa   # 用 skill / 跑测试都不需要子模块
 ```
 
-`ref/` 下的 35 个参考仓库是子模块——很重，只在研究上游时才需要。普通克隆
-（不加 `--recursive`）使用和测试其余一切完全够用。需要时刷新参考：
+`ref/` 下的参考仓库是子模块，只在研究上游时才需要。普通克隆
+（不加 `--recursive`）即可使用和测试其余内容。新克隆的子模块默认使用浅克隆。
+需要时刷新参考：
 `git submodule update --init --remote --merge`。
 
 ## 该放哪儿？（分类）
@@ -257,7 +256,6 @@ git clone https://github.com/wxxb789/hoa   # 用 skill / 跑测试都不需要�
 | `paseo-plugins/` | 显式安装为 Paseo 插件的可移植源码包 | 机器专属插件注册或 runtime 设置（→ chezmoi） |
 | `agents/` | 多个 runtime 都能实现的单 agent role 契约 | vendor 专属 runtime 设置(→ chezmoi);crew 调度(→ `orchestration/`) |
 | `orchestration/` | 决定谁何时运行、结果如何流转、是否 retry / 停止 | 具体业务 recipe(→ `workflows/`) |
-| `mcps/` | 可移植的 MCP endpoint / tool 定义 | `settings.json` 里的 vendor 专属注册(→ chezmoi) |
 | `prompts/` | 一次任务的请求模板 | 常驻行为约束(→ `rules/`);persona(→ `agents/`) |
 | `rules/` | “始终 / 禁止 / 必须”式常驻约束 | 一次性任务说明(→ `prompts/`) |
 | `workflows/` | 以结果为中心的有限步骤 | 任何拥有 retry / continuation / agent 调度的东西(→ `orchestration/`) |
@@ -350,8 +348,6 @@ OpenCode 用 `@hermes-models-cutover`。
 对行为变更，`hoa-skill-create` 默认使用聚焦检查；只有覆盖面、风险或相互矛盾的证据需要时，
 才扩大到多版本、多模型或多 runtime。复盘候选须经负责人逐项批准后才能进入创建流程；
 直接请求创建或改进一个明确的 skill，不需要走该提名流程。
-`evals/skill-method-cases.json` 保存聚焦行为场景；CI 只校验结构与隔离路径，
-模型和 runtime 行为须在全新运行中判断，不能把 fixture 检查当成行为证明。
 Claude Code 内置的 `plugin eval` 测试 plugin 形态的包；Anthropic 的
 `skill-creator` 是另外安装的官方 plugin，先前的 `define-goal` 审查则使用 CE
 指导和会话自写 runner。它们都不是这些可移植 hoa skill 的必需依赖。
@@ -382,7 +378,7 @@ type 从目录推导。两个轴都可多值。
 
 ## 参考地图
 
-[`ref/README.md`](./ref/README.md) 把 **35 个外部 agent/skill/harness 仓库**逐一
+[`ref/README.md`](./ref/README.md) 把外部 agent/skill/harness 仓库逐一
 映射到"它是什么 + 值得偷什么具体模式"——如果你想设计自己的 agent 体系，这是
 本仓库信息密度最高的一页。
 

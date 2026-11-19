@@ -51,7 +51,6 @@ LIBRARY_FOLDERS = {
     "rules": "rule",
     "prompts": "prompt",
     "workflows": "workflow",
-    "mcps": "mcp",
 }
 
 AREAS = ("software-development", "work-management", "self-management")
