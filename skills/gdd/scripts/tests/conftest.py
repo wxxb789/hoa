@@ -13,6 +13,8 @@ if os.name == "nt":
     runpy.run_path(str(guard_dir / "sitecustomize.py"))
     guard = str(guard_dir)
     paths = [path for path in os.environ.get("PYTHONPATH", "").split(os.pathsep) if path]
+    # Keep an explicit host guard first, but make our entry survive child cwd changes.
+    paths = [guard if os.path.normcase(os.path.abspath(path)) == os.path.normcase(guard) else path for path in paths]
     if guard not in paths:
-        # A host guard, when explicitly supplied, still takes precedence in children.
-        os.environ["PYTHONPATH"] = os.pathsep.join([*paths, guard])
+        paths.append(guard)
+    os.environ["PYTHONPATH"] = os.pathsep.join(paths)

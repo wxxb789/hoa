@@ -1,5 +1,6 @@
 """Process creation for detached POSIX runners and no-window Windows children."""
 
+import errno
 import os
 import signal
 import subprocess
@@ -8,6 +9,25 @@ NO_WINDOW = 0x08000000  # CREATE_NO_WINDOW
 NEW_GROUP = 0x00000200  # CREATE_NEW_PROCESS_GROUP
 BREAKAWAY = 0x01000000  # CREATE_BREAKAWAY_FROM_JOB
 IS_WINDOWS = os.name == "nt"
+if IS_WINDOWS:
+    import msvcrt
+else:
+    import fcntl
+
+
+def try_file_lock(handle):
+    """Lock a persistent file until its handle closes; return False on contention."""
+    try:
+        if IS_WINDOWS:
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError as exc:
+        if isinstance(exc, BlockingIOError) or (IS_WINDOWS and exc.errno == errno.EACCES):
+            return False
+        raise
+    return True
 
 
 def _options(options):
@@ -60,7 +80,6 @@ def daemonize(argv, cwd, env, log_path):
                 os.setsid()
                 if os.fork():
                     os._exit(0)
-                os.umask(0o077)
                 os.chdir(cwd)
                 for target, source in enumerate((null, log, log)):
                     os.dup2(source.fileno(), target)

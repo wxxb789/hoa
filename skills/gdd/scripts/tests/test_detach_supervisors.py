@@ -3,7 +3,8 @@
 import json
 import os
 import plistlib
-import shlex
+import re
+import signal
 import subprocess
 import sys
 import tempfile
@@ -20,7 +21,7 @@ FIXTURE = str(HERE / "fixtures" / "events" / "omp.ok.ndjson")
 
 
 SUPERVISOR = r"""
-import json, sys
+import json, os, signal, sys
 from pathlib import Path
 root, tool, *args = sys.argv[1:]
 root = Path(root)
@@ -31,12 +32,27 @@ if tool == "launchctl" and args[0] == "bootstrap":
         sys.exit("Unrecognized subcommand: bootstrap")
     if (root / "refuse").exists():
         sys.exit("permission denied")
+elif tool == "launchctl" and args[0] == "bootout":
+    if (root / "refuse").exists():
+        sys.exit("Domain does not support specified action")
+    if (root / "self-bootout").exists():
+        run = root / "2026-01-01" / "test"
+        assert (run / "finalized").read_text(encoding="utf-8").strip() == "0"
+        assert (run / "exit.code").read_text(encoding="utf-8").strip() == "0"
+        assert (run / "answer.md").is_file()
+        runner_pid = json.loads((run / "state.json").read_text(encoding="utf-8"))["pid"]
+        assert runner_pid == os.getppid()
+        os.kill(runner_pid, signal.SIGTERM)
+elif tool == "tmux" and args[0] == "-V":
+    print("tmux 3.1c" if (root / "old-tmux").exists() else "tmux 3.2a")
 elif tool == "tmux" and args[0] == "new-session":
     if (root / "refuse").exists():
         sys.exit("cannot connect")
-    (root / "session").touch()
+    session = args[args.index("-s") + 1]
+    assert "." not in session and ":" not in session
+    (root / "session").write_text(session, encoding="utf-8")
 elif tool == "tmux" and args[0] == "has-session":
-    if not (root / "session").exists():
+    if not (root / "session").exists() or args[-1] != "=" + (root / "session").read_text(encoding="utf-8"):
         sys.exit("can't find session")
 elif tool == "tmux" and args[0] == "kill-session":
     (root / "session").unlink()
@@ -100,6 +116,8 @@ class SupervisorTests(unittest.TestCase):
         agent_run.write_json(self.run_dir / "run.json", {"agent": "omp", "argv": [sys.executable, STUB],
                                                         "cwd": str(self.root), "prompt": "argv"})
         (self.run_dir / "prompt.md").write_text("finish", encoding="utf-8")
+        if os.name != "nt":
+            (self.root / "self-bootout").touch()
         # Execute the internal runner with only launchctl replaced. The stub agent is short-lived.
         source = """
 import sys
@@ -115,7 +133,7 @@ sys.exit(agent_run.main(args))
             run = gdd_process.run([sys.executable, "-c", source, RUNNER, SUPERVISOR, str(self.root),
                                    *expected[2:]], cwd=self.root, env=self.env, capture_output=True,
                                   text=True, timeout=15)
-            self.assertEqual(run.returncode, 0, run.stderr)
+            self.assertEqual(run.returncode, 0 if os.name == "nt" else -signal.SIGTERM, run.stderr)
             self.assertEqual(agent_run.read_state(self.run_dir)["state"], "done")
             self.assertFalse(plist.exists())
             self.assertEqual(self.calls()[-1], ["launchctl", "bootout", f"gui/123/{target['label']}"])
@@ -147,8 +165,11 @@ sys.exit(agent_run.main(args))
         state = agent_run.read_state(self.run_dir)
         self.assertEqual(state["detach"], "setsid")
         self.assertIn("permission denied", state["detach_fallback"])
+        self.assertNotIn("supervisor", state)
         self.assertFalse((self.run_dir / "runner.plist").exists())
         self.assertEqual(self.calls()[-1][1], "bootout")
+        agent_run.effective_state(self.run_dir)
+        self.assertEqual(len(self.calls()), 2)
 
     def test_missing_launchctl_records_setsid_fallback(self):
         with mock.patch.object(gdd_process, "daemonize", return_value=313):
@@ -203,17 +224,26 @@ sys.exit(agent_run.main(args))
         self.assertFalse((self.run_dir / "runner.plist").exists())
 
     def test_tmux_argv_handle_and_kill(self):
+        self.state["name"] = "test.v1:rc"
         self.start("tmux", "tmux")
         target = agent_run.read_state(self.run_dir)["supervisor"]
         name = target["session"]
-        self.assertRegex(name, r"^gdd-test-[0-9a-f]{12}$")
-        argv = self.calls()[0]
+        self.assertRegex(name, r"^gdd-test-v1-rc-[0-9a-f]{12}$")
+        argv = self.calls()[1]
         self.assertEqual(argv[:8], ["tmux", "new-session", "-d", "-s", name, "-c", str(self.root), "-e"])
         self.assertEqual(argv[argv.index("--") + 1:], [*self.argv, "--restore-env"])
         self.assertNotIn("SECRET_TEST", str(argv))
         self.check_kill("tmux")
         self.assertEqual(self.calls()[-2:], [["tmux", "has-session", "-t", "=" + name],
                                              ["tmux", "kill-session", "-t", "=" + name]])
+
+    def test_tmux_before_3_2_uses_the_private_environment_file(self):
+        (self.root / "old-tmux").touch()
+        self.start("tmux", "tmux")
+        argv = self.calls()[1]
+        self.assertNotIn("-e", argv[:argv.index("--")])
+        self.assertIn("--restore-env", argv)
+        self.assertEqual(json.loads((self.run_dir / ".runner-env").read_text(encoding="utf-8")), self.env)
 
     def test_tmux_missing_session_recovers_stale_run(self):
         self.start("tmux", "tmux")
@@ -226,19 +256,35 @@ sys.exit(agent_run.main(args))
         self.assertEqual(self.calls()[-1][1], "has-session")
 
     def test_herdr_json_handle_and_unfocused_start_and_kill(self):
-        self.argv[2] = "runner's path with spaces.py"
+        script = self.root / "runner's path with spaces \u2019; test.py"
+        script.write_text("import json, sys\nprint(json.dumps(sys.argv))\n", encoding="utf-8")
+        self.argv[2] = str(script)
         self.start("herdr", "herdr")
         target = agent_run.read_state(self.run_dir)["supervisor"]
         self.assertEqual((target["tab"], target["pane"]), ("tab-1", "pane-1"))
         create, run = self.calls()
-        self.assertEqual(create[:9], ["herdr", "tab", "create", "--no-focus", "--cwd", str(self.root),
+        self.assertEqual(create[:9], ["herdr", "tab", "create", "--no-focus", "--cwd", str(self.run_dir),
                                       "--label", "gdd-test", "--env"])
         self.assertNotIn("--focus", create)
         self.assertEqual(run[:4], ["herdr", "pane", "run", "pane-1"])
+        command = run[4].split()
+        self.assertRegex(command[0], r"^python[0-9.]*(?:\.exe)?$")
+        self.assertEqual(command[1], "-B")
+        self.assertRegex(command[2], r"^\.runner-herdr-[0-9a-f]{12}\.py$")
+        executed = gdd_process.run([sys.executable, *command[1:]], cwd=self.run_dir, env=self.env,
+                                   capture_output=True, text=True, timeout=10)
+        self.assertEqual(executed.returncode, 0, executed.stderr)
+        self.assertEqual(json.loads(executed.stdout), [*self.argv[2:], "--restore-env", "--runner-cwd", str(self.root)])
+        self.assertFalse((self.run_dir / command[2]).exists())
         if os.name == "nt":
-            self.assertIn("'runner''s path with spaces.py'", run[4])
-        else:
-            self.assertEqual(shlex.split(run[4]), [*self.argv, "--restore-env"])
+            env_file = self.run_dir / ".runner-env"
+            acl = gdd_process.run(["icacls.exe", str(env_file)], capture_output=True, text=True, check=True).stdout
+            self.assertNotIn("(I)", acl)
+            self.assertEqual(len(re.findall(r":\(F\)", acl)), 1, acl)
+            with mock.patch.dict(os.environ):
+                agent_run.restore_detached_env(self.run_dir)
+                self.assertEqual(os.environ["SECRET_TEST"], self.env["SECRET_TEST"])
+            self.assertFalse(env_file.exists())
         self.check_kill("herdr")
         self.assertEqual(self.calls()[-1], ["herdr", "tab", "close", "tab-1"])
 

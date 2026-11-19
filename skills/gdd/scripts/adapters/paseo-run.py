@@ -35,8 +35,8 @@ and agent_id), events.ndjson (observed lifecycle transitions), stderr.log,
 cli.ndjson (raw command evidence), answer.md when addressable, result.json when
 the answer carries a stage result valid against --schema, answer.partial.md
 while a pre-delete capture awaits confirmation, exit.code and finalized. The run
-dir's os.mkdir claims the slug; an O_EXCL `refresh` file holding the holder's pid and start time
-serializes readers (a dead holder's file is taken over). A finalized marker is immutable. An
+dir's os.mkdir claims the slug; a kernel lock on the persistent `refresh` file
+serializes readers and is released on process exit. A finalized marker is immutable. An
 existing slug is refused rather than silently reused or replaced. Unsupported
 --max-time is refused: Paseo's --wait-timeout is not an execution deadline.
 """
@@ -69,7 +69,6 @@ EXITS = {"done": 0, "failed": 1, "killed": 143}
 # the detached monitor retries every timeout until terminal evidence exists.
 CLI_TIMEOUT_SECONDS = 60
 CLAIM_WAIT_SECONDS = CLI_TIMEOUT_SECONDS / 2
-STALE_CLAIM_SECONDS = 60  # a claim file still empty this long lost its holder before the pid write
 
 
 class ClaimTimeout(RuntimeError):
@@ -113,52 +112,16 @@ def text_file(run_dir, name, text):
         handle.write(text)
 
 
-def claim_holder(path):
-    with open(path, encoding="utf-8") as handle:
-        return handle.read().strip()
-
-
 @contextmanager
 def claim(path):
-    """Held for as long as the holder lives (it may make several CLI calls); only a dead
-    holder's file is taken over, and release removes the file only while it is still ours."""
+    """Keep the inode in place so every reader competes for the same kernel lock."""
     deadline = time.monotonic() + CLAIM_WAIT_SECONDS
-    mine = f"{os.getpid()} {support.identity(os.getpid())}".rstrip()
-    while True:
-        try:
-            with os.fdopen(os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY), "wb") as handle:
-                handle.write(mine.encode("utf-8"))
-            break
-        except FileExistsError:
-            with suppress(OSError):
-                holder = claim_holder(path)
-                pid, _, recorded = holder.partition(" ")
-                if pid.isdecimal():
-                    pid = int(pid)
-                    live = support.identity(pid) if recorded else ""
-                    dead = not support.pid_alive(pid) or bool(live and live != recorded)
-                else:
-                    dead = time.time() - os.path.getmtime(path) > STALE_CLAIM_SECONDS
-                if dead and claim_holder(path) == holder:
-                    os.unlink(path)
-                    continue
-        if time.monotonic() >= deadline:
-            raise ClaimTimeout(f"cannot acquire claim: {path}")
-        time.sleep(0.05)
-    try:
+    with open(path, "a+b") as handle:
+        while not gdd_process.try_file_lock(handle):
+            if time.monotonic() >= deadline:
+                raise ClaimTimeout(f"cannot acquire claim: {path}")
+            time.sleep(0.05)
         yield
-    finally:
-        for attempt in range(10):
-            try:
-                if claim_holder(path) == mine:
-                    os.unlink(path)
-                break
-            except PermissionError:
-                # On Windows a contender's open read handle can block unlink.
-                if attempt < 9:
-                    time.sleep(0.1)
-            except OSError:
-                break
 
 
 def cli(state, argv):

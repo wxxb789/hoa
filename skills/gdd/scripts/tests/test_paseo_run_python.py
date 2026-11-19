@@ -283,29 +283,55 @@ class PaseoLauncherTests(unittest.TestCase):
         adapter = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(adapter)
         path = self.home / "refresh"
-        dead = gdd_process.popen([sys.executable, "-c", "pass"])
-        dead.wait()
-        path.write_text(str(dead.pid), encoding="utf-8")
-        own = f"{os.getpid()} {adapter.support.identity(os.getpid())}"
-        self.assertTrue(own.split()[1])
         with adapter.claim(str(path)):
-            self.assertEqual(path.read_text(encoding="utf-8"), own)
-        self.assertFalse(path.exists())
-        live = gdd_process.popen([sys.executable, "-c", "import time; time.sleep(30)"])
-        self.addCleanup(live.wait)
-        self.addCleanup(live.kill)
-        prior = f"{live.pid} old-start-time"
-        path.write_text(prior, encoding="utf-8")
+            with mock.patch.object(adapter, "CLAIM_WAIT_SECONDS", 0.1), self.assertRaises(adapter.ClaimTimeout):
+                with adapter.claim(str(path)):
+                    pass
+        self.assertTrue(path.exists())
         with adapter.claim(str(path)):
-            self.assertEqual(path.read_text(encoding="utf-8"), own)
-        actual = f"{live.pid} {adapter.support.identity(live.pid)}"
-        self.assertNotEqual(actual, prior)
-        path.write_text(actual, encoding="utf-8")
-        os.utime(path, (time.time() - 3600,) * 2)  # age alone never frees a live holder's claim
-        with mock.patch.object(adapter, "CLAIM_WAIT_SECONDS", 0.3), self.assertRaises(adapter.ClaimTimeout):
-            with adapter.claim(str(path)):
-                pass
-        self.assertEqual(path.read_text(encoding="utf-8"), actual)
+            pass
+
+    @unittest.skipIf(os.name == "nt", "POSIX abrupt holder exit and competing processes")
+    def test_only_one_contender_takes_over_a_dead_refresh_holder(self):
+        source = """
+import importlib.util, os, sys, time
+from pathlib import Path
+spec = importlib.util.spec_from_file_location('adapter', sys.argv[1])
+adapter = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(adapter)
+root, role = Path(sys.argv[2]), sys.argv[3]
+if role != 'holder':
+    (root / f'ready-{role}').touch()
+with adapter.claim(str(root / 'refresh')):
+    if role == 'holder':
+        (root / 'ready').touch()
+        while not (root / 'release').exists():
+            time.sleep(0.01)
+        os._exit(0)
+    with (root / 'inside').open('x'):
+        time.sleep(0.08)
+    (root / 'inside').unlink()
+"""
+        def start(role):
+            child = gdd_process.popen([sys.executable, "-B", "-c", source, str(ADAPTER), str(self.home), role])
+            recorded = agent_run.identity(child.pid)
+
+            def cleanup():
+                if child.poll() is None and recorded and agent_run.identity(child.pid) == recorded:
+                    child.kill()
+                child.wait(timeout=5)
+
+            self.addCleanup(cleanup)
+            return child
+
+        holder = start("holder")
+        self.assertTrue(agent_run.wait_until(lambda: (self.home / "ready").exists(), 5))
+        contenders = [start(str(i)) for i in range(8)]
+        self.assertTrue(agent_run.wait_until(lambda: len(list(self.home.glob("ready-*"))) == len(contenders), 5))
+        (self.home / "release").touch()
+        self.assertEqual(holder.wait(timeout=5), 0)
+        for contender in contenders:
+            self.assertEqual(contender.wait(timeout=10), 0)
 
     def test_unknown_native_run_reserves_worktree_until_confirmed_termination(self):
         spec = importlib.util.spec_from_file_location("gdd_under_test", ADAPTER.parent.parent / "gdd.py")

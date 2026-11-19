@@ -40,7 +40,7 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 - gdd: add a shared headless runner for OMP and DSH, with event fixtures and pytest coverage
   on Ubuntu, macOS and Windows.
 - gdd: make the shared OMP and DSH runner the default (`GDD_AGENT` selects the CLI).
-  Retire the separate OMP/DSH adapters, tmux backend and shell watcher in favor of the shared
+  Retire the separate OMP/DSH adapters, old tmux backend flag and shell watcher in favor of the shared
   runner and Python watcher. Runner and dispatch contracts run through pytest on Ubuntu,
   macOS and Windows.
 - gdd: support Codex and Claude Code and record structured stage results. Codex and Claude
@@ -51,9 +51,9 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 - gdd: support Pi and OpenCode as headless routes, with recorded success and failure events.
 - gdd, gdd-route-omp, gdd-route-dsh: use `GDD_RUN_ROOT` instead of `OMP_RUN_ROOT` or
   `DSH_RUN_ROOT`; rename the shared event, startup, stop and drain knobs from `OMP_RUN_*` /
-  `DSH_RUN_*` to `GDD_RUN_*`. Retire `OMP_LEDGER`, `OMP_RUN_BACKEND` and
-  `DSH_RUN_SETTLE_WAIT_SECONDS` without equivalents. Use `GDD_RUN_DETACH` to select platform-native
-  detachment or a Linux transient user unit; there is no tmux backend.
+  `DSH_RUN_*` to `GDD_RUN_*`. Retire `OMP_LEDGER` and `DSH_RUN_SETTLE_WAIT_SECONDS` without
+  equivalents. Replace `OMP_RUN_BACKEND` with `GDD_RUN_DETACH`; tmux and Herdr are environment-only
+  opt-ins, not values for the retired `--backend` selector.
 - gdd: use `run.json`, `runner.log`, and rotated `events.1.ndjson`; the shared runner no longer
   writes `session.id`, `lock`, `run.sh` / `run.cmd`, `events.stats.json`, or a runner ledger.
   `tail` shows summaries, not raw NDJSON. Legacy task-local, `omp-runs`, and repo/goal layouts
@@ -62,12 +62,16 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
   The optional POSIX `omp-run.sh` no longer searches PATH for the runner; `--profile P` is forwarded
   and `--backend` only warns (including `tmux`). DSH still accepts `--session-id` as a resume alias.
 - gdd: trust recorded state from custom launchers that do not publish PID keys. Keep a Paseo refresh
-  claim while its holder lives and reclaim it when the PID has been reused. Serialize concurrent
-  starts on one slug and preserve state writes after Windows replace retries are exhausted.
+  claim under a kernel lock released on holder exit. Refuse a second concurrent start on the same
+  slug with exit 1 (`already starting`).
 - gdd: prevent console flashes for the runner, dispatch, watcher, and helper subprocesses; enforce
   the Windows spawn flags in tests.
 - gdd: detach through a one-shot macOS LaunchAgent or POSIX double fork when a Linux user unit
   is unavailable; record the effective mode and support explicit, unfocused tmux and Herdr runs.
+- gdd: preserve literal systemd paths and the caller's setsid umask; reject reused PIDs,
+  finalize stopped runs with zombie-only groups, and retry blocked progress writes. Publish
+  terminal state before launchd bootout, keep supervisor paths out of Herdr shell input, and
+  support tmux before 3.2. The observer uses runner counters or marks rotated event counts partial.
 
 - Trigger evals now route on visible skills' frontmatter descriptions, accept `none` when no
   artifact fits, and include three no-trigger cases.

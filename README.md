@@ -185,7 +185,7 @@ UI; a newer push to a pull request cancels the older run.
 | pytest | `python -m pytest` | Every `test_*.py` unittest/pytest file under `scripts/`, `evals/` and `skills/` (`pytest.ini`); 120 s per test. |
 | Script checks | `python evals/run_trigger_evals.py`, `evals/validate_skill_method_cases.py`, `skills/define-goal/evals/validate_fixtures.py`, `skills/hermes-models/scripts/tests/test-*.py`, `skills/gdd/scripts/tests/test_verdict_matrix.py`, `mutate_verdict_matrix.py` | Standalone checks whose exit code is the contract; one step each. |
 | Paseo gdd-run-observer | `npm ci && npm run typecheck && npm test` in `paseo-plugins/gdd-run-observer` | The plugin's typecheck and Vitest suite. |
-| `gdd-runner` (Ubuntu, macOS, Windows) | `python -m pytest -q` on `test_agent_run.py`, `test_gdd.py`, `test_no_window.py`, `test_paseo_run_python.py`, and `test_watch_pr_checks.py` under `skills/gdd/scripts/tests/` | Cross-platform runner, stage dispatch, console suppression, Paseo adapter, and PR watcher contracts. |
+| `gdd-runner` (Ubuntu, macOS, Windows) | `python -m pytest -q` on `test_agent_run.py`, `test_detach_supervisors.py`, `test_gdd.py`, `test_no_window.py`, `test_paseo_run_python.py`, and `test_watch_pr_checks.py` under `skills/gdd/scripts/tests/` | Cross-platform runner, detach supervisors, stage dispatch, console suppression, Paseo adapter, and PR watcher contracts. |
 
 Run the Python tests locally with
 `uv run --no-project --with-requirements scripts/requirements.txt python -m pytest` (or

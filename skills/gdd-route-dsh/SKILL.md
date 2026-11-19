@@ -155,9 +155,10 @@ a detached run never notifies.
 
 ## Configuration
 
-For `GDD_AGENT` and `GDD_RUN_ROOT`, the shared runner checks the environment, then the
+For `GDD_AGENT`, `GDD_RUN_ROOT`, and `GDD_RUN_DETACH`, the shared runner checks the environment, then the
 [GDD config file](../gdd/references/configuration.md), then the default. `start --agent` takes
-precedence over `GDD_AGENT`. The remaining keys resolve from the environment, then the default.
+precedence over `GDD_AGENT`. Set `tmux` or `herdr` only in the environment, not the config file.
+The remaining keys resolve from the environment, then the default.
 
 | Key | Resolves | Default |
 |---|---|---|

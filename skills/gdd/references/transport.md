@@ -51,7 +51,13 @@ Windows in the `gdd-runner` CI job; the real-CLI smoke is an opt-in operator ste
    access denied retries without breakaway. State records the actual `spawn.creationflags`.
 3. **Opt in to a watchable supervisor in the environment.** `GDD_RUN_DETACH=tmux` creates a
    detached session; `GDD_RUN_DETACH=herdr` creates an unfocused tab in an existing Herdr 0.9.5
-   server. Herdr submits shell input to the pane (POSIX shell syntax, or PowerShell on Windows).
+   server. Tmux before 3.2 restores the environment solely from the private runner file.
+   Herdr's pane API accepts shell input, not an argv vector. GDD starts the pane in the run
+   directory and sends only a standard Python executable name and a generated ASCII entry filename.
+   That entry loads the original runner arguments without shell parsing and removes itself.
+   The pane shell must support simple external commands and honor the supplied Python directory on
+   `PATH`. The private environment file is removed after reading; on Windows it is created with
+   a protected, current-user-only DACL.
    Neither is selected by auto; a missing executable or failed request refuses startup.
    State records the handle under `supervisor`; the runner or a subsequent reader removes the
    job, session or tab at completion. Use the runner's `kill` to stop the agent as well.
@@ -140,10 +146,13 @@ counter re-derived from a truncated stream is marked partial (`tool_calls_partia
   `gdd.py` and `delivery-state.py` read the same liveness rule and print `stale` without writing.
 - **Stop.** `kill` writes a `stop` file; the runner ends the agent (POSIX group TERM, 5 s, KILL;
   Windows `taskkill /T /F`) and finalizes `killed`/`143`. If the runner is gone, `kill` signals a
-  recorded pid only when its live start time equals the one recorded at spawn; otherwise it signals
-  nothing and exits `1` naming each pid and why.
+  recorded PID only when its live start time equals the one recorded at spawn. A mismatched PID
+  belongs to another process and counts as gone. A still-live PID with unverified identity is not
+  signalled and produces exit `1`. Zombie-only groups count as stopped.
 - **Events.** `events.ndjson` rotates to `events.1.ndjson` at half of `GDD_RUN_EVENTS_MAX_BYTES`; the
-  new file starts with `{"type":"truncated","dropped_bytes":N}`. `tail` prints one line per event
+  new file starts with `{"type":"truncated","dropped_bytes":N}` only after bytes have been dropped.
+  An observer reading only the active segment treats counts as partial as soon as a rotated
+  segment exists, even before any bytes are dropped. `tail` prints one line per event
   (type plus the first 160 characters of its text), never the raw JSON.
 - **Stage result.** `gdd.py` passes `--schema references/stage-result.schema.json`. codex
   (`--output-schema`) and claude (`--json-schema`) enforce it natively; the stage templates ask every
@@ -307,8 +316,10 @@ Each native CLI subprocess has a **60-second timeout**. One attempt to acquire t
 waits **30 seconds**, half that budget, keeping foreground requests bounded while another request
 owns the claim. This is not a run deadline: a holder can make several CLI calls under one claim,
 so increasing the claim wait to one CLI timeout would still not bound its full critical section.
-Claims record the holder's PID and process start time. A live PID with a different start time
-does not preserve an abandoned claim.
+The claim is a kernel lock on the persistent `refresh` file. The OS releases it when the holder
+exits, and waiting readers compete for the same lock without unlinking the file.
+Finish or stop native runs before upgrading from a monitor that unlinks this file; do not mix the
+two claim protocols in the same live run.
 The detached monitor catches claim-acquisition timeouts, leaves the last published observation
 unchanged, sleeps one second, and retries **without a retry limit**. It stops only after observing
 a terminal state (`done`, `failed`, `killed`) or a `finalized` marker, not because a claim is busy

@@ -344,7 +344,8 @@ sys.exit(agent_run.main())
                 killed = self.cli("kill", name, env=fast)
                 if forged:
                     self.assertEqual(killed.returncode, 1, killed.stdout)
-                    self.assertIn(f"agent_pid {state['agent_pid']} not signalled", killed.stderr)
+                    self.assertIn("already finished", killed.stderr)
+                    self.assertFalse(json.loads(self.cli("status", name).stdout)["alive"])
                     self.assertTrue(pid_alive(state["agent_pid"]))
                     force_kill(state["agent_pid"], state["agent_pid_identity"])
                 else:
@@ -353,6 +354,42 @@ sys.exit(agent_run.main())
                     self.assertEqual((final["state"], final["exit"]), ("killed", 143))
                     self.assertTrue(wait_for(lambda: not pid_alive(state["agent_pid"]), 10))
 
+    @unittest.skipIf(IS_WINDOWS, "POSIX stopped runner and zombie process group")
+    def test_kill_finalizes_with_a_non_reaping_runner(self):
+        self.start("stuck", env={"STUB_HANG": "1", "STUB_FIXTURE": ""})
+        state = self.state("stuck")
+        self.assertEqual(agent_run.identity(state["pid"]), state["pid_identity"])
+        os.kill(state["pid"], signal.SIGSTOP)
+        killed = self.cli("kill", "stuck", env={"GDD_RUN_STOP_WAIT_SECONDS": "1"})
+        self.assertEqual(killed.returncode, 0, killed.stderr)
+        self.assertTrue(Path(self.run_dir("stuck"), "finalized").exists())
+        self.assertEqual(self.state("stuck")["state"], "killed")
+
+    @unittest.skipUnless(sys.platform == "linux", "requires a Linux user manager")
+    def test_systemd_runs_in_literal_paths(self):
+        try:
+            agent_run.select_detach("systemd")
+        except ValueError as exc:
+            self.skipTest(str(exc))
+        self.root = os.path.join(self.tmp, "runs %h $HOME")
+        self.work = os.path.join(self.tmp, "work %n $USER")
+        os.mkdir(self.work)
+        self.env.update(GDD_RUN_ROOT=self.root, GDD_RUN_DETACH="systemd")
+        self.start("literal")
+        self.assertTrue(wait_for(lambda: Path(self.run_dir("literal"), "finalized").exists()))
+        self.assertEqual(self.state("literal")["state"], "done")
+        self.assertEqual(json.loads(read(self.record))["cwd"], self.work)
+
+    @unittest.skipIf(IS_WINDOWS, "POSIX file creation mask")
+    def test_setsid_keeps_the_dispatchers_umask(self):
+        started = gdd_process.run(
+            [sys.executable, "-B", RUNNER, "start", "--name", "umask", "--prompt", self.prompt],
+            env={**self.env, "STUB_FIXTURE": os.path.join(FIXTURES, "omp.ok.ndjson")},
+            cwd=self.work, umask=0o027, capture_output=True, text=True, timeout=30)
+        self.assertEqual(started.returncode, 0, started.stderr)
+        self.assertEqual(self.finished("umask")["state"], "done")
+        self.assertEqual(Path(self.record).stat().st_mode & 0o777, 0o640)
+
     def craft(self, name, state=None, raw=None):
         run_dir = os.path.join(self.root, datetime.now().strftime("%Y-%m-%d"), name)
         os.makedirs(run_dir)
@@ -360,6 +397,17 @@ sys.exit(agent_run.main())
         if state is not None or raw is not None:
             write(os.path.join(run_dir, "state.json"), raw if raw is not None else json.dumps(state))
         return run_dir
+
+    def test_status_treats_a_reused_runner_pid_as_stale(self):
+        state = {"name": "reused-runner", "agent": "omp", "state": "running", "pid": os.getpid(),
+                 "pid_identity": "forged", "agent_pid": None}
+        run_dir = self.craft("reused-runner", state)
+        self.assertEqual(agent_run.observed_state(run_dir, state), "stale")
+        status = self.cli("status", "reused-runner")
+        self.assertEqual(status.returncode, 0, status.stderr)
+        result = json.JSONDecoder().raw_decode(status.stdout)[0]
+        self.assertFalse(result["alive"])
+        self.assertTrue(result["stale_recovered"])
 
     def test_t7_starting_grace(self):
         base = {"name": "s", "agent": "omp", "state": "running", "exit": None, "pid": None, "agent_pid": None}
@@ -653,7 +701,7 @@ class RunnerMechanicsTests(unittest.TestCase):
 
             def submit(argv, **kwargs):
                 self.assertEqual(argv, [
-                    "systemd-run", "--user", "--collect", "--quiet", "--unit", state["unit"], "--service-type=exec",
+                    "systemd-run", "--user", "--collect", "--unit", state["unit"], "--service-type=exec",
                     "--no-ask-password", "--working-directory=/work/with spaces",
                     f"--property=StandardOutput=append:{run / 'runner.log'}", "--property=StandardError=inherit",
                     "--", "/python", "-B", "/runner.py", "_run", "--run-dir", "/runs/$$literal", "--restore-env",
@@ -663,7 +711,7 @@ class RunnerMechanicsTests(unittest.TestCase):
                     self.assertEqual(dict(os.environ), {"SECRET": "value with \n and $"})
                 return subprocess.CompletedProcess(argv, 0, "", "")
 
-            with mock.patch.object(agent_run.subprocess, "run", side_effect=submit):
+            with mock.patch.object(agent_run, "supervisor_call", side_effect=submit):
                 agent_run.spawn_detached(["/python", "-B", "/runner.py", "_run", "--run-dir", "/runs/$literal"],
                                          run, "/work/with spaces", {"SECRET": "value with \n and $"},
                                          state, "systemd", "systemd-run")
@@ -684,6 +732,51 @@ class RunnerMechanicsTests(unittest.TestCase):
             self.assertEqual(json.loads(path.read_text(encoding="utf-8")), {"state": "done"})
             self.assertEqual(list(Path(tmp).iterdir()), [path])
             self.assertEqual(len(stderr.getvalue().splitlines()), 1)
+
+    def test_runner_retries_progress_when_replace_and_in_place_write_fail(self):
+        fixture = os.path.join(FIXTURES, "omp.ok.ndjson")
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)
+            agent_run.write_json(path / "state.json", {"name": "progress", "spawn": {}})
+            agent_run.write_json(path / "run.json", {
+                "agent": "omp", "argv": [sys.executable, STUB], "cwd": tmp, "prompt": "argv",
+            })
+            (path / "prompt.md").write_text("finish", encoding="utf-8")
+            writes, real_replace, real_write = [], os.replace, agent_run.write_text
+            error = PermissionError("locked by a reader")
+            error.winerror = 5
+
+            def replace(source, target):
+                if writes == [False] and str(target) == str(path / "state.json"):
+                    raise error
+                return real_replace(source, target)
+
+            def write_text(target, data):
+                if str(target) == str(path / "state.json") and writes == [False]:
+                    writes.append(True)
+                    raise error
+                if str(target).endswith(".tmp") and '"turns":' in data and '"ended":' not in data:
+                    writes.append(False)
+                return real_write(target, data)
+
+            stderr = io.StringIO()
+            with mock.patch.object(os, "replace", side_effect=replace), \
+                    mock.patch.object(agent_run, "write_text", side_effect=write_text), \
+                    mock.patch.object(agent_run, "PROGRESS_SECONDS", 0.05), \
+                    mock.patch.dict(os.environ, {"STUB_FIXTURE": fixture, "STUB_DELAY": "0.12"}), \
+                    contextlib.redirect_stderr(stderr):
+                handlers = {sig: signal.getsignal(sig) for sig in (signal.SIGTERM,
+                            getattr(signal, "SIGBREAK" if IS_WINDOWS else "SIGHUP"))}
+                try:
+                    self.assertEqual(agent_run.main(["_run", "--run-dir", tmp]), 0)
+                finally:
+                    for sig, handler in handlers.items():
+                        signal.signal(sig, handler)
+                    state = agent_run.read_state(tmp)
+                    force_kill(state.get("agent_pid"), state.get("agent_pid_identity"))
+            self.assertEqual(writes[:3], [False, True, False])
+            self.assertEqual(len(stderr.getvalue().splitlines()), 1)
+            self.assertEqual(agent_run.read_state(tmp)["state"], "done")
 
 
 @unittest.skipUnless(os.environ.get("GDD_SMOKE_AGENTS"), "set GDD_SMOKE_AGENTS=omp,... to run real CLIs")

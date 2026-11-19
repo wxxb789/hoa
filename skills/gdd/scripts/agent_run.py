@@ -47,7 +47,6 @@ import sys
 sys.dont_write_bytecode = True
 
 import argparse
-import errno
 import glob
 import json
 import os
@@ -76,8 +75,6 @@ if IS_WINDOWS:
     import ctypes
     import msvcrt
     from ctypes import wintypes
-else:
-    import fcntl
 
 KILLED_EXITS = (130, -2, 137, -9, 143, -15)
 KILL_EXIT, TIMEOUT_EXIT = 143, 124
@@ -165,15 +162,57 @@ def select_detach(requested):
 
 
 def systemd_argv(launcher, unit, cwd, log, runner):
-    return [launcher, "--user", "--collect", "--quiet", "--unit", unit, "--service-type=exec",
-            "--no-ask-password", f"--working-directory={cwd.replace('%', '%%')}",
-            f"--property=StandardOutput=append:{str(log).replace('%', '%%')}",
+    # Transient unit properties carry literal paths; only ExecStart expands dollar variables.
+    return [launcher, "--user", "--collect", "--unit", unit, "--service-type=exec",
+            "--no-ask-password", f"--working-directory={cwd}",
+            f"--property=StandardOutput=append:{log}",
             "--property=StandardError=inherit", "--", runner[0],
             *(arg.replace("$", "$$") for arg in runner[1:]), "--restore-env"]
 
 
 def private_file(path):
-    return os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    if os.name != "nt":
+        return os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    # Assign the protected DACL at creation, before writing any private data.
+    import csv
+
+    whoami = Path(os.environ["SystemRoot"], "System32", "whoami.exe")
+    account = require_success(gdd_process.run([str(whoami), "/user", "/fo", "csv", "/nh"],
+                                              capture_output=True, text=True, timeout=5))
+    sid = next(csv.reader(account.stdout.splitlines()), ["", ""])[-1]
+    if not re.fullmatch(r"S-1-(?:[0-9]+-)*[0-9]+", sid):
+        raise OSError("whoami.exe did not return a user SID")
+    advapi = ctypes.WinDLL("advapi32", use_last_error=True)
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+
+    class SecurityAttributes(ctypes.Structure):
+        _fields_ = [("length", wintypes.DWORD), ("descriptor", ctypes.c_void_p),
+                    ("inherit", wintypes.BOOL)]
+
+    convert = advapi.ConvertStringSecurityDescriptorToSecurityDescriptorW
+    convert.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, ctypes.POINTER(ctypes.c_void_p), ctypes.c_void_p]
+    create = kernel.CreateFileW
+    create.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD,
+                       ctypes.POINTER(SecurityAttributes), wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+    create.restype = wintypes.HANDLE
+    kernel.LocalFree.argtypes = [ctypes.c_void_p]
+    kernel.LocalFree.restype = ctypes.c_void_p
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    descriptor = ctypes.c_void_p()
+    if not convert(f"O:{sid}D:P(A;;FA;;;{sid})", 1, ctypes.byref(descriptor), None):
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        attrs = SecurityAttributes(ctypes.sizeof(SecurityAttributes), descriptor, False)
+        handle = create(str(path), 0x40000000, 0, ctypes.byref(attrs), 1, 0x80, None)
+        if handle == ctypes.c_void_p(-1).value:
+            raise ctypes.WinError(ctypes.get_last_error())
+        try:
+            return msvcrt.open_osfhandle(handle, os.O_WRONLY | os.O_BINARY)
+        except BaseException:
+            kernel.CloseHandle(handle)
+            raise
+    finally:
+        kernel.LocalFree(descriptor)
 
 
 def save_detached_env(run_dir, env):
@@ -227,15 +266,6 @@ def herdr_response(result):
     return response["result"]
 
 
-def herdr_command(runner):
-    # Herdr 0.9.5 joins arguments as shell input; it does not preserve argv boundaries.
-    if any(re.search(r"[\x00-\x1f\x7f]", arg) for arg in runner):
-        raise ValueError("control characters cannot be sent to a Herdr pane")
-    if IS_WINDOWS:  # Herdr defaults to PowerShell on native Windows.
-        return "& " + " ".join("'" + arg.replace("'", "''") + "'" for arg in runner)
-    return shlex.join(runner)
-
-
 def spawn_detached(runner, run_dir, cwd, env, state, mode, launcher=None):
     run_dir = Path(run_dir)
     log_path = run_dir / "runner.log"
@@ -251,13 +281,15 @@ def spawn_detached(runner, run_dir, cwd, env, state, mode, launcher=None):
         socket = os.environ.get("TMUX", "").partition(",")[0]
         target = {"mode": mode, "argv": [launcher, *(["-S", socket] if socket else [])],
                   "env": {key: os.environ[key] for key in ("TMUX_TMPDIR", "TMPDIR") if key in os.environ},
-                  "session": f"gdd-{state['name']}-{suffix}"}
+                  "session": re.sub(r"[^a-zA-Z0-9_-]", "-", f"gdd-{state['name']}-{suffix}")}
     elif mode == "herdr":
-        target = {"mode": mode, "argv": [launcher], "env": {
+        target = {"mode": mode, "argv": [launcher], "entry": f".runner-herdr-{suffix}.py", "env": {
             key: os.environ[key] for key in ("HERDR_SESSION", "HERDR_SOCKET_PATH", "HERDR_CONFIG_PATH", "XDG_CONFIG_HOME")
             if key in os.environ}}
     if target:
         state["supervisor"] = target
+    else:
+        state.pop("supervisor", None)
     if mode == "systemd":
         state["unit"] = unit_name(state["name"])
     write_json(run_dir / "state.json", state)
@@ -278,11 +310,25 @@ def spawn_detached(runner, run_dir, cwd, env, state, mode, launcher=None):
             options = [arg for key in ("PYTHONUNBUFFERED", "PYTHONPATH", "NOWINDOW_GUARD_LOG")
                        if key in env or key == "PYTHONUNBUFFERED" for arg in (setting, f"{key}={env.get(key, '1')}")]
             if mode == "tmux":
-                require_success(supervisor_call([*target["argv"], "new-session", "-d", "-s", target["session"],
-                                                 "-c", cwd, *options, "--", *runner]))
+                version = require_success(target_call(target, "-V")).stdout
+                match = re.match(r"tmux (\d+)\.(\d+)", version)
+                if not match or tuple(map(int, match.groups())) < (3, 2):
+                    options = []
+                require_success(target_call(target, "new-session", "-d", "-s", target["session"],
+                                            "-c", cwd, *options, "--", *runner))
                 (run_dir / ".supervisor-started").touch()
             else:
-                result = herdr_response(supervisor_call([launcher, "tab", "create", "--no-focus", "--cwd", cwd,
+                # Herdr joins arguments into shell input. Only fixed ASCII tokens reach that shell.
+                executable = Path(runner[0])
+                if not re.fullmatch(r"python[0-9.]*(?:\.exe)?", executable.name):
+                    raise ValueError(f"Herdr requires a standard Python executable name: {executable.name}")
+                options += ["--env", f"PATH={executable.parent}{os.pathsep}{env.get('PATH', os.defpath)}"]
+                with os.fdopen(private_file(run_dir / target["entry"]), "w", encoding="utf-8") as entry:
+                    entry.write("import os, runpy, sys\n"
+                                f"sys.argv = {ascii([*runner[2:], '--runner-cwd', cwd])}\n"
+                                "os.unlink(__file__)\n"
+                                "runpy.run_path(sys.argv[0], run_name='__main__')\n")
+                result = herdr_response(supervisor_call([launcher, "tab", "create", "--no-focus", "--cwd", str(run_dir),
                                                          "--label", f"gdd-{state['name']}", *options]))
                 tab = result["tab"]["tab_id"]
                 if not isinstance(tab, str) or not tab or tab.startswith("-"):
@@ -294,7 +340,8 @@ def spawn_detached(runner, run_dir, cwd, env, state, mode, launcher=None):
                     raise ValueError("invalid Herdr pane ID")
                 target["pane"] = pane
                 write_json(run_dir / "state.json", state)
-                require_success(supervisor_call([launcher, "pane", "run", pane, herdr_command(runner)]))
+                require_success(supervisor_call([launcher, "pane", "run", pane,
+                                                 f"{executable.name} -B {target['entry']}"]))
             return None, 0
     except (OSError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired) as exc:
         (run_dir / ".runner-env").unlink(missing_ok=True)
@@ -409,6 +456,8 @@ def cleanup_supervisor(run_dir, state):
                 error = response.get("error") or {}
                 if not isinstance(error, dict) or error.get("code") not in ("tab_not_found", "not_found"):
                     raise OSError(supervisor_error(result) if result.returncode else "invalid tab close result")
+        if mode == "herdr" and target.get("entry"):
+            (Path(run_dir) / target["entry"]).unlink(missing_ok=True)
         marker.touch()
         return ""
     except (OSError, subprocess.TimeoutExpired) as exc:
@@ -445,18 +494,7 @@ def slug_start_lock(root, slug):
     Path(root).mkdir(parents=True, exist_ok=True)
     # Keep the lock file: unlinking would allow another process to lock a different inode.
     with (Path(root) / f"{slug}.start.lock").open("a+b") as handle:
-        if IS_WINDOWS:
-            handle.seek(0)
-        try:
-            if IS_WINDOWS:
-                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
-            else:
-                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            die(f"start: run '{slug}' is already starting")
-        except OSError as exc:
-            if not IS_WINDOWS or exc.errno != errno.EACCES:
-                raise
+        if not gdd_process.try_file_lock(handle):
             die(f"start: run '{slug}' is already starting")
         yield  # closing the file releases the kernel lock on both platforms
 
@@ -474,23 +512,25 @@ def read_state(run_dir):
     return state if isinstance(state, dict) else {}
 
 
-def write_json(path, payload):
+def write_json(path, payload, *, progress_tick=False):
     """Retry WinError 5 from a poller before sacrificing atomicity, not the run."""
     tmp = f"{path}.{os.getpid()}.tmp"
     data = json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
     write_text(tmp, data)
+    replace_attempts = 3 if progress_tick else 40
     try:
-        for attempt in range(40):
+        for attempt in range(replace_attempts):
             try:
                 return os.replace(tmp, path)
             except PermissionError as exc:
                 if getattr(exc, "winerror", None) != 5:
                     raise
-                if attempt < 39:
+                if attempt + 1 < replace_attempts:
                     time.sleep(0.05 + 0.05 * (attempt % 5))
         # A torn read is bad, a lost run is worse.
-        print(f"gdd: warning: could not replace {path} (WinError 5); writing in place", file=sys.stderr)
         write_text(path, data)
+        if not progress_tick:
+            print(f"gdd: warning: could not replace {path} (WinError 5); writing in place", file=sys.stderr)
     finally:
         Path(tmp).unlink(missing_ok=True)
 
@@ -570,6 +610,14 @@ def pid_alive(pid):
                     return False
         except (OSError, IndexError):
             pass
+    elif _probe(os.kill, pid):
+        try:
+            result = gdd_process.run(["ps", "-o", "stat=", "-p", str(pid)], capture_output=True, text=True)
+            if result.stdout.strip().startswith("Z"):
+                return False
+        except OSError:
+            pass
+        return True
     return _probe(os.kill, pid)
 
 
@@ -595,17 +643,38 @@ def identity(pid):
     return f"ps:{out}" if out else ""
 
 
-def terminate(pid, reap=lambda: None, *, single=False):
+def group_alive(pid):
+    if not _probe(os.killpg, pid):
+        return False
+    # killpg(..., 0) also succeeds for zombie-only groups whose parent has not reaped.
+    try:
+        result = gdd_process.run(["ps", "-ax", "-o", "pgid=", "-o", "stat="], capture_output=True, text=True)
+    except OSError:
+        return True
+    rows = (line.split(None, 1) for line in result.stdout.splitlines())
+    return bool(result.returncode or any(
+        group == str(pid) and not status.startswith(("Z", "X"))
+        for group, status in (row for row in rows if len(row) == 2)))
+
+
+def terminate(pid, reap=lambda: None, *, single=False, recorded=None):
     """End the tree pid leads; True once gone. `reap` lets the parent collect its own zombie."""
+    def reused():
+        return bool(recorded and (current := identity(pid)) and current != recorded)
+
     def gone():
         reap()
-        return not (pid_alive(pid) or (not IS_WINDOWS and not single and _probe(os.killpg, pid)))
+        return reused() or not (pid_alive(pid) or (not IS_WINDOWS and not single and group_alive(pid)))
 
+    if gone():
+        return True
     if IS_WINDOWS:
         gdd_process.run(["taskkill", "/T", "/F", "/PID", str(pid)], stdin=subprocess.DEVNULL,
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return wait_until(gone, 5)
     for signum in (signal.SIGTERM, signal.SIGKILL):
+        if reused():
+            return True
         try:
             (os.kill if single else os.killpg)(pid, signum)
         except OSError:
@@ -615,10 +684,18 @@ def terminate(pid, reap=lambda: None, *, single=False):
     return False
 
 
+def recorded_pid_alive(state, key):
+    pid, recorded = state.get(key), state.get(f"{key}_identity")
+    if not pid_alive(pid):
+        return False
+    current = identity(pid) if recorded else ""
+    return not current or current == recorded
+
+
 def run_alive(run_dir, state=None):
     """The runner or the agent recorded in state.json is alive (public: gdd.py imports it)."""
     state = read_state(run_dir) if state is None else state
-    return pid_alive(state.get("pid")) or pid_alive(state.get("agent_pid"))
+    return any(recorded_pid_alive(state, key) for key in ("pid", "agent_pid"))
 
 
 def is_starting(state):
@@ -1042,30 +1119,40 @@ def find_run(name, command=None):
 
 
 def stop_run(run_dir):
-    """"" once the run is finalized after a stop request, else why the stop is unproven."""
+    """Return an empty string after finalization, or why the stop is unproven."""
     marker = os.path.join(run_dir, "finalized")
+
+    def settled():
+        if os.path.exists(marker):
+            return True
+        current = read_state(run_dir)
+        return not (run_alive(run_dir, current) or is_starting(current))
+
+    if not os.path.exists(marker):
+        write_json(os.path.join(run_dir, "stop"), {"requested_at": now_iso(), "by": os.getpid()})
+        wait_until(settled, knob("GDD_RUN_STOP_WAIT_SECONDS", 20))
     if os.path.exists(marker):
-        return cleanup_supervisor(run_dir, read_state(run_dir))
-    write_json(os.path.join(run_dir, "stop"), {"requested_at": now_iso(), "by": os.getpid()})
-    if wait_until(lambda: os.path.exists(marker), knob("GDD_RUN_STOP_WAIT_SECONDS", 20)):
-        return cleanup_supervisor(run_dir, read_state(run_dir))
+        cleanup_supervisor(run_dir, read_state(run_dir))
+        return ""
     state, problems = read_state(run_dir), []
     for key in ("agent_pid", "pid"):
-        pid = state.get(key)
+        pid, recorded = state.get(key), state.get(f"{key}_identity")
         if not pid_alive(pid):
             continue
         live = identity(pid)
-        if not live or live != state.get(f"{key}_identity"):
-            problems.append(f"{key} {pid} not signalled (start time {'unreadable' if not live else 'differs from the recorded one'})")
-        elif not terminate(pid, single=key == "pid" and state.get("detach") in
-                           ("systemd", "launchd", "setsid", "tmux", "herdr")):
+        if not live or not recorded:
+            if pid_alive(pid):
+                problems.append(f"{key} {pid} not signalled (start time unverified)")
+        elif live == recorded and not terminate(
+                pid, recorded=recorded, single=key == "pid" and state.get("detach") in
+                ("systemd", "launchd", "setsid", "tmux", "herdr")):
             problems.append(f"{key} {pid} still alive after TERM/KILL")
     if problems:
         return "; ".join(problems)
-    problem = cleanup_supervisor(run_dir, state)
     if not os.path.exists(marker):
-        finalize(run_dir, KILL_EXIT, note="stop requested; the runner did not finalize, so kill recorded the stop")
-    return problem
+        state = finalize(run_dir, KILL_EXIT, note="stop requested; the runner did not finalize, so kill recorded the stop")
+    cleanup_supervisor(run_dir, state)
+    return ""
 
 
 def cmd_start(args):
@@ -1175,8 +1262,9 @@ def start_locked(args, spec, slug, cwd, run_dir, command, prompt, max_time, mode
 
     def started():
         seen.update(read_state(run_dir))
-        return (seen.get("agent_pid") or seen.get("state") not in (None, "running")
-                or (pid is not None and not pid_alive(pid)))
+        runner_alive = recorded_pid_alive(seen, "pid") if seen.get("pid") == pid else pid_alive(pid)
+        return (recorded_pid_alive(seen, "agent_pid") or seen.get("state") not in (None, "running")
+                or (pid is not None and not runner_alive))
 
     if not wait_until(started, 20):
         problem = stop_run(run_dir)
@@ -1197,7 +1285,11 @@ def runner_main(args):
     finally:
         # A concurrent kill/status may also recover this handle after finalization.
         state = read_state(args.run_dir)
-        if state.get("pid") == os.getpid():
+        if state.get("pid") == os.getpid() and (
+                state.get("detach") != "launchd" or Path(args.run_dir, "finalized").exists()):
+            if state.get("detach") == "launchd":
+                # The job can be terminated by bootout; write all terminal files first.
+                signal.signal(signal.SIGTERM, signal.SIG_DFL)
             cleanup_supervisor(args.run_dir, state)
 
 
@@ -1224,16 +1316,29 @@ def run_agent(args):
                 stdin=subprocess.PIPE if spec.prompt == "stdin" else subprocess.DEVNULL,
                 env=child_env(plan.get("scrub_env") or ()), start_new_session=not IS_WINDOWS)
         except OSError as exc:
+            log.handle.close()
             finalize(run_dir, 127, acc, note=f"agent did not start: {exc}")
             return 1
         state.update(agent_pid=process.pid, agent_pid_identity=identity(process.pid))
-        write_json(state_path, state)
+        try:
+            write_json(state_path, state)
+        except OSError:
+            log.handle.close()
+            terminate(process.pid, process.poll, recorded=state["agent_pid_identity"])
+            process.stdout.close()
+            if process.stdin:
+                process.stdin.close()
+            raise
 
         def read():
-            for raw in process.stdout:
-                with lock:
-                    log.write(raw)
-                    fold_line(spec, acc, raw)
+            try:
+                with process.stdout:
+                    for raw in process.stdout:
+                        with lock:
+                            log.write(raw)
+                            fold_line(spec, acc, raw)
+            finally:
+                log.handle.close()
 
         def feed():
             try:
@@ -1250,19 +1355,26 @@ def run_agent(args):
             if hasattr(signal, name):
                 signal.signal(getattr(signal, name), lambda *_: requested.set())
         deadline = time.monotonic() + plan["max_time_s"] if plan.get("max_time_s") else None
-        note, next_write, stop = None, 0.0, False
+        note, next_write, stop, progress_failed = None, 0.0, False, False
         while (exit_code := process.poll()) is None:
             stop = requested.is_set() or os.path.exists(os.path.join(run_dir, "stop"))
             if stop or (deadline is not None and time.monotonic() >= deadline):
                 exit_code = KILL_EXIT if stop else TIMEOUT_EXIT
                 note = None if stop else f"max_time exceeded ({plan['max_time_s']:g} s)"
-                if not terminate(process.pid, process.poll):
+                if not terminate(process.pid, process.poll, recorded=state["agent_pid_identity"]):
                     note = f"{note or 'stopped'}; agent pid {process.pid} still alive after TERM/KILL"
                 break
             if time.monotonic() >= next_write:
                 with lock:
                     state.update(progress(acc), **event_stats(run_dir))
-                write_json(state_path, state)
+                try:
+                    write_json(state_path, state, progress_tick=True)
+                except OSError as exc:
+                    if not progress_failed:
+                        print(f"agent_run: warning: could not write progress to {state_path}: {exc}", file=sys.stderr)
+                    progress_failed = True
+                else:
+                    progress_failed = False
                 next_write = time.monotonic() + PROGRESS_SECONDS
             time.sleep(POLL)
         # A descendant still holding stdout must not wedge the runner (measured on Windows). After a
