@@ -1,12 +1,12 @@
 ---
 name: project-phase-closeout
 description: >-
-  Close a phase: enumerate the task surface and reconcile the record, the index, the published release
-  and the thing users actually load, then rank the closeout list so one decision clears the phase. Use
-  when a goal series ends and before the next phase's goals are written on top of the drift. Do not use
-  mid-goal, or as a substitute for one increment's merge gate.
+  Close a phase: enumerate the task surface, reconcile record, index, published release and what users
+  actually load, then rank the tails so one decision clears the phase. Use when a goal series ends,
+  before writing the next phase's goals, or on "anything left undone?". Not mid-goal, not a merge
+  gate, not a report audit (report-claim-audit).
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "enumerate the task surface, reconcile record/index/release/production, output a ranked closeout list with one decision"

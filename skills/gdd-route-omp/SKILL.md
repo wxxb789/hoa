@@ -1,13 +1,12 @@
 ---
 name: gdd-route-omp
 description: >-
-  Use when delegating a repo task to OMP (`omp -p`) that will run more than a couple of minutes —
-  standalone or as `gdd`'s OMP route — when the orchestrating chat/session may restart, or when
-  recovering a run that was killed mid-turn. Runs it headlessly so it survives the session that
-  dispatched it: detached tmux, NDJSON event log, polled completion, session-id recovery. Do not use
-  for a two-minute command (run it inline) or for work that needs live steering (that is a TUI session).
+  Use when delegating a repo task to OMP (`omp -p`) that runs more than a couple of minutes —
+  standalone or as `gdd`'s OMP route — or recovering a run killed mid-turn. Launches it detached to
+  survive session restarts: NDJSON event log, polled completion, session-id recovery. Not for a short
+  command (run inline) or work needing live steering (TUI).
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "software-development,work-management"
   targets: "pi"
   summary: "detached tmux launcher for long `omp -p` runs; polled completion, session-id recovery"

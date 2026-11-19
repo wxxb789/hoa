@@ -1,13 +1,12 @@
 ---
 name: review-revision-candidates
 description: >-
-  Run a revision round on a candidate a reviewer rejected: re-read the governing files at the
-  start of the round, treat the numbered list as the entire change set, and deliver bytes plus
-  anchors rather than prose about the rejection. Use when a reviewer returns a patch, draft or
-  page edit as REJECTED with items to fix. Not for open-ended rewrites or for reviewing someone
-  else's work.
+  Run a revision round on a reviewer-rejected candidate: re-read governing files, treat the
+  numbered list as the whole change set, build vN+1 without editing the rejected patch, and deliver
+  bytes plus anchors, not prose. Use when a patch, draft or page edit comes back REJECTED with items
+  to fix. Not for open-ended rewrites or reviewing others' work.
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "work-management"
   targets: "runtime-agnostic"
   summary: "run a rejected candidate's revision round: the numbered list is the whole change set"

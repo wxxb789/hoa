@@ -82,7 +82,7 @@ CI (`.github/workflows/ci.yml`) fails on:
 
 | Behavior | Check | Enforces |
 |---|---|---|
-| Description over 1024 characters (agentskills spec, Codex); over 500 (DSH default) only warns | `scripts/check_frontmatter.py` | listing budget; hosts truncate long descriptions |
+| A model-visible description over 350 characters; a hidden one over 1024 (agentskills spec, Codex) | `scripts/check_frontmatter.py` | listing budget; hosts truncate long descriptions |
 | `disable-model-invocation` not a kebab-case YAML boolean, or `true` without `agents/openai.yaml` `policy.allow_implicit_invocation: false`, or the reverse | `scripts/check_frontmatter.py` | Visibility 1–2 |
 | A `../<sibling>/` reference in `SKILL.md` or `references/**/*.md` that names no sibling skill or no existing path; one that leaves `skills/` only warns | `scripts/check_skill_links.py` | Chaining 1–2 |
 | A hidden skill in `must_pick` (`R10`) | `scripts/check_contract_graph.py` | Visibility 5 |

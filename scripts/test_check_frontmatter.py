@@ -139,15 +139,24 @@ class CheckFrontmatterTests(unittest.TestCase):
                 else:
                     self.assertTrue(any(message in finding for finding in findings), findings)
 
-    def test_description_over_1024_characters_fails(self):
-        for name, length in (("at-cap", 1024), ("too-long", 1025)):
-            self.skill(name, valid_frontmatter(name).replace(
-                f"description: {name} does one thing.", "description: " + "x" * length))
+    def test_description_caps_depend_on_visibility(self):
+        for name, length, hidden in (("visible-at-cap", 350, False), ("visible-long", 351, False),
+                                     ("hidden-at-cap", 1024, True), ("hidden-long", 1025, True)):
+            text = valid_frontmatter(name).replace(
+                f"description: {name} does one thing.", "description: " + "x" * length)
+            if hidden:
+                text = text.replace("metadata:", "disable-model-invocation: true\nmetadata:", 1)
+            path = self.skill(name, text)
+            if hidden:
+                (path.parent / "agents").mkdir()
+                (path.parent / "agents" / "openai.yaml").write_text(
+                    "policy:\n  allow_implicit_invocation: false\n", encoding="utf-8")
         code, out, _ = self.run_main()
         self.assertEqual(code, 1)
-        self.assertIn("too-long", out)
-        self.assertIn("1025 characters; cap is 1024", out)
-        self.assertNotIn("at-cap", out)
+        self.assertIn("351 characters; cap for a model-visible skill is 350", out)
+        self.assertIn("1025 characters; cap for a hidden skill is 1024", out)
+        self.assertNotIn("visible-at-cap", out)
+        self.assertNotIn("hidden-at-cap", out)
 
 
 if __name__ == "__main__":

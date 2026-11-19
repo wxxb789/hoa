@@ -3,10 +3,10 @@ name: package-release-verification
 description: >-
   Cut or verify a package release: changelog, gates on the same commit, workflow dispatch, a per-version
   registry check, and cleanup as a separate approval. Use when publishing a version to a registry, or
-  when verifying that the release users can install is the one the gates ran on. Do not use for landing
-  the increment itself — merging is the merge phase of `gdd`.
+  checking that the installable release is the one the gates ran on. Not for landing the increment —
+  that is the merge phase of `gdd`.
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "software-development"
   targets: "runtime-agnostic"
   summary: "changelog → gate-on-the-same-commit → dispatch → per-version registry check → approved cleanup"

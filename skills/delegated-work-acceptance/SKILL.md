@@ -1,13 +1,12 @@
 ---
 name: delegated-work-acceptance
 description: >-
-  Verify work a teammate or sub-agent reports as done — the artifact, the numbers, and the write
-  boundary — before you accept it or pass it on. Use when a delegated batch, repair, report, corpus
-  scan or handoff comes back "complete", when a sub-agent's summary must be turned into a ruling, or
-  when deciding what to authorize and what to send back. Do not use for grading your own work, or when
-  no artifact exists to inspect.
+  Verify work a teammate or sub-agent reports as done — the artifact, the re-derived numbers and the
+  write boundary — before accepting or passing it on. Use when a delegated batch, repair, report or
+  handoff comes back "complete" and must become a ruling on what to authorize or send back.
+  Not for grading your own work, or when no artifact exists.
 metadata:
-  revision: "3"
+  revision: "4"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
   summary: "verify a delegated \"done\" against the artifact, the re-derived numbers and the write boundary"

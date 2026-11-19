@@ -1,13 +1,12 @@
 ---
 name: hoa-skill-review
 description: >-
-  Evidence-ranks skill behavior against its intended outcome and next consumer
-  without changing the subject. Use when reviewing one skill or a changed
-  skill block. Use when candidate skill replies need judgment against task requirements.
-  Use hoa-skill-create for requested skill creation or evolution; for whole-set verdicts,
-  suggest the user run hoa-skill-set-audit.
+  Read-only, evidence-ranked review of one skill or a changed skill block against its intended
+  outcome and next consumer; also grades candidate skill replies against task requirements. Use
+  when reviewing a skill, its diff, or its outputs. Not for creating or evolving
+  skills (hoa-skill-create) or whole-set verdicts (user runs hoa-skill-set-audit).
 metadata:
-  revision: "3"
+  revision: "4"
   areas: "software-development,work-management,self-management"
   targets: "runtime-agnostic"
   summary: "review skill behavior and changes against consumer evidence without editing the target"

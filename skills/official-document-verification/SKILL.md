@@ -1,13 +1,12 @@
 ---
 name: official-document-verification
 description: >-
-  Verify a load-bearing claim against the exact print of the document that carries it: pin
-  the print before reading, scan by number and by content, and get an artifact a plain client
-  cannot fetch. Use when a conclusion rests on a bill, a statute, an audit report, a
-  regulator's page, or any artifact whose wording and version decide the answer. Not for
-  ordinary web reading where the page itself is the source of record.
+  Verify a load-bearing claim against the exact document print: pin the version, scan by number and
+  content, and fetch what a plain client cannot. Use when a conclusion rests on a bill, statute, audit
+  report, regulator's page or other artifact whose wording and version decide it. Not for ordinary
+  web reading where the page is the source of record.
 metadata:
-  revision: "2"
+  revision: "3"
   areas: "work-management"
   targets: "runtime-agnostic"
   summary: "verify a claim against the exact print of the document, including artifacts a plain client cannot fetch"

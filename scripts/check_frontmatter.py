@@ -10,7 +10,9 @@ index generator agree on what a valid skill is.
 Visibility: `disable-model-invocation` (kebab-case only) must be a YAML boolean,
 and it must agree with `agents/openai.yaml` `policy.allow_implicit_invocation`:
 a hidden skill ships that key as `false`, and a `false` key needs the flag.
-A description over 1024 characters (the agentskills spec cap) is an error.
+A model-visible description over 350 characters is an error: every host lists visible
+descriptions in one shared, size-limited catalog. A hidden skill is not listed, so only
+the 1024-character agentskills spec cap applies to it.
 
 Usage:
     python scripts/check_frontmatter.py
@@ -33,6 +35,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SKILLS = ROOT / "skills"
 HIDDEN = "disable-model-invocation"
 DESCRIPTION_MAX = 1024
+VISIBLE_DESCRIPTION_MAX = 350
 
 
 def _frontmatter(text: str) -> str:
@@ -104,9 +107,11 @@ def check_skill(skill_md: Path) -> list[str]:
     if isinstance(data.get("name"), str) and data["name"].strip() != name:
         findings.append(f"{skill_md}: name {data['name']!r} does not match directory {name!r}")
     description = data.get("description")
-    if isinstance(description, str) and len(description) > DESCRIPTION_MAX:
+    cap = DESCRIPTION_MAX if data.get(HIDDEN) is True else VISIBLE_DESCRIPTION_MAX
+    if isinstance(description, str) and len(description) > cap:
+        kind = "hidden" if cap == DESCRIPTION_MAX else "model-visible"
         findings.append(f"{skill_md}: description is {len(description)} characters; "
-                        f"cap is {DESCRIPTION_MAX}")
+                        f"cap for a {kind} skill is {cap}")
     findings.extend(_visibility(skill_md, data))
     try:
         gi.parse_skill_metadata(skill_md)

@@ -1,13 +1,12 @@
 ---
 name: hermes-context-file-loading
 description: >-
-  Trace how Hermes assembles its system prompt from instruction files: which file loads from which
-  directory, which project file wins when several exist, and which tier each rule lands in. Use when
-  auditing or editing SOUL/AGENTS/MEMORY/USER files, deciding where a durable rule belongs, debugging
-  an instruction file that did or did not take effect, or reasoning about subagent context and prompt
-  cache stability. Not for editing the runtime source, and not for other harnesses' context files.
+  Trace how Hermes builds its system prompt: which instruction file loads from where, which project
+  file wins, which tier a rule lands in. Use when auditing/editing SOUL/AGENTS/MEMORY/USER files,
+  placing a durable rule, debugging why one did/didn't apply, or checking subagent context or prompt
+  caching. Not for runtime source edits or other harnesses.
 metadata:
-  revision: "2"
+  revision: "3"
   areas: "software-development"
   targets: "hermes"
   summary: "which Hermes instruction file loads from where, which project file wins, and which prompt tier a rule belongs to"
