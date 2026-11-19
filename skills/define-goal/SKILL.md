@@ -1,12 +1,12 @@
 ---
 name: define-goal
 description: >-
-  Define ambitious intentions as numbered goal-prompt files: clear near-term outcomes, provisional
-  later ones, no implementation plans. Use when turning a large vision into inspectable increments
-  or refining the next goal from prior results. Not for a request whose scope or done criteria are
-  undecided (spec-convergence first) or task breakdown.
+  Turn an ambitious direction into numbered goal-prompt files, or refine the next goal from prior
+  results. Write verifiable near-term outcomes and provisional later ones, not implementation
+  tasks. Use spec-convergence first if the next outcome's scope, acceptance, or testing boundary
+  is still undecided.
 metadata:
-  revision: "3"
+  revision: "4"
   areas: "self-management,software-development,work-management"
   targets: "runtime-agnostic"
   summary: "preserve ambitious intent in numbered goal files, with clear near-term and provisional later outcomes, not implementation plans"

@@ -1,11 +1,11 @@
 {
-  "case_count": 22,
+  "case_count": 32,
   "model": "gemini-4-carbon",
   "effort": "low",
-  "passed": 22,
-  "total": 22,
+  "passed": 32,
+  "total": 32,
   "judge_endpoint_host": "127.0.0.1:4141",
-  "generated_at": "2026-11-19T03:56:40Z",
+  "generated_at": "2026-11-19T15:55:19Z",
   "per_case": [
     {
       "id": "route-to-search",
@@ -100,6 +100,56 @@
     {
       "id": "route-boundaryless-goal-to-spec-first",
       "pick": "spec-convergence",
+      "passed": true
+    },
+    {
+      "id": "route-to-report-claim-audit",
+      "pick": "report-claim-audit",
+      "passed": true
+    },
+    {
+      "id": "route-to-evidence-boundary-discipline",
+      "pick": "evidence-boundary-discipline",
+      "passed": true
+    },
+    {
+      "id": "route-to-official-document-verification",
+      "pick": "official-document-verification",
+      "passed": true
+    },
+    {
+      "id": "route-to-delegated-work-acceptance",
+      "pick": "delegated-work-acceptance",
+      "passed": true
+    },
+    {
+      "id": "route-to-measurement-campaign-evidence",
+      "pick": "measurement-campaign-evidence",
+      "passed": true
+    },
+    {
+      "id": "route-to-research-stream-consolidation",
+      "pick": "research-stream-consolidation",
+      "passed": true
+    },
+    {
+      "id": "route-to-review-revision-candidates",
+      "pick": "review-revision-candidates",
+      "passed": true
+    },
+    {
+      "id": "route-to-evidence-backed-analytical-writing",
+      "pick": "evidence-backed-analytical-writing",
+      "passed": true
+    },
+    {
+      "id": "route-to-hermes-ops-claim-verification",
+      "pick": "hermes-ops-claim-verification",
+      "passed": true
+    },
+    {
+      "id": "no-trigger-evidence-terminology",
+      "pick": "none",
       "passed": true
     },
     {
