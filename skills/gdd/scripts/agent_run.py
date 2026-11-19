@@ -32,9 +32,9 @@ the next reader; a pid-less run younger than GDD_RUN_START_GRACE_SECONDS (60) is
 taskkill /T /F) and finalizes killed/143. With the runner gone, `kill` signals a recorded pid
 only if its live start time equals the one recorded at spawn, else exits 1 naming the pid.
 
-Detachment: POSIX start_new_session (runner and agent); Windows CREATE_NO_WINDOW |
-CREATE_NEW_PROCESS_GROUP, never DETACHED_PROCESS (a console-less run makes every tool command
-allocate a visible console).
+Detachment: GDD_RUN_DETACH=auto|systemd|session. Linux prefers a transient user unit;
+other POSIX hosts use start_new_session. Windows uses a detached process group and
+breaks away from the caller's job when allowed.
 
 Knobs: GDD_RUN_EVENTS_MAX_BYTES (8388608), GDD_RUN_START_GRACE_SECONDS (60),
 GDD_RUN_STOP_WAIT_SECONDS (20), GDD_RUN_DRAIN_TIMEOUT_SECONDS (30; 5 after a stop).
@@ -47,6 +47,7 @@ import sys
 sys.dont_write_bytecode = True
 
 import argparse
+import errno
 import glob
 import json
 import os
@@ -58,22 +59,28 @@ import subprocess
 import threading
 import time
 import uuid
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Callable
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import gdd_process
 import skill_config
 import stage_result
 
 IS_WINDOWS = os.name == "nt"
 if IS_WINDOWS:
     import ctypes
+    import msvcrt
+    from ctypes import wintypes
+else:
+    import fcntl
 
 KILLED_EXITS = (130, -2, 137, -9, 143, -15)
 KILL_EXIT, TIMEOUT_EXIT = 143, 124
-HIDDEN = 0x08000000 if IS_WINDOWS else 0  # CREATE_NO_WINDOW
-DETACH = HIDDEN | 0x00000200 if IS_WINDOWS else 0  # | CREATE_NEW_PROCESS_GROUP
+WINDOWS_DETACH = gdd_process.NO_WINDOW | gdd_process.NEW_GROUP
 POLL, PROGRESS_SECONDS = 0.25, 2.0
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 SLUG_RE = re.compile(r"[^a-z0-9._-]+")
@@ -114,6 +121,112 @@ def run_root():
     return os.path.abspath(os.path.expanduser(root))
 
 
+def detach_config():
+    try:
+        return skill_config.resolve("gdd", "GDD_RUN_DETACH", default="auto")
+    except skill_config.ConfigError as exc:
+        raise ValueError(f"GDD_RUN_DETACH: {exc}") from exc
+
+
+def select_detach(requested):
+    if requested not in ("auto", "systemd", "session"):
+        raise ValueError(f"GDD_RUN_DETACH={requested!r}: expected auto, systemd or session")
+    if requested != "session" and sys.platform == "linux":
+        if (launcher := shutil.which("systemd-run")) and (ctl := shutil.which("systemctl")):
+            try:
+                status = gdd_process.run([ctl, "--user", "is-system-running"], stdin=subprocess.DEVNULL,
+                                        capture_output=True, encoding="utf-8", errors="replace", timeout=1)
+                if status.stdout.strip() in ("running", "degraded"):
+                    return "systemd", launcher
+            except (OSError, subprocess.TimeoutExpired):
+                pass
+    if requested == "systemd":
+        raise ValueError("GDD_RUN_DETACH=systemd requires systemd-run and a reachable Linux user manager")
+    return ("windows" if IS_WINDOWS else "session"), None
+
+
+def systemd_argv(launcher, unit, cwd, log, runner):
+    return [launcher, "--user", "--collect", "--quiet", "--unit", unit, "--service-type=exec",
+            "--no-ask-password", f"--working-directory={cwd.replace('%', '%%')}",
+            f"--property=StandardOutput=append:{str(log).replace('%', '%%')}",
+            "--property=StandardError=inherit", "--", runner[0],
+            *(arg.replace("$", "$$") for arg in runner[1:]), "--restore-env"]
+
+
+def spawn_detached(runner, run_dir, cwd, env, mode, launcher=None, unit=None):
+    log_path = Path(run_dir) / "runner.log"
+    if mode == "systemd":
+        # A transient unit inherits the manager's environment, not the dispatcher's.
+        # Pass the exact environment privately; don't put credentials in argv or unit properties.
+        path = Path(run_dir) / ".runner-env"
+        handle = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        try:
+            with os.fdopen(handle, "w", encoding="utf-8") as stream:
+                json.dump(env, stream)
+            gdd_process.run(systemd_argv(launcher, unit, cwd, log_path, runner), check=True,
+                           stdin=subprocess.DEVNULL, capture_output=True, encoding="utf-8", errors="replace")
+        except (OSError, subprocess.CalledProcessError) as exc:
+            path.unlink(missing_ok=True)
+            raise OSError(getattr(exc, "stderr", "").strip() or str(exc)) from exc
+        return None, 0
+    with log_path.open("ab", buffering=0) as log:
+        options = dict(cwd=cwd, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT, env=env)
+        if mode == "windows":
+            for creationflags in (WINDOWS_DETACH | gdd_process.BREAKAWAY, WINDOWS_DETACH):
+                try:
+                    return gdd_process.popen([*runner, "--creationflags", str(creationflags)],
+                                            creationflags=creationflags, **options), creationflags
+                except OSError as exc:
+                    if creationflags == WINDOWS_DETACH or getattr(exc, "winerror", None) != 5:
+                        raise
+        return gdd_process.popen(runner, start_new_session=True, **options), 0
+
+
+def restore_detached_env(run_dir):
+    path = Path(run_dir) / ".runner-env"
+    with path.open(encoding="utf-8") as handle:
+        env = json.load(handle)
+    path.unlink()
+    os.environ.clear()
+    os.environ.update(env)
+
+
+def unit_name(slug):
+    return f"gdd-{slug}-{uuid.uuid4().hex[:12]}"
+
+
+def warn_wsl(binary, run_dir):
+    if sys.platform != "linux" or "microsoft" not in os.uname().release.lower():
+        return
+    if Path(binary).suffix.lower() == ".exe":
+        print(f"gdd: warning: WSL is using Windows CLI {binary} through interop; prefer a native Linux CLI",
+              file=sys.stderr)
+    if run_dir is not None and re.match(r"^/mnt/[a-z](?:/|$)", Path(run_dir).resolve().as_posix(), re.IGNORECASE):
+        print(f"gdd: warning: WSL run directory {run_dir} is on a Windows drive; prefer the Linux filesystem",
+              file=sys.stderr)
+
+
+@contextmanager
+def slug_start_lock(root, slug):
+    Path(root).mkdir(parents=True, exist_ok=True)
+    # Keep the lock file: unlinking would allow another process to lock a different inode.
+    with (Path(root) / f"{slug}.start.lock").open("a+b") as handle:
+        if IS_WINDOWS:
+            handle.seek(0)
+        try:
+            if IS_WINDOWS:
+                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            die(f"start: run '{slug}' is already starting")
+        except OSError as exc:
+            if not IS_WINDOWS or exc.errno != errno.EACCES:
+                raise
+            die(f"start: run '{slug}' is already starting")
+        yield  # closing the file releases the kernel lock on both platforms
+
+
 def read_json(path, default=None):
     try:
         with open(path, encoding="utf-8") as handle:
@@ -128,18 +241,24 @@ def read_state(run_dir):
 
 
 def write_json(path, payload):
-    """Atomic replace; retry the measured Windows WinError 5 (a poller holds path), then raise."""
+    """Retry WinError 5 from a poller before sacrificing atomicity, not the run."""
     tmp = f"{path}.{os.getpid()}.tmp"
-    with open(tmp, "w", encoding="utf-8") as handle:
-        handle.write(json.dumps(payload, indent=2, ensure_ascii=False) + "\n")
-    for attempt in range(40):
-        try:
-            return os.replace(tmp, path)
-        except PermissionError:
-            if attempt == 39:
-                os.unlink(tmp)
-                raise
-            time.sleep(0.05 + 0.05 * (attempt % 5))
+    data = json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
+    write_text(tmp, data)
+    try:
+        for attempt in range(40):
+            try:
+                return os.replace(tmp, path)
+            except PermissionError as exc:
+                if getattr(exc, "winerror", None) != 5:
+                    raise
+                if attempt < 39:
+                    time.sleep(0.05 + 0.05 * (attempt % 5))
+        # A torn read is bad, a lost run is worse.
+        print(f"gdd: warning: could not replace {path} (WinError 5); writing in place", file=sys.stderr)
+        write_text(path, data)
+    finally:
+        Path(tmp).unlink(missing_ok=True)
 
 
 def write_text(path, text):
@@ -177,6 +296,10 @@ def wait_until(predicate, seconds):
 def _windows_query(pid, query):
     """query(kernel32, handle) on an open process handle, or None when it cannot be opened."""
     kernel32 = ctypes.windll.kernel32
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel32.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+    kernel32.GetProcessTimes.argtypes = [wintypes.HANDLE, *([ctypes.POINTER(wintypes.FILETIME)] * 4)]
     handle = kernel32.OpenProcess(0x00100000 | 0x1000, False, pid)  # SYNCHRONIZE | QUERY_LIMITED
     if not handle:
         return None
@@ -214,9 +337,9 @@ def identity(pid):
     if not pid_alive(pid):
         return ""
     if IS_WINDOWS:
-        times = [ctypes.c_ulonglong() for _ in range(4)]
+        times = [wintypes.FILETIME() for _ in range(4)]
         ok = _windows_query(pid, lambda k, h: k.GetProcessTimes(h, *(ctypes.byref(t) for t in times)))
-        return f"win:{times[0].value}" if ok else ""
+        return f"win:{(times[0].dwHighDateTime << 32) | times[0].dwLowDateTime}" if ok else ""
     if sys.platform.startswith("linux"):
         try:
             with open(f"/proc/{pid}/stat", encoding="utf-8") as handle:
@@ -224,26 +347,26 @@ def identity(pid):
         except (OSError, IndexError):
             return ""
     try:
-        out = subprocess.run(["ps", "-o", "lstart=", "-p", str(pid)], capture_output=True, encoding="utf-8",
-                             errors="replace", stdin=subprocess.DEVNULL).stdout.strip()
+        out = gdd_process.run(["ps", "-o", "lstart=", "-p", str(pid)], capture_output=True, text=True,
+                              env={**os.environ, "LC_ALL": "C"}, stdin=subprocess.DEVNULL).stdout.strip()
     except OSError:
         out = ""
     return f"ps:{out}" if out else ""
 
 
-def terminate(pid, reap=lambda: None):
+def terminate(pid, reap=lambda: None, *, single=False):
     """End the tree pid leads; True once gone. `reap` lets the parent collect its own zombie."""
     def gone():
         reap()
-        return not (pid_alive(pid) or (not IS_WINDOWS and _probe(os.killpg, pid)))
+        return not (pid_alive(pid) or (not IS_WINDOWS and not single and _probe(os.killpg, pid)))
 
     if IS_WINDOWS:
-        subprocess.run(["taskkill", "/T", "/F", "/PID", str(pid)], stdin=subprocess.DEVNULL,
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=HIDDEN)
+        gdd_process.run(["taskkill", "/T", "/F", "/PID", str(pid)], stdin=subprocess.DEVNULL,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return wait_until(gone, 5)
     for signum in (signal.SIGTERM, signal.SIGKILL):
         try:
-            os.killpg(pid, signum)
+            (os.kill if single else os.killpg)(pid, signum)
         except OSError:
             pass
         if wait_until(gone, 5):
@@ -410,7 +533,8 @@ def flags(*pairs):
 
 def omp_argv(args, extra):
     return ["-p", "--mode=json", "--approval-mode", "yolo",
-            *flags(("--model", args.model), ("--thinking", args.thinking), ("-r", args.resume)), *extra]
+            *flags(("--model", args.model), ("--thinking", args.thinking), ("-r", args.resume),
+                   ("--profile", args.profile)), *extra]
 
 
 def dsh_argv(args, extra):
@@ -678,7 +802,7 @@ def stop_run(run_dir):
         live = identity(pid)
         if not live or live != state.get(f"{key}_identity"):
             problems.append(f"{key} {pid} not signalled (start time {'unreadable' if not live else 'differs from the recorded one'})")
-        elif not terminate(pid):
+        elif not terminate(pid, single=key == "pid" and state.get("detach") == "systemd"):
             problems.append(f"{key} {pid} still alive after TERM/KILL")
     if problems:
         return "; ".join(problems)
@@ -696,6 +820,15 @@ def cmd_start(args):
     except skill_config.ConfigError as exc:
         die(f"start: {exc}")
     spec = AGENTS.get(agent) or die(f"start: unknown agent {agent!r} (known: {', '.join(AGENTS)})")
+    if args.session_id is not None:
+        if agent != "dsh" or args.resume is not None:
+            die("start: --session-id is a DSH alias for --resume; do not combine them")
+        args.resume = args.session_id
+    if (args.backend is not None or args.profile is not None) and agent != "omp":
+        die("start: --backend and --profile are OMP compatibility flags")
+    if args.backend is not None:
+        print(f"agent_run: warning: --backend {args.backend} is retired; using GDD_RUN_DETACH instead",
+              file=sys.stderr)
     for field in spec.refuse:
         if getattr(args, field):
             die(f"start: --{field} is not supported on the {agent.upper()} route")
@@ -713,21 +846,35 @@ def cmd_start(args):
         args.schema = os.path.abspath(os.path.expanduser(args.schema))
         if not isinstance(read_json(args.schema), dict):
             die(f"start: --schema {args.schema} is not a readable JSON object")
-    command = resolve_binary(spec) + spec.argv(args, shlex.split(args.extra or ""))
+    prefix = resolve_binary(spec)
+    command = prefix + spec.argv(args, shlex.split(args.extra or ""))
     shim = command[2] if command[1:2] == ["/c"] else command[0]
     checked = command[command.index(shim) + 1:] + ([prompt.decode("utf-8", "replace")] if spec.prompt == "argv" else [])
     if hazard := shim_hazard(shim, checked):
         die(f"start: {hazard}; point {agent.upper()}_BIN at the real executable")
 
+    root = run_root()
+    run_dir = str(Path(root) / datetime.now().strftime("%Y-%m-%d") / slug)
+    warn_wsl(prefix[-1], run_dir)
+    try:
+        mode, launcher = select_detach(detach_config())
+        with slug_start_lock(root, slug):
+            return start_locked(args, spec, slug, cwd, run_dir, command, prompt, max_time, mode, launcher)
+    except (OSError, ValueError) as exc:
+        die(f"start: {exc}")
+
+
+def start_locked(args, spec, slug, cwd, run_dir, command, prompt, max_time, mode, launcher):
     previous = find_run(slug)
     if previous:
         state, _ = effective_state(previous)
+        if state.get("backend") == "paseo" and state.get("state") in ("running", "unknown"):
+            die(f"start: native Paseo run '{slug}' is unresolved; use the Paseo adapter")
         live = not os.path.exists(os.path.join(previous, "finalized")) and (run_alive(previous, state) or is_starting(state))
         if live and not args.replace:
             die(f"start: run '{slug}' is still running (pid {state.get('pid')}/{state.get('agent_pid')}; use --replace)")
         if live and (problem := stop_run(previous)):
             die(f"start: could not stop run '{slug}': {problem}")
-    run_dir = os.path.join(run_root(), datetime.now().strftime("%Y-%m-%d"), slug)
     try:
         if os.path.isdir(run_dir):  # keep the previous run; on Windows its exiting runner still holds files
             wait_until(lambda: not run_alive(run_dir), knob("GDD_RUN_STOP_WAIT_SECONDS", 20))
@@ -750,6 +897,8 @@ def cmd_start(args):
         die(f"start: cannot claim {run_dir}: {exc}")
     with open(os.path.join(run_dir, "prompt.md"), "wb") as handle:
         handle.write(prompt)
+    agent = spec.name
+    unit = unit_name(slug) if mode == "systemd" else None
     write_json(os.path.join(run_dir, "run.json"), {"agent": agent, "argv": command, "prompt": spec.prompt,
                                                    "cwd": cwd, "scrub_env": spec.scrub_env, "max_time_s": max_time,
                                                    "schema": args.schema})
@@ -757,18 +906,24 @@ def cmd_start(args):
         "name": slug, "agent": agent, "state": "running", "exit": None, "cwd": cwd, "started": now_iso(),
         "ended": None, "duration_s": None, "run_dir": run_dir, "pid": None, "agent_pid": None,
         "session_id": args.resume or (command[command.index("--session-id") + 1] if "--session-id" in command else ""),
-        "backend": "windows" if IS_WINDOWS else "setsid", "model": args.model,
+        "backend": {"session": "setsid", "windows": "windows", "systemd": "systemd"}[mode],
+        "detach": mode, **({"unit": unit} if unit else {}), "model": args.model,
         "thinking": args.thinking, "max_time": args.max_time, "resumed_from": args.resume,
-        "spawn": {"creationflags": DETACH, "platform": sys.platform}})
+        "spawn": {"creationflags": 0, "platform": sys.platform}})
     runner = [interpreter(), "-B", os.path.abspath(__file__), "_run", "--run-dir", run_dir]
     try:
-        with open(os.path.join(run_dir, "runner.log"), "ab") as log:
-            subprocess.Popen(runner, cwd=cwd, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
-                             env=child_env(spec.scrub_env), creationflags=DETACH, start_new_session=not IS_WINDOWS)
+        process, _ = spawn_detached(runner, run_dir, cwd, child_env(spec.scrub_env), mode, launcher, unit)
     except OSError as exc:
+        finalize(run_dir, 127, note=f"could not spawn the runner: {exc}")
         die(f"start: could not spawn the runner: {exc}")
     seen = {}
-    if not wait_until(lambda: seen.update(read_state(run_dir)) or seen.get("agent_pid") or seen.get("state") != "running", 20):
+
+    def started():
+        seen.update(read_state(run_dir))
+        return (seen.get("agent_pid") or seen.get("state") not in (None, "running")
+                or (process is not None and process.poll() is not None))
+
+    if not wait_until(started, 20):
         die(f"start: no agent pid recorded within 20 s (see {os.path.join(run_dir, 'runner.log')})")
     if not seen.get("agent_pid"):
         die(f"start: agent did not start: {seen.get('note') or seen.get('state')} (see {run_dir})")
@@ -779,9 +934,12 @@ def cmd_start(args):
 
 def runner_main(args):
     run_dir = os.path.abspath(args.run_dir)
+    if args.restore_env:
+        restore_detached_env(run_dir)
     plan, state_path = read_json(os.path.join(run_dir, "run.json"), {}), os.path.join(run_dir, "state.json")
     spec, state = AGENTS[plan["agent"]], read_state(run_dir)
     state.update(pid=os.getpid(), pid_identity=identity(os.getpid()))
+    state["spawn"]["creationflags"] = args.creationflags
     write_json(state_path, state)
     with open(os.path.join(run_dir, "prompt.md"), "rb") as handle:
         prompt = handle.read()
@@ -789,8 +947,8 @@ def runner_main(args):
     log, acc, lock, requested = EventLog(run_dir), new_acc(), threading.Lock(), threading.Event()
     with open(os.path.join(run_dir, "stderr.log"), "ab") as stderr:
         try:
-            process = subprocess.Popen(
-                argv, cwd=plan["cwd"], stdout=subprocess.PIPE, stderr=stderr, creationflags=HIDDEN,
+            process = gdd_process.popen(
+                argv, cwd=plan["cwd"], stdout=subprocess.PIPE, stderr=stderr,
                 stdin=subprocess.PIPE if spec.prompt == "stdin" else subprocess.DEVNULL,
                 env=child_env(plan.get("scrub_env") or ()), start_new_session=not IS_WINDOWS)
         except OSError as exc:
@@ -932,12 +1090,17 @@ def main(argv=None):
     start = sub.add_parser("start", help="start one detached run")
     for flag in ("--cwd", "--agent", "--model", "--thinking", "--max-time", "--resume", "--schema", "--extra"):
         start.add_argument(flag)
+    for compat in ("--backend", "--profile", "--session-id"):
+        start.add_argument(compat, help=argparse.SUPPRESS)
     start.add_argument("--name", required=True)
     start.add_argument("--prompt", required=True)
     start.add_argument("--replace", action="store_true")
     start.set_defaults(func=cmd_start)
-    sub.add_parser("_run").add_argument("--run-dir", required=True)
-    sub.choices["_run"].set_defaults(func=runner_main)
+    internal = sub.add_parser("_run")
+    internal.add_argument("--run-dir", required=True)
+    internal.add_argument("--restore-env", action="store_true")
+    internal.add_argument("--creationflags", type=int, default=0)
+    internal.set_defaults(func=runner_main)
     sub.add_parser("list").set_defaults(func=cmd_list)
     for name, func in (("status", cmd_status), ("result", cmd_status), ("answer", cmd_answer),
                        ("kill", cmd_kill), ("tail", cmd_tail)):

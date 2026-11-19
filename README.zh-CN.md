@@ -157,11 +157,12 @@ scope-seal）。每条规则都由该命令执行：
 
 ### CI 跑什么
 
-`test` job（`.github/workflows/ci.yml`）在每次 push 到 `main`、每个 pull request 与
+CI（`.github/workflows/ci.yml`）有两个 job：Ubuntu 上的 `test`，以及覆盖 Ubuntu、macOS 和
+Windows 的 `gdd-runner`。两者都在每次 push 到 `main`、每个 pull request 与
 `workflow_dispatch` 时运行。没有 release job：`npx skills` 直接从 GitHub 安装，因此不打 tag、不发布。
 每项检查都是一个具名 step，失败时在 Actions 界面里直接显示是哪一步；同一 pull request 的新 push 会取消旧的运行。
 
-| Step | 命令 | 保护什么 |
+| Job / Step | 命令 | 保护什么 |
 |---|---|---|
 | Frontmatter | `python scripts/check_frontmatter.py` | 每个 `SKILL.md` 的 frontmatter 与目录字段；description 上限：可见 350 字符、隐藏 1024 字符；隐藏标记与 `agents/openai.yaml` 一致。 |
 | Contract graph | `python scripts/check_contract_graph.py` | 上面的 R1–R10。 |
@@ -172,12 +173,13 @@ scope-seal）。每条规则都由该命令执行：
 | pytest | `python -m pytest` | `scripts/`、`evals/`、`skills/` 下每个 `test_*.py` unittest/pytest 文件（`pytest.ini`）；每个测试 120 秒上限。 |
 | 脚本检查 | `python evals/run_trigger_evals.py`、`evals/validate_skill_method_cases.py`、`skills/define-goal/evals/validate_fixtures.py`、`skills/hermes-models/scripts/tests/test-*.py`、`skills/gdd/scripts/tests/test_verdict_matrix.py`、`mutate_verdict_matrix.py` | 以退出码为契约的独立检查；每个一个 step。 |
 | Paseo gdd-run-observer | 在 `paseo-plugins/gdd-run-observer` 中 `npm ci && npm run typecheck && npm test` | 插件的 typecheck 与 Vitest 套件。 |
+| `gdd-runner`（Ubuntu、macOS、Windows） | 对 `skills/gdd/scripts/tests/` 下的 `test_agent_run.py`、`test_gdd.py`、`test_no_window.py`、`test_paseo_run_python.py`、`test_watch_pr_checks.py` 运行 `python -m pytest -q` | 跨平台 runner、阶段派发、控制台抑制、Paseo adapter 和 PR watcher 契约。 |
 
 本地运行 Python 测试：
 `uv run --no-project --with-requirements scripts/requirements.txt python -m pytest`（或
 `pip install -r scripts/requirements.txt && python -m pytest`）。新的 `test_*.py` 测试文件无需登记即被收集；
-不是测试文件的独立检查需要在 `ci.yml` 中有自己的 step。CI 在 Linux 上运行；gdd launcher 的测试按 POSIX
-进程语义编写，请在 Linux（或 WSL）上运行，而不是原生 Windows。
+不是测试文件的独立检查需要在 `ci.yml` 中有自己的 step。GDD runner 测试也在原生 Windows 和
+macOS 上运行；平台专属用例会在不适用的平台跳过。
 
 ### eval case 如何评分——以及它能证明什么
 

@@ -250,8 +250,8 @@ MUTATIONS = [
      "structured rows are indexed by name, so a repeated check name collapses two rows into one "
      "and a failing row vanishes"),
     ("subprocess-cwd-dropped",
-     "        proc = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)",
-     "        proc = subprocess.run(cmd, cwd=None, capture_output=True, text=True)",
+     "        proc = gdd_process.run(cmd, cwd=cwd, capture_output=True, text=True)",
+     "        proc = gdd_process.run(cmd, cwd=None, capture_output=True, text=True)",
      "the working directory the call forwarded is dropped at subprocess.run(), so gh inspects the "
      "caller's repository instead of the one --repo named"),
     ("git-repository-flag-dropped",

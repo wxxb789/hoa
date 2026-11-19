@@ -16,8 +16,7 @@ metadata:
 
 # gdd-route-omp
 
-Delegate bounded work to OMP (`omp -p`) without losing runs when the dispatching session, gateway or
-terminal goes down.
+Delegate bounded work to OMP (`omp -p`) without tying the run to the dispatching session.
 
 ## When to Use
 
@@ -31,23 +30,26 @@ terminal goes down.
 
 A background child of the orchestrating session receives SIGTERM when that session ends, and `omp -p`
 prints only at exit — a run killed at minute 37 leaves a 0-byte output file. Always launch through the
-shared runner (a detached process: own session on POSIX, one hidden console on Windows):
+shared runner:
 
-```bash
-uv run ../gdd/scripts/agent_run.py start --agent omp --name <slug> --prompt <file> --cwd <repo> \
-  [--resume <session-id>] [--model M] [--thinking L] [--max-time 3h] [--extra "--no-tools"]
-uv run ../gdd/scripts/agent_run.py status <slug>
+```text
+uv run ../gdd/scripts/agent_run.py start --agent omp --name example --prompt task.md --cwd .
+uv run ../gdd/scripts/agent_run.py status example
 ```
 
 `--max-time` takes seconds or one unit (`90m`, `2h`); the runner enforces it (exit `124`, `failed`).
 
-A detached run hangs off init (POSIX) or off the process tree Windows keeps alive on its own, not off
-your session, so it survives session and gateway restarts. Verify with the ancestor chain of the omp
-pid, not by assumption.
+The runner survives the session that dispatched it. It survives a systemd-managed gateway or service
+restart only when `state.json` records `detach: systemd` (a separate transient user unit). On macOS,
+Windows, or Linux/WSL without a reachable user manager, detaching does not protect it from a service
+manager that kills its process group, cgroup, or job. See
+[transport](../gdd/references/transport.md#headless-platform-rules) for `GDD_RUN_DETACH`.
 
 This skill requires skill `gdd`: the runner is maintained once, as gdd's `../gdd/scripts/agent_run.py`
 (cross-platform, stdlib Python), because that skill's `gdd.py` launches through it too. Existing
-POSIX callers can still use `scripts/omp-run.sh`, a forwarder that sets `GDD_AGENT=omp`.
+POSIX callers can still use the optional `scripts/omp-run.sh` forwarder; it sets `GDD_AGENT=omp`
+and resolves the sibling runner (no PATH fallback). `--profile P` still reaches OMP;
+`--backend` is accepted with a warning and has no effect, including for `tmux`.
 Only if a script command fails (for example `uv` is not found), read
 [the runner troubleshooting reference](../gdd/references/troubleshooting.md).
 
@@ -108,7 +110,7 @@ Only if a script command fails (for example `uv` is not found), read
     `duration_s`, `error`) appear as the run progresses. Read `state`, `exit`, `duration_s`, `cwd` and
     `run_dir` defensively; treat everything else as optional.
 
-15. **A run that says it "launched" its verification is not evidence.** Whether teardown takes
+14. **A run that says it "launched" its verification is not evidence.** Whether teardown takes
     backgrounded children with it is the launcher's cleanup contract, not a universal law: a launcher
     that terminates its cleanup group at finalize (`systemd-run`, `KillMode=control-group`) kills a gate
     left under `&` / `nohup` with no exit code anywhere, while one that merely returns may leave it
@@ -116,7 +118,7 @@ Only if a script command fails (for example `uv` is not found), read
     completion is fine, a gate left behind is not. The stage-side rule lives in skill `gdd` →
     `references/run-failure-modes.md` §8.
 
-16. **A model-endpoint restart window is a transport fault, not a model defect — and a report-only
+15. **A model-endpoint restart window is a transport fault, not a model defect — and a report-only
     stage can hide it behind `exit 0`.** The endpoint that fronts the models restarts on a schedule
     the operator's runtime configuration declares — read that schedule from the configuration, never
     assume it. A lane dispatched inside the window fails with `ECONNREFUSED`: classify that as
@@ -129,21 +131,22 @@ Only if a script command fails (for example `uv` is not found), read
 
 ## Recovery after a session restart
 
-```bash
+```text
 uv run ../gdd/scripts/agent_run.py list  # failed(stale) = runner and agent died; sess= is the resume id
 ```
 
 Then start a new run with `--agent omp --name <slug>-r2 --prompt <continuation> --resume <id>`.
 
 Artifacts per run (`<run_root>/<YYYY-MM-DD>/<slug>/`): `prompt.md`, `run.json` (the exact argv),
-`events.ndjson`, `stderr.log`, `runner.log`, `state.json` (the single record, including `session_id`),
+`events.ndjson` (and `events.1.ndjson` after rotation), `stderr.log`, `runner.log`, `state.json`
+(the single record, including `session_id`),
 `answer.md`, `exit.code`, `finalized`. There is no runner ledger; `list` shows every run.
 
 ## When a TUI is still right
 
 Ambiguous scope, work needing mid-run steering, or the operator explicitly asking to watch:
-`tmux new -d -s omp-<slug> 'omp --resume <id>'` and let them attach. Never run a TUI and a headless
-process on the same session id.
+run `omp --resume SESSION_ID` in an interactive terminal. Never run a TUI and a headless process on
+the same session id.
 
 ## Related
 

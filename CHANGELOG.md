@@ -49,13 +49,30 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 - gdd: keep the report in `answer.md` on native structured-result routes. Custom launchers
   must accept `--schema`; failed runs retain both the runner's reason and the agent's error.
 - gdd: support Pi and OpenCode as headless routes, with recorded success and failure events.
+- gdd, gdd-route-omp, gdd-route-dsh: use `GDD_RUN_ROOT` instead of `OMP_RUN_ROOT` or
+  `DSH_RUN_ROOT`; rename the shared event, startup, stop and drain knobs from `OMP_RUN_*` /
+  `DSH_RUN_*` to `GDD_RUN_*`. Retire `OMP_LEDGER`, `OMP_RUN_BACKEND` and
+  `DSH_RUN_SETTLE_WAIT_SECONDS` without equivalents. Use `GDD_RUN_DETACH` to select platform-native
+  detachment or a Linux transient user unit; there is no tmux backend.
+- gdd: use `run.json`, `runner.log`, and rotated `events.1.ndjson`; the shared runner no longer
+  writes `session.id`, `lock`, `run.sh` / `run.cmd`, `events.stats.json`, or a runner ledger.
+  `tail` shows summaries, not raw NDJSON. Legacy task-local, `omp-runs`, and repo/goal layouts
+  are no longer scanned or reserved; finish or stop those runs with the old launcher before upgrading.
+- gdd-route-omp: exit 0 without a successful assistant `message_end` is no longer `done`.
+  The optional POSIX `omp-run.sh` no longer searches PATH for the runner; `--profile P` is forwarded
+  and `--backend` only warns (including `tmux`). DSH still accepts `--session-id` as a resume alias.
+- gdd: trust recorded state from custom launchers that do not publish PID keys. Keep a Paseo refresh
+  claim while its holder lives and reclaim it when the PID has been reused. Serialize concurrent
+  starts on one slug and preserve state writes after Windows replace retries are exhausted.
+- gdd: prevent console flashes for the runner, dispatch, watcher, and helper subprocesses; enforce
+  the Windows spawn flags in tests.
 
 - Trigger evals now route on visible skills' frontmatter descriptions, accept `none` when no
   artifact fits, and include three no-trigger cases.
 
 - Tests: `python -m pytest` (`pytest.ini`, 120 s per test) collects every `test_*.py` under
   `scripts/`, `evals/` and `skills/` with no registration. `ci.yml` runs each static gate (previously manifest
-  suites), standalone check, gdd shell suite and the Paseo plugin as its own
+  suites), standalone check and the Paseo plugin as its own
   named step, with job/step timeouts and cancel-in-progress for pull requests.
 - Removed the test discoverer (`scripts/run_all_tests.py`, `scripts/test_manifest.toml`,
   `scripts/test_run_all_tests.py`) and `scripts/test_catalog_measurement.py`.

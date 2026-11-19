@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # /// script
-# requires-python = ">=3.7"
+# requires-python = ">=3.9"
 # dependencies = []
 # ///
 """Native Paseo launcher: start|status|result|answer|kill|list (stdlib only).
@@ -35,7 +35,7 @@ and agent_id), events.ndjson (observed lifecycle transitions), stderr.log,
 cli.ndjson (raw command evidence), answer.md when addressable, result.json when
 the answer carries a stage result valid against --schema, answer.partial.md
 while a pre-delete capture awaits confirmation, exit.code and finalized. The run
-dir's os.mkdir claims the slug; an O_EXCL `refresh` file holding the holder's pid
+dir's os.mkdir claims the slug; an O_EXCL `refresh` file holding the holder's pid and start time
 serializes readers (a dead holder's file is taken over). A finalized marker is immutable. An
 existing slug is refused rather than silently reused or replaced. Unsupported
 --max-time is refused: Paseo's --wait-timeout is not an execution deadline.
@@ -52,11 +52,13 @@ import sys
 import time
 from contextlib import contextmanager, suppress
 from datetime import datetime
+from pathlib import Path
 
 ADAPTER = os.path.abspath(__file__)
 sys.path.insert(0, os.path.dirname(os.path.dirname(ADAPTER)))
 sys.dont_write_bytecode = True  # no __pycache__ inside an installed skill
 import agent_run as support
+import gdd_process
 import stage_result
 
 STATES = {"initializing": "running", "running": "running", "idle": "done",
@@ -121,18 +123,22 @@ def claim(path):
     """Held for as long as the holder lives (it may make several CLI calls); only a dead
     holder's file is taken over, and release removes the file only while it is still ours."""
     deadline = time.monotonic() + CLAIM_WAIT_SECONDS
-    mine = str(os.getpid())
+    mine = f"{os.getpid()} {support.identity(os.getpid())}".rstrip()
     while True:
         try:
-            handle = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-            os.write(handle, mine.encode())
-            os.close(handle)
+            with os.fdopen(os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY), "wb") as handle:
+                handle.write(mine.encode("utf-8"))
             break
         except FileExistsError:
             with suppress(OSError):
                 holder = claim_holder(path)
-                dead = (not support.pid_alive(holder) if holder
-                        else time.time() - os.path.getmtime(path) > STALE_CLAIM_SECONDS)
+                pid, _, recorded = holder.partition(" ")
+                if pid.isdecimal():
+                    pid = int(pid)
+                    live = support.identity(pid) if recorded else ""
+                    dead = not support.pid_alive(pid) or bool(live and live != recorded)
+                else:
+                    dead = time.time() - os.path.getmtime(path) > STALE_CLAIM_SECONDS
                 if dead and claim_holder(path) == holder:
                     os.unlink(path)
                     continue
@@ -172,9 +178,9 @@ def cli(state, argv):
     if argv[0] != "run" and not os.path.isdir(cwd):
         cwd = state["run_dir"]
     try:
-        result = subprocess.run(command, cwd=cwd, capture_output=True,
+        result = gdd_process.run(command, cwd=cwd, capture_output=True,
                                 text=True, encoding="utf-8", errors="replace", timeout=CLI_TIMEOUT_SECONDS,
-                                creationflags=support.HIDDEN, env=environment)
+                                env=environment)
         code, stdout, stderr = result.returncode, result.stdout, result.stderr
     except (OSError, subprocess.TimeoutExpired) as exc:
         code, stdout, stderr = -1, "", str(exc)
@@ -327,7 +333,19 @@ def start(args):
     # Validate before creating a run directory or dispatching anything. Batch
     # shims cannot carry arbitrary prompts; never send a silently shortened one.
     command_argv({"paseo_argv": prefix}, ["run", "--cwd", cwd, "--", prompt])
-    run_dir = os.path.join(support.run_root(), datetime.now().strftime("%Y-%m-%d"), slug)
+    root = support.run_root()
+    run_dir = str(Path(root) / datetime.now().strftime("%Y-%m-%d") / slug)
+    support.warn_wsl(binary, run_dir)
+    for arg in prefix[1:]:
+        if Path(arg).suffix.lower() == ".exe":
+            support.warn_wsl(arg, run_dir=None)
+    mode, launcher = support.select_detach(support.detach_config())
+    with support.slug_start_lock(root, slug):
+        return start_locked(args, slug, prefix, cwd, prompt, schema, run_dir, mode, launcher)
+
+
+def start_locked(args, slug, prefix, cwd, prompt, schema, run_dir, mode, launcher):
+    binary = prefix[0]
     os.makedirs(os.path.dirname(run_dir), exist_ok=True)
     try:
         os.mkdir(run_dir)  # the slug claim
@@ -368,13 +386,23 @@ def start(args):
                                       "(agent identity preserved; inspect before retrying)")
                 fail(state["cwd_error"])
             state["cwd_verified"] = True
-            with open(os.path.join(run_dir, "runner.log"), "ab", buffering=0) as log:
-                process = subprocess.Popen([support.interpreter(), "-B", ADAPTER, "_watch", "--run-dir", run_dir],
-                                           cwd=run_dir, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
-                                           creationflags=support.DETACH, start_new_session=not support.IS_WINDOWS)
-            state["pid"] = process.pid
+            runner = [support.interpreter(), "-B", ADAPTER, "_watch", "--run-dir", run_dir]
+            unit = support.unit_name(slug) if mode == "systemd" else None
+            process, creationflags = support.spawn_detached(runner, run_dir, run_dir, dict(os.environ),
+                                                            mode, launcher, unit)
+            state.update(detach=mode, spawn={"creationflags": creationflags, "platform": sys.platform})
+            if unit:
+                state["unit"] = unit
+                status = gdd_process.run(["systemctl", "--user", "show", "-p", "MainPID", "--value", unit],
+                                        stdin=subprocess.DEVNULL, capture_output=True, encoding="utf-8",
+                                        errors="replace", timeout=2)
+                if status.returncode == 0 and status.stdout.strip().isdigit():
+                    state["pid"] = int(status.stdout.strip()) or None
+            else:
+                state["pid"] = process.pid
+            state["pid_identity"] = support.identity(state.get("pid"))
             publish(state)
-        except (RuntimeError, OSError) as exc:
+        except (RuntimeError, OSError, subprocess.TimeoutExpired) as exc:
             state.update(state="unknown", error=str(exc))
             publish(state)
             raise
@@ -383,6 +411,8 @@ def start(args):
 
 
 def watch(args):
+    if args.restore_env:
+        support.restore_detached_env(args.run_dir)
     while True:
         try:
             state = refresh(args.run_dir)
@@ -444,6 +474,8 @@ def main(argv=None):
     launch.add_argument("--schema", help="stage-result schema; the answer's ```json block is checked against it")
     monitor = commands.add_parser("_watch", help=argparse.SUPPRESS)
     monitor.add_argument("--run-dir", required=True)
+    monitor.add_argument("--restore-env", action="store_true")
+    monitor.add_argument("--creationflags", type=int, default=0, help=argparse.SUPPRESS)
     for name in ("status", "result", "answer", "kill"):
         sub = commands.add_parser(name)
         sub.add_argument("name")
@@ -494,6 +526,6 @@ def main(argv=None):
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except (RuntimeError, OSError) as error:
+    except (RuntimeError, OSError, ValueError, subprocess.TimeoutExpired) as error:
         print(f"paseo-run: {error}", file=sys.stderr)
         sys.exit(1)

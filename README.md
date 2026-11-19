@@ -168,12 +168,13 @@ spec, acceptance-verdict, scope-seal). Every rule is enforced by that command:
 
 ### What CI runs
 
-The `test` job (`.github/workflows/ci.yml`) runs on every push to `main`, every pull request, and
+CI (`.github/workflows/ci.yml`) has two jobs: `test` on Ubuntu and `gdd-runner` on Ubuntu, macOS,
+and Windows. Both run on every push to `main`, every pull request, and
 `workflow_dispatch`. There is no release job: `npx skills` installs straight from GitHub, so nothing
 is tagged or published. Each check is its own named step, so a failure names itself in the Actions
 UI; a newer push to a pull request cancels the older run.
 
-| Step | Command | Protects |
+| Job / Step | Command | Protects |
 |---|---|---|
 | Frontmatter | `python scripts/check_frontmatter.py` | Every `SKILL.md` frontmatter and catalog field; description cap 350 chars when model-visible, 1024 when hidden; hidden flag agrees with `agents/openai.yaml`. |
 | Contract graph | `python scripts/check_contract_graph.py` | Rules R1–R10 above. |
@@ -184,13 +185,14 @@ UI; a newer push to a pull request cancels the older run.
 | pytest | `python -m pytest` | Every `test_*.py` unittest/pytest file under `scripts/`, `evals/` and `skills/` (`pytest.ini`); 120 s per test. |
 | Script checks | `python evals/run_trigger_evals.py`, `evals/validate_skill_method_cases.py`, `skills/define-goal/evals/validate_fixtures.py`, `skills/hermes-models/scripts/tests/test-*.py`, `skills/gdd/scripts/tests/test_verdict_matrix.py`, `mutate_verdict_matrix.py` | Standalone checks whose exit code is the contract; one step each. |
 | Paseo gdd-run-observer | `npm ci && npm run typecheck && npm test` in `paseo-plugins/gdd-run-observer` | The plugin's typecheck and Vitest suite. |
+| `gdd-runner` (Ubuntu, macOS, Windows) | `python -m pytest -q` on `test_agent_run.py`, `test_gdd.py`, `test_no_window.py`, `test_paseo_run_python.py`, and `test_watch_pr_checks.py` under `skills/gdd/scripts/tests/` | Cross-platform runner, stage dispatch, console suppression, Paseo adapter, and PR watcher contracts. |
 
 Run the Python tests locally with
 `uv run --no-project --with-requirements scripts/requirements.txt python -m pytest` (or
 `pip install -r scripts/requirements.txt && python -m pytest`). A new test file named `test_*.py`
 is collected with no registration; a standalone check that is not a test file needs its own step
-in `ci.yml`. CI runs on Linux; the gdd launcher suites assume POSIX process semantics, so run them
-there (or in WSL) rather than on native Windows.
+in `ci.yml`. The GDD runner suites also run natively on Windows and macOS; platform-specific
+cases skip where they do not apply.
 
 ### How an eval case is graded — and what that proves
 

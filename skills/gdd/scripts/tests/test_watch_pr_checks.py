@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import os
 import shutil
-import subprocess
 import sys
 import tempfile
 import unittest
@@ -19,6 +18,8 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 SCRIPTS = HERE.parent
+sys.path.insert(0, str(SCRIPTS))
+import gdd_process
 WATCHER = SCRIPTS / "watch-pr-checks.py"
 IS_WINDOWS = os.name == "nt"
 BASE_ENV = {
@@ -89,7 +90,7 @@ class WatchTests(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
         self.state = self.tmp / "gh-state"
         self.state.mkdir()
-        self.bin = self.tmp / "bin"
+        self.bin = self.tmp / "bin with spaces"
         self.bin.mkdir()
         stub = self.bin / "gh.py"
         stub.write_text(GH_STUB, encoding="utf-8")
@@ -108,11 +109,11 @@ class WatchTests(unittest.TestCase):
             ["-c", "user.email=t@example.invalid", "-c", "user.name=t",
              "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "seed"],
         ):
-            done = subprocess.run(
+            done = gdd_process.run(
                 ["git", "-C", str(self.repo), *args], capture_output=True, text=True
             )
             self.assertEqual(done.returncode, 0, done.stderr)
-        self.head = subprocess.run(
+        self.head = gdd_process.run(
             ["git", "-C", str(self.repo), "rev-parse", "--short", "HEAD"],
             capture_output=True, text=True,
         ).stdout.strip()
@@ -134,7 +135,7 @@ class WatchTests(unittest.TestCase):
         environment["STUB_GH_DIR"] = str(self.state)
         environment["GH_BIN"] = str(self.gh_bin())
         environment.update(env or {})
-        return subprocess.run(
+        return gdd_process.run(
             [
                 sys.executable,
                 str(WATCHER),
@@ -231,7 +232,7 @@ class WatchTests(unittest.TestCase):
         self.assertEqual(len([call for call in self.calls() if call.startswith("pr checks")]), 2)
 
     def test_usage_and_environment_errors_exit_three(self):
-        done = subprocess.run(
+        done = gdd_process.run(
             [sys.executable, str(WATCHER)], capture_output=True, text=True, timeout=60
         )
         self.assertEqual(done.returncode, 3)

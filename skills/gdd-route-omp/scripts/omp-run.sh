@@ -6,6 +6,13 @@
 # to pin a launcher.
 set -uo pipefail
 
+case "$OSTYPE" in
+  msys*|cygwin*|win32*)
+    printf '%s\n' 'omp-run.sh is POSIX-only; run the shared agent_run.py with --agent omp on Windows.' >&2
+    exit 2
+    ;;
+esac
+
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SIBLING="$HERE/../../gdd/scripts/agent_run.py"
 CATEGORIZED="$HERE/../../software-development/gdd/scripts/agent_run.py"

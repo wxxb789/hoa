@@ -12,6 +12,11 @@ import os
 import subprocess
 import sys
 import time
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import agent_run
+import gdd_process
 
 
 def main():
@@ -29,8 +34,12 @@ def main():
                     sys.stdout.flush()
                     time.sleep(delay)
     if os.environ.get("STUB_CHILD_HOLDS_STDOUT"):
-        subprocess.Popen([sys.executable, "-c", f"import time; time.sleep({float(os.environ['STUB_CHILD_HOLDS_STDOUT'])})"],
-                         stdin=subprocess.DEVNULL, stdout=sys.stdout.fileno(), stderr=subprocess.DEVNULL)
+        child = gdd_process.popen(
+            [sys.executable, "-c", f"import time; time.sleep({float(os.environ['STUB_CHILD_HOLDS_STDOUT'])})",
+             os.environ["STUB_RECORD"]],
+            stdin=subprocess.DEVNULL, stdout=sys.stdout.fileno(), stderr=subprocess.DEVNULL)
+        Path(os.environ["STUB_RECORD"] + ".child").write_text(
+            json.dumps([child.pid, agent_run.identity(child.pid)]), encoding="utf-8")
     if os.environ.get("STUB_HANG"):
         time.sleep(3600)
     return int(os.environ.get("STUB_EXIT") or 0)

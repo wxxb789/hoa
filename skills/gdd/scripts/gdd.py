@@ -60,7 +60,6 @@ import glob
 import os
 import re
 import shlex
-import subprocess
 import sys
 import time
 from datetime import datetime
@@ -70,6 +69,7 @@ if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
 sys.dont_write_bytecode = True  # no __pycache__ inside an installed skill
 import agent_run
+import gdd_process
 import skill_config
 import stage_result
 
@@ -139,7 +139,7 @@ def run_root():
 
 
 def git(repo, *args):
-    proc = subprocess.run(
+    proc = gdd_process.run(
         ["git", "-C", repo, *args], capture_output=True, text=True
     )
     if proc.returncode != 0:
@@ -172,7 +172,7 @@ def resolve_ref(repo, value):
     """Full SHA for a supplied endpoint; the value unchanged when git cannot resolve it."""
     if not value:
         return value
-    proc = subprocess.run(
+    proc = gdd_process.run(
         ["git", "-C", repo, "rev-parse", "--verify", "--quiet", str(value)],
         capture_output=True,
         text=True,
@@ -341,7 +341,7 @@ def ledger_rounds(state_path, repo_name, goal, stage):
 
 def ledger_append(repo, goal, stage, base, head, gates, next_stage=None, note=None, pr=None, rounds=None):
     cmd = [
-        sys.executable,
+        agent_run.interpreter(),
         DELIVERY_STATE,
         "append",
         "--repo",
@@ -370,43 +370,28 @@ def ledger_append(repo, goal, stage, base, head, gates, next_stage=None, note=No
         cmd += ["--next", next_stage]
     if note:
         cmd += ["--note", note]
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    proc = gdd_process.run(cmd, capture_output=True, text=True)
     if proc.returncode != 0:
         reason = (proc.stderr or proc.stdout or f"exit {proc.returncode}").strip()
         fail(f"ledger append failed: {reason}", 1)
 
 
 def launcher_command(launcher):
-    """argv prefix for the launcher: a Python launcher needs the interpreter on Windows.
-
-    POSIX executes a `.py` adapter through its shebang and executable bit, which is
-    how the bundled adapter has always run there. Windows CreateProcess cannot
-    execute a `.py` file at all (WinError 193: there is no shebang handling), so on
-    Windows the dispatcher prefixes the current interpreter instead and leaves
-    POSIX byte-identical.
-    """
+    """Run Python launchers without relying on a shebang or executable bit."""
     path = os.path.expanduser(launcher)
-    if os.name == "nt" and path.lower().endswith(".py"):
-        return [sys.executable, path]
+    if path.lower().endswith(".py"):
+        return [agent_run.interpreter(), path]
+    if os.name == "nt" and path.lower().endswith((".cmd", ".bat")):
+        return agent_run.command_prefix(path)
     return [path]
-
-
-def launcher_creationflags():
-    """CREATE_NO_WINDOW on Windows: a dispatch must not flash a console.
-
-    The adapter then gives the whole run one hidden console that the runner, the
-    agent and the agent's own tool commands inherit. Without it, every dispatched
-    run allocates a visible console for a moment, and a run started with
-    DETACHED_PROCESS instead leaves each of those commands to allocate its own.
-    """
-    return subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 
 
 def launch(launcher, prompt_path, repo, goal, stage, model, thinking, max_time):
     name = f"{os.path.basename(repo)}-{goal}-{stage}"
     resolved_run_root = run_root()
+    prefix = launcher_command(launcher)
     cmd = [
-        *launcher_command(launcher),
+        *prefix,
         "start",
         "--name",
         name,
@@ -417,6 +402,8 @@ def launch(launcher, prompt_path, repo, goal, stage, model, thinking, max_time):
         "--schema",
         stage_result.SCHEMA,
     ]
+    if prefix[1:2] == ["/c"] and (problem := agent_run.shim_hazard(prefix[-1], cmd[len(prefix):])):
+        raise LaunchError(f"{problem}; configure a native executable or Python launcher")
     for flag, value in (
         ("--model", model),
         ("--thinking", thinking),
@@ -428,22 +415,25 @@ def launch(launcher, prompt_path, repo, goal, stage, model, thinking, max_time):
     # what this process resolved so a config-file value reaches it too.
     child_env = dict(os.environ)
     child_env["GDD_RUN_ROOT"] = resolved_run_root
+    child_env["PYTHONIOENCODING"] = "utf-8"
     agent = config("GDD_AGENT")
     if agent:
         child_env["GDD_AGENT"] = agent
     try:
-        proc = subprocess.run(
+        proc = gdd_process.run(
             cmd,
             capture_output=True,
-            text=True,
+            encoding="utf-8",
+            errors="replace",
             env=child_env,
-            creationflags=launcher_creationflags(),
         )
     except OSError as exc:
         raise LaunchError(str(exc)) from exc
     if proc.returncode != 0:
         reason = (proc.stderr or proc.stdout or f"exit {proc.returncode}").strip()
         raise LaunchError(reason or f"exit {proc.returncode}")
+    if proc.stderr:
+        sys.stderr.write(proc.stderr)
     run_name = name
     run_dir = None
     for line in proc.stdout.splitlines():
@@ -730,7 +720,7 @@ def cmd_close(args):
 
 def cmd_status(args):
     cmd = [
-        sys.executable,
+        agent_run.interpreter(),
         DELIVERY_STATE,
         "show",
         "--repo",
@@ -744,7 +734,11 @@ def cmd_status(args):
         "--run-root",
         run_root(),
     ]
-    return subprocess.run(cmd).returncode
+    result = gdd_process.run(cmd, capture_output=True, text=True,
+                             env={**os.environ, "PYTHONIOENCODING": "utf-8"})
+    sys.stdout.write(result.stdout)
+    sys.stderr.write(result.stderr)
+    return result.returncode
 
 
 EPILOG = """\

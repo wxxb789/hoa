@@ -1443,7 +1443,7 @@ TERMINAL_THREADS = _threads_page([], False, None)
 def _fake_run_for(cell_, records=None, repo_token=None):
     view = {"state": "OPEN", "isDraft": False, "headRefOid": HEAD, "headRefName": "feature"}
 
-    def fake_run(cmd, cwd=None, capture_output=False, text=False, env=None):
+    def fake_run(cmd, cwd=None, capture_output=False, text=False, env=None, **_options):
         # The golden call log keeps what the gate forwards to the child: the command, the working
         # directory and whether it passed an environment. capture_output/text describe how the gate
         # reads the streams, not what the child is asked to run.
@@ -1500,7 +1500,7 @@ def run_cell(module, cell_):
     if cell_.allow_table_only:
         argv.append("--allow-table-only-checks")
     out, err = io.StringIO(), io.StringIO()
-    with patch.object(module.subprocess, "run",
+    with patch.object(subprocess, "run",
                       side_effect=_fake_run_for(cell_, repo_token=".")), \
             patch.object(sys, "argv", argv), redirect_stdout(out), redirect_stderr(err):
         code = module.main()
@@ -1564,11 +1564,11 @@ def check_cell(module, cell_):
 def run_stream_cell(module, stream_cell):
     """sh_raw() with subprocess.run() faked: returns the forwarded (code, stdout, stderr)."""
 
-    def fake_run(cmd, cwd=None, capture_output=False, text=False):
+    def fake_run(cmd, cwd=None, capture_output=False, text=False, **_options):
         return subprocess.CompletedProcess(cmd, stream_cell.exit_code,
                                            stream_cell.stdout, stream_cell.stderr)
 
-    with patch.object(module.subprocess, "run", side_effect=fake_run):
+    with patch.object(subprocess, "run", side_effect=fake_run):
         return module.sh_raw(["gh", "pr", "checks", "7"])
 
 
@@ -1586,10 +1586,10 @@ def check_stream_cell(module, stream_cell):
 def run_sh_cell(module, sh_cell):
     """sh() with subprocess.run() faked: returns the value sh() handed back."""
 
-    def fake_run(cmd, cwd=None, capture_output=False, text=False):
+    def fake_run(cmd, cwd=None, capture_output=False, text=False, **_options):
         return subprocess.CompletedProcess(cmd, sh_cell.exit_code, sh_cell.stdout, sh_cell.stderr)
 
-    with patch.object(module.subprocess, "run", side_effect=fake_run):
+    with patch.object(subprocess, "run", side_effect=fake_run):
         return module.sh(["git", "-C", ".", "rev-parse", "--abbrev-ref", "HEAD"])
 
 
@@ -1613,7 +1613,7 @@ def run_boundary_cell(module, boundary_cell, repo, records):
     argv = ["pr-merge-check.py", REQUESTED_PR, "--repo", repo, "--verified-head", HEAD,
             "--gates-rc", "0", "--allow-no-machine-review"]
     out, err = io.StringIO(), io.StringIO()
-    with patch.object(module.subprocess, "run",
+    with patch.object(subprocess, "run",
                       side_effect=_fake_run_for(driver, records, repo_token=repo)), \
             patch.object(sys, "argv", argv), redirect_stdout(out), redirect_stderr(err):
         module.main()

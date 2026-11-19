@@ -70,7 +70,7 @@ from the command line. Launcher: not used — this tool starts no run.
 import argparse
 import json
 import os
-import subprocess
+import gdd_process
 import sys
 from datetime import datetime
 
@@ -143,7 +143,7 @@ class GateError(Exception):
 def sh_raw(cmd, cwd=None):
     """Run cmd and hand back (returncode, stdout, stderr); a non-zero exit is data, not an error."""
     try:
-        proc = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+        proc = gdd_process.run(cmd, cwd=cwd, capture_output=True, text=True)
     except OSError as exc:
         raise GateError(str(exc)) from exc
     return proc.returncode, proc.stdout or "", proc.stderr or ""

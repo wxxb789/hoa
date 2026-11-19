@@ -12,7 +12,7 @@ Paths below are relative to the installed `gdd` skill directory.
 
 | Route | Launcher | Runtime requirement |
 |---|---|---|
-| Headless CLI (default) | `scripts/agent_run.py` | One detached runner for every headless agent CLI; `GDD_AGENT` picks the CLI (`omp` by default, or `dsh`, `codex`, `claude`, `pi`, `opencode`); stdlib Python 3, no bash, `setsid` or `tmux`. The DSH route's operating method is the [`gdd-route-dsh`](../../gdd-route-dsh/SKILL.md) mechanism skill |
+| Headless CLI (default) | `scripts/agent_run.py` | One detached runner for every headless agent CLI; `GDD_AGENT` picks the CLI (`omp` by default, or `dsh`, `codex`, `claude`, `pi`, `opencode`); stdlib Python 3, with optional Linux `systemd-run` and no dependency on bash or tmux. The DSH route's operating method is the [`gdd-route-dsh`](../../gdd-route-dsh/SKILL.md) mechanism skill |
 | Native Paseo (opt-in) | Set `GDD_LAUNCHER` to `scripts/adapters/paseo-run.py` | An installed Paseo CLI and a reachable Paseo daemon; each stage is a native Paseo agent |
 
 Select the route as configuration, never from a daemon reachability probe. An unreachable daemon
@@ -27,22 +27,29 @@ routes and the shared `GDD_RUN_ROOT`. Installing it executes trusted, unsandboxe
 
 ## Headless platform rules
 
-`scripts/tests/test_agent_run.py` (stub agent, no network or model) runs on ubuntu in the `test` job
-and on macOS and Windows in the `gdd-runner` CI job; the real-CLI smoke is an opt-in operator step
+`scripts/tests/test_agent_run.py` (stub agent, no network or model) runs on Ubuntu, macOS and
+Windows in the `gdd-runner` CI job; the real-CLI smoke is an opt-in operator step
 (`GDD_SMOKE_AGENTS=omp`), because CI has no agent credentials.
 
-1. **One hidden console, inherited by the run (Windows).** A `.cmd` shim runs through `cmd.exe`, a
-   console-subsystem program, so Windows allocates a visible console on every dispatch. The runner and
-   everything it starts are therefore spawned with `CREATE_NO_WINDOW` (plus
-   `CREATE_NEW_PROCESS_GROUP`), never with `DETACHED_PROCESS`: detached means *no* console, and then
-   the first console-subsystem process the agent runs allocates one of its own. Measured on Windows 11
-   with the same launcher and only the flags differing. `state.json` records the requested flags under
-   `spawn.creationflags`. On POSIX the runner and the agent each get their own session.
-2. **A Windows launcher must not be driven from inside a WSL distro, or the reverse.** WSL2 interop is
-   asymmetric: Windows environment variables do not reach the distro, and a detached Windows `.exe`
-   started from a distro has been observed to record its session and then never exit, so the run never
-   finalizes. Run the launcher *inside* the distro with the distro's own Python, and point
-   `GDD_RUN_ROOT` at one root both halves can see.
+1. **Session survival is not service survival.** A detached run survives the dispatching session.
+   It survives a systemd-managed gateway or service restart only with `detach: systemd` in
+   `state.json`: the recorded `unit` is a separate transient user service. It does not survive
+   shutdown of the user manager itself. Linux (including WSL2) probes the user manager for at most
+   one second and accepts `running` or `degraded`. Without it, or on macOS, the runner uses
+   `start_new_session` (`detach: session`); that does not escape a service's cgroup.
+2. **Windows detaches the runner, not the agent from the runner.** The runner uses
+   `CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW` and tries `CREATE_BREAKAWAY_FROM_JOB` first;
+   access denied retries without breakaway. State records `detach: windows` and actual
+   `spawn.creationflags`. Plain detachment on macOS,
+   Windows or Linux/WSL without a user manager is not protection against a manager that kills the
+   process group, cgroup, or job.
+3. **Use native Python and a native agent inside WSL2.** Both bundled launchers warn, but do not
+   fail, for an interop Windows `.exe` or a run directory on `/mnt/<drive>`. Interop can prevent
+   clean process exit; a mounted Windows drive can also cause file-lock and rename problems.
+   Keep the run root on the Linux filesystem and map it separately for any Windows observer.
+4. **Bundled spawns do not open console windows.** All Windows subprocesses (including npm shims)
+   use `CREATE_NO_WINDOW`; Python children use `python.exe` rather than `pythonw.exe` when available.
+   On macOS and Linux/WSL2, commands run directly without a terminal emulator or shell window.
 
 ### Native Paseo evidence boundary
 
@@ -82,10 +89,15 @@ A launcher must:
    `{"name","state","exit","cwd","started","ended","duration_s"}` with `state` one of
    `running|done|killed|failed|unknown`;
 4. resolve `<run_root>` from `GDD_RUN_ROOT` (default
-   `${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs`).
+   `${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs`);
+5. accept `--schema FILE` (`gdd.py` always passes it). If the launcher checks the answer against
+   it, record `state.result` as `valid|invalid|missing` and write `result.json` when valid.
 
 A missing `state.json` means **unknown**, never success. On the native route, a missing agent,
 unreachable daemon, or unrecognized daemon state also means unknown, never successful completion.
+The bundled tools discover runs in the date/slug layout only. Before migrating, finish or stop
+runs under legacy task-local, `omp-runs`, or repo/goal paths with the old launcher; those layouts
+no longer reserve a worktree or appear in headless run lookup.
 
 A launcher that bounds its live event log must not let the bound hide the stream's size. It reports
 `events_bytes` (retained), `events_bytes_total` (everything the agent emitted),
@@ -145,11 +157,22 @@ counter re-derived from a truncated stream is marked partial (`tool_calls_partia
   `--thinking` requires `--model` and maps to the `#variant` suffix of `-m MODEL#VARIANT`.
   A Windows `.cmd` shim cannot take a multiline prompt on this route; use a native executable.
 
+The CLI flags below were verified with these versions. Older versions were not verified.
+
+| CLI | Verified With | Required Flags |
+|---|---|---|
+| Codex | codex-cli 0.169.0 | `exec --json`, `--output-schema` |
+| Claude Code | 2.1.326 | `--output-format stream-json --verbose`, `--json-schema` |
+| OMP | 18.22.0 | `-p --mode=json --approval-mode yolo` |
+| Pi | 1.5.2 | `--mode json --no-approve` |
+| OpenCode | 2.3.0 | `run --standalone --format json --auto` |
+
 | Key | Resolves | Default |
 |---|---|---|
 | `GDD_AGENT` | agent CLI | `omp` |
 | `OMP_BIN`, `DSH_BIN`, `CODEX_BIN`, `CLAUDE_BIN`, `PI_BIN`, `OPENCODE_BIN` | agent binary | the agent's name on `PATH` |
 | `GDD_RUN_ROOT` | run root (env, then the gdd config file) | `${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs` — on Windows that resolves under `%USERPROFILE%`, deliberately not `%LOCALAPPDATA%`, so both platforms and every script see one tree |
+| `GDD_RUN_DETACH` | `auto` probes Linux for systemd and falls back; `systemd` requires a reachable Linux user manager; `session` skips the probe and uses POSIX session or native Windows detachment | `auto` |
 | `GDD_RUN_EVENTS_MAX_BYTES` | bound for the retained event log | `8388608` |
 | `GDD_RUN_START_GRACE_SECONDS` | how long a run that has recorded no pid is still *starting*, not dead | `60` |
 | `GDD_RUN_STOP_WAIT_SECONDS` | how long `kill` waits for the runner to finalize before it acts itself | `20` |
@@ -158,12 +181,15 @@ counter re-derived from a truncated stream is marked partial (`tool_calls_partia
 
 `start` prints one warning line for each retired key it finds set (the old per-adapter run roots,
 ledger, backend and knob names) and names its replacement.
+`GDD_RUN_DETACH` is read from the environment, then the [gdd config file](configuration.md), then
+the default. It also controls detachment of the native Paseo monitor, not the daemon or its agent.
 
 ### DSH route specifics
 
 The invocation is `dsh --profile $DSH_RUN_PROFILE [--extra flags] --json [--session-id ID]
 --permission-mode MODE --approval-policy never -` with `prompt.md` on stdin; `--resume ID` becomes
-`--session-id ID`. `DSH_PROFILE`, `DSH_PROFILE_DIR` and `DSH_SESSION_ID` (DeepSeek Harness's own
+`--session-id ID` (the runner also accepts `start --session-id ID` as an alias for `--resume`).
+`DSH_PROFILE`, `DSH_PROFILE_DIR` and `DSH_SESSION_ID` (DeepSeek Harness's own
 session identity) are removed from the child environment, so a stage dispatched from inside a live
 `dsh` session cannot inherit its caller's identity. `--model`/`--thinking` are refused before a run
 directory is created (`start: --model is not supported on the DSH route`): leave
@@ -269,6 +295,8 @@ Each native CLI subprocess has a **60-second timeout**. One attempt to acquire t
 waits **30 seconds**, half that budget, keeping foreground requests bounded while another request
 owns the claim. This is not a run deadline: a holder can make several CLI calls under one claim,
 so increasing the claim wait to one CLI timeout would still not bound its full critical section.
+Claims record the holder's PID and process start time. A live PID with a different start time
+does not preserve an abandoned claim.
 The detached monitor catches claim-acquisition timeouts, leaves the last published observation
 unchanged, sleeps one second, and retries **without a retry limit**. It stops only after observing
 a terminal state (`done`, `failed`, `killed`) or a `finalized` marker, not because a claim is busy
@@ -344,7 +372,7 @@ native tool/turn/cost counters are not inferred from those transitions.
 2. `answer.md` — the report, treated as a CLAIM.
 3. The repo's gates, re-run by you, with real exit codes.
 
-`state=done` means process exit 0 for headless transport, or an observed idle native turn without
+`state=done` means exit 0 plus the agent's own success marker (see Headless runner, Done), or an observed idle native turn without
 pending permissions. Native `exit` values are adapter classifications, not provider-process exit
 codes; the native agent remains resumable until explicitly deleted. It does not mean the work is correct or the
 stage finished — a report that ends "waiting for the gate result" is a turn that ended mid-gate.

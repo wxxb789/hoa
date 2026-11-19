@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # /// script
-# requires-python = ">=3.7"
+# requires-python = ">=3.9"
 # dependencies = []
 # ///
 """Append-only ledger for goal-driven delivery increments.
@@ -40,13 +40,13 @@ import argparse
 import glob
 import json
 import os
-import subprocess
 import sys
 from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.dont_write_bytecode = True  # no __pycache__ inside an installed skill
 import agent_run
+import gdd_process
 
 STAGES = [
     "contract",
@@ -121,7 +121,7 @@ def normalize_repo(value):
     path = os.path.expanduser(value)
     if os.path.isdir(path):
         try:
-            out = subprocess.run(
+            out = gdd_process.run(
                 ["git", "-C", path, "rev-parse", "--show-toplevel"],
                 capture_output=True,
                 text=True,
@@ -153,7 +153,7 @@ def resolve_repo_path(repo):
 def run(cmd, cwd=None):
     """(ok, stdout, reason)."""
     try:
-        proc = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+        proc = gdd_process.run(cmd, cwd=cwd, capture_output=True, text=True)
     except OSError as exc:
         return False, "", str(exc)
     if proc.returncode != 0:

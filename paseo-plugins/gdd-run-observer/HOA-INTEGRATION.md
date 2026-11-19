@@ -9,7 +9,7 @@ Its runtime source is imported unchanged from the standalone plugin. That source
 
 | Route | Execution owner | Plugin's role |
 | --- | --- | --- |
-| Observe existing GDD launcher runs in Paseo | The launcher selected by HOA, including the default detached OMP adapter, creates and finalizes each run. | Read the shared run root and show state, liveness, counters, event tails, and answer tails. No Paseo-native agent is needed just to observe these artifacts. |
+| Observe existing GDD launcher runs in Paseo | The launcher selected by HOA, by default the shared headless runner `agent_run.py`, creates and finalizes each run. | Read the shared run root and show state, liveness, counters, event tails, and answer tails. No Paseo-native agent is needed just to observe these artifacts. |
 | Execute GDD stages through native Paseo | An explicitly selected native Paseo launcher adapter owns daemon-backed execution and publishes the launcher artifacts. | Optionally display those artifacts through the same file contract. Installing the observer neither selects nor implements this launcher route. |
 
 See the [HOA launcher transport contract](../../skills/gdd/references/transport.md) for launcher
@@ -54,16 +54,17 @@ The store scans `<run-root>/<YYYY-MM-DD>/<slug>/`. The contract is defined by
 
 | Artifact | Observation |
 | --- | --- |
-| `state.json` | Declared state, timing, exit code, PIDs, session metadata, counters, and event-loss fields. Missing state is `unknown` unless a `finalized` marker supplies a usable exit code. |
-| `events.ndjson` | Event tail, live counters, and current tool, using the supported session/turn/message/tool event shapes and `truncated` splice marker. |
-| `events.stats.json` | Retained, total, and dropped event bytes plus truncation status. |
+| `state.json` | Declared state, timing, exit code, PIDs, `session_id`, counters, and runner-owned `events_*` statistics. Missing state is `unknown` unless a `finalized` marker supplies a usable exit code. |
+| `events.ndjson` | Current event segment. The observer derives live counters and current tool from OMP/Pi event shapes only; other routes may expose counts later through state. At rotation the runner moves the previous segment to `events.1.ndjson`; the observer tails only the current segment. |
 | `answer.md` | Answer presence and a bounded tail for display, not an accepted delivery result. |
-| `lock` | Recorded runner/agent PIDs and metadata for process liveness. |
 | `finalized` | Settled-run marker and exit code; if declared state is absent or still `running`, the exit code determines the displayed terminal state. |
-| `session.id` | Session identifier fallback when `state.json` lacks `session_id`. |
+| `run.json`, `runner.log` | Launcher invocation and runner diagnostics. These are inspection artifacts, not parsed by the observer. |
 
-The detail view also lists paths and sizes for `prompt.md`, `runner.out`, and `stderr.log`; it does
-not render their bodies. Three read-only RPCs are registered: `runs.list` returns the root and run
+The detail view lists paths and sizes for `prompt.md` and `stderr.log` without rendering their bodies.
+`events.stats.json`, `lock`, `session.id`, and `runner.out` are legacy adapter artifacts; the shared
+runner does not create them. The plugin falls back to state for PIDs and session ID, but its detailed
+retained/total/dropped-byte panel still requires the legacy statistics file. Three read-only RPCs
+are registered: `runs.list` returns the root and run
 summaries, `runs.detail` adds event/answer tails and file paths, and `runs.follow` polls the selected
 run's tails. Host settings persistence is separate from these run-data RPCs.
 
@@ -73,7 +74,7 @@ Liveness is separate from state. A finalized marker means `settled`; recorded li
 launcher's stale recovery or writes its own finalization marker.
 
 Finalized state counters take precedence when present. Otherwise counters come from the retained
-supported event stream or available state values. Spliced streams are marked partial; the observer
+supported event stream or available state values. Recognized `truncated` markers mark counters partial; the observer
 does not invent missing turns, tools, or cost. Event tails read at most 256 KiB and answer tails at
 most 64 KiB before the line limit is applied. Polling, event vocabulary, and liveness limits remain
 those of the imported plugin; see [README](README.md#known-limits).

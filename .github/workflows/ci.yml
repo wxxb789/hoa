@@ -82,7 +82,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]  # Ubuntu is covered by the test job.
+        os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:
@@ -90,6 +90,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: scripts/requirements.txt
       - run: python -m pip install -r scripts/requirements.txt
-      - name: Shared gdd runner and dispatch contracts
-        run: python -m pytest skills/gdd/scripts/tests/test_agent_run.py skills/gdd/scripts/tests/test_gdd.py skills/gdd/scripts/tests/test_paseo_run_python.py -q
+      - name: Shared gdd runner, dispatch, and watcher contracts
+        run: >-
+          python -m pytest -q
+          skills/gdd/scripts/tests/test_agent_run.py
+          skills/gdd/scripts/tests/test_gdd.py
+          skills/gdd/scripts/tests/test_no_window.py
+          skills/gdd/scripts/tests/test_paseo_run_python.py
+          skills/gdd/scripts/tests/test_watch_pr_checks.py

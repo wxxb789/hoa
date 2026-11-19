@@ -58,8 +58,9 @@ and read back the exact comment before accepting it. Never turn a dirty report i
 A version claim is only true for the main it was measured against. **After** any rebase onto
 `origin/main` — never before it — run the gate the project **profile** declares for merge time:
 
-```bash
-git fetch origin main && python scripts/version.py check-revisions   # hoa; other repos: their profile's gate
+```text
+git fetch origin main
+uv run --no-project --with-requirements scripts/requirements.txt python scripts/version.py check-revisions
 ```
 
 A repo whose profile declares no merge-time version gate skips this step. It is not part of the
@@ -72,12 +73,14 @@ raising each `metadata.revision` the gate names above the rebased base.
 
 Then `gh pr merge <N> --squash --delete-branch`, `git fetch --prune`, `git checkout main`,
 `git pull --ff-only`, prove `gh pr view <N> --json headRefOid` equals the head you verified, report.
-Land and re-branch in one sequence so the next goal starts from the merged head:
+Land and re-branch in this order, stopping on any failure, so the next goal starts from the merged head:
 
 ```bash
 gh pr merge <N> --squash --delete-branch
 gh pr view <N> --json state,mergeCommit --jq '"\(.state) \(.mergeCommit.oid)"'
-git checkout -q main && git pull -q --ff-only && git checkout -q -b feat/<next-goal-slug>
+git checkout -q main
+git pull -q --ff-only
+git checkout -q -b feat/<next-goal-slug>
 ```
 
 A PR that reads `MERGED` while `origin/main` still shows the old head means main had not been fetched,

@@ -6,7 +6,6 @@ import importlib.util
 import json
 import os
 import shutil
-import subprocess
 import sys
 import tempfile
 import time
@@ -15,6 +14,10 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 from unittest import mock
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import agent_run
+import gdd_process
 
 ADAPTER = Path(__file__).resolve().parents[1] / "adapters" / "paseo-run.py"
 STUB = '''#!/usr/bin/env python3
@@ -75,7 +78,7 @@ class PaseoLauncherTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix="paseo-run-test.")
         self.addCleanup(self.temp.cleanup)
         self.home = Path(self.temp.name)
-        self.bin = self.home / "bin"
+        self.bin = self.home / "bin with spaces"
         self.bin.mkdir()
         source = self.bin / "paseo.py"
         source.write_text(STUB, encoding="utf-8")
@@ -94,9 +97,9 @@ class PaseoLauncherTests(unittest.TestCase):
         self.env = dict(os.environ)
         for key in ("PASEO_BIN", "GDD_MODEL", "GDD_THINKING"):
             self.env.pop(key, None)
-        self.env.update(GDD_RUN_ROOT=str(self.root), STUB_HOME=str(self.home),
+        self.env.update(GDD_RUN_ROOT=str(self.root), STUB_HOME=str(self.home), GDD_RUN_DETACH="session",
                         PATH=str(self.bin) + os.pathsep + os.environ.get("PATH", ""))
-        self.monitors = []
+        self.monitors = {}
         self.addCleanup(self.stop_monitors)
 
     def save_fixture(self, **fields):
@@ -106,24 +109,21 @@ class PaseoLauncherTests(unittest.TestCase):
         os.replace(path, self.home / "fixture.json")
 
     def run_adapter(self, *args, env=None):
-        return subprocess.run([sys.executable, "-B", str(ADAPTER), *args], env=env or self.env,
-                              capture_output=True, text=True, timeout=30)
+        try:
+            return gdd_process.run([sys.executable, "-B", str(ADAPTER), *args], env=env or self.env,
+                                   capture_output=True, text=True, timeout=30)
+        finally:
+            if args[0] == "start":
+                for path in self.root.glob("*/*/state.json"):
+                    state = agent_run.read_state(path.parent)
+                    if recorded := state.get("pid_identity"):
+                        self.monitors[state["pid"]] = recorded
 
     def start(self, *flags, name="stage", env=None):
         result = self.run_adapter("start", "--name", name, "--prompt", str(self.prompt),
                                   "--cwd", str(self.home), *flags, env=env)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("started: " + name, result.stdout)
-        pid = json.loads((self.run_dir(name) / "state.json").read_text(encoding="utf-8"))["pid"]
-        if os.name == "nt":
-            import ctypes
-            kernel = ctypes.windll.kernel32
-            kernel.OpenProcess.restype = ctypes.c_void_p
-            kernel.WaitForSingleObject.argtypes = [ctypes.c_void_p, ctypes.c_ulong]
-            kernel.CloseHandle.argtypes = [ctypes.c_void_p]
-            self.monitors.append((pid, kernel.OpenProcess(0x00100000, False, pid)))
-        else:
-            self.monitors.append((pid, None))
         return result
 
     def run_dir(self, name="stage"):
@@ -152,22 +152,9 @@ class PaseoLauncherTests(unittest.TestCase):
         if not self.root.exists():
             return
         self.save_fixture(status="closed", offline=False, missing=False)
-        for pid, handle in self.monitors:
-            if os.name == "nt":
-                import ctypes
-                if handle:
-                    try:
-                        if ctypes.windll.kernel32.WaitForSingleObject(handle, 5000) == 258:
-                            subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"],
-                                           capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
-                            ctypes.windll.kernel32.WaitForSingleObject(handle, 5000)
-                    finally:
-                        ctypes.windll.kernel32.CloseHandle(handle)
-            else:
-                try:
-                    os.kill(pid, 15)
-                except ProcessLookupError:
-                    pass
+        for pid, recorded in self.monitors.items():
+            if not agent_run.wait_until(lambda: agent_run.identity(pid) != recorded, 4):
+                self.assertTrue(agent_run.terminate(pid), f"monitor {pid} did not stop for {self.root}")
 
     def test_start_argv_identity_and_artifacts(self):
         self.start("--model", "stub-provider", "--thinking", "deliberate")
@@ -293,21 +280,29 @@ class PaseoLauncherTests(unittest.TestCase):
         adapter = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(adapter)
         path = self.home / "refresh"
-        dead = subprocess.Popen([sys.executable, "-c", "pass"])
+        dead = gdd_process.popen([sys.executable, "-c", "pass"])
         dead.wait()
         path.write_text(str(dead.pid), encoding="utf-8")
+        own = f"{os.getpid()} {adapter.support.identity(os.getpid())}"
+        self.assertTrue(own.split()[1])
         with adapter.claim(str(path)):
-            self.assertEqual(path.read_text(encoding="utf-8"), str(os.getpid()))
+            self.assertEqual(path.read_text(encoding="utf-8"), own)
         self.assertFalse(path.exists())
-        live = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+        live = gdd_process.popen([sys.executable, "-c", "import time; time.sleep(30)"])
         self.addCleanup(live.wait)
         self.addCleanup(live.kill)
-        path.write_text(str(live.pid), encoding="utf-8")
+        prior = f"{live.pid} old-start-time"
+        path.write_text(prior, encoding="utf-8")
+        with adapter.claim(str(path)):
+            self.assertEqual(path.read_text(encoding="utf-8"), own)
+        actual = f"{live.pid} {adapter.support.identity(live.pid)}"
+        self.assertNotEqual(actual, prior)
+        path.write_text(actual, encoding="utf-8")
         os.utime(path, (time.time() - 3600,) * 2)  # age alone never frees a live holder's claim
         with mock.patch.object(adapter, "CLAIM_WAIT_SECONDS", 0.3), self.assertRaises(adapter.ClaimTimeout):
             with adapter.claim(str(path)):
                 pass
-        self.assertEqual(path.read_text(encoding="utf-8"), str(live.pid))
+        self.assertEqual(path.read_text(encoding="utf-8"), actual)
 
     def test_unknown_native_run_reserves_worktree_until_confirmed_termination(self):
         spec = importlib.util.spec_from_file_location("gdd_under_test", ADAPTER.parent.parent / "gdd.py")
@@ -495,7 +490,7 @@ class PaseoLauncherTests(unittest.TestCase):
 
     def test_interrupted_idle_agent_is_not_reported_killed(self):
         self.start()
-        result = subprocess.run([sys.executable, str(self.bin / "paseo.py"), "stop", self.fixture["id"], "--json"],
+        result = gdd_process.run([sys.executable, str(self.bin / "paseo.py"), "stop", self.fixture["id"], "--json"],
                                 env=self.env, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         state = self.status()

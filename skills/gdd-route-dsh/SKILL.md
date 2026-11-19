@@ -9,8 +9,8 @@ metadata:
   revision: "2"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
-  summary: "dispatch and supervise a GDD stage on dsh headless: session/worktree rules, completion judgement, recovery, harness traps"
-  summary_zh: "把 GDD 阶段派发给 dsh headless 并监督：会话/worktree 规则、完成判定、恢复、harness 陷阱"
+  summary: "dispatch and supervise a GDD stage on dsh headless: session/worktree rules, completion judgement, recovery, harness traps (requires skill `gdd`)"
+  summary_zh: "把 GDD 阶段派发给 dsh headless 并监督：会话/worktree 规则、完成判定、恢复、harness 陷阱（需要 skill `gdd`）"
   kind: "mechanism"
 ---
 
@@ -22,7 +22,7 @@ the permission policy, not by the working directory: with the default `workspace
 whose harness enforces a sandbox, writes inside the policy's boundary succeed and writes outside it are
 denied; `--cwd` only selects the run's working directory. Changing the profile or `DSH_PERMISSION_MODE`
 changes that boundary, so re-confirm it before dispatching (see "Harness facts that bite"). The protocol
-stays in `gdd`; this skill is the operating method for that route, invoked from the DSH route row of
+stays in `gdd`; see the Headless CLI row and DSH route specifics in
 [`../gdd/references/transport.md`](../gdd/references/transport.md).
 
 ## When to Use
@@ -41,21 +41,14 @@ directory, detaches a runner, keeps `state.json` current, finalizes a dead run w
 `stale_recovered: true`, and stops a run through its control file. A raw `dsh --profile headless …`
 invocation is for one-off/manual use only: it does **not** detach, does not write `state.json`, never
 sets `stale_recovered`, and watches no stop file. Every statement below about state, recovery and
-stopping belongs to the runner. One goal, one worktree, one session still holds; the raw form is:
-
-```bash
-git worktree add -b goal/<slug> <worktree> <base-ref>
-cd <worktree>
-dsh --profile headless --json --permission-mode workspace-write --approval-policy never \
-    - < <task.md>          # stdout is the NDJSON stream; the raw CLI writes no run artifacts
-```
+stopping belongs to the runner. One goal, one worktree, one session still holds.
 
 The runner's equivalent, which is what a GDD stage uses:
 
-```bash
-uv run ../gdd/scripts/agent_run.py start --agent dsh --name <slug> --prompt <task.md> --cwd <worktree> [--resume <id>]
-uv run ../gdd/scripts/agent_run.py status <slug>     # until state != running
-uv run ../gdd/scripts/agent_run.py answer <slug>     # the final assistant text
+```text
+uv run ../gdd/scripts/agent_run.py start --agent dsh --name example --prompt task.md --cwd .
+uv run ../gdd/scripts/agent_run.py status example
+uv run ../gdd/scripts/agent_run.py answer example
 ```
 
 Only if a script command fails (for example `uv` is not found), read
@@ -71,7 +64,7 @@ Only if a script command fails (for example `uv` is not found), read
 - **New increment → new session.** An unrelated increment resumed into an old session works but re-sends
   the accumulated context (measured ≈8× a fresh session's first-step input) for no benefit.
 - Next round of the *same* increment (revise, verify) → resume the same session in the same cwd. Through
-  the runner that is `start --resume <session-id>` (passed to dsh as `--session-id`), which re-sends
+  the runner that is `start --resume <session-id>` (`--session-id` is a compatibility alias), which re-sends
   `--permission-mode` / `--approval-policy` itself; by raw CLI it is `--session-id <session-id>` with
   `--permission-mode` / `--approval-policy` repeated and `--add-dir` for extra writable paths. The prompt
   must say the run was interrupted, that the tree is mid-flight, and that this continues rather than
@@ -171,6 +164,7 @@ precedence over `GDD_AGENT`. The remaining keys resolve from the environment, th
 | `GDD_AGENT` | the agent CLI (`--agent` wins) | `omp`; set `dsh` for this route |
 | `DSH_BIN` | the harness CLI the runner spawns | `dsh` resolved through `PATH` |
 | `GDD_RUN_ROOT` | run/artifact root, the one `gdd.py` exports | `${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs` |
+| `GDD_RUN_DETACH` | shared runner detach mode; see [platform rules](../gdd/references/transport.md#headless-platform-rules) | `auto` |
 | `DSH_RUN_PROFILE` | launcher `--profile` | `headless` |
 | `DSH_PERMISSION_MODE` | app `--permission-mode` | `workspace-write` |
 | `DSH_APPROVAL_POLICY` | app `--approval-policy`; any other value is refused | `never` |

@@ -27,40 +27,27 @@ GPT-family lanes require `REVIEW_TRANSPORT=responses` and select a supported act
 (`openai-responses`, `azure-openai-responses`, or `openai-codex-responses`). Other lanes declare `other`
 and their own actual API ID. `REVIEW_API` has no fallback and is checked against runtime receipts.
 
-```bash
-: "${REVIEW_PROVIDER:?select a configured provider}" "${REVIEW_MODEL:?select a model}"
-GH_REPO=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
-REVIEW_HEAD=$(git rev-parse HEAD)
-test "$REVIEW_HEAD" = "$(gh pr view "$PR" --json headRefOid --jq .headRefOid)" || exit 2
-test -z "$(git status --porcelain)" || exit 2  # review only the committed PR tree
-git diff "$BASE_REF...$REVIEW_HEAD" > "$REVIEW_DIFF" || exit 2
-# Pi accepts fuzzy patterns. Require an exact provider/id registry row first.
-pi --offline --list-models > "$REVIEW_REGISTRY" || exit 2
-uv run --no-project python - "$REVIEW_REGISTRY" "$REVIEW_PROVIDER" "$REVIEW_MODEL" <<'PY'
-import sys
-from pathlib import Path
-rows = [line.split() for line in Path(sys.argv[1]).read_text().splitlines()]
-if not any(row[:2] == sys.argv[2:4] for row in rows):
-    raise SystemExit("requested provider/model is not an exact registry entry")
-PY
-test "$?" -eq 0 || exit 2
-# Use a fresh per-round directory so old receipts cannot satisfy this run.
-test ! -e "$REVIEW_SESSION_DIR" || exit 2
-if pi -p --provider "$REVIEW_PROVIDER" --model "$REVIEW_MODEL" \
-    --session-dir "$REVIEW_SESSION_DIR" \
-    "@$REVIEW_PROMPT" "@$REVIEW_DIFF" > "$REVIEW_REPORT" 2> "$REVIEW_LOG"; then
-  test -s "$REVIEW_REPORT" || exit 2
-else
-  exit 2  # preserve failed-run artifacts; do not label them completed evidence
-fi
-uv run "$GDD_SKILL/scripts/review-receipt.py" --session-dir "$REVIEW_SESSION_DIR" \
-  --provider "$REVIEW_PROVIDER" --model "$REVIEW_MODEL" \
-  --transport "${REVIEW_TRANSPORT:?declare lane transport}" \
-  --api-id "${REVIEW_API:?declare actual API ID}" || exit 2
-test "$REVIEW_HEAD" = "$(git rev-parse HEAD)" || exit 2
-test -z "$(git status --porcelain)" || exit 2
-test "$REVIEW_HEAD" = "$(gh pr view "$PR" --json headRefOid --jq .headRefOid)" || exit 2
-```
+Run commands individually in PowerShell or a POSIX shell. Substitute the named values or set
+them as shell variables first. Stop on any nonzero exit; keep failed-run artifacts without
+labeling them completed evidence. Use byte-preserving stdout redirection (PowerShell 7.4+ or a
+POSIX shell) for evidence files.
+
+1. Record `GH_REPO` from `gh repo view --json nameWithOwner --jq .nameWithOwner` and
+   `REVIEW_HEAD` from `git rev-parse HEAD`. Require
+   `gh pr view "$PR" --json headRefOid --jq .headRefOid` to equal the recorded head and
+   `git status --porcelain` to be empty.
+2. Save the exact diff with `git diff "${BASE_REF}...${REVIEW_HEAD}" > "$REVIEW_DIFF"`. Run
+   `pi --offline --list-models > "$REVIEW_REGISTRY"`. Pi accepts fuzzy matches; require one row
+   whose provider and model ID columns match the requested values exactly.
+3. Use a fresh, nonexistent `REVIEW_SESSION_DIR`, then run:
+
+   ```text
+   pi -p --provider "$REVIEW_PROVIDER" --model "$REVIEW_MODEL" --session-dir "$REVIEW_SESSION_DIR" "@$REVIEW_PROMPT" "@$REVIEW_DIFF" > "$REVIEW_REPORT" 2> "$REVIEW_LOG"
+   uv run "$GDD_SKILL/scripts/review-receipt.py" --session-dir "$REVIEW_SESSION_DIR" --provider "$REVIEW_PROVIDER" --model "$REVIEW_MODEL" --transport "$REVIEW_TRANSPORT" --api-id "$REVIEW_API"
+   ```
+
+4. Require a nonempty report and successful receipt validation. Recheck that the local head and PR
+   head equal `REVIEW_HEAD` and that the worktree is still clean.
 
 Keep the exact registry row, session receipt with actual provider/model/API, invocation, prompt,
 exact diff, stderr/exit result, and **unabridged actual report** as the
@@ -75,11 +62,8 @@ Read the report. Set `REVIEW_FINDINGS` to `true` or `false` explicitly according
 `true` records a completed review with findings and **blocks merge**. A failed/incomplete run is not
 a completed review. The generator does not infer the verdict, invoke a model, or post anything.
 
-```bash
-uv run "$GDD_SKILL/scripts/review-evidence.py" \
-  --report "$REVIEW_REPORT" --head "$REVIEW_HEAD" \
-  --model "$REVIEW_MODEL" --provider "$REVIEW_PROVIDER" \
-  --findings "$REVIEW_FINDINGS" --output "$REVIEW_COMMENT" || exit 2
+```text
+uv run "$GDD_SKILL/scripts/review-evidence.py" --report "$REVIEW_REPORT" --head "$REVIEW_HEAD" --model "$REVIEW_MODEL" --provider "$REVIEW_PROVIDER" --findings "$REVIEW_FINDINGS" --output "$REVIEW_COMMENT"
 ```
 
 The generated comment starts with a plain marker token and JSON (the gate also accepts an HTML-comment
@@ -115,24 +99,15 @@ whose profile explicitly declares no machine-review lane; it is not a repair for
 After confirming the PR head is still `REVIEW_HEAD`, post the generated file, not shell-quoted
 multiline text. Preserve the returned URL/id and fetch that exact comment, not just a page's last item:
 
-```bash
-test "$REVIEW_HEAD" = "$(gh pr view "$PR" --json headRefOid --jq .headRefOid)" || exit 2
-COMMENT_URL=$(gh pr comment "$PR" --body-file "$REVIEW_COMMENT") || exit 2
-COMMENT_ID=${COMMENT_URL##*issuecomment-}
-case "$COMMENT_ID" in ''|*[!0-9]*) exit 2 ;; esac
-gh api "repos/$GH_REPO/issues/comments/$COMMENT_ID" > "$REVIEW_RECEIPT" || exit 2
-uv run --no-project python - "$REVIEW_COMMENT" "$REVIEW_RECEIPT" <<'PY'
-import json, sys
-from pathlib import Path
-expected = Path(sys.argv[1]).read_bytes().decode("utf-8")
-actual = json.loads(Path(sys.argv[2]).read_bytes())["body"]
-if actual != expected:
-    raise SystemExit("posted review evidence differs from the generated comment")
-print("posted review evidence: exact body readback verified")
-PY
-test "$?" -eq 0 || exit 2
-test "$REVIEW_HEAD" = "$(gh pr view "$PR" --json headRefOid --jq .headRefOid)" || exit 2
+Run `gh pr comment "$PR" --body-file "$REVIEW_COMMENT"` and take `COMMENT_ID` from the digits
+after `#issuecomment-` in the returned URL; stop if that suffix is missing or malformed.
+
+```text
+gh api "repos/$GH_REPO/issues/comments/$COMMENT_ID" > "$REVIEW_RECEIPT"
+uv run --no-project python -c "import json, sys; from pathlib import Path; expected = Path(sys.argv[1]).read_bytes().decode('utf-8'); actual = json.loads(Path(sys.argv[2]).read_bytes())['body']; sys.exit(0 if actual == expected else 'posted review evidence differs from the generated comment')" "$REVIEW_COMMENT" "$REVIEW_RECEIPT"
 ```
+
+Require exit 0 from both commands, then check the PR head against `REVIEW_HEAD` again.
 
 Then run the project gates and `uv run scripts/pr-merge-check.py <PR> --repo <worktree> --verified-head
 <full-reviewed-head> --gates-rc <actual-rc>` (with the same `--marker` if customized). A successful

@@ -4,7 +4,6 @@ import glob
 import json
 import os
 import shutil
-import subprocess
 import sys
 import tempfile
 import unittest
@@ -12,6 +11,9 @@ from datetime import datetime, timedelta, timezone
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCRIPTS = os.path.dirname(HERE)
+sys.path.insert(0, SCRIPTS)
+import gdd_process
+import agent_run
 GDD = os.path.join(SCRIPTS, "gdd.py")
 DELIVERY = os.path.join(SCRIPTS, "delivery-state.py")
 STUB = os.path.join(HERE, "stub_agent.py")
@@ -30,7 +32,7 @@ def write(path, text):
 
 
 def dead_pid():
-    proc = subprocess.Popen([sys.executable, "-c", "pass"])
+    proc = gdd_process.popen([sys.executable, "-c", "pass"])
     proc.wait()
     return proc.pid
 
@@ -44,11 +46,13 @@ class GddCase(unittest.TestCase):
         drop = ("GDD_", "STUB_", "DSH_", "OMP_", "XDG_")
         self.env = {k: v for k, v in os.environ.items() if not k.startswith(drop)}
         self.env.update(XDG_STATE_HOME=self.state_home, XDG_CONFIG_HOME=os.path.join(self.tmp, "config"),
+                        GDD_RUN_DETACH="session",
                         OMP_BIN=STUB, DSH_BIN=STUB, CLAUDE_BIN=STUB, STUB_FIXTURE=OK_FIXTURE, STUB_RECORD=self.record,
                         PYTHONDONTWRITEBYTECODE="1", GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@example.invalid",
                         GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@example.invalid")
         self.repo = os.path.realpath(os.path.join(self.tmp, "workrepo"))
         os.makedirs(self.repo)
+        self.addCleanup(self.stop_runners)
         self.git("init", "-q", "-b", "main")
         write(os.path.join(self.repo, "docs", "goals", "0001-first.md"), "# Goal 0001\nState: active\n")
         self.commit("contract")
@@ -58,7 +62,7 @@ class GddCase(unittest.TestCase):
         self.head = self.commit("work")
 
     def git(self, *args):
-        return subprocess.run(["git", "-C", self.repo, *args], env=self.env, capture_output=True, text=True,
+        return gdd_process.run(["git", "-C", self.repo, *args], env=self.env, capture_output=True, text=True,
                               check=True).stdout.strip()
 
     def commit(self, message):
@@ -67,7 +71,7 @@ class GddCase(unittest.TestCase):
         return self.git("rev-parse", "HEAD")
 
     def run_tool(self, script, *args, env=None):
-        return subprocess.run([sys.executable, "-B", script, *args], capture_output=True, text=True,
+        return gdd_process.run([sys.executable, "-B", script, *args], capture_output=True, text=True,
                               env={**self.env, **(env or {})}, timeout=120)
 
     def stage(self, stage, *args, env=None):
@@ -81,6 +85,17 @@ class GddCase(unittest.TestCase):
 
     def run_dirs(self, root=None):
         return glob.glob(os.path.join(root or os.path.join(self.state_home, "gdd", "runs"), "*", "*"))
+
+    def stop_runners(self):
+        for path in glob.glob(os.path.join(self.tmp, "**", "run.json"), recursive=True):
+            run_dir = os.path.dirname(path)
+            state = agent_run.read_state(run_dir)
+            if not state.get("backend") or not agent_run.run_alive(run_dir, state):
+                continue
+            self.assertEqual(agent_run.stop_run(run_dir), "")
+            pid, recorded = state.get("pid"), state.get("pid_identity")
+            if recorded:
+                self.assertTrue(agent_run.wait_until(lambda: agent_run.identity(pid) != recorded, 10))
 
     def craft_run(self, name, **state):
         run_dir = os.path.join(self.state_home, "gdd", "runs", datetime.now().strftime("%Y-%m-%d"), name)
@@ -220,6 +235,7 @@ class LaunchTests(GddCase):
         old = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
         stale = self.craft_run("workrepo-0001-implement", pid=dead_pid(), started=old)
         show = self.run_tool(GDD, "status", "--repo", self.repo, "--goal", "0001")
+        self.assertEqual(show.returncode, 0, show.stderr)
         self.assertIn("last_run: workrepo-0001-implement stale exit=- dur=-", show.stdout.splitlines())
         done = self.stage("implement", "--wait")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)

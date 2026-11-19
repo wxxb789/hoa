@@ -32,6 +32,8 @@
     "agent_pid": {"type": ["integer", "null"]},
     "session_id": {"type": "string"},
     "backend": {"type": "string"},
+    "detach": {"type": "string", "enum": ["systemd", "session", "windows"]},
+    "unit": {"type": "string"},
     "model": {"type": ["string", "null"]},
     "thinking": {"type": ["string", "null"]},
     "max_time": {"type": ["string", "null"]},

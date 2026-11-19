@@ -6,7 +6,8 @@
    and which behaviours are deliberate non-goals.
 1. `git fetch origin --prune`, fast-forward `main`, branch `feat/<kebab-outcome>` **from
    `origin/main`**, never from a stale local main. Report the base SHA every time.
-2. Record the baseline before dispatching: `uv run "$(uv run scripts/gdd.py scope)" snapshot --repo <path> --label <goal>`.
+2. Resolve the scope tool with `uv run scripts/gdd.py scope`. Record the baseline before dispatching
+   with `uv run "<scope-tool>" snapshot --repo <path> --label <goal>`.
    Report the count of pre-existing dirty paths in the dispatch line — they are not part of this
    increment. Refuse to dispatch on a dirty submodule or nested repository; resolve it first.
 3. Dispatch one implementation run carrying the goal file, the repo's contract docs, the most recent
@@ -15,9 +16,8 @@
 
 ## Dispatch tooling
 
-```bash
-uv run scripts/gdd.py stage --repo <path> --goal <id> --stage <implement|simplify|apply|review|fix> \
-  [--findings FILE] [--base SHA] [--launcher CMD] [--dry-run] [--wait]
+```text
+uv run scripts/gdd.py stage --repo <path> --goal <id> --stage <stage> [--findings FILE] [--base SHA] [--launcher CMD] [--dry-run] [--wait]
 ```
 
 Renders the stage prompt from `references/stage-templates/<stage>.md`, refuses to ship an unresolved
