@@ -1,11 +1,11 @@
 {
-  "case_count": 20,
+  "case_count": 23,
   "model": "gemini-4-carbon",
   "effort": "low",
-  "passed": 19,
-  "total": 20,
-  "judge_endpoint_host": "localhost:4141",
-  "generated_at": "2026-11-18T03:17:04Z",
+  "passed": 23,
+  "total": 23,
+  "judge_endpoint_host": "127.0.0.1:4141",
+  "generated_at": "2026-11-19T00:35:01Z",
   "per_case": [
     {
       "id": "route-to-search",
@@ -104,8 +104,23 @@
     },
     {
       "id": "route-boundaryless-goal-to-spec-first",
-      "pick": "define-goal",
-      "passed": false
+      "pick": "spec-convergence",
+      "passed": true
+    },
+    {
+      "id": "no-trigger-python-expression",
+      "pick": "none",
+      "passed": true
+    },
+    {
+      "id": "no-trigger-unit-conversion",
+      "pick": "none",
+      "passed": true
+    },
+    {
+      "id": "no-trigger-translation",
+      "pick": "none",
+      "passed": true
     }
   ]
 }

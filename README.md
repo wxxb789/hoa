@@ -196,15 +196,15 @@ there (or in WSL) rather than on native Windows.
 ### How an eval case is graded — and what that proves
 
 `evals/trigger-cases.json` holds the routing cases: an `id`, a user `request`, exactly one
-`must_pick` artifact, and `distractors` that must not be chosen. The grader is an LLM in a fresh
-context, and it is told only what a new contributor would see:
+`must_pick` answer (an artifact name or `none`), and `distractors` that must not be chosen.
+The grader is an LLM in a fresh context:
 
-1. Build the catalog from `scripts/generate_index.py collect()`: name, type, and English summary
-   for every artifact in the catalog.
-2. For one case, send the catalog and the request, and ask for exactly one artifact name.
-3. Pass iff the stripped reply is exactly the case's `must_pick`. A reply that names no catalog
-   entry is a failed case and is preserved verbatim as the pick. A network or endpoint error fails
-   that case only; the rest of the batch completes.
+1. Use `scripts/generate_index.py collect()` to list artifacts. Show each visible skill's name,
+   type, and full `SKILL.md` frontmatter `description`. Omit skills with
+   `disable-model-invocation: true`; keep the English index note for other library artifacts.
+2. Send the catalog and the request, and ask for one artifact name or `none` if nothing fits.
+3. Pass iff the stripped reply matches the case's sole `must_pick` entry. Any other reply fails
+   and is preserved as the pick. A network or endpoint error fails only that case.
 4. `must_pick` and `distractors` are never shown to the judge.
 
 The judge is configured, never compiled in. Endpoint, model, and effort resolve as CLI flag →
@@ -223,11 +223,11 @@ them supplied the script exits 2, prints the keys and the config path, and never
 `--record` writes `evals/baseline.json` (`case_count`, `model`, `effort`, `passed`, `total`,
 `judge_endpoint_host`, `generated_at`, `per_case`) for the full case set only; an existing record is
 replaced only with `--force`. The proposed record is checked with the gate's own rules before it is
-written: a run containing transport errors or non-catalog answers cannot be represented in the
+written: a run containing transport errors or answers other than catalog names or `none` cannot be represented in the
 accepted schema, so the file is left untouched and the script exits 2 naming the offending cases
-(re-run instead of losing the previous measurement); a wrong-but-catalog pick is recorded as the
+(re-run instead of losing the previous measurement); a valid but incorrect pick is recorded as the
 failure it is. CI never calls the model: `run_trigger_evals.py` validates the
-baseline's ids, catalog picks, recomputed pass flags and case totals offline, and reports
+baseline's ids, picks, recomputed pass flags and case totals offline, and reports
 `no baseline recorded yet` before the first record.
 
 The honest limit: one model, one prompt, one effort level, one curated case set. A pass rate says

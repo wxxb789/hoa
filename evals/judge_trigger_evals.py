@@ -90,29 +90,29 @@ class RecordError(ValueError):
     """A baseline record that cannot be written without losing an earlier one."""
 
 
-def hidden(row: dict) -> bool:
-    """A `disable-model-invocation: true` skill is never offered to the model."""
-    if row["type"] != "skill":
-        return False
-    skill_md = ROOT / row["path"] / "SKILL.md"
-    frontmatter, _ = sm._frontmatter(skill_md.read_text(encoding="utf-8"), skill_md)
-    return yaml.safe_load(frontmatter).get("disable-model-invocation") is True
-
-
 def catalog_text() -> str:
-    """The catalog a host offers the model: hidden skills are left out."""
-    return "\n".join(
-        f"- {row['name']} ({row['type']}): {row['note_en']}"
-        for row in gi.collect() if not hidden(row)
-    )
+    """Use frontmatter descriptions for visible skills and index notes otherwise."""
+    lines = []
+    for row in gi.collect():
+        if row["type"] == "skill":
+            skill_md = ROOT / row["path"] / "SKILL.md"
+            frontmatter, _ = sm._frontmatter(skill_md.read_text(encoding="utf-8"), skill_md)
+            fields = yaml.safe_load(frontmatter)
+            if fields.get("disable-model-invocation") is True:
+                continue
+            description = fields["description"]
+        else:
+            description = row["note_en"]
+        lines.append(f"- {row['name']} ({row['type']}): {description}")
+    return "\n".join(lines)
 
 
 def build_prompt(catalog: str, request: str) -> str:
     return (
-        "You are routing a user request to exactly one artifact from this catalog.\n\n"
+        "Route the user request to the best-fitting artifact, if any.\n\n"
         f"Catalog:\n{catalog}\n\n"
         f"User request: {request}\n\n"
-        "Reply with ONLY the artifact name from the catalog, nothing else."
+        f"Reply with only the artifact name, or {gate.NO_MATCH} if no artifact applies."
     )
 
 

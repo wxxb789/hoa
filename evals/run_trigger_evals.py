@@ -8,7 +8,7 @@ scripts/generate_index.py — a case routing to a nonexistent artifact fails
 here, in CI, instead of silently in a judge run.
 
 It also validates a recorded evals/baseline.json when one exists: every case id
-exists, every pick names a catalog artifact, each recorded pass flag is
+exists, every pick names a catalog artifact or is `none`, each recorded pass flag is
 recomputed from that pick against the current case's must_pick, the pass count
 equals the sum of per-case passes, and the record describes the full current case
 set. No baseline is allowed before the first explicit
@@ -30,6 +30,7 @@ import generate_index as gi  # noqa: E402
 
 REQUIRED_TOP = {"purpose", "procedure", "cases"}
 REQUIRED_CASE = {"id", "request", "must_pick", "distractors"}
+NO_MATCH = "none"
 BASELINE = EVALS / "baseline.json"
 BASELINE_FIELDS = ("case_count", "model", "effort", "passed", "total",
                    "judge_endpoint_host", "generated_at", "per_case")
@@ -64,7 +65,7 @@ def baseline_errors(cases: list[dict], record: dict,
 
     Recorded flags are not trusted: each row's outcome is recomputed from its
     pick against the current case's must_pick, and every pick must name a
-    catalog artifact. A baseline recorded before a case was retargeted is stale
+    catalog artifact or be `none`. A baseline recorded before a case was retargeted is stale
     even when all of its internal totals still add up.
     """
     errors: list[str] = []
@@ -106,9 +107,9 @@ def baseline_errors(cases: list[dict], record: dict,
             seen.add(entry["id"])
         if not isinstance(entry["pick"], str):
             errors.append(f"{where} pick must be a string")
-        elif entry["pick"] not in catalog:
+        elif entry["pick"] != NO_MATCH and entry["pick"] not in catalog:
             errors.append(f"{where} ({entry['id']}) pick {entry['pick']!r} is not a "
-                          f"catalog artifact")
+                          f"catalog artifact or {NO_MATCH!r}")
         if isinstance(entry["id"], str) and isinstance(entry["pick"], str):
             case = cases_by_id.get(entry["id"])
             must_pick = case.get("must_pick") if case else None
@@ -179,7 +180,11 @@ def main() -> int:
         must_pick = case["must_pick"]
         if not (isinstance(must_pick, list) and len(must_pick) == 1
                 and isinstance(must_pick[0], str) and must_pick[0].strip()):
-            errors.append(f"{where} ({cid}): must_pick must be a list of exactly one artifact name")
+            errors.append(f"{where} ({cid}): must_pick must contain one artifact name or {NO_MATCH!r}")
+        elif must_pick[0] != NO_MATCH and must_pick[0] not in catalog:
+            errors.append(f"{where} ({cid}): must_pick names unknown artifact {must_pick[0]!r}")
+        elif isinstance(case["distractors"], list) and must_pick[0] in case["distractors"]:
+            errors.append(f"{where} ({cid}): must_pick {must_pick[0]!r} is also a distractor")
         distractors = case["distractors"]
         if (not isinstance(distractors, list) or not distractors
                 or not all(isinstance(v, str) and v.strip() for v in distractors)):
@@ -188,10 +193,6 @@ def main() -> int:
             unknown = [v for v in distractors if v not in catalog]
             if unknown:
                 errors.append(f"{where} ({cid}): distractors name unknown artifacts: {unknown}")
-        if isinstance(must_pick, list) and len(must_pick) == 1 and must_pick[0] in catalog \
-                and isinstance(distractors, list):
-            if must_pick[0] in distractors:
-                errors.append(f"{where} ({cid}): must_pick {must_pick[0]!r} is also a distractor")
 
     if errors:
         for error in errors:
@@ -214,8 +215,8 @@ def main() -> int:
     else:
         baseline = "; no baseline recorded yet (judge_trigger_evals.py --record)"
 
-    print(f"PASS: {len(data['cases'])} trigger cases valid; every must_pick/distractor "
-          f"resolves to a cataloged artifact ({len(catalog)} artifacts){baseline}")
+    print(f"PASS: {len(data['cases'])} trigger cases valid "
+          f"({len(catalog)} cataloged artifacts; {NO_MATCH!r} allowed in must_pick){baseline}")
     return 0
 
 

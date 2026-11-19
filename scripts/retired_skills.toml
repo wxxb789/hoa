@@ -10,16 +10,32 @@
 #   reason       one line: why the name went away
 
 [retired.to-prd]
-replacement = "notes-to-prd"
+replacement = "ce-plan"
 reason = "older name of the same skill (2026-11-13)"
 
 [retired.to-issues]
-replacement = "plan-to-issues"
+replacement = "to-tickets"
 reason = "older name of the same skill (2026-11-13)"
 
 [retired.improve-codebase-architecture]
-replacement = "arch-improvement-plan"
-reason = "host stub whose description arch-improvement-plan already carries (2026-11-13)"
+replacement = "ce-plan"
+reason = "retired as a duplicate architecture planning stub (2026-11-13)"
+
+[retired.design-an-interface]
+replacement = "codebase-design"
+reason = "retired a description-only stub in favor of a dedicated interface design workflow (2026-11-18)"
+
+[retired.arch-improvement-plan]
+replacement = "ce-plan"
+reason = "retired a description-only stub in favor of structured implementation planning (2026-11-18)"
+
+[retired.notes-to-prd]
+replacement = "ce-plan"
+reason = "retired a description-only stub in favor of structured requirements planning (2026-11-18)"
+
+[retired.plan-to-issues]
+replacement = "to-tickets"
+reason = "retired a stub that referenced an unavailable issue skill (2026-11-18)"
 
 [retired.my-ado-cppr]
 replacement = "prompts/ado-commit-push-pr.md"
