@@ -47,3 +47,26 @@ wastes tokens" — judge the design, not just the docs.
 ## Report shape
 
 Write the full review as an artifact in the task workspace (`<artifacts>/<topic>/`); chat gets TL;DR, per-question answers, a prioritized P0–Pn route with sizes/risks, and a "do not touch" list. Label measured numbers as measured and estimates as estimates. Contract changes inside the target repo follow that repo's own evolution gates — propose, don't apply unilaterally.
+
+## Operating Contract Review Checklist
+
+When reviewing the operating protocol like a code reviewer, check:
+
+- **Scope separation**: Is identity leaking into the protocol? Is ops leaking into the identity file?
+- **Trigger clarity**: Does each rule say when it applies?
+- **Conflict risk**: Do async, context-loading, safety gates, and delegation rules fight each other?
+- **Blast radius**: Are Green / Yellow / Red gates defined by reversibility and impact?
+- **Team leverage**: Are specialist agents used when they improve quality or wall-clock time, not for ceremony?
+- **Model leverage**: Is there a heuristic for fast/default/strong model routing without hardcoding stale model names?
+- **Filesystem hygiene**: Are artifacts named, scoped, and cleaned after work?
+- **Persistence routing**: Are durable lessons going into the right layer?
+- **Live-inventory accuracy**: a section that enumerates live objects (profiles, scheduled jobs, delivery
+  channels, model ids) is a fact table, not a rule. Re-derive it from the runtime's profile list / the
+  scheduler's job list / config after any infrastructure change, and keep a drift checker asserting
+  each live name appears in the file — rosters grow silently while the prose stays confidently wrong.
+- **Proof trail**: Are edits requiring backup, diff/path/proof, and minimal verification?
+- **Control-plane overhead ratio**: For contract/control-plane systems, measure control bytes/files against product bytes (a completed object's records vs its deliverables). A ratio approaching or exceeding 1:1 is over-engineering regardless of correctness — report it as the headline finding.
+- **Mechanical ceremony done by the LLM**: Any contract step where the LLM computes, transcribes, or verifies values a script or git could own (hashes, IDs, counters, hand-made snapshot copies) is both token waste and the dominant error source. The contract should let the LLM declare intent and let a script stamp and verify.
+- **Fail-closed composition**: A fail-closed contract running under an orchestrator that treats `blocked` as terminal and unretryable guarantees whole-run death on a single mechanical slip. Check what the surrounding runtime does with each contract state before adding more gates; tier ceremony by risk and provide a lite path plus an automatic doctor for weaker models.
+- **Validator signal value**: Run the system's own validator and count standing errors. A permanently-red validator has zero signal — new failures drown in old noise; require fix-or-legacy-freeze.
+- **Proposal shape when the owner asks "review and give me N improvements"**: deliver ranked options (highest value first), each with the specific lines/measurement it rests on, the concrete edit, expected effect, and cost. Close with an explicit "deliberately not doing" list — the owner reads judgment boundaries, not a menu. Every option must be **independently executable by name** ("execute option 1") without re-deriving the plan, and cite the real gap (grep first — do not re-propose something already in the file or the ops contract).

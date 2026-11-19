@@ -12,6 +12,9 @@ Install and path mechanics live in [cross-platform-skills.md](cross-platform-ski
    SKILL.md frontmatter: a YAML boolean, kebab-case (DeepSeek Harness drops a skill whose key is
    camelCase). Claude Code, Pi, OMP, OpenCode and DeepSeek Harness honor it
    ([Claude Code](https://code.claude.com/docs/en/skills), [OpenCode](https://opencode.ai/docs/skills/)).
+   Hermes does not honor the flag; the skill stays listed. Hermes can conditionally hide
+   entries with platform metadata such as `metadata.hermes.session_platforms`;
+   `skills.disabled` removes the skill rather than hiding it.
 2. **Codex sidecar.** Codex ignores that key, so the same skill also ships `agents/openai.yaml` with
    `policy:` / `allow_implicit_invocation: false` ([Codex](https://learn.chatgpt.com/docs/build-skills)).
    Edit that key by hand: Codex's `generate_openai_yaml.py` rewrites the whole file. The flag and the

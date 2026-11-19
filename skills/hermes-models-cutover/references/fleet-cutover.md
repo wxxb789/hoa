@@ -65,12 +65,12 @@ The generator contract, which a hand pass must also satisfy:
    old provider) — never the generated home.
 2. Apply writes the route into every generated home and touches no unmanaged home.
 3. Check is **silent and exits 0 when every generated home agrees with its binding**; any output is drift.
-4. Commit + push the binding (the repo is the SSOT; a hand-edited live home is drift by definition).
+4. Publish the binding through the repo's authorized sync process (the repo is the SSOT; a hand-edited live home is drift by definition).
 
 `fallback_providers` has no binding field, so hand-set fallbacks survive the apply — re-read them
 anyway, because a generator rewrite of the `model:` block is exactly when a stale fallback hides. When the
 binding's new provider is the one a home already fell back to, that fallback becomes a self-fallback: rewrite
-it to a different provider in the same pass (rule 13), or the home loses its second leg without any error.
+it to a different provider in the same pass, or the home loses its second leg without any error.
 
 **Before you re-materialize, check who is writing the repo.** `--check` reporting SOUL drift for every bot
 right after your route change is not caused by your change: `SOUL.md` is compiled from `bots/roles/ROLE.md` +
@@ -120,8 +120,8 @@ rather than letting the pin fail at runtime.
 5. Channel-served bots and the restart question: a config change reaches a home through agent construction,
    so a *new* session usually picks it up while an in-flight session keeps the old route. Do not assert either
    way from code reading — check the home's own `state.db` before/after pair after real traffic (details in
-   SKILL.md → Proof). Restarting the gateway is the gated fallback, and it is actively harmful when another
-   agent session is mid-write: ask, never restart to "finish" the task.
+   the cutover SKILL.md, Proof section). A gateway restart is the gated fallback and is actively
+   harmful when another agent session is mid-write: ask, never restart to "finish" the task.
 6. **Prove each harness from its own run record, not from the config you just wrote.** Hermes answers with a
    `state.db` session row; OMP writes `<run dir>/state.json` with `model` and `thinking` per run (its event
    stream repeats both on every call); omo writes the session JSONL above. Reading config only proves intent —
@@ -167,7 +167,7 @@ failure surfaces only after the first `import yaml`.
 ## 7. Rollback and hygiene
 
 - One script, one backup root: the workspace's backup directory for the cutover (`backups/<cutover>/<ts>/`) mirroring home-relative paths, printing
-  the changed-file list so the report can cite it. Restore = copy back, then `git revert` the binding commit.
+  the changed-file list so the report can cite it. Restore = copy back, then revert the binding commit through the owning repo only with separate authorization.
 - Do the edits in a single idempotent script that prints `changed N files` plus any `MISS <pattern>` lines;
   a text-anchored replacement that silently misses leaves a half-cutover with a clean exit code.
 - In a shared repo, `git add` only the files you touched. Another agent's dirty working tree

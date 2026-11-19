@@ -241,3 +241,41 @@ the account cannot serve silently advertises dead routes, and that is the defect
 - **Transport picks the provider, not the model family**: `/v1/responses` models live in
   `local-openai`, chat-completions models in `local-chat`. Adding a model to the wrong provider looks
   like a capability gap (`400 does not support the responses endpoint`).
+
+## Operational details
+
+**Transport is per model, not per endpoint.** One proxy serves `/v1/responses` for some ids and
+`/v1/chat/completions` for others; probe both before concluding a capability is missing.
+
+**Provider entries** live under top-level `providers:`; `model.provider` normally names the bare
+key (`local-openai`). A `custom:<name>` prefix is also accepted for custom-gateway entries, so a
+drift check must strip a leading `custom:` before comparing against the `providers:` keys — a raw
+string compare reports every valid custom route as undefined. Declare `context_length` per model.
+
+**Dotted model ids** cannot go through a dotted path — `providers.<n>.models.deepseek-v4.1-flash.context_length`
+builds a phantom nested mapping. Set the whole map as one JSON value instead
+(`hermes config set providers.<n>.models '{"GLM-5.3":{"context_length":1048576},"deepseek-v4.1-flash":{"context_length":1000000}}'`),
+or edit YAML with plain dotted keys. Back up first, then read the file back with a YAML parse — a
+masked `config get` cannot prove the map shape, and a successful chat does not prove the override
+was read.
+
+**Aliases and fallbacks are separate records from the provider entry.** `model_aliases.<name>` is a
+DirectAlias (`model`, `provider: custom`, `base_url`, `key_env`) resolved *before* the catalog, so
+it needs its own copy of the URL and key variable. `fallback_providers` entries are
+`{provider: <provider key>, model: <id>}` resolved through the provider registry, and they are
+per-home — set them in root **and** every profile. Prove both with one probe: point a throwaway
+alias at a nonexistent model id; the error names that id (alias routed) and the run continues on
+the fallback (`Model fallback: … via <provider>`), which proves the chain end to end. Delete the
+probe alias afterwards. A fallback entry must name a **different provider** than
+`model.provider` — same-provider fallback dies with the outage it was meant to cover, so a
+default on `opencode-go-flash` falls back to a second gateway, not to another id on the same one.
+
+**A fallback or pin is only as real as that home's catalog.** `providers.<p>.models` is a per-home
+map: root can be missing an id that several profiles already run as their *default* (`gpt-6.1-sol`
+ran in three profiles while root's catalog never listed it), and a fallback entry naming a missing
+id fails at failover — exactly when it is needed. Read the catalog of the home you are editing and
+add the id there first (whole-map JSON, rule 8), then wire the fallback. Effort variants: a
+`#variant` is supplied by the client config, so prove the relay accepts it with a CLI override
+*before* editing anything — `opencode run -m <provider>/<id>#max 'Reply with exactly: V_OK'`.
+Editing the config first leaves you unable to tell a rejected variant from a flaky relay.
+Config surgery inside generated/provider files (repeated blocks) → [config drift](config-drift.md).

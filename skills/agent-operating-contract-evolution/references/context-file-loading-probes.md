@@ -2,7 +2,8 @@
 
 This is the ground truth procedure for **which instruction file actually gets injected into the system
 prompt**, and under what conditions. "Put the rule in the right layer" is necessary but NOT sufficient —
-a correctly-layered rule in a file that the current cwd does not load is silently dead.
+a correctly-layered rule in a file that the current cwd does not load is silently dead. Relocating a
+project-context file into the runtime home does not change its discovery scope.
 
 The scopes below are the common pattern across agent CLIs; the exact loader names and priority order
 differ per runtime, so verify yours with the probes at the end. Never transfer a claim from one file type
@@ -73,6 +74,9 @@ another produces confidently-wrong answers.
 Corollary: "Does the operating protocol require a git repo?" → **No.** Verified live: a cwd with no `.git`
 anywhere up the tree still loads its protocol file fine. Only the overlay file even references git, and
 only as a search *upper bound*, not a requirement.
+
+Confirm the owner's real cwd habits before choosing the protocol file as the home for must-always-hold
+rules.
 
 ## How to verify on any box (don't reason — probe)
 

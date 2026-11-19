@@ -80,3 +80,30 @@ call 2: [ system , user(learn-instruction + FULL packet) ,
   a later failure does not lose the learn output.
 - After it returns, verify the contract metric (Unicode length range, every citation marker present,
   section count) with the project's own measuring script — never a private reimplementation.
+
+### 3b. Adding a model that is not in the frozen registry
+
+The owner will name a model to add to the comparison. Route it through the project's own registry;
+never silently substitute a reachable model for the named one, and never hand-write "that model's"
+draft yourself.
+
+- **A new model needs a new versioned registry, not an edit to the frozen one.** Copy the project
+  registry to `providers-vN+1.json`, add the entry, and leave the previous version file intact — the
+  earlier drafts must stay reproducible against the registry that produced them.
+- **Resolve the model→gateway mapping from the agent config before pronouncing a model unavailable.**
+  The agent config (`DELIVERABLE_AGENT_CONFIG`, default `$XDG_CONFIG_HOME/<agent>/config.yaml`) may
+  expose a named provider (with a `key_env`) that is absent from the local proxy's `/v1/models`
+  list — a missing proxy listing means "not on the proxy", not "unavailable". Registry entries carry
+  `key_env` (an environment-variable *name*), never an inline secret.
+- **Run and keep an identity/effort preflight for every newly added model.** Send a trivial request
+  at `effort=high`, and record the returned model id, whether the effort field was accepted, and
+  reasoning tokens > 0; also record the standing caveat that the gateway echoing your request is not
+  proof of the provider's internal effort mapping.
+- **For "learn the context first, then write", use a multi-turn call.** These transports are
+  stateless single-request endpoints: re-send the full frozen packet in *each* call's message array
+  and carry the model's learn reply as the preceding assistant turn. A separate one-shot "learn"
+  call that is not carried into the write call teaches the model nothing.
+- **Label provenance when the only available path is direct authoring.** If the named model cannot
+  be reached and you write the draft yourself, name the file for the real author and mark it
+  direct-authored (no generation receipt) — never file your own prose under the requested model's
+  name.

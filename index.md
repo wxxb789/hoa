@@ -49,6 +49,7 @@ targets:  runtime-agnostic | repo-only |
 | harness-engineering | skill | software-development | runtime-agnostic | `skills/harness-engineering/` | audit and restructure harness scripts: self-containment, obligations bound to owner decisions, pure checks plus one thin runner, net-negative line budget |
 | hermes-context-file-loading | skill | software-development | hermes | `skills/hermes-context-file-loading/` | which Hermes instruction file loads from where, which project file wins, and which prompt tier a rule belongs to |
 | hermes-models | skill | software-development | hermes | `skills/hermes-models/` | configure Hermes providers, transports and routing; prove every route with live signals, not `config get` |
+| hermes-models-cutover | skill | software-development | hermes | `skills/hermes-models-cutover/` | cut over provider routes across Hermes homes and harnesses with live proof and rollback |
 | hermes-updates | skill | software-development | hermes | `skills/hermes-updates/` | upgrade a live Hermes install and diagnose drift: snapshot, official updater, post-check, failure index |
 | hoa-introspect | skill | self-management,work-management | runtime-agnostic | `skills/hoa-introspect/` | layered self-report: deterministic usage facets (L1) + evidence-cited blind-spot audit (L2) |
 | hoa-introspect-distill | skill | self-management,software-development | runtime-agnostic | `skills/hoa-introspect-distill/` | qualify supplied recurring-work findings as candidates; create only after individual approval |
@@ -96,6 +97,7 @@ below. A skill without a row has no dependencies: `npx skills add wxxb789/hoa -g
 | gdd | delegated-work-acceptance, gdd-route-dsh | `npx skills add wxxb789/hoa -g -s gdd -s delegated-work-acceptance -s gdd-route-dsh -y` |
 | gdd-route-dsh | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-dsh -s delegated-work-acceptance -s gdd -y` |
 | gdd-route-omp | delegated-work-acceptance, gdd, gdd-route-dsh | `npx skills add wxxb789/hoa -g -s gdd-route-omp -s delegated-work-acceptance -s gdd -s gdd-route-dsh -y` |
+| hermes-models | hermes-models-cutover | `npx skills add wxxb789/hoa -g -s hermes-models -s hermes-models-cutover -y` |
 | hoa-skill-set-audit | hoa-skill-create | `npx skills add wxxb789/hoa -g -s hoa-skill-set-audit -s hoa-skill-create -y` |
 
 After a release that renames or retires skills, remove the names this repo no longer ships

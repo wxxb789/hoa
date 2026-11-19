@@ -288,6 +288,14 @@ npx skills update -g -y
 所以单写 `-s <skill>` 可能缺少它串联的同级 skill。要单装，从 [`index.zh-CN.md`](./index.zh-CN.md#安装)
 的“安装”一节复制该 skill 的命令：它由链接生成，列出该 skill 的整个闭包。表中没有的 skill 没有依赖。
 
+**Hermes 模型路由。** [`hermes-models`](./skills/hermes-models/SKILL.md) 用于配置和验证 Hermes 模型路由。
+请使用父 skill 生成的安装命令，将 [`hermes-models-cutover`](./skills/hermes-models-cutover/SKILL.md)
+和父 skill 一起装到同一个 skills 根目录。子 skill 负责可回滚的全量切换和同 provider 的 ID 替换，
+并逐一验证受影响的运行面。Hermes 不识别 `disable-model-invocation`，因此仍会列出子 skill。
+其他 runtime 的手动入口：Claude Code 和 DeepSeek Harness 用 `/hermes-models-cutover`，
+Codex 用 `$hermes-models-cutover`，Pi 和 OMP 用 `/skill:hermes-models-cutover`，
+OpenCode 用 `@hermes-models-cutover`。
+
 **某次发布改名或退役了 skill 之后。** `npx skills update` 会把改名或退役的 skill 以旧名保留（只警告
 上游已删除），也从不安装新名称。运行 `index.zh-CN.md` 同一节里生成的 `npx skills remove -g …` 命令
 （来源是 `scripts/retired_skills.toml`，其中写明每个替代者），再重新运行整库安装命令，

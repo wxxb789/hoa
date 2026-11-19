@@ -6,7 +6,7 @@ description: >-
   or needs per-card ownership and routing. Not for a single edit, and not for uniform batch
   fan-out — that wants one resumable runner script.
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
   summary: "multi-card board work: decomposition, parallel dispatch, review gates, stuck-card recovery"
@@ -15,6 +15,24 @@ metadata:
 ---
 
 # Kanban Workflows
+
+## Gates
+
+- Use the board for persistent, heterogeneous work, not a single action or uniform batch fan-out.
+- Orchestrate without taking over. Bound each card, name its owner and dependencies, include
+  commands and acceptance criteria, and calibrate the criterion on a real sample before dispatch.
+- Confirm repo, tenant, account, profile and tool access before claims or writes. Stay in scope;
+  parallel writers need distinct files or isolated workspaces. Order same-repo cards with
+  explicit `link` dependencies or bound them with `--max-runtime`; do not overlap writes.
+  Use `--workspace dir:` for repos with their own publisher; scratch/worktree edits will not reach it.
+- Put the guide on disk before creating dependent discovery cards. Assign profiles before dispatch;
+  specify the board every time and run only one dispatcher.
+- A worker's report is a claim: require artifacts and real command output before review or close.
+  Keep discovery read-only apart from its one output per lane; the main thread judges and synthesizes.
+- Block early with evidence on missing inputs, permissions or exhausted goal budgets. Preserve
+  logs and diffs before reassigning. If an existing artifact passes review, `comment` the evidence
+  and `complete --result` with a nonempty result. Fix a miswritten criterion and release the card;
+  do not rerun done work.
 
 ## Overview
 
@@ -146,120 +164,17 @@ Avoid noisy heartbeats that only say "still working" without state change.
 4. Either unblock with a concrete answer, split the card, or requeue with captured state.
 5. Do not duplicate two workers onto the same mutating worktree unless you intentionally fork it.
 
-## Parallel Discovery Lanes (read-only research / scan fan-out)
+## Parallel discovery lanes
 
-When the work is "gather evidence from many directions" rather than "make changes", the productive
-shape is: **N independent lanes → one verifier → main-thread synthesis**.
+For read-only evidence fan-out, use distinct lane outputs, one in-repo guide file, a verifier that
+depends on all lanes, and main-thread synthesis. Follow
+[discovery lanes](references/discovery-lanes.md) for dispatch, review recovery and CLI details.
 
-- One card per lane, each writing **exactly one distinct output file**, all in a shared
-  `--workspace dir:<repo>`. Distinct files are what let many workers share one directory without
-  write conflicts — do not rely on locking.
-- Put the shared evidence discipline in **one** in-repo guide file (search tool + its path, source
-  priority list, output format, "record failures, never invent") and have every card point at it.
-  Repeat per card only that lane's own queries and scope.
-- Add the verifier as a **child of every lane** (`--parent <id>` per lane) so it only becomes ready
-  when all lanes finish. Its job is dedupe by origin family, contradictions, and a ranked candidate
-  list — not prose.
-- **Workers gather, the main thread judges.** Synthesis, causal ranking and the final verdict stay
-  with the main agent; a worker's completion summary is a claim, not evidence.
-- For search lanes, put the time window *inside* the query string when the search tool ranks by
-  relevance rather than recency, and require every finding to carry publisher + date + URL.
+## Goal-mode cards, swarm, and triage
 
-Mechanics worth knowing before you debug — the subcommands are not named the way you expect:
-
-- `board kanban --board <slug> dispatch` runs a pass now; with gateway dispatch enabled ready cards
-  also start on an interval, so a card can be claimed before you have finished planning the batch.
-- **Write the shared guide file to disk and verify it exists BEFORE creating the cards that point at
-  it.** A worker that cannot read a file its card names blocks with `needs_input` instead of
-  improvising — correct behaviour, but you get several simultaneous blocks on the same missing file.
-- **A card needs an assignee profile or dispatch skips it** (`skipped_unassigned` in the JSON).
-  `board kanban --board <slug> assign <id> <profile>`; run it before the first dispatch pass.
-  For auto-decomposed cards at scale, set `kanban.default_assignee` (and
-  `kanban.orchestrator_profile`) in config so decomposition output gets an owner without
-  per-card assignment.
-- **Do not also start the standalone `daemon` when `kanban.dispatch_in_gateway: true`** — it refuses
-  to run because the two race for claims (pass `--force` only when there is genuinely no gateway).
-  The gateway ticks on `kanban.dispatch_interval_seconds`; tune that instead of adding a second
-  dispatcher.
-- **`dispatch --max N` returning `spawned: []` is a per-profile concurrency cap, not a failure.** The
-  remaining assigned cards are picked up on the next tick — wait a tick and re-list before debugging.
-- `unblock <id>` returns a `needs_input`-blocked card to ready once you have supplied what it asked
-  for; no need to recreate the card.
-- `link` / `unlink` take **parent then child**.
-- `kanban list` / `show` / `log` (not `task list`), `kanban boards` (not `board`), and
-  `block <id> "<reason>"` takes the reason **positionally** — there is no `--reason` flag. `edit`
-  changes a live card's title/body, which is the cheap way to fix a mis-scoped card instead of
-  recreating it.
-- **`complete` refuses an evidence-free close**: pass `--result "..."` (or `--summary`) describing
-  what was done and where the artifact is. An empty completion is rejected by design.
-- **A card blocked in `review` is usually a done card with a broken transition, not missing work.**
-  Read `show <id>`: a `review_requested` event carrying artifact paths plus later
-  `worker_lost`/`crashed` runs with `exit_code 1` and output like `execution unknown; retained by
-  owner` means the review worker died on the state transition. Verify the artifact yourself against
-  the card's acceptance criteria, `comment` the verification, then `complete --result`. Re-running
-  the work burns a worker cycle and can overwrite a good draft.
-- **`create --body-file <path>` for any real card body.** Inline `--body` mangles quoting, and bodies
-  with tables, blank lines, or lines starting with `-` are the normal case. Write the body file into
-  the task directory first so the same file remains the durable brief after the card closes.
-- **`--workspace dir:<abs path>` when the worker must edit a real checkout.** Default is scratch (a
-  copy nobody publishes) and `worktree` forks a tree; both are wrong when the target repo has its own
-  publisher (an auto-sync cron, a landing gate), because the edits then never reach the branch the
-  publisher watches. Use `dir:` and let the repo's own publication path commit them.
-- **Pass `--board <slug>` on every command, including `create`.** `boards` prints the *current* board
-  with a `●`, and a bare `create` lands there — which is usually the previous project's board.
-- **`create --json | tail` hides the id** in the trailing object fields; capture it with
-  `grep '"id"'` or follow with `list` before `assign`/`dispatch`.
-- Ready cards for one assignee profile dispatch in a single pass and run in parallel **when they
-  touch different repos**; same-repo cards need explicit `link` ordering or a bounded
-  `--max-runtime`, not hope.
-
-## Goal-mode cards, swarm, and triage auto-decompose
-
-- **Goal-mode card** — `kanban_create(goal_mode=True)` / CLI `--goal [--goal-max-turns N]`
-  (default 20): the worker runs the `/goal` Ralph loop *inside its one session*, judge-checking the
-  card's title+body as acceptance criteria each turn. An exhausted budget **blocks** the card for
-  human review (never a silent exit); a card judged unachievable-as-written blocks immediately. Use
-  for iteration-shaped acceptance (get CI green, fix every lint error), not one-shot cards.
-- **Standing multi-session goals live on the board**, not in chat: a root card stays parent of its
-  graph — when the graph completes it re-promotes to `ready` and its owner
-  (`kanban.orchestrator_profile`, else the card's assignee, else the active default profile) judges
-  completion and adds follow-up tasks. A chat `/goal` is single-session only and never creates or
-  moves cards.
-- **Triage + auto-decompose** — with `kanban.auto_decompose: true`, the dispatcher runs the
-  decomposer on triage cards each tick (cap `auto_decompose_per_tick`, default 3; aux model
-  `auxiliary.kanban_decomposer`): drop a one-liner in triage and walk away.
-  `board kanban specify <id>` = single-card spec rewrite; `board kanban decompose <id>` /
-  `/kanban decompose <id>` = one-shot fan-out.
-- **`board kanban swarm <goal> --worker PROFILE:TITLE[:SKILLS]… --verifier P --synthesizer P`**
-  builds the canonical workers→verifier→synthesizer graph in one command — prefer it over
-  hand-building that topology.
-
-## Common Pitfalls
-
-1. Orchestrator doing the implementation and leaving the board stale.
-2. Cards that lack acceptance criteria or verification commands.
-3. Workers reporting success without artifacts or command output.
-4. Tenant/profile confusion: doing work in the wrong agent profile, repo, org, or account.
-5. Notification spam that hides the one important blocker.
-6. Reassigning stuck work without preserving partial diffs/logs.
-7. **A card title can collide with a repo's retired vocabulary.** A worker that reads the repo
-   contract may (correctly) refuse a card whose naming implies a retired process; parking it as
-   blocked is right behaviour, not a bug. Name cards in neutral language, and when the repo has
-   retired a lifecycle, say so on the card ("this is not the retired X process; it is new work under
-   <authority>").
-8. **The auto-decomposer re-promotes whatever you block.** A blocked card that gets split can be
-   promoted again in a loop. Once you have decided the main thread will do that work instead,
-   **archive** the card; do not keep re-arguing with it.
-9. **A blocked parent silently parks its children.** A verifier waiting on a blocked lane sits in
-   `todo` indefinitely: `unlink <parent> <child>` frees it, or finish the lane yourself and archive
-   the stale card.
-10. **Calibrate a card's acceptance threshold against a real sample before dispatching.** Generate
-    one sample artifact and measure it with the exact command the card names; a gate written in the
-    wrong unit (e.g. a CJK-character count enforced against a checker that counts total file
-    characters — the two differ ~2×) false-blocks workers that actually succeeded, and every false
-    block costs a manual release cycle. When a mis-written criterion blocks an otherwise-done card,
-    correct the criterion and release the card against it (`edit` a live card; comment + complete a
-    blocked-but-done one) — do not re-run the work.
+Choose board-backed root goals for multi-session work; chat `/goal` is single-session.
+Use goal-mode cards for iterative acceptance and block on exhaustion or unachievability.
+Read [goal mode](references/goal-mode.md) for ownership, limits, auto-decomposition and swarm.
 
 ## Verification Checklist
 
@@ -268,3 +183,12 @@ Mechanics worth knowing before you debug — the subcommands are not named the w
 - [ ] Workers have the right workspace/profile/tool access.
 - [ ] Reports include artifacts and real verification output.
 - [ ] Stuck work has been preserved before reassignment.
+
+## References
+
+- [Board CLI and discovery lanes](references/discovery-lanes.md): shared guide, assignment, dispatch,
+  `create --body-file`, `complete --result`, and stuck-review recovery; use these CLI notes for non-discovery cards too.
+- [Board pitfalls](references/discovery-lanes.md#pitfalls-across-board-operations): retired
+  vocabulary, archiving main-thread takeovers to stop auto-decompose loops, using `unlink` for
+  children parked behind a blocked parent, and acceptance calibration.
+- [Goal mode](references/goal-mode.md): card budgets, root goals, triage and swarm.

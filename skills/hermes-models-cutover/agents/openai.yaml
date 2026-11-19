@@ -1,0 +1,6 @@
+interface:
+  display_name: "Hermes Models Cutover"
+  short_description: "Cut over Hermes fleet model routes"
+  default_prompt: "Use $hermes-models-cutover to plan a reversible fleet route change and verify each affected surface."
+policy:
+  allow_implicit_invocation: false

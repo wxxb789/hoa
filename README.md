@@ -317,6 +317,15 @@ skill without the siblings it chains to. To install single skills, copy that ski
 the Install section of [`index.md`](./index.md#install): it is generated from the links and names the
 skill's whole closure. A skill not listed there has no dependencies.
 
+**Hermes model routing.** [`hermes-models`](./skills/hermes-models/SKILL.md) configures and verifies Hermes model routes.
+Install [`hermes-models-cutover`](./skills/hermes-models-cutover/SKILL.md) together with it
+in the same skills root using the parent skill's generated Install row. The child covers reversible
+fleet cutovers and same-provider ID swaps, with live proof per affected surface. Hermes keeps the
+child listed because it does not honor `disable-model-invocation`.
+Manual entry on other hosts: Claude Code and DeepSeek Harness `/hermes-models-cutover`;
+Codex `$hermes-models-cutover`; Pi and OMP `/skill:hermes-models-cutover`;
+OpenCode `@hermes-models-cutover`.
+
 **After a release that renames or retires skills.** `npx skills update` keeps a renamed or retired
 skill under its old name (it only warns that it was deleted upstream) and never installs a new name.
 Run the generated `npx skills remove -g …` line from the same section of `index.md`
