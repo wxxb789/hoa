@@ -30,12 +30,10 @@ targets:  runtime-agnostic | repo-only |
 | agent-harness-settings-parity | skill | software-development | runtime-agnostic | `skills/agent-harness-settings-parity/` | 让同一条策略在每个 coding harness 上生效，尽管配置文件、键名与单位各不相同 |
 | agent-operating-contract-evolution | skill | software-development,work-management,self-management | runtime-agnostic | `skills/agent-operating-contract-evolution/` | 按分层演进 agent 身份文件与操作协议：覆盖标记、行为评测、加载范围探测 |
 | ai-coding-agent-delegation | skill | software-development,work-management | runtime-agnostic | `skills/ai-coding-agent-delegation/` | 把定界编码任务交给隔离 worktree 中的外部 agent CLI，再自行核验 diff、测试与全部验收声明 |
-| arch-improvement-plan | skill | software-development | runtime-agnostic | `skills/arch-improvement-plan/` | 增量架构改进：划边界、给迁移计划、产出 PRD 与任务 |
 | contract-bound-deliverables | skill | work-management,software-development | runtime-agnostic | `skills/contract-bound-deliverables/` | 满足可度量契约：冻结证据包、并行起草、按字数装配、用契约自身的度量脚本验收 |
 | cross-agent-repair-routing | skill | software-development,work-management | runtime-agnostic | `skills/cross-agent-repair-routing/` | 把他人写入面内的缺陷送修：权限地图、复现、一次定界的落地决策 |
 | define-goal | skill | self-management,software-development,work-management | runtime-agnostic | `skills/define-goal/` | 把雄心转化为编号 goal 文件，近期清晰、远期可细化，不制定实现步骤 |
 | delegated-work-acceptance | skill | work-management,software-development | runtime-agnostic | `skills/delegated-work-acceptance/` | 验收被委派的交付：核对 artifact、重算关键数字、检查写入边界 |
-| design-an-interface | skill | software-development | runtime-agnostic | `skills/design-an-interface/` | 设计软件接口或公开 API：签名草稿、OpenAPI 片段、用法示例 |
 | discord-rich-message | skill | software-development,work-management | runtime-agnostic | `skills/discord-rich-message/` | 在平台限制内发送结构化 Discord 消息：Components V2、等宽对齐表格、附件兜底 |
 | dotnet-repo-workflow | skill | software-development | runtime-agnostic | `skills/dotnet-repo-workflow/` | 走仓库自带 .NET gate 而非手搓 `dotnet test`；lock 文件、Roslyn 编译陷阱、merge-ready 清单 |
 | evidence-backed-analytical-writing | skill | work-management | runtime-agnostic | `skills/evidence-backed-analytical-writing/` | 中文分析报告：证据地图与「主张 → 证据 → 机制 → 局限」骨架；时效边界、状态阶梯、否定性结论 |
@@ -59,11 +57,9 @@ targets:  runtime-agnostic | repo-only |
 | hoa-skill-set-audit | skill | software-development,self-management | runtime-agnostic | `skills/hoa-skill-set-audit/` | 审计会话实际提供的整套技能：单项质量、重叠、遮蔽、指令冲突、同名漂移、可见性、../ 闭包、清单预算；只出报告 |
 | kanban-workflows | skill | work-management,software-development | runtime-agnostic | `skills/kanban-workflows/` | 多卡片看板工作：拆解、并行派发、评审门禁、卡住任务恢复 |
 | measurement-campaign-evidence | skill | software-development,work-management | runtime-agnostic | `skills/measurement-campaign-evidence/` | 测量运动：先钉候选身份、串行跑、一致报告集，不让基线伪造延迟对比 |
-| notes-to-prd | skill | work-management | runtime-agnostic | `skills/notes-to-prd/` | 把笔记或想法转成结构化 PRD 草稿 |
 | official-document-verification | skill | work-management | runtime-agnostic | `skills/official-document-verification/` | 用文档的确切版本核验结论，含只能用真浏览器取到的被封来源 |
 | ops-claim-verification | skill | software-development,work-management | runtime-agnostic | `skills/ops-claim-verification/` | 把定时任务、修复或部署的说法变成证据：找准记录面、区分手动与调度运行、审查审计者 |
 | package-release-verification | skill | software-development | runtime-agnostic | `skills/package-release-verification/` | 发版：先补 changelog、同一 commit 的门禁、分派、按版本号核 registry、单独获批的清理 |
-| plan-to-issues | skill | work-management | runtime-agnostic | `skills/plan-to-issues/` | 把 PRD 或计划拆成 issue 级任务：标题、正文、标签 |
 | project-phase-closeout | skill | software-development,work-management | runtime-agnostic | `skills/project-phase-closeout/` | 清点任务面，对账记录/索引/发布/生产四层，输出带唯一决策点的收尾清单 |
 | report-claim-audit | skill | work-management,software-development | runtime-agnostic | `skills/report-claim-audit/` | 从各自的权威 artifact 重算每条报告声明、对账交付集合，并给待决事项定价 |
 | research-stream-consolidation | skill | work-management | runtime-agnostic | `skills/research-stream-consolidation/` | 把重复的研究流并成一个项目，并修好绑定旧路径的记录 |
@@ -107,7 +103,7 @@ targets:  runtime-agnostic | repo-only |
 把你从其它来源安装的同名 skill 从命令中去掉：
 
 ```bash
-npx skills remove -g design-md dsh-headless-gdd find-nearby git-worktree-workflow github-code-review github-repo-management grounded-citations hoa-agent-retrieve hoa-skill-work html-artifact improve-codebase-architecture jupyter-live-kernel m365-copilot-cdp microsoft-office my-ado-cppr ocr-and-documents omp-headless-orchestration rss-feeds skill-library-curation skill-porting-and-publishing subagent-driven-development systematic-debugging teams-cdp to-issues to-prd whisper writing-plans
+npx skills remove -g arch-improvement-plan design-an-interface design-md dsh-headless-gdd find-nearby git-worktree-workflow github-code-review github-repo-management grounded-citations hoa-agent-retrieve hoa-skill-work html-artifact improve-codebase-architecture jupyter-live-kernel m365-copilot-cdp microsoft-office my-ado-cppr notes-to-prd ocr-and-documents omp-headless-orchestration plan-to-issues rss-feeds skill-library-curation skill-porting-and-publishing subagent-driven-development systematic-debugging teams-cdp to-issues to-prd whisper writing-plans
 ```
 
 > reflections 与 eval 结果属于文章 / 知识类，不在此索引。
