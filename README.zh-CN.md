@@ -288,6 +288,14 @@ npx skills update -g -y
 所以单写 `-s <skill>` 可能缺少它串联的同级 skill。要单装，从 [`index.zh-CN.md`](./index.zh-CN.md#安装)
 的“安装”一节复制该 skill 的命令：它由链接生成，列出该 skill 的整个闭包。表中没有的 skill 没有依赖。
 
+**Hermes 模型路由。** [`hermes-models`](./skills/hermes-models/SKILL.md) 用于配置和验证 Hermes 模型路由。
+请使用父 skill 生成的安装命令，将 [`hermes-models-cutover`](./skills/hermes-models-cutover/SKILL.md)
+和父 skill 一起装到同一个 skills 根目录。子 skill 负责可回滚的全量切换和同 provider 的 ID 替换，
+并逐一验证受影响的运行面。Hermes 不识别 `disable-model-invocation`，因此仍会列出子 skill。
+其他 runtime 的手动入口：Claude Code 和 DeepSeek Harness 用 `/hermes-models-cutover`，
+Codex 用 `$hermes-models-cutover`，Pi 和 OMP 用 `/skill:hermes-models-cutover`，
+OpenCode 用 `@hermes-models-cutover`。
+
 **某次发布改名或退役了 skill 之后。** `npx skills update` 会把改名或退役的 skill 以旧名保留（只警告
 上游已删除），也从不安装新名称。运行 `index.zh-CN.md` 同一节里生成的 `npx skills remove -g …` 命令
 （来源是 `scripts/retired_skills.toml`，其中写明每个替代者），再重新运行整库安装命令，
@@ -336,7 +344,6 @@ npx skills update -g -y
 | 从 agent 历史中发现重复工作 | `hoa-introspect` | 带证据的工作模式发现；不会自动创建资产 |
 | 在选择资产前评估给定的重复工作发现 | `hoa-introspect-distill` | 逐项批准的候选，以及获批后创建的资产 |
 | 审计会话实际提供的整套 skill：重叠、遮蔽、漂移、可见性与清单预算（隐藏 skill：手动运行 `/hoa-skill-set-audit`，Codex 用 `$hoa-skill-set-audit`） | `hoa-skill-set-audit` | 按危害排序、带证据的整体发现项；不做任何修改 |
-| 在供应商中断、退役或恢复时切换 Hermes 路由（隐藏 skill；手动运行 `/hermes-models-cutover`，Codex 用 `$hermes-models-cutover`，Pi/OMP 用 `/skill:hermes-models-cutover`，OpenCode 用 `@hermes-models-cutover`） | `hermes-models-cutover` | 可回滚的全量切换，并逐一提供受影响运行面的实时证据 |
 
 对行为变更，`hoa-skill-create` 默认使用聚焦检查；只有覆盖面、风险或相互矛盾的证据需要时，
 才扩大到多版本、多模型或多 runtime。`hoa-introspect-distill` 保留逐候选批准门槛；

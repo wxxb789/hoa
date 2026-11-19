@@ -31,7 +31,7 @@ metadata:
   keep vs revert; never silently revert. Record the owner's decision and fix.
 - Do not edit runtime source to fix contract behavior. Probe what actually loads before moving
   a rule; explicitly pass needed rules to subagents that skip context files.
-- Generated profile deltas carry differences only; reconcile from root and repair section pointers.
+- Profile deltas carry differences only; regenerate profiles from root + delta and repair section pointers.
 - Verify store ownership and an alleged gate's implementation and call site before asserting it.
   Sweep old references in the same migration batch; inventory the full depth before retirement.
 - Measure behavior before and after contract edits; keep cases outside the workspace and fail
@@ -41,10 +41,13 @@ metadata:
 
 Evolve or audit identity files, operating protocols, team-agent definitions, or user-owned
 agent contracts/control planes (research, orchestration, evidence pipelines). Trigger on owner
-corrections to identity, workflow, formatting, delegation or persistence. Not for ordinary
-repo coding rules or one-off notes. For a kernel flip or a control-plane refactor, read the
+corrections to identity, workflow, formatting, delegation or persistence. Not for one-off notes
+or ordinary repo coding rules unless the task is explicitly about agent behavior or operating
+contracts. For a kernel flip or a control-plane refactor, read the
 [refactor playbook](references/agent-repo-refactor-playbook.md). For repo-owned skill placement,
 read the [port procedure](references/repo-owned-skills-port.md).
+
+Triggers: "evolve your soul", "audit every identity file", "work async", "keep files organized"; unifying or retiring scattered scripts or making them portable across harnesses goes to the refactor playbook.
 
 ## Core Principle
 
@@ -69,9 +72,9 @@ The identity file and operating protocol are injected context consumed by an LLM
 - Report measured `bytes` and non-heading rule-line counts before/after — never estimated ones.
 - Prove no rule was lost: `uv run scripts/contract-coverage-check.py OLD NEW markers.txt` (declare one distinctive substring per rule before editing, check after). Only if a script command fails (for example `uv` is not found), read [references/troubleshooting.md](references/troubleshooting.md).
 
-Compress rules, not every exemplar. A voice anchor like "the assistant you'd actually want at 2am" calibrates tone in a way rules cannot.
+Compress rules, not exemplars. Keep voice anchors like "the assistant you'd actually want at 2am": deleting every anchor flattens the voice; no added rule restores it.
 
-Apply density to **instruction files only**. The contract should require human-facing replies in full sentences, one idea per line, and explicit causal links.
+Apply density to **instruction files only**. Your own replies to the owner stay human-facing; compressed chat is telegraphic and unreadable. The contract should require full sentences, one idea per line, and explicit causal links.
 
 ## Measure the real per-turn prompt before optimizing
 
@@ -87,6 +90,7 @@ staleness trap, and the drift-guard script pattern: `references/context-budget-m
   edits; keep 10–15 one-shot cases with expect/forbid patterns and compare raw outputs.
 - **Loading:** read [context-file-loading probes](references/context-file-loading-probes.md)
   before choosing a rule's layer; verify the loader, cwd scope, and slot precedence.
+  Rules that must hold regardless of cwd belong in the identity file; an overlay preempts, it does not add.
 - **Persistence:** read [storage and routing probes](references/asset-store-vs-workspace-routing.md)
   before writing ownership or sync rules; read [vault migration](references/knowledge-vault-migration-execution.md)
   before executing a migration.

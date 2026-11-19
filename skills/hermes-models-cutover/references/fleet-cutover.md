@@ -120,8 +120,8 @@ rather than letting the pin fail at runtime.
 5. Channel-served bots and the restart question: a config change reaches a home through agent construction,
    so a *new* session usually picks it up while an in-flight session keeps the old route. Do not assert either
    way from code reading — check the home's own `state.db` before/after pair after real traffic (details in
-   [Proof](../SKILL.md#proof)). Restarting the gateway is the gated fallback, and it is actively harmful when another
-   agent session is mid-write: ask, never restart to "finish" the task.
+   the cutover SKILL.md, Proof section). A gateway restart is the gated fallback and is actively
+   harmful when another agent session is mid-write: ask, never restart to "finish" the task.
 6. **Prove each harness from its own run record, not from the config you just wrote.** Hermes answers with a
    `state.db` session row; OMP writes `<run dir>/state.json` with `model` and `thinking` per run (its event
    stream repeats both on every call); omo writes the session JSONL above. Reading config only proves intent —

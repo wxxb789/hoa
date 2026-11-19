@@ -32,7 +32,10 @@ metadata:
 - Prove each changed surface with its own run record, not config alone. Include an untouched
   route as a control, re-check generated state and report missing hooks as unavailable.
 
-## 20. Scope and run the fleet cutover
+Hermes does not honor `disable-model-invocation`; this mechanism stays listed there.
+Install it together with `hermes-models` in the same skills root.
+
+## 1. Scope and run the fleet cutover
 
 For a provider outage, retirement or restore, follow the
 [fleet cutover procedure](references/fleet-cutover.md). Move affected live routes together,
@@ -40,11 +43,12 @@ including generated bindings and harness effort metadata. Update the standing ro
 instructions and facts that name the prior route. A same-provider ID swap changes live pins,
 not the old catalog entry; follow [the ID-swap procedure](references/fleet-cutover.md#6-same-provider-id-swap-new-variant-of-an-existing-model).
 
-## 21. Use one switch adapter
+## 2. Use one switch adapter
 
 Resolve the install's adapter and presets as specified in
-[switch adapter](references/switch-adapter.md). Run list/check, correct stale targets and intent,
-review the dry run, apply the authorized change, then verify. If there is no adapter, execute the
+[switch adapter](references/switch-adapter.md). Run list/check and identify stale targets or
+wrong-state presets. Obtain write authorization before correcting preset files. Review the dry run
+before applying the authorized change, then verify. If there is no adapter, execute the
 same inventory, validation, migration, live proof and rollback contract by hand. Keep comments
 and layout intact, and use the owning repo's sync path to publish bindings.
 
@@ -56,6 +60,9 @@ read-only `state.db` (new ID above old), and check `resolve_reasoning_config(loa
 in that home. The `sessions` table has no `provider` column; pair the live ID with the configured
 provider or preset. Check each harness's own run record, not its settings. Keep the backup path,
 scope, diff, unverified surfaces, rollback plan and any pending approval in the report.
+
+For the runnable background probe and delegation transcript check, see the installed
+`hermes-models` reference `references/model-switching.md#proof`.
 
 ## References
 

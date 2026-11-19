@@ -22,13 +22,17 @@ metadata:
 - Orchestrate without taking over. Bound each card, name its owner and dependencies, include
   commands and acceptance criteria, and calibrate the criterion on a real sample before dispatch.
 - Confirm repo, tenant, account, profile and tool access before claims or writes. Stay in scope;
-  parallel writers need distinct files or isolated workspaces, not a shared mutating checkout.
+  parallel writers need distinct files or isolated workspaces. Order same-repo cards with
+  explicit `link` dependencies or bound them with `--max-runtime`; do not overlap writes.
+  Use `--workspace dir:` for repos with their own publisher; scratch/worktree edits will not reach it.
 - Put the guide on disk before creating dependent discovery cards. Assign profiles before dispatch;
   specify the board every time and run only one dispatcher.
 - A worker's report is a claim: require artifacts and real command output before review or close.
   Keep discovery read-only apart from its one output per lane; the main thread judges and synthesizes.
 - Block early with evidence on missing inputs, permissions or exhausted goal budgets. Preserve
-  logs and diffs before reassigning. Verify an existing artifact before rerunning a stuck review.
+  logs and diffs before reassigning. If an existing artifact passes review, `comment` the evidence
+  and `complete --result` with a nonempty result. Fix a miswritten criterion and release the card;
+  do not rerun done work.
 
 ## Overview
 
@@ -162,7 +166,7 @@ Avoid noisy heartbeats that only say "still working" without state change.
 
 ## Parallel discovery lanes
 
-For read-only evidence fan-out, use distinct lane outputs, one mounted guide, a verifier that
+For read-only evidence fan-out, use distinct lane outputs, one in-repo guide file, a verifier that
 depends on all lanes, and main-thread synthesis. Follow
 [discovery lanes](references/discovery-lanes.md) for dispatch, review recovery and CLI details.
 
@@ -182,7 +186,9 @@ Read [goal mode](references/goal-mode.md) for ownership, limits, auto-decomposit
 
 ## References
 
-- [Discovery lanes](references/discovery-lanes.md): shared guide, assignment, dispatch and recovery.
-- [Board pitfalls](references/discovery-lanes.md#pitfalls-across-board-operations): terminology,
-  blocked dependencies, auto-decompose loops and acceptance calibration.
+- [Board CLI and discovery lanes](references/discovery-lanes.md): shared guide, assignment, dispatch,
+  `create --body-file`, `complete --result`, and stuck-review recovery; use these CLI notes for non-discovery cards too.
+- [Board pitfalls](references/discovery-lanes.md#pitfalls-across-board-operations): retired
+  vocabulary, archiving main-thread takeovers to stop auto-decompose loops, using `unlink` for
+  children parked behind a blocked parent, and acceptance calibration.
 - [Goal mode](references/goal-mode.md): card budgets, root goals, triage and swarm.

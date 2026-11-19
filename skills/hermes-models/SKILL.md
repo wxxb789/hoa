@@ -60,7 +60,7 @@ Substitute provider keys from your install's `providers:` block.
 
 | You hear / see | Load |
 |---|---|
-| provider outage / retirement / restore, or fleet-wide ID swap | rule 20 below |
+| fleet cutover (including planning, inventory, drift checks and dry runs), or same-provider ID swap at any scope | rule 20 below |
 | 换默认模型 / 加 provider / 换 endpoint | rules below + `references/model-switching.md` |
 | 某模型 404、`does not support the responses endpoint` | `references/custom-providers.md` |
 | "让 subagent 用便宜点的模型" | `references/delegation-routing.md` |
@@ -85,7 +85,8 @@ Substitute provider keys from your install's `providers:` block.
 4. **Proof:** see the three signals below; a config echo is not live proof.
 5. **Effort:** use `agent.reasoning_overrides` for per-model tiers. Read
    [config drift](references/config-drift.md) for surface differences and precedence.
-6. **Delegation:** pin per profile; pin values reload on spawn, schema changes on next session.
+6. **Delegation:** pin per profile; pin values reload on spawn. The schema is built at session
+   start; never flip it mid-conversation.
    Verify a real child. For per-task paths, read [delegation routing](references/delegation-routing.md).
 7. **Profiles:** provider maps and `.env` are per-home; remove inherited inline keys that win over
    `key_env`, then probe live in that home.
@@ -107,8 +108,10 @@ Substitute provider keys from your install's `providers:` block.
 19. **Catalog scope:** resolve pins against the actual home's catalog. Probe effort before edits.
 20. **Fleet cutover gate:** an outage, retirement or restore moves all affected homes and harnesses;
     an ID swap moves only live references and preserves the old ID. Keep old provider definitions,
-    verify generated homes and harness effort metadata. For an authorized fleet change, use the
-    following step and re-read the child after compaction.
+    verify generated homes and harness effort metadata. For any fleet cutover or same-provider
+    ID swap, even in a single home, read the child before planning, inventory, `--check`, or
+    `--dry-run`. Re-read it after compaction. Read-only work does not require mutation approval;
+    the Gates above still apply to every mutating step.
 
     Read `../hermes-models-cutover/SKILL.md` (relative to this skill's directory) and follow it. Do not call the Skill tool for it.
 
@@ -127,6 +130,7 @@ real spawn and live transcript; verify vision with one real image call per profi
 ## References
 
 - `references/custom-providers.md` — provider shape, transport, sizing, aliases and install policy.
+  The provider list itself belongs to the install, not to this skill.
 - `references/model-switching.md` — switching order, three-signal proof, ghc-proxy deployment, Copilot
   fallback hygiene.
 - `references/delegation-routing.md` — layer lifetimes, overrides, pool tiers and profile routing.
@@ -135,5 +139,7 @@ real spawn and live transcript; verify vision with one real image call per profi
   `references/config-drift-audit.md` — audit detail.
 - Only if a script command fails (for example `uv` is not found), read [references/troubleshooting.md](references/troubleshooting.md).
 - `references/cases.md` — historical cases: Copilot fallback cleanup, ghc-proxy deployment.
+- `scripts/audit-routing-inventory.py` — dumps every routing layer for all homes into JSON
+  and flags self-fallbacks and cron coverage.
 - `scripts/audit-provider-metadata.py`, `scripts/audit-config-drift.py`,
-  `scripts/audit-routing-inventory.py`, `scripts/probe-provider-endpoint.sh` — audit scripts and endpoint probes; `templates/ghc-proxy.service` — unit template.
+  `scripts/probe-provider-endpoint.sh` — audit scripts and endpoint probes; `templates/ghc-proxy.service` — unit template.

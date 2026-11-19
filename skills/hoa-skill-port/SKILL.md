@@ -21,11 +21,12 @@ metadata:
 ## Gates
 
 - Configuration is a gate, not advice: no environment literals or private profiles in the
-  package. Prove ignore coverage and block release on unresolved scan hits.
+  package. Prove ignore coverage and block release on any scan hit outside the expected list.
 - Validate and back up before touching a live runtime; verify its loader after the swap.
   Compare allowed vs derived disabled lists and route policy changes to the owner.
 - Publishing requires authority: use a branch and PR, never push to main or force-push.
-  Merge and branch cleanup require explicit delegation.
+  When the owner has delegated the loop for this repo, squash-merge on green, delete the branch,
+  pull the default branch, and start the next increment without asking again.
 - Never bake the repo's current version into a spec or prompt. Use the repo's version command;
   bump per-skill revisions only for touched skills. Regenerate catalogs, never hand-edit them.
 - Use the repo's real validators and CI commands; inspect worker evidence and rerun acceptance.
@@ -101,7 +102,7 @@ Review each ported package against this list and record the outcome in the repor
 
 ## 4. Delegate the mechanical port, verify it yourself
 
-For mechanical portability work, give the coding agent a spec with:
+For mechanical portability work, give the coding agent a spec file that states, verbatim:
 
 - the exact write scope, and an explicit "do not touch" list (skill prose, private dirs, other repos,
   git operations, live runs);
@@ -122,8 +123,8 @@ and diff the exact settings and consumer-visible set; do not infer acceptance fr
 
 ## 6. Validate the way the repo validates
 
-Run the repo's CI commands locally before pushing: structure, catalog `--check`, revision and
-eval-fixture checks. Read failing output for the actual convention.
+Run the repo's CI commands locally before pushing: structure, catalog `--check`, revision, version
+check, and eval-fixture checks, as provided by the target repo. A package that is valid by your reading and invalid to the repo's generator is not done.
 
 Extract the commands from the workflow rather than guessing them:
 
@@ -131,12 +132,16 @@ Extract the commands from the workflow rather than guessing them:
 grep -nE '^\s+(run:|- name:)' "${PORTING_CI_FILE:-.github/workflows/ci.yml}"
 ```
 
+A catalog/version generator failing in CI after your local "all green" is the normal shape of
+this error: the repo's own scripts are the acceptance criteria, and its error text names the
+replacement annotation style.
+
 ## 7. Publish through a branch, not straight to main
 
 After authorization, open a PR with scope, de-coupling decisions, evidence and known limits.
 On red CI, read the failing log, rerun the real gate, and fix forward on the same branch.
 After an authorized merge, pull the default branch before the next increment.
-See [publishing and CI failures](references/pitfalls.md).
+See [delegated publish loop and CI failures](references/pitfalls.md).
 
 
 ## 8. Keep the symlinked runtime honest
@@ -175,6 +180,5 @@ it. A section that vanished without a row is indistinguishable from an accident.
 
 - [Runtime swap](references/runtime-swap.md): backups, loader checks, reconciliation and live drift.
 - [Pitfalls](references/pitfalls.md): repo intake, publication, generators and portability failures.
-- [Configuration keys](references/configuration-keys.md): install-specific overrides and defaults.
 - `references/de-coupling-checklist.md` — the five axes with concrete before/after transforms, the
   configuration resolution rule, and the release-blocking scan.

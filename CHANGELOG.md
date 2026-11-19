@@ -8,17 +8,16 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 - Retired four stubs: `design-an-interface` (`codebase-design`), `arch-improvement-plan` and
   `notes-to-prd` (`ce-plan`), and `plan-to-issues` (`to-tickets`).
-- Keep Kanban ownership, dispatch, and review gates at activation; load discovery and goal-mode details on demand.
-
-- Keep portability and release gates at activation and move runtime-swap and publishing detail to references.
-
-- Front-load Hermes routing gates, remove a dead route, and chain fleet changes to `hermes-models-cutover`.
-
-- Keep the deliverable acceptance spine at activation; load evidence, generation, and publishing details on demand.
-
-- Keep operating-contract gates at activation and move eval, review, and pitfall detail to references.
-
 - Add the hidden `hermes-models-cutover` mechanism for reversible fleet route changes and live verification.
+- Keep operating-contract gates at activation and move eval, review, and pitfall detail to references.
+- Keep the deliverable acceptance spine at activation; load evidence, generation, and publishing details on demand.
+- Front-load Hermes routing gates, remove a dead route, and chain fleet changes to `hermes-models-cutover`.
+- Keep portability and release gates at activation and move runtime-swap and publishing detail to references.
+- Keep Kanban ownership, dispatch, and review gates at activation; load discovery and goal-mode details on demand.
+- Route read-only Hermes fleet checks and same-provider ID swaps at any scope through the cutover
+  child without relaxing mutation authorization. Document shared installation and Hermes visibility.
+- Restore operating-contract wording, traceable deliverable references, target-repo port gates and
+  delegated publishing, and Kanban checkout and review recovery rules after the references split.
 
 - Trigger evals now route on visible skills' frontmatter descriptions, accept `none` when no
   artifact fits, and include three no-trigger cases.

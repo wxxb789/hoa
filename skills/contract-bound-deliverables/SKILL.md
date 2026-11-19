@@ -26,8 +26,8 @@ metadata:
   window. Exclude inadmissible evidence explicitly and rerun a retrieval that used a looser window.
 - Freeze the evidence packet as the **only permitted input**. Never invent or elevate evidence.
   Do not rewrite a frozen packet or versioned registry in place after drafts exist.
-- Never substitute a model or claim its authorship; preserve raw drafts and honest provenance.
-  Registry entries name secret environment variables; never embed or print their values.
+- Never silently substitute a model; label any direct-authored draft as such and preserve raw
+  drafts and honest provenance. Registry entries name secret environment variables, not inline secrets.
 - Assemble the final to the number; never re-prompt for it. A separately requested checked draft
   can use bounded same-model passes only with raw receipt and frozen evidence/citations/conditions.
 - Verify with the contract's own authoritative metric, then independently measure the written file.
@@ -72,10 +72,11 @@ whole chain for a new deliverable or changed research constraint. Use the
 ## 3. Draft in parallel
 
 Give every model the same packet and schema; name drafts by gateway and model id. Rank by
-verified numbers, specifics, citations, numbering and wording. Take the strongest compliant
-skeleton; add only packet-proven details. Measure adoption by citation marker and surrounding
-claim, not keyword. For a new model, use a versioned registry, check configured routes, capture
-identity/effort preflight and preserve generation attribution. Read the
+verified numbers, specifics, citations, numbering and wording. Take the skeleton from the most
+disciplined draft; good prose never outranks discipline. Add only packet-proven details. Measure
+adoption by citation marker and surrounding claim, not keyword. For a new model, use a versioned
+registry, check configured routes, capture identity/effort preflight and preserve generation
+attribution. Read the
 [generation harness](references/model-generation-harness.md) for registry, multi-turn and retry rules.
 
 ## 4. Assemble to the number
@@ -83,8 +84,8 @@ identity/effort preflight and preserve generation attribution. Read the
 Keep raw outputs intact. Fit the editorial merge with a section-by-section build script measuring
 section and total lengths. Keep provenance metadata in a sidecar, not the counted file. For an
 existing file, assert each exact replacement matches once before writing any. Cut low-value prose
-before reference handles (report numbers, URLs, dates); log cuts in the sidecar. See
-[assembly in the evidence packet reference](references/evidence-packet.md).
+instead of reference handles: compress titles if needed, but never drop report numbers, URLs or dates.
+Log cuts in the sidecar. See [assembly in the evidence packet reference](references/evidence-packet.md).
 
 ## 5. Verify, then independently measure
 
@@ -94,7 +95,7 @@ requirement. Independently measure the written file and report the exact count. 
 re-run after artifact or gate changes. If citations change to simple sourcing, enforce no marker
 residue. Document whitespace exceptions for captured text; never reformat source to silence QA.
 Report provisioned vs probed vs accepted; only the real route with a passing artifact is accepted.
-See [verification details](references/evidence-packet.md).
+See [verification details](references/evidence-packet.md) and [pitfalls](references/publish.md#pitfalls).
 
 ## 6. Publish the deliverable and its evidence
 
