@@ -146,6 +146,31 @@ class JudgeCliTests(unittest.TestCase):
             stderr=subprocess.PIPE,
         )
 
+    def test_catalog_uses_skill_description_and_excludes_hidden_skills(self) -> None:
+        rows = [
+            {"name": "sample-skill", "type": "skill", "path": "sample-skill",
+             "note_en": "Index summary only."},
+            {"name": "hidden-skill", "type": "skill", "path": "hidden-skill",
+             "note_en": "Hidden index summary."},
+            {"name": "sample-pattern", "type": "pattern", "note_en": "Library note."},
+        ]
+        for row, description, visibility in (
+            (rows[0], "First sentence. A second routing cue.", ""),
+            (rows[1], "Hidden description.", "disable-model-invocation: true\n"),
+        ):
+            folder = self.tmp / row["path"]
+            folder.mkdir()
+            (folder / "SKILL.md").write_text(
+                f"---\ndescription: {description}\n{visibility}---\n", encoding="utf-8")
+
+        with patch.object(judge, "ROOT", self.tmp), \
+                patch.object(judge.gi, "collect", return_value=rows):
+            catalog = judge.catalog_text()
+        self.assertIn("First sentence. A second routing cue.", catalog)
+        self.assertNotIn("Index summary only.", catalog)
+        self.assertNotIn("hidden-skill", catalog)
+        self.assertIn("Library note.", catalog)
+
     def test_unconfigured_exits_two_with_keys_and_config_path(self) -> None:
         result = self.run_judge()
         self.assertEqual(result.returncode, 2, result.stderr)
@@ -283,6 +308,8 @@ class RecordTests(unittest.TestCase):
             "XDG_CONFIG_HOME": str(self.tmp / "xdg"),
             "PYTHONDONTWRITEBYTECODE": "1",
         }
+        if "SYSTEMROOT" in os.environ:
+            self.environ["SYSTEMROOT"] = os.environ["SYSTEMROOT"]
         judge.BASELINE_PATH = self.baseline
 
     def make_stub(self, **kwargs) -> Stub:
@@ -317,6 +344,9 @@ class RecordTests(unittest.TestCase):
         self.assertRegex(record["generated_at"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
         self.assertEqual(len(record["per_case"]), record["case_count"])
         self.assertEqual(set(record["per_case"][0]), {"id", "pick", "passed"})
+        no_match = [row for row in record["per_case"] if row["pick"] == "none"]
+        self.assertGreaterEqual(len(no_match), 3)
+        self.assertTrue(all(row["passed"] for row in no_match))
 
         before = self.baseline.read_bytes()
         requests = len(self.stub.requests)
@@ -351,16 +381,17 @@ class RecordTests(unittest.TestCase):
         self.assertEqual(code, 0, err)
         before = self.baseline.read_bytes()
         cases = _cases()
-        stub = self.make_stub(mode="other_artifact", fail_case=cases[0]["id"])
+        case = next(case for case in cases if case["must_pick"] == ["none"])
+        stub = self.make_stub(mode="other_artifact", fail_case=case["id"])
         code, _out, err = self.run_main("--record", "--force", stub=stub)
         self.assertEqual(code, 1, err)
         self.assertIn("wrote", err)
         self.assertNotEqual(self.baseline.read_bytes(), before)
         record = json.loads(self.baseline.read_text(encoding="utf-8"))
         row = next(entry for entry in record["per_case"]
-                   if entry["id"] == cases[0]["id"])
+                   if entry["id"] == case["id"])
         self.assertFalse(row["passed"])
-        self.assertNotIn(row["pick"], cases[0]["must_pick"])
+        self.assertNotEqual(row["pick"], "none")
         self.assertEqual(record["passed"], len(cases) - 1)
         self.assertEqual(gate.baseline_errors(cases, record), [])
 

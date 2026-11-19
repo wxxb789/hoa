@@ -183,13 +183,14 @@ scope-seal）。每条规则都由该命令执行：
 ### eval case 如何评分——以及它能证明什么
 
 `evals/trigger-cases.json` 存路由 case：`id`、用户 `request`、恰好一个 `must_pick`
-artifact，以及不得被选中的 `distractors`。评分者是 fresh context 中的 LLM，它只看到一个新贡献者
-会看到的东西：
+答案（artifact 名或 `none`），以及不得被选中的 `distractors`。评分者是 fresh context 中的 LLM：
 
-1. 从 `scripts/generate_index.py collect()` 构建目录：目录里全部 artifact 的 name、type 与英文 summary。
-2. 对一个 case，发送目录与请求，要求只回复一个 artifact 名。
-3. 只有去掉首尾空白后的回复恰好等于该 case 的 `must_pick` 才算通过。回复没有命中任何目录条目
-   即该 case 失败，pick 原样保留。网络或 endpoint 错误只让该 case 失败，批次其余 case 继续完成。
+1. 用 `scripts/generate_index.py collect()` 列出 artifact。可见 skill 使用 name、type 和
+   `SKILL.md` frontmatter 中的完整 `description`；省略设置了 `disable-model-invocation: true`
+   的 skill，其他库内 artifact 仍使用英文索引说明。
+2. 发送目录与请求，要求只回复一个 artifact 名；没有合适的 artifact 则回复 `none`。
+3. 去掉首尾空白后的回复须匹配 `must_pick` 中唯一的答案；否则该 case 失败，回复保留为 pick。
+   网络或 endpoint 错误只让该 case 失败。
 4. `must_pick` 与 `distractors` 从不展示给 judge。
 
 judge 靠配置运行，绝不写死。endpoint、model、effort 按 CLI flag → 环境变量 →
@@ -206,10 +207,9 @@ python evals/judge_trigger_evals.py --json \
 以 2 退出，打印所需键与配置文件路径，绝不猜一个模型。`--record` 写入 `evals/baseline.json`
 （`case_count`、`model`、`effort`、`passed`、`total`、`judge_endpoint_host`、`generated_at`、
 `per_case`），且只记录完整 case set；已有记录只有加 `--force` 才会被替换。写入前会用离线
-gate 自身的规则校验待写入记录：包含传输错误或非目录回答的运行无法用接受的 schema 表示，因此
-文件保持原样、脚本以 2 退出并点名出错的 case（重跑而不是丢掉上一次测量）；答成目录内但错误的
-artifact 则如实记录为失败。CI 从不调用模型：
-`run_trigger_evals.py` 离线校验 baseline 的 id、目录内 pick、重算后的通过标志与 case 总数，
+gate 自身的规则校验待写入记录：包含传输错误或目录名称与 `none` 以外的回答时，文件保持原样，
+脚本以 2 退出并点名出错的 case；格式合法但答错的 pick 则如实记录为失败。CI 从不调用模型：
+`run_trigger_evals.py` 离线校验 baseline 的 id、pick、重算后的通过标志与 case 总数，
 在第一次记录之前报告 `no baseline recorded yet`。
 
 诚实边界：一个模型、一个 prompt、一个 effort 级别、一套人工挑选的 case。通过率说明的是这个

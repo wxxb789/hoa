@@ -1,8 +1,8 @@
 {
-  "purpose": "Trigger (routing) evals for hoa artifacts: given a user request, which artifact should a runtime pick? Graded by an LLM judge against the artifact descriptions; must_pick lists exactly one acceptable choice, distractors name artifacts that must NOT be picked.",
+  "purpose": "Trigger (routing) evals for hoa artifacts: given a user request, which artifact, if any, should a runtime pick? must_pick lists exactly one acceptable choice, including 'none' for requests that need no artifact; distractors name artifacts that must NOT be picked.",
   "procedure": [
-    "Build the catalog: each artifact's name, type, and description from its SKILL.md frontmatter (skills) or NOTES override (library artifacts).",
-    "For each case, present ONLY the catalog to a fresh-context judge along with the user request; ask for one artifact name.",
+    "Build the catalog: each visible skill's name, type, and SKILL.md frontmatter description; other library artifacts retain their English index notes.",
+    "For each case, show a fresh-context judge the catalog and user request; ask for one artifact name or 'none' if no artifact applies.",
     "Grade: pass iff the judge's pick is in must_pick.",
     "Do not reveal must_pick or distractors to the judge.",
     "This file is data, not a runner; evals/run_trigger_evals.py validates it offline and CI checks that validation."
@@ -127,6 +127,24 @@
       "request": "我想把团队的发布流程改成全自动，目标定大一点，顺便把这季度的计划排出来。但现在连这件事该包含什么、什么算做完了都还没想清楚。",
       "must_pick": ["spec-convergence"],
       "distractors": ["define-goal", "gdd"]
+    },
+    {
+      "id": "no-trigger-python-expression",
+      "request": "In Python, what does 'hello'[::-1] return?",
+      "must_pick": ["none"],
+      "distractors": ["ghc-search", "typed-verification-gates"]
+    },
+    {
+      "id": "no-trigger-unit-conversion",
+      "request": "How many millimeters are in 2.5 centimeters?",
+      "must_pick": ["none"],
+      "distractors": ["ghc-search", "typed-verification-gates"]
+    },
+    {
+      "id": "no-trigger-translation",
+      "request": "Translate 'See you tomorrow' into Spanish.",
+      "must_pick": ["none"],
+      "distractors": ["ghc-search", "spec-convergence"]
     }
   ]
 }

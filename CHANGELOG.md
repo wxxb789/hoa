@@ -6,6 +6,9 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 ## 2026-11-18
 
+- Trigger evals now route on visible skills' frontmatter descriptions, accept `none` when no
+  artifact fits, and include three no-trigger cases.
+
 - Tests: `python -m pytest` (`pytest.ini`, 120 s per test) collects every `test_*.py` under
   `scripts/`, `evals/` and `skills/` with no registration. `ci.yml` runs each static gate (previously manifest
   suites), standalone check, gdd shell suite and the Paseo plugin as its own
