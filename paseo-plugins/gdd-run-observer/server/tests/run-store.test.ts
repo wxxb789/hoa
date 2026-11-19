@@ -76,6 +76,31 @@ const STATE_RUNNING = JSON.stringify({
 });
 
 describe("run store", () => {
+  it("uses state totals after rotation and labels active-segment-only totals partial", async () => {
+    const active = event({ type: "turn_end" });
+    const files = { "events.ndjson": active, "events.1.ndjson": active.repeat(7) };
+    const state = { ...JSON.parse(STATE_RUNNING), agent: "omp" };
+    const dir = await writeRun("rotated", { ...files, "state.json": JSON.stringify(state) });
+    const runs = store([111]);
+    expect((await runs.listRuns()).runs[0]).toMatchObject({
+      turns: 1, countersFrom: "events", countersPartial: true, eventsTruncated: false,
+    });
+    await writeFile(join(dir, "state.json"), JSON.stringify({ ...state, turns: 8, tool_calls: 0 }));
+    expect((await runs.listRuns()).runs[0]).toMatchObject({
+      turns: 8, countersFrom: "state", countersPartial: false, eventsTruncated: false,
+    });
+  });
+
+  it("uses live DSH state totals instead of generic tool events", async () => {
+    await writeRun("dsh", {
+      "state.json": JSON.stringify({ ...JSON.parse(STATE_RUNNING), agent: "dsh", turns: 3, tool_calls: 5 }),
+      "events.ndjson": event({ type: "tool_call" }),
+    });
+    expect((await store([111]).listRuns()).runs[0]).toMatchObject({
+      turns: 3, toolCalls: 5, countersFrom: "state",
+    });
+  });
+
   it("reports a missing run root instead of failing", async () => {
     const missing = join(root, "absent");
     const result = await createRunStore({

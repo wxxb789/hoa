@@ -18,7 +18,7 @@ export type RunLock = {
 };
 export type RunFinalized = { present: boolean; exitCode: number | null };
 export type RunAnswer = { exists: boolean; bytes: number | null };
-export type RunEventLog = { exists: boolean; bytes: number; readable: boolean };
+export type RunEventLog = { exists: boolean; bytes: number; readable: boolean; rotated?: boolean };
 
 export type RunFiles = {
   dir: string;
@@ -94,7 +94,7 @@ export function mapRun(inputs: RunInputs, nowMs: number): RunSummary {
     costUsd: countersFrom === "state" ? asNumber(values.cost_usd) : (eventCounters?.costUsd ?? null),
     countersFrom,
     countersPartial:
-      truncated ||
+      (countersFrom === "events" && (truncated || files.events.rotated === true)) ||
       values.turns_partial === true ||
       values.tool_calls_partial === true ||
       values.cost_partial === true,
@@ -168,7 +168,10 @@ function counterSource(
     asNumber(files.state.values.tool_calls) !== null ||
     asNumber(files.state.values.cost_usd) !== null;
   const eventsHaveCounters = counters?.hasCounters === true;
-  if (files.finalized.present && stateHasCounters) return "state";
+  if (stateHasCounters && (files.finalized.present || files.events.rotated ||
+      (typeof files.state.values.agent === "string" && !["omp", "pi"].includes(files.state.values.agent)))) {
+    return "state";
+  }
   if (eventsHaveCounters) return "events";
   return stateHasCounters ? "state" : "none";
 }

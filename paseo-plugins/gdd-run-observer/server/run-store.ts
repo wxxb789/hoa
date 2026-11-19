@@ -298,6 +298,7 @@ export function createRunStore(deps: StoreDeps): RunStore {
       exists: eventsFile.exists,
       bytes: eventsFile.bytes ?? 0,
       readable: true,
+      rotated: (await fileBytes(join(dir, "events.1.ndjson"))).exists,
     };
     const sessionIdText = await readTailText(join(dir, "session.id"), 4096);
     const dirStat = await stat(dir).catch(() => null);

@@ -55,7 +55,7 @@ The store scans `<run-root>/<YYYY-MM-DD>/<slug>/`. The contract is defined by
 | Artifact | Observation |
 | --- | --- |
 | `state.json` | Declared state, timing, exit code, PIDs, `session_id`, counters, and runner-owned `events_*` statistics. Missing state is `unknown` unless a `finalized` marker supplies a usable exit code. |
-| `events.ndjson` | Current event segment. The observer derives live counters and current tool from OMP/Pi event shapes only; other routes may expose counts later through state. At rotation the runner moves the previous segment to `events.1.ndjson`; the observer tails only the current segment. |
+| `events.ndjson`, `events.1.ndjson` | Current and previous event segments. The observer tails only the current segment for live OMP/Pi counters and current tool; the runner writes counters to `state.json` for every headless route. |
 | `answer.md` | Answer presence and a bounded tail for display, not an accepted delivery result. |
 | `finalized` | Settled-run marker and exit code; if declared state is absent or still `running`, the exit code determines the displayed terminal state. |
 | `run.json`, `runner.log` | Launcher invocation and runner diagnostics. These are inspection artifacts, not parsed by the observer. |
@@ -73,9 +73,10 @@ Liveness is separate from state. A finalized marker means `settled`; recorded li
 `unknown`. Windows confirmation uses a background `tasklist` query. The plugin never invokes the
 launcher's stale recovery or writes its own finalization marker.
 
-Finalized state counters take precedence when present. Otherwise counters come from the retained
-supported event stream or available state values. Recognized `truncated` markers mark counters partial; the observer
-does not invent missing turns, tools, or cost. Event tails read at most 256 KiB and answer tails at
+State counters take precedence for finalized runs, non-OMP/Pi headless routes and rotated logs.
+Without state counters, counts derived from events are marked partial once the previous segment
+exists or a legacy truncation marker reports loss. The observer does not invent missing turns,
+tools, or cost. Event tails read at most 256 KiB and answer tails at
 most 64 KiB before the line limit is applied. Polling, event vocabulary, and liveness limits remain
 those of the imported plugin; see [README](README.md#known-limits).
 

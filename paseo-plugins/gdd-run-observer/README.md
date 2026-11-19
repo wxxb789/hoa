@@ -42,11 +42,13 @@ Each run is `<root>/<YYYY-MM-DD>/<slug>/`:
 | File                 | Meaning                                                                                                |
 | -------------------- | ------------------------------------------------------------------------------------------------------ |
 | `state.json`         | `state` (`running`, `done`, `killed`, `failed`), `exit`, `cwd`, `started`, `ended`, `duration_s`, `model`, `thinking`, `max_time`, `session_id`, `pid`, `agent_pid`, counters, loss accounting. |
-| `events.ndjson`      | One agent-CLI JSON event per line: `session`, `turn_start`/`turn_end`, `message_start`/`message_end`, `tool_execution_start`/`_end`/`_update`, and the launcher's `truncated` splice marker. |
-| `events.stats.json`  | Exact byte accounting for the retained log (`total_bytes`, `retained_bytes`, `dropped_bytes`, `truncated`). |
+| `events.ndjson`, `events.1.ndjson` | Current and previous NDJSON event segments. The current segment starts with a `truncated` marker only after bytes have been dropped. The plugin tails only the current segment. |
+| `run.json`, `runner.log` | Invocation and runner diagnostics, available on disk for inspection. |
 | `answer.md`          | Final assistant text, written when the run finalizes.                                                   |
-| `lock`               | `{pid, agent_pid, backend, started_at}` for liveness.                                                    |
 | `finalized`          | Present once the run ended; holds the exit code.                                                        |
+
+The shared runner does not write `events.stats.json`, `lock`, `session.id`, or `runner.out`.
+The observer still understands these legacy adapter artifacts where present.
 
 Derived per run:
 
@@ -57,15 +59,16 @@ Derived per run:
   alive, `stale` when every recorded pid is confirmed gone, `unknown` while unproven. Absence of
   `finalized` with a dead pid is reported `stale`, never `done`.
 - **counters**: `turns` counts `turn_end`, `tool_calls` counts every `*tool*start*` event, `cost`
-  sums assistant `message_end` usage. Running runs are counted from the retained event log while
-  tailing (only appended bytes are read); once a run finalized, the launcher's own `state.json`
-  counters win. A lifecycle-only stream (such as the native adapter's `paseo_status` transitions)
+  sums assistant `message_end` usage when counting events. The runner's `state.json` counters
+  take precedence after rotation, at finalization and for non-OMP/Pi headless routes.
+  A lifecycle-only stream (such as the native adapter's `paseo_status` transitions)
   supplies no measurements: metrics remain unavailable (`null`, source `none`) unless the
   launcher records counters. Recognized agent instrumentation establishes event counters,
-  including measured zeros. The UI labels which source it used and marks spliced logs partial.
+  including measured zeros. The UI labels the source and marks event-derived counts partial
+  when a rotated segment exists or truncation is reported.
 - **current tool**: the last `tool_execution_start` without a matching `tool_execution_end`.
 - **loss accounting**: `eventsTruncated` and `eventsDroppedBytes` take the largest value reported by
-  `state.json`, `events.stats.json`, and the splice marker.
+  the runner's `events_*` state fields, supported truncation markers, and legacy `events.stats.json`.
 
 ### Liveness details
 
@@ -168,9 +171,9 @@ work, `client/` the surfaces, translations, and styles. Tests live in `server/te
 - **Polling, not subscriptions.** Paseo 0.15 has no plugin subscription transport, so the live tail
   is a bounded poll that reuses a per-run byte offset: each tick reads only what the launcher
   appended, and polling stops as soon as the surface unmounts.
-- **Retained-window counters.** At its bound the launcher replaces the log with
-  `head + truncated marker + tail`. The plugin then recounts the retained log, so turns, tools, and
-  cost describe the retained window only; `state.json` counters take over once a run finalizes.
+- **Retained event tail.** The runner moves the previous event segment to `events.1.ndjson`
+  and overwrites that segment on the next rotation. The observer does not replay the previous
+  segment. Without runner counters, the visible event totals are therefore partial after rotation.
 - **Unproven liveness reads `unknown`.** On Windows the first scan of a stale run shows `unknown`
   until the background listing confirms it; a run is only ever labelled `stale` after the OS stops
   listing its pid.
