@@ -1162,9 +1162,8 @@ LAST_HEAD="$(awk -F'\t' 'NR>1 {h=$6} END {print h}' "$HEAD_KEEP_TSV" 2>/dev/null
 check $? "a report-only stage keeps the dispatched head in its completion row (got '$LAST_HEAD' rc=$HEAD_KEEP_RC)" "$(cat "$TMP/head-keep.out")"
 
 # --- dispatch guards ---------------------------------------------------------
-# The coverage manifest accounts for test-dispatch-guards.py through this suite
-# (covered_by in scripts/test_manifest.toml) and reads its positive count back out
-# of this log, so echo the child's own summary line before asserting it.
+# CI runs test-dispatch-guards.py only through this suite, so echo the child's own
+# summary line into this log before asserting it.
 GUARD_OUT="$(python3 "$HERE/test-dispatch-guards.py" 2>&1)"
 GUARD_RC=$?
 printf '%s\n' "$GUARD_OUT" | tail -n 1

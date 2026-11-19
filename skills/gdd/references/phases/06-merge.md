@@ -59,7 +59,7 @@ A version claim is only true for the main it was measured against. **After** any
 `origin/main` — never before it — run the gate the project **profile** declares for merge time:
 
 ```bash
-git fetch origin main && python scripts/version.py check-bump   # hoa; other repos: their profile's gate
+git fetch origin main && python scripts/version.py check-revisions   # hoa; other repos: their profile's gate
 ```
 
 A repo whose profile declares no merge-time version gate skips this step. It is not part of the
@@ -68,7 +68,7 @@ repo silently skip Phase 6.
 
 A non-zero exit blocks the merge. The fetch comes first so a sibling PR that merged after your last
 fetch cannot hide behind a stale `origin/main`. The fix is always a rebase onto `origin/main` plus
-`python scripts/version.py bump` — never a hand-edited `VERSION`.
+raising each `metadata.revision` the gate names above the rebased base.
 
 Then `gh pr merge <N> --squash --delete-branch`, `git fetch --prune`, `git checkout main`,
 `git pull --ff-only`, prove `gh pr view <N> --json headRefOid` equals the head you verified, report.

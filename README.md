@@ -73,8 +73,7 @@ custom deploy tooling.
 ```text
 hoa/
 ├── index.md · index.zh-CN.md   # every artifact, labeled by area + target (GENERATED — see scripts/)
-├── VERSION        # the one project version; skills carry their own metadata.revision
-├── CHANGELOG.md   # notable changes; older entries retain historical per-skill versions
+├── CHANGELOG.md   # optional dated notes; older entries retain historical project and per-skill versions
 ├── skills/        # THE deploy surface — SKILL.md packages installed via `npx skills`
 ├── paseo-plugins/ # optional Paseo plugin source; explicitly installed, never auto-deployed
 ├── agents/        # portable, runtime-agnostic role / persona / authority / I-O contracts
@@ -169,85 +168,30 @@ spec, acceptance-verdict, scope-seal). Every rule is enforced by that command:
 
 ### What CI runs
 
-The `test` job runs on every push to `main`, every pull request, and `workflow_dispatch`. There is
-no release job: `npx skills` installs straight from GitHub, so nothing is tagged or published.
+The `test` job (`.github/workflows/ci.yml`) runs on every push to `main`, every pull request, and
+`workflow_dispatch`. There is no release job: `npx skills` installs straight from GitHub, so nothing
+is tagged or published. Each check is its own named step, so a failure names itself in the Actions
+UI; a newer push to a pull request cancels the older run.
 
-The `test` job provisions the runtimes and dependencies, then runs
-`python scripts/run_all_tests.py`. That discoverer schedules the commands below as entries in
-`scripts/test_manifest.toml` rather than as separate CI steps (the table is being converged onto the
-manifest in a later step of this series). It also schedules the Python suites that were never wired in
-before —
-`skills/delegated-work-acceptance/scripts/tests/test_worktree_scope.py` and
-`skills/gdd/scripts/tests/test_paseo_run_python.py` — and the `paseo-plugins/gdd-run-observer` Vitest
-package.
+| Step | Command | Protects |
+|---|---|---|
+| Frontmatter | `python scripts/check_frontmatter.py` | Every `SKILL.md` frontmatter and catalog field; 1024-char description cap; hidden flag agrees with `agents/openai.yaml`. |
+| Contract graph | `python scripts/check_contract_graph.py` | Rules R1–R10 above. |
+| Skill links | `python scripts/check_skill_links.py` | Every `../<name>/` reference in a skill names an existing sibling skill and path, relative to the file that holds it; every `uv run <path>.py` in skill Markdown runs a script with a PEP 723 block, `uv run python` carries `--no-project`, and no bare `python`/`python3` runs a skill script. |
+| Catalog index drift | `python scripts/generate_index.py --check` | `index.md` / `index.zh-CN.md` match artifact metadata. |
+| Vendored shared scripts drift | `python scripts/vendor_shared.py --check` | Vendored copies of shared scripts match their canonical file. |
+| PR bumps changed skills' revision (pull requests) | `python scripts/version.py check-revisions` | Every skill directory changed since the merge base raises its `metadata.revision`. |
+| pytest | `python -m pytest` | Every `test_*.py` unittest/pytest file under `scripts/`, `evals/` and `skills/` (`pytest.ini`); 120 s per test. |
+| Script checks | `python evals/run_trigger_evals.py`, `evals/validate_skill_method_cases.py`, `skills/define-goal/evals/validate_fixtures.py`, `skills/hoa-introspect/evals/run.py`, `skills/hoa-introspect-distill/evals/run_evals.py`, `skills/hermes-models/scripts/tests/test-*.py`, `skills/gdd/scripts/tests/test_verdict_matrix.py`, `mutate_verdict_matrix.py` | Standalone checks whose exit code is the contract; one step each. |
+| gdd shell suites | `bash skills/gdd/scripts/tests/run-gdd-selftest.sh`, `test-omp-run-stale.sh`, `test-omp-run-setsid.sh` | The gdd loop end to end (including `test-dispatch-guards.py`) and the `omp-run.sh` forwarder. |
+| Paseo gdd-run-observer | `npm ci && npm run typecheck && npm test` in `paseo-plugins/gdd-run-observer` | The plugin's typecheck and Vitest suite. |
 
-Settling is anti-false-green. Zero executed checks never settles PASS, and a counter must account for
-every check it did not pass — including a suite that settles from a parent's log through
-`covered_by`. Each suite runs in its own process group and task-local scratch tree; a suite that did
-not finish under its own control — the runner timed it out, or a signal killed it — has the process
-the run spawned terminated, while everything else that command left behind is *reported and left
-alone*: the members of the group the command led, and the processes still holding the suite's
-task-local scratch (found by the cwd they were started in or the scratch paths in their environment,
-from `/proc`). The rule is deliberately narrow — **the runner signals only the process it spawned** —
-because that is the one process whose identity it recorded itself; a same-group member, a scratch
-holder or any descendant is named in the suite's record and keeps running, and the suite's teardown
-is `unverified` whenever such a process is found, so the limit is readable in the result instead of
-being silently absorbed. Nothing is ever broadcast to a process group, and no signal ever goes
-through a bare pid or group number. The spawned process's identity — its pid and the start time
-`/proc/<pid>/stat` field 22 read at spawn — is pinned *at delivery* rather than sampled before it: a
-pidfd is opened for that pid (`os.pidfd_open`), the start time is re-read and must equal the recorded
-one, and only then is the signal sent through `signal.pidfd_send_signal`. The pidfd pins that
-process instance, so a pid someone else's reap recycled cannot receive the run's signal, a target
-that is gone is reported as gone, a process that has already terminated takes no signal at all, and
-escalation (TERM, a bounded grace, KILL) re-pins the target in every round instead of reusing an
-earlier round's authority. The run also establishes its own `SIGCHLD` disposition (`SIG_DFL`) before
-spawning anything and observes a command's exit without reaping it (`waitid` with `WNOWAIT`), which
-is what keeps the pid from being recycled while the teardown still needs it; the group the command
-led is read before the command is reaped, so what a clean exit left behind is reported while the
-number is still the command's own. Where any of that proof cannot be held — no established or
-still-live disposition, no kernel probe, no pidfd, no `/proc` to read the identity from, a
-start-time re-check that fails, a target reaped by someone else — nothing is signalled and the
-teardown is reported unverified; there is no fallback to `Popen`'s cached `returncode` (which cannot
-see a reap) or to a bare pid or group number (which can name anything by the time it is used). Every
-exit path — clean, timed out or signalled — publishes the teardown record, limits included, in the
-suite's entry of the result, so a limit is readable by whoever reads the run and not only by the
-helper that found it; and a command whose exit can no longer be waited for settles as an error
-rather than taking the run down. **Residual limit, stated plainly:** the runner signals only the
-process it spawned, so whatever else a suite leaves behind — a same-group member, a detached holder,
-any descendant — outlives the run; the teardown's record names it and says it was left alone. The
-gates bound the teardown's reach on real platforms: macOS and Windows expose no pidfds (and no
-`/proc`), so there nothing is ever signalled — each teardown refuses and records that limit — while
-on Linux the same run gates every delivery as described above.
-
-| Gate command (CI step) | Protects |
-|---|---|
-| `python scripts/vendor_shared.py --check` | Vendored copies of shared scripts match their canonical file. |
-| `python scripts/generate_index.py --check` | `index.md` / `index.zh-CN.md` match artifact metadata. |
-| `python scripts/check_contract_graph.py` | Rules R1–R10 above. |
-| `python scripts/check_skill_links.py` | Every `../<name>/` reference in a skill names an existing sibling skill and path, relative to the file that holds it; every `uv run <path>.py` in skill Markdown runs a script with a PEP 723 block, `uv run python` carries `--no-project`, and no bare `python`/`python3` runs a skill script. |
-| `python -m unittest scripts.test_check_skill_links` | The link checker's own tests. |
-| `python scripts/test_check_contract_graph.py` | The graph checker's own rule tests. |
-| `python -m unittest scripts.test_skill_config` | Config resolution order and malformed-config behavior. |
-| `python scripts/test_generate_index.py` | Catalog collection, summaries, bilingual fallback, drift, generated install and remove commands, retired-registry validation. |
-| `python -m unittest scripts.test_check_changelog` | The changelog rule's own tests. |
-| `python scripts/check_frontmatter.py` | Every `SKILL.md` frontmatter and catalog field; 1024-char description cap; hidden flag agrees with `agents/openai.yaml`. |
-| `python -m unittest scripts.test_check_frontmatter` | The frontmatter checker's own tests. |
-| `python scripts/version.py check-bump` (pull requests) | `VERSION` is exactly `origin/main`'s patch + 1. |
-| `python scripts/version.py check-revisions` (pull requests) | Every skill directory changed since the merge base raises its `metadata.revision`. |
-| `python scripts/check_changelog.py --base origin/main` (pull requests) | A changed `VERSION` has a changed `CHANGELOG.md`. |
-| `python scripts/test_version.py` | The `bump`, `check-bump` and `check-revisions` CLI against throwaway Git repos. |
-| `python skills/ghc-search/scripts/test_ghc_search.py` | The search client's request/parse/error behavior. |
-| `python skills/hoa-introspect/evals/run.py` | `hoa-introspect` eval fixtures. |
-| `python skills/hoa-introspect-distill/evals/run_evals.py` | `hoa-introspect-distill` eval fixtures. |
-| `python skills/define-goal/evals/validate_fixtures.py` | `define-goal` eval fixtures. |
-| `python evals/run_trigger_evals.py` | Trigger-case structure, catalog cross-references, and baseline arithmetic (offline). |
-| `python -m unittest evals.test_judge_trigger_evals` | Judge configuration precedence, exit codes, per-case failures, baseline writes, against a local stub. |
-| `python evals/validate_skill_method_cases.py` | `skill-method-cases.json` structure and isolation paths. |
-| `python -m unittest evals.test_validate_skill_method_cases` | Setup-file isolation for skill-method cases. |
-
-The dependency install (`python -m pip install -r scripts/requirements.txt`) precedes the gates.
-The judge's HTTP client is stdlib only; the catalog builder it imports uses the repo's PyYAML
-tooling.
+Run the Python tests locally with
+`uv run --no-project --with-requirements scripts/requirements.txt python -m pytest` (or
+`pip install -r scripts/requirements.txt && python -m pytest`). A new test file named `test_*.py`
+is collected with no registration; a standalone check that is not a test file needs its own step
+in `ci.yml`. CI runs on Linux; the gdd launcher suites assume POSIX process semantics, so run them
+there (or in WSL) rather than on native Windows.
 
 ### How an eval case is graded — and what that proves
 
@@ -293,25 +237,19 @@ pins model, effort, endpoint host and date precisely because changing any of the
 comparability. The suite proves discrimination on curated near-misses, not routing quality in the
 wild.
 
-## Versions and revisions
+## Revisions
 
-Two counters, each with one job:
-
-- `VERSION` is the one project version (semver). Every pull request bumps its patch: CI requires
-  exactly `origin/main`'s patch + 1, so a branch cut before another merge rebases and bumps again.
-- `metadata.revision` in each `SKILL.md` is an integer string counting that skill's own iterations.
-  A pull request raises it only for the skill directories it changes; a new skill starts at `"1"`.
-  The project version is never copied into skills.
+There is no project version. `metadata.revision` in each `SKILL.md` is an integer string counting
+that skill's own iterations. A pull request raises it only for the skill directories it changes; a
+new skill starts at `"1"`.
 
 ```bash
 python -m pip install -r scripts/requirements.txt  # repository tooling; prefer a venv
-python scripts/version.py bump             # patch by default: 0.1.0 -> 0.1.1
-python scripts/version.py check-bump       # VERSION is origin/main's patch + 1
 python scripts/version.py check-revisions  # every changed skill raised its revision
 ```
 
 There are no releases, tags or binaries: `npx skills` installs from the GitHub default branch.
-Local version commands never commit or push.
+`CHANGELOG.md` entries are dated and optional; no gate requires one.
 
 
 ## Bilingual policy

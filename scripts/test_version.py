@@ -27,7 +27,7 @@ def skill_text(name: str, revision: str) -> str:
 
 
 class VersionCliTests(unittest.TestCase):
-    """origin/main holds VERSION 0.1.0 and skills kept (rev 2) and gone (rev 1)."""
+    """origin/main holds skills kept (rev 2) and gone (rev 1)."""
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -36,7 +36,6 @@ class VersionCliTests(unittest.TestCase):
         (self.root / "scripts").mkdir()
         for name in ("version.py", "skill_metadata.py"):
             shutil.copy2(SCRIPTS / name, self.root / "scripts" / name)
-        self.write("VERSION", "0.1.0\n")
         self.write("skills/kept/SKILL.md", skill_text("kept", "2"))
         self.write("skills/gone/SKILL.md", skill_text("gone", "1"))
         self.write("skills/gone/notes.md", "moved later\n")
@@ -59,22 +58,6 @@ class VersionCliTests(unittest.TestCase):
     def run_cli(self, *args: str) -> subprocess.CompletedProcess:
         return subprocess.run([sys.executable, str(self.root / "scripts" / "version.py"), *args],
                               env=GIT_ENV, text=True, encoding="utf-8", capture_output=True)
-
-    def test_bump_rewrites_only_version(self):
-        result = self.run_cli("bump")
-        self.assertEqual((result.returncode, result.stdout.strip()), (0, "0.1.1"))
-        self.assertEqual(self.run_cli("bump", "minor").stdout.strip(), "0.2.0")
-        self.assertEqual((self.root / "VERSION").read_text(encoding="utf-8"), "0.2.0\n")
-        self.assertIn('revision: "2"', (self.root / "skills/kept/SKILL.md").read_text())
-
-    def test_check_bump_requires_exactly_one_patch(self):
-        for current, status in (("0.1.1", 0), ("0.1.0", 1), ("0.1.2", 1), ("0.2.0", 1)):
-            with self.subTest(current=current):
-                self.write("VERSION", current + "\n")
-                result = self.run_cli("check-bump")
-                self.assertEqual(result.returncode, status, result.stderr)
-                if status:
-                    self.assertIn("expected 0.1.1", result.stderr)
 
     def test_check_revisions_names_each_unbumped_skill(self):
         self.write("skills/kept/notes.md", "changed\n")
@@ -104,7 +87,6 @@ class VersionCliTests(unittest.TestCase):
         self.assertIn("2 changed skill(s) OK", result.stdout)
 
     def test_unchanged_skills_need_no_bump(self):
-        self.write("VERSION", "0.1.1\n")
         result = self.run_cli("check-revisions")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("0 changed skill(s) OK", result.stdout)

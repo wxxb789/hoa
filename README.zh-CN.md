@@ -66,8 +66,7 @@ Hermes · Claude Code · Codex · pi · OpenCode · Kimi Code · *(`npx skills` 
 ```text
 hoa/
 ├── index.md · index.zh-CN.md   # 全部 artifact，按 area + target 打标签（自动生成——见 scripts/）
-├── VERSION        # 唯一的项目版本；skill 各自携带 metadata.revision
-├── CHANGELOG.md   # 重要变更；旧条目保留历史上的各 skill 版本
+├── CHANGELOG.md   # 可选的按日期记录；旧条目保留历史上的项目版本与各 skill 版本
 ├── skills/        # 唯一部署面 —— 用 `npx skills` 安装的 SKILL.md 包
 ├── paseo-plugins/ # 可选 Paseo 插件源码；显式安装，不自动下发
 ├── agents/        # 可移植、runtime 无关的 role / persona / authority / I-O 契约
@@ -158,69 +157,28 @@ scope-seal）。每条规则都由该命令执行：
 
 ### CI 跑什么
 
-`test` job 在每次 push 到 `main`、每个 pull request 与 `workflow_dispatch` 时运行。没有 release
-job：`npx skills` 直接从 GitHub 安装，因此不打 tag、不发布。
+`test` job（`.github/workflows/ci.yml`）在每次 push 到 `main`、每个 pull request 与
+`workflow_dispatch` 时运行。没有 release job：`npx skills` 直接从 GitHub 安装，因此不打 tag、不发布。
+每项检查都是一个具名 step，失败时在 Actions 界面里直接显示是哪一步；同一 pull request 的新 push 会取消旧的运行。
 
-`test` job 先装好运行时与依赖，然后运行 `python scripts/run_all_tests.py`。该 discoverer 将下表
-中的每一条命令作为 `scripts/test_manifest.toml` 里的 manifest 条目来调度，而非独立的 CI
-step（该表将在本系列的后续步骤中与 manifest 收敛）。它同时调度此前从未接入 CI 的 Python 测试套件——
-`skills/delegated-work-acceptance/scripts/tests/test_worktree_scope.py` 与
-`skills/gdd/scripts/tests/test_paseo_run_python.py`——以及 `paseo-plugins/gdd-run-observer`
-这个 Vitest 包。
+| Step | 命令 | 保护什么 |
+|---|---|---|
+| Frontmatter | `python scripts/check_frontmatter.py` | 每个 `SKILL.md` 的 frontmatter 与目录字段；description 上限 1024 字符；隐藏标记与 `agents/openai.yaml` 一致。 |
+| Contract graph | `python scripts/check_contract_graph.py` | 上面的 R1–R10。 |
+| Skill links | `python scripts/check_skill_links.py` | skill 中每个 `../<name>/` 引用都指向存在的同级 skill 与路径（相对所在文件解析）；skill Markdown 里每个 `uv run <path>.py` 指向带 PEP 723 块的脚本，`uv run python` 带 `--no-project`，且不用裸 `python`/`python3` 运行 skill 脚本。 |
+| Catalog index drift | `python scripts/generate_index.py --check` | `index.md` / `index.zh-CN.md` 与 artifact 元数据一致。 |
+| Vendored shared scripts drift | `python scripts/vendor_shared.py --check` | 分发到 skill 内的共享脚本副本与权威文件一致。 |
+| PR bumps changed skills' revision（pull request） | `python scripts/version.py check-revisions` | 自 merge base 以来改动过的每个 skill 目录都提高了 `metadata.revision`。 |
+| pytest | `python -m pytest` | `scripts/`、`evals/`、`skills/` 下每个 `test_*.py` unittest/pytest 文件（`pytest.ini`）；每个测试 120 秒上限。 |
+| 脚本检查 | `python evals/run_trigger_evals.py`、`evals/validate_skill_method_cases.py`、`skills/define-goal/evals/validate_fixtures.py`、`skills/hoa-introspect/evals/run.py`、`skills/hoa-introspect-distill/evals/run_evals.py`、`skills/hermes-models/scripts/tests/test-*.py`、`skills/gdd/scripts/tests/test_verdict_matrix.py`、`mutate_verdict_matrix.py` | 以退出码为契约的独立检查；每个一个 step。 |
+| gdd shell 套件 | `bash skills/gdd/scripts/tests/run-gdd-selftest.sh`、`test-omp-run-stale.sh`、`test-omp-run-setsid.sh` | gdd 端到端循环（含 `test-dispatch-guards.py`）与 `omp-run.sh` forwarder。 |
+| Paseo gdd-run-observer | 在 `paseo-plugins/gdd-run-observer` 中 `npm ci && npm run typecheck && npm test` | 插件的 typecheck 与 Vitest 套件。 |
 
-结算是防假绿的：零执行检查永远不是 PASS，counter 必须交代每一个未通过的检查——包括通过
-`covered_by` 依据父套件日志结算的子套件。每个套件在自己的进程组与任务级 scratch 目录中运行；
-未能按自身流程收尾的套件（被 runner 超时终止，或被信号杀死）只会终止**本运行 spawn 的那一个
-进程**，其余一切都只**报告、不碰**：该命令所领导组的成员，以及仍持有该套件任务级 scratch 的进程
-（按启动时的 cwd 或环境中的 scratch 路径识别，读 `/proc`）。规则刻意收窄——**runner 只对本运行
-spawn 的进程发信号**——因为只有那个进程的身份是本运行自己记下的；同组成员、scratch 持有者、任何
-后代都只会在记录里被点名并继续运行，而且只要发现这类进程，该套件的 teardown 就是 `unverified`，
-让这条限制出现在结果里，而不是被悄悄吸收。绝不向进程组广播，也绝不通过裸 pid 或组号发信号。
-被 spawn 进程的身份（pid 与 spawn 时读到的 `/proc/<pid>/stat` 第 22 字段：起始时间）是**投递时**
-钉住的，而不是之前采样来的：为该 pid 打开 pidfd（`os.pidfd_open`），重读起始时间并要求等于记下的
-那个，然后才经 `signal.pidfd_send_signal` 发信号。pidfd 钉住的是那个进程实例，所以被别人的 reap
-释放、又被内核复用的 pid 收不到本运行的信号；已经消失的目标记为消失；已经终止的进程根本不会收到
-信号；升级（TERM → 有界宽限 → KILL）每一轮都重新钉住目标，绝不复用上一轮的授权。spawn 之前本运行
-还会把自己的 `SIGCHLD` 处置置为 `SIG_DFL`，并以不 reap 的方式观察命令退出（`waitid` + `WNOWAIT`），
-这才让 pid 在 teardown 还需要它时不会被回收复用；组在命令被 reap 之前读取，所以干净退出留下的成员
-会在组号仍属于该命令时被如实报告。证明拿不到时——处置没能建立或已不再存活、没有内核探针、没有
-pidfd、没有 `/proc` 可读身份、起始时间复核失败、目标被别人 reap——一律不发信号，teardown 记为
-unverified；既不退回 `Popen` 缓存的 `returncode`（它看不见 reap），也不退回裸 pid 或组号（用时它
-可能已经指向别的什么）。每条退出路径——干净退出、超时、被信号杀死——都把 teardown 记录（含它证明
-不了的部分）写进结果里的套件条目，让看记录的人看得到而不止产生它的那个 helper；再也无法等待其退出
-的命令按错误结算，而不是把整轮运行拖下水。**残留限制写明**：runner 只对 spawn 的进程发信号，所以
-套件留下的其他进程——同组成员、detached 持有者、任何后代——都会活过本轮运行，记录会点名它们并写明
-未被触碰。这些门槛也决定了 teardown 在各平台上的上限：macOS 与 Windows 没有 pidfd（也没有
-`/proc`），那里永远不发信号——每次 teardown 都拒绝并如实记录——Linux 上则按上面的方式逐次把关。
-
-| 检查命令（CI step） | 保护什么 |
-|---|---|
-| `python scripts/vendor_shared.py --check` | 分发到 skill 内的共享脚本副本与权威文件一致。 |
-| `python scripts/generate_index.py --check` | `index.md` / `index.zh-CN.md` 与 artifact 元数据一致。 |
-| `python scripts/check_contract_graph.py` | 上面的 R1–R10。 |
-| `python scripts/check_skill_links.py` | skill 中每个 `../<name>/` 引用都指向存在的同级 skill 与路径（相对所在文件解析）；skill Markdown 里每个 `uv run <path>.py` 指向带 PEP 723 块的脚本，`uv run python` 带 `--no-project`，且不用裸 `python`/`python3` 运行 skill 脚本。 |
-| `python -m unittest scripts.test_check_skill_links` | 链接检查器自身的测试。 |
-| `python scripts/test_check_contract_graph.py` | 契约图检查器自身的规则测试。 |
-| `python -m unittest scripts.test_skill_config` | 配置解析顺序与畸形配置行为。 |
-| `python scripts/test_generate_index.py` | 目录收集、summary、中文回退、漂移、生成的安装与移除命令、退役登记校验。 |
-| `python -m unittest scripts.test_check_changelog` | changelog 规则自身的测试。 |
-| `python scripts/check_frontmatter.py` | 每个 `SKILL.md` 的 frontmatter 与目录字段；description 上限 1024 字符；隐藏标记与 `agents/openai.yaml` 一致。 |
-| `python -m unittest scripts.test_check_frontmatter` | frontmatter 检查器自身的测试。 |
-| `python scripts/version.py check-bump`（pull request） | `VERSION` 恰好是 `origin/main` 的 patch + 1。 |
-| `python scripts/version.py check-revisions`（pull request） | 自 merge base 以来改动过的每个 skill 目录都提高了 `metadata.revision`。 |
-| `python scripts/check_changelog.py --base origin/main`（pull request） | `VERSION` 变化时 `CHANGELOG.md` 也变化。 |
-| `python scripts/test_version.py` | 在临时 Git 仓库中检验 `bump`、`check-bump`、`check-revisions` CLI。 |
-| `python skills/ghc-search/scripts/test_ghc_search.py` | 搜索客户端的请求/解析/错误行为。 |
-| `python skills/hoa-introspect/evals/run.py` | `hoa-introspect` eval fixtures。 |
-| `python skills/hoa-introspect-distill/evals/run_evals.py` | `hoa-introspect-distill` eval fixtures。 |
-| `python skills/define-goal/evals/validate_fixtures.py` | `define-goal` eval fixtures。 |
-| `python evals/run_trigger_evals.py` | trigger case 结构、目录交叉引用与 baseline 算术（离线）。 |
-| `python -m unittest evals.test_judge_trigger_evals` | judge 配置优先级、退出码、逐 case 失败、baseline 写入；对本地 stub 运行。 |
-| `python evals/validate_skill_method_cases.py` | `skill-method-cases.json` 结构与隔离路径。 |
-| `python -m unittest evals.test_validate_skill_method_cases` | skill-method case 的 setup 文件隔离。 |
-
-依赖安装（`python -m pip install -r scripts/requirements.txt`）先于这些检查。judge 的 HTTP
-客户端只用标准库；它导入的目录生成器使用仓库的 PyYAML 工具。
+本地运行 Python 测试：
+`uv run --no-project --with-requirements scripts/requirements.txt python -m pytest`（或
+`pip install -r scripts/requirements.txt && python -m pytest`）。新的 `test_*.py` 测试文件无需登记即被收集；
+不是测试文件的独立检查需要在 `ci.yml` 中有自己的 step。CI 在 Linux 上运行；gdd launcher 的测试按 POSIX
+进程语义编写，请在 Linux（或 WSL）上运行，而不是原生 Windows。
 
 ### eval case 如何评分——以及它能证明什么
 
@@ -259,24 +217,18 @@ judge 在这一天这样理解了这些描述；它不证明用户会同样路�
 模型会同意。baseline 固定 model、effort、endpoint host 与日期，正是因为改动其中任何一项都会
 破坏可比性。这个 suite 证明的是在人工挑选的近义 case 上有区分度，而不是真实世界的路由质量。
 
-## 版本与 revision
+## Revision
 
-两个计数器，各管一件事：
-
-- `VERSION` 是唯一的项目版本（semver）。每个 PR 递增它的 patch：CI 要求恰好等于
-  `origin/main` 的 patch + 1，所以落后于他人合并的分支要 rebase 后重新 bump。
-- 每个 `SKILL.md` 里的 `metadata.revision` 是整数字符串，记录该 skill 自身的迭代次数。
-  PR 只为它改动过的 skill 目录提高 revision；新 skill 从 `"1"` 开始。项目版本不会复制进 skill。
+没有项目版本。每个 `SKILL.md` 里的 `metadata.revision` 是整数字符串，记录该 skill 自身的迭代次数。
+PR 只为它改动过的 skill 目录提高 revision；新 skill 从 `"1"` 开始。
 
 ```bash
 python -m pip install -r scripts/requirements.txt  # 仓库工具依赖；建议使用 venv
-python scripts/version.py bump             # 默认 patch：0.1.0 -> 0.1.1
-python scripts/version.py check-bump       # VERSION 是 origin/main 的 patch + 1
 python scripts/version.py check-revisions  # 每个改动过的 skill 都提高了 revision
 ```
 
 没有 release、tag 或二进制产物：`npx skills` 直接从 GitHub 默认分支安装。
-本地版本命令不会 commit 或 push。
+`CHANGELOG.md` 条目按日期记录且可选，没有 gate 要求必须写。
 
 
 ## 双语政策

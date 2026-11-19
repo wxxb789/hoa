@@ -42,6 +42,7 @@ private/
 # Python build artifacts (generated when running skill scripts / evals)
 __pycache__/
 *.pyc
+.pytest_cache/
 
 # Local npm dependencies (paseo-plugins)
 node_modules/
