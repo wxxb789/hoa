@@ -84,3 +84,5 @@ Keep it short enough for an instruction file (example layer names abbreviated):
 - **Sensitive subfolders widen exposure on migration.** When the store keeps an isolated private root, the migration must not copy private material into a published layer, and must not bypass the secret scan to make a batch pass.
 - **Duplicate state stores are the real finding.** Two live GTD directories, two ledgers, two goal lists mean the owner is paying maintenance twice; report the duplication and the retirement order, not just the destination path.
 - **Moving a named directory leaves dead paths everywhere.** Every contract mention, script path, and bot fast-line command that names the old location breaks silently; sweep them in the same batch or keep the directory as a documented exception.
+
+- Report duplication as the finding (two GTD stores, two ledgers, two goal lists); moving files without retiring the copy recreates it in a week.
