@@ -72,8 +72,9 @@ prefix. A clash with an upstream skill the owner has not installed is not a reas
    but repair any live links the rename breaks.
 2. Add `[retired.<old>]` to `scripts/retired_skills.toml` with `replacement` and `reason`, and
    regenerate the indexes: the entry joins the generated `npx skills remove -g …` line. A name that
-   was never released gets no entry. Omit names still shipped by an upstream skill: the remove
-   command matches by name, not source.
+   was never released gets no entry. Omit a name that the owner's selection still installs from an
+   upstream source (as with mattpocock's `improve-codebase-architecture`): the remove command matches
+   by name, not source.
 3. The renamed directory restarts at `metadata.revision: "1"` (`scripts/version.py check-revisions`
    treats it as a new skill); bump the revision of every other skill whose directory the rename
    touched.

@@ -54,7 +54,7 @@ Hermes · Claude Code · Codex · pi · OpenCode · Kimi Code · *(`npx skills` 
 | 关注点 | 归属 | 机制 |
 |---|---|---|
 | Skills（`SKILL.md` 包） | **hoa** | `npx skills add wxxb789/hoa -s <skill>` → `~/<agent>/skills/` |
-| agent 角色、orchestration、prompt、rule、mcp、workflow、eval | **hoa** | 版本控制的库 / 知识（拼进 skill 或手动取用） |
+| agent 角色、orchestration、prompt、rule、workflow、eval | **hoa** | 版本控制的库 / 知识（拼进 skill 或手动取用） |
 | reflections 与外部参考 | **hoa** | 知识，永不下发 |
 | runtime **设置**——LLM provider、models、plugins、`settings.json` / `config.toml` / `opencode.json` | **chezmoi** | `chezmoi apply` |
 
