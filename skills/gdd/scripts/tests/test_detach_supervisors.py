@@ -4,8 +4,6 @@ import json
 import os
 import plistlib
 import re
-import shlex
-import shutil
 import signal
 import subprocess
 import sys
@@ -78,6 +76,7 @@ class SupervisorTests(unittest.TestCase):
         self.run_dir = self.root / "2026-01-01" / "test"
         self.run_dir.mkdir(parents=True)
         self.argv = [sys.executable, "-B", RUNNER, "_run", "--run-dir", str(self.run_dir)]
+        self.herdr_python = r"C:\Python-3\python.exe" if os.name == "nt" else "/opt/python-3/bin/python3"
         self.state = {"name": "test", "state": "running", "started": "2000-01-01T00:00:00+00:00",
                       "pid": None, "agent_pid": None, "spawn": {}}
         self.env = {**os.environ, "GDD_RUN_ROOT": str(self.root), "STUB_FIXTURE": FIXTURE,
@@ -123,12 +122,19 @@ class SupervisorTests(unittest.TestCase):
                                "StandardErrorPath": str(self.run_dir / "runner.log"),
                                "AbandonProcessGroup": True, "RunAtLoad": True, "Umask": 0o027})
         self.assertEqual(self.calls(), [["launchctl", "bootstrap", "gui/123", str(plist)]])
+        if os.name != "nt":
+            (self.root / "self-bootout").touch()
+        run = self.run_launchd_job(expected)
+        self.assertEqual(run.returncode, 0 if os.name == "nt" else -signal.SIGTERM, run.stderr)
+        self.assertEqual(agent_run.read_state(self.run_dir)["state"], "done")
+        self.assertFalse(plist.exists())
+        self.assertEqual(self.calls()[-1], ["launchctl", "bootout", f"gui/123/{target['label']}"])
+
+    def run_launchd_job(self, argv, **kwargs):
         agent_run.write_json(self.run_dir / "run.json", {"agent": "omp", "argv": [sys.executable, STUB],
                                                         "cwd": str(self.root), "prompt": "argv"})
         (self.run_dir / "prompt.md").write_text("finish", encoding="utf-8")
-        if os.name != "nt":
-            (self.root / "self-bootout").touch()
-        # Execute the internal runner with only launchctl replaced. The stub agent is short-lived.
+        # Replay the stub's job after launchctl returns and the runner is released.
         source = """
 import sys
 from pathlib import Path
@@ -140,13 +146,9 @@ agent_run.supervisor_call = lambda argv, env=None: gdd_process.run(
 sys.exit(agent_run.main(args))
 """
         try:
-            run = gdd_process.run([sys.executable, "-c", source, RUNNER, SUPERVISOR, str(self.root),
-                                   *expected[2:]], cwd=self.root, env=self.env, capture_output=True,
-                                  text=True, timeout=15)
-            self.assertEqual(run.returncode, 0 if os.name == "nt" else -signal.SIGTERM, run.stderr)
-            self.assertEqual(agent_run.read_state(self.run_dir)["state"], "done")
-            self.assertFalse(plist.exists())
-            self.assertEqual(self.calls()[-1], ["launchctl", "bootout", f"gui/123/{target['label']}"])
+            return gdd_process.run([sys.executable, "-c", source, RUNNER, SUPERVISOR, str(self.root),
+                                    *argv[2:]], cwd=self.root, capture_output=True, text=True,
+                                   timeout=15, **kwargs)
         finally:
             state = agent_run.read_state(self.run_dir)
             for key in ("agent_pid", "pid"):
@@ -159,13 +161,28 @@ sys.exit(agent_run.main(args))
         self.start("launchd", "launchctl")
         label = self.state["supervisor"]["label"]
         log = str(self.run_dir / "runner.log")
-        self.assertEqual(self.calls()[1], ["launchctl", "submit", "-l", label, "-o", log, "-e", log, "--",
-                                           *self.argv, "--launchd-start", "--restore-env", "--runner-cwd",
-                                           str(self.root)])
+        submit = self.calls()[1]
+        self.assertEqual(submit[:9], ["launchctl", "submit", "-l", label, "-o", log, "-e", log, "--"])
+        self.assertEqual(submit[9:-2], [*self.argv, "--launchd-start", "--restore-env", "--runner-cwd",
+                                       str(self.root)])
         self.assertEqual(agent_run.effective_state(self.run_dir)[0]["state"], "failed")
         self.assertEqual(self.calls()[-1], ["launchctl", "bootout", f"gui/123/{label}"])
         self.assertFalse((self.run_dir / "runner.plist").exists())
         self.assertFalse(agent_run.effective_state(self.run_dir)[1])
+
+    @unittest.skipIf(os.name == "nt", "POSIX file modes")
+    def test_launchd_submit_keeps_dispatchers_umask(self):
+        (self.root / "unsupported").touch()
+        record = self.root / "record.json"
+        self.env["STUB_RECORD"] = str(record)
+        with mock.patch.object(os, "umask", return_value=0o027):
+            self.start("launchd", "launchctl")
+        submit = self.calls()[1]
+        run = self.run_launchd_job(submit[submit.index("--") + 1:], umask=0o002)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertEqual(agent_run.read_state(self.run_dir)["state"], "done")
+        for path in (record, self.run_dir / "answer.md"):
+            self.assertEqual(path.stat().st_mode & 0o777, 0o640)
 
     def test_launchd_failure_records_setsid_fallback(self):
         (self.root / "refuse").touch()
@@ -191,7 +208,8 @@ sys.exit(agent_run.main(args))
 
     def test_optional_modes_require_env_and_executable(self):
         for mode in ("tmux", "herdr"):
-            with self.subTest(mode=mode), mock.patch.object(agent_run, "IS_WINDOWS", False):
+            with self.subTest(mode=mode), mock.patch.object(agent_run, "IS_WINDOWS", mode == "herdr" and os.name == "nt"), \
+                    mock.patch.object(agent_run, "interpreter", return_value=self.herdr_python):
                 with mock.patch.object(agent_run.skill_config, "resolve", return_value=mode), \
                         mock.patch.dict(os.environ, {"GDD_RUN_DETACH": "auto"}):
                     with self.assertRaisesRegex(ValueError, "must be set in the environment"):
@@ -283,10 +301,7 @@ sys.exit(agent_run.main(args))
         script.write_text("import sys\nfrom runner_sibling import json\nprint(json.dumps(sys.argv))\n",
                           encoding="utf-8")
         self.argv[2] = str(script)
-        if os.name != "nt":
-            executable = self.root / "python's path with spaces ;$HOME"
-            executable.symlink_to(sys.executable)
-            self.argv[0] = str(executable)
+        self.argv[0] = self.herdr_python
         self.start("herdr", "herdr")
         target = agent_run.read_state(self.run_dir)["supervisor"]
         self.assertEqual((target["tab"], target["pane"]), ("tab-1", "pane-1"))
@@ -298,13 +313,9 @@ sys.exit(agent_run.main(args))
         entry = target["entry"]
         self.assertRegex(entry, r"^\.runner-herdr-[0-9a-f]{12}\.py$")
         self.assertFalse(any(option.startswith("PATH=") for option in create))
-        if os.name == "nt":
-            self.assertEqual(run[4], "& '" + self.argv[0].replace("'", "''") + f"' -B {entry}")
-            command = [self.argv[0], "-B", entry]
-        else:
-            self.assertEqual(shlex.split(run[4]), [self.argv[0], "-B", entry])
-            command = [shutil.which("sh"), "-c", run[4]]
-        executed = gdd_process.run(command, cwd=self.run_dir, env={**self.env, "PATH": os.defpath},
+        executable = self.argv[0].replace("\\", "/")
+        self.assertEqual(run[4:], [f"{executable} -B {entry}"])
+        executed = gdd_process.run([sys.executable, "-B", entry], cwd=self.run_dir, env=self.env,
                                    capture_output=True, text=True, timeout=10)
         self.assertEqual(executed.returncode, 0, executed.stderr)
         self.assertEqual(json.loads(executed.stdout), [*self.argv[2:], "--restore-env", "--runner-cwd", str(self.root)])
@@ -321,7 +332,38 @@ sys.exit(agent_run.main(args))
         self.check_kill("herdr")
         self.assertEqual(self.calls()[-1], ["herdr", "tab", "close", "tab-1"])
 
+    def test_herdr_refuses_paths_requiring_shell_quoting(self):
+        for windows, template in ((False, "/opt/py{}thon/bin/python3"),
+                                  (True, r"C:\py{}thon\python.exe")):
+            for char in (" ", "'", "\u2018", "\u2019", "\u201a", "\u201b", "\u00e9", "\u4e2d"):
+                with self.subTest(windows=windows, char=char), \
+                        mock.patch.object(agent_run, "IS_WINDOWS", windows), \
+                        mock.patch.object(agent_run, "supervisor_call") as call, \
+                        mock.patch.object(agent_run.shutil, "which", return_value="herdr"):
+                    self.argv[0] = template.format(char)
+                    with mock.patch.object(agent_run, "interpreter", return_value=self.argv[0]):
+                        with self.assertRaises(OSError):
+                            agent_run.select_detach("herdr")
+                    with self.assertRaises(OSError):
+                        self.start("herdr", "herdr")
+                    call.assert_not_called()
+                    self.assertFalse((self.run_dir / ".runner-env").exists())
+                    self.assertFalse(list(self.run_dir.glob(".runner-herdr-*.py")))
+
+    def test_herdr_start_uses_selected_interpreter(self):
+        prompt = self.root / "prompt.md"
+        prompt.write_text("test", encoding="utf-8")
+        executable = str(HERE / "python.exe")
+        with mock.patch.object(agent_run, "interpreter", return_value=executable), \
+                mock.patch.object(agent_run, "select_detach", return_value=("herdr", "herdr")), \
+                mock.patch.object(agent_run, "spawn_detached", side_effect=OSError) as spawn, \
+                mock.patch.dict(os.environ, {"GDD_AGENT": "omp", "OMP_BIN": STUB}):
+            with self.assertRaises(SystemExit):
+                agent_run.main(["start", "--name", "interpreter", "--prompt", str(prompt)])
+        self.assertEqual(spawn.call_args.args[0][0], executable)
+
     def test_herdr_tab_already_closed_is_clean(self):
+        self.argv[0] = self.herdr_python
         self.start("herdr", "herdr")
         (self.root / "tab-missing").touch()
         self.assertEqual(agent_run.cleanup_supervisor(self.run_dir, self.state), "")
@@ -330,6 +372,7 @@ sys.exit(agent_run.main(args))
 
     def test_optional_failures_do_not_fall_back(self):
         (self.root / "refuse").touch()
+        self.argv[0] = self.herdr_python
         for mode, error in (("tmux", "cannot connect"), ("herdr", "pane command refused")):
             with self.subTest(mode=mode), mock.patch.object(gdd_process, "daemonize") as fork:
                 # Each submission owns a fresh directory.

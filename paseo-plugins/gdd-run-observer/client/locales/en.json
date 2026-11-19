@@ -77,7 +77,7 @@
     "no-pids": "No pid is recorded, so liveness cannot be checked.",
     "liveness-unknown": "Liveness is unproven for this run.",
     "log-unreadable": "events.ndjson could not be read.",
-    "log-truncated": "The launcher spliced the event log; counters cover the retained part only."
+    "log-truncated": "Some older events are no longer available in the event log."
   },
   "source": {
     "setting": "the plugin setting",

@@ -76,6 +76,9 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 - gdd: keep PID checks independent of time zone and locale, treat legacy identities as unverified,
   preserve the dispatcher's umask in systemd units and LaunchAgent plists, retry progress publishes
   for up to about a second, and pin the Herdr pane to the dispatcher's Python executable.
+- gdd: use the same Python selection for Herdr as other detach modes, reject interpreter paths
+  that need shell quoting, and preserve the dispatcher umask on legacy launchctl submit.
+  Load the no-window guard at Windows CI startup and correct the observer's event-log warning.
 
 - Trigger evals now route on visible skills' frontmatter descriptions, accept `none` when no
   artifact fits, and include three no-trigger cases.

@@ -143,6 +143,8 @@ def select_detach(requested):
             raise ValueError(f"GDD_RUN_DETACH={requested}: {requested} executable not found on PATH")
         if requested == "tmux":
             check_tmux_version(launcher)
+        else:
+            herdr_executable(interpreter())
         return requested, launcher
     if requested in ("auto", "systemd") and sys.platform == "linux":
         if (launcher := shutil.which("systemd-run")) and (ctl := shutil.which("systemctl")):
@@ -265,11 +267,12 @@ def launchd_start(runner, run_dir, cwd, env, state):
     plist = run_dir / "runner.plist"
     runner = [*runner, "--launchd-start"]
     launcher, domain, label = target["argv"][0], target["domain"], target["label"]
+    umask = dispatcher_umask()
     with os.fdopen(private_file(plist), "wb") as stream:
         plistlib.dump({"Label": label, "ProgramArguments": runner, "WorkingDirectory": cwd,
                        "EnvironmentVariables": env, "StandardOutPath": str(run_dir / "runner.log"),
                        "StandardErrorPath": str(run_dir / "runner.log"), "AbandonProcessGroup": True,
-                       "RunAtLoad": True, "Umask": dispatcher_umask()}, stream)
+                       "RunAtLoad": True, "Umask": umask}, stream)
     result = supervisor_call([launcher, "bootstrap", domain, str(plist)])
     if result.returncode and (result.returncode == 64 or re.search(
             r"(?:unknown|unrecognized|unsupported) (?:sub)?command", result.stderr, re.IGNORECASE)):
@@ -278,7 +281,7 @@ def launchd_start(runner, run_dir, cwd, env, state):
         save_detached_env(run_dir, env)
         result = supervisor_call([launcher, "submit", "-l", label, "-o", str(run_dir / "runner.log"),
                                   "-e", str(run_dir / "runner.log"), "--", *runner, "--restore-env",
-                                  "--runner-cwd", cwd])
+                                  "--runner-cwd", cwd, "--runner-umask", str(umask)])
     require_success(result)
     (run_dir / ".launchd-ready").touch()
 
@@ -291,9 +294,22 @@ def herdr_response(result):
     return response["result"]
 
 
+def herdr_executable(path):
+    executable = os.path.abspath(path)
+    if IS_WINDOWS:
+        executable = executable.replace("\\", "/")
+    if not re.fullmatch(r"[A-Za-z0-9_./:\-]+", executable):
+        raise OSError(f"GDD_RUN_DETACH=herdr cannot use Python at {path!r}; "
+                      "install Python at a path without spaces or special characters "
+                      "(use ASCII letters, digits, underscores, hyphens and dots in path components)")
+    return executable
+
+
 def spawn_detached(runner, run_dir, cwd, env, state, mode, launcher=None):
     run_dir = Path(run_dir)
     log_path = run_dir / "runner.log"
+    if mode == "herdr":
+        executable = herdr_executable(runner[0])
     state["detach"] = mode
     if state.get("backend") != "paseo":
         state["backend"] = mode
@@ -340,13 +356,6 @@ def spawn_detached(runner, run_dir, cwd, env, state, mode, launcher=None):
                 (run_dir / ".supervisor-started").touch()
             else:
                 # Herdr sends shell input. Keep run arguments in the private entry, not the command.
-                executable = os.path.abspath(runner[0])
-                if not executable.isprintable():
-                    raise ValueError(f"Herdr interpreter path contains non-printable characters: {executable!r}")
-                if IS_WINDOWS:
-                    command = "& '" + re.sub(r"['\u2018\u2019]", lambda m: m[0] * 2, executable) + "'"
-                else:
-                    command = shlex.quote(executable)
                 with os.fdopen(private_file(run_dir / target["entry"]), "w", encoding="utf-8") as entry:
                     entry.write("import os, runpy, sys\n"
                                 f"sys.argv = {ascii([*runner[2:], '--runner-cwd', cwd])}\n"
@@ -366,7 +375,7 @@ def spawn_detached(runner, run_dir, cwd, env, state, mode, launcher=None):
                 target["pane"] = pane
                 write_json(run_dir / "state.json", state)
                 require_success(target_call(target, "pane", "run", pane,
-                                            f"{command} -B {target['entry']}"))
+                                            f"{executable} -B {target['entry']}"))
             return None, 0
     except (OSError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired) as exc:
         (run_dir / ".runner-env").unlink(missing_ok=True)
@@ -401,6 +410,8 @@ def restore_detached_env(run_dir):
 
 
 def enter_detached(args):
+    if args.runner_umask is not None:
+        os.umask(args.runner_umask)
     # RunAtLoad can execute before bootstrap returns. Never run a second copy after fallback.
     if args.launchd_start:
         ready = Path(args.run_dir, ".launchd-ready")
@@ -417,6 +428,7 @@ def enter_detached(args):
 def add_detach_arguments(parser):
     parser.add_argument("--restore-env", action="store_true")
     parser.add_argument("--runner-cwd")
+    parser.add_argument("--runner-umask", type=int, help=argparse.SUPPRESS)
     parser.add_argument("--launchd-start", action="store_true")
     parser.add_argument("--creationflags", type=int, default=0, help=argparse.SUPPRESS)
 
@@ -1298,8 +1310,7 @@ def start_locked(args, spec, slug, cwd, run_dir, command, prompt, max_time, mode
         "model": args.model,
         "thinking": args.thinking, "max_time": args.max_time, "resumed_from": args.resume,
         "spawn": {"creationflags": 0, "platform": sys.platform}}
-    runner = [sys.executable if mode == "herdr" else interpreter(),
-              "-B", os.path.abspath(__file__), "_run", "--run-dir", run_dir]
+    runner = [interpreter(), "-B", os.path.abspath(__file__), "_run", "--run-dir", run_dir]
     try:
         pid, _ = spawn_detached(runner, run_dir, cwd, child_env(spec.scrub_env), state, mode, launcher)
     except OSError as exc:

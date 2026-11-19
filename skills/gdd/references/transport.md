@@ -40,12 +40,13 @@ Windows in the `gdd-runner` CI job; the real-CLI smoke is an opt-in operator ste
 | `tmux` (optional, POSIX, 3.2a or newer) | Yes | Only if the tmux server is outside the gateway's cgroup/job | No |
 | `herdr` (optional, latest herdr) | Yes | Only if the Herdr server survives the restart | No |
 
-The real-systemd literal-path regression test needs a reachable user manager and is skipped
-where none is available.
+The real-systemd literal-path and umask regression tests need a reachable user manager and
+are skipped where none is available.
 
 1. **Auto selects the platform ladder.** Linux/WSL2 checks its user manager for at most one
    second and uses a transient unit if it reports `running` or `degraded`. macOS bootstraps a one-shot
    LaunchAgent in the current GUI domain, using legacy submit only if bootstrap is unavailable.
+   Both launchd paths preserve the dispatcher's umask.
    A launchctl failure falls back to double-fork plus `setsid` and records `detach_fallback`.
    Other POSIX hosts use that double fork directly. Launchd is verified only with stubs; a real
    WSL2 test exercises double-fork session/process-group survival, not a macOS/BSD live run.
@@ -54,12 +55,15 @@ where none is available.
    access denied retries without breakaway. State records the actual `spawn.creationflags`.
 3. **Opt in to a watchable supervisor in the environment.** `GDD_RUN_DETACH=tmux` creates a
    detached session; `GDD_RUN_DETACH=herdr` creates an unfocused tab in an existing server.
-   Herdr's pane API accepts shell input, not an argv vector. GDD starts the pane in the run
-   directory and invokes the dispatcher's absolute Python executable with a generated ASCII
-   entry filename, independent of the pane's `PATH`. The entry loads the original runner
-   arguments without shell parsing and removes itself.
-   The command uses POSIX shell quoting (PowerShell on Windows). The private environment file is
-   removed after reading; on Windows it is created with a protected, current-user-only DACL.
+   Herdr's pane API accepts shell input, not an argv vector, and its CLI help exposes no pane-shell
+   option. GDD sends the absolute interpreter (the same `python.exe` selection as other Windows
+   modes) and a generated ASCII entry filename as bare tokens, independent of the pane's `PATH`.
+   The interpreter path may contain only ASCII letters, digits, underscores, dots, slashes, colons,
+   and hyphens. Windows backslashes are converted to forward slashes before sending the command.
+   If the path contains spaces or other special characters, install Python at a path without them
+   or choose another detach mode. The entry loads the run arguments without shell parsing and
+   removes itself. The private environment file is removed after reading; on Windows it is created
+   with a protected, current-user-only DACL.
    Neither is selected by auto; a missing executable or failed request refuses startup.
    State records the handle under `supervisor`; the runner or a subsequent reader removes the
    job, session or tab at completion. Use the runner's `kill` to stop the agent as well.

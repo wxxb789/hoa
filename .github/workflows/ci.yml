@@ -94,6 +94,8 @@ jobs:
           cache-dependency-path: scripts/requirements.txt
       - run: python -m pip install -r scripts/requirements.txt
       - name: Shared gdd runner, dispatch, and watcher contracts
+        env:
+          PYTHONPATH: ${{ runner.os == 'Windows' && format('{0}/skills/gdd/scripts/tests/nowindow', github.workspace) || '' }}
         run: >-
           python -m pytest -q
           skills/gdd/scripts/tests/test_agent_run.py
