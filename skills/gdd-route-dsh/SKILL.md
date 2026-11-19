@@ -1,12 +1,12 @@
 ---
 name: gdd-route-dsh
 description: >-
-  Dispatch and supervise a bounded task on a DeepSeek Harness (`dsh`) headless worker, via its
-  adapter or as a `gdd` stage beside the OMP route. Use when a dsh run claims success without the
+  Dispatch and supervise a bounded task on a DeepSeek Harness (`dsh`) headless worker, through the
+  shared runner or as a `gdd` stage beside the OMP route. Use when a dsh run claims success without the
   work, must be resumed, stopped or recovered, or its launcher needs configuring. Not for the
   delivery protocol (`gdd`) or OMP runs (`gdd-route-omp`).
 metadata:
-  revision: "2"
+  revision: "3"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "dispatch and supervise a GDD stage on dsh headless: session/worktree rules, completion judgement, recovery, harness traps (requires skill `gdd`)"

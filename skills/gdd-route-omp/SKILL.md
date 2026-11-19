@@ -6,7 +6,7 @@ description: >-
   survive session restarts: NDJSON event log, polled completion, session-id recovery. Not for a short
   command (run inline) or work needing live steering (TUI).
 metadata:
-  revision: "2"
+  revision: "3"
   areas: "software-development,work-management"
   targets: "pi"
   summary: "detached runner for long `omp -p` runs; polled completion, session-id recovery (requires skill `gdd`)"
