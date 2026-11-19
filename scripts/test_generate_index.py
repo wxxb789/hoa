@@ -305,6 +305,18 @@ class CheckDriftTests(unittest.TestCase):
         append(self.tmp / "skills" / "solo" / "SKILL.md", "Read ../c/SKILL.md.\n")
         self.assertEqual(self._run(check=True), 1)
 
+    def test_install_without_hermes_lists_every_other_skill_and_stays_complete(self):
+        make_skill(self.tmp, "a")
+        make_skill(self.tmp, "hermes-x")
+        self.assertEqual(self._run(check=False), 0)
+        for name, marker in (("index.md", "Without Hermes"), ("index.zh-CN.md", "不使用 Hermes")):
+            text = (self.tmp / name).read_text(encoding="utf-8")
+            self.assertIn(marker, text)
+            self.assertIn("```bash\nnpx skills add wxxb789/hoa -g -s a -y\n```", text)
+
+        append(self.tmp / "skills" / "a" / "SKILL.md", "Read ../hermes-x/SKILL.md.\n")
+        self.assertEqual(self._run(check=False), 1)
+
     def test_retired_registry_becomes_one_remove_command_and_is_validated(self):
         make_skill(self.tmp, "alpha")
         registry = self.tmp / "scripts" / "retired_skills.toml"

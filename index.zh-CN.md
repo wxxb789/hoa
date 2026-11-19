@@ -97,6 +97,13 @@ targets:  runtime-agnostic | repo-only |
 | hermes-models | hermes-models-cutover | `npx skills add wxxb789/hoa -g -s hermes-models -s hermes-models-cutover -y` |
 | hoa-skill-set-audit | hoa-skill-create | `npx skills add wxxb789/hoa -g -s hoa-skill-set-audit -s hoa-skill-create -y` |
 
+不使用 Hermes 时，不要安装 `hermes-*` skill：它们只用于操作 Hermes，其他 skill 也不链接它们。
+安装其余全部 skill：
+
+```bash
+npx skills add wxxb789/hoa -g -s agent-harness-settings-parity -s agent-operating-contract-evolution -s ai-coding-agent-delegation -s contract-bound-deliverables -s cross-agent-repair-routing -s define-goal -s delegated-work-acceptance -s discord-rich-message -s dotnet-repo-workflow -s evidence-backed-analytical-writing -s evidence-boundary-discipline -s gdd -s gdd-route-dsh -s gdd-route-omp -s ghc-search -s git-auto-sync-pipelines -s harness-engineering -s hoa-practice-retro -s hoa-repo-reckoning -s hoa-skill-create -s hoa-skill-curate -s hoa-skill-port -s hoa-skill-review -s hoa-skill-set-audit -s measurement-campaign-evidence -s official-document-verification -s package-release-verification -s project-phase-closeout -s report-claim-audit -s research-stream-consolidation -s review-revision-candidates -s spec-convergence -s structural-validity-gates -s tmux-agent-control -s writing -y
+```
+
 某次发布改名或退役了 skill 时：移除本仓库已不再提供的名称（由 `scripts/retired_skills.toml`
 生成，其中写明每个名称的替代者），再重新运行整库安装命令或上表中该 skill 的当前行（之前保存的命令可能仍含旧名称）——
 `npx skills update` 从不安装新名称。

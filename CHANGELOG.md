@@ -6,6 +6,9 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 ## 2026-11-19
 
+- The README and the generated index tell users who do not run Hermes to skip the `hermes-*` skills, and
+  the index carries an install-everything-but-Hermes command; `generate_index.py` fails if any other
+  skill starts linking to a `hermes-*` skill.
 - Use the public npm registry for GDD Observer and reject corporate package-feed hosts in CI.
 - Remove completed records, unused skill-method fixtures and the redundant proxy catalog entry; repair relative links and track deferred maintenance in TODO.md.
 - Recommend shallow clones for reference submodules without changing pins or update behavior.

@@ -287,6 +287,10 @@ npx skills update -g -y
 所以单写 `-s <skill>` 可能缺少它串联的同级 skill。要单装，从 [`index.zh-CN.md`](./index.zh-CN.md#安装)
 的“安装”一节复制该 skill 的命令：它由链接生成，列出该 skill 的整个闭包。表中没有的 skill 没有依赖。
 
+**不使用 Hermes？那就不要安装 `hermes-*` skill。** 它们只用于操作 Hermes，而上面的整库安装命令会把它们一起装上。
+请改用 [`index.zh-CN.md`](./index.zh-CN.md#安装) “安装”一节里生成的“不使用 Hermes 时”命令；
+其他 skill 都不链接它们，所以不会缺依赖。
+
 **Hermes 模型路由。** [`hermes-models`](./skills/hermes-models/SKILL.md) 用于配置和验证 Hermes 模型路由。
 请使用父 skill 生成的安装命令，将 [`hermes-models-cutover`](./skills/hermes-models-cutover/SKILL.md)
 和父 skill 一起装到同一个 skills 根目录。子 skill 负责可回滚的全量切换和同 provider 的 ID 替换，

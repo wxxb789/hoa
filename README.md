@@ -315,6 +315,11 @@ skill without the siblings it chains to. To install single skills, copy that ski
 the Install section of [`index.md`](./index.md#install): it is generated from the links and names the
 skill's whole closure. A skill not listed there has no dependencies.
 
+**Not using Hermes? Skip the `hermes-*` skills.** They only operate a Hermes install, and the
+install-everything command above includes them. Use the generated "Without Hermes" command in the
+Install section of [`index.md`](./index.md#install) instead; no other skill links to them, so nothing
+else is left incomplete.
+
 **Hermes model routing.** [`hermes-models`](./skills/hermes-models/SKILL.md) configures and verifies Hermes model routes.
 Install [`hermes-models-cutover`](./skills/hermes-models-cutover/SKILL.md) together with it
 in the same skills root using the parent skill's generated Install row. The child covers reversible

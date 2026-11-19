@@ -99,6 +99,13 @@ below. A skill without a row has no dependencies: `npx skills add wxxb789/hoa -g
 | hermes-models | hermes-models-cutover | `npx skills add wxxb789/hoa -g -s hermes-models -s hermes-models-cutover -y` |
 | hoa-skill-set-audit | hoa-skill-create | `npx skills add wxxb789/hoa -g -s hoa-skill-set-audit -s hoa-skill-create -y` |
 
+Without Hermes, skip the `hermes-*` skills: they only operate a Hermes install, and no other skill
+links to them. Install everything else with:
+
+```bash
+npx skills add wxxb789/hoa -g -s agent-harness-settings-parity -s agent-operating-contract-evolution -s ai-coding-agent-delegation -s contract-bound-deliverables -s cross-agent-repair-routing -s define-goal -s delegated-work-acceptance -s discord-rich-message -s dotnet-repo-workflow -s evidence-backed-analytical-writing -s evidence-boundary-discipline -s gdd -s gdd-route-dsh -s gdd-route-omp -s ghc-search -s git-auto-sync-pipelines -s harness-engineering -s hoa-practice-retro -s hoa-repo-reckoning -s hoa-skill-create -s hoa-skill-curate -s hoa-skill-port -s hoa-skill-review -s hoa-skill-set-audit -s measurement-campaign-evidence -s official-document-verification -s package-release-verification -s project-phase-closeout -s report-claim-audit -s research-stream-consolidation -s review-revision-candidates -s spec-convergence -s structural-validity-gates -s tmux-agent-control -s writing -y
+```
+
 After a release that renames or retires skills, remove the names this repo no longer ships
 (generated from `scripts/retired_skills.toml`, which names each replacement), then re-run the
 install-all command or the current row above for each skill (a saved command may still name the old
