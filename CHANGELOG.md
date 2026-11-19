@@ -6,6 +6,13 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 ## 2026-11-18
 
+- Bound Windows stress rounds, retain failure diagnostics, and clean up round-owned processes.
+  Verify descendant shutdown, stale-run preservation, PID reuse, and first terminal state; keep
+  lifecycle cleanup compatible with Python 3.9-3.11 and lighten the Paseo stub.
+
+- gdd (revision 7): harden lifecycle tests with atomic records, explicit readiness, identity-checked
+  cleanup, and a nightly and manual Windows stress run.
+
 - Rewrote the 31 model-visible descriptions over 350 characters to fit 350 (visible total 15,764 → 12,860
   characters), keeping each skill's triggers and nearest sibling boundary.
   `check_frontmatter.py` now rejects a model-visible description over 350; hidden skills keep

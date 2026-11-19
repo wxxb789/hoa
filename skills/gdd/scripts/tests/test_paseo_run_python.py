@@ -6,6 +6,7 @@ import importlib.util
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
@@ -18,16 +19,30 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import agent_run
 import gdd_process
+from gdd_test_support import (check_locks, check_processes, claim, cleanup_child, finalized, own_identity, publish_json, ready,
+                              remove_tree, retry_windows, wait_for_json)
 
 ADAPTER = Path(__file__).resolve().parents[1] / "adapters" / "paseo-run.py"
 STUB = '''#!/usr/bin/env python3
-import json, os, sys
+import json, os, sys, time
 from pathlib import Path
+sys.path[:0] = [os.environ["STUB_TESTS"], os.environ["STUB_SCRIPTS"]]
+from gdd_test_support import own_identity, publish_json
 args = sys.argv[1:]
 root = Path(os.environ["STUB_HOME"])
+pid = os.getpid()
+publish_json(root / "children" / f"{pid}.json", [pid, own_identity()])
 with (root / "argv.ndjson").open("a", encoding="utf-8") as f:
     f.write(json.dumps(args) + "\\n")
-config = json.loads((root / "fixture.json").read_text(encoding="utf-8"))
+deadline = time.monotonic() + 2
+while True:
+    try:
+        config = json.loads((root / "fixture.json").read_text(encoding="utf-8"))
+        break
+    except PermissionError:
+        if time.monotonic() >= deadline:
+            raise
+        time.sleep(0.025)
 command = args[0]
 if config.get("offline"):
     print("daemon unavailable", file=sys.stderr)
@@ -53,18 +68,14 @@ elif command == "stop":
                       "agentIds": [config["id"]] if stopped else []}))
     if stopped:
         config["status"] = "idle"
-        target = root / "fixture.next"
-        target.write_text(json.dumps(config), encoding="utf-8")
-        os.replace(target, root / "fixture.json")
+        publish_json(root / "fixture.json", config)
 elif command == "delete":
     deleted = not config.get("delete_failed")
     receipt = config.get("delete_receipt", {"deletedCount": int(deleted), "agentIds": [config["id"]] if deleted else []})
     print(json.dumps(receipt))
     if deleted and type(receipt.get("deletedCount")) is int and receipt == {"deletedCount": 1, "agentIds": [config["id"]]}:
         config["missing"] = True
-        target = root / "fixture.next"
-        target.write_text(json.dumps(config), encoding="utf-8")
-        os.replace(target, root / "fixture.json")
+        publish_json(root / "fixture.json", config)
 elif command == "ls":
     print(json.dumps([] if config.get("missing") else
                      [{"id": config["id"], "status": config["status"]}]))
@@ -73,11 +84,22 @@ else:
 '''
 
 
+def test_stub_identity_matches_runner():
+    recorded = own_identity()
+    assert recorded and recorded == agent_run.identity(os.getpid())
+
+
 class PaseoLauncherTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(prefix="paseo-run-test.")
-        self.addCleanup(self.temp.cleanup)
-        self.home = Path(self.temp.name)
+        self.home = Path(tempfile.mkdtemp(prefix="paseo-run-test."))
+        self.addCleanup(remove_tree, self.home)
+        self.addCleanup(check_locks, self.home)
+        self.addCleanup(self.stop_stub_children)
+        self.monitors = {}
+        self.addCleanup(self.stop_monitors)
+        self.children = []
+        self.addCleanup(cleanup_child, self.children)
+        (self.home / "children").mkdir()
         self.bin = self.home / "bin with spaces"
         self.bin.mkdir()
         source = self.bin / "paseo.py"
@@ -98,16 +120,13 @@ class PaseoLauncherTests(unittest.TestCase):
         for key in ("PASEO_BIN", "GDD_MODEL", "GDD_THINKING"):
             self.env.pop(key, None)
         self.env.update(GDD_RUN_ROOT=str(self.root), STUB_HOME=str(self.home),
+                        STUB_TESTS=str(Path(__file__).resolve().parent), STUB_SCRIPTS=str(ADAPTER.parents[1]),
                         GDD_RUN_DETACH="windows" if os.name == "nt" else "setsid",
                         PATH=str(self.bin) + os.pathsep + os.environ.get("PATH", ""))
-        self.monitors = {}
-        self.addCleanup(self.stop_monitors)
 
     def save_fixture(self, **fields):
         self.fixture.update(fields)
-        path = self.home / "fixture.tmp"
-        path.write_text(json.dumps(self.fixture), encoding="utf-8")
-        os.replace(path, self.home / "fixture.json")
+        publish_json(self.home / "fixture.json", self.fixture)
 
     def run_adapter(self, *args, env=None):
         try:
@@ -115,10 +134,16 @@ class PaseoLauncherTests(unittest.TestCase):
                                    capture_output=True, text=True, timeout=30)
         finally:
             if args[0] == "start":
+                issues = []
                 for path in self.root.glob("*/*/state.json"):
-                    state = agent_run.read_state(path.parent)
-                    if recorded := state.get("pid_identity"):
-                        self.monitors[state["pid"]] = recorded
+                    try:
+                        state = wait_for_json(path, bool, time.monotonic() + 3)
+                        if pid := state.get("pid"):
+                            self.monitors[pid, state.get("pid_identity")] = (path, False)
+                    except (OSError, AssertionError) as exc:
+                        issues.append(str(exc))
+                if issues:
+                    self.fail("\n".join(issues))
 
     def start(self, *flags, name="stage", env=None):
         result = self.run_adapter("start", "--name", name, "--prompt", str(self.prompt),
@@ -128,11 +153,15 @@ class PaseoLauncherTests(unittest.TestCase):
         return result
 
     def run_dir(self, name="stage"):
-        return self.root / datetime.now().strftime("%Y-%m-%d") / name
+        return Path(agent_run.newest_first([str(path) for path in self.root.glob(f"*/{name}")])[0])
+
+    def state(self, name="stage"):
+        return wait_for_json(self.run_dir(name) / "state.json", bool, time.monotonic() + 5)
 
     def calls(self):
         path = self.home / "argv.ndjson"
-        return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+        text = retry_windows(lambda: path.read_text(encoding="utf-8"), time.monotonic() + 2)
+        return [json.loads(line) for line in text.splitlines()]
 
     def status(self, name="stage"):
         result = self.run_adapter("status", name)
@@ -140,24 +169,35 @@ class PaseoLauncherTests(unittest.TestCase):
         return json.loads(result.stdout)
 
     def wait_state(self, word):
-        deadline = time.monotonic() + 15
-        while time.monotonic() < deadline:
-            state = json.loads((self.run_dir() / "state.json").read_text(encoding="utf-8"))
-            if state["state"] == word:
-                return state
-            time.sleep(0.1)
-        self.fail(f"monitor never wrote {word}: {state}")
+        run_dir = self.run_dir()
+        return wait_for_json(run_dir / "state.json", lambda s: s.get("state") == word and finalized(run_dir, s),
+                             time.monotonic() + 15)
 
     def stop_monitors(self):
-        # Stop only monitor pids recorded in this test's own isolated run root.
-        if not self.root.exists():
+        if not self.monitors:
             return
-        self.save_fixture(status="closed", offline=False, missing=False)
-        for pid, recorded in self.monitors.items():
-            if not agent_run.wait_until(lambda: agent_run.identity(pid) != recorded, 4):
-                if agent_run.identity(pid) == recorded:
-                    self.assertTrue(agent_run.terminate(pid, single=True),
-                                    f"monitor {pid} did not stop for {self.root}")
+        try:
+            self.save_fixture(status="closed", offline=False, missing=False)
+        finally:
+            check_processes(self.monitors, 10)
+
+    def stop_stub_children(self):
+        # A normal watcher exit has already waited for its CLI. Verify the stub
+        # independently as well, including if watcher cleanup had to kill the tree.
+        owned = {}
+        issues = []
+        for path in (self.home / "children").glob("*.json"):
+            try:
+                pid, recorded = wait_for_json(path, lambda row: len(row) == 2, time.monotonic() + 3)
+                owned[pid, recorded] = (path, True)
+            except (OSError, AssertionError) as exc:
+                issues.append(str(exc))
+        try:
+            check_processes(owned, 5)
+        except AssertionError as exc:
+            issues.append(str(exc))
+        if issues:
+            self.fail("\n".join(issues))
 
     def test_start_argv_identity_and_artifacts(self):
         self.start("--model", "stub-provider", "--thinking", "deliberate")
@@ -195,7 +235,7 @@ class PaseoLauncherTests(unittest.TestCase):
                                   "--cwd", str(self.home))
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("different cwd", result.stderr)
-        recorded = json.loads((self.run_dir() / "state.json").read_text(encoding="utf-8"))
+        recorded = self.state()
         self.assertEqual(recorded["state"], "unknown")
         self.assertEqual(recorded["agent_id"], self.fixture["id"])
 
@@ -205,7 +245,7 @@ class PaseoLauncherTests(unittest.TestCase):
                 with self.subTest(inspected_cwd=inspected_cwd, command=command):
                     result = self.run_adapter(command, *([] if command == "list" else ["stage"]))
                     self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                    state = json.loads((self.run_dir() / "state.json").read_text(encoding="utf-8"))
+                    state = self.state()
                     self.assertEqual(state["state"], "unknown")
                     self.assertIsNone(state["exit"])
                     self.assertEqual(state["agent_id"], self.fixture["id"])
@@ -219,7 +259,7 @@ class PaseoLauncherTests(unittest.TestCase):
         self.assertEqual(verified["state"], "done")
         self.assertEqual(verified["exit"], 0)
         self.assertNotIn("error", verified)
-        self.assertEqual((self.run_dir() / "finalized").read_text().strip(), "0")
+        self.assertEqual(self.wait_state("done")["exit"], 0)
 
     def test_unset_options_are_not_defaulted(self):
         self.start()
@@ -244,7 +284,7 @@ class PaseoLauncherTests(unittest.TestCase):
                 result = self.run_adapter("start", "--name", "unsafe", "--prompt", str(self.prompt))
                 self.assertEqual(result.returncode, 1)
                 self.assertIn("PASEO_BIN as a JSON argv array", result.stderr)
-                self.assertFalse(self.run_dir("unsafe").exists())
+                self.assertEqual(list(self.root.glob("*/unsafe")), [])
                 self.assertFalse((self.home / "argv.ndjson").exists())
 
     def test_invalid_json_argv_refuses(self):
@@ -253,7 +293,7 @@ class PaseoLauncherTests(unittest.TestCase):
                 result = self.run_adapter("start", "--name", "invalid", "--prompt", str(self.prompt),
                                           env=dict(self.env, PASEO_BIN=value))
                 self.assertEqual(result.returncode, 1)
-                self.assertFalse(self.run_dir("invalid").exists())
+                self.assertEqual(list(self.root.glob("*/invalid")), [])
 
     def test_each_paseo_lifecycle_state(self):
         # Complete lifecycle enum from Paseo 0.15.4, not inferred aliases.
@@ -294,42 +334,43 @@ class PaseoLauncherTests(unittest.TestCase):
     @unittest.skipIf(os.name == "nt", "POSIX abrupt holder exit and competing processes")
     def test_only_one_contender_takes_over_a_dead_refresh_holder(self):
         source = """
-import importlib.util, os, sys, time
+import importlib.util, os, sys
 from pathlib import Path
 spec = importlib.util.spec_from_file_location('adapter', sys.argv[1])
 adapter = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(adapter)
 root, role = Path(sys.argv[2]), sys.argv[3]
 if role != 'holder':
-    (root / f'ready-{role}').touch()
+    with (root / 'refresh').open('a+b') as handle:
+        if adapter.gdd_process.try_file_lock(handle):
+            raise SystemExit('contender acquired the live holder lock')
+    print('READY', flush=True)
+    if sys.stdin.readline().strip() != 'RELEASE':
+        raise SystemExit(2)
 with adapter.claim(str(root / 'refresh')):
     if role == 'holder':
-        (root / 'ready').touch()
-        while not (root / 'release').exists():
-            time.sleep(0.01)
-        os._exit(0)
-    with (root / 'inside').open('x'):
-        time.sleep(0.08)
+        print('READY', flush=True)
+        os._exit(0 if sys.stdin.readline().strip() == 'RELEASE' else 2)
+    (root / 'inside').touch(exist_ok=False)
     (root / 'inside').unlink()
 """
         def start(role):
-            child = gdd_process.popen([sys.executable, "-B", "-c", source, str(ADAPTER), str(self.home), role])
-            recorded = agent_run.identity(child.pid)
-
-            def cleanup():
-                if child.poll() is None and recorded and agent_run.identity(child.pid) == recorded:
-                    child.kill()
-                child.wait(timeout=5)
-
-            self.addCleanup(cleanup)
+            child = gdd_process.popen([sys.executable, "-B", "-c", source, str(ADAPTER), str(self.home), role],
+                                      stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, encoding="utf-8")
+            self.children.append(child)
             return child
 
         holder = start("holder")
-        self.assertTrue(agent_run.wait_until(lambda: (self.home / "ready").exists(), 5))
+        ready(holder, 5)
         contenders = [start(str(i)) for i in range(8)]
-        self.assertTrue(agent_run.wait_until(lambda: len(list(self.home.glob("ready-*"))) == len(contenders), 5))
-        (self.home / "release").touch()
-        self.assertEqual(holder.wait(timeout=5), 0)
+        deadline = time.monotonic() + 5
+        for contender in contenders:
+            ready(contender, max(0, deadline - time.monotonic()))
+        holder.communicate("RELEASE\n", timeout=5)
+        self.assertEqual(holder.returncode, 0)
+        for contender in contenders:
+            contender.stdin.write("RELEASE\n")
+            contender.stdin.close()
         for contender in contenders:
             self.assertEqual(contender.wait(timeout=10), 0)
 
@@ -343,7 +384,7 @@ with adapter.claim(str(root / 'refresh')):
             with self.subTest(termination=termination), mock.patch.dict(os.environ, env, clear=True):
                 # The daemon owns this run; no local monitor is needed for status refreshes.
                 name = "reservation-" + termination
-                run_dir = self.run_dir(name)
+                run_dir = self.root / "2000-01-01" / name
                 run_dir.mkdir(parents=True)
                 state = {"name": name, "backend": "paseo", "state": "running", "exit": None,
                          "cwd": str(self.home), "cwd_verified": True, "pid": None,
@@ -383,14 +424,14 @@ with adapter.claim(str(root / 'refresh')):
                     self.save_fixture(status=termination)
                     settled = self.status(name)
                     self.assertIn(settled["state"], ("done", "failed", "killed"))
-                self.assertTrue((run_dir / "finalized").exists())
+                self.assertTrue(finalized(run_dir, settled))
                 self.assertEqual(gdd.active_runs(repo), [])
 
     def test_native_reservation_ignores_dead_monitor_and_preserves_headless_states(self):
         spec = importlib.util.spec_from_file_location("gdd_under_test", ADAPTER.parent.parent / "gdd.py")
         gdd = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(gdd)
-        run_dir = self.run_dir()
+        run_dir = self.root / "2000-01-01" / "stage"
         run_dir.mkdir(parents=True)
         state = {"name": "stage", "backend": "paseo", "state": "running",
                  "cwd": str(self.home), "pid": 999999999}
@@ -433,8 +474,16 @@ with adapter.claim(str(root / 'refresh')):
 
     def test_missing_state_file_is_unknown_even_with_an_agent_lock(self):
         self.start()
-        (self.run_dir() / "state.json").unlink()
-        self.assertEqual(self.status()["state"], "unknown")
+        run_dir = self.run_dir()
+        path = run_dir / "state.json"
+        with claim(run_dir / "refresh"):
+            state = self.state()
+            retry_windows(path.unlink, time.monotonic() + 2)
+        try:
+            self.assertEqual(self.status()["state"], "unknown")
+        finally:
+            with claim(run_dir / "refresh"):
+                publish_json(path, state)
 
     def test_monitor_finalizes_without_status_and_answer_is_last_assistant(self):
         self.start()
@@ -446,7 +495,6 @@ with adapter.claim(str(root / 'refresh')):
         self.assertEqual(answer.stdout, "Final assistant answer\nsecond line\n")
         self.assertIn(["logs", self.fixture["id"], "--filter", "assistant_message", "--tail", "1"],
                       self.calls())
-        self.assertEqual((self.run_dir() / "finalized").read_text().strip(), "0")
 
     def test_stage_result_in_the_answer_is_checked_against_the_schema(self):
         schema = ADAPTER.parent.parent.parent / "references" / "stage-result.schema.json"
@@ -584,7 +632,7 @@ with adapter.claim(str(root / 'refresh')):
         env["PASEO_BIN"] = str(self.home / "absent-paseo")
         result = self.run_adapter("start", "--name", "absent", "--prompt", str(self.prompt), env=env)
         self.assertNotEqual(result.returncode, 0)
-        self.assertFalse(self.run_dir("absent").exists())
+        self.assertEqual(list(self.root.glob("*/absent")), [])
 
 
 if __name__ == "__main__":
