@@ -1,20 +1,20 @@
 ---
-name: kanban-workflows
+name: hermes-kanban
 description: >-
   Run multi-card work on a persistent board: decompose heterogeneous work, dispatch parallel
   workers, enforce review gates, and recover stuck cards. Use when a task outlives one agent turn
   or needs per-card ownership and routing. Not for a single edit, and not for uniform batch
   fan-out — that wants one resumable runner script.
 metadata:
-  revision: "2"
+  revision: "1"
   areas: "work-management,software-development"
-  targets: "runtime-agnostic"
+  targets: "hermes"
   summary: "multi-card board work: decomposition, parallel dispatch, review gates, stuck-card recovery"
   summary_zh: "多卡片看板工作：拆解、并行派发、评审门禁、卡住任务恢复"
   kind: "entry"
 ---
 
-# Kanban Workflows
+# Hermes Kanban
 
 ## Gates
 
@@ -43,8 +43,8 @@ should claim/execute/report, and how to recover stuck work.
 The basic worker lifecycle may be auto-injected by runtime guidance. Load this skill when you need
 the deeper operational playbook or need to reason across orchestrator and worker roles.
 
-Commands below use `board kanban …` as the entry point; substitute your board implementation's own
-binary name. The subcommands, flags and quirks are the part this skill is written against.
+Commands below use `board kanban …` as shorthand for the configured Hermes Kanban CLI.
+The subcommands, flags and dispatch behavior assume Hermes.
 
 ## When to Use
 

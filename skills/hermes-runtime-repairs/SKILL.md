@@ -1,23 +1,23 @@
 ---
-name: generated-runtime-repairs
+name: hermes-runtime-repairs
 description: >-
   Repair repository-owned wrappers and scheduled routines without confusing source correctness with
   deployment. Use when a generated file misbehaves and the fix belongs in its template or generator,
   or when a reviewed patch must be landed and then materialized into a live runtime. Not for editing
   generated output by hand.
 metadata:
-  revision: "2"
+  revision: "1"
   areas: "software-development,work-management"
-  targets: "runtime-agnostic"
+  targets: "hermes"
   summary: "repair the template/generator, prove the staged artifact, then deploy and read back the live runtime"
   summary_zh: "修模板/生成器、验证暂存产物，再部署并回读线上运行时"
   kind: "entry"
 ---
 
-# Generated runtime repairs
+# Hermes runtime repairs
 
 Repair repository-owned wrappers and scheduled routines without confusing source correctness with
-deployment. Load the repository contract and the relevant runtime skill for its supported commands.
+deployment to Hermes profiles. Load the repository contract for its supported materializer commands.
 
 ## When to Use
 

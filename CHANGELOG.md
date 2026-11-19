@@ -6,6 +6,9 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 ## 2026-11-18
 
+- Renamed `kanban-workflows`, `ops-claim-verification`, and `generated-runtime-repairs` to
+  `hermes-kanban`, `hermes-ops-claim-verification`, and `hermes-runtime-repairs`, respectively.
+
 - Retired four stubs: `design-an-interface` (`codebase-design`), `arch-improvement-plan` and
   `notes-to-prd` (`ce-plan`), and `plan-to-issues` (`to-tickets`).
 - Add the hidden `hermes-models-cutover` mechanism for reversible fleet route changes and live verification.

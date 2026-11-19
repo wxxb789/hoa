@@ -108,13 +108,13 @@
       "id": "route-contract-increment-to-gdd",
       "request": "这个增量我已经写好验收契约（可观测的通过条件、判定工件、失败对照都齐了），帮我从分支开始一路跑到合并，不用逐步问我。",
       "must_pick": ["gdd"],
-      "distractors": ["kanban-workflows", "ai-coding-agent-delegation"]
+      "distractors": ["hermes-kanban", "ai-coding-agent-delegation"]
     },
     {
       "id": "route-explicit-gdd",
       "request": "跑 GDD：下一个 goal 端到端交付并合并，合并后直接起下一个分支。",
       "must_pick": ["gdd"],
-      "distractors": ["kanban-workflows", "project-phase-closeout"]
+      "distractors": ["hermes-kanban", "project-phase-closeout"]
     },
     {
       "id": "route-boundaryless-goal-to-spec-first",

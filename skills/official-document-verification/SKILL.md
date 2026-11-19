@@ -7,7 +7,7 @@ description: >-
   regulator's page, or any artifact whose wording and version decide the answer. Not for
   ordinary web reading where the page itself is the source of record.
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "work-management"
   targets: "runtime-agnostic"
   summary: "verify a claim against the exact print of the document, including artifacts a plain client cannot fetch"
@@ -22,7 +22,7 @@ artifact whose exact version and exact wording decide the conclusion — and whe
 bot protection, a jurisdictional gate, or a page a plain HTTP client cannot reach.
 
 Companion skills: `evidence-backed-analytical-writing`
-(claim hygiene and report structure), `ops-claim-verification` (cron results and "fixed" claims). This
+(claim hygiene and report structure), `hermes-ops-claim-verification` (cron results and "fixed" claims). This
 skill covers what those do not: getting the right version, proving what it does and does not say, and
 proposing a change instead of making one.
 

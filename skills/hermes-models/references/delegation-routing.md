@@ -16,7 +16,7 @@ are easy to get wrong:
    system; else pure inherit (parent provider + model + key + credential pool). `delegation.model`
    applies on every branch; empty = inherit the parent model.
 2. The pin is global to the profile — `delegate_task` has no per-task model parameter. Per-task
-   granularity needs another rail: the Kanban per-card override (see skill `kanban-workflows`), a
+   granularity needs another rail: the Kanban per-card override (see skill `hermes-kanban`), a
    per-job cron pin (`hermes cron edit --model/--provider`), or an independent spawn
    (`hermes chat -q -m <model> --provider <p>`).
 3. A pinned child never borrows the parent's fallback chain — pin means single-route. Give children
