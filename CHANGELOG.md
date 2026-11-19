@@ -6,6 +6,7 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 ## 2026-11-19
 
+- Use the public npm registry for GDD Observer and reject corporate package-feed hosts in CI.
 - Share overlapping GDD Observer scans and send revision deltas, bound tail and PID caches, and
   stop polling the hidden list in compact detail.
 - Verify GDD Observer on Windows, macOS, and Linux in CI, bound its persisted settings, and show
