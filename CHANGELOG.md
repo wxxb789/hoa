@@ -4,6 +4,15 @@ Entries are dated and optional; no CI gate requires one. There is no project ver
 counts its own iterations in `metadata.revision`. Earlier entries retain the retired project
 `VERSION` numbers and historical per-skill versions.
 
+## 2026-11-19
+
+- Share overlapping GDD Observer scans and send revision deltas, bound tail and PID caches, and
+  stop polling the hidden list in compact detail.
+- Verify GDD Observer on Windows, macOS, and Linux in CI, bound its persisted settings, and show
+  recorded dispatch lineage (GDD goal/stage and initiating Paseo agent) in the run detail.
+- Renamed the optional Paseo plugin to `gdd-observer`, ported the current observer into HOA, and
+  kept **GDD runs** in the sidebar footer as its only run-browser entry.
+
 ## 2026-11-18
 
 - Bound Windows stress rounds, retain failure diagnostics, and clean up round-owned processes.

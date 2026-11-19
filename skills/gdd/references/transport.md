@@ -19,11 +19,20 @@ Select the route as configuration, never from a daemon reachability probe. An un
 does not substitute the headless launcher, and a reachable daemon does not opt a default install into
 native agents. Both launchers use the contract below and add no Python dependencies.
 
-The optional [GDD run observer plugin](../../../paseo-plugins/gdd-run-observer/README.md) reads run
+The optional [GDD run observer plugin](../../../paseo-plugins/gdd-observer/README.md) reads run
 artifacts; it is **not a launcher**, selects neither route, and is not installed with the skill.
-Its README covers clean-checkout installation and typecheck/tests, trust, disable, and removal;
-[HOA-INTEGRATION.md](../../../paseo-plugins/gdd-run-observer/HOA-INTEGRATION.md) explains the two
+It registers one entry point — the sidebar footer **GDD runs** row, which opens the global `runs`
+screen — plus a separate settings screen. Its README covers installation, development checks,
+trust, disable, and removal;
+[HOA-INTEGRATION.md](../../../paseo-plugins/gdd-observer/HOA-INTEGRATION.md) explains the two
 routes and the shared `GDD_RUN_ROOT`. Installing it executes trusted, unsandboxed daemon/client code.
+
+After a successful `gdd.py stage` launch into the canonical run root, the dispatcher writes one
+bounded `lineage.json` beside the run's state: `goal`, `stage`, and `parentAgentId` when the
+dispatching session supplied `PASEO_AGENT_ID`. This identifies the initiating Paseo session, not
+the session or process doing the launched work. The observer reads it only when a run is selected.
+Previous runs and starts made directly through an adapter may have no lineage. A sidecar write
+failure is reported separately and does not change the already-started run or its ledger entry.
 
 ## Headless platform rules
 

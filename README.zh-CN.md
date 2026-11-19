@@ -172,7 +172,7 @@ Windows 的 `gdd-runner`。两者都在每次 push 到 `main`、每个 pull requ
 | PR bumps changed skills' revision（pull request） | `python scripts/version.py check-revisions` | 自 merge base 以来改动过的每个 skill 目录都提高了 `metadata.revision`。 |
 | pytest | `python -m pytest` | `scripts/`、`evals/`、`skills/` 下每个 `test_*.py` unittest/pytest 文件（`pytest.ini`）；每个测试 120 秒上限。 |
 | 脚本检查 | `python evals/run_trigger_evals.py`、`evals/validate_skill_method_cases.py`、`skills/define-goal/evals/validate_fixtures.py`、`skills/hermes-models/scripts/tests/test-*.py`、`skills/gdd/scripts/tests/test_verdict_matrix.py`、`mutate_verdict_matrix.py` | 以退出码为契约的独立检查；每个一个 step。 |
-| Paseo gdd-run-observer | 在 `paseo-plugins/gdd-run-observer` 中 `npm ci && npm run typecheck && npm test` | 插件的 typecheck 与 Vitest 套件。 |
+| Paseo gdd-observer | 在 `paseo-plugins/gdd-observer` 中 `npm ci && npm run typecheck && npm test` | 插件的 typecheck 与 Vitest 套件。 |
 | `gdd-runner`（Ubuntu、macOS、Windows） | 对 `skills/gdd/scripts/tests/` 下的 `test_agent_run.py`、`test_detach_supervisors.py`、`test_gdd.py`、`test_no_window.py`、`test_paseo_run_python.py`、`test_watch_pr_checks.py` 运行 `python -m pytest -q` | 跨平台 runner、分离进程 supervisor、阶段派发、控制台抑制、Paseo adapter 和 PR watcher 契约。 |
 
 本地运行 Python 测试：
@@ -326,11 +326,12 @@ OpenCode 用 `@hermes-models-cutover`。
 [Transport 契约](./skills/gdd/references/transport.md) 说明配置、答案读取、完成判定，
 以及相互独立的 headless / native 平台证据。
 
-[`paseo-plugins/gdd-run-observer`](./paseo-plugins/gdd-run-observer/README.md) 是可选的
+[`paseo-plugins/gdd-observer`](./paseo-plugins/gdd-observer/README.md) 是可选的
 只读 observer 源码，**不是 launcher**。`npx skills` 不会自动安装它，它也不会改变
-所选 transport。[README](./paseo-plugins/gdd-run-observer/README.md) 提供从干净克隆
-安装依赖、typecheck / 测试、信任边界、禁用和移除说明；
-[HOA-INTEGRATION.md](./paseo-plugins/gdd-run-observer/HOA-INTEGRATION.md) 说明共享
+所选 transport。它只保留一个入口——侧栏底部的 **GDD runs** 行，用于打开全局 `runs`
+屏幕——另有独立的设置屏幕。[README](./paseo-plugins/gdd-observer/README.md) 说明读取的
+运行产物、设置、信任边界、开发检查、安装与移除；
+[HOA-INTEGRATION.md](./paseo-plugins/gdd-observer/HOA-INTEGRATION.md) 说明共享
 `GDD_RUN_ROOT` 与两条路径的集成。安装前先审查：插件会在 Paseo daemon / client 中
 执行受信任、无沙箱的代码。Runtime 注册与设置仍由本机管理。
 
