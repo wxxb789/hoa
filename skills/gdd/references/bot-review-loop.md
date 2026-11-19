@@ -109,10 +109,10 @@ uv run --no-project python -c "import json, sys; from pathlib import Path; expec
 
 Require exit 0 from both commands, then check the PR head against `REVIEW_HEAD` again.
 
-Then run the project gates and `uv run scripts/pr-merge-check.py <PR> --repo <worktree> --verified-head
-<full-reviewed-head> --gates-rc <actual-rc>` (with the same `--marker` if customized). A successful
-post alone is not merge permission. Require CI green on that head, valid completed clean evidence,
-zero unresolved threads, and verified local gates. Recheck the head immediately before merging.
+Then run the project gates and follow [Phase 6](phases/06-merge.md), passing the full reviewed head
+and the same `--marker` if customized. A successful post alone is not merge permission. Both paths
+require valid completed clean evidence, zero unresolved threads, and verified local gates; only
+the manual path waits for all CI checks in gdd.
 
 ## Finding dispositions and threads
 

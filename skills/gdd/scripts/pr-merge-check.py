@@ -3,20 +3,24 @@
 # requires-python = ">=3.13"
 # dependencies = []
 # ///
-"""Mechanical merge gate for one PR: may it be squashed right now?
+"""Mechanical merge gate for one PR: may it be squashed or queued for auto-merge?
 
-Answers with booleans only. Every fact comes from git/gh; nothing is inferred.
+By default this is read-only. With --auto, confirmed required status checks plus
+allow_auto_merge delegate CI to GitHub, and passing the other gates submits the
+auto-merge request for the full, verified PR head. Unconfirmed capability keeps
+the ordinary manual gate. A submitted request is not proof of landing.
 
 Usage:
     pr-merge-check.py 123 --repo PATH --gates-rc 0 --verified-head SHA
     pr-merge-check.py 123 --repo PATH --gates-rc 0 --verified-head SHA --json
+    pr-merge-check.py 123 --repo PATH --gates-rc 0 --verified-head SHA --auto
     pr-merge-check.py 123 --repo PATH --marker 'my-bot-state:v2'
     pr-merge-check.py 123 --repo PATH --allow-no-machine-review
     pr-merge-check.py 123 --repo PATH --gates-rc 0 --verified-head SHA --allow-no-checks
     pr-merge-check.py 123 --repo PATH --gates-rc 0 --verified-head SHA --allow-table-only-checks
     pr-merge-check.py --selftest
 
-Exit codes: 0 MERGE-OK, 1 BLOCKED, 2 usage/gh/git error.
+Exit codes: 0 MERGE-OK or MERGE-QUEUED, 1 BLOCKED, 2 usage/gh/git error.
 
 Checks:
   1. every CI check completed with SUCCESS/SKIPPED/NEUTRAL — read from gh's `bucket` field
@@ -70,9 +74,11 @@ from the command line. Launcher: not used — this tool starts no run.
 import argparse
 import json
 import os
+import re
 import gdd_process
 import sys
 from datetime import datetime
+from urllib.parse import quote
 
 from machine_review import (
     DEFAULT_MARKER, EvidenceError, make_evidence, parse_marker, review_facts, validate_marker,
@@ -542,66 +548,47 @@ def evaluate_gates(gates_rc, gates_note, head_verified, now):
     return facts, [] if facts["pass"] else ["gates unverified"]
 
 
-def evaluate(
-    pr,
-    repo,
-    gates_rc,
-    gates_note=None,
-    offline=False,
-    verified_head=None,
-    marker=DEFAULT_MARKER,
-    allow_no_machine_review=False,
-    allow_no_checks=False,
-    allow_table_only_checks=False,
-):
-    facts = {"pr": int(pr) if str(pr).isdigit() else pr, "gates": {}, "marker": marker}
-    reasons = []
-    now = datetime.now().astimezone().isoformat(timespec="seconds")
+def supports_auto_merge(repo, name_with_owner, base):
+    """Only positive evidence permits GitHub to take over the CI gate."""
+    if not isinstance(base, str) or not base:
+        return False
+    endpoint = f"repos/{name_with_owner}"
 
-    if offline:
-        facts["gates"], gate_reasons = evaluate_gates(gates_rc, gates_note, True, now)
-        reasons.extend(gate_reasons)
-        return facts, reasons
+    def api(path, *args):
+        try:
+            return json.loads(sh(["gh", "api", endpoint + path, *args], cwd=repo))
+        except (GateError, ValueError):
+            return None
 
-    local_head = sh(["git", "-C", repo, "rev-parse", "HEAD"])
-    local_branch = sh(["git", "-C", repo, "rev-parse", "--abbrev-ref", "HEAD"])
-    view = json.loads(
-        sh(
-            [
-                "gh",
-                "pr",
-                "view",
-                str(pr),
-                "--json",
-                "headRefOid,headRefName,state,isDraft",
-            ],
-            cwd=repo,
+    def named_checks(rows):
+        return isinstance(rows, list) and any(
+            isinstance(row, dict) and isinstance(row.get("context"), str) and row["context"].strip()
+            for row in rows
         )
-    )
-    pr_state, state_reasons = evaluate_pr_state(
-        view.get("state"), view.get("isDraft")
-    )
-    facts["pr_state"] = pr_state
-    if state_reasons:
-        facts["gates"], _ = evaluate_gates(gates_rc, gates_note, False, now)
-        return facts, state_reasons
 
-    head = view.get("headRefOid") or ""
-    head_facts, head_reasons, head_verified = resolve_head(
-        head,
-        view.get("headRefName"),
-        local_head,
-        local_branch,
-        verified_head,
-    )
-    facts["head"] = head_facts
-    reasons.extend(head_reasons)
+    if api("", "-q", ".allow_auto_merge") is not True:
+        return False
+    branch = quote(base, safe="")
+    pages = api(f"/rules/branches/{branch}", "--paginate", "--slurp")
+    if isinstance(pages, list) and any(
+        isinstance(rule, dict) and rule.get("type") == "required_status_checks"
+        and isinstance(rule.get("parameters"), dict)
+        and named_checks(rule["parameters"].get("required_status_checks"))
+        for page in pages if isinstance(page, list) for rule in page
+    ):
+        return True
 
-    facts["gates"], gate_reasons = evaluate_gates(
-        gates_rc, gates_note, head_verified, now
+    classic = api(f"/branches/{branch}/protection/required_status_checks")
+    if not isinstance(classic, dict):
+        return False
+    contexts = classic.get("contexts")
+    return named_checks(classic.get("checks")) or (
+        isinstance(contexts, list)
+        and any(isinstance(context, str) and context.strip() for context in contexts)
     )
-    reasons.extend(gate_reasons)
 
+
+def evaluate_ci(pr, repo, facts, reasons, allow_no_checks, allow_table_only_checks):
     checks_rows, checks_source = fetch_checks(pr, repo, allow_table_only_checks)
     checks = evaluate_checks(checks_rows, allow_no_checks=allow_no_checks)
     facts["checks"] = checks
@@ -626,12 +613,70 @@ def evaluate(
             reasons.append("checks pending")
         else:
             reasons.append("checks")
+    return reasons
+
+
+def evaluate(
+    pr,
+    repo,
+    gates_rc,
+    gates_note=None,
+    offline=False,
+    verified_head=None,
+    marker=DEFAULT_MARKER,
+    allow_no_machine_review=False,
+    allow_no_checks=False,
+    allow_table_only_checks=False,
+    auto=False,
+):
+    facts = {"pr": int(pr) if str(pr).isdigit() else pr, "gates": {}, "marker": marker}
+    reasons = []
+    now = datetime.now().astimezone().isoformat(timespec="seconds")
+
+    if offline:
+        facts["gates"], gate_reasons = evaluate_gates(gates_rc, gates_note, True, now)
+        reasons.extend(gate_reasons)
+        return facts, reasons
+
+    local_head = sh(["git", "-C", repo, "rev-parse", "HEAD"])
+    local_branch = sh(["git", "-C", repo, "rev-parse", "--abbrev-ref", "HEAD"])
+    view_cmd = [
+        "gh", "pr", "view", str(pr), "--json", "headRefOid,headRefName,state,isDraft",
+    ]
+    if auto:
+        view_cmd[-1] += ",baseRefName"
+    view = json.loads(sh(view_cmd, cwd=repo))
+    pr_state, state_reasons = evaluate_pr_state(view.get("state"), view.get("isDraft"))
+    facts["pr_state"] = pr_state
+    if state_reasons:
+        facts["gates"], _ = evaluate_gates(gates_rc, gates_note, False, now)
+        return facts, state_reasons
+
+    head = view.get("headRefOid") or ""
+    head_facts, head_reasons, head_verified = resolve_head(
+        head, view.get("headRefName"), local_head, local_branch, verified_head,
+    )
+    facts["head"] = head_facts
+    reasons.extend(head_reasons)
+
+    facts["gates"], gate_reasons = evaluate_gates(gates_rc, gates_note, head_verified, now)
+    reasons.extend(gate_reasons)
 
     name_with_owner = sh(
         ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
         cwd=repo,
     )
     owner, _, name = name_with_owner.partition("/")
+
+    base = view.get("baseRefName")
+    if auto and supports_auto_merge(repo, name_with_owner, base):
+        facts["checks_source"] = "github"
+        facts["base"] = base
+        if (not isinstance(head, str) or not re.fullmatch(r"[0-9a-f]{40}", head)
+                or head != (verified_head or local_head)):
+            reasons.append("auto-merge requires the full verified head")
+    else:
+        reasons = evaluate_ci(pr, repo, facts, reasons, allow_no_checks, allow_table_only_checks)
 
     comments = fetch_issue_comments(owner, name, pr, repo)
     review = evaluate_review(
@@ -672,6 +717,8 @@ def print_human(facts, reasons):
                 " (no checks)" if checks["total"] == 0 else "",
             )
         )
+    elif facts.get("checks_source") == "github":
+        print(f"checks: enforced by GitHub on {facts['base']}")
     review = facts.get("review")
     if review:
         marker = facts.get("marker") or DEFAULT_MARKER
@@ -719,11 +766,8 @@ def print_human(facts, reasons):
                 gates["rc"] if gates["rc"] is not None else "-", gates["ts"], note
             )
         )
-    print(
-        "verdict: MERGE-OK"
-        if not reasons
-        else "verdict: BLOCKED: " + ", ".join(reasons)
-    )
+    verdict = facts.get("verdict", "MERGE-OK") if not reasons else "BLOCKED: " + ", ".join(reasons)
+    print(f"verdict: {verdict}")
 
 
 def selftest():
@@ -1155,7 +1199,7 @@ def selftest():
 def build_parser():
     parser = argparse.ArgumentParser(
         description="Mechanical merge gate for one PR.",
-        epilog="Exit 0 MERGE-OK, 1 BLOCKED, 2 usage/gh/git error. Environment: none (all inputs are flags).",
+        epilog="Exit 0 MERGE-OK or MERGE-QUEUED, 1 BLOCKED, 2 usage/gh/git error.",
     )
     parser.add_argument("pr", nargs="?", help="PR number")
     parser.add_argument("--repo", default=os.getcwd(), help="repo path (default: cwd)")
@@ -1188,6 +1232,8 @@ def build_parser():
              "(older gh); the default blocks, because the table is not a stable contract",
     )
     parser.add_argument("--json", action="store_true", help="emit one JSON object")
+    parser.add_argument("--auto", action="store_true",
+                        help="submit auto-merge if GitHub enforces required checks; otherwise gate only")
     parser.add_argument("--selftest", action="store_true", help="offline fixture test")
     return parser
 
@@ -1214,11 +1260,17 @@ def main():
             allow_no_machine_review=args.allow_no_machine_review,
             allow_no_checks=args.allow_no_checks,
             allow_table_only_checks=args.allow_table_only_checks,
+            auto=args.auto,
         )
+        verdict = "BLOCKED" if reasons else "MERGE-OK"
+        if not reasons and facts.get("checks_source") == "github":
+            sh(["gh", "pr", "merge", args.pr, "--auto", "--squash", "--match-head-commit",
+                facts["head"]["remote"]], cwd=args.repo)
+            verdict = "MERGE-QUEUED"
     except (GateError, ValueError, KeyError) as exc:
         print(f"pr-merge-check: {exc}", file=sys.stderr)
         return 2
-    facts["verdict"] = "MERGE-OK" if not reasons else "BLOCKED"
+    facts["verdict"] = verdict
     facts["reasons"] = reasons
     if args.json:
         print(json.dumps(facts, indent=2, ensure_ascii=False))

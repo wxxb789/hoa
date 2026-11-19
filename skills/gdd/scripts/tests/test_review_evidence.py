@@ -1026,9 +1026,11 @@ class RealSubprocessBoundaryTests(unittest.TestCase):
     THREADS = json.dumps({"data": {"repository": {"pullRequest": {"reviewThreads": {
         "pageInfo": {"hasNextPage": False, "endCursor": None}, "nodes": []}}}}})
 
-    def run_boundary(self, *, json_result, table_result, extra=(), repo=".", record=None):
+    def run_boundary(self, *, json_result, table_result, extra=(), repo=".", record=None,
+                     api=None, comments=(), threads=THREADS, merge_result=(0, "", "")):
         calls = []
-        view = {"state": "OPEN", "isDraft": False, "headRefOid": HEAD, "headRefName": "feature"}
+        view = {"state": "OPEN", "isDraft": False, "headRefOid": HEAD,
+                "headRefName": "feature", "baseRefName": "release/next"}
 
         def fake_run(cmd, cwd=None, capture_output=False, text=False, **_options):
             calls.append(list(cmd))
@@ -1041,13 +1043,20 @@ class RealSubprocessBoundaryTests(unittest.TestCase):
                 return subprocess.CompletedProcess(cmd, *(json_result if "--json" in cmd
                                                           else table_result))
             if cmd[:3] == ["gh", "pr", "view"]:
-                return subprocess.CompletedProcess(cmd, 0, json.dumps(view), "")
+                fields = cmd[cmd.index("--json") + 1].split(",")
+                return subprocess.CompletedProcess(cmd, 0,
+                                                   json.dumps({key: view[key] for key in fields}), "")
+            if cmd[:3] == ["gh", "pr", "merge"]:
+                return subprocess.CompletedProcess(cmd, *merge_result)
             if cmd[:3] == ["gh", "repo", "view"]:
                 return subprocess.CompletedProcess(cmd, 0, "fixture-owner/fixture-repo", "")
             if cmd[:3] == ["gh", "api", "graphql"]:
-                return subprocess.CompletedProcess(cmd, 0, self.THREADS, "")
+                return subprocess.CompletedProcess(cmd, 0, threads, "")
             if cmd[:2] == ["gh", "api"]:
-                return subprocess.CompletedProcess(cmd, 0, "[]", "")
+                if "/issues/7/comments?" in cmd[2]:
+                    return subprocess.CompletedProcess(cmd, 0, json.dumps(comments), "")
+                if api is not None:
+                    return subprocess.CompletedProcess(cmd, *api[tuple(cmd[2:])])
             raise AssertionError(f"unexpected command: {cmd}")
 
         out, err = io.StringIO(), io.StringIO()
@@ -1056,6 +1065,79 @@ class RealSubprocessBoundaryTests(unittest.TestCase):
              patch.object(sys, "argv", argv), redirect_stdout(out), redirect_stderr(err):
             code = gate.main()
         return code, out.getvalue(), err.getvalue(), calls
+
+    REPO_API = ("repos/fixture-owner/fixture-repo", "-q", ".allow_auto_merge")
+    RULES_API = ("repos/fixture-owner/fixture-repo/rules/branches/release%2Fnext",
+                 "--paginate", "--slurp")
+    CLASSIC_API = ("repos/fixture-owner/fixture-repo/branches/release%2Fnext"
+                   "/protection/required_status_checks",)
+    REQUIRED_RULE = {"type": "required_status_checks",
+                     "parameters": {"required_status_checks": [{"context": "build"}]}}
+
+    def run_auto(self, api, *, bucket="pending", comments=None, verified_head=HEAD,
+                 gates_rc="0", threads=THREADS, merge_result=(0, "", "")):
+        code, out, err, calls = self.run_boundary(
+            json_result=(0, json.dumps([{"name": "build", "bucket": bucket}]), ""),
+            table_result=(0, "", ""), api=api,
+            comments=[comment(clean_evidence())] if comments is None else comments,
+            extra=("--auto", "--verified-head", verified_head, "--gates-rc", gates_rc, "--json"),
+            threads=threads, merge_result=merge_result)
+        return code, json.loads(out) if out else {}, err, calls
+
+    def test_auto_merge_uses_the_full_github_head_and_leaves_checks_to_github(self):
+        for protection in (
+            {self.RULES_API: (0, json.dumps([[], [self.REQUIRED_RULE]]), "")},
+            {self.RULES_API: (0, "[[]]", ""),
+             self.CLASSIC_API: (0, '{"contexts":[],"checks":[{"context":"build"}]}', "")},
+        ):
+            with self.subTest(protection=protection):
+                code, facts, err, calls = self.run_auto({
+                    self.REPO_API: (0, "true", ""), **protection,
+                })
+                self.assertEqual((code, facts.get("verdict"), err), (0, "MERGE-QUEUED", ""))
+                self.assertEqual([cmd for cmd in calls if cmd[:2] == ["gh", "pr"]
+                                  and cmd[2] in ("checks", "merge")],
+                                 [["gh", "pr", "merge", "7", "--auto", "--squash",
+                                   "--match-head-commit", HEAD]])
+
+    def test_auto_unavailable_retains_the_manual_check_gate(self):
+        for capability in (
+            {self.REPO_API: (0, "false", "")},
+            {self.REPO_API: (0, "true", ""),
+             self.RULES_API: (0, '[[{"type":"required_status_checks","parameters":'
+                                 '{"required_status_checks":[]}}]]', ""),
+             self.CLASSIC_API: (1, "", "HTTP 404")},
+        ):
+            for bucket, expected in (("pending", (1, "BLOCKED")), ("pass", (0, "MERGE-OK"))):
+                with self.subTest(capability=capability, bucket=bucket):
+                    code, facts, err, calls = self.run_auto(capability, bucket=bucket)
+                    self.assertEqual((code, facts.get("verdict")), expected)
+                    self.assertEqual(err, "")
+                    self.assertTrue(any(cmd[:3] == ["gh", "pr", "checks"] for cmd in calls))
+                    self.assertFalse(any(cmd[:3] == ["gh", "pr", "merge"] for cmd in calls))
+
+    def test_auto_still_requires_gdd_evidence(self):
+        capability = {self.REPO_API: (0, "true", ""),
+                      self.RULES_API: (0, json.dumps([[self.REQUIRED_RULE]]), "")}
+        threads = json.loads(self.THREADS)
+        threads["data"]["repository"]["pullRequest"]["reviewThreads"]["nodes"] = [
+            {"isResolved": False}
+        ]
+        for options in ({"comments": []}, {"verified_head": HEAD[:8]}, {"gates_rc": "1"},
+                        {"threads": json.dumps(threads)}):
+            with self.subTest(options=options):
+                code, facts, _, calls = self.run_auto(capability, **options)
+                self.assertEqual((code, facts.get("verdict")), (1, "BLOCKED"))
+                self.assertFalse(any(cmd[:3] == ["gh", "pr", "merge"] for cmd in calls))
+
+    def test_auto_merge_submission_failure_is_not_permission_to_merge_manually(self):
+        code, facts, err, calls = self.run_auto(
+            {self.REPO_API: (0, "true", ""),
+             self.RULES_API: (0, json.dumps([[self.REQUIRED_RULE]]), "")},
+            merge_result=(1, "", "head changed"))
+        self.assertEqual((code, facts), (2, {}))
+        self.assertIn("head changed", err)
+        self.assertEqual(sum(cmd[:3] == ["gh", "pr", "merge"] for cmd in calls), 1)
 
     def test_sh_raw_forwards_exit_code_and_both_streams_verbatim(self):
         def fake_run(cmd, cwd=None, capture_output=False, text=False, **_options):

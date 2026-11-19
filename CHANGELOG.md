@@ -12,6 +12,8 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 - Keep the upstream `improve-codebase-architecture` skill out of the generated uninstall command.
 - Verify gdd detachment and teardown against a private tmux server on Ubuntu CI, and exercise
   simultaneous Paseo refresh-claim takeovers after an abrupt holder exit.
+- Queue gdd squash merges through GitHub auto-merge when the PR base has required checks; keep
+  head-bound review and local gates, and fall back to the verified manual path otherwise.
 - Share overlapping GDD Observer scans and send revision deltas, bound tail and PID caches, and
   stop polling the hidden list in compact detail.
 - Verify GDD Observer on Windows, macOS, and Linux in CI, bound its persisted settings, and show

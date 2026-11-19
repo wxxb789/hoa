@@ -1,10 +1,13 @@
 # Phase 6 — merge gate (mechanical, not remembered)
 
 ```bash
-uv run <gdd-skill>/scripts/pr-merge-check.py <pr> --repo <path> --verified-head <sha> --gates-rc <rc> [--marker TEXT]
+uv run <gdd-skill>/scripts/pr-merge-check.py <pr> --repo <path> --verified-head <sha> --gates-rc <rc> --auto [--marker TEXT]
 ```
 
-Boolean lines and a verdict; exit 0 = merge allowed. `--verified-head` is the SHA you actually ran
+Run the merge-time version precondition below first. Only pass `--auto` with merge authorization:
+it can land immediately. Omit it for a read-only manual verdict. Exit 0 means `MERGE-QUEUED`
+(request submitted) or `MERGE-OK` (manual gate passed); exit 1 blocks and exit 2 is an error.
+`--verified-head` is the full SHA you actually ran
 the gates on (usually `git rev-parse HEAD` in the worktree you verified), and `--gates-rc` without it
 is `UNKNOWN`. A PR whose branch is not checked out reports `head not verified`, never a false mismatch;
 a merged or draft PR reports `pr not open` / `pr is draft`. A repo with no machine-review lane reports
@@ -12,7 +15,7 @@ a merged or draft PR reports `pr not open` / `pr is draft`. A repo with no machi
 case it prints `marker: none`. That opt-out applies only when no selected marker exists. Never merge
 on any other basis:
 
-1. every CI check green **on the head SHA** — unless the PR head tree has no
+1. For the manual path, every CI check green **on the head SHA** — unless the PR head tree has no
    `.github/workflows/*.yml|*.yaml` **and** zero registered workflows/check runs/statuses on that
    head SHA. The CI clause is **not applicable** only on the script's exact `verdict: BLOCKED: no
    checks` (sole blocking reason; items 2–4 pass in the same output). The operator's closeout note
@@ -71,13 +74,44 @@ A non-zero exit blocks the merge. The fetch comes first so a sibling PR that mer
 fetch cannot hide behind a stale `origin/main`. The fix is always a rebase onto `origin/main` plus
 raising each `metadata.revision` the gate names above the rebased base.
 
-Then `gh pr merge <N> --squash --delete-branch`, `git fetch --prune`, `git checkout main`,
-`git pull --ff-only`, prove `gh pr view <N> --json headRefOid` equals the head you verified, report.
-Land and re-branch in this order, stopping on any failure, so the next goal starts from the merged head:
+## Submit and confirm landing
+
+- **Auto:** The script reads `allow_auto_merge` on the target repo and looks for required status
+  checks on the actual PR base, in active rulesets or classic protection. If both are confirmed,
+  it delegates the CI clause to GitHub (required checks only) and still enforces items 2–4.
+  After those pass, it runs `gh pr merge <N> --auto --squash --match-head-commit <sha>` with
+  the full `headRefOid` read from GitHub by `gh pr view`, not a typed or abbreviated SHA.
+  Branch deletion is left to the repository setting. If submission fails, stop and inspect the
+  PR; never treat it as permission to merge manually.
+- **Manual:** If capability is absent or unreadable, the same invocation runs the existing manual
+  gate. On `MERGE-OK` (or the explicit no-CI exception above), recheck that
+  `gh pr view <N> --json headRefOid` still equals the verified head, then run
+  `gh pr merge <N> --squash --delete-branch`.
+
+On `MERGE-QUEUED`, record the PR, full verified head, and target branch in the ledger before waiting:
 
 ```bash
-gh pr merge <N> --squash --delete-branch
-gh pr view <N> --json state,mergeCommit --jq '"\(.state) \(.mergeCommit.oid)"'
+uv run scripts/delivery-state.py append --repo <path> --goal <id> --stage merge --head <full-sha> --pr <N> --next merge --note "merge queued; base=<target-branch>"
+gh pr view <N> --json state,baseRefName,headRefOid,mergeCommit,autoMergeRequest
+```
+
+Keep the ledger at `merge queued` while the PR remains open with auto-merge enabled. On resume,
+read the live state before doing anything else; do not resubmit a pending request or run a second
+CI waiter. While queued, read the check conclusions with `gh pr checks <N>`: GitHub does not merge
+past a failed required check, and it does not report that as a failure either. A required check
+that died on an infra step (<60 s, download/setup) gets `gh run rerun <run-id> --failed` once, and
+the queue stays as is. Any other failed required check blocks the goal: disable auto-merge
+(`gh pr merge <N> --disable-auto`), record it in the ledger, and fix forward as on the manual path. Do not push or retarget while queued: the match flag applies at submission, not as a
+permanent lock. Disable auto-merge and verify it is off before changing the head or base. If the
+queue disappears or head/base drifts, stop, disable any remaining auto-merge request, and
+re-verify before proceeding.
+
+On either path, require GitHub to report `MERGED`, confirm `headRefOid` still equals the verified
+head and `baseRefName` still names the intended target, and record the `mergeCommit.oid` and the
+ledger close per Phase 7. Only then reset from the updated main, stopping on any failure:
+
+```bash
+git fetch --prune
 git checkout -q main
 git pull -q --ff-only
 git checkout -q -b feat/<next-goal-slug>
@@ -87,7 +121,7 @@ A PR that reads `MERGED` while `origin/main` still shows the old head means main
 not that the merge failed. **Done** is merged *and* the next goal branched off the merged head — an
 open PR is not done.
 
-Bounded CI watching: `uv run scripts/watch-pr-checks.py <PR> [max_reruns] [max_polls] [logfile]` waits for a
+Bounded CI watching (manual path): `uv run scripts/watch-pr-checks.py <PR> [max_reruns] [max_polls] [logfile]` waits for a
 settled verdict — checks done *and* the PR `MERGEABLE CLEAN` at the head it started on — reruns only
 jobs that died on an infra step (<60 s fail), and logs every poll. A download step failing in under a
 minute is infra — `gh run rerun <run-id> --failed` first, then look at the code.

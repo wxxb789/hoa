@@ -6,7 +6,7 @@ description: >-
   increment is delegated end to end, including the merge. Not for one-line fixes, exploration without
   acceptance criteria, or work no machine can check.
 metadata:
-  revision: "10"
+  revision: "11"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "goal contract → agent-authored stages → operator-run gates → scripted merge gate → resumable ledger; ships `gdd.py`, `delivery-state.py`, `pr-merge-check.py`"
