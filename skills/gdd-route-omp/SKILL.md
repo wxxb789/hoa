@@ -31,13 +31,12 @@ terminal goes down.
 
 A background child of the orchestrating session receives SIGTERM when that session ends, and `omp -p`
 prints only at exit — a run killed at minute 37 leaves a 0-byte output file. Always launch through the
-launcher shipped with this skill (a detached process: own session on POSIX, one hidden console on
-Windows):
+shared runner (a detached process: own session on POSIX, one hidden console on Windows):
 
 ```bash
-scripts/omp-run.sh start --name <slug> --prompt <file> --cwd <repo> \
+uv run ../gdd/scripts/agent_run.py start --agent omp --name <slug> --prompt <file> --cwd <repo> \
   [--resume <session-id>] [--model M] [--thinking L] [--max-time 3h] [--extra "--no-tools"]
-scripts/omp-run.sh list | status <slug> | tail <slug> 20 | result <slug> | answer <slug> | kill <slug>
+uv run ../gdd/scripts/agent_run.py status <slug>
 ```
 
 `--max-time` takes seconds or one unit (`90m`, `2h`); the runner enforces it (exit `124`, `failed`).
@@ -47,8 +46,10 @@ your session, so it survives session and gateway restarts. Verify with the ances
 pid, not by assumption.
 
 This skill requires skill `gdd`: the runner is maintained once, as gdd's `../gdd/scripts/agent_run.py`
-(cross-platform, stdlib Python), because that skill's `gdd.py` launches through it too. `scripts/omp-run.sh`
-here is a forwarder that pins `GDD_AGENT=omp`, so manual and dispatched runs share one code path.
+(cross-platform, stdlib Python), because that skill's `gdd.py` launches through it too. Existing
+POSIX callers can still use `scripts/omp-run.sh`, a forwarder that sets `GDD_AGENT=omp`.
+Only if a script command fails (for example `uv` is not found), read
+[the runner troubleshooting reference](../gdd/references/troubleshooting.md).
 
 ## Why headless (not TUI)
 
@@ -86,11 +87,11 @@ here is a forwarder that pins `GDD_AGENT=omp`, so manual and dispatched runs sha
 8. Headless only works when the result is falsifiable. Treat the agent's report as a claim; re-run the
    repo gates yourself (build, test, format, docs snippets, api baseline, examples) and read exit codes
    before committing.
-9. **Judge liveness from `state.json` / `omp-run.sh status`, never from `ps | grep <shim path>`.**
+9. **Judge liveness from `state.json` or the runner's `status`, never from `ps | grep <shim path>`.**
    Package-manager shims (`mise`, `asdf`, `volta`) point at a different binary than the one running, so
    grepping the shim path reports a healthy run as dead — use the pid in `state.json`.
 10. **A detached run has no completion notification.** Nothing pings you when it ends: poll
-    `omp-run.sh status <slug>` at turn boundaries, and treat `state` leaving `running` as the done
+    the runner's `status <slug>` at turn boundaries, and treat `state` leaving `running` as the done
     signal. A run whose runner and agent died is finalized as failed (`stale_recovered: true`, exit
     `-1`) the next time `status`/`list`/`result`/`answer` reads it; a state file stuck at `running` is
     not evidence that the work is alive — read `finalized` or the `stale_recovered` flag.
@@ -100,7 +101,7 @@ here is a forwarder that pins `GDD_AGENT=omp`, so manual and dispatched runs sha
     run (`-r <session-id>` plus a prompt that names the remaining steps), not a fresh restart.
 12. **Never print the raw `events.ndjson` of a JSON-mode run.** Each event carries the full prompt of
     every sub-agent the run spawned, so one raw read returns hundreds of KB and floods the context for
-    no signal. `omp-run.sh tail <slug> [N]` prints one line per event (type plus at most 160 characters
+    no signal. The runner's `tail <slug> [N]` prints one line per event (type plus at most 160 characters
     of text), which is safe; poll `status <slug>` for liveness and read `answer.md` (or `result <slug>`)
     for the outcome.
 13. **`state.json` grows over the run lifecycle.** Counters and the final fields (`ended`,
@@ -129,10 +130,10 @@ here is a forwarder that pins `GDD_AGENT=omp`, so manual and dispatched runs sha
 ## Recovery after a session restart
 
 ```bash
-scripts/omp-run.sh list          # failed(stale) = runner and agent died; sess= is the resume id
+uv run ../gdd/scripts/agent_run.py list  # failed(stale) = runner and agent died; sess= is the resume id
 ```
 
-Then `omp-run.sh start --name <slug>-r2 --prompt <continuation> --resume <id>`.
+Then start a new run with `--agent omp --name <slug>-r2 --prompt <continuation> --resume <id>`.
 
 Artifacts per run (`<run_root>/<YYYY-MM-DD>/<slug>/`): `prompt.md`, `run.json` (the exact argv),
 `events.ndjson`, `stderr.log`, `runner.log`, `state.json` (the single record, including `session_id`),

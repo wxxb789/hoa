@@ -58,6 +58,9 @@ uv run ../gdd/scripts/agent_run.py status <slug>     # until state != running
 uv run ../gdd/scripts/agent_run.py answer <slug>     # the final assistant text
 ```
 
+Only if a script command fails (for example `uv` is not found), read
+[the runner troubleshooting reference](../gdd/references/troubleshooting.md).
+
 ## One goal, one worktree, one session
 
 - **Launcher flags precede app flags.** `--profile`, `--patch`, `--dump-config` belong to the launcher;
@@ -159,11 +162,9 @@ a detached run never notifies.
 
 ## Configuration
 
-Resolution order per setting: environment variable → `gdd.py` config file (`GDD_AGENT` and
-`GDD_RUN_ROOT` only) → documented default. The runner's flags are the contract's (`start --name --prompt
---cwd --agent --max-time --resume --extra --replace`, plus the other subcommand arguments), so the runner
-itself reads the keys below from the environment only. No environment-specific value belongs in
-the runner, the skill body, or the goal contract.
+For `GDD_AGENT` and `GDD_RUN_ROOT`, the shared runner checks the environment, then the
+[GDD config file](../gdd/references/configuration.md), then the default. `start --agent` takes
+precedence over `GDD_AGENT`. The remaining keys resolve from the environment, then the default.
 
 | Key | Resolves | Default |
 |---|---|---|

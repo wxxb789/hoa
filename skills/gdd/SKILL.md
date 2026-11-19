@@ -107,13 +107,10 @@ matching the current stage directly — do not create per-phase skills.
 | round caps | `implement` / `simplify` / `review` run at most **2x** — enforced by `gdd.py stage`, override with `--over-budget` | `scripts/gdd.py` |
 | `GDD_WORKTREE_SCOPE` | `worktree-scope.py` path | `../delegated-work-acceptance/scripts/worktree-scope.py` |
 
-Resolution order and the config-file path are defined in
-[references/configuration.md](references/configuration.md).
-`gdd.py` implements it through the vendored `scripts/skill_config.py`; the config-file keys are the
-`GDD_*` names in the table except the profile's `GDD_WORKTREE_SCOPE` override. Nothing about one
-install lives in the protocol: a profile may point at its own files, but no path is inlined.
-Commands run the bundled scripts with `uv run <path>`. Only if a script command fails (for example
-`uv` is not found), read [references/troubleshooting.md](references/troubleshooting.md).
+See [references/configuration.md](references/configuration.md) for lookup order and the config path.
+`gdd.py` resolves the table's `GDD_*` keys through `scripts/skill_config.py`.
+Run bundled scripts with `uv run <path>`. Only if a script command fails (for example `uv` is not
+found), read [references/troubleshooting.md](references/troubleshooting.md).
 
 Read [`references/transport.md`](references/transport.md) before selecting or dispatching a launcher:
 it defines both routes, model/thinking mapping, artifact polling, and platform-specific evidence.

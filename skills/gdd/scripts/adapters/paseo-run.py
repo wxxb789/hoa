@@ -142,9 +142,17 @@ def claim(path):
     try:
         yield
     finally:
-        with suppress(OSError):
-            if claim_holder(path) == mine:
-                os.unlink(path)
+        for attempt in range(10):
+            try:
+                if claim_holder(path) == mine:
+                    os.unlink(path)
+                break
+            except PermissionError:
+                # On Windows a contender's open read handle can block unlink.
+                if attempt < 9:
+                    time.sleep(0.1)
+            except OSError:
+                break
 
 
 def cli(state, argv):

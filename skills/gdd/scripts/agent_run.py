@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # /// script
-# requires-python = ">=3.10"
+# requires-python = ">=3.9"
 # dependencies = []
 # ///
 """agent_run.py — one detached runner for every headless agent CLI gdd dispatches.
@@ -224,8 +224,8 @@ def identity(pid):
         except (OSError, IndexError):
             return ""
     try:
-        out = subprocess.run(["ps", "-o", "lstart=", "-p", str(pid)], capture_output=True, text=True,
-                             stdin=subprocess.DEVNULL).stdout.strip()
+        out = subprocess.run(["ps", "-o", "lstart=", "-p", str(pid)], capture_output=True, encoding="utf-8",
+                             errors="replace", stdin=subprocess.DEVNULL).stdout.strip()
     except OSError:
         out = ""
     return f"ps:{out}" if out else ""
@@ -731,7 +731,19 @@ def cmd_start(args):
     try:
         if os.path.isdir(run_dir):  # keep the previous run; on Windows its exiting runner still holds files
             wait_until(lambda: not run_alive(run_dir), knob("GDD_RUN_STOP_WAIT_SECONDS", 20))
-            os.rename(run_dir, f"{run_dir}.prev-{datetime.now():%H%M%S%f}")
+            archive = f"{run_dir}.prev-{datetime.now():%H%M%S%f}"
+            before = os.stat(run_dir)
+            for attempt in range(10):
+                try:
+                    os.rename(run_dir, archive)
+                    break
+                except PermissionError:
+                    if attempt == 9:
+                        raise
+                    # DrvFS can briefly deny a rename after the final state files close.
+                    time.sleep(0.1)
+                    if not os.path.samestat(before, os.stat(run_dir)):
+                        raise
         os.makedirs(os.path.dirname(run_dir), exist_ok=True)
         os.mkdir(run_dir)  # the slug claim
     except OSError as exc:

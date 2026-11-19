@@ -290,10 +290,12 @@ class ContractTests(RunnerCase):
         fast = {"GDD_RUN_STOP_WAIT_SECONDS": "1"}
         for name, forged in (("orphan", False), ("reused", True)):
             with self.subTest(forged=forged):
-                self.start(name, env={"STUB_HANG": "1"})
+                # The agent must survive the runner's pipe closing until kill checks its identity.
+                self.start(name, env={"STUB_HANG": "1", "STUB_FIXTURE": ""})
                 state = self.state(name)
                 force_kill(state["pid"])
                 self.assertTrue(wait_for(lambda: not pid_alive(state["pid"]), 10))
+                self.assertTrue(pid_alive(state["agent_pid"]))
                 if forged:  # the recorded pid now names a different process
                     write(os.path.join(self.run_dir(name), "state.json"),
                           json.dumps({**state, "agent_pid_identity": "forged"}))
@@ -475,9 +477,9 @@ class ContractTests(RunnerCase):
         self.assertEqual(refused.returncode, 1)
         self.assertIn("is not a readable JSON object", refused.stderr)
 
-    @unittest.skipIf(IS_WINDOWS or not shutil.which("bash"), "the omp-headless-orchestration forwarder is bash")
+    @unittest.skipIf(IS_WINDOWS or not shutil.which("bash"), "the gdd-route-omp forwarder is bash")
     def test_t15_omp_headless_forwarder_resolves_the_sibling_runner(self):
-        forwarder = os.path.join(HERE, "..", "..", "..", "omp-headless-orchestration", "scripts", "omp-run.sh")
+        forwarder = os.path.join(HERE, "..", "..", "..", "gdd-route-omp", "scripts", "omp-run.sh")
         env = {**self.env, "STUB_FIXTURE": os.path.join(FIXTURES, "omp.ok.ndjson"), "GDD_AGENT": "dsh"}
         proc = subprocess.run(["bash", forwarder, "start", "--name", "fwd", "--prompt", self.prompt, "--cwd", self.work],
                               capture_output=True, text=True, env=env, timeout=90)

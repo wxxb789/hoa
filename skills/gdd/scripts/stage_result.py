@@ -1,3 +1,7 @@
+# /// script
+# requires-python = ">=3.9"
+# dependencies = []
+# ///
 """The gdd stage-result contract: references/stage-result.schema.json, how a result is found in an
 agent's answer, and the stdlib subset validator for exactly the keywords that schema uses
 (type, enum, required, properties, additionalProperties: false, items).

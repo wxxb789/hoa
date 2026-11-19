@@ -41,15 +41,15 @@ and on macOS and Windows in the `gdd-runner` CI job; the real-CLI smoke is an op
 2. **A Windows launcher must not be driven from inside a WSL distro, or the reverse.** WSL2 interop is
    asymmetric: Windows environment variables do not reach the distro, and a detached Windows `.exe`
    started from a distro has been observed to record its session and then never exit, so the run never
-   finalizes. Run the launcher *inside* the distro with the distro's own python3, and point
+   finalizes. Run the launcher *inside* the distro with the distro's own Python, and point
    `GDD_RUN_ROOT` at one root both halves can see.
 
 ### Native Paseo evidence boundary
 
 | Platform | Native validation status |
 |---|---|
-| Windows | Executed: `python3 -B -m unittest discover -s skills/gdd/scripts/tests` → 83 tests, `OK (skipped=3)`, exit 0. Native stub cases cover argv/state/answer/deletion and monitor finalization after a 33-second refresh-claim hold. Live CLI 0.15.4 native-argv multiline smoke returned the exact requested answer; real inspect verified the stage cwd despite inherited caller/workspace identities; deletion receipt and both list formats confirmed agent removal. |
-| WSL2 (Ubuntu 24.04, inside the distro) | Executed: the same 83-test command with a fresh native-filesystem `TMPDIR` → `OK (skipped=4)`, exit 0; includes the native stub cases. No real-daemon native smoke claimed. |
+| Windows | The prior native integration's stub tests covered argv, state, answer, deletion and monitor finalization after a 33-second refresh-claim hold. A live CLI 0.15.4 smoke returned the exact requested answer; inspect verified the stage cwd despite inherited caller/workspace identities, and deletion receipt and both list formats confirmed agent removal. |
+| WSL2 (Ubuntu 24.04, inside the distro) | The prior native integration ran its stub tests with a fresh native-filesystem `TMPDIR`. No real-daemon native smoke claimed. |
 | Linux / macOS | No native live-test evidence claimed; the headless POSIX evidence above is not transferable |
 
 The Windows daemon smoke used the explicit native executable/entrypoint argv described below;
@@ -62,7 +62,7 @@ and desktop rendering remain unverified.
 ## Launcher contract
 
 ```
-<launcher> start  --name SLUG --prompt FILE [--cwd DIR] [--model M] [--thinking L] [--max-time D]
+<launcher> start  --name SLUG --prompt FILE --schema FILE [--cwd DIR] [--model M] [--thinking L] [--max-time D]
 <launcher> list
 <launcher> status SLUG
 <launcher> result SLUG
