@@ -71,7 +71,8 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 - gdd: preserve literal systemd paths and the caller's setsid umask; reject reused PIDs,
   finalize stopped runs with zombie-only groups, and retry blocked progress writes. Publish
   terminal state before launchd bootout, keep supervisor paths out of Herdr shell input, and
-  support tmux before 3.2. The observer uses runner counters or marks rotated event counts partial.
+  require tmux 3.2a or newer and the latest herdr for their opt-in modes. The observer uses runner
+  counters or marks rotated event counts partial.
 
 - Trigger evals now route on visible skills' frontmatter descriptions, accept `none` when no
   artifact fits, and include three no-trigger cases.

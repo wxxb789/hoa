@@ -37,8 +37,8 @@ Windows in the `gdd-runner` CI job; the real-CLI smoke is an opt-in operator ste
 | `launchd` | Yes | Yes, separate job; not a GUI-domain restart | No |
 | `setsid` | Yes | No guarantee; the double fork does not leave a cgroup | No |
 | `windows` | Yes | Only if the runner is outside the terminating job | No |
-| `tmux` (optional, POSIX) | Yes | Only if the tmux server is outside the gateway's cgroup/job | No |
-| `herdr` (optional) | Yes | Only if the Herdr server survives the restart | No |
+| `tmux` (optional, POSIX, 3.2a or newer) | Yes | Only if the tmux server is outside the gateway's cgroup/job | No |
+| `herdr` (optional, latest herdr) | Yes | Only if the Herdr server survives the restart | No |
 
 1. **Auto selects the platform ladder.** Linux/WSL2 checks its user manager for at most one
    second and uses a transient unit if it reports `running` or `degraded`. macOS bootstraps a one-shot
@@ -50,8 +50,7 @@ Windows in the `gdd-runner` CI job; the real-CLI smoke is an opt-in operator ste
    `CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW` and tries `CREATE_BREAKAWAY_FROM_JOB` first;
    access denied retries without breakaway. State records the actual `spawn.creationflags`.
 3. **Opt in to a watchable supervisor in the environment.** `GDD_RUN_DETACH=tmux` creates a
-   detached session; `GDD_RUN_DETACH=herdr` creates an unfocused tab in an existing Herdr 0.9.5
-   server. Tmux before 3.2 restores the environment solely from the private runner file.
+   detached session; `GDD_RUN_DETACH=herdr` creates an unfocused tab in an existing server.
    Herdr's pane API accepts shell input, not an argv vector. GDD starts the pane in the run
    directory and sends only a standard Python executable name and a generated ASCII entry filename.
    That entry loads the original runner arguments without shell parsing and removes itself.

@@ -44,7 +44,8 @@ elif tool == "launchctl" and args[0] == "bootout":
         assert runner_pid == os.getppid()
         os.kill(runner_pid, signal.SIGTERM)
 elif tool == "tmux" and args[0] == "-V":
-    print("tmux 3.1c" if (root / "old-tmux").exists() else "tmux 3.2a")
+    version = root / "tmux-version"
+    print(version.read_text(encoding="utf-8") if version.exists() else "tmux 3.2a")
 elif tool == "tmux" and args[0] == "new-session":
     if (root / "refuse").exists():
         sys.exit("cannot connect")
@@ -61,6 +62,8 @@ elif args[:2] == ["tab", "create"]:
 elif args[:2] == ["pane", "run"] and (root / "refuse").exists():
     sys.exit("pane command refused")
 elif args[:2] == ["tab", "close"]:
+    if (root / "tab-missing").exists():
+        sys.exit(json.dumps({"error": {"code": "tab_not_found"}}))
     print(json.dumps({"result": {"closed": True}}))
 """
 
@@ -96,6 +99,10 @@ class SupervisorTests(unittest.TestCase):
 
     def start(self, mode, tool):
         with mock.patch.object(os, "getuid", return_value=123, create=True):
+            if mode == "tmux":
+                with mock.patch.object(agent_run, "IS_WINDOWS", False), \
+                        mock.patch.object(agent_run.shutil, "which", return_value=tool):
+                    mode, tool = agent_run.select_detach(mode)
             return agent_run.spawn_detached(self.argv, self.run_dir, str(self.root), self.env,
                                             self.state, mode, tool)
 
@@ -237,13 +244,25 @@ sys.exit(agent_run.main(args))
         self.assertEqual(self.calls()[-2:], [["tmux", "has-session", "-t", "=" + name],
                                              ["tmux", "kill-session", "-t", "=" + name]])
 
-    def test_tmux_before_3_2_uses_the_private_environment_file(self):
-        (self.root / "old-tmux").touch()
-        self.start("tmux", "tmux")
-        argv = self.calls()[1]
-        self.assertNotIn("-e", argv[:argv.index("--")])
-        self.assertIn("--restore-env", argv)
-        self.assertEqual(json.loads((self.run_dir / ".runner-env").read_text(encoding="utf-8")), self.env)
+    def test_tmux_version_floor(self):
+        for version in ("2.9a", "3.1c", "3.2", "next-3.1", "3.2a", "3.4", "3.6a", "next-3.7", "master", "unknown"):
+            with self.subTest(version=version):
+                (self.root / "tmux-version").write_text(f"tmux {version}", encoding="utf-8")
+                (self.root / "calls").unlink(missing_ok=True)
+                self.run_dir = self.root / version
+                self.run_dir.mkdir()
+                if version in ("2.9a", "3.1c", "3.2", "next-3.1", "unknown"):
+                    with self.assertRaises(ValueError) as exc:
+                        self.start("tmux", "tmux")
+                    self.assertIn(f"tmux {version}", str(exc.exception))
+                    self.assertIn("3.2a", str(exc.exception))
+                    self.assertEqual(self.calls(), [["tmux", "-V"]])
+                    self.assertFalse((self.run_dir / ".runner-env").exists())
+                else:
+                    self.start("tmux", "tmux")
+                    self.assertEqual(self.calls()[1][1], "new-session")
+                    self.assertIn("-e", self.calls()[1])
+                    self.assertEqual(agent_run.cleanup_supervisor(self.run_dir, self.state), "")
 
     def test_tmux_missing_session_recovers_stale_run(self):
         self.start("tmux", "tmux")
@@ -257,7 +276,9 @@ sys.exit(agent_run.main(args))
 
     def test_herdr_json_handle_and_unfocused_start_and_kill(self):
         script = self.root / "runner's path with spaces \u2019; test.py"
-        script.write_text("import json, sys\nprint(json.dumps(sys.argv))\n", encoding="utf-8")
+        (self.root / "runner_sibling.py").write_text("import json\n", encoding="utf-8")
+        script.write_text("import sys\nfrom runner_sibling import json\nprint(json.dumps(sys.argv))\n",
+                          encoding="utf-8")
         self.argv[2] = str(script)
         self.start("herdr", "herdr")
         target = agent_run.read_state(self.run_dir)["supervisor"]
@@ -287,6 +308,13 @@ sys.exit(agent_run.main(args))
             self.assertFalse(env_file.exists())
         self.check_kill("herdr")
         self.assertEqual(self.calls()[-1], ["herdr", "tab", "close", "tab-1"])
+
+    def test_herdr_tab_already_closed_is_clean(self):
+        self.start("herdr", "herdr")
+        (self.root / "tab-missing").touch()
+        self.assertEqual(agent_run.cleanup_supervisor(self.run_dir, self.state), "")
+        self.assertFalse((self.run_dir / self.state["supervisor"]["entry"]).exists())
+        self.assertTrue((self.run_dir / ".supervisor-cleaned").exists())
 
     def test_optional_failures_do_not_fall_back(self):
         (self.root / "refuse").touch()

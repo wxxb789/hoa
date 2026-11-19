@@ -79,6 +79,8 @@ if IS_WINDOWS:
 KILLED_EXITS = (130, -2, 137, -9, 143, -15)
 KILL_EXIT, TIMEOUT_EXIT = 143, 124
 WINDOWS_DETACH = gdd_process.NO_WINDOW | gdd_process.NEW_GROUP
+# Ubuntu 22.04 leaves standard support in 2027-04; then move the floor to 24.04's 3.4.
+TMUX_MIN_VERSION = (3, 2, "a")
 POLL, PROGRESS_SECONDS = 0.25, 2.0
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 SLUG_RE = re.compile(r"[^a-z0-9._-]+")
@@ -139,6 +141,8 @@ def select_detach(requested):
         launcher = shutil.which(requested)
         if not launcher:
             raise ValueError(f"GDD_RUN_DETACH={requested}: {requested} executable not found on PATH")
+        if requested == "tmux":
+            check_tmux_version(launcher)
         return requested, launcher
     if requested in ("auto", "systemd") and sys.platform == "linux":
         if (launcher := shutil.which("systemd-run")) and (ctl := shutil.which("systemctl")):
@@ -159,6 +163,20 @@ def select_detach(requested):
     if requested not in ("auto", native):
         raise ValueError(f"GDD_RUN_DETACH={requested} is not supported on {sys.platform}")
     return native, None
+
+
+def check_tmux_version(launcher):
+    try:
+        found = require_success(supervisor_call([launcher, "-V"])).stdout.strip()
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise ValueError(f"tmux: cannot check version: {exc}") from exc
+    if found == "tmux master":
+        return
+    match = re.fullmatch(r"tmux (?:next-)?([0-9]+)\.([0-9]+)([a-z]*)", found)
+    if match and (int(match[1]), int(match[2]), match[3]) >= TMUX_MIN_VERSION:
+        return
+    minimum = "{}.{}{}".format(*TMUX_MIN_VERSION)
+    raise ValueError(f"tmux: found {found!r}; requires tmux {minimum} or newer")
 
 
 def systemd_argv(launcher, unit, cwd, log, runner):
@@ -310,10 +328,6 @@ def spawn_detached(runner, run_dir, cwd, env, state, mode, launcher=None):
             options = [arg for key in ("PYTHONUNBUFFERED", "PYTHONPATH", "NOWINDOW_GUARD_LOG")
                        if key in env or key == "PYTHONUNBUFFERED" for arg in (setting, f"{key}={env.get(key, '1')}")]
             if mode == "tmux":
-                version = require_success(target_call(target, "-V")).stdout
-                match = re.match(r"tmux (\d+)\.(\d+)", version)
-                if not match or tuple(map(int, match.groups())) < (3, 2):
-                    options = []
                 require_success(target_call(target, "new-session", "-d", "-s", target["session"],
                                             "-c", cwd, *options, "--", *runner))
                 (run_dir / ".supervisor-started").touch()
@@ -326,10 +340,11 @@ def spawn_detached(runner, run_dir, cwd, env, state, mode, launcher=None):
                 with os.fdopen(private_file(run_dir / target["entry"]), "w", encoding="utf-8") as entry:
                     entry.write("import os, runpy, sys\n"
                                 f"sys.argv = {ascii([*runner[2:], '--runner-cwd', cwd])}\n"
+                                "sys.path[0] = os.path.dirname(os.path.abspath(sys.argv[0]))\n"
                                 "os.unlink(__file__)\n"
                                 "runpy.run_path(sys.argv[0], run_name='__main__')\n")
-                result = herdr_response(supervisor_call([launcher, "tab", "create", "--no-focus", "--cwd", str(run_dir),
-                                                         "--label", f"gdd-{state['name']}", *options]))
+                result = herdr_response(target_call(target, "tab", "create", "--no-focus", "--cwd", str(run_dir),
+                                                    "--label", f"gdd-{state['name']}", *options))
                 tab = result["tab"]["tab_id"]
                 if not isinstance(tab, str) or not tab or tab.startswith("-"):
                     raise ValueError("invalid Herdr tab ID")
@@ -340,8 +355,8 @@ def spawn_detached(runner, run_dir, cwd, env, state, mode, launcher=None):
                     raise ValueError("invalid Herdr pane ID")
                 target["pane"] = pane
                 write_json(run_dir / "state.json", state)
-                require_success(supervisor_call([launcher, "pane", "run", pane,
-                                                 f"{executable.name} -B {target['entry']}"]))
+                require_success(target_call(target, "pane", "run", pane,
+                                            f"{executable.name} -B {target['entry']}"))
             return None, 0
     except (OSError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired) as exc:
         (run_dir / ".runner-env").unlink(missing_ok=True)
@@ -454,7 +469,7 @@ def cleanup_supervisor(run_dir, state):
             response = read_json_text(result.stdout if not result.returncode else result.stderr)
             if result.returncode or "result" not in response:
                 error = response.get("error") or {}
-                if not isinstance(error, dict) or error.get("code") not in ("tab_not_found", "not_found"):
+                if not isinstance(error, dict) or error.get("code") != "tab_not_found":
                     raise OSError(supervisor_error(result) if result.returncode else "invalid tab close result")
         if mode == "herdr" and target.get("entry"):
             (Path(run_dir) / target["entry"]).unlink(missing_ok=True)
