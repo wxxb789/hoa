@@ -20,7 +20,6 @@ CATEGORIZED="$HERE/../../software-development/gdd/scripts/agent_run.py"
 # which a non-login shell (systemd-run, wsl -e) may not have on PATH.
 UV="$(command -v uv || true)"
 if [[ -z "$UV" && -x "$HOME/.local/bin/uv" ]]; then UV="$HOME/.local/bin/uv"; fi
-export PYTHONDONTWRITEBYTECODE=1
 export GDD_AGENT=omp
 
 if [[ -n "${OMP_RUN_SH:-}" && -x "${OMP_RUN_SH}" ]]; then

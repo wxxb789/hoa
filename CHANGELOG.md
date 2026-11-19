@@ -23,7 +23,9 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
   and evals carry PEP 723 blocks (PyYAML where imported), `omp-run.sh` starts the runner through uv
   (also found in `~/.local/bin` from a non-login shell), the troubleshooting reference no longer
   offers a bare `python3` fallback, and `check_skill_links.py` fails a skill script whose shebang
-  bypasses uv.
+  bypasses uv or a skill launcher (`.sh`/`.ps1`) that calls a bare `python`. The shared runner drops
+  the venv `uv run --script` activates before it starts the agent, so the agent's gates use the
+  target repo's Python rather than uv's stdlib-only script environment.
 
 ## 2026-11-18
 

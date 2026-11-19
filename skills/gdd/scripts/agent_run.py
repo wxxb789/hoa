@@ -1031,7 +1031,18 @@ def max_time_seconds(value):
 
 
 def child_env(scrub):
-    return {key: value for key, value in os.environ.items() if key not in scrub}
+    env = {key: value for key, value in os.environ.items() if key not in scrub}
+    # `uv run --script` activates its cached script venv; the agent and its gates need the caller's
+    # python, not a stdlib-only interpreter shadowing the target repo's.
+    venv = env.get("VIRTUAL_ENV")
+    if ("UV_RUN_RECURSION_DEPTH" in env and venv and os.path.isdir(venv)
+            and os.path.samefile(venv, sys.prefix)):
+        bindir = os.path.normcase(os.path.join(venv, "Scripts" if IS_WINDOWS else "bin"))
+        env["PATH"] = os.pathsep.join(entry for entry in env.get("PATH", "").split(os.pathsep)
+                                      if os.path.normcase(entry.rstrip("\\/")) != bindir)
+        for key in ("VIRTUAL_ENV", "VIRTUAL_ENV_PROMPT", "UV_RUN_RECURSION_DEPTH"):
+            env.pop(key, None)
+    return env
 
 
 class EventLog:

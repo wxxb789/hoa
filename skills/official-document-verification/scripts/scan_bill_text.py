@@ -10,7 +10,7 @@ named things an absence claim rests on. It answers "what does this fetched text 
 "what does the bill say", and never a procedural forecast.
 
 Usage:
-    python3 scan_bill_text.py <file> [--section 904] [--cite "42 U.S.C. 1396"] [--term "renewal"] ...
+    uv run scan_bill_text.py <file> [--section 904] [--cite "42 U.S.C. 1396"] [--term "renewal"] ...
 
 Output is JSON on stdout so the caller can quote exact counts in the evidence note.
 """

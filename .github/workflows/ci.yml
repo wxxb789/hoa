@@ -28,7 +28,7 @@ jobs:
           python-version: "3.13"
           cache: pip
           cache-dependency-path: scripts/requirements.txt
-      - uses: astral-sh/setup-uv@v10  # gdd-route-omp's forwarder runs the shared runner via uv
+      - uses: astral-sh/setup-uv@v10.3.3  # gdd-route-omp's forwarder runs the shared runner via uv
       - run: python -m pip install -r scripts/requirements.txt
 
       # Static gates
@@ -105,7 +105,7 @@ jobs:
           python-version: "3.13"
           cache: pip
           cache-dependency-path: scripts/requirements.txt
-      - uses: astral-sh/setup-uv@v10  # gdd-route-omp's forwarder runs the shared runner via uv
+      - uses: astral-sh/setup-uv@v10.3.3  # gdd-route-omp's forwarder runs the shared runner via uv
       - run: python -m pip install -r scripts/requirements.txt
       - name: Shared gdd runner, dispatch, and watcher contracts
         env:

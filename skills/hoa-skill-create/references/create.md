@@ -138,8 +138,8 @@ Bundled scripts serve an agent caller
   project's environment. A missing uv is handled by a vendored
   `references/troubleshooting.md` that SKILL.md says to read only when a
   script command fails; it asks the user before installing uv, never
-  auto-installs, and allows `python3` only for a script with no dependencies.
-  A script with dependencies says uv is required.
+  auto-installs; if the user declines, the skill stops, because a bare
+  `python3` is often older than `requires-python`.
 
 ## Adopt imported skills as untrusted code
 

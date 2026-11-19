@@ -103,6 +103,8 @@ class CheckSkillLinksTests(unittest.TestCase):
                           "scripts/plain.py": "print()\n",
                           "scripts/test_run.py": "#!/usr/bin/env python3\n",
                           "scripts/tests/stub.py": "#!/usr/bin/env python3\n",
+                          "scripts/probe.sh": "# python3 in a comment\n"
+                                              "uv run --no-project python - <<'PY'\nPY\n",
                           "references/x.md": "`uv run scripts/run.py`"})
         code, out, err = self.run_main()
         self.assertEqual(code, 0, out + err)
@@ -115,7 +117,8 @@ class CheckSkillLinksTests(unittest.TestCase):
                            "uv run --with pyyaml python -c 'import yaml'\n```\n"
                            "Measure with `python3\nscripts/run.py draft.md`.",
                    files={"scripts/run.py": self.PEP_723, "scripts/plain.py": "print()\n",
-                          "scripts/legacy.py": "#!/usr/bin/env python3\n" + self.PEP_723})
+                          "scripts/legacy.py": "#!/usr/bin/env python3\n" + self.PEP_723,
+                          "scripts/probe.sh": "#!/bin/sh\npython3 - \"$KEY\" <<'PY'\nPY\n"})
         code, out, err = self.run_main()
         self.assertEqual(code, 1)
         self.assertEqual(out.splitlines(), [
@@ -133,8 +136,10 @@ class CheckSkillLinksTests(unittest.TestCase):
             "write uv run scripts/run.py",
             "skills/tool/scripts/legacy.py:1: shebang '#!/usr/bin/env python3' bypasses uv; "
             "write #!/usr/bin/env -S uv run --script",
+            "skills/tool/scripts/probe.sh:2: bare python in a launcher; write uv run <script> or "
+            "uv run --no-project python",
         ])
-        self.assertIn("7 error(s)", err)
+        self.assertIn("8 error(s)", err)
 
 
 if __name__ == "__main__":
