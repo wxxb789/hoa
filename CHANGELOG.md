@@ -26,6 +26,8 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
   and both merge paths require the exact verified head.
 - Slim the gdd shared runner, Paseo adapter, transport reference, and overlapping contract tests
   while retaining platform detachment, process ownership, and stage outcome rules.
+- Restore the DSH transport instructions and regression coverage for runner identity,
+  lifecycle diagnostics, and Paseo start output.
 
 - The README and the generated index tell users who do not run Hermes to skip the `hermes-*` skills, and
   the index carries an install-everything-but-Hermes command; `generate_index.py` fails if any other

@@ -188,17 +188,18 @@ class PaseoLauncherTests(unittest.TestCase):
         env = dict(self.env, GDD_MODEL="environment-provider", GDD_THINKING="deliberate",
                    PASEO_AGENT_ID="caller", PASEO_WORKSPACE_ID="caller-workspace",
                    PASEO_AGENT_CWD=str(self.home / "not-the-stage"))
-        self.start("--model", "stub-provider", env=env)
-        expected = ["run", "--no-wait", "--title", "stage", "--cwd", str(self.home),
+        result = self.start("--model", "stub-provider", name="Stage V1", env=env)
+        self.assertIn("started: stage-v1", result.stdout.splitlines())
+        expected = ["run", "--no-wait", "--title", "stage-v1", "--cwd", str(self.home),
                     "--provider", "stub-provider", "--thinking", "deliberate", "--json",
                     "--", self.prompt.read_text(encoding="utf-8")]
         self.assertEqual(next(row for row in self.calls() if row[0] == "run"), expected)
-        state = self.status()
+        state = self.status("stage-v1")
         self.assertEqual((state["agent_id"], state["session_id"], state["backend"]),
                          (self.fixture["id"], self.fixture["id"], "paseo"))
         self.assertIsInstance(state["pid"], int)
         for filename in ("prompt.md", "run.json", "stderr.log", "events.ndjson"):
-            self.assertTrue((self.run_dir() / filename).exists(), filename)
+            self.assertTrue((self.run_dir("stage-v1") / filename).exists(), filename)
 
         self.assertEqual(state["cwd"], str(self.home))
         self.assertEqual(json.loads((self.home / "run-env.json").read_text(encoding="utf-8")), {})
@@ -210,6 +211,7 @@ class PaseoLauncherTests(unittest.TestCase):
         self.assertIn("different cwd", result.stderr)
         recorded = self.state()
         self.assertEqual((recorded["state"], recorded["agent_id"]), ("unknown", self.fixture["id"]))
+        self.assertIn("cwd", recorded["error"])
 
         for inspected_cwd in (wrong_cwd, None):
             self.save_fixture(inspect_cwd=inspected_cwd)

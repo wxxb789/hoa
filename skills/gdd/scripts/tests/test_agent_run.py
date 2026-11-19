@@ -30,8 +30,8 @@ sys.path.insert(0, os.path.dirname(RUNNER))
 import agent_run
 import gdd_process
 import stage_result
-from gdd_test_support import (check_locks, check_processes, cleanup_child, exited, finalized, ready, remove_tree,
-                              stop_headless, wait_for_json)
+from gdd_test_support import (check_locks, check_processes, cleanup_child, exited, finalized, own_identity,
+                              ready, remove_tree, stop_headless, wait_for_json)
 PROMPT = "Do the task.\nReply with the word done.\n"
 EXPECTED = {
     "omp": {"answer": "done", "session_id": "00000000-0000-7000-8000-000000000001", "turns": 2, "tool_calls": 1,
@@ -487,6 +487,7 @@ sys.exit(agent_run.main())
         with self.stdout_holder("slow", flags=("--max-time", "5"), STUB_HANG="1") as (_, descendant):
             state = self.finished("slow")
             self.assertEqual((state["state"], state["exit"]), ("failed", 124))
+            self.assertIn("max_time exceeded", state["note"])
             self.assertTrue(agent_run.wait_until(lambda: exited(*descendant), 5),
                             f"Grandchild PID {descendant[0]} survived max-time")
 
@@ -674,6 +675,11 @@ if sys.stdin.readline().strip() != "RELEASE":
 
 
 class RunnerMechanicsTests(unittest.TestCase):
+    def test_stub_identity_matches_runner(self):
+        stub_identity = own_identity()
+        self.assertTrue(stub_identity)
+        self.assertEqual(stub_identity, agent_run.identity(os.getpid()))
+
     def test_child_env_drops_the_uv_script_venv_only(self):
         with tempfile.TemporaryDirectory() as venv:
             bindir = os.path.join(venv, "Scripts" if IS_WINDOWS else "bin")
@@ -764,6 +770,7 @@ class RunnerMechanicsTests(unittest.TestCase):
 
             def submit(argv, **kwargs):
                 self.assertRegex(state["unit"], r"^gdd-demo\.slug-[0-9a-f]{12}$")
+                self.assertNotEqual(state["unit"], agent_run.unit_name(state["name"]))
                 self.assertEqual(argv, [
                     "systemd-run", "--user", "--collect", "--unit", state["unit"], "--service-type=exec",
                     "--no-ask-password", "--working-directory=/work/with spaces", "--property=UMask=0027",
@@ -816,9 +823,10 @@ class RunnerMechanicsTests(unittest.TestCase):
             path = Path(tmp) / "state.json"
             original = {"state": "running"}
             agent_run.write_json(path, original)
-            with mock.patch.object(agent_run.os, "replace", side_effect=error), \
+            with mock.patch.object(agent_run.os, "replace", side_effect=error) as replace, \
                     mock.patch.object(agent_run.time, "sleep"), contextlib.redirect_stderr(stderr):
                 agent_run.write_json(path, {"state": "done"})
+            self.assertEqual(replace.call_count, 40)
             self.assertEqual(json.loads(path.read_text(encoding="utf-8")), {"state": "done"})
             self.assertEqual(list(Path(tmp).iterdir()), [path])
             self.assertEqual(len(stderr.getvalue().splitlines()), 1)

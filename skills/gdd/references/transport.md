@@ -103,8 +103,9 @@ metacharacters (`" & | < > ^ ( ) % !` or newlines).
 | OpenCode 2.3.0 | argv; `run --standalone --format json --auto`, private server; resume `-s`; thinking requires model (`MODEL#VARIANT`) | Last step reason stop, no error event |
 
 - **End states:** stop is killed/143; signal exit codes are kept
-  (`130/137/143/-2/-9/-15`). Max time ends the run as failed/124. Kill writes
-  `stop` and the runner terminates the agent group (TERM, wait five seconds,
+  (`130/137/143/-2/-9/-15`). Max time ends the run as failed/124 with a
+  `max_time exceeded` state note. Kill writes `stop` and the runner
+  terminates the agent group (TERM, wait five seconds,
   KILL; Windows `taskkill /T /F`). If the runner is gone, kill requires a
   verified process start time. A reused PID counts as gone; a live,
   unverifiable PID is never signalled. Zombie-only groups count as stopped.
@@ -132,12 +133,24 @@ metacharacters (`" & | < > ^ ( ) % !` or newlines).
 | `GDD_RUN_DRAIN_TIMEOUT_SECONDS` | 30 (at most 5 on stop); expiry marks `stream_incomplete` |
 | `DSH_RUN_PROFILE`, `DSH_PERMISSION_MODE`, `DSH_APPROVAL_POLICY` | `headless`, `workspace-write`, `never` (other approval values refused) |
 
-DSH drops inherited `DSH_PROFILE`, `DSH_PROFILE_DIR`, and `DSH_SESSION_ID`.
-Leave model/thinking unset; DSH refuses either. Resume in the same recorded
-worktree. The sandbox, when enforced by the host, sets the write boundary;
-the cwd does not. See [gdd-route-dsh](../../gdd-route-dsh/SKILL.md).
 Retired environment keys warn; OMP accepts legacy `--backend` (warns) and
-`--profile`, and DSH accepts `--session-id` as a resume alias.
+`--profile`.
+
+### DSH route specifics
+
+`dsh --profile PROFILE [extra flags] --json [--session-id ID] --permission-mode MODE --approval-policy never -`
+reads `prompt.md` on stdin. The runner maps `--resume ID` to `--session-id ID`
+and accepts `start --session-id ID` as a resume alias. The cwd must be the
+session's recorded worktree; DSH refuses to resume it from another directory.
+
+`--approval-policy never` is required because a detached run has no approval
+channel; a tool call needing approval is rejected. The sandbox, when enforced
+by the host, sets the write boundary, not the cwd. See
+[gdd-route-dsh](../../gdd-route-dsh/SKILL.md) for the permission boundary.
+
+DSH drops inherited `DSH_PROFILE`, `DSH_PROFILE_DIR`, and `DSH_SESSION_ID`.
+Leave `GDD_MODEL` and `GDD_THINKING` unset: both flags are refused before a
+run directory is created, for example `start: --model is not supported on the DSH route`.
 
 ## Native Paseo adapter
 
