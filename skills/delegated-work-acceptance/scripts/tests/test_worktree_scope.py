@@ -55,7 +55,8 @@ class ScopeTests(unittest.TestCase):
         self.git(repo, "commit", "-q", "-m", message)
 
     def write(self, repo: Path, name: str, text: str) -> None:
-        (repo / name).write_text(text, encoding="utf-8")
+        # Exact bytes: text mode would turn "\n" into "\r\n" on Windows and change the digest.
+        (repo / name).write_bytes(text.encode("utf-8"))
 
     def invoke(self, *args: str, state=_DEFAULT, label="t", env=None,
                expect: int | None = None):
