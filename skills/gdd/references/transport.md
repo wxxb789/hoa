@@ -40,6 +40,9 @@ Windows in the `gdd-runner` CI job; the real-CLI smoke is an opt-in operator ste
 | `tmux` (optional, POSIX, 3.2a or newer) | Yes | Only if the tmux server is outside the gateway's cgroup/job | No |
 | `herdr` (optional, latest herdr) | Yes | Only if the Herdr server survives the restart | No |
 
+The real-systemd literal-path regression test needs a reachable user manager and is skipped
+where none is available.
+
 1. **Auto selects the platform ladder.** Linux/WSL2 checks its user manager for at most one
    second and uses a transient unit if it reports `running` or `degraded`. macOS bootstraps a one-shot
    LaunchAgent in the current GUI domain, using legacy submit only if bootstrap is unavailable.
@@ -52,11 +55,11 @@ Windows in the `gdd-runner` CI job; the real-CLI smoke is an opt-in operator ste
 3. **Opt in to a watchable supervisor in the environment.** `GDD_RUN_DETACH=tmux` creates a
    detached session; `GDD_RUN_DETACH=herdr` creates an unfocused tab in an existing server.
    Herdr's pane API accepts shell input, not an argv vector. GDD starts the pane in the run
-   directory and sends only a standard Python executable name and a generated ASCII entry filename.
-   That entry loads the original runner arguments without shell parsing and removes itself.
-   The pane shell must support simple external commands and honor the supplied Python directory on
-   `PATH`. The private environment file is removed after reading; on Windows it is created with
-   a protected, current-user-only DACL.
+   directory and invokes the dispatcher's absolute Python executable with a generated ASCII
+   entry filename, independent of the pane's `PATH`. The entry loads the original runner
+   arguments without shell parsing and removes itself.
+   The command uses POSIX shell quoting (PowerShell on Windows). The private environment file is
+   removed after reading; on Windows it is created with a protected, current-user-only DACL.
    Neither is selected by auto; a missing executable or failed request refuses startup.
    State records the handle under `supervisor`; the runner or a subsequent reader removes the
    job, session or tab at completion. Use the runner's `kill` to stop the agent as well.

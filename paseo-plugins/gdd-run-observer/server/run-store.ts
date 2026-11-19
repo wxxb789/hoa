@@ -90,11 +90,9 @@ export function createRunStore(deps: StoreDeps): RunStore {
   }
 
   /**
-   * Counters are derived by tailing `events.ndjson` from the last byte we read, so a
-   * scan costs only the appended window. The launcher splices the log at its bound by replacing it
-   * with `head + truncated marker + tail`, so any of three cheap signals restarts the count from
-   * byte 0 (a replaced file, a shrunken file, or a lost line boundary) and the numbers stay a
-   * description of the retained log rather than a mix of two revisions.
+   * Tail the active `events.ndjson` segment from the last byte read. Rotation replaces that
+   * segment, so restart at byte 0 on replacement, shrinkage, or a lost line boundary.
+   * A legacy truncation marker in the appended window also triggers a recount.
    */
   async function countersFor(
     dir: string,

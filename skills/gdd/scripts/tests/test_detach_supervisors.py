@@ -4,6 +4,8 @@ import json
 import os
 import plistlib
 import re
+import shlex
+import shutil
 import signal
 import subprocess
 import sys
@@ -107,7 +109,8 @@ class SupervisorTests(unittest.TestCase):
                                             self.state, mode, tool)
 
     def test_launchd_plist_and_runner_exit_cleanup(self):
-        self.start("launchd", "launchctl")
+        with mock.patch.object(os, "umask", return_value=0o027):
+            self.start("launchd", "launchctl")
         target = self.state["supervisor"]
         plist = self.run_dir / "runner.plist"
         with plist.open("rb") as stream:
@@ -118,7 +121,7 @@ class SupervisorTests(unittest.TestCase):
                                "WorkingDirectory": str(self.root), "EnvironmentVariables": self.env,
                                "StandardOutPath": str(self.run_dir / "runner.log"),
                                "StandardErrorPath": str(self.run_dir / "runner.log"),
-                               "AbandonProcessGroup": True, "RunAtLoad": True})
+                               "AbandonProcessGroup": True, "RunAtLoad": True, "Umask": 0o027})
         self.assertEqual(self.calls(), [["launchctl", "bootstrap", "gui/123", str(plist)]])
         agent_run.write_json(self.run_dir / "run.json", {"agent": "omp", "argv": [sys.executable, STUB],
                                                         "cwd": str(self.root), "prompt": "argv"})
@@ -207,7 +210,7 @@ sys.exit(agent_run.main(args))
     def check_kill(self, mode):
         # Model a dead runner and still-live agent: cleanup must follow the guarded signal.
         state = agent_run.read_state(self.run_dir)
-        state.update(pid=101, pid_identity="runner", agent_pid=102, agent_pid_identity="agent")
+        state.update(pid=101, pid_identity="linux:101", agent_pid=102, agent_pid_identity="linux:102")
         agent_run.write_json(self.run_dir / "state.json", state)
         signalled = []
 
@@ -218,7 +221,7 @@ sys.exit(agent_run.main(args))
 
         with mock.patch.object(agent_run, "wait_until", return_value=False), \
                 mock.patch.object(agent_run, "pid_alive", side_effect=lambda pid: pid == 102), \
-                mock.patch.object(agent_run, "identity", return_value="agent"), \
+                mock.patch.object(agent_run, "identity", return_value="linux:102"), \
                 mock.patch.object(agent_run, "terminate", side_effect=terminate):
             self.assertEqual(agent_run.stop_run(self.run_dir), "")
         self.assertEqual(signalled, [(102, False)])
@@ -280,6 +283,10 @@ sys.exit(agent_run.main(args))
         script.write_text("import sys\nfrom runner_sibling import json\nprint(json.dumps(sys.argv))\n",
                           encoding="utf-8")
         self.argv[2] = str(script)
+        if os.name != "nt":
+            executable = self.root / "python's path with spaces ;$HOME"
+            executable.symlink_to(sys.executable)
+            self.argv[0] = str(executable)
         self.start("herdr", "herdr")
         target = agent_run.read_state(self.run_dir)["supervisor"]
         self.assertEqual((target["tab"], target["pane"]), ("tab-1", "pane-1"))
@@ -288,15 +295,20 @@ sys.exit(agent_run.main(args))
                                       "--label", "gdd-test", "--env"])
         self.assertNotIn("--focus", create)
         self.assertEqual(run[:4], ["herdr", "pane", "run", "pane-1"])
-        command = run[4].split()
-        self.assertRegex(command[0], r"^python[0-9.]*(?:\.exe)?$")
-        self.assertEqual(command[1], "-B")
-        self.assertRegex(command[2], r"^\.runner-herdr-[0-9a-f]{12}\.py$")
-        executed = gdd_process.run([sys.executable, *command[1:]], cwd=self.run_dir, env=self.env,
+        entry = target["entry"]
+        self.assertRegex(entry, r"^\.runner-herdr-[0-9a-f]{12}\.py$")
+        self.assertFalse(any(option.startswith("PATH=") for option in create))
+        if os.name == "nt":
+            self.assertEqual(run[4], "& '" + self.argv[0].replace("'", "''") + f"' -B {entry}")
+            command = [self.argv[0], "-B", entry]
+        else:
+            self.assertEqual(shlex.split(run[4]), [self.argv[0], "-B", entry])
+            command = [shutil.which("sh"), "-c", run[4]]
+        executed = gdd_process.run(command, cwd=self.run_dir, env={**self.env, "PATH": os.defpath},
                                    capture_output=True, text=True, timeout=10)
         self.assertEqual(executed.returncode, 0, executed.stderr)
         self.assertEqual(json.loads(executed.stdout), [*self.argv[2:], "--restore-env", "--runner-cwd", str(self.root)])
-        self.assertFalse((self.run_dir / command[2]).exists())
+        self.assertFalse((self.run_dir / entry).exists())
         if os.name == "nt":
             env_file = self.run_dir / ".runner-env"
             acl = gdd_process.run(["icacls.exe", str(env_file)], capture_output=True, text=True, check=True).stdout

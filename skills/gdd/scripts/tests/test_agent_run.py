@@ -123,6 +123,11 @@ def force_kill(pid, recorded):
         os.kill(pid, signal.SIGKILL)
 
 
+def different_identity(recorded):
+    source, timestamp = recorded.split(":")
+    return f"{source}:{int(timestamp) + 1}"
+
+
 def wait_for(predicate, seconds=30.0):
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
@@ -340,7 +345,7 @@ sys.exit(agent_run.main())
                 self.assertTrue(pid_alive(state["agent_pid"]))
                 if forged:  # the recorded pid now names a different process
                     write(os.path.join(self.run_dir(name), "state.json"),
-                          json.dumps({**state, "agent_pid_identity": "forged"}))
+                          json.dumps({**state, "agent_pid_identity": different_identity(state["agent_pid_identity"])}))
                 killed = self.cli("kill", name, env=fast)
                 if forged:
                     self.assertEqual(killed.returncode, 1, killed.stdout)
@@ -382,13 +387,25 @@ sys.exit(agent_run.main())
 
     @unittest.skipIf(IS_WINDOWS, "POSIX file creation mask")
     def test_setsid_keeps_the_dispatchers_umask(self):
+        self.check_dispatcher_umask("setsid")
+
+    @unittest.skipUnless(sys.platform == "linux", "requires a Linux user manager")
+    def test_systemd_keeps_the_dispatchers_umask(self):
+        try:
+            agent_run.select_detach("systemd")
+        except ValueError as exc:
+            self.skipTest(str(exc))
+        self.check_dispatcher_umask("systemd")
+
+    def check_dispatcher_umask(self, mode):
         started = gdd_process.run(
             [sys.executable, "-B", RUNNER, "start", "--name", "umask", "--prompt", self.prompt],
-            env={**self.env, "STUB_FIXTURE": os.path.join(FIXTURES, "omp.ok.ndjson")},
+            env={**self.env, "GDD_RUN_DETACH": mode, "STUB_FIXTURE": os.path.join(FIXTURES, "omp.ok.ndjson")},
             cwd=self.work, umask=0o027, capture_output=True, text=True, timeout=30)
         self.assertEqual(started.returncode, 0, started.stderr)
         self.assertEqual(self.finished("umask")["state"], "done")
         self.assertEqual(Path(self.record).stat().st_mode & 0o777, 0o640)
+        self.assertEqual(Path(self.run_dir("umask"), "answer.md").stat().st_mode & 0o777, 0o640)
 
     def craft(self, name, state=None, raw=None):
         run_dir = os.path.join(self.root, datetime.now().strftime("%Y-%m-%d"), name)
@@ -400,7 +417,7 @@ sys.exit(agent_run.main())
 
     def test_status_treats_a_reused_runner_pid_as_stale(self):
         state = {"name": "reused-runner", "agent": "omp", "state": "running", "pid": os.getpid(),
-                 "pid_identity": "forged", "agent_pid": None}
+                 "pid_identity": different_identity(agent_run.identity(os.getpid())), "agent_pid": None}
         run_dir = self.craft("reused-runner", state)
         self.assertEqual(agent_run.observed_state(run_dir, state), "stale")
         status = self.cli("status", "reused-runner")
@@ -408,6 +425,46 @@ sys.exit(agent_run.main())
         result = json.JSONDecoder().raw_decode(status.stdout)[0]
         self.assertFalse(result["alive"])
         self.assertTrue(result["stale_recovered"])
+
+    def test_ps_identity_survives_changes_to_dispatcher_timezone_and_locale(self):
+        outputs = {"America/Los_Angeles": "Wed Nov 18 21:39:53 2026",
+                   "UTC": "Thu Nov 19 05:39:53 2026"}
+
+        def ps(argv, *, env, **kwargs):
+            output = outputs[env["TZ"]] if env["LC_ALL"] == "C" else "localized output"
+            return subprocess.CompletedProcess(argv, 0, output + "\n")
+
+        state = {"name": "mac-run", "state": "running", "pid": os.getpid()}
+        with mock.patch.object(agent_run, "IS_WINDOWS", False), mock.patch.object(sys, "platform", "darwin"), \
+                mock.patch.object(agent_run, "pid_alive", return_value=True), \
+                mock.patch.object(gdd_process, "run", side_effect=ps):
+            with mock.patch.dict(os.environ, {"TZ": "America/Los_Angeles", "LC_ALL": "fr_FR.UTF-8"}):
+                state["pid_identity"] = agent_run.identity(state["pid"])
+            with mock.patch.dict(os.environ, {"TZ": "UTC", "LC_ALL": "C"}):
+                self.assertEqual(agent_run.identity(state["pid"]), state["pid_identity"])
+                self.assertEqual(agent_run.observed_state(self.tmp, state), "running")
+            self.assertRegex(state["pid_identity"], r"^ps-utc:[0-9]+$")
+
+    def test_unverified_identity_never_settles_or_signals_a_live_pid(self):
+        cases = [
+            ("ps:Thu Nov 19 05:39:53 2026", "ps-utc:123"),
+            ("ps-utc:garbage", "ps-utc:123"),
+            ("linux:garbage", "linux:123"),
+            ("win:garbage", "win:123"),
+            ("linux:123", "win:456"),
+            ("linux:123", ""),
+        ]
+        for i, (recorded, current) in enumerate(cases):
+            with self.subTest(recorded=recorded, current=current):
+                state = {"name": f"unknown-{i}", "state": "running", "pid": os.getpid(), "pid_identity": recorded}
+                run_dir = self.craft(state["name"], state)
+                with mock.patch.object(agent_run, "identity", return_value=current), \
+                        mock.patch.object(agent_run, "wait_until", side_effect=lambda ready, _: ready()), \
+                        mock.patch.object(agent_run, "terminate") as terminate:
+                    self.assertEqual(agent_run.observed_state(run_dir, state), "running")
+                    self.assertIn("start time unverified", agent_run.stop_run(run_dir))
+                    terminate.assert_not_called()
+                    self.assertFalse(Path(run_dir, "finalized").exists())
 
     def test_t7_starting_grace(self):
         base = {"name": "s", "agent": "omp", "state": "running", "exit": None, "pid": None, "agent_pid": None}
@@ -702,7 +759,7 @@ class RunnerMechanicsTests(unittest.TestCase):
             def submit(argv, **kwargs):
                 self.assertEqual(argv, [
                     "systemd-run", "--user", "--collect", "--unit", state["unit"], "--service-type=exec",
-                    "--no-ask-password", "--working-directory=/work/with spaces",
+                    "--no-ask-password", "--working-directory=/work/with spaces", "--property=UMask=0027",
                     f"--property=StandardOutput=append:{run / 'runner.log'}", "--property=StandardError=inherit",
                     "--", "/python", "-B", "/runner.py", "_run", "--run-dir", "/runs/$$literal", "--restore-env",
                 ])
@@ -711,11 +768,38 @@ class RunnerMechanicsTests(unittest.TestCase):
                     self.assertEqual(dict(os.environ), {"SECRET": "value with \n and $"})
                 return subprocess.CompletedProcess(argv, 0, "", "")
 
-            with mock.patch.object(agent_run, "supervisor_call", side_effect=submit):
+            with mock.patch.object(agent_run, "supervisor_call", side_effect=submit), \
+                    mock.patch.object(os, "umask", return_value=0o027) as umask:
                 agent_run.spawn_detached(["/python", "-B", "/runner.py", "_run", "--run-dir", "/runs/$literal"],
                                          run, "/work/with spaces", {"SECRET": "value with \n and $"},
                                          state, "systemd", "systemd-run")
+            self.assertEqual(umask.call_args_list, [mock.call(0o777), mock.call(0o027)])
             self.assertFalse((run / ".runner-env").exists())
+
+    def test_progress_tick_waits_out_windows_reader_before_replacing(self):
+        error = PermissionError("locked by a reader")
+        error.winerror = 5
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "state.json"
+            replace = os.replace
+            waited = 0.0
+
+            def sleep(seconds):
+                nonlocal waited
+                waited += seconds
+
+            def replace_when_released(source, dest):
+                if waited < 0.5:
+                    raise error
+                return replace(source, dest)
+
+            with mock.patch.object(os, "replace", side_effect=replace_when_released) as attempt, \
+                    mock.patch.object(agent_run.time, "sleep", side_effect=sleep):
+                agent_run.write_json(path, {"turns": 2}, progress_tick=True)
+            self.assertGreater(attempt.call_count, 3)
+            self.assertGreaterEqual(waited, 0.5)
+            self.assertLessEqual(waited, 1.0)
+            self.assertEqual(agent_run.read_state(tmp), {"turns": 2})
 
     def test_winerror_5_falls_back_to_in_place_write(self):
         error = PermissionError("locked by a reader")

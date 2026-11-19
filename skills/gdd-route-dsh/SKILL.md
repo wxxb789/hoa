@@ -165,7 +165,7 @@ The remaining keys resolve from the environment, then the default.
 | `GDD_AGENT` | the agent CLI (`--agent` wins) | `omp`; set `dsh` for this route |
 | `DSH_BIN` | the harness CLI the runner spawns | `dsh` resolved through `PATH` |
 | `GDD_RUN_ROOT` | run/artifact root, the one `gdd.py` exports | `${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs` |
-| `GDD_RUN_DETACH` | shared runner detach mode; see [platform rules](../gdd/references/transport.md#headless-platform-rules) | `auto` |
+| `GDD_RUN_DETACH` | shared runner detach mode; `tmux` requires 3.2a or newer. See [platform rules](../gdd/references/transport.md#headless-platform-rules) | `auto` |
 | `DSH_RUN_PROFILE` | launcher `--profile` | `headless` |
 | `DSH_PERMISSION_MODE` | app `--permission-mode` | `workspace-write` |
 | `DSH_APPROVAL_POLICY` | app `--approval-policy`; any other value is refused | `never` |

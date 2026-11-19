@@ -47,7 +47,7 @@ The runner records its effective `detach` mode in `state.json`.
 | `launchd` | Yes | Yes, separate job; not a GUI-domain restart | No |
 | `setsid` | Yes | No guarantee against cgroup or job teardown | No |
 | `windows` | Yes | Only if the runner is outside the terminating job | No |
-| `tmux` (optional) | Yes | Only if the tmux server is outside the gateway's cgroup/job | No |
+| `tmux` (optional, 3.2a or newer) | Yes | Only if the tmux server is outside the gateway's cgroup/job | No |
 | `herdr` (optional) | Yes | Only if the Herdr server survives the restart | No |
 
 Launchd is verified with stubs only; double-fork session and process-group survival is exercised on

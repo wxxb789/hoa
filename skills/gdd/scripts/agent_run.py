@@ -179,10 +179,17 @@ def check_tmux_version(launcher):
     raise ValueError(f"tmux: found {found!r}; requires tmux {minimum} or newer")
 
 
+def dispatcher_umask():
+    # Called by the single-threaded dispatcher. Never make its mask more permissive.
+    mask = os.umask(0o777)
+    os.umask(mask)
+    return mask
+
+
 def systemd_argv(launcher, unit, cwd, log, runner):
     # Transient unit properties carry literal paths; only ExecStart expands dollar variables.
     return [launcher, "--user", "--collect", "--unit", unit, "--service-type=exec",
-            "--no-ask-password", f"--working-directory={cwd}",
+            "--no-ask-password", f"--working-directory={cwd}", f"--property=UMask={dispatcher_umask():04o}",
             f"--property=StandardOutput=append:{log}",
             "--property=StandardError=inherit", "--", runner[0],
             *(arg.replace("$", "$$") for arg in runner[1:]), "--restore-env"]
@@ -262,7 +269,7 @@ def launchd_start(runner, run_dir, cwd, env, state):
         plistlib.dump({"Label": label, "ProgramArguments": runner, "WorkingDirectory": cwd,
                        "EnvironmentVariables": env, "StandardOutPath": str(run_dir / "runner.log"),
                        "StandardErrorPath": str(run_dir / "runner.log"), "AbandonProcessGroup": True,
-                       "RunAtLoad": True}, stream)
+                       "RunAtLoad": True, "Umask": dispatcher_umask()}, stream)
     result = supervisor_call([launcher, "bootstrap", domain, str(plist)])
     if result.returncode and (result.returncode == 64 or re.search(
             r"(?:unknown|unrecognized|unsupported) (?:sub)?command", result.stderr, re.IGNORECASE)):
@@ -332,11 +339,14 @@ def spawn_detached(runner, run_dir, cwd, env, state, mode, launcher=None):
                                             "-c", cwd, *options, "--", *runner))
                 (run_dir / ".supervisor-started").touch()
             else:
-                # Herdr joins arguments into shell input. Only fixed ASCII tokens reach that shell.
-                executable = Path(runner[0])
-                if not re.fullmatch(r"python[0-9.]*(?:\.exe)?", executable.name):
-                    raise ValueError(f"Herdr requires a standard Python executable name: {executable.name}")
-                options += ["--env", f"PATH={executable.parent}{os.pathsep}{env.get('PATH', os.defpath)}"]
+                # Herdr sends shell input. Keep run arguments in the private entry, not the command.
+                executable = os.path.abspath(runner[0])
+                if not executable.isprintable():
+                    raise ValueError(f"Herdr interpreter path contains non-printable characters: {executable!r}")
+                if IS_WINDOWS:
+                    command = "& '" + re.sub(r"['\u2018\u2019]", lambda m: m[0] * 2, executable) + "'"
+                else:
+                    command = shlex.quote(executable)
                 with os.fdopen(private_file(run_dir / target["entry"]), "w", encoding="utf-8") as entry:
                     entry.write("import os, runpy, sys\n"
                                 f"sys.argv = {ascii([*runner[2:], '--runner-cwd', cwd])}\n"
@@ -356,7 +366,7 @@ def spawn_detached(runner, run_dir, cwd, env, state, mode, launcher=None):
                 target["pane"] = pane
                 write_json(run_dir / "state.json", state)
                 require_success(target_call(target, "pane", "run", pane,
-                                            f"{executable.name} -B {target['entry']}"))
+                                            f"{command} -B {target['entry']}"))
             return None, 0
     except (OSError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired) as exc:
         (run_dir / ".runner-env").unlink(missing_ok=True)
@@ -532,7 +542,7 @@ def write_json(path, payload, *, progress_tick=False):
     tmp = f"{path}.{os.getpid()}.tmp"
     data = json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
     write_text(tmp, data)
-    replace_attempts = 3 if progress_tick else 40
+    replace_attempts = 40
     try:
         for attempt in range(replace_attempts):
             try:
@@ -541,7 +551,8 @@ def write_json(path, payload, *, progress_tick=False):
                 if getattr(exc, "winerror", None) != 5:
                     raise
                 if attempt + 1 < replace_attempts:
-                    time.sleep(0.05 + 0.05 * (attempt % 5))
+                    # Keep all 40 chances, but cap the tick's backoff at 0.975 seconds.
+                    time.sleep(0.025 if progress_tick else 0.05 + 0.05 * (attempt % 5))
         # A torn read is bad, a lost run is worse.
         write_text(path, data)
         if not progress_tick:
@@ -643,19 +654,39 @@ def identity(pid):
     if IS_WINDOWS:
         times = [wintypes.FILETIME() for _ in range(4)]
         ok = _windows_query(pid, lambda k, h: k.GetProcessTimes(h, *(ctypes.byref(t) for t in times)))
-        return f"win:{(times[0].dwHighDateTime << 32) | times[0].dwLowDateTime}" if ok else ""
+        created = (times[0].dwHighDateTime << 32) | times[0].dwLowDateTime
+        return f"win:{created}" if ok and created else ""
     if sys.platform.startswith("linux"):
         try:
-            with open(f"/proc/{pid}/stat", encoding="utf-8") as handle:
-                return "linux:" + handle.read().rsplit(")", 1)[1].split()[19]
+            with open(f"/proc/{pid}/stat", encoding="utf-8", errors="replace") as handle:
+                ticks = handle.read().rsplit(")", 1)[1].split()[19]
+                return f"linux:{ticks}" if re.fullmatch(r"[0-9]+", ticks) else ""
         except (OSError, IndexError):
             return ""
     try:
-        out = gdd_process.run(["ps", "-o", "lstart=", "-p", str(pid)], capture_output=True, text=True,
-                              env={**os.environ, "LC_ALL": "C"}, stdin=subprocess.DEVNULL).stdout.strip()
-    except OSError:
-        out = ""
-    return f"ps:{out}" if out else ""
+        # BSD ps formats lstart in the child's local time; neither that zone nor the
+        # parent's locale should affect the stored epoch seconds.
+        result = gdd_process.run(["ps", "-o", "lstart=", "-p", str(pid)], capture_output=True, text=True,
+                                 env={**os.environ, "TZ": "UTC", "LC_ALL": "C"}, stdin=subprocess.DEVNULL)
+        if result.returncode:
+            return ""
+        _, month, day, clock, year = result.stdout.split()
+        month = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split().index(month) + 1
+        hour, minute, second = map(int, clock.split(":"))
+        started = datetime(int(year), month, int(day), hour, minute, second, tzinfo=timezone.utc)
+        return f"ps-utc:{int(started.timestamp())}"
+    except (OSError, ValueError):
+        return ""
+
+
+def identity_matches(recorded, current):
+    """True/False only for comparable identities; legacy local-time ps strings are unknown."""
+    pattern = r"(linux|win|ps-utc):(0|[1-9][0-9]*)"
+    before = re.fullmatch(pattern, recorded) if isinstance(recorded, str) else None
+    after = re.fullmatch(pattern, current)
+    if before and after and before[1] == after[1]:
+        return before[2] == after[2]
+    return None
 
 
 def group_alive(pid):
@@ -675,7 +706,7 @@ def group_alive(pid):
 def terminate(pid, reap=lambda: None, *, single=False, recorded=None):
     """End the tree pid leads; True once gone. `reap` lets the parent collect its own zombie."""
     def reused():
-        return bool(recorded and (current := identity(pid)) and current != recorded)
+        return bool(recorded) and identity_matches(recorded, identity(pid)) is False
 
     def gone():
         reap()
@@ -704,7 +735,7 @@ def recorded_pid_alive(state, key):
     if not pid_alive(pid):
         return False
     current = identity(pid) if recorded else ""
-    return not current or current == recorded
+    return identity_matches(recorded, current) is not False
 
 
 def run_alive(run_dir, state=None):
@@ -1154,11 +1185,11 @@ def stop_run(run_dir):
         pid, recorded = state.get(key), state.get(f"{key}_identity")
         if not pid_alive(pid):
             continue
-        live = identity(pid)
-        if not live or not recorded:
+        matches = identity_matches(recorded, identity(pid))
+        if matches is None:
             if pid_alive(pid):
                 problems.append(f"{key} {pid} not signalled (start time unverified)")
-        elif live == recorded and not terminate(
+        elif matches and not terminate(
                 pid, recorded=recorded, single=key == "pid" and state.get("detach") in
                 ("systemd", "launchd", "setsid", "tmux", "herdr")):
             problems.append(f"{key} {pid} still alive after TERM/KILL")
@@ -1267,7 +1298,8 @@ def start_locked(args, spec, slug, cwd, run_dir, command, prompt, max_time, mode
         "model": args.model,
         "thinking": args.thinking, "max_time": args.max_time, "resumed_from": args.resume,
         "spawn": {"creationflags": 0, "platform": sys.platform}}
-    runner = [interpreter(), "-B", os.path.abspath(__file__), "_run", "--run-dir", run_dir]
+    runner = [sys.executable if mode == "herdr" else interpreter(),
+              "-B", os.path.abspath(__file__), "_run", "--run-dir", run_dir]
     try:
         pid, _ = spawn_detached(runner, run_dir, cwd, child_env(spec.scrub_env), state, mode, launcher)
     except OSError as exc:

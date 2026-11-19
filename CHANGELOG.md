@@ -73,6 +73,9 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
   terminal state before launchd bootout, keep supervisor paths out of Herdr shell input, and
   require tmux 3.2a or newer and the latest herdr for their opt-in modes. The observer uses runner
   counters or marks rotated event counts partial.
+- gdd: keep PID checks independent of time zone and locale, treat legacy identities as unverified,
+  preserve the dispatcher's umask in systemd units and LaunchAgent plists, retry progress publishes
+  for up to about a second, and pin the Herdr pane to the dispatcher's Python executable.
 
 - Trigger evals now route on visible skills' frontmatter descriptions, accept `none` when no
   artifact fits, and include three no-trigger cases.

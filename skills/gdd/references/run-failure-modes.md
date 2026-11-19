@@ -118,7 +118,7 @@ launcher that merely returns may leave that child running, and a killed tmux ses
 | `launchd` | Yes | Yes, separate job; not a GUI-domain restart | No |
 | `setsid` | Yes | No guarantee against cgroup or job teardown | No |
 | `windows` | Yes | Only if the runner is outside the terminating job | No |
-| `tmux` (optional) | Yes | Only if the tmux server is outside the gateway's cgroup/job | No |
+| `tmux` (optional, 3.2a or newer) | Yes | Only if the tmux server is outside the gateway's cgroup/job | No |
 | `herdr` (optional) | Yes | Only if the Herdr server survives the restart | No |
 
 Launchd was tested only with stubs. The double fork was tested against dispatch-group death on WSL2,
