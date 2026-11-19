@@ -1,5 +1,5 @@
 ---
-name: ops-claim-verification
+name: hermes-ops-claim-verification
 description: >-
   Turn a statement about a scheduled job, a repair, or a deployment into evidence before it reaches
   the operator or a teammate: find the surface that actually records the claim, separate a manual
@@ -7,7 +7,7 @@ description: >-
   when verifying a cron result, a "fixed" claim, a CI/review-bot gate, or a batch status report about
   an environment. Not for auditing a written report's contents or accepting a teammate's delivery.
 metadata:
-  revision: "3"
+  revision: "1"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "turn a scheduled-job, repair or deployment claim into evidence: find the recording surface, separate manual from scheduled runs, audit the auditor"
@@ -32,14 +32,14 @@ are the one who authorized what the owner still gates — and the teammate who r
 
 Absence in one file is your search error, not the sender's fabrication. Locate the record first, rule second.
 
-- **Scheduled job outcomes** live in the scheduler's per-run output, not the agent log. Common layout:
+- **Scheduled job outcomes** live in the scheduler's per-run output, not the agent log. Hermes example:
   `<home>/cron/output/<job_id>/<timestamp>.md` (full stdout/stderr, `Script exited with code N`), while
   the agent log prints only the first line of the injected prompt. Grepping the log for a traceback
   returns 0 on a genuine failure.
-- **The wake is the signature.** A logged gate decision (`wake=false, skipping agent run`) = the gate
+- **Read the scheduler's gate decision.** In Hermes, `wake=false, skipping agent run` means the gate
   returned false (healthy). `Running job` followed by an inbound message carrying the job output = the
-  gate did not return false, so the agent was woken by an error or by real work. Read the scheduler's own
-  log for its gate lines and the run output for the payload.
+  gate did not return false, so the agent was woken by an error or by real work. For other schedulers,
+  find the equivalent gate record and check the run output for the payload.
 - **Repairs** are proven by `git apply --check` against the current tree, `git show --stat` on the landed
   commit, `rev-list --left-right --count origin/main...HEAD` for publication, and a re-run of the gates.
   A patch file that applies cleanly is not a deployed fix.

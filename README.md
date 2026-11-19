@@ -241,7 +241,7 @@ wild.
 
 There is no project version. `metadata.revision` in each `SKILL.md` is an integer string counting
 that skill's own iterations. A pull request raises it only for the skill directories it changes; a
-new skill starts at `"1"`.
+new skill starts at `"1"`; a Git-detected rename continues at the previous revision plus one.
 
 ```bash
 python -m pip install -r scripts/requirements.txt  # repository tooling; prefer a venv

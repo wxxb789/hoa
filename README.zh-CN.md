@@ -220,7 +220,7 @@ judge 在这一天这样理解了这些描述；它不证明用户会同样路�
 ## Revision
 
 没有项目版本。每个 `SKILL.md` 里的 `metadata.revision` 是整数字符串，记录该 skill 自身的迭代次数。
-PR 只为它改动过的 skill 目录提高 revision；新 skill 从 `"1"` 开始。
+PR 只为它改动过的 skill 目录提高 revision；新 skill 从 `"1"` 开始，Git 识别到的改名在原 revision 上加一。
 
 ```bash
 python -m pip install -r scripts/requirements.txt  # 仓库工具依赖；建议使用 venv

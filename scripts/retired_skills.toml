@@ -77,6 +77,18 @@ reason = "renamed into the gdd- route family (2026-11-18)"
 replacement = "gdd-route-omp"
 reason = "renamed into the gdd- route family (2026-11-18)"
 
+[retired.kanban-workflows]
+replacement = "hermes-kanban"
+reason = "renamed to identify the Hermes board and gateway contract (2026-11-18)"
+
+[retired.ops-claim-verification]
+replacement = "hermes-ops-claim-verification"
+reason = "renamed into the Hermes family by owner decision; the verification method stays portable (2026-11-18)"
+
+[retired.generated-runtime-repairs]
+replacement = "hermes-runtime-repairs"
+reason = "renamed to identify the Hermes profile deployment workflow (2026-11-18)"
+
 [retired.teams-cdp]
 replacement = "an MCP server"
 reason = "replaced by MCP (#72)"

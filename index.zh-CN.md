@@ -41,13 +41,15 @@ targets:  runtime-agnostic | repo-only |
 | gdd | skill | software-development,work-management | runtime-agnostic | `skills/gdd/` | 目标契约 → agent 分阶段产出 → operator 验收 → 脚本化合并门禁 → 可续跑账本；随附 `gdd.py`、`delivery-state.py`、`pr-merge-check.py` |
 | gdd-route-dsh | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-dsh/` | 把 GDD 阶段派发给 dsh headless 并监督：会话/worktree 规则、完成判定、恢复、harness 陷阱 |
 | gdd-route-omp | skill | software-development,work-management | pi | `skills/gdd-route-omp/` | 脱离会话的 tmux 启动器跑 `omp -p` 长任务；轮询完成、按 session id 恢复 |
-| generated-runtime-repairs | skill | software-development,work-management | runtime-agnostic | `skills/generated-runtime-repairs/` | 修模板/生成器、验证暂存产物，再部署并回读线上运行时 |
 | ghc-search | skill | software-development | runtime-agnostic | `skills/ghc-search/` | 经本机 `ghc-proxy` Responses API 做 web 与 X/Twitter 搜索；返回答案加去重来源 |
 | git-auto-sync-pipelines | skill | software-development,work-management | runtime-agnostic | `skills/git-auto-sync-pipelines/` | 手改仓库的定时提交推送：固定门序、白名单与体积上限、暂存区密钥扫描、心跳与去重告警 |
 | harness-engineering | skill | software-development | runtime-agnostic | `skills/harness-engineering/` | 重构与设计 harness 脚本：自包含、检查绑定 owner 决策、纯函数检查加薄 runner、净减行数 |
 | hermes-context-file-loading | skill | software-development | hermes | `skills/hermes-context-file-loading/` | Hermes 指令文件各自从何处加载、哪个项目文件生效，以及规则该放进哪个 prompt 层 |
+| hermes-kanban | skill | work-management,software-development | hermes | `skills/hermes-kanban/` | 多卡片看板工作：拆解、并行派发、评审门禁、卡住任务恢复 |
 | hermes-models | skill | software-development | hermes | `skills/hermes-models/` | 配置 Hermes provider、传输与路由；用实时信号证明路由，而非 `config get` |
 | hermes-models-cutover | skill | software-development | hermes | `skills/hermes-models-cutover/` | 跨 Hermes home 与 harness 切换供应商路由，实时验证并保留回滚 |
+| hermes-ops-claim-verification | skill | software-development,work-management | runtime-agnostic | `skills/hermes-ops-claim-verification/` | 把定时任务、修复或部署的说法变成证据：找准记录面、区分手动与调度运行、审查审计者 |
+| hermes-runtime-repairs | skill | software-development,work-management | hermes | `skills/hermes-runtime-repairs/` | 修模板/生成器、验证暂存产物，再部署并回读线上运行时 |
 | hermes-updates | skill | software-development | hermes | `skills/hermes-updates/` | 升级运行中的 Hermes 并诊断漂移：快照、官方更新器、更新后检查、故障索引 |
 | hoa-practice-retro | skill | self-management,work-management | runtime-agnostic | `skills/hoa-practice-retro/` | 定期复盘负责人跨仓库、会话与记忆的工程实践：应停止的习惯、未执行的决定、未知的未知，每条都有两个独立来源 |
 | hoa-repo-reckoning | skill | software-development,work-management | runtime-agnostic | `skills/hoa-repo-reckoning/` | 定期深度审计单个仓库：分维度查找、对抗验证与补漏评审，产出排序的停止清单与未知的未知 |
@@ -56,10 +58,8 @@ targets:  runtime-agnostic | repo-only |
 | hoa-skill-port | skill | software-development,work-management | runtime-agnostic | `skills/hoa-skill-port/` | 把私有 skill 解耦到可发布仓库：确定权威副本、五轴改造、配置解析、目录与 CI 校验、走分支与 PR 发布 |
 | hoa-skill-review | skill | software-development,work-management,self-management | runtime-agnostic | `skills/hoa-skill-review/` | 依据消费者证据审计 skill 行为与修改，不改动被审查对象 |
 | hoa-skill-set-audit | skill | software-development,self-management | runtime-agnostic | `skills/hoa-skill-set-audit/` | 审计会话实际提供的整套技能：单项质量、重叠、遮蔽、指令冲突、同名漂移、可见性、../ 闭包、清单预算；只出报告 |
-| kanban-workflows | skill | work-management,software-development | runtime-agnostic | `skills/kanban-workflows/` | 多卡片看板工作：拆解、并行派发、评审门禁、卡住任务恢复 |
 | measurement-campaign-evidence | skill | software-development,work-management | runtime-agnostic | `skills/measurement-campaign-evidence/` | 测量运动：先钉候选身份、串行跑、一致报告集，不让基线伪造延迟对比 |
 | official-document-verification | skill | work-management | runtime-agnostic | `skills/official-document-verification/` | 用文档的确切版本核验结论，含只能用真浏览器取到的被封来源 |
-| ops-claim-verification | skill | software-development,work-management | runtime-agnostic | `skills/ops-claim-verification/` | 把定时任务、修复或部署的说法变成证据：找准记录面、区分手动与调度运行、审查审计者 |
 | package-release-verification | skill | software-development | runtime-agnostic | `skills/package-release-verification/` | 发版：先补 changelog、同一 commit 的门禁、分派、按版本号核 registry、单独获批的清理 |
 | project-phase-closeout | skill | software-development,work-management | runtime-agnostic | `skills/project-phase-closeout/` | 清点任务面，对账记录/索引/发布/生产四层，输出带唯一决策点的收尾清单 |
 | report-claim-audit | skill | work-management,software-development | runtime-agnostic | `skills/report-claim-audit/` | 从各自的权威 artifact 重算每条报告声明、对账交付集合，并给待决事项定价 |
@@ -105,7 +105,7 @@ targets:  runtime-agnostic | repo-only |
 把你从其它来源安装的同名 skill 从命令中去掉：
 
 ```bash
-npx skills remove -g arch-improvement-plan design-an-interface design-md dsh-headless-gdd find-nearby git-worktree-workflow github-code-review github-repo-management grounded-citations hoa-agent-retrieve hoa-introspect hoa-introspect-distill hoa-skill-work html-artifact improve-codebase-architecture jupyter-live-kernel m365-copilot-cdp microsoft-office my-ado-cppr notes-to-prd ocr-and-documents omp-headless-orchestration plan-to-issues rss-feeds skill-library-curation skill-porting-and-publishing subagent-driven-development systematic-debugging teams-cdp to-issues to-prd whisper writing-plans
+npx skills remove -g arch-improvement-plan design-an-interface design-md dsh-headless-gdd find-nearby generated-runtime-repairs git-worktree-workflow github-code-review github-repo-management grounded-citations hoa-agent-retrieve hoa-introspect hoa-introspect-distill hoa-skill-work html-artifact improve-codebase-architecture jupyter-live-kernel kanban-workflows m365-copilot-cdp microsoft-office my-ado-cppr notes-to-prd ocr-and-documents omp-headless-orchestration ops-claim-verification plan-to-issues rss-feeds skill-library-curation skill-porting-and-publishing subagent-driven-development systematic-debugging teams-cdp to-issues to-prd whisper writing-plans
 ```
 
 > reflections 与 eval 结果属于文章 / 知识类，不在此索引。
