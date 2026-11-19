@@ -193,8 +193,18 @@ class RunnerCase(unittest.TestCase):
         return self.state(name)
 
     def recorded(self):
-        self.assertTrue(wait_for(lambda: os.path.exists(self.record), 10))
-        return json.loads(read(self.record))
+        # The stub creates the file before it finishes writing, so wait for parseable JSON.
+        parsed = {}
+
+        def ready():
+            try:
+                parsed["record"] = json.loads(read(self.record))
+            except (OSError, ValueError):
+                return False
+            return True
+
+        self.assertTrue(wait_for(ready, 10), "stub record never became valid JSON")
+        return parsed["record"]
 
 
 class ContractTests(RunnerCase):
