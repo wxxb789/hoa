@@ -407,6 +407,31 @@ FOOTER_ZH = """
 > reflections 与 eval 结果属于文章 / 知识类，不在此索引。
 """
 
+HERMES = "hermes-"
+
+WITHOUT_HERMES_EN = """
+Without Hermes, skip the `hermes-*` skills: they only operate a Hermes install, and no other skill
+links to them. Install everything else with:
+
+```bash
+"""
+
+WITHOUT_HERMES_ZH = """
+不使用 Hermes 时，不要安装 `hermes-*` skill：它们只用于操作 Hermes，其他 skill 也不链接它们。
+安装其余全部 skill：
+
+```bash
+"""
+
+def check_hermes_isolation(rows: list[dict]) -> None:
+    """The install-without-Hermes command is complete only if no other skill links to hermes-*."""
+    for r in rows:
+        needs = [n for n in r.get("closure", ()) if n.startswith(HERMES)]
+        if needs and not r["name"].startswith(HERMES):
+            raise ValueError(f"{r['name']} links to {', '.join(needs)}: the install-without-Hermes "
+                             f"command would leave it incomplete")
+
+
 def render(rows: list[dict], lang: str, retired: list[str] = ()) -> str:
     header, install, removal, footer = (
         (HEADER_EN, INSTALL_EN, RETIRED_EN, FOOTER_EN) if lang == "en"
@@ -423,6 +448,10 @@ def render(rows: list[dict], lang: str, retired: list[str] = ()) -> str:
         if r.get("closure"):
             command = " ".join([NPX_ADD] + [f"-s {name}" for name in [r["name"], *r["closure"]]] + ["-y"])
             out.append(f"| {r['name']} | {', '.join(r['closure'])} | `{command}` |\n")
+    general = [r["name"] for r in rows if r["type"] == "skill" and not r["name"].startswith(HERMES)]
+    if len(general) < sum(r["type"] == "skill" for r in rows):
+        command = " ".join([NPX_ADD] + [f"-s {name}" for name in general] + ["-y"])
+        out.append(f"{WITHOUT_HERMES_EN if lang == 'en' else WITHOUT_HERMES_ZH}{command}\n```\n")
     if retired:
         out.append(f"{removal}npx skills remove -g {' '.join(retired)}\n```\n")
     out.append(footer)
@@ -437,6 +466,7 @@ def main(argv=None) -> int:
 
     try:
         rows = collect()
+        check_hermes_isolation(rows)
         retired = retired_names(ROOT / "scripts" / "retired_skills.toml",
                                 {r["name"] for r in rows if r["type"] == "skill"})
     except ValueError as e:
