@@ -97,7 +97,11 @@ gh pr view <N> --json state,baseRefName,headRefOid,mergeCommit,autoMergeRequest
 
 Keep the ledger at `merge queued` while the PR remains open with auto-merge enabled. On resume,
 read the live state before doing anything else; do not resubmit a pending request or run a second
-CI waiter. Do not push or retarget while queued: the match flag applies at submission, not as a
+CI waiter. While queued, read the check conclusions with `gh pr checks <N>`: GitHub does not merge
+past a failed required check, and it does not report that as a failure either. A required check
+that died on an infra step (<60 s, download/setup) gets `gh run rerun <run-id> --failed` once, and
+the queue stays as is. Any other failed required check blocks the goal: disable auto-merge
+(`gh pr merge <N> --disable-auto`), record it in the ledger, and fix forward as on the manual path. Do not push or retarget while queued: the match flag applies at submission, not as a
 permanent lock. Disable auto-merge and verify it is off before changing the head or base. If the
 queue disappears or head/base drifts, stop, disable any remaining auto-merge request, and
 re-verify before proceeding.
