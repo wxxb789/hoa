@@ -135,3 +135,52 @@ actually reads (a bot's richer job usually wins over a thin root shim), then
 `hermes cron pause <id>` — kept, reversible, history intact — and confirm `enabled: false` in the
 store. Deleting is for prompts worth nothing; a pause is the default for "deprecated but possibly
 wanted back".
+
+## Operational details
+
+**Delegation pin** is global to the profile; `delegate_task` has no per-task model parameter and its schema
+is built at session start (never flip mid-conversation). Per-task granularity = Kanban card override, cron
+pin, or independent spawn. Verify with a real child spawn + its live transcript.
+The section is **re-read on every spawn** (`_load_config()` inside `delegate_task`), so editing
+`delegation.provider|model` applies to the next child — no restart, no `/new`; blank means "inherit the
+parent model". True per-task routing needs `delegation.backend` set to a registered
+`DelegationProvider` (`agent/delegation_registry.py`); the only bundled one is
+`plugins/delegation/default`, which merely applies the `delegation.*` section. A custom backend returns
+one route per task (`provider`, `model`, optional `reasoning_effort` / `profile`) and may declare extra
+`task_parameters()` to the model — that is the seam for "background work → cheap pool, hot path → fast
+pool". Until such a plugin exists, per-task routing is the caller's job: name the model explicitly on the
+`pi`/`omp` spawn.
+
+**Profiles carry their own `providers:` and `.env`.** Add the block, delete any inherited inline
+`model.api_key` (it outranks `key_env`), copy the key into that profile's `.env`, then verify with a
+live one-shot under `HERMES_HOME=<profile>`.
+
+**A single bounded task on a non-default model: harness CLI first (`pi`, then `omp`), not
+`hermes chat`.** `pi -p --no-tools --no-skills --model <provider>/<id> --thinking high @prompt.md`
+carries the prompt and nothing else — no tool schemas, no session context — so instruction
+following on long writing/analysis prompts is measurably tighter. Resolve the binary before
+concluding it is missing: `command -v pi`, then the install's own lookup if it has one
+(`mise which pi`), then an explicit path the operator keeps. A CLI installed through npm, a
+tool manager, or a pinned path is just as valid — and `command -v` returning empty in a
+non-interactive shell means "not on this PATH", not "not installed". Export whatever directory
+holds it, or call the absolute path. `omp -p` is the fallback (it truncates large attachments).
+
+**Name the layer before the model.** Seven places decide a model, each with its own lifetime:
+`model.default|provider` (per session, `/new` or `/model`), `delegation.*` (per spawn),
+`delegation.backend` (per task, plugin), per-job cron pin (`hermes cron edit --model/--provider`),
+each profile's `profile.yaml`, per-invocation `pi`/`omp --model`, and `fallback_providers`
+(runtime). Instruction files (AGENTS.md / SOUL.md) only steer **which** layer the agent reaches
+for — they never change resolution, so "I edited AGENTS.md" is not an implementation of routing.
+Always report which layers changed and which stayed instruction-only.
+A whole-surface audit must enumerate all seven **plus every cron store**: each profile home keeps its own
+`cron/jobs.json`, so a job pinned only in root leaves the same work unpinned where it actually runs. Pins
+on `no_agent` script jobs are inert — nothing reads them, so they never count as free-pool coverage — and
+a harness catalog must be read from that harness's own `models` command, not from its config file.
+
+**Tiered routing: fast pool on the hot path, free/slow pool for everything that can wait.** The
+default session and anything the user waits on stay on the fast provider; subagents, cron agent
+jobs, batch lanes, self-improvement runs and isolated-context work go to the free pool; paired or
+multi-view lanes (blind review, MoA references) keep at least one free-pool model so the cheap
+capacity actually gets used. When the free pool is one gateway with several ids, a 5xx rotates
+across ids — the failure is the upstream id, not the route config, so probe each id once before
+blaming the config.

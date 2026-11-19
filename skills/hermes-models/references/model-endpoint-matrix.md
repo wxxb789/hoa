@@ -157,3 +157,26 @@ Rules that survive catalog churn:
   schema check, not a local config error.** Seen intermittently on `opencode-go/deepseek-v4.1-flash`
   through the `opencode` CLI (both `#high` and `#max`, and with no variant at all); the identical
   command succeeds on retry. Retry once before touching variants or provider blocks.
+
+## Operational details
+
+**Reasoning effort is a hint, not a guarantee**, and the effort→cost ladder is per relay and
+non-monotonic. Judge from `usage.reasoning_tokens`; size `max_tokens` per model because reasoning is
+charged against it on chat-completions transports.
+
+**Text-only one-shot generation is `-t clarify`, not `-t ""`.** An empty `-t` value leaves the
+FULL toolset enabled — the model can write files and emits tool/diff previews into stdout,
+corrupting programmatic parsing; `-t none` is rejected as an unknown toolset name. Inert form:
+`hermes chat --query-file <f> -m <model> --provider <p> -t clarify -Q --ignore-rules --max-turns 1`,
+then strip the trailing `session_id:` line from stdout. `hermes chat` takes `-q/--query` (add
+`--oneshot` to answer and exit) — there is no `-p`; `-p` is the `pi`/`omp` flag. Prove inertness once
+per model by asking it to create a file and checking it cannot.
+
+**Long generation runs in the background; wait on the event, never on a foreground `sleep`.**
+`terminal(background=true, notify_on_complete=true)` then end the turn, or block once with
+`process_manage wait` (600 s) — do not poll a file size with `sleep 60..240` calls: each one
+blocks the same wall-clock, blocks every other task, and any sleep over the 180 s foreground
+timeout dies empty-handed. `sleep` is only for a fixed delay with no event to wait on (e.g. a
+CI run not yet visible in `gh run list`), and then ≤30 s. If a long generation comes back
+truncated (a few hundred bytes instead of a full answer), re-run with `--thinking medium` plus
+an explicit stop condition ("write through to the last section") rather than the same call again.

@@ -97,6 +97,7 @@ below. A skill without a row has no dependencies: `npx skills add wxxb789/hoa -g
 | gdd | delegated-work-acceptance, gdd-route-dsh | `npx skills add wxxb789/hoa -g -s gdd -s delegated-work-acceptance -s gdd-route-dsh -y` |
 | gdd-route-dsh | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-dsh -s delegated-work-acceptance -s gdd -y` |
 | gdd-route-omp | delegated-work-acceptance, gdd, gdd-route-dsh | `npx skills add wxxb789/hoa -g -s gdd-route-omp -s delegated-work-acceptance -s gdd -s gdd-route-dsh -y` |
+| hermes-models | hermes-models-cutover | `npx skills add wxxb789/hoa -g -s hermes-models -s hermes-models-cutover -y` |
 | hoa-skill-set-audit | hoa-skill-create | `npx skills add wxxb789/hoa -g -s hoa-skill-set-audit -s hoa-skill-create -y` |
 
 After a release that renames or retires skills, remove the names this repo no longer ships

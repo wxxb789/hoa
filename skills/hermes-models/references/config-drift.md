@@ -117,3 +117,25 @@ if the configured provider exposes no such endpoint at all (e.g. a
 Responses-only proxy returns `404 Unknown endpoint` for
 `/v1/images/generations`), mark it unavailable in `LOCAL_OVERRIDES.md` instead
 of repeatedly "fixing" it.
+
+## Operational details
+
+**`agent.reasoning_effort` is global**, not per model — change it and every selectable model re-tiers.
+Put per-model levels in `agent.reasoning_overrides` and say which models moved. The "not a recognized
+config key" warning is noise; the runtime reads it. Effort is also **per surface**: the Hermes session,
+`opencode` (`#max` variant), and `omp`/`omo` (thinking level) can legitimately sit on different tiers for
+the same id — e.g. `deepseek-v4.1-flash` at `high` inside Hermes while the CLIs run `max`. Ask which
+surface the owner means before "aligning" them; do not raise the session tier because a CLI is higher.
+
+**`auxiliary.vision: auto` is a trap** — doctor green only proves routing resolved. Pin provider+model
+in root **and** every profile, then run one real image call per profile.
+
+**Config drift is the default failure mode.** Classify root-only keys as "never overrode" vs
+"deliberately different" before mirroring; read back after every write; regenerate
+`$HERMES_HOME/scripts/config-snapshot.py`.
+
+**`$HERMES_HOME/config.yaml` cannot be edited with `patch`/`write_file`** — the tool refuses it ("Refusing
+to write to Hermes config file"); route every write through `hermes config set <dotted.key> <value>`.
+List-valued keys take a JSON string (`hermes config set fallback_providers '[{"provider":"p",
+"model":"m"}]'`) and land as proper YAML; back up the file first, then `hermes config get <key>`
+plus a read of the YAML block for shape.
