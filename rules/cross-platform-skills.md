@@ -78,7 +78,7 @@ with a PEP 723 block, after the shebang:
 ```python
 #!/usr/bin/env -S uv run --script
 # /// script
-# requires-python = ">=3.7"
+# requires-python = ">=3.13"
 # dependencies = []
 # ///
 ```

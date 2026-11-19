@@ -6,7 +6,7 @@ description: >-
   refactor them, or when the owner corrects the agent's identity, routing, delegation, or
   persistence. Not for ordinary repo coding rules or one-off task notes.
 metadata:
-  revision: "4"
+  revision: "5"
   areas: "software-development,work-management,self-management"
   targets: "runtime-agnostic"
   summary: "evolve an agent's identity file and operating protocol by layer, with coverage markers, behavioral evals, and load-scope probes"

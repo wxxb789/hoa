@@ -206,11 +206,7 @@ def remove_tree(path):
             raise error
 
     if Path(path).exists():
-        if sys.version_info >= (3, 12):
-            callbacks = {"onexc": remove_readonly}
-        else:
-            callbacks = {"onerror": lambda operation, name, info: remove_readonly(operation, name, info[1])}
-        retry_windows(lambda: shutil.rmtree(path, **callbacks), time.monotonic() + 5)
+        retry_windows(lambda: shutil.rmtree(path, onexc=remove_readonly), time.monotonic() + 5)
 
 
 def check_processes(owned, seconds):

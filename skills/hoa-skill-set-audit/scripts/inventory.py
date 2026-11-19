@@ -1,6 +1,6 @@
 #!/usr/bin/env -S uv run --script
 # /// script
-# requires-python = ">=3.7"
+# requires-python = ">=3.13"
 # dependencies = []
 # ///
 """Inventory one or more skill roots as JSON for a set-level skill audit.

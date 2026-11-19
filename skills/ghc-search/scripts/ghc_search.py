@@ -1,6 +1,6 @@
 #!/usr/bin/env -S uv run --script
 # /// script
-# requires-python = ">=3.7"
+# requires-python = ">=3.13"
 # dependencies = []
 # ///
 """Web / X search through the local ghc-proxy Responses API.

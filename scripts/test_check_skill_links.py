@@ -87,7 +87,7 @@ class CheckSkillLinksTests(unittest.TestCase):
                       "sibling is ../../../child/", out)
         self.assertIn("4 error(s)", err)
 
-    PEP_723 = "# /// script\n# requires-python = \">=3.9\"\n# dependencies = []\n# ///\n"
+    PEP_723 = "# /// script\n# requires-python = \">=3.13\"\n# dependencies = []\n# ///\n"
 
     def test_script_commands_that_follow_the_uv_convention_pass(self):
         self.skill("other", files={"scripts/shared.py": self.PEP_723})

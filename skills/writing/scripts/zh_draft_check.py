@@ -1,6 +1,6 @@
 #!/usr/bin/env -S uv run --script
 # /// script
-# requires-python = ">=3.6"
+# requires-python = ">=3.13"
 # dependencies = []
 # ///
 """Chinese draft self-check: sentence length, structure-level AI counters, rewrite similarity.

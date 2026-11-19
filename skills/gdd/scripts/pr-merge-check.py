@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # /// script
-# requires-python = ">=3.7"
+# requires-python = ">=3.13"
 # dependencies = []
 # ///
 """Mechanical merge gate for one PR: may it be squashed right now?

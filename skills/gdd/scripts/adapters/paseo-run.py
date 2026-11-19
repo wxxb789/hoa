@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # /// script
-# requires-python = ">=3.9"
+# requires-python = ">=3.13"
 # dependencies = []
 # ///
 """Native Paseo launcher: start|status|result|answer|kill|list (stdlib only).

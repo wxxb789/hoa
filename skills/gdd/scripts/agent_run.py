@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # /// script
-# requires-python = ">=3.9"
+# requires-python = ">=3.13"
 # dependencies = []
 # ///
 """agent_run.py — one detached runner for every headless agent CLI gdd dispatches.

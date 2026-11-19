@@ -15,6 +15,9 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
   kept **GDD runs** in the sidebar footer as its only run-browser entry.
 - delegated-work-acceptance: the worktree-scope tests write fixture files as exact bytes, so the
   dirty-path digest test passes on Windows (text mode had turned `\n` into `\r\n`).
+- Raise the supported Python floor to 3.13: every PEP 723 `requires-python` declares `>=3.13`
+  (it ranged from 3.6 to 3.11 and none of those were tested), CI and the Windows stress job run
+  3.13, and the gdd test cleanup drops its pre-3.12 `shutil.rmtree(onerror=...)` fallback.
 
 ## 2026-11-18
 
