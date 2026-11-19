@@ -6,7 +6,7 @@ description: >-
   increment is delegated end to end, including the merge. Not for one-line fixes, exploration without
   acceptance criteria, or work no machine can check.
 metadata:
-  revision: "5"
+  revision: "6"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "goal contract → agent-authored stages → operator-run gates → scripted merge gate → resumable ledger; ships `gdd.py`, `delivery-state.py`, `pr-merge-check.py`"
@@ -101,17 +101,17 @@ matching the current stage directly — do not create per-phase skills.
 | `GDD_STATE_FILE` | ledger path | `${XDG_STATE_HOME:-$HOME/.local/state}/gdd/ledger.tsv` |
 | `GDD_TASK_ROOT` | task/state root | `${XDG_STATE_HOME:-$HOME/.local/state}/gdd/tasks` |
 | `GDD_RUN_ROOT` | launcher run root | `${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs` |
-| `GDD_LAUNCHER` | explicit launcher selection | bundled `scripts/adapters/omp-run.py`; opt in to native Paseo with `scripts/adapters/paseo-run.py` |
+| `GDD_LAUNCHER`, `GDD_AGENT` | explicit launcher selection (custom launchers must accept `--schema`); the headless agent CLI, exported to the launcher when set | bundled `scripts/agent_run.py`, agent `omp` (or `dsh`, `codex`, `claude`, `pi`, `opencode`); opt in to native Paseo with `scripts/adapters/paseo-run.py` |
+| `GDD_RUN_DETACH` | detach mode: `auto`, `systemd`, `launchd`, `setsid`, `windows`, or environment-only `tmux` / `herdr` | `auto` (Linux user unit, macOS LaunchAgent, POSIX double fork, or native Windows) |
 | `GDD_TEMPLATES` | stage-template root | the bundled `references/stage-templates` |
 | `GDD_GOAL_GLOB` | goal-contract glob | `docs/goals/*<goal>*.md` |
 | round caps | `implement` / `simplify` / `review` run at most **2x** — enforced by `gdd.py stage`, override with `--over-budget` | `scripts/gdd.py` |
 | `GDD_WORKTREE_SCOPE` | `worktree-scope.py` path | `../delegated-work-acceptance/scripts/worktree-scope.py` |
 
-Resolution order and the config-file path are defined in
-[references/configuration.md](references/configuration.md).
-`gdd.py` implements it through the vendored `scripts/skill_config.py`; the config-file keys are the
-six names in the table. Nothing about one install lives in the protocol: a profile may point at its own
-files, but no path is inlined. Commands run the bundled scripts with `uv run <path>`. Only if a script command fails (for example `uv` is not found), read [references/troubleshooting.md](references/troubleshooting.md).
+See [references/configuration.md](references/configuration.md) for lookup order and the config path.
+`gdd.py` resolves the table's `GDD_*` keys through `scripts/skill_config.py`.
+Run bundled scripts with `uv run <path>`. Only if a script command fails (for example `uv` is not
+found), read [references/troubleshooting.md](references/troubleshooting.md).
 
 Read [`references/transport.md`](references/transport.md) before selecting or dispatching a launcher:
 it defines both routes, model/thinking mapping, artifact polling, and platform-specific evidence.

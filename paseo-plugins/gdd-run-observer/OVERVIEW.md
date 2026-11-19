@@ -19,6 +19,7 @@ event lines in the tail are configurable; the defaults are two seconds and eight
 The plugin only reads what a run writes. It never writes into a run directory, never finalizes a
 run, and never signals a process; the only command it runs on the daemon host is a process listing
 on Windows, used to confirm whether a recorded pid is still alive. It requires no credentials and
-logs only counters, tool names, and paths, never prompts, transcripts, or answers. Counters for a
-running run come from the retained event log and are marked partial once the launcher has spliced
-that log; after a run finalizes, the launcher's own counters are used.
+logs only counters, tool names, and paths, never prompts, transcripts, or answers. When available,
+runner counters take precedence after finalization, after event rotation, and for agents other than
+OMP and Pi. Otherwise the observer uses counters from the active event log when present, marking
+them partial after rotation or legacy truncation.

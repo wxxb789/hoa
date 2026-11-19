@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # /// script
-# requires-python = ">=3.7"
+# requires-python = ">=3.9"
 # dependencies = []
 # ///
 """Append-only ledger for goal-driven delivery increments.
@@ -24,12 +24,9 @@ Environment:
     GDD_RUN_ROOT    launcher run root (default ${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs)
     GDD_REPO_ROOT   optional root used to resolve a bare repo name
 
-Run discovery: a run dir is any directory holding state.json under
-<run_root>/<date>/<name>/, <task_root>/<date>/runs/<name>/,
-<task_root>/<date>/omp-runs/<name>/ or the legacy
-<task_root>/<date>/<repo>-<goal>/... layout. A run whose state.json says
-`running` but whose lock file names a dead process is reported as `stale lock`,
-never as `running`.
+Run discovery: a run dir is <run_root>/<date>/<name>/ holding state.json. A run
+whose state.json says `running` but whose runner and agent pids are both gone
+(past the startup grace) is reported as `stale`, never as `running`.
 
 Launcher contract (read side only; this tool never starts a run):
     <launcher> start --name SLUG --prompt FILE [--cwd DIR] [--model M] [--thinking L] [--max-time D]
@@ -43,9 +40,13 @@ import argparse
 import glob
 import json
 import os
-import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import datetime
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.dont_write_bytecode = True  # no __pycache__ inside an installed skill
+import agent_run
+import gdd_process
 
 STAGES = [
     "contract",
@@ -120,7 +121,7 @@ def normalize_repo(value):
     path = os.path.expanduser(value)
     if os.path.isdir(path):
         try:
-            out = subprocess.run(
+            out = gdd_process.run(
                 ["git", "-C", path, "rev-parse", "--show-toplevel"],
                 capture_output=True,
                 text=True,
@@ -152,7 +153,7 @@ def resolve_repo_path(repo):
 def run(cmd, cwd=None):
     """(ok, stdout, reason)."""
     try:
-        proc = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+        proc = gdd_process.run(cmd, cwd=cwd, capture_output=True, text=True)
     except OSError as exc:
         return False, "", str(exc)
     if proc.returncode != 0:
@@ -214,184 +215,7 @@ def unknown(reason):
     return f"unknown ({reason})"
 
 
-def read_lock(run_dir):
-    """(lock dict or None, lock file exists). Accepts JSON or a bare pid file."""
-    for name in ("lock", ".lock"):
-        path = os.path.join(run_dir, name)
-        if not os.path.isfile(path):
-            continue
-        try:
-            with open(path, encoding="utf-8", errors="replace") as handle:
-                raw = handle.read().strip()
-        except OSError:
-            return None, True
-        if not raw:
-            return None, True
-        if raw.startswith("{"):
-            try:
-                data = json.loads(raw)
-            except ValueError:
-                return None, True
-            if isinstance(data, dict):
-                return (
-                    {
-                        "pid": data.get("pid"),
-                        "agent_pid": data.get("agent_pid"),
-                        "tmux": data.get("tmux"),
-                    },
-                    True,
-                )
-            return None, True
-        try:
-            return {"pid": int(raw.split()[0]), "agent_pid": None, "tmux": None}, True
-        except (ValueError, IndexError):
-            return None, True
-    return None, False
-
-
-def pid_alive(pid):
-    """True/False, or None when the pid is unusable.
-
-    Windows needs a process query rather than os.kill(pid, 0): measured on Windows 11,
-    os.kill on a live console process raises (a live run read as `stale lock`) and on
-    an exited one whose handle is still open it succeeds (a dead run read as live).
-    Keep in step with gdd.py and adapters/omp-run.py.
-    """
-    try:
-        pid = int(pid)
-    except (TypeError, ValueError):
-        return None
-    if pid <= 0:
-        return None
-    if os.name == "nt":
-        import ctypes
-
-        SYNCHRONIZE = 0x00100000
-        QUERY_LIMITED = 0x1000
-        STILL_ACTIVE = 259
-        kernel32 = ctypes.windll.kernel32
-        handle = kernel32.OpenProcess(SYNCHRONIZE | QUERY_LIMITED, False, pid)
-        if not handle:
-            return False
-        try:
-            code = ctypes.c_ulong()
-            if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
-                return None
-            return code.value == STILL_ACTIVE
-        finally:
-            kernel32.CloseHandle(handle)
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    except OSError:
-        return None
-    return True
-
-
-def tmux_alive(session):
-    if not session:
-        return None
-    try:
-        proc = subprocess.run(
-            ["tmux", "has-session", "-t", str(session)],
-            capture_output=True,
-            text=True,
-        )
-    except OSError:
-        return None
-    return proc.returncode == 0
-
-
-def recorded_lock(state):
-    """Launcher identity from state.json, for launchers that never write a lock file.
-
-    omp-run.sh records `pid` (null under tmux) and `tmux` in state.json but writes no lock, so
-    `read_lock` found nothing and a run that died kept reading as "running" until the 6h deadline.
-    Both adapters also record the agent's own pid, and the agent can outlive its runner.
-    """
-    text = state or {}
-    pid, agent_pid, tmux = text.get("pid"), text.get("agent_pid"), text.get("tmux")
-    if not pid and not agent_pid and not tmux:
-        return None, False
-    return {"pid": pid, "agent_pid": agent_pid, "tmux": tmux}, True
-
-
-def effective_state(run_dir, state):
-    """Recorded run state, with `stale lock` for a lock whose processes are gone.
-
-    Same rule as gdd.py: live while either the runner or the agent is alive, and
-    "starting" rather than stale while a pidless run is inside the grace window.
-    """
-    recorded = str((state or {}).get("state") or "?")
-    if recorded != "running":
-        return recorded
-    lock, has_lock = read_lock(run_dir)
-    if not has_lock:
-        lock, has_lock = recorded_lock(state)
-    if not has_lock:
-        return recorded
-    if not lock:
-        return "stale lock"
-    verdicts = [pid_alive(lock.get("pid")), pid_alive(lock.get("agent_pid"))]
-    if any(verdict is True for verdict in verdicts):
-        return "running"
-    if all(verdict is None for verdict in verdicts):
-        alive = tmux_alive(lock.get("tmux"))
-        if alive is None:
-            return "running" if run_is_young(state) else "stale lock"
-        return "running" if alive else "stale lock"
-    return "stale lock"
-
-
-def startup_grace_seconds():
-    """The launcher's OMP_RUN_START_GRACE_SECONDS, so both sides agree on "starting"."""
-    try:
-        value = float((os.environ.get("OMP_RUN_START_GRACE_SECONDS") or "").strip())
-    except ValueError:
-        return 60.0
-    return value if value > 0 else 60.0
-
-
-def run_is_young(state):
-    """Was this run started inside the grace window (so it may still be claiming a pid)?"""
-    started = (state or {}).get("started")
-    if not started:
-        return False
-    try:
-        age = (
-            datetime.now(timezone.utc) - datetime.fromisoformat(str(started))
-        ).total_seconds()
-    except ValueError:
-        return False
-    return age < startup_grace_seconds()
-
-
-def run_state_paths(task_root, run_root):
-    """state.json candidates across the canonical and legacy run layouts."""
-    patterns = [
-        os.path.join(run_root, "*", "*", "state.json"),
-        os.path.join(task_root, "*", "*", "state.json"),
-        os.path.join(task_root, "*", "runs", "*", "state.json"),
-        os.path.join(task_root, "*", "omp-runs", "*", "state.json"),
-        os.path.join(task_root, "*", "*-*", "*", "state.json"),
-        os.path.join(task_root, "*", "*-*", "*", "*", "state.json"),
-    ]
-    seen = set()
-    paths = []
-    for pattern in patterns:
-        for path in glob.glob(pattern):
-            real = os.path.realpath(path)
-            if real in seen:
-                continue
-            seen.add(real)
-            paths.append(path)
-    return paths
-
-
-def live_facts(repo, goal, task_root, run_root, path_hint=None):
+def live_facts(repo, goal, run_root, path_hint=None):
     facts = []
     path = None
     reason = None
@@ -485,18 +309,12 @@ def live_facts(repo, goal, task_root, run_root, path_hint=None):
 
     candidates = []
     try:
-        for state_path in run_state_paths(task_root, run_root):
-            try:
-                with open(state_path, encoding="utf-8") as handle:
-                    state = json.load(handle)
-            except (OSError, ValueError):
-                continue
-            cwd = state.get("cwd")
-            if not cwd:
-                continue
-            if os.path.realpath(os.path.expanduser(cwd)) != path:
-                continue
+        for state_path in glob.glob(os.path.join(run_root, "*", "*", "state.json")):
             run_dir = os.path.dirname(state_path)
+            state = agent_run.read_state(run_dir)
+            cwd = state.get("cwd")
+            if not cwd or os.path.realpath(os.path.expanduser(cwd)) != path:
+                continue
             name = str(state.get("name") or os.path.basename(run_dir))
             try:
                 mtime = os.path.getmtime(state_path)
@@ -516,7 +334,7 @@ def live_facts(repo, goal, task_root, run_root, path_hint=None):
             facts.append(
                 "last_run: {} {} exit={} dur={}".format(
                     name,
-                    effective_state(run_dir, state),
+                    agent_run.observed_state(run_dir, state),
                     "-" if exit_code is None else exit_code,
                     "-" if duration is None else duration,
                 )
@@ -564,7 +382,7 @@ def cmd_show(args):
     lines.append("LIVE")
     if repo:
         lines.extend(
-            live_facts(repo, args.goal, args.task_root, args.run_root, args.repo)
+            live_facts(repo, args.goal, args.run_root, args.repo)
         )
     else:
         lines.append("repo: unknown (no rows and no --repo)")
@@ -629,9 +447,8 @@ Environment:
   GDD_RUN_ROOT    launcher run root  (default ${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs)
   GDD_REPO_ROOT   optional root used to resolve a bare repo name
 
-Run discovery covers <run_root>/<date>/<name>/, <task_root>/<date>/runs/<name>/,
-<task_root>/<date>/omp-runs/<name>/ and <task_root>/<date>/<repo>-<goal>/... .
-A `running` state.json whose lock file names a dead process prints `stale lock`.
+Run discovery covers <run_root>/<date>/<name>/. A `running` state.json whose
+runner and agent pids are both gone prints `stale`.
 
 Launcher contract (read side only; this tool never starts a run):
   <launcher> start --name SLUG --prompt FILE [--cwd DIR] [--model M] [--thinking L] [--max-time D]

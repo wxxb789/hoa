@@ -1,0 +1,9 @@
+# SYNTHETIC: dsh is not installed on the recording host. Built from the event shapes recorded in the
+# retired dsh adapter's docstring: a run that exits 0 but whose last `final` is not `completed`.
+{"type": "session", "sessionId": "dsh-session-0002", "cwd": "/work/repo"}
+{"type": "status", "turn": 1, "step": 1, "phase": "turn_start"}
+{"type": "tool_call", "callId": "c1", "tool": "bash", "input": {"command": "echo hi"}}
+{"type": "tool_result", "callId": "c1", "status": "completed", "result": "hi", "truncated": false}
+{"type": "text", "text": "half a report"}
+{"type": "status", "turn": 1, "step": 1, "phase": "turn_end", "reason": {"kind": "aborted"}, "usage": {"inputTokens": 50, "outputTokens": 10, "totalTokens": 60, "cacheReadTokens": 0}}
+{"type": "final", "sessionId": "dsh-session-0002", "reason": {"kind": "aborted"}, "text": "half a report"}

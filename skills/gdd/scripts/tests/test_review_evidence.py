@@ -21,6 +21,7 @@ from unittest.mock import patch
 
 SCRIPTS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SCRIPTS))
+import gdd_process
 from machine_review import (  # noqa: E402
     DEFAULT_MARKER, EvidenceError, evidence_comment, make_evidence, parse_marker,
     report_digest, review_facts, validate_runtime_receipt, RESPONSES_APIS,
@@ -251,7 +252,7 @@ class GeneratorCLITests(unittest.TestCase):
                      "--provider", PROVIDER, "--findings", "false"]
 
     def run_cli(self, args):
-        return subprocess.run([sys.executable, str(SCRIPTS / "review-evidence.py"), *args],
+        return gdd_process.run([sys.executable, str(SCRIPTS / "review-evidence.py"), *args],
                               capture_output=True)
 
     def test_real_file_to_comment_to_gate(self):
@@ -401,7 +402,7 @@ class RuntimeReceiptTests(unittest.TestCase):
                 records[-1]["message"]["content"][0]["text"] = "No" + separator + "findings."
                 (Path(folder) / "session.jsonl").write_text(
                     "\n".join(json.dumps(r, ensure_ascii=False) for r in records) + "\n", encoding="utf-8")
-                result = subprocess.run([sys.executable, str(SCRIPTS / "review-receipt.py"),
+                result = gdd_process.run([sys.executable, str(SCRIPTS / "review-receipt.py"),
                     "--session-dir", folder, "--provider", PROVIDER, "--model", MODEL,
                     "--transport", "responses", "--api-id", "openai-responses"], capture_output=True)
                 self.assertEqual(result.returncode, 0, result.stderr)
@@ -414,14 +415,14 @@ class RuntimeReceiptTests(unittest.TestCase):
             args = [sys.executable, str(SCRIPTS / "review-receipt.py"), "--session-dir", folder,
                     "--provider", PROVIDER, "--model", MODEL, "--transport", "responses",
                     "--api-id", "openai-responses"]
-            good = subprocess.run(args, capture_output=True, text=True)
+            good = gdd_process.run(args, capture_output=True, text=True)
             self.assertEqual(good.returncode, 0, good.stderr)
             self.assertEqual(json.loads(good.stdout)["model"], MODEL)
             (root / "second.jsonl").write_bytes(receipt.read_bytes())
-            self.assertEqual(subprocess.run(args, capture_output=True).returncode, 2)
+            self.assertEqual(gdd_process.run(args, capture_output=True).returncode, 2)
             receipt.unlink()
             (root / "second.jsonl").unlink()
-            self.assertEqual(subprocess.run(args, capture_output=True).returncode, 2)
+            self.assertEqual(gdd_process.run(args, capture_output=True).returncode, 2)
 
 
 class MergeGateIntegrationTests(unittest.TestCase):
@@ -626,7 +627,7 @@ class CheckFetchTests(unittest.TestCase):
 
     def test_missing_binary_raises_gate_error_not_oserror(self):
         # A missing gh/git must reach the exit-2 path (GateError), never an OSError traceback.
-        with patch.object(gate.subprocess, "run",
+        with patch.object(subprocess, "run",
                           side_effect=FileNotFoundError("No such file or directory: 'gh'")):
             with self.assertRaises(gate.GateError) as raised:
                 gate.sh_raw(["gh", "pr", "checks", "7"])
@@ -920,7 +921,7 @@ class CheckFetchCliTests(unittest.TestCase):
         out, err = io.StringIO(), io.StringIO()
         argv = ["pr-merge-check.py", "7", "--repo", ".", "--verified-head", HEAD, "--gates-rc", "0"]
         missing = FileNotFoundError("[Errno 2] No such file or directory: 'gh'")
-        with patch.object(gate.subprocess, "run", side_effect=missing), \
+        with patch.object(subprocess, "run", side_effect=missing), \
              patch.object(sys, "argv", argv), redirect_stdout(out), redirect_stderr(err):
             code = gate.main()
         self.assertEqual(code, 2)
@@ -1029,7 +1030,7 @@ class RealSubprocessBoundaryTests(unittest.TestCase):
         calls = []
         view = {"state": "OPEN", "isDraft": False, "headRefOid": HEAD, "headRefName": "feature"}
 
-        def fake_run(cmd, cwd=None, capture_output=False, text=False):
+        def fake_run(cmd, cwd=None, capture_output=False, text=False, **_options):
             calls.append(list(cmd))
             if record is not None:
                 record.append((list(cmd), cwd))
@@ -1051,16 +1052,16 @@ class RealSubprocessBoundaryTests(unittest.TestCase):
 
         out, err = io.StringIO(), io.StringIO()
         argv = ["pr-merge-check.py", "7", "--repo", repo, *extra]
-        with patch.object(gate.subprocess, "run", side_effect=fake_run), \
+        with patch.object(subprocess, "run", side_effect=fake_run), \
              patch.object(sys, "argv", argv), redirect_stdout(out), redirect_stderr(err):
             code = gate.main()
         return code, out.getvalue(), err.getvalue(), calls
 
     def test_sh_raw_forwards_exit_code_and_both_streams_verbatim(self):
-        def fake_run(cmd, cwd=None, capture_output=False, text=False):
+        def fake_run(cmd, cwd=None, capture_output=False, text=False, **_options):
             return subprocess.CompletedProcess(cmd, 8, "stdout text", "stderr text")
 
-        with patch.object(gate.subprocess, "run", side_effect=fake_run):
+        with patch.object(subprocess, "run", side_effect=fake_run):
             self.assertEqual(gate.sh_raw(["gh", "pr", "checks", "7"]),
                              (8, "stdout text", "stderr text"))
             # sh() makes a non-zero exit an error; sh_raw() hands it back as data.
@@ -1150,10 +1151,10 @@ class RealSubprocessBoundaryTests(unittest.TestCase):
         stdout = "  leading\nbody\n\n"
         stderr = "\ttrailing \n\n"
 
-        def fake_run(cmd, cwd=None, capture_output=False, text=False):
+        def fake_run(cmd, cwd=None, capture_output=False, text=False, **_options):
             return subprocess.CompletedProcess(cmd, 7, stdout, stderr)
 
-        with patch.object(gate.subprocess, "run", side_effect=fake_run):
+        with patch.object(subprocess, "run", side_effect=fake_run):
             self.assertEqual(gate.sh_raw(["gh", "pr", "checks", "7"]),
                              (7, stdout, stderr))
 

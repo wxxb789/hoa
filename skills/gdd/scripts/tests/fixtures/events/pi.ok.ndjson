@@ -1,0 +1,16 @@
+# Trimmed from a real `pi --mode json --no-approve --model <ghc model>` run with the prompt on stdin
+# (pi 1.5.2, 2026-11-18); message_update events, the system message, agent_end and signatures
+# removed, turn_end messages reduced to role and stopReason, session id and cwd sanitized.
+{"type": "session", "version": 3, "id": "00000000-0000-7000-8000-000000000006", "timestamp": "2026-11-18T00:00:00.000Z", "cwd": "/work/repo"}
+{"type": "agent_start"}
+{"type": "turn_start"}
+{"type": "message_end", "message": {"role": "user", "content": [{"type": "text", "text": "Run the shell command `echo hi` with your bash tool, then reply with the word done."}], "timestamp": 1794981263714}}
+{"type": "message_end", "message": {"role": "assistant", "content": [{"type": "toolCall", "id": "call_0001", "name": "bash", "arguments": {"command": "echo hi", "timeout": null}}], "api": "openai-responses", "provider": "ghc", "model": "gpt-6-luna", "usage": {"input": 3, "output": 23, "cacheRead": 0, "cacheWrite": 14695, "reasoning": 0, "totalTokens": 14721, "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "total": 0, "totalFromProvider": false}}, "stopReason": "toolUse", "timestamp": 1794981263734, "rawStopReason": "completed", "durationMs": 1223, "thinkingLevel": "high"}}
+{"type": "tool_execution_start", "toolCallId": "call_0001", "toolName": "bash", "args": {"command": "echo hi", "timeout": null}}
+{"type": "tool_execution_end", "toolCallId": "call_0001", "toolName": "bash", "result": {"content": [{"type": "text", "text": "hi\n"}], "structuredContent": {"output": "hi\n", "truncated": false, "exit_code": 0, "wall_time_seconds": 0.1}}, "isError": false, "durationMs": 109}
+{"type": "message_end", "message": {"role": "toolResult", "toolCallId": "call_0001", "toolName": "bash", "content": [{"type": "text", "text": "hi\n"}], "isError": false, "durationMs": 109, "timestamp": 1794981265072}}
+{"type": "turn_end", "message": {"role": "assistant", "stopReason": "toolUse"}, "toolResults": [{"role": "toolResult", "toolCallId": "call_0001", "toolName": "bash", "content": [{"type": "text", "text": "hi\n"}], "isError": false, "durationMs": 109, "timestamp": 1794981265072}]}
+{"type": "turn_start"}
+{"type": "message_end", "message": {"role": "assistant", "content": [{"type": "text", "text": "done"}], "api": "openai-responses", "provider": "ghc", "model": "gpt-6-luna", "usage": {"input": 3, "output": 5, "cacheRead": 14695, "cacheWrite": 36, "reasoning": 0, "totalTokens": 14739, "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "total": 0, "totalFromProvider": false}}, "stopReason": "stop", "timestamp": 1794981265080, "rawStopReason": "completed", "durationMs": 1588, "thinkingLevel": "high"}}
+{"type": "turn_end", "message": {"role": "assistant", "stopReason": "stop"}, "toolResults": []}
+{"type": "agent_settled", "aborted": false}

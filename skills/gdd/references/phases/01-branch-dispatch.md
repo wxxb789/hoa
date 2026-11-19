@@ -6,7 +6,8 @@
    and which behaviours are deliberate non-goals.
 1. `git fetch origin --prune`, fast-forward `main`, branch `feat/<kebab-outcome>` **from
    `origin/main`**, never from a stale local main. Report the base SHA every time.
-2. Record the baseline before dispatching: `uv run "$(uv run scripts/gdd.py scope)" snapshot --repo <path> --label <goal>`.
+2. Resolve the scope tool with `uv run scripts/gdd.py scope`. Record the baseline before dispatching
+   with `uv run "<scope-tool>" snapshot --repo <path> --label <goal>`.
    Report the count of pre-existing dirty paths in the dispatch line — they are not part of this
    increment. Refuse to dispatch on a dirty submodule or nested repository; resolve it first.
 3. Dispatch one implementation run carrying the goal file, the repo's contract docs, the most recent
@@ -15,9 +16,8 @@
 
 ## Dispatch tooling
 
-```bash
-uv run scripts/gdd.py stage --repo <path> --goal <id> --stage <implement|simplify|apply|review|fix> \
-  [--findings FILE] [--base SHA] [--launcher CMD] [--dry-run] [--wait]
+```text
+uv run scripts/gdd.py stage --repo <path> --goal <id> --stage <stage> [--findings FILE] [--base SHA] [--launcher CMD] [--dry-run] [--wait]
 ```
 
 Renders the stage prompt from `references/stage-templates/<stage>.md`, refuses to ship an unresolved
@@ -58,10 +58,8 @@ failure. Launcher contract, artifacts, recovery and liveness: [`references/trans
 - `references/profiles/_template.md` — per-repo profile template.
 - `scripts/` — `gdd.py` (dispatch), `delivery-state.py` (ledger/resume), `pr-merge-check.py`
   (merge gate), `review-evidence.py` (full report evidence generator), `watch-pr-checks.py`
-  (bounded CI poller with infra-only rerun; the `.sh` twin has the
-  same semantics),
-  `adapters/omp-run.py` (bundled cross-platform launcher), `adapters/omp-run.sh` (POSIX reference
-  launcher, the one with the attachable `tmux` backend), `adapters/events-writer.py` (bounded NDJSON
-  writer shared by both adapters), `tests/run-gdd-selftest.sh`,
-  `tests/test_omp_run_python.py` (the launcher suite that runs on any platform),
+  (bounded CI poller with infra-only rerun),
+  `agent_run.py` (bundled cross-platform headless runner, one for every agent CLI),
+  `adapters/paseo-run.py` (opt-in native Paseo launcher), `tests/test_gdd.py` (dispatch and ledger),
+  `tests/test_agent_run.py` (the runner suite that runs on any platform),
   `tests/test_watch_pr_checks.py` (the CI watcher's state machine, against a scripted `gh`).

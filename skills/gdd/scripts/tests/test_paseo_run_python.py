@@ -6,7 +6,6 @@ import importlib.util
 import json
 import os
 import shutil
-import subprocess
 import sys
 import tempfile
 import time
@@ -15,6 +14,10 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 from unittest import mock
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import agent_run
+import gdd_process
 
 ADAPTER = Path(__file__).resolve().parents[1] / "adapters" / "paseo-run.py"
 STUB = '''#!/usr/bin/env python3
@@ -75,7 +78,7 @@ class PaseoLauncherTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix="paseo-run-test.")
         self.addCleanup(self.temp.cleanup)
         self.home = Path(self.temp.name)
-        self.bin = self.home / "bin"
+        self.bin = self.home / "bin with spaces"
         self.bin.mkdir()
         source = self.bin / "paseo.py"
         source.write_text(STUB, encoding="utf-8")
@@ -92,11 +95,12 @@ class PaseoLauncherTests(unittest.TestCase):
         self.fixture = {"id": str(uuid.uuid4()), "status": "running", "answer": "STAGE OK"}
         self.save_fixture()
         self.env = dict(os.environ)
-        for key in ("PASEO_BIN", "GDD_MODEL", "GDD_THINKING", "OMP_RUN_ROOT"):
+        for key in ("PASEO_BIN", "GDD_MODEL", "GDD_THINKING"):
             self.env.pop(key, None)
         self.env.update(GDD_RUN_ROOT=str(self.root), STUB_HOME=str(self.home),
+                        GDD_RUN_DETACH="windows" if os.name == "nt" else "setsid",
                         PATH=str(self.bin) + os.pathsep + os.environ.get("PATH", ""))
-        self.monitors = []
+        self.monitors = {}
         self.addCleanup(self.stop_monitors)
 
     def save_fixture(self, **fields):
@@ -106,24 +110,21 @@ class PaseoLauncherTests(unittest.TestCase):
         os.replace(path, self.home / "fixture.json")
 
     def run_adapter(self, *args, env=None):
-        return subprocess.run([sys.executable, "-B", str(ADAPTER), *args], env=env or self.env,
-                              capture_output=True, text=True, timeout=30)
+        try:
+            return gdd_process.run([sys.executable, "-B", str(ADAPTER), *args], env=env or self.env,
+                                   capture_output=True, text=True, timeout=30)
+        finally:
+            if args[0] == "start":
+                for path in self.root.glob("*/*/state.json"):
+                    state = agent_run.read_state(path.parent)
+                    if recorded := state.get("pid_identity"):
+                        self.monitors[state["pid"]] = recorded
 
     def start(self, *flags, name="stage", env=None):
         result = self.run_adapter("start", "--name", name, "--prompt", str(self.prompt),
                                   "--cwd", str(self.home), *flags, env=env)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("started: " + name, result.stdout)
-        pid = json.loads((self.run_dir(name) / "state.json").read_text(encoding="utf-8"))["pid"]
-        if os.name == "nt":
-            import ctypes
-            kernel = ctypes.windll.kernel32
-            kernel.OpenProcess.restype = ctypes.c_void_p
-            kernel.WaitForSingleObject.argtypes = [ctypes.c_void_p, ctypes.c_ulong]
-            kernel.CloseHandle.argtypes = [ctypes.c_void_p]
-            self.monitors.append((pid, kernel.OpenProcess(0x00100000, False, pid)))
-        else:
-            self.monitors.append((pid, None))
         return result
 
     def run_dir(self, name="stage"):
@@ -152,22 +153,11 @@ class PaseoLauncherTests(unittest.TestCase):
         if not self.root.exists():
             return
         self.save_fixture(status="closed", offline=False, missing=False)
-        for pid, handle in self.monitors:
-            if os.name == "nt":
-                import ctypes
-                if handle:
-                    try:
-                        if ctypes.windll.kernel32.WaitForSingleObject(handle, 5000) == 258:
-                            subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"],
-                                           capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
-                            ctypes.windll.kernel32.WaitForSingleObject(handle, 5000)
-                    finally:
-                        ctypes.windll.kernel32.CloseHandle(handle)
-            else:
-                try:
-                    os.kill(pid, 15)
-                except ProcessLookupError:
-                    pass
+        for pid, recorded in self.monitors.items():
+            if not agent_run.wait_until(lambda: agent_run.identity(pid) != recorded, 4):
+                if agent_run.identity(pid) == recorded:
+                    self.assertTrue(agent_run.terminate(pid, single=True),
+                                    f"monitor {pid} did not stop for {self.root}")
 
     def test_start_argv_identity_and_artifacts(self):
         self.start("--model", "stub-provider", "--thinking", "deliberate")
@@ -180,8 +170,6 @@ class PaseoLauncherTests(unittest.TestCase):
         self.assertEqual(state["session_id"], self.fixture["id"])
         self.assertEqual(state["backend"], "paseo")
         self.assertIsInstance(state["pid"], int)
-        lock = json.loads((self.run_dir() / "lock").read_text(encoding="utf-8"))
-        self.assertEqual(lock["agent_id"], self.fixture["id"])
         for filename in ("prompt.md", "run.json", "stderr.log", "events.ndjson"):
             self.assertTrue((self.run_dir() / filename).exists(), filename)
 
@@ -225,7 +213,6 @@ class PaseoLauncherTests(unittest.TestCase):
                     self.assertIn("cwd", state["error"])
                     for name in ("finalized", "exit.code", "answer.md"):
                         self.assertFalse((self.run_dir() / name).exists(), name)
-                    self.assertFalse((self.root / "ledger.tsv").exists())
 
         self.save_fixture(inspect_cwd=str(self.home))
         verified = self.status()
@@ -291,6 +278,61 @@ class PaseoLauncherTests(unittest.TestCase):
                 self.assertIsNone(state["exit"])
                 self.assertFalse((self.run_dir() / "finalized").exists())
 
+    def test_refresh_claim_is_held_while_its_holder_lives(self):
+        spec = importlib.util.spec_from_file_location("paseo_under_test", ADAPTER)
+        adapter = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(adapter)
+        path = self.home / "refresh"
+        with adapter.claim(str(path)):
+            with mock.patch.object(adapter, "CLAIM_WAIT_SECONDS", 0.1), self.assertRaises(adapter.ClaimTimeout):
+                with adapter.claim(str(path)):
+                    pass
+        self.assertTrue(path.exists())
+        with adapter.claim(str(path)):
+            pass
+
+    @unittest.skipIf(os.name == "nt", "POSIX abrupt holder exit and competing processes")
+    def test_only_one_contender_takes_over_a_dead_refresh_holder(self):
+        source = """
+import importlib.util, os, sys, time
+from pathlib import Path
+spec = importlib.util.spec_from_file_location('adapter', sys.argv[1])
+adapter = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(adapter)
+root, role = Path(sys.argv[2]), sys.argv[3]
+if role != 'holder':
+    (root / f'ready-{role}').touch()
+with adapter.claim(str(root / 'refresh')):
+    if role == 'holder':
+        (root / 'ready').touch()
+        while not (root / 'release').exists():
+            time.sleep(0.01)
+        os._exit(0)
+    with (root / 'inside').open('x'):
+        time.sleep(0.08)
+    (root / 'inside').unlink()
+"""
+        def start(role):
+            child = gdd_process.popen([sys.executable, "-B", "-c", source, str(ADAPTER), str(self.home), role])
+            recorded = agent_run.identity(child.pid)
+
+            def cleanup():
+                if child.poll() is None and recorded and agent_run.identity(child.pid) == recorded:
+                    child.kill()
+                child.wait(timeout=5)
+
+            self.addCleanup(cleanup)
+            return child
+
+        holder = start("holder")
+        self.assertTrue(agent_run.wait_until(lambda: (self.home / "ready").exists(), 5))
+        contenders = [start(str(i)) for i in range(8)]
+        self.assertTrue(agent_run.wait_until(lambda: len(list(self.home.glob("ready-*"))) == len(contenders), 5))
+        (self.home / "release").touch()
+        self.assertEqual(holder.wait(timeout=5), 0)
+        for contender in contenders:
+            self.assertEqual(contender.wait(timeout=10), 0)
+
     def test_unknown_native_run_reserves_worktree_until_confirmed_termination(self):
         spec = importlib.util.spec_from_file_location("gdd_under_test", ADAPTER.parent.parent / "gdd.py")
         gdd = importlib.util.module_from_spec(spec)
@@ -307,8 +349,7 @@ class PaseoLauncherTests(unittest.TestCase):
                          "cwd": str(self.home), "cwd_verified": True, "pid": None,
                          "started": datetime.now().astimezone().isoformat(),
                          "run_dir": str(run_dir), "agent_id": self.fixture["id"],
-                         "paseo_argv": [sys.executable, str(self.bin / "paseo.py")],
-                         "ledger": str(self.root / "ledger.tsv")}
+                         "paseo_argv": [sys.executable, str(self.bin / "paseo.py")]}
                 (run_dir / "state.json").write_text(json.dumps(state), encoding="utf-8")
                 expected = [(name, str(run_dir))]
                 self.assertEqual(gdd.active_runs(repo), expected)
@@ -318,7 +359,7 @@ class PaseoLauncherTests(unittest.TestCase):
                 self.assertEqual(refreshed["state"], "unknown")
                 self.assertIsNone(refreshed["exit"])
                 self.assertFalse((run_dir / "finalized").exists())
-                self.assertEqual(gdd.effective_state(str(run_dir), refreshed), "unknown")
+                self.assertEqual(gdd.agent_run.observed_state(str(run_dir), refreshed), "unknown")
                 self.assertEqual(gdd.active_runs(repo), expected,
                                  "offline inspect must not release the native worktree reservation")
 
@@ -357,18 +398,18 @@ class PaseoLauncherTests(unittest.TestCase):
         expected = [("stage", str(run_dir))]
         with mock.patch.dict(os.environ, env, clear=True):
             (run_dir / "state.json").write_text(json.dumps(state), encoding="utf-8")
-            self.assertEqual(gdd.effective_state(str(run_dir), state), "stale lock")
+            self.assertEqual(gdd.agent_run.observed_state(str(run_dir), state), "stale")
             self.assertEqual(gdd.active_runs(os.path.realpath(self.home)), expected)
             (run_dir / "finalized").write_text("143\n", encoding="utf-8")
             self.assertEqual(gdd.active_runs(os.path.realpath(self.home)), [])
             (run_dir / "finalized").unlink()
 
-            state.update(backend="windows", pid=None)
+            state.update(backend="windows", pid=None, started=datetime.now().astimezone().isoformat())
             for word in ("running", "done", "failed", "killed"):
                 with self.subTest(headless_state=word):
                     state["state"] = word
                     (run_dir / "state.json").write_text(json.dumps(state), encoding="utf-8")
-                    self.assertEqual(gdd.effective_state(str(run_dir), state), word)
+                    self.assertEqual(gdd.agent_run.observed_state(str(run_dir), state), word)
                     self.assertEqual(gdd.active_runs(os.path.realpath(self.home)),
                                      expected if word == "running" else [])
 
@@ -406,75 +447,21 @@ class PaseoLauncherTests(unittest.TestCase):
         self.assertIn(["logs", self.fixture["id"], "--filter", "assistant_message", "--tail", "1"],
                       self.calls())
         self.assertEqual((self.run_dir() / "finalized").read_text().strip(), "0")
-        self.assertEqual(len((self.root / "ledger.tsv").read_text().splitlines()), 2)
-        self.status()
-        self.assertEqual(len((self.root / "ledger.tsv").read_text().splitlines()), 2)
 
-    def test_monitor_retries_refresh_claim_after_thirty_seconds_for_file_only_waiter(self):
-        spec = importlib.util.spec_from_file_location("paseo_under_test", ADAPTER)
-        adapter = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(adapter)
-        spec = importlib.util.spec_from_file_location("gdd_under_test", ADAPTER.parent.parent / "gdd.py")
-        gdd = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(gdd)
-        self.start()
-        run_dir = str(self.run_dir())
-        pid = gdd.read_state(run_dir)["pid"]
-        with adapter.claim(os.path.join(run_dir, "refresh")):
-            # A legal 60-second CLI call can hold this claim past the monitor's
-            # 30-second acquisition budget. Exercise the real detached process.
-            time.sleep(33)
-            state = gdd.read_state(run_dir)
-            self.assertEqual(state["state"], "running")
-            self.assertIsNone(state["exit"])
-            self.assertFalse((self.run_dir() / "finalized").exists())
-            self.assertTrue(adapter.support.pid_alive(pid),
-                            "detached monitor exited during refresh contention:\n" +
-                            (self.run_dir() / "runner.log").read_text(encoding="utf-8"))
-            self.assertEqual(gdd.effective_state(run_dir, state), "running")
-            self.save_fixture(status="idle")
-
-        # These are the file-only reads used by gdd.py stage --wait, not an
-        # adapter status/result call that could repair a dead monitor for us.
-        deadline = time.monotonic() + 15
-        while time.monotonic() < deadline:
-            state = gdd.read_state(run_dir)
-            if (gdd.effective_state(run_dir, state) == "done" and
-                    (self.run_dir() / "finalized").exists()):
-                break
-            time.sleep(0.1)
-        else:
-            self.fail(f"file-only waiter never observed finalized completion: {state}")
-        self.assertEqual(state["exit"], 0)
-        self.assertEqual((self.run_dir() / "finalized").read_text().strip(), "0")
-
-    def test_monitor_retries_until_terminal_state_or_finalized_marker(self):
-        spec = importlib.util.spec_from_file_location("paseo_under_test", ADAPTER)
-        adapter = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(adapter)
-        for outcome in ("done", "failed", "killed", "finalized"):
-            with self.subTest(outcome=outcome):
-                terminal = {"state": "unknown" if outcome == "finalized" else outcome}
-                observations = [adapter.ClaimTimeout("busy"), adapter.ClaimTimeout("still busy"),
-                                {}, terminal]
-                with mock.patch.object(adapter, "refresh", side_effect=observations) as refresh, \
-                        mock.patch.object(adapter.support, "read_state_file",
-                                          side_effect=[{}, {"state": "unknown"}]), \
-                        mock.patch.object(adapter.os.path, "exists", side_effect=[False, False, False, True]), \
-                        mock.patch.object(adapter.time, "sleep") as sleep, \
-                        mock.patch.object(adapter, "publish") as publish:
-                    self.assertEqual(adapter.watch(mock.Mock(run_dir=str(self.run_dir()))), 0)
-                self.assertEqual(refresh.call_count, 4)
-                self.assertEqual(sleep.call_args_list, [mock.call(1)] * 3)
-                publish.assert_not_called()
-
-    def test_monitor_does_not_swallow_unexpected_refresh_errors(self):
-        spec = importlib.util.spec_from_file_location("paseo_under_test", ADAPTER)
-        adapter = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(adapter)
-        with mock.patch.object(adapter, "refresh", side_effect=RuntimeError("unexpected failure")):
-            with self.assertRaisesRegex(RuntimeError, "unexpected failure"):
-                adapter.watch(mock.Mock(run_dir=str(self.run_dir())))
+    def test_stage_result_in_the_answer_is_checked_against_the_schema(self):
+        schema = ADAPTER.parent.parent.parent / "references" / "stage-result.schema.json"
+        result = {"stage": "review", "verdict": "APPROVE", "summary": "ok", "changed_files": [], "gates": [],
+                  "findings": [], "unmet_criteria": []}
+        self.start("--schema", str(schema))
+        self.save_fixture(status="idle", answer=f"Report.\n```json\n{json.dumps(result)}\n```")
+        state = self.wait_state("done")
+        self.assertEqual(state["result"], "valid", state)
+        self.assertEqual(json.loads((self.run_dir() / "result.json").read_text(encoding="utf-8")), result)
+        refused = self.run_adapter("start", "--name", "noschema", "--prompt", str(self.prompt),
+                                   "--cwd", str(self.home), "--schema", str(self.home / "nope.json"))
+        self.assertEqual(refused.returncode, 1, refused.stdout + refused.stderr)
+        self.assertIn("is not a readable JSON object", refused.stderr)
+        self.assertEqual(list(self.run_dir().parent.glob("noschema*")), [])
 
     def test_kill_records_confirmed_agent_deletion(self):
         self.start()
@@ -532,7 +519,7 @@ class PaseoLauncherTests(unittest.TestCase):
 
     def test_interrupted_idle_agent_is_not_reported_killed(self):
         self.start()
-        result = subprocess.run([sys.executable, str(self.bin / "paseo.py"), "stop", self.fixture["id"], "--json"],
+        result = gdd_process.run([sys.executable, str(self.bin / "paseo.py"), "stop", self.fixture["id"], "--json"],
                                 env=self.env, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         state = self.status()

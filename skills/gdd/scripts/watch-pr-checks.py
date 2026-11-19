@@ -1,12 +1,11 @@
 #!/usr/bin/env -S uv run --script
 # /// script
-# requires-python = ">=3.7"
+# requires-python = ">=3.9"
 # dependencies = []
 # ///
 """watch-pr-checks.py — bounded CI poller for one PR, with infra-only auto-rerun.
 
-Cross-platform port of `watch-pr-checks.sh`; same semantics, same exit codes, no
-bash. Why it exists at all: a job that dies in under a minute on a download step
+Cross-platform, no bash. Why it exists at all: a job that dies in under a minute on a download step
 (curl 5xx while installing a pinned binary) is infra, not your diff. Rerunning it
 by hand costs a round trip per occurrence; rerunning it unbounded turns a broken
 job green-adjacent by attrition. This bounds both.
@@ -44,7 +43,8 @@ import sys
 import time
 from datetime import datetime
 
-IS_WINDOWS = os.name == "nt"
+import agent_run
+import gdd_process
 # `gh pr checks` prints one row per check: name, state, duration, optional link.
 ROW_RE = re.compile(r"^[^\t]+\t(pass|fail|pending|skipping)")
 NO_CHECKS_RE = re.compile(r"no checks reported|no check runs found", re.IGNORECASE)
@@ -62,27 +62,14 @@ def env_seconds(key, default):
     return value if value > 0 else float(default)
 
 
-def hidden_flags() -> int:
-    """CREATE_NO_WINDOW on Windows: a poller must not flash a console per `gh` call."""
-    return 0x08000000 if IS_WINDOWS else 0
-
-
-def command_for(binary, args):
-    """argv for the GitHub CLI: a Windows `.cmd`/`.bat` shim runs through %COMSPEC%."""
-    if IS_WINDOWS and os.path.splitext(binary)[1].lower() in (".cmd", ".bat"):
-        return [os.environ.get("COMSPEC") or "cmd.exe", "/c", binary, *args]
-    return [binary, *args]
-
-
 def run(argv, cwd=None):
     """Run a helper, capturing everything; never inherits the caller's console state."""
-    return subprocess.run(
+    return gdd_process.run(
         argv,
         cwd=cwd,
         stdin=subprocess.DEVNULL,
         capture_output=True,
         text=True,
-        creationflags=hidden_flags(),
     )
 
 
@@ -125,6 +112,9 @@ def main(argv=None) -> int:
     if not gh:
         print("watch-pr-checks: gh not found on PATH (set GH_BIN)", file=sys.stderr)
         return 3
+    if problem := agent_run.shim_hazard(gh, [pull_request]):
+        print(f"watch-pr-checks: {problem}; point GH_BIN at the real executable", file=sys.stderr)
+        return 3
 
     top = run(["git", "rev-parse", "--show-toplevel"])
     if top.returncode != 0:
@@ -156,13 +146,12 @@ def main(argv=None) -> int:
     child_env["GH_NO_SPINNER"] = "1"
 
     def gh_run(args):
-        return subprocess.run(
-            command_for(gh, args),
+        return gdd_process.run(
+            [*agent_run.command_prefix(gh), *args],
             stdin=subprocess.DEVNULL,
             capture_output=True,
             text=True,
             env=child_env,
-            creationflags=hidden_flags(),
         )
 
     reruns = 0

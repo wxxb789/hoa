@@ -54,3 +54,11 @@ DECISION_NEEDED (<question>) | BLOCKED:no_progress`) and stable IDs (`STD-A01…
 the test-code triage above in the Standards axis; the Spec axis answers one line per acceptance
 clause. If a `(axis, rule, file, mechanism)` quadruple repeats a prior round, stop at
 `BLOCKED:no_progress` instead of starting another round.
+
+## Stage result
+
+After the report, end your final message with one fenced ```json block matching the schema at
+`${RESULT_SCHEMA}`: `"stage": "review"`, the verdict line as `"verdict"` (`nothing material` is
+`"APPROVE"`, `BLOCKED:no_progress` is `"BLOCKED"`; in dual-axis mode, the worse axis verdict); every
+finding also goes in `findings`. Gate exit codes are integers. If your runtime enforces that schema
+itself, send the report as its own message first; the final message is then that JSON object alone.

@@ -1,0 +1,19 @@
+# Trimmed from a real `omp -p --mode=json --approval-mode yolo` run (omp 18.22.0, 2026-11-17);
+# derived: the last assistant message ends with stopReason "error" and exit 0;
+# ids, signatures and tool traces removed.
+{"type": "session", "version": 3, "id": "00000000-0000-7000-8000-000000000001", "timestamp": "2026-11-17T00:00:00.000Z", "cwd": "/work/repo"}
+{"type": "agent_start"}
+{"type": "turn_start"}
+{"type": "message_start", "message": {"role": "user", "content": [{"type": "text", "text": "Use your shell tool to run: echo hi. Then reply with the word done."}], "attribution": "user", "timestamp": 1794934097974}}
+{"type": "message_end", "message": {"role": "user", "content": [{"type": "text", "text": "Use your shell tool to run: echo hi. Then reply with the word done."}], "attribution": "user", "timestamp": 1794934097974}}
+{"type": "message_update", "assistantMessageEvent": {"type": "toolcall_start", "contentIndex": 0}}
+{"type": "message_update", "assistantMessageEvent": {"type": "toolcall_delta", "contentIndex": 0, "delta": "{\""}}
+{"type": "message_end", "message": {"role": "assistant", "content": [{"type": "toolCall", "id": "call_1", "name": "bash", "arguments": {"i": "Running requested echo", "command": "echo hi", "timeout": null, "cwd": null, "pty": null, "async": null, "name": null, "ready": null}, "intent": "Running requested echo"}], "api": "openai-responses", "provider": "ghc", "model": "gpt-6.1-sol", "usage": {"input": 3, "output": 49, "cacheRead": 0, "cacheWrite": 13420, "totalTokens": 13472, "cost": {"input": 6e-06, "output": 0.0004900000000000001, "cacheRead": 0, "cacheWrite": 0.03355, "total": 0.03404600000000001}}, "stopReason": "toolUse", "timestamp": 1794934098030, "duration": 2287.5047, "ttft": 1762.5562, "completedAt": 1794934100320}}
+{"type": "tool_execution_start", "toolCallId": "call_1", "toolName": "bash", "args": {"command": "echo hi"}, "intent": "Running requested echo"}
+{"type": "tool_execution_end", "toolCallId": "call_1", "toolName": "bash", "result": {"content": [{"type": "text", "text": "hi\n"}]}, "isError": false}
+{"type": "message_start", "message": {"role": "toolResult", "toolCallId": "call_1", "toolName": "bash", "content": [{"type": "text", "text": "hi\n"}], "isError": false, "timestamp": 1794934100764}}
+{"type": "message_end", "message": {"role": "toolResult", "toolCallId": "call_1", "toolName": "bash", "content": [{"type": "text", "text": "hi\n"}], "isError": false, "timestamp": 1794934100764}}
+{"type": "turn_end", "message": {"role": "assistant", "content": [{"type": "toolCall", "id": "call_1", "name": "bash", "arguments": {"i": "Running requested echo", "command": "echo hi", "timeout": null, "cwd": null, "pty": null, "async": null, "name": null, "ready": null}, "intent": "Running requested echo"}], "api": "openai-responses", "provider": "ghc", "model": "gpt-6.1-sol", "usage": {"input": 3, "output": 49, "cacheRead": 0, "cacheWrite": 13420, "totalTokens": 13472, "cost": {"input": 6e-06, "output": 0.0004900000000000001, "cacheRead": 0, "cacheWrite": 0.03355, "total": 0.03404600000000001}}, "stopReason": "toolUse", "timestamp": 1794934098030, "duration": 2287.5047, "ttft": 1762.5562}, "toolResults": [{"role": "toolResult", "toolCallId": "call_1", "toolName": "bash", "content": [{"type": "text", "text": "hi\n"}], "isError": false, "timestamp": 1794934100764}]}
+{"type": "turn_start"}
+{"type": "message_end", "message": {"role": "assistant", "content": [], "api": "openai-responses", "provider": "ghc", "model": "gpt-6.1-sol", "usage": {"input": 3, "output": 5, "cacheRead": 13420, "cacheWrite": 62, "totalTokens": 13490, "cost": {"input": 6e-06, "output": 5e-05, "cacheRead": 0.001342, "cacheWrite": 0.000155, "total": 0.0015530000000000001}}, "stopReason": "error", "timestamp": 1794934100774, "duration": 2777.4692999999997, "ttft": 2687.3037999999997, "completedAt": 1794934103552, "errorMessage": "upstream returned 500"}}
+{"type": "agent_end", "messages": []}

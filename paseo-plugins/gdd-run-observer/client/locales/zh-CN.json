@@ -76,7 +76,7 @@
     "no-pids": "没有记录进程号，无法检查存活性。",
     "liveness-unknown": "该运行的存活性无法确认。",
     "log-unreadable": "events.ndjson 无法读取。",
-    "log-truncated": "启动器已对事件日志做拼接裁剪，计数仅覆盖保留部分。"
+    "log-truncated": "事件日志中的部分早期事件已不再保留。"
   },
   "source": {
     "setting": "插件设置",

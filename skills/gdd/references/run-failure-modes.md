@@ -1,7 +1,7 @@
 # Failure modes of a long stage run
 
 Every rule below was learned from a real run that died or lied. Read this before adding a test to the
-selftest, before writing a stage's verification plan, and before trusting a run's own report of itself.
+GDD suites (`scripts/tests/test_*.py`), writing a stage's verification plan, or trusting its report.
 
 ## 1. A test must never be able to kill the process under test
 
@@ -11,14 +11,13 @@ panes, its stdout pipe broke, and the run died with `EPIPE: broken pipe` eleven 
 producing several hundred lines of uncommitted work and no `answer.md`.
 
 - Never `tmux kill-server`, and never kill a session you did not create, from inside a stage.
-- Tests that need tmux use a stub binary on `PATH` (`fake-tmux` that records its argv) or an isolated
-  socket: `tmux -L <unique-name>` or `TMUX_TMPDIR=<temp dir>`.
+- Tests for the runner's tmux and Herdr backends use recording stubs, never either live server.
 - Same class of hazard: killing by process name (`pkill -f python`), `kill 0`, and anything that
   addresses "the" server rather than your own handle.
 
 ## 2. A hermetic test that passes on your machine may be proving nothing
 
-The selftest claims "no network, no tmux". After a change added a `status` assertion, only the `start`
+The retired shell selftest claimed "no network, no tmux". After a change added a `status` assertion, only the `start`
 invocation received the fake-bin `PATH`; `status` reached the real `tmux`. On the maintainer's machine
 (which has tmux) it printed 80/80 — green. On a machine without tmux it raised `FileNotFoundError` and
 two checks failed.
@@ -47,11 +46,11 @@ been dead for hours. Deleting the run's `lock` file does **not** clear it — `a
 ## 4. "It returned 0" is not "the file is right", and "the file is right" is not "the run succeeded"
 
 The bounded event writer caught a broken terminal pipe, kept writing the file correctly, and still
-exited **120**, because the interpreter's shutdown flush raised again. The generated `run.sh` uses
-`set -o pipefail`, so a successful agent run was recorded as failed whenever the pane went away.
+exited **120**, because the interpreter's shutdown flush raised again. The old adapter generated a
+`run.sh` with `set -o pipefail`, so a successful agent run was recorded as failed whenever the pane went away.
 
 - A process that is honest about a degraded sink must neutralize that sink, not just stop writing to it
-  (retarget the descriptor at `/dev/null`; do not rely on the exception having been caught).
+  (retarget the descriptor at Python's `os.devnull`; do not rely on the exception having been caught).
 - When a wrapper's exit status feeds a `pipefail` pipeline or a finalizer, the wrapper's exit code is
   part of the contract. Test it with the reader closed, not only with a live reader.
 
@@ -78,7 +77,7 @@ bundled with skill `gdd-route-omp` resolves `--prompt` against the caller's cwd,
 run's own `--cwd`.
 
 - Resolve each intended input against that documented base yourself and verify it exists and is
-  non-empty (`test -s`) before launch: the tool may review an empty attachment and still exit 0.
+  non-empty before launch: the tool may review an empty attachment and still exit 0.
 - Pass absolute paths for arguments that accept filesystem paths.
 - Any wrapper you ship must exit non-zero before launching the tool when an input is missing or empty.
 
@@ -107,8 +106,20 @@ launcher that merely returns may leave that child running, and a killed tmux ses
   in the **foreground** of the stage, or start it in the background and await its completion before the
   stage returns.
 - A gate that must outlive the stage needs a lifetime outside the stage's teardown boundary — a new
-  session or process group is **not** that boundary: a runner detached with `start_new_session` stays in
+  session or process group is **not** that boundary: even a double-forked runner stays in
   the launcher's cgroup and still dies when a `KillMode=control-group` unit finalizes. Hand the gate
   **and whatever records its result** to a separate detached unit/job whose id the operator can poll.
 - Record the result as an exit code; until one exists, treat "I started the verification in the
   background" in a stage report as **unverified**.
+
+| Mode | Dispatch session | Gateway/service restart | Logout/reboot |
+|---|---|---|---|
+| `systemd` | Yes | Yes, separate user unit; not a user-manager restart | No |
+| `launchd` | Yes | Yes, separate job; not a GUI-domain restart | No |
+| `setsid` | Yes | No guarantee against cgroup or job teardown | No |
+| `windows` | Yes | Only if the runner is outside the terminating job | No |
+| `tmux` (optional, 3.2a or newer) | Yes | Only if the tmux server is outside the gateway's cgroup/job | No |
+| `herdr` (optional) | Yes | Only if the Herdr server survives the restart | No |
+
+Launchd was tested only with stubs. The double fork was tested against dispatch-group death on WSL2,
+not against a real macOS/BSD service restart.

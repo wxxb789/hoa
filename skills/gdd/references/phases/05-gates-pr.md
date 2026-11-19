@@ -1,12 +1,13 @@
 # Phase 5 — gates, commit, PR
 
 1. Re-run gates on the exact tree you ship.
-2. **Before committing, define the working increment.** `uv run "$(uv run scripts/gdd.py scope)" diff
+2. **Before committing, define the working increment.** Resolve the scope tool with
+   `uv run scripts/gdd.py scope`, then use `uv run "<scope-tool>" diff
    --repo <path> --label <goal>`, then `seal`. (Phase 4 already committed the stage output to give the
    reviewer a range; this step seals the increment that ships, so run it against the whole branch.) If `overlapping_paths` is non-empty, stop and ask the operator which
    writer owns each path — do not commit across it.
 3. Commit with explicit paths; push; open the PR.
-4. **After committing, verify the sealed scope.** `uv run "$(uv run scripts/gdd.py scope)" verify --repo <path>
+4. **After committing, verify the sealed scope.** `uv run "<scope-tool>" verify --repo <path>
    --label <goal>`. Drift ⇒ stop, name the paths, and require either a re-review or an explicit operator
    acceptance recorded in the PR body. Do not move this check into `pr-merge-check.py`: that gate
    declares `Environment: none` and only judges the remote PR.
@@ -15,12 +16,12 @@
    Record the tree it was measured on (head SHA plus the sealed `scope_sha`).
 6. **Before opening the PR, prove the branch is not behind main.** `git rev-list --count
    origin/main..HEAD` reads `1` whether you are one commit ahead of the current main or one commit
-   ahead of a main that has since moved — it cannot see behind-ness. Check
-   `test "$(git merge-base HEAD origin/main)" = "$(git rev-parse origin/main)"`; when it fails, a sibling
+   ahead of a main that has since moved — it cannot see behind-ness. Compare the outputs of
+   `git merge-base HEAD origin/main` and `git rev-parse origin/main`; if they differ, a sibling
    PR merged mid-increment and you must rebase onto `origin/main` first, or the review range is not
    exactly one increment. Pushing a branch does not freeze its version claim: if a sibling PR merges,
-   re-run the profile's merge-time version gate (in `hoa`: `git fetch origin main && python
-   scripts/version.py check-revisions`)
+   fetch again and re-run the profile's merge-time version gate (in `hoa`:
+   `uv run --no-project --with-requirements scripts/requirements.txt python scripts/version.py check-revisions`)
    before asking for a merge. A repo whose profile declares no such gate skips it — never invent one
    and never skip one silently.
 7. The PR body is a contract artifact — shape in [`references/pr-body.md`](../pr-body.md):

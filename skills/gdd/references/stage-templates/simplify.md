@@ -40,3 +40,10 @@ Keep a separate **possible defect** section: a note that the record's rule and t
 a correctness finding, not a tidy-up, and must not be filed as style.
 
 End by stating how the findings could be applied: all, specific numbers, or a described subset.
+
+## Stage result
+
+After the report, end your final message with one fenced ```json block matching the schema at
+`${RESULT_SCHEMA}`: `"stage": "simplify"`, `"verdict": "DONE"`; every finding also goes in
+`findings`. Gate exit codes are integers. If your runtime enforces that schema itself, send the
+report as its own message first; the final message is then that JSON object alone.
