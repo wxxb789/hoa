@@ -6,7 +6,7 @@ description: >-
   or refining the next goal from prior results. Not for a request whose scope or done criteria are
   undecided (spec-convergence first) or task breakdown.
 metadata:
-  revision: "2"
+  revision: "3"
   areas: "self-management,software-development,work-management"
   targets: "runtime-agnostic"
   summary: "preserve ambitious intent in numbered goal files, with clear near-term and provisional later outcomes, not implementation plans"

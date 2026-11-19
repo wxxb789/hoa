@@ -6,7 +6,7 @@ description: >-
   report, regulator's page or other artifact whose wording and version decide it. Not for ordinary
   web reading where the page is the source of record.
 metadata:
-  revision: "3"
+  revision: "4"
   areas: "work-management"
   targets: "runtime-agnostic"
   summary: "verify a claim against the exact print of the document, including artifacts a plain client cannot fetch"

@@ -18,6 +18,12 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 - Raise the supported Python floor to 3.13: every PEP 723 `requires-python` declares `>=3.13`
   (it ranged from 3.6 to 3.11 and none of those were tested), CI and the Windows stress job run
   3.13, and the gdd test cleanup drops its pre-3.12 `shutil.rmtree(onerror=...)` fallback.
+- uv is the only way scripts run: every entry point's shebang is `#!/usr/bin/env -S uv run --script`
+  (gdd's runner, dispatcher, merge check and adapters lose their `python3` exception), repo tooling
+  and evals carry PEP 723 blocks (PyYAML where imported), `omp-run.sh` starts the runner through uv
+  (also found in `~/.local/bin` from a non-login shell), the troubleshooting reference no longer
+  offers a bare `python3` fallback, and `check_skill_links.py` fails a skill script whose shebang
+  bypasses uv.
 
 ## 2026-11-18
 

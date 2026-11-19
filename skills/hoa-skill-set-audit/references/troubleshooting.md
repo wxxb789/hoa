@@ -19,9 +19,9 @@ Symptom: a `uv run` command fails with "command not found", "is not recognized",
    `uv --version`, or with that full path, and open a new shell if needed.
 4. Re-run the command that failed.
 
-If the user declines: open the script and read its PEP 723 block (`# /// script`). With
-`dependencies = []`, run it with `python3 <script> <args>` (`python` on Windows). With any
-dependency listed, it cannot run without uv: stop and tell the user uv is required.
+If the user declines: stop and tell the user uv is required. Do not run the script with a bare
+`python3`/`python` instead: the system interpreter is often older than the script's
+`requires-python` (Ubuntu 24.04 ships 3.12, macOS `/usr/bin/python3` is 3.9).
 
 ## uv cannot download Python or packages
 

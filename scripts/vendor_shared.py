@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.13"
+# dependencies = []
+# ///
 """Vendor shared scripts into each skill package (single source of truth).
 
 npx skills installs each skill folder as a self-contained package, so shared

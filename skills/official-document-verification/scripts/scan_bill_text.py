@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.13"
+# dependencies = []
+# ///
 """Mechanical pass over one print of a bill or statute.
 
 Counts section-number hits, shows the window around each citation of an older law, and counts the

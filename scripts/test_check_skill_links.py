@@ -100,7 +100,9 @@ class CheckSkillLinksTests(unittest.TestCase):
                            "python3 <repo>/tools/own.py\n```\n"
                            "Run `uv run ../other/scripts/shared.py`; prose python3 scripts/plain.py.",
                    files={"scripts/run.py": "#!/usr/bin/env -S uv run --script\n" + self.PEP_723,
-                          "scripts/plain.py": "print()\n", "scripts/test_run.py": "",
+                          "scripts/plain.py": "print()\n",
+                          "scripts/test_run.py": "#!/usr/bin/env python3\n",
+                          "scripts/tests/stub.py": "#!/usr/bin/env python3\n",
                           "references/x.md": "`uv run scripts/run.py`"})
         code, out, err = self.run_main()
         self.assertEqual(code, 0, out + err)
@@ -112,7 +114,8 @@ class CheckSkillLinksTests(unittest.TestCase):
                            "uv run scripts/run.py && uv run \"$(uv run scripts/plain.py scope)\"\n"
                            "uv run --with pyyaml python -c 'import yaml'\n```\n"
                            "Measure with `python3\nscripts/run.py draft.md`.",
-                   files={"scripts/run.py": self.PEP_723, "scripts/plain.py": "print()\n"})
+                   files={"scripts/run.py": self.PEP_723, "scripts/plain.py": "print()\n",
+                          "scripts/legacy.py": "#!/usr/bin/env python3\n" + self.PEP_723})
         code, out, err = self.run_main()
         self.assertEqual(code, 1)
         self.assertEqual(out.splitlines(), [
@@ -128,8 +131,10 @@ class CheckSkillLinksTests(unittest.TestCase):
             "write uv run --no-project python",
             "skills/tool/SKILL.md:11: bare python runs skills/tool/scripts/run.py; "
             "write uv run scripts/run.py",
+            "skills/tool/scripts/legacy.py:1: shebang '#!/usr/bin/env python3' bypasses uv; "
+            "write #!/usr/bin/env -S uv run --script",
         ])
-        self.assertIn("6 error(s)", err)
+        self.assertIn("7 error(s)", err)
 
 
 if __name__ == "__main__":

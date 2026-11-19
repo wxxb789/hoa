@@ -85,18 +85,19 @@ with a PEP 723 block, after the shebang:
 
 `requires-python` is what the code needs; `dependencies` lists every third-party import and is `[]`
 for stdlib-only code. Inline Python and stdlib modules run as `uv run --no-project python -c …` or
-`uv run --no-project python -m …`, with `--with <package>` for a third-party import. A script that
-bundled tooling executes through its shebang where uv may be absent keeps `#!/usr/bin/env python3`
-and still carries the block (gdd's `gdd.py`, `delivery-state.py`, `pr-merge-check.py` and its
-launcher adapters, which its selftest runs in CI and `gdd.py` starts with its own interpreter).
+`uv run --no-project python -m …`, with `--with <package>` for a third-party import. There is no
+`#!/usr/bin/env python3` exception: a script that tooling executes directly (a forwarder, a selftest)
+goes through `uv run --script` too, and a child a script starts uses that script's own interpreter
+(`sys.executable`).
 
 uv is a prerequisite for skills with scripts. A missing uv is handled on demand, not in SKILL.md:
 `scripts/shared/troubleshooting.md` is vendored by `scripts/vendor_shared.py` to
 `references/troubleshooting.md` in every skill whose docs run its own scripts with `uv run`, and
 SKILL.md carries one line: "Only if a script command fails (for example `uv` is not found), read
 [references/troubleshooting.md](references/troubleshooting.md)." The reference asks the user before
-installing uv and never auto-installs; a script with no dependencies may then run with `python3`
-(`python` on Windows). A skill whose script declares dependencies still says uv is required.
+installing uv and never auto-installs; if the user declines, the skill stops: uv is required, and a
+bare `python3` is not a fallback because the system interpreter is often older than
+`requires-python` (Ubuntu 24.04 ships 3.12, macOS `/usr/bin/python3` is 3.9).
 
 Why: measured on 2026-11-17 (uv 0.13.9 on Windows, 0.13.8 on Linux) with the working directory
 inside a user's project that has a `pyproject.toml` and the script inside that project, as a
@@ -115,5 +116,6 @@ command that runs a script under `skills/`.
 `uv run` also ends the interpreter-name split: Linux distributions ship `python3` and leave `python`
 to an optional package ([`python-is-python3`](https://packages.ubuntu.com/noble/python-is-python3));
 macOS has had no `python` since 12.3 ([release notes](https://developer.apple.com/documentation/macos-release-notes/macos-12_3-release-notes));
-on Windows `python3.exe` may be only the App Execution Alias that opens the Store. That is why the
-fallback names both spellings. Repo tooling (`scripts/`, CI, README commands) is out of scope.
+on Windows `python3.exe` may be only the App Execution Alias that opens the Store. Repo tooling
+(`scripts/`, `evals/`) carries the same shebang and block, so `uv run <script>` works there too; CI
+installs `scripts/requirements.txt` and calls `python` directly.
