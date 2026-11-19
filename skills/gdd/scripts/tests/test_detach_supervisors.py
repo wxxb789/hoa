@@ -1,25 +1,116 @@
-"""Supervisor contract tests. All supervisor commands reach a local recording stub."""
+"""Supervisor contract tests with recording stubs and an isolated real tmux server."""
 
 import json
 import os
 import plistlib
 import re
+import shutil
 import signal
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
 
 import agent_run
 import gdd_process
-from gdd_test_support import check_locks, remove_tree, stop_headless
+from gdd_test_support import check_locks, finalized, remove_tree, stop_headless, wait_for_json
 
 HERE = Path(__file__).resolve().parent
 RUNNER = str(HERE.parent / "agent_run.py")
 STUB = str(HERE / "stub_agent.py")
 FIXTURE = str(HERE / "fixtures" / "events" / "omp.ok.ndjson")
+
+
+class RealTmuxTests(unittest.TestCase):
+    @unittest.skipUnless(os.name == "posix", "tmux requires POSIX")
+    def test_detached_runs_finish_or_stop_on_private_tmux_server(self):
+        executable = shutil.which("tmux")
+        if not executable:
+            self.skipTest("tmux is not on PATH")
+        try:
+            agent_run.check_tmux_version(executable)
+        except ValueError as exc:
+            self.skipTest(str(exc))
+
+        # Keep the socket below the POSIX sockaddr_un length limit, even on macOS.
+        root = Path(tempfile.mkdtemp(prefix="gdd-tmux-", dir="/tmp")).resolve()
+        self.addCleanup(remove_tree, root)
+        socket_dir = root / f"tmux-{os.getuid()}"
+        socket_dir.mkdir(mode=0o700)
+        socket = socket_dir / "default"
+        other_tmp = root / "other"
+        other_tmp.mkdir()
+        runs = root / "runs"
+        env = {k: v for k, v in os.environ.items()
+               if not k.startswith(("TMUX", "GDD_", "OMP_", "STUB_", "PYTHON"))
+               and k != "NOWINDOW_GUARD_LOG"}
+        env.update(TMUX_TMPDIR=str(root), LC_ALL="C")
+
+        def tmux(*args):
+            return gdd_process.run([executable, "-S", str(socket), *args], env=env, capture_output=True,
+                                   text=True, encoding="utf-8", timeout=5)
+
+        def checked(result):
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            return result.stdout.strip()
+
+        def kill_server():
+            result = tmux("kill-server")
+            if not agent_run.tmux_missing(result):
+                checked(result)
+            self.assertTrue(agent_run.wait_until(lambda: tmux("show-options", "-s").returncode == 1, 5),
+                            f"tmux server still responding at {socket}")
+
+        self.addCleanup(kill_server)
+        self.addCleanup(stop_headless, runs)
+        checked(tmux("-f", "/dev/null", "start-server", ";", "set-option", "-s", "exit-empty", "off"))
+        prompt = root / "prompt.md"
+        prompt.write_text("Reply with done.", encoding="utf-8")
+        values = {"PYTHONPATH": str(root / "module path"), "NOWINDOW_GUARD_LOG": str(root / "guard log")}
+        cli_env = {**env, **values, "GDD_RUN_ROOT": str(runs), "GDD_RUN_DETACH": "tmux",
+                   "XDG_CONFIG_HOME": str(root / "config"), "OMP_BIN": STUB, "STUB_FIXTURE": FIXTURE,
+                   "PYTHONDONTWRITEBYTECODE": "1"}
+
+        def cli(*args, **stub_env):
+            return gdd_process.run([sys.executable, "-B", RUNNER, *args], cwd=root,
+                                   env={**cli_env, **stub_env}, capture_output=True, text=True,
+                                   encoding="utf-8", timeout=15)
+
+        for action, expected in (("finish", "done"), ("stop", "killed")):
+            with self.subTest(action=action):
+                name = f"tmux-{action}.v1"
+                release = root / f"release-{action}"
+                record = root / f"record-{action}.json"
+                checked(cli("start", "--name", name, "--prompt", str(prompt), "--agent", "omp", "--cwd", str(root),
+                            STUB_RECORD=str(record), STUB_PROGRESS_RELEASE=str(release)))
+                # The dispatch process has exited; the stub must still be running in its pane.
+                self.assertEqual(wait_for_json(record, bool, time.monotonic() + 5)["cwd"], str(root))
+                run_dir, = runs.glob(f"*/{name}")
+                state_path = run_dir / "state.json"
+                state = wait_for_json(state_path, lambda s: s.get("agent_pid"), time.monotonic() + 5)
+                self.assertEqual((state["detach"], state["state"]), ("tmux", "running"))
+                session = state["supervisor"]["session"]
+                self.assertRegex(session, rf"^gdd-tmux-{action}-v1-[0-9a-f]{{12}}$")
+                self.assertEqual(checked(tmux("list-panes", "-s", "-t", session, "-F",
+                                              "#{session_name}:#{pane_pid}")),
+                                 f"{session}:{state['pid']}")
+                for key, value in {**values, "PYTHONUNBUFFERED": "1"}.items():
+                    self.assertEqual(checked(tmux("show-environment", "-t", session, key)), f"{key}={value}")
+
+                if action == "finish":
+                    release.touch()
+                else:
+                    # The CLI spells stop as kill; resolve the private server from the run record.
+                    checked(cli("kill", name, TMUX_TMPDIR=str(other_tmp)))
+                final = wait_for_json(state_path, lambda s: finalized(run_dir, s), time.monotonic() + 5)
+                self.assertEqual(final["state"], expected)
+                if action == "finish":
+                    self.assertEqual(final["exit"], 0)
+                self.assertTrue(agent_run.wait_until(lambda: tmux("list-sessions").stdout == "", 5))
+                self.assertEqual(checked(tmux("show-options", "-s", "-v", "exit-empty")), "off")
 
 
 SUPERVISOR = r"""
