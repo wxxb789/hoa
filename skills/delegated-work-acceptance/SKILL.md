@@ -6,7 +6,7 @@ description: >-
   handoff comes back "complete" and must become a ruling on what to authorize or send back.
   Not for grading your own work, or when no artifact exists.
 metadata:
-  revision: "4"
+  revision: "5"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
   summary: "verify a delegated \"done\" against the artifact, the re-derived numbers and the write boundary"

@@ -12,6 +12,8 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
   recorded dispatch lineage (GDD goal/stage and initiating Paseo agent) in the run detail.
 - Renamed the optional Paseo plugin to `gdd-observer`, ported the current observer into HOA, and
   kept **GDD runs** in the sidebar footer as its only run-browser entry.
+- delegated-work-acceptance: the worktree-scope tests write fixture files as exact bytes, so the
+  dirty-path digest test passes on Windows (text mode had turned `\n` into `\r\n`).
 
 ## 2026-11-18
 
