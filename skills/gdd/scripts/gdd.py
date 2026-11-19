@@ -53,16 +53,24 @@ This tool polls that file and treats a missing file as unknown, never success; a
 launcher that records neither `pid` nor `agent_pid` is trusted as recorded.
 Native Paseo runs reserve their worktree while running or unknown, regardless
 of local monitor liveness, until a terminal state or finalized marker is recorded.
+
+Each successful launch also writes a best-effort lineage sidecar, `lineage.json`
+inside the run directory: the goal and stage of this dispatch plus, when the
+dispatcher inherited one, `parentAgentId` from `PASEO_AGENT_ID`. A sidecar failure
+warns on stderr and never affects the run or the ledger.
 """
 
 import argparse
 import glob
+import json
 import os
 import re
 import shlex
 import sys
+import tempfile
 import time
 from datetime import datetime
+from pathlib import Path
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 if SCRIPT_DIR not in sys.path:
@@ -386,6 +394,103 @@ def launcher_command(launcher):
     return [path]
 
 
+LINEAGE_FILE = "lineage.json"
+
+
+def _lineage_text(value, limit, label):
+    """Trim one lineage string and hold it to the TypeScript field bounds.
+
+    The observer validates in TypeScript, where `.length` counts UTF-16 units and
+    an astral character is two of them; checking the UTF-16 length as well keeps
+    values this writer accepts acceptable to that reader.
+    """
+    if not isinstance(value, str):
+        raise ValueError(f"{label} is not a string")
+    trimmed = value.strip()
+    if not trimmed:
+        raise ValueError(f"{label} is empty")
+    if len(trimmed) > limit:
+        raise ValueError(f"{label} is longer than {limit} codepoints")
+    if len(trimmed.encode("utf-16-le")) // 2 > limit:
+        raise ValueError(f"{label} is wider than {limit} UTF-16 units")
+    return trimmed
+
+
+def lineage_payload(goal, stage):
+    """The lineage object for one launched run: the dispatch's own goal and stage.
+
+    `parentAgentId` is read from the `PASEO_AGENT_ID` this process inherited — the
+    launcher's initiating environment, before any adapter strips it for its own
+    child. It is never derived from the run's own name, and a missing or malformed
+    value stays absent rather than being guessed.
+    """
+    payload = {
+        "goal": _lineage_text(goal, 256, "goal"),
+        "stage": _lineage_text(stage, 32, "stage"),
+    }
+    parent = os.environ.get("PASEO_AGENT_ID", "").strip()
+    if re.fullmatch(r"[A-Za-z0-9._-]{1,128}", parent):
+        payload["parentAgentId"] = parent
+    return payload
+
+
+def resolve_lineage_dir(run_root, run_name, run_dir):
+    """The run directory when it is exactly `<run_root>/<date>/<run_name>`.
+
+    Both sides resolve symlinks before the comparison: a run root reached through
+    a link still matches its real path, while a run directory whose link points
+    outside the root stops containing it. Anything else — outside the root, other
+    depths, a different name than the launcher printed, a missing directory —
+    raises, so nothing is created and nothing is written outside the root.
+    """
+    root = Path(os.path.expanduser(run_root)).resolve()
+    target = Path(os.path.expanduser(run_dir)).resolve()
+    try:
+        relative = target.relative_to(root)
+    except ValueError:
+        raise ValueError(f"run dir {target} is outside GDD_RUN_ROOT {root}") from None
+    parts = relative.parts
+    if (
+        len(parts) != 2
+        or parts[1] != run_name
+        or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", parts[0])
+    ):
+        raise ValueError(f"run dir {target} is not <GDD_RUN_ROOT>/<date>/{run_name}")
+    if not target.is_dir():
+        raise ValueError(f"run dir does not exist: {target}")
+    return target
+
+
+def write_lineage_sidecar(run_root, run_name, run_dir, goal, stage):
+    """Write lineage.json inside the run directory, best effort only.
+
+    The run has already started when this is called, so no failure here may fail
+    the dispatch: an invalid value or unusable directory warns on stderr and
+    leaves the launcher's state, the ledger and the reported launch success
+    untouched. The file is replaced atomically through a temporary file in the
+    same directory, so a reader never sees a partial object.
+    """
+    try:
+        payload = lineage_payload(goal, stage)
+        target = resolve_lineage_dir(run_root, run_name, run_dir)
+        fd, temp_path = tempfile.mkstemp(
+            dir=str(target), prefix="." + LINEAGE_FILE + ".", suffix=".tmp"
+        )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
+                handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+            os.replace(temp_path, str(target / LINEAGE_FILE))
+        except BaseException:
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
+            raise
+    except Exception as exc:
+        reason = str(exc).strip() or exc.__class__.__name__
+        print(f"gdd: warning: lineage sidecar not written: {reason}", file=sys.stderr)
+
+
 def launch(launcher, prompt_path, repo, goal, stage, model, thinking, max_time):
     name = f"{os.path.basename(repo)}-{goal}-{stage}"
     resolved_run_root = run_root()
@@ -446,6 +551,7 @@ def launch(launcher, prompt_path, repo, goal, stage, model, thinking, max_time):
         run_dir = os.path.join(
             resolved_run_root, datetime.now().strftime("%Y-%m-%d"), run_name
         )
+    write_lineage_sidecar(resolved_run_root, run_name, run_dir, goal, stage)
     return run_name, run_dir, resolved_run_root
 
 

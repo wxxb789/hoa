@@ -10,13 +10,13 @@ export default function contribute(server: PluginServerContext) {
   const current: ObserverSettings = { ...OBSERVER_DEFAULTS };
   const probe = createLivenessProbe();
   const settings = server.registerSettings(observerSettings);
+  // No `log` wiring on the store: per-poll diagnostics must not accumulate in the daemon log.
   const store = createRunStore({
     probe,
     config: () => ({
       runRoot: current.runRoot,
       tailLines: current.tailLines,
     }),
-    log: (message) => console.log(`[observer] ${message}`),
   });
 
   const apply = (state: PluginSettingsState<typeof observerSettingsSchema>) => {
@@ -41,7 +41,7 @@ export default function contribute(server: PluginServerContext) {
       );
     });
 
-  server.handle(listRuns, () => store.listRuns());
+  server.handle(listRuns, ({ knownRevision }) => store.listUpdate(knownRevision));
   server.handle(runPaths, ({ id }) => store.paths(id));
   server.handle(followRun, ({ id, tailLines }) => store.follow(id, tailLines));
 

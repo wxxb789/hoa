@@ -1,8 +1,19 @@
 import { describe, expect, it } from "vitest";
 import type { ReactTestInstance } from "react-test-renderer";
-import type { FollowRunOutput, RunEvent, RunSummary } from "../../shared/runs";
+import type { FollowRunOutput, ListRunsUpdate, RunEvent, RunSummary } from "../../shared/runs";
 import { RunsScreen } from "../runs-browser";
-import { hostProps, makeEvent, makeRun, makeScan, nodes, renderClient, textOf, type RenderedClient } from "./harness";
+import {
+  hostProps,
+  makeEvent,
+  makeRun,
+  makeScan,
+  makeScanFacts,
+  mountedListRows,
+  nodes,
+  renderClient,
+  textOf,
+  type RenderedClient,
+} from "./harness";
 import { testHost } from "./setup";
 
 const compactProps = { ...hostProps, layout: { ...hostProps.layout, compact: true } };
@@ -24,16 +35,30 @@ async function detailView(run: RunSummary, options: {
   locale?: "en" | "zh-CN";
   events?: RunEvent[];
   answerTail?: string | null;
+  lineage?: FollowRunOutput["lineage"];
 } = {}) {
   return selectRun(run, {
     locale: options.locale,
-    follow: { found: true, summary: run, events: options.events ?? [], answerTail: options.answerTail ?? null },
+    follow: {
+      found: true,
+      summary: run,
+      events: options.events ?? [],
+      answerTail: options.answerTail ?? null,
+      lineage: options.lineage,
+    },
   });
 }
 
 function eventRows(root: ReactTestInstance): ReactTestInstance[] {
   // Event clocks are the row's first text cell, including the missing-time placeholder.
   return nodes(root, "Text").filter((node) => textOf(node) === "--:--:--").map((node) => node.parent!);
+}
+
+function factValue(root: ReactTestInstance, label: string): string {
+  // FactsCard renders each fact as one label/value Text pair inside the same row View.
+  const labelNode = nodes(root, "Text").find((node) => textOf(node) === label);
+  expect(labelNode, `fact ${label} must render`).toBeDefined();
+  return textOf(labelNode!.parent!.children[1]);
 }
 
 async function replaceEvents(view: RenderedClient, run: RunSummary, events: RunEvent[]) {
@@ -49,6 +74,51 @@ describe("run browser surfaces", () => {
     const view = await renderClient(<RunsScreen {...hostProps} params={{}} />);
     expect(view.texts()).toContain("No runs yet");
     expect(view.texts()).toContain("No run selected");
+  });
+
+  it("merges a delta's changes, additions, removals and order into the mounted list", async () => {
+    const a = makeRun({ id: "a", name: "a" });
+    const b = makeRun({ id: "b", name: "b" });
+    const c = makeRun({ id: "c", name: "c" });
+    const fresh = makeRun({ id: "d", name: "d" });
+    const settled = makeRun({ id: "a", name: "a", state: "done", liveness: "settled" });
+    const calls: unknown[] = [];
+    const view = await renderClient(<RunsScreen {...hostProps} params={{}} />, {
+      queryDefaults: { staleTime: 0 },
+      invoke: async (method, input) => {
+        if (method !== "runs.list") throw new Error(`Unexpected RPC: ${method}`);
+        calls.push(input);
+        if (calls.length === 1) return { revision: "scan-r1", ...makeScan({ runs: [a, b, c] }) };
+        const delta: ListRunsUpdate = {
+          ...makeScanFacts(),
+          revision: "scan-r2",
+          changes: [settled, fresh],
+          removed: [b.id],
+          order: [fresh.id, a.id, c.id],
+        };
+        return delta;
+      },
+    });
+    const before = mountedListRows(view);
+    expect(before.map((row) => String(row.props.accessibilityLabel))).toEqual([
+      "GDD run a: running, live, model no model named",
+      "GDD run b: running, live, model no model named",
+      "GDD run c: running, live, model no model named",
+    ]);
+
+    await view.change(async () => {
+      await view.query.refetchQueries({ queryKey: ["gddRuns", "list"] });
+    });
+
+    expect(calls).toEqual([{}, { knownRevision: "scan-r1" }]);
+    const after = mountedListRows(view);
+    expect(after.map((row) => String(row.props.accessibilityLabel))).toEqual([
+      "GDD run d: running, live, model no model named",
+      "GDD run a: done, settled, model no model named",
+      "GDD run c: running, live, model no model named",
+    ]);
+    // The untouched run keeps the row instance it already had.
+    expect(after[2]).toBe(before[2]);
   });
 
   it.each([
@@ -175,6 +245,34 @@ describe("run browser surfaces", () => {
       maxTime: "12h", sessionId: "session-fixture", pids: { pid: 123, agentPid: 456 }, lastEventAt: "2026-11-14T13:34:56Z" });
     const view = await detailView(run);
     expect(view.texts()).toEqual(expect.arrayContaining(["Nov 14, 12:34 PM", "Nov 14, 01:34 PM", "12h", "session-fixture", "launcher 123 · agent 456", run.runDir, "Fixture host · Updated Nov 14, 01:34 PM"]));
+  });
+
+  it.each([
+    { locale: "en" as const, title: "Run lineage", goal: "Goal", stage: "Stage", agent: "Initiating Paseo agent", session: "Session", notRecorded: "Not recorded", missing: "No lineage recorded for this run. Previous runs and direct adapter starts have none." },
+    { locale: "zh-CN" as const, title: "运行血缘", goal: "目标", stage: "阶段", agent: "发起 Paseo agent", session: "会话", notRecorded: "未记录", missing: "该运行未记录血缘信息。此前的运行和直接通过适配器启动的运行均无记录。" },
+  ])("keeps recorded dispatch lineage distinct from the run's own session and names unknown agents in $locale", async ({ locale, title, goal, stage, agent, session, notRecorded, missing }) => {
+    const run = makeRun({ sessionId: "session-fixture" });
+    const view = await detailView(run, {
+      locale,
+      lineage: { goal: "goal-fixture", stage: "stage-fixture", parentAgentId: "parent-fixture" },
+    });
+    expect(view.texts()).toEqual(expect.arrayContaining([title, goal, "goal-fixture", stage, "stage-fixture"]));
+    expect(factValue(view.root, agent)).toBe("parent-fixture");
+    expect(factValue(view.root, session)).toBe("session-fixture");
+    await view.change(() => {
+      view.query.setQueryData<FollowRunOutput>(["gddRuns", "follow", run.id, 80], {
+        found: true, summary: run, events: [], answerTail: null,
+        lineage: { goal: "goal-fixture", stage: "stage-fixture" },
+      });
+    });
+    expect(factValue(view.root, agent)).toBe(notRecorded);
+    await view.change(() => {
+      view.query.setQueryData<FollowRunOutput>(["gddRuns", "follow", run.id, 80], {
+        found: true, summary: run, events: [], answerTail: null,
+      });
+    });
+    expect(view.texts()).toContain(missing);
+    expect(view.texts()).not.toContain(notRecorded);
   });
 
   it("shows event content, fallback clocks, tool names, intent precedence and the answer fragment", async () => {

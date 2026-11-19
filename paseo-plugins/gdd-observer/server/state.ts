@@ -16,7 +16,7 @@ export type RunLock = {
 };
 export type RunFinalized = { present: boolean; exitCode: number | null };
 export type RunAnswer = { exists: boolean; bytes: number | null };
-export type RunEventLog = { exists: boolean; bytes: number };
+export type RunEventLog = { exists: boolean; bytes: number; rotated?: boolean };
 
 export type RunFiles = {
   dir: string;
@@ -166,7 +166,9 @@ function countersOf(
     asNumber(files.state.values.tool_calls) !== null ||
     asNumber(files.state.values.cost_usd) !== null;
   const eventsHaveCounters = counters !== null && counters.lines > 0;
-  if (stateHasCounters && (files.finalized.present || !eventsHaveCounters)) {
+  const agent = asString(files.state.values.agent);
+  if (stateHasCounters && (files.finalized.present || !eventsHaveCounters || files.events.rotated ||
+      (agent !== null && agent !== "omp" && agent !== "pi"))) {
     const values = files.state.values;
     return {
       from: "state",
@@ -177,7 +179,7 @@ function countersOf(
     };
   }
   if (eventsHaveCounters) {
-    return { from: "events", partial: truncated || counters.badLines > 0 };
+    return { from: "events", partial: truncated || files.events.rotated === true || counters.badLines > 0 };
   }
   return { from: "none", partial: false };
 }

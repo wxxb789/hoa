@@ -1,15 +1,19 @@
+import { randomUUID } from "node:crypto";
 import type { Stats } from "node:fs";
 import { open, readdir, stat, type FileHandle } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import type {
   EventStats,
   FollowRunOutput,
+  ListRunsDelta,
   ListRunsOutput,
+  ListRunsUpdate,
   RunEvent,
   RunPathsOutput,
   RunSummary,
 } from "../shared/runs";
-import { MAX_TAIL_LINES } from "../shared/runs";
+import { MAX_TAIL_LINES, runLineageSchema } from "../shared/runs";
 import {
   applyEventLine,
   asRecord,
@@ -43,6 +47,7 @@ export type StoreDeps = {
 
 export type RunStore = {
   listRuns(): Promise<ListRunsOutput>;
+  listUpdate(knownRevision?: string): Promise<ListRunsUpdate>;
   paths(id: string): Promise<RunPathsOutput>;
   follow(id: string, tailLines?: number): Promise<FollowRunOutput>;
   dispose(): void;
@@ -56,6 +61,7 @@ export type RunStore = {
 const RUN_FILES = {
   state: "state.json",
   events: "events.ndjson",
+  previousEvents: "events.1.ndjson",
   stats: "events.stats.json",
   answer: "answer.md",
   lock: "lock",
@@ -65,6 +71,11 @@ const RUN_FILES = {
   stderr: "stderr.log",
 } as const;
 const SESSION_FILE = "session.id";
+/**
+ * The GDD dispatcher's lineage sidecar: written once beside the launcher's files, listed with
+ * neither the scan nor the path listing, and read only for the selected run's `runs.follow`.
+ */
+const LINEAGE_FILE = "lineage.json";
 
 const DATE_DIR = /^\d{4}-\d{2}-\d{2}$/;
 const TAIL_BYTES = 256 * 1024;
@@ -72,9 +83,19 @@ const ANSWER_TAIL_BYTES = 64 * 1024;
 const COUNTER_CHUNK = 256 * 1024;
 const JSON_READ_BYTES = 1024 * 1024;
 const SESSION_READ_BYTES = 4096;
+/**
+ * The sidecar is one small document; a file past this bound is refused rather than parsed, so a
+ * window that cut off its head cannot pass as lineage.
+ */
+const LINEAGE_READ_BYTES = 4096;
 /** A body past this size is re-read each pass rather than held; the run files that matter are small. */
 const BODY_CACHE_BYTES = 16 * 1024;
-const BODY_CACHE_ENTRIES = 2048;
+const BODY_CACHE_BUDGET = 16 * 1024 * 1024;
+const SCAN_CONCURRENCY = 12;
+const FINALIZED_RECHECK_MS = 30_000;
+const ROOT_GRACE_MS = 30_000;
+const EVENT_CACHE_BUDGET = 16 * 1024 * 1024;
+const ANSWER_CACHE_BUDGET = 2 * 1024 * 1024;
 /** Bound on the tail parser's scratch bookkeeping, which must not grow with a batch of tool starts. */
 const SCRATCH_OPEN_TOOLS = 1024;
 const NO_BYTES = Buffer.alloc(0);
@@ -102,8 +123,8 @@ type BodyEntry = {
   dir: string;
   revision: string;
   want: number;
-  bytes: Buffer;
-  text: string | null;
+  text: string;
+  weight: number;
 };
 
 /** One parsed event and the byte its line began at, which is how a window boundary is applied. */
@@ -115,6 +136,7 @@ type TailLine = { event: RunEvent; start: number };
  * is parsed when its last byte arrives rather than the whole window being read again.
  */
 type EventTailState = {
+  weight: number;
   identity: string;
   revision: string;
   size: number;
@@ -129,6 +151,7 @@ type EventTailState = {
 
 /** The answer file's bounded tail, held the same way: raw bytes that appends extend. */
 type AnswerTailState = {
+  weight: number;
   identity: string;
   revision: string;
   size: number;
@@ -136,15 +159,23 @@ type AnswerTailState = {
   lines: string[] | null;
 };
 
-type Counted = { counters: CounterSnapshot | null; unreadable: boolean };
+type Counted = { counters: CounterSnapshot | null; unreadable: boolean; events: RunEventLog };
+type FinalizedEntry = { run: RunSummary; directoryRevision: string; checkedAt: number };
+type ListChanges = Pick<ListRunsDelta, "changes" | "removed" | "order">;
+type ListSnapshot = {
+  scan: ListRunsOutput;
+  revision: string;
+  previous?: { revision: string; changes: ListChanges };
+};
 
-/** One run's outcome inside the scan: its summary, or the failure that kept it out. */
-type ScannedRun = { run: RunSummary | null; failure: string | null };
-
+/**
+ * A file body: `text` holds the file's last `min(size, want)` bytes decoded, and `size` is the size
+ * the file had when it was read — how a caller tells an oversized file from a truncated window.
+ */
 type FileText =
   | { kind: "missing" }
   | { kind: "unreadable" }
-  | { kind: "text"; text: string };
+  | { kind: "text"; text: string; size: number };
 
 export function createRunStore(deps: StoreDeps): RunStore {
   const env = deps.env ?? process.env;
@@ -152,11 +183,19 @@ export function createRunStore(deps: StoreDeps): RunStore {
   const tailers = new Map<string, Tailer>();
   const passes = new Map<string, Promise<Counted>>();
   const bodies = new Map<string, BodyEntry>();
+  let bodyWeight = 0;
   const eventTails = new Map<string, EventTailState>();
   const eventTailPasses = new Map<string, Promise<EventTailState | null>>();
   const answerTails = new Map<string, AnswerTailState>();
   const answerTailPasses = new Map<string, Promise<AnswerTailState | null>>();
+  const finalized = new Map<string, FinalizedEntry>();
   let rootKey: string | null = null;
+  let generation = 0;
+  let unavailableSince: number | null = null;
+  const storeId = randomUUID();
+  let revision = 0;
+  let latestList: ListSnapshot | undefined;
+  let listPass: Promise<ListSnapshot> | undefined;
 
   /**
    * Every cache is keyed under the resolved root, so a root change or a dispose retires all of them
@@ -167,10 +206,20 @@ export function createRunStore(deps: StoreDeps): RunStore {
     tailers.clear();
     passes.clear();
     bodies.clear();
+    bodyWeight = 0;
     eventTails.clear();
     eventTailPasses.clear();
     answerTails.clear();
     answerTailPasses.clear();
+    finalized.clear();
+  }
+
+  function reset(): void {
+    clearCaches();
+    generation += 1;
+    unavailableSince = null;
+    listPass = undefined;
+    latestList = undefined;
   }
 
   function resolution(): RunRootResolution {
@@ -178,10 +227,8 @@ export function createRunStore(deps: StoreDeps): RunStore {
     const next = resolveRunRoot(runRoot, env);
     const nextKey = `${next.root}|${next.source}`;
     if (nextKey !== rootKey) {
-      if (rootKey !== null) {
-        deps.log?.(`run root changed to ${next.root} (${next.source}); clearing caches`);
-        clearCaches();
-      }
+      if (rootKey !== null) deps.log?.(`run root changed to ${next.root} (${next.source}); clearing caches`);
+      reset();
       rootKey = nextKey;
     }
     return next;
@@ -223,8 +270,10 @@ export function createRunStore(deps: StoreDeps): RunStore {
       return {
         counters: current.counters.lines > 0 ? snapshotCounters(current.counters) : null,
         unreadable: false,
+        events: { exists: false, bytes: 0 },
       };
     }
+    const events = { exists: true, bytes: info.size };
     const revision = revisionOf(info);
     if (current.revision === revision && current.offset === info.size) {
       // This revision is already folded to its last byte, so there is nothing to read and no
@@ -233,6 +282,7 @@ export function createRunStore(deps: StoreDeps): RunStore {
       return {
         counters: current.counters.lines > 0 ? snapshotCounters(current.counters) : null,
         unreadable: false,
+        events,
       };
     }
     const identity = identityOf(info);
@@ -263,6 +313,7 @@ export function createRunStore(deps: StoreDeps): RunStore {
     return {
       counters: current.counters.lines > 0 ? snapshotCounters(current.counters) : null,
       unreadable: current.unreadable,
+      events,
     };
   }
 
@@ -331,39 +382,43 @@ export function createRunStore(deps: StoreDeps): RunStore {
    * run. A file past the cache ceiling is read each pass rather than held.
    */
   async function readBody(path: string, want: number): Promise<FileText> {
+    const started = generation;
     const cached = bodies.get(path);
     let info: Stats;
     try {
       info = await stat(path);
     } catch {
-      bodies.delete(path);
+      if (started === generation) dropBody(path);
       return { kind: "missing" };
     }
     const revision = revisionOf(info);
     if (cached && cached.revision === revision && cached.want === want) {
-      return { kind: "text", text: textOf(cached) };
+      if (bodies.get(path) === cached) touch(bodies, path, cached);
+      return { kind: "text", text: cached.text, size: info.size };
     }
     const start = Math.max(0, info.size - want);
     const bytes = info.size === 0 ? NO_BYTES : await readRange(path, start, info.size);
     if (bytes === null) {
-      bodies.delete(path);
+      if (started === generation) dropBody(path);
       return { kind: "unreadable" };
     }
-    const entry: BodyEntry = { dir: dirname(path), revision, want, bytes, text: null };
-    if (bytes.length <= BODY_CACHE_BYTES) {
-      bodies.delete(path);
-      bodies.set(path, entry);
-      while (bodies.size > BODY_CACHE_ENTRIES) {
-        const oldest = bodies.keys().next();
-        if (oldest.done) break;
-        bodies.delete(oldest.value);
+    const text = bytes.toString("utf8");
+    if (started === generation) {
+      dropBody(path);
+      if (bytes.length <= BODY_CACHE_BYTES) {
+        // Charge both UTF-16 text and keys, with a floor for map/entry overhead.
+        const weight = 256 + 2 * (text.length + path.length + revision.length);
+        bodies.set(path, { dir: dirname(path), revision, want, text, weight });
+        bodyWeight += weight;
+        while (bodyWeight > BODY_CACHE_BUDGET) dropBody(bodies.keys().next().value!);
       }
-    } else {
-      // Too large to hold: drop whatever an older revision left behind, which no longer describes a
-      // file that exists.
-      bodies.delete(path);
     }
-    return { kind: "text", text: textOf(entry) };
+    return { kind: "text", text, size: info.size };
+  }
+
+  function dropBody(path: string): void {
+    const body = bodies.get(path);
+    if (body && bodies.delete(path)) bodyWeight -= body.weight;
   }
 
   /**
@@ -409,6 +464,26 @@ export function createRunStore(deps: StoreDeps): RunStore {
     }
   }
 
+  /**
+   * Validate one run's optional lineage sidecar for a follow window. Every way the sidecar can
+   * disappoint — absent, unreadable, larger than the cap, malformed JSON or a value the schema
+   * rejects — answers the same way: no lineage. The file annotates the run, so it may never change
+   * the run's own state, processes or tails; and a file past the cap is refused rather than parsed,
+   * so a document whose head was cut off cannot pass as the run's lineage.
+   */
+  async function readLineage(dir: string): Promise<FollowRunOutput["lineage"]> {
+    const read = await readBody(join(dir, LINEAGE_FILE), LINEAGE_READ_BYTES);
+    if (read.kind !== "text" || read.size > LINEAGE_READ_BYTES) return undefined;
+    let value: unknown;
+    try {
+      value = JSON.parse(read.text);
+    } catch {
+      return undefined;
+    }
+    const parsed = runLineageSchema.safeParse(value);
+    return parsed.success ? parsed.data : undefined;
+  }
+
   async function fileBytes(path: string): Promise<{ exists: boolean; bytes: number | null }> {
     try {
       return { exists: true, bytes: (await stat(path)).size };
@@ -417,18 +492,16 @@ export function createRunStore(deps: StoreDeps): RunStore {
     }
   }
 
-  async function readFiles(dir: string, date: string, slug: string): Promise<RunFiles> {
-    // The eight reads are independent, so they run as one wave instead of one await after another.
-    const [state, lockJson, finalizedText, statsJson, answerFile, eventsFile, sessionIdRead, dirStat] =
+  async function readFiles(dir: string, date: string, slug: string, dirStat: Stats): Promise<RunFiles> {
+    const [state, lockJson, finalizedText, statsJson, answerFile, sessionIdRead, previousEvents] =
       await Promise.all([
         readJson(join(dir, RUN_FILES.state)),
         readJson(join(dir, RUN_FILES.lock)),
         readJson(join(dir, RUN_FILES.finalized)),
         readJson(join(dir, RUN_FILES.stats)),
         fileBytes(join(dir, RUN_FILES.answer)),
-        fileBytes(join(dir, RUN_FILES.events)),
         readBody(join(dir, SESSION_FILE), SESSION_READ_BYTES),
-        stat(dir).catch(() => null),
+        fileBytes(join(dir, RUN_FILES.previousEvents)),
       ]);
     const values = asRecord(state.value) ?? {};
     const stateFile: RunStateFile = { present: state.present, readable: state.readable, values };
@@ -453,7 +526,6 @@ export function createRunStore(deps: StoreDeps): RunStore {
       : null;
 
     const answer: RunAnswer = { exists: answerFile.exists, bytes: answerFile.bytes };
-    const events: RunEventLog = { exists: eventsFile.exists, bytes: eventsFile.bytes ?? 0 };
     const sessionId = sessionIdRead.kind === "text" ? sessionIdRead.text.trim() : "";
 
     return {
@@ -465,14 +537,13 @@ export function createRunStore(deps: StoreDeps): RunStore {
       finalized,
       stats,
       answer,
-      events,
+      events: { exists: false, bytes: 0, rotated: previousEvents.exists },
       sessionIdFromFile: sessionId ? sessionId.split(/\r?\n/)[0] : null,
-      dirModifiedAt: dirStat ? dirStat.mtime.toISOString() : null,
+      dirModifiedAt: dirStat.mtime.toISOString(),
     };
   }
 
-  async function summarize(files: RunFiles): Promise<RunSummary> {
-    const derived = await countersFor(files.dir);
+  function summarize(files: RunFiles, derived: Counted): RunSummary {
     const pids = pidsOf(files.state.values, files.lock);
     const needsLiveness = !files.finalized.present && pids.length > 0;
     const verdicts: Map<number, PidVerdict> = needsLiveness
@@ -487,18 +558,18 @@ export function createRunStore(deps: StoreDeps): RunStore {
       });
     }
     return mapRun(
-      { files, counters: derived.counters, logReadable: !derived.unreadable, verdicts },
+      { files: { ...files, events: { ...files.events, ...derived.events } }, counters: derived.counters, logReadable: !derived.unreadable, verdicts },
       now(),
     );
   }
 
-  async function findRun(id: string): Promise<{ dir: string; date: string; slug: string } | null> {
+  async function findRun(id: string): Promise<{ dir: string; date: string; slug: string; info: Stats } | null> {
     const parts = id.split("/");
     if (parts.length !== 2 || !DATE_DIR.test(parts[0])) return null;
     const dir = join(resolution().root, parts[0], parts[1]);
     const dirStat = await stat(dir).catch(() => null);
     if (!dirStat?.isDirectory()) return null;
-    return { dir, date: parts[0], slug: parts[1] };
+    return { dir, date: parts[0], slug: parts[1], info: dirStat };
   }
 
   /**
@@ -520,10 +591,13 @@ export function createRunStore(deps: StoreDeps): RunStore {
     }
     const revision = revisionOf(info);
     const previous = eventTails.get(dir);
-    if (previous && previous.revision === revision) return previous;
+    if (previous && previous.revision === revision) {
+      touch(eventTails, dir, previous);
+      return previous;
+    }
     const identity = identityOf(info);
     const windowStart = Math.max(0, info.size - TAIL_BYTES);
-    if (previous && previous.identity === identity && previous.size < info.size) {
+    if (previous && previous.identity === identity && previous.size < info.size && previous.size > windowStart) {
       const unfinishedInsideWindow =
         previous.pending.length === 0 || windowStart === 0 || previous.pendingStart > windowStart;
       if (unfinishedInsideWindow) {
@@ -613,7 +687,9 @@ export function createRunStore(deps: StoreDeps): RunStore {
       start = size;
       lost = true;
     }
+    // Charge for the decoded window and parsed rows, not just the unfinished byte buffer.
     const state: EventTailState = {
+      weight: 256 + 2 * Math.min(size, TAIL_BYTES) + 128 * lines.length,
       identity,
       revision,
       size,
@@ -624,7 +700,7 @@ export function createRunStore(deps: StoreDeps): RunStore {
       pendingEvent: undefined,
       pendingLost: lost,
     };
-    eventTails.set(dir, state);
+    touch(eventTails, dir, state);
     return state;
   }
 
@@ -646,9 +722,12 @@ export function createRunStore(deps: StoreDeps): RunStore {
     }
     const revision = revisionOf(info);
     const previous = answerTails.get(dir);
-    if (previous && previous.revision === revision) return previous;
+    if (previous && previous.revision === revision) {
+      touch(answerTails, dir, previous);
+      return previous;
+    }
     const identity = identityOf(info);
-    if (previous && previous.identity === identity && previous.size < info.size) {
+    if (previous && previous.identity === identity && previous.size < info.size && info.size - previous.size < ANSWER_TAIL_BYTES) {
       const added = await readRange(path, previous.size, info.size);
       if (added === null) return null;
       let bytes = Buffer.concat([previous.bytes, added]);
@@ -675,13 +754,15 @@ export function createRunStore(deps: StoreDeps): RunStore {
     bytes: Buffer,
   ): AnswerTailState {
     const state: AnswerTailState = {
+      // Include a conservative allowance for the line split and decoded UTF-16 text.
+      weight: 256 + 4 * bytes.length,
       identity,
       revision,
       size,
       bytes: Buffer.from(bytes),
       lines: null,
     };
-    answerTails.set(dir, state);
+    touch(answerTails, dir, state);
     return state;
   }
 
@@ -689,19 +770,21 @@ export function createRunStore(deps: StoreDeps): RunStore {
    * Drop cache entries for run directories a scan did not find, so a deleted run takes its caches
    * with it. An entry with a pass in flight is left alone; the next scan retires it.
    */
-  function pruneCaches(live: Set<string>): void {
+  function pruneCaches(live: Set<string>, unavailableDates: Set<string>): void {
+    const deleted = (dir: string) => !live.has(dir) && !unavailableDates.has(dirname(dir));
     for (const [path, body] of bodies) {
-      if (!live.has(body.dir)) bodies.delete(path);
+      if (deleted(body.dir)) dropBody(path);
     }
     for (const [dir] of eventTails) {
-      if (!live.has(dir) && !eventTailPasses.has(dir)) eventTails.delete(dir);
+      if (deleted(dir) && !eventTailPasses.has(dir)) eventTails.delete(dir);
     }
     for (const [dir] of answerTails) {
-      if (!live.has(dir) && !answerTailPasses.has(dir)) answerTails.delete(dir);
+      if (deleted(dir) && !answerTailPasses.has(dir)) answerTails.delete(dir);
     }
     for (const [dir] of tailers) {
-      if (!live.has(dir) && !passes.has(dir)) tailers.delete(dir);
+      if (deleted(dir) && !passes.has(dir)) tailers.delete(dir);
     }
+    for (const dir of finalized.keys()) if (deleted(dir)) finalized.delete(dir);
   }
 
   /**
@@ -745,12 +828,23 @@ export function createRunStore(deps: StoreDeps): RunStore {
   }
 
   async function buildFollow(id: string, tailLines: number): Promise<FollowRunOutput> {
+    const started = generation;
     const found = await findRun(id);
     if (!found) {
       return { found: false, summary: null, events: [], answerTail: null };
     }
-    const files = await readFiles(found.dir, found.date, found.slug);
-    const summary = await summarize(files);
+    const [files, counted] = await Promise.all([
+      readFiles(found.dir, found.date, found.slug, found.info),
+      countersFor(found.dir),
+    ]);
+    const summary = summarize(files, counted);
+    // A detail read observes in-place edits immediately. Make them visible to the next list
+    // scan too instead of keeping a snapshot we now know is out of date.
+    const cachedSummary = finalized.get(found.dir);
+    if (started === generation && cachedSummary && !isDeepStrictEqual(summary, cachedSummary.run)) {
+      finalized.delete(found.dir);
+    }
+    const lineage = await readLineage(found.dir);
     // Both tails come from a revision-checked cache: a warmed poll of an unchanged run reads no log
     // bytes, and an append costs only the bytes it added. Each is materialized once per run at a
     // time, so overlapping polls share the pass and neither can extend a state the other replaces.
@@ -760,89 +854,151 @@ export function createRunStore(deps: StoreDeps): RunStore {
     const answerTail = await singleFlight(answerTailPasses, found.dir, () =>
       materializeAnswerTail(found.dir),
     );
+    trimTailCache(eventTails, eventTailPasses, EVENT_CACHE_BUDGET);
+    trimTailCache(answerTails, answerTailPasses, ANSWER_CACHE_BUDGET);
     return {
       found: true,
       summary,
+      lineage,
       events: tailEventsOf(eventTail, tailLines),
       answerTail: answerTail === null ? null : answerTextOf(answerTail, tailLines),
     };
   }
 
-  return {
-    async listRuns(): Promise<ListRunsOutput> {
-      const resolved = resolution();
-      const scannedAt = new Date(now()).toISOString();
-      const warnings: string[] = [];
-      const runs: RunSummary[] = [];
-      // The directories this scan found, which is everything a cache entry may still describe.
-      const live = new Set<string>();
-      if (!resolved.exists) {
-        pruneCaches(live);
-        return {
-          runRoot: resolved.root,
-          rootSource: resolved.source,
-          rootExists: false,
-          candidates: resolved.candidates,
-          probe: deps.probe.kind,
-          scannedAt,
-          runs,
-          stats: summarizeRuns(runs),
-          warnings,
-        };
+  async function scanArchive(resolved: RunRootResolution, started: number): Promise<ListRunsOutput> {
+    const scanTime = now();
+    const warnings: string[] = [];
+    const runs: RunSummary[] = [];
+    let rootExists = resolved.exists;
+    let dates: string[] = [];
+    if (rootExists) {
+      try {
+        dates = (await readdir(resolved.root, { withFileTypes: true }))
+          .filter((entry) => entry.isDirectory() && DATE_DIR.test(entry.name))
+          .map((entry) => entry.name)
+          .sort()
+          .reverse();
+      } catch (error) {
+        warnings.push(`${resolved.root}: ${messageOf(error)}`);
+        rootExists = false;
       }
-      const dates = (await readdir(resolved.root, { withFileTypes: true }))
-        .filter((entry) => entry.isDirectory() && DATE_DIR.test(entry.name))
-        .map((entry) => entry.name)
-        .sort()
-        .reverse();
-      // Every run's reads are independent, so the scan is one wave of work whose wall time is the
-      // slowest run rather than the sum of all of them. `Promise.all` keeps the results in input
-      // order, and `runs.sort` below stays the only ordering authority.
-      const scanned = await Promise.all(
-        dates.map(async (date) => {
-          const dateDir = join(resolved.root, date);
-          let slugs: string[];
-          try {
-            slugs = (await readdir(dateDir, { withFileTypes: true }))
-              .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."))
-              .map((entry) => entry.name);
-          } catch (error) {
-            return { summaries: [], failure: `${dateDir}: ${messageOf(error)}` };
+    }
+    if (started === generation && !rootExists) {
+      // An unavailable mount and a removed root can both look like ENOENT. A short grace
+      // preserves warm state and labels the last known rows until the grace expires.
+      unavailableSince ??= scanTime;
+      if (scanTime - unavailableSince >= ROOT_GRACE_MS) {
+        clearCaches();
+      } else if (latestList?.scan.runs.length) {
+        for (const run of latestList.scan.runs) runs.push(run);
+        if (warnings.length === 0) warnings.push(`${resolved.root}: temporarily unavailable; showing last scan`);
+      }
+    }
+    if (started === generation && rootExists) {
+      unavailableSince = null;
+      const live = new Set<string>();
+      const unavailableDates = new Set<string>();
+      const groups = await mapBounded(dates, async (date) => {
+        const dateDir = join(resolved.root, date);
+        try {
+          const slugs = (await readdir(dateDir, { withFileTypes: true }))
+            .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."));
+          return slugs.map(({ name: slug }) => ({ dir: join(dateDir, slug), date, slug }));
+        } catch (error) {
+          unavailableDates.add(dateDir);
+          warnings.push(`${dateDir}: ${messageOf(error)}`);
+          return [];
+        }
+      });
+      const summaries = await mapBounded(groups.flat(), async ({ dir, date, slug }) => {
+        if (started !== generation) return null;
+        live.add(dir);
+        try {
+          const info = await stat(dir);
+          if (!info.isDirectory() || started !== generation) return null;
+          const directoryRevision = revisionOf(info);
+          const cached = finalized.get(dir);
+          if (cached?.directoryRevision === directoryRevision && scanTime - cached.checkedAt < FINALIZED_RECHECK_MS) {
+            return cached.run;
           }
-          const summaries = await Promise.all(
-            slugs.map(async (slug): Promise<ScannedRun> => {
-              const dir = join(dateDir, slug);
-              live.add(dir);
-              try {
-                return { run: await summarize(await readFiles(dir, date, slug)), failure: null };
-              } catch (error) {
-                return { run: null, failure: `${dir}: ${messageOf(error)}` };
-              }
-            }),
-          );
-          return { summaries, failure: null };
-        }),
-      );
-      for (const scan of scanned) {
-        if (scan.failure !== null) warnings.push(scan.failure);
-        for (const entry of scan.summaries) {
-          if (entry.failure !== null) warnings.push(entry.failure);
-          else if (entry.run !== null) runs.push(entry.run);
+          const [files, counted] = await Promise.all([readFiles(dir, date, slug, info), countersFor(dir)]);
+          const run = summarize(files, counted);
+          if (started === generation) {
+            if (run.finalized && files.state.readable && !counted.unreadable) {
+              finalized.set(dir, { run, directoryRevision, checkedAt: scanTime });
+            } else {
+              finalized.delete(dir);
+            }
+          }
+          return run;
+        } catch (error) {
+          warnings.push(`${dir}: ${messageOf(error)}`);
+          return null;
+        }
+      });
+      for (const run of summaries) if (run !== null) runs.push(run);
+      // An unreadable date is not a deletion. Its last observed rows remain until a successful
+      // enumeration can establish membership (or the date disappears from the parent listing).
+      if (unavailableDates.size > 0) {
+        for (const run of latestList?.scan.runs ?? []) {
+          if (unavailableDates.has(dirname(run.runDir))) runs.push(run);
         }
       }
       runs.sort((left, right) => sortKey(right).localeCompare(sortKey(left)));
-      pruneCaches(live);
-      return {
-        runRoot: resolved.root,
-        rootSource: resolved.source,
-        rootExists: true,
-        candidates: resolved.candidates,
-        probe: deps.probe.kind,
-        scannedAt,
-        runs,
-        stats: summarizeRuns(runs),
-        warnings,
-      };
+      if (started === generation) pruneCaches(live, unavailableDates);
+    }
+    warnings.sort();
+    return {
+      runRoot: resolved.root,
+      rootSource: resolved.source,
+      rootExists,
+      candidates: resolved.candidates,
+      probe: deps.probe.kind,
+      scannedAt: new Date(scanTime).toISOString(),
+      runs,
+      stats: summarizeRuns(runs),
+      warnings,
+    };
+  }
+
+  async function refreshList(): Promise<ListSnapshot> {
+    const resolved = resolution();
+    if (listPass) return listPass;
+    const started = generation;
+    const pass = scanArchive(resolved, started).then((scan) => {
+      if (started !== generation) return refreshList();
+      const base = latestList;
+      const changes = base ? compareLists(base.scan.runs, scan.runs) : undefined;
+      if (base && changes && !changes.order && changes.changes.length === 0) {
+        latestList = { ...base, scan: { ...scan, runs: base.scan.runs } };
+      } else {
+        latestList = {
+          scan,
+          revision: `${storeId}:${++revision}`,
+          previous: base && changes ? { revision: base.revision, changes } : undefined,
+        };
+      }
+      return latestList;
+    }).finally(() => {
+      if (listPass === pass) listPass = undefined;
+    });
+    listPass = pass;
+    return pass;
+  }
+
+  return {
+    async listRuns() {
+      return (await refreshList()).scan;
+    },
+
+    async listUpdate(knownRevision) {
+      const { scan, revision, previous } = await refreshList();
+      const delta = knownRevision === revision
+        ? { changes: [], removed: [] }
+        : previous && previous.revision === knownRevision ? previous.changes : undefined;
+      if (!delta) return { ...scan, revision };
+      const { runs: _runs, ...facts } = scan;
+      return { ...facts, revision, ...delta };
     },
 
     async paths(id: string): Promise<RunPathsOutput> {
@@ -864,9 +1020,41 @@ export function createRunStore(deps: StoreDeps): RunStore {
     },
 
     dispose(): void {
-      clearCaches();
+      reset();
       rootKey = null;
     },
+  };
+}
+
+async function mapBounded<T, U>(values: readonly T[], map: (value: T) => Promise<U>): Promise<U[]> {
+  const results: U[] = new Array(values.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(SCAN_CONCURRENCY, values.length) }, async () => {
+    while (next < values.length) {
+      const index = next++;
+      results[index] = await map(values[index]);
+    }
+  }));
+  return results;
+}
+
+function compareLists(before: RunSummary[], after: RunSummary[]): ListChanges {
+  const byId = new Map(before.map((run) => [run.id, run]));
+  const changes: RunSummary[] = [];
+  let orderChanged = before.length !== after.length;
+  for (let i = 0; i < after.length; i++) {
+    const run = after[i];
+    const old = byId.get(run.id);
+    orderChanged ||= before[i]?.id !== run.id;
+    byId.delete(run.id);
+    if (old === run) continue;
+    if (old && isDeepStrictEqual(old, run)) after[i] = old;
+    else changes.push(run);
+  }
+  return {
+    changes,
+    removed: [...byId.keys()],
+    ...(orderChanged ? { order: after.map(({ id }) => id) } : {}),
   };
 }
 
@@ -929,9 +1117,22 @@ function revisionOf(info: Stats): string {
   return `${identityOf(info)}:${info.size}:${info.mtimeMs}:${info.ctimeMs}`;
 }
 
-function textOf(entry: BodyEntry): string {
-  if (entry.text === null) entry.text = entry.bytes.toString("utf8");
-  return entry.text;
+function touch<K, V>(cache: Map<K, V>, key: K, value: V): void {
+  cache.delete(key);
+  cache.set(key, value);
+}
+
+function trimTailCache<T extends { weight: number }>(
+  cache: Map<string, T>, inflight: ReadonlyMap<string, unknown>, budget: number,
+): void {
+  let weight = 0;
+  for (const value of cache.values()) weight += value.weight;
+  for (const key of cache.keys()) {
+    if (weight <= budget) break;
+    if (inflight.has(key)) continue;
+    weight -= cache.get(key)!.weight;
+    cache.delete(key);
+  }
 }
 
 /** Run one pass per key at a time: an overlapping caller awaits the pass already in flight. */

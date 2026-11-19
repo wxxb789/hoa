@@ -10,6 +10,7 @@ import time
 import unittest
 import uuid
 from datetime import datetime, timedelta, timezone
+from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCRIPTS = os.path.dirname(HERE)
@@ -56,7 +57,7 @@ class GddCase(unittest.TestCase):
         self.addCleanup(cleanup_child, self.children)
         self.state_home = os.path.join(self.tmp, "state")
         self.record = os.path.join(self.tmp, "record.json")
-        drop = ("GDD_", "STUB_", "DSH_", "OMP_", "XDG_")
+        drop = ("GDD_", "STUB_", "DSH_", "OMP_", "PASEO_", "XDG_")
         self.env = {k: v for k, v in os.environ.items() if not k.startswith(drop)}
         self.env.update(XDG_STATE_HOME=self.state_home, XDG_CONFIG_HOME=os.path.join(self.tmp, "config"),
                         GDD_RUN_DETACH="windows" if os.name == "nt" else "setsid",
@@ -271,6 +272,81 @@ class LaunchTests(GddCase):
         refused = self.stage("implement")
         self.assertEqual(refused.returncode, 3, refused.stdout)
         self.assertIn("still active", refused.stderr)
+
+
+class LineageTests(GddCase):
+    def lineage(self, run_dir):
+        return json.loads(read(os.path.join(run_dir, "lineage.json")))
+
+    def test_lineage_sidecar_records_goal_and_stage(self):
+        done = self.stage("implement", "--wait")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        [run_dir] = self.run_dirs()
+        self.assertEqual(self.lineage(run_dir), {"goal": "0001", "stage": "implement"})
+
+    def test_lineage_sidecar_records_inherited_parent_agent(self):
+        done = self.stage("implement", "--wait", env={"PASEO_AGENT_ID": "selftest-parent.01"})
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        [run_dir] = self.run_dirs()
+        self.assertEqual(self.lineage(run_dir), {"goal": "0001", "stage": "implement",
+                                                 "parentAgentId": "selftest-parent.01"})
+
+    def test_lineage_sidecar_outside_run_root_warns_and_still_records(self):
+        outside = os.path.join(self.tmp, "outside", "workrepo-0001-implement")
+        launcher = os.path.join(self.tmp, "outside-run.py")
+        write(launcher, "\n".join([
+            "import os",
+            "import sys",
+            "",
+            f"run_dir = {outside!r}",
+            "os.makedirs(run_dir, exist_ok=True)",
+            'name = sys.argv[sys.argv.index("--name") + 1]',
+            'print("started:", name)',
+            'print("run dir:", run_dir)',
+        ]) + "\n")
+        dispatched = self.stage("implement", env={"GDD_LAUNCHER": launcher})
+        self.assertEqual(dispatched.returncode, 0, dispatched.stdout + dispatched.stderr)
+        self.assertIn("lineage sidecar not written", dispatched.stderr)
+        self.assertEqual([(r["stage"], r["next_action"]) for r in self.ledger()],
+                         [("implement", "implement")])
+        self.assertEqual(self.run_dirs(), [])
+        self.assertFalse(os.path.exists(os.path.join(outside, "lineage.json")))
+
+    def test_lineage_payload_bounds_match_the_observer(self):
+        import gdd
+
+        with mock.patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(gdd.lineage_payload(" 0001 ", " simplify "), {"goal": "0001", "stage": "simplify"})
+            for goal in ("", "x" * 257):
+                with self.assertRaises(ValueError):
+                    gdd.lineage_payload(goal, "simplify")
+            # 128 astral codepoints are 256 UTF-16 units: exactly the observer's bound.
+            self.assertEqual(gdd.lineage_payload("\U0001F600" * 128, "simplify")["goal"], "\U0001F600" * 128)
+            # 256 codepoints but 257 UTF-16 units: the observer's TypeScript .length rejects it.
+            with self.assertRaises(ValueError):
+                gdd.lineage_payload("x" * 255 + "\U0001F600", "simplify")
+
+    def test_lineage_dir_must_be_the_canonical_run_dir(self):
+        import gdd
+
+        root = os.path.join(self.tmp, "runs")
+        name = "workrepo-0001-implement"
+        good = os.path.join(root, "2024-02-29", name)
+        os.makedirs(good)
+        self.assertTrue(os.path.samefile(gdd.resolve_lineage_dir(root, name, good), good))
+        outside = os.path.join(self.tmp, "outside", name)
+        for label, run_dir in (
+            ("missing date level", os.path.join(root, name)),
+            ("different run name", os.path.join(root, "2024-02-29", "other-run")),
+            ("non-date level", os.path.join(root, "2024-2-9", name)),
+            ("outside the root", outside),
+            ("deeper than <date>/<name>", os.path.join(good, "nested")),
+            ("missing directory", os.path.join(root, "2024-02-30", name)),
+        ):
+            with self.subTest(label=label):
+                with self.assertRaises(ValueError):
+                    gdd.resolve_lineage_dir(root, name, run_dir)
+        self.assertFalse(os.path.exists(outside))
 
 
 if __name__ == "__main__":

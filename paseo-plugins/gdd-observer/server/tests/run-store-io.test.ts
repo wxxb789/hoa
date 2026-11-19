@@ -34,6 +34,9 @@ const io = vi.hoisted(() => ({
   opens: new Map<string, number>(),
   reads: [] as Read[],
   failOpen: new Set<string>(),
+  failReaddir: new Set<string>(),
+  directories: [] as string[],
+  stats: [] as string[],
   holds: [] as HeldRead[],
 }));
 
@@ -88,7 +91,26 @@ vi.mock("node:fs/promises", async (importOriginal) => {
       },
     });
   };
-  return { ...actual, open: countedOpen };
+  const realReaddir = actual.readdir as (...args: unknown[]) => Promise<unknown>;
+  const realStat = actual.stat as (...args: unknown[]) => Promise<unknown>;
+  return {
+    ...actual,
+    open: countedOpen,
+    async readdir(...args: unknown[]) {
+      const path = String(args[0]);
+      io.directories.push(path);
+      if (io.failReaddir.has(path)) {
+        const error: NodeJS.ErrnoException = new Error(`EIO: injected directory failure for ${path}`);
+        error.code = "EIO";
+        throw error;
+      }
+      return realReaddir(...args);
+    },
+    async stat(...args: unknown[]) {
+      io.stats.push(String(args[0]));
+      return realStat(...args);
+    },
+  };
 });
 
 /**
@@ -149,6 +171,9 @@ beforeEach(async () => {
   io.opens.clear();
   io.reads.length = 0;
   io.failOpen.clear();
+  io.failReaddir.clear();
+  io.directories.length = 0;
+  io.stats.length = 0;
 });
 
 afterEach(async () => {
@@ -196,14 +221,14 @@ function fakeProbe(alive: number[] = []): LivenessProbe {
   };
 }
 
-function makeStore(alive: number[] = [], config: Partial<StoreConfig> = {}) {
+function makeStore(alive: number[] = [], config: Partial<StoreConfig> = {}, now = () => NOW) {
   const settings: StoreConfig = { runRoot: root, tailLines: 5, ...config };
   const logs: string[] = [];
   const store = createRunStore({
     probe: fakeProbe(alive),
     config: () => settings,
     env: {},
-    now: () => NOW,
+    now,
     log: (message) => logs.push(message),
   });
   return { store, settings, logs };
@@ -243,6 +268,122 @@ function typesOf(events: { type: string }[]): string[] {
 }
 
 describe("run store file revisions", () => {
+  it("walks the archive once for overlapping list requests", async () => {
+    await writeRun("live", { "state.json": STATE_RUNNING, "events.ndjson": event({ type: "turn_end" }) });
+    const { store } = makeStore([]);
+    const lists = await Promise.all(Array.from({ length: 4 }, () => store.listRuns()));
+    expect(lists.map(({ stats }) => stats.turns)).toEqual([1, 1, 1, 1]);
+    expect(io.directories.filter((path) => path === root)).toHaveLength(1);
+  });
+
+  it("returns exact list changes, removals and new order, or a full snapshot for an expired revision", async () => {
+    const state = (ended: string, turns: number) => JSON.stringify({ state: "done", ended, turns });
+    await writeRun("keep", { "state.json": state(STARTED, 1) });
+    await writeRun("remove", { "state.json": state(ENDED, 2) });
+    const { store } = makeStore([]);
+    const first = await store.listUpdate();
+    expect(first).toHaveProperty("runs");
+
+    await rm(join(root, DATE, "remove"), { recursive: true });
+    await writeRun("add", { "state.json": state(ENDED, 3) });
+    const second = await store.listUpdate(first.revision);
+    expect(second).toMatchObject({
+      changes: [{ id: `${DATE}/add` }],
+      removed: [`${DATE}/remove`],
+      order: [`${DATE}/add`, `${DATE}/keep`],
+      stats: { total: 2, turns: 4 },
+    });
+    expect(second).not.toHaveProperty("runs");
+
+    await writeRun("keep", { "state.json": state(STARTED, 4) });
+    const third = await store.listUpdate(second.revision);
+    expect(third).toMatchObject({ changes: [{ id: `${DATE}/keep`, turns: 4 }], removed: [] });
+    expect(third).not.toHaveProperty("order");
+    expect(await store.listUpdate(first.revision)).toMatchObject({
+      revision: third.revision,
+      runs: [{ id: `${DATE}/add` }, { id: `${DATE}/keep` }],
+    });
+  });
+
+  it("reuses finalized summaries but checks for in-place edits on a bounded cadence", async () => {
+    const state = join(await writeRun("done", {
+      "state.json": '{"name":"done","turns":1}',
+      "events.ndjson": event({ type: "turn_end" }),
+      finalized: "0",
+    }), "state.json");
+    let clock = NOW;
+    const { store } = makeStore([], {}, () => clock);
+    expect((await store.listRuns()).stats.turns).toBe(1);
+    expect(io.stats.filter((path) => path === join(root, DATE, "done", "events.ndjson"))).toHaveLength(1);
+    io.stats.length = 0;
+    expect((await store.listRuns()).stats.turns).toBe(1);
+    expect(io.stats).not.toContain(state);
+
+    await writeFile(state, '{"name":"done","turns":2}');
+    await utimes(state, TIME_TWO, TIME_TWO);
+    clock += 30_000;
+    expect((await store.listRuns()).stats.turns).toBe(2);
+    await rm(join(root, DATE, "done"), { recursive: true });
+    expect((await store.listRuns()).stats.total).toBe(0);
+  });
+
+  it("preserves warm caches through transient traversal errors", async () => {
+    const dir = await writeRun("live", { "state.json": STATE_RUNNING, "events.ndjson": event({ type: "turn_end" }) });
+    const { store } = makeStore([]);
+    expect((await store.listRuns()).stats.turns).toBe(1);
+    io.reads.length = 0;
+    for (const failedPath of [root, join(root, DATE)]) {
+      io.failReaddir.add(failedPath);
+      const failed = await store.listRuns();
+      expect(failed.warnings[0]).toContain(failedPath);
+      expect(failed.runs.map(({ slug }) => slug)).toEqual(["live"]);
+      expect(failed.stats.turns).toBe(1);
+      io.failReaddir.delete(failedPath);
+      expect((await store.listRuns()).stats.turns).toBe(1);
+    }
+    expect(readsOf(eventPath(dir))).toEqual([]);
+  });
+
+  it("evicts visited tails without changing the followed output", { timeout: 20_000 }, async () => {
+    const { store } = makeStore([]);
+    const hot = await writeRun("hot", { "events.ndjson": event({ type: "turn_end" }), "answer.md": "hot answer\n" });
+    const cold = await writeRun("cold", { "events.ndjson": event({ type: "turn_end" }), "answer.md": "cold answer\n" });
+    const hotFollow = await store.follow(`${DATE}/hot`);
+    const coldFollow = await store.follow(`${DATE}/cold`);
+    const largeLog = fixedLine("turn_end", 128).repeat(2048);
+    const largeAnswer = "answer\n".repeat(10_000);
+    await Promise.all(Array.from({ length: 28 }, (_, i) => writeRun(`visit-${i}`, {
+      "events.ndjson": largeLog, "answer.md": largeAnswer,
+    })));
+    for (let i = 0; i < 28; i += 1) {
+      await store.follow(`${DATE}/hot`);
+      await store.follow(`${DATE}/visit-${i}`);
+    }
+    io.reads.length = 0;
+    expect(await store.follow(`${DATE}/hot`)).toEqual(hotFollow);
+    expect(readsOf(eventPath(hot))).toEqual([]);
+    expect(await store.follow(`${DATE}/cold`)).toEqual(coldFollow);
+    expect(bytesReadOf(eventPath(cold))).toBeGreaterThan(0);
+    expect(bytesReadOf(join(cold, "answer.md"))).toBeGreaterThan(0);
+  });
+
+  it("bounds large append reads while keeping counters and tails equal to a fresh follow", async () => {
+    const dir = await writeRun("live", { "events.ndjson": event({ type: "turn_end" }), "answer.md": "original\n" });
+    const { store } = makeStore([]);
+    await store.follow(`${DATE}/live`);
+    const appended = fixedLine("turn_end", 1024).repeat(1000);
+    await appendFile(eventPath(dir), appended);
+    await appendFile(join(dir, "answer.md"), "测量\r\n".repeat(32_000) + "last line\n");
+    io.reads.length = 0;
+    const warm = await store.follow(`${DATE}/live`);
+    expect(warm.summary?.turns).toBe(1001);
+    expect(warm.answerTail?.endsWith("last line")).toBe(true);
+    expect(io.reads.every(({ bytes }) => bytes <= 256 * 1024)).toBe(true);
+    expect(bytesReadOf(eventPath(dir))).toBeLessThanOrEqual(Buffer.byteLength(appended) + 256 * 1024 + 1);
+    expect(bytesReadOf(join(dir, "answer.md"))).toBeLessThanOrEqual(64 * 1024);
+    expect(warm).toEqual(await makeStore([]).store.follow(`${DATE}/live`));
+  });
+
   it("answers an unchanged list and follow without reading the retained log again", async () => {
     const log =
       event({ type: "turn_end" }) +

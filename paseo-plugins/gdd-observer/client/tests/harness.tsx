@@ -7,7 +7,13 @@ import {
 } from "@tanstack/react-query";
 import { PluginRpcProvider, PluginTranslationProvider, PluginTranslationRuntime } from "@getpaseo/plugin/client/host";
 import type { PluginHostProps } from "@getpaseo/plugin/client";
-import type { FollowRunOutput, ListRunsOutput, RunEvent, RunPathsOutput, RunSummary } from "../../shared/runs";
+import type {
+  FollowRunOutput,
+  ListRunsOutput,
+  RunEvent,
+  RunPathsOutput,
+  RunSummary,
+} from "../../shared/runs";
 import { afterEach, vi, type Mock } from "vitest";
 import { StateBadge } from "../status-strip";
 
@@ -55,6 +61,17 @@ export function makeScan(overrides: Partial<ListRunsOutput> = {}): ListRunsOutpu
     ...overrides,
   };
 }
+
+/** The scan facts without the runs: the base a delta answer replaces. */
+export function makeScanFacts(
+  overrides: Partial<Omit<ListRunsOutput, "runs">> = {},
+): Omit<ListRunsOutput, "runs"> {
+  const { runs: _runs, ...facts } = makeScan(overrides);
+  return facts;
+}
+
+/** Revision the default `runs.list` mock reports; delta-driven tests supply their own `invoke`. */
+export const LIST_SCAN_REVISION = "scan-revision-1";
 
 export function makeEvent(overrides: Partial<RunEvent> = {}): RunEvent {
   return { type: "turn_end", at: null, tool: null, intent: null, detail: null, role: null, ...overrides };
@@ -134,7 +151,7 @@ export async function renderClient(element: ReactElement, options: Options = {})
   }
   const invoke = vi.fn(options.invoke ?? (async (method: string) => {
     if (options.pending) return new Promise<never>(() => {});
-    if (method === "runs.list") return scan;
+    if (method === "runs.list") return { revision: LIST_SCAN_REVISION, ...scan };
     if (method === "runs.follow") return follow;
     if (method === "runs.paths") return paths;
     throw new Error(`Unexpected RPC: ${method}`);

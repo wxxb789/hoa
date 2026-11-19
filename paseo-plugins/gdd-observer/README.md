@@ -23,6 +23,9 @@ translated (`en`, `zh-CN`).
 
 ## Data contract
 
+The same package runs in Paseo on Windows, macOS, and Linux. The daemon reads paths on its own
+machine using its native filesystem and process probe. HOA CI checks the package on all three OSes.
+
 The plugin reads only what a run writes. Run root resolution, in order:
 
 1. the plugin setting `runRoot`;
@@ -40,11 +43,16 @@ Each run is `<root>/<YYYY-MM-DD>/<slug>/`:
 | File                 | Meaning                                                                                                |
 | -------------------- | ------------------------------------------------------------------------------------------------------ |
 | `state.json`         | `state` (`running`, `done`, `killed`, `failed`), `exit`, `cwd`, `started`, `ended`, `duration_s`, `model`, `thinking`, `max_time`, `session_id`, `pid`, `agent_pid`, counters, loss accounting. `model` is what the launcher requested: `provider/model`, a link such as `@sol_high`, or absent when it left the choice to the tool's own default. |
-| `events.ndjson`      | One agent-CLI JSON event per line: `session`, `turn_start`/`turn_end`, `message_start`/`message_end`, `tool_execution_start`/`_end`/`_update`, and the launcher's `truncated` splice marker. Assistant `message_start`/`message_end` carry the `provider`, `model`, and `api` of the model that produced the message, which is the only place the run records the model it actually used. |
-| `events.stats.json`  | Exact byte accounting for the retained log (`total_bytes`, `retained_bytes`, `dropped_bytes`, `truncated`). |
+| `events.ndjson`, `events.1.ndjson` | Current event segment and, after rotation, the previous segment. The observer tails the current segment; assistant events can identify the model that actually ran. |
+| `events.stats.json`  | Legacy byte-accounting file (`total_bytes`, `retained_bytes`, `dropped_bytes`, `truncated`). The shared runner records loss in `state.json`. |
 | `answer.md`          | Final assistant text, written when the run finalizes.                                                   |
-| `lock`               | `{pid, agent_pid, backend, started_at}` for liveness.                                                    |
+| `lock`               | Legacy `{pid, agent_pid, backend, started_at}` fallback for liveness.                                     |
 | `finalized`          | Present once the run ended; holds the exit code.                                                        |
+| `lineage.json`       | Optional GDD-dispatch metadata: `goal`, `stage`, and `parentAgentId` if the dispatch originated in a Paseo agent. Read only for the selected run (4 KiB maximum). |
+
+The **Run lineage** section shows the recorded goal and stage, and the initiating Paseo agent ID
+when available. Old runs and direct adapter starts may have no lineage. The plugin does not infer a
+parent from the run's own session ID, process IDs, or filename.
 
 Derived per run:
 
@@ -55,13 +63,11 @@ Derived per run:
   alive, `stale` when every recorded pid is confirmed gone, `unknown` while unproven. Absence of
   `finalized` with a dead pid is reported `stale`, never `done`.
 - **counters**: `turns` counts `turn_end`, `tool_calls` counts every `*tool*start*` event, `cost`
-  sums assistant `message_end` usage. Running runs are counted from the retained event log while
-  tailing, one pass per run shared by every caller, and each pass reads only the bytes appended
-  since the last one; once a run finalized, the launcher's own `state.json` counters win. The UI
-  labels which source it used. Counters folded from the log are marked partial when the log was
-  spliced or held a line that could not be parsed, because they then describe the retained window;
-  launcher counters are marked partial only when the launcher says so, since a spliced log says
-  nothing about the counters it wrote for the whole run.
+  sums assistant `message_end` usage. Live OMP and Pi runs can use the current event segment until
+  it rotates. The launcher's `state.json` counters take precedence after rotation or finalization,
+  and for other headless routes. The UI labels the source. Event-derived counters are partial if
+  the log rotated, was spliced, or contains an unusable line; launcher counters follow the
+  launcher's partial flags.
 - **current tool**: the last `tool_execution_start` without a matching `tool_execution_end`.
 - **model attribution**: `requested` is `state.json`'s `model` verbatim, with a concrete
   `provider/model` split at the first `/` and a link (`@flash_max`) kept whole. `observed` is every
@@ -99,13 +105,15 @@ never turn uncertainty into `stale`.
 
 | Setting          | Default | Bounds        | Meaning                                              |
 | ---------------- | ------- | ------------- | ---------------------------------------------------- |
-| `runRoot`        | `""`    | any path      | Absolute path on the daemon host; empty resolves the order above. |
+| `runRoot`        | `""`    | 32,767 UTF-16 code units | Absolute path on the daemon host; empty resolves the order above. |
 | `pollIntervalMs` | `2000`  | 500–60000     | Scan interval for the list and the selected run's tail. |
 | `tailLines`      | `80`    | 10–500        | Event lines kept in the tail view.                   |
 
-Settings are stored per host as an ordinary host-side JSON document. The list, the tail, and the
-file-path listing are the only RPCs (`runs.list`, `runs.follow`, `runs.paths`); nothing else leaves
-the daemon.
+Each plugin installation stores one bounded settings document on its daemon. Observation does not
+append history or persist run data; per-poll diagnostics are not forwarded to the daemon log.
+Paseo controls retention for its own logs, and the launcher owns its run artifacts. The list, the
+selected detail (including lineage), and the file-path listing use `runs.list`, `runs.follow`, and
+`runs.paths` respectively.
 
 The mounted screen and settings surfaces share one list-query polling owner per host query cache.
 The fastest requested interval wins; settings still requests 10 seconds. Owner unmount transfers
@@ -114,6 +122,15 @@ the shared scan. A joining surface waits for the active owner's next scheduled r
 the elected interval (at most 10 seconds when settings is mounted); reopening as the sole observer
 still refetches stale data and retries an initial error immediately, including a one-commit surface
 replacement. Selected-run following keeps its own configured cadence.
+In compact mode the hidden list stops observing while the selected run is open. An open settings
+screen still polls at its own cadence, and returning to the list resumes observation.
+
+Overlapping list requests share one archive walk. The first request returns all summaries; later
+requests can send their revision to receive only changed and removed rows, plus the full ID order
+when it changes. Totals always describe the full returned population. A client with no retained
+base gets a full snapshot. If the root becomes unavailable after a successful scan, the list keeps
+the last known rows with a warning for up to 30 seconds; an unreadable date retains its last known
+rows until that date can be read or is removed. Changing the configured root discards the old view.
 
 ## Trust model
 
@@ -199,12 +216,18 @@ measurements) and its archived goal contracts are not part of this checkout; the
 - **Polling, not subscriptions.** Paseo 0.15 has no plugin subscription transport, so the live tail
   is a bounded poll and polling stops as soon as the last observing surface unmounts. File revision
   checks reuse unchanged event counters and bounded event/answer tails; warmed unchanged polls
-  read and parse zero retained-event bytes. Appends extend the cached tails, while replacement,
-  shrink and detected splicing invalidate the retained revision. Event and answer windows remain
-  capped at 256 KiB and 64 KiB. No file-content TTL delays a changed revision until a later poll.
+  read and parse zero retained-event bytes. Small appends extend cached tails; large appends rebuild
+  only the bounded tail, while the independent counter fold still reads all new event lines.
+  Replacement, shrink and detected splicing invalidate the retained revision. Event and answer
+  windows are capped at 256 KiB and 64 KiB. Visited tails use separate estimated memory budgets
+  of 16 MiB and 2 MiB; small file bodies share a 16 MiB estimated budget. These are cache budgets,
+  not process RSS limits.
 - **Windowed list, whole-scan facts.** The SDK FlatList mounts a viewport window instead of every
-  known run, retaining the same newest-first membership and global status totals. Metadata discovery,
-  sorting and the full list payload still scale with total runs. Cold counter/model discovery and
+  known run, retaining the same newest-first membership and global status totals. Directory
+  discovery, sorting and cold full responses still scale with total runs. Scans reuse finalized
+  summaries while directory metadata is unchanged, and recheck file revisions at least every
+  30 seconds on the next poll. In-place edits may take that long to appear in the list if the
+  detail isn't open. Cold counter/model discovery and
   recounts after replacement/splicing still scale with retained log bytes; no displayed aggregate
   or observed model is dropped to reduce that work. Filesystem metadata is not an atomic multi-file
   snapshot, so concurrent launcher writes can still span scan observations.
@@ -217,16 +240,17 @@ measurements) and its archived goal contracts are not part of this checkout; the
 - **Spliced logs are not always valid NDJSON.** The launcher's compaction can leave a line that
   glues the JSON it cut to the `truncated` marker it inserted. The parser tolerates it, counts it as
   an unusable line, and reports counters folded from that log as partial.
-- **Retained-window counters.** At its bound the launcher replaces the log with
-  `head + truncated marker + tail`. The plugin then recounts the retained log, so turns, tools, and
-  cost describe the retained window only; `state.json` counters take over once a run finalizes.
+- **Retained-window counters.** The shared runner rotates between two segments; legacy runs may
+  instead contain a `truncated` marker. The event fold sees only the current segment. Use the source
+  and partial labels to distinguish that fold from the runner's totals.
 - **Retained-window model attribution.** The model that actually ran is read from the assistant
   events the log still holds, so a heavily spliced log may name fewer models than the run used, and
   a run with no assistant event shows only what the launcher requested. The model card explains
   where its numbers came from.
 - **Unproven liveness reads `unknown`.** On Windows the first scan of a stale run shows `unknown`
   until the background listing confirms it; a run is only ever labelled `stale` after the OS stops
-  listing its pid.
+  listing its pid. Windows retains the 4,096 most recently observed PID records; overflow may
+  leave verdicts unknown. POSIX uses fresh signal-zero checks without retaining PID history.
 - **No kill.** Killing a stale run needs an explicit user action and signaling a run is outside the
   read-only contract, so no `killRun` RPC exists.
 - **Answer tails are capped.** `answer.md` and the event window are read from the last 64 KiB and

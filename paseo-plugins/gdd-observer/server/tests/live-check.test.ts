@@ -12,6 +12,16 @@ import { createRunStore } from "../run-store";
 const root = process.env.GDD_LIVE_ROOT?.trim() ?? "";
 
 describe.skipIf(root === "")("live run root", () => {
+  // The host's tasklist can time out under load. The regular suite covers both listing outcomes
+  // with controlled completion; require a successful native listing only in this opt-in check.
+  it.skipIf(process.platform !== "win32")("confirms a reserved pid through native tasklist", async () => {
+    const probe = createLivenessProbe();
+    const absentPid = 2_147_483_632;
+    expect(probe.verdicts([absentPid]).get(absentPid)).not.toBe("alive");
+    await probe.refresh([absentPid]);
+    expect(probe.verdicts([absentPid]).get(absentPid)).toBe("dead");
+  }, 30_000);
+
   it("lists real runs with sane counters", async () => {
     const probe = createLivenessProbe();
     const store = createRunStore({
@@ -19,7 +29,8 @@ describe.skipIf(root === "")("live run root", () => {
       config: () => ({ runRoot: root, tailLines: 10 }),
     });
 
-    const first = await store.listRuns();
+    const first = await store.listUpdate();
+    if (!("runs" in first)) throw new Error("Expected a full list without a known revision");
     console.log(
       `[live] root=${first.runRoot} source=${first.rootSource} exists=${first.rootExists} ` +
         `probe=${first.probe} stats=${JSON.stringify(first.stats)}`,
@@ -31,7 +42,8 @@ describe.skipIf(root === "")("live run root", () => {
       .flatMap((run) => [run.pids.pid, run.pids.agentPid])
       .filter((pid): pid is number => pid !== null);
     await probe.refresh(pids);
-    const scan = await store.listRuns();
+    const scan = await store.listUpdate();
+    if (!("runs" in scan)) throw new Error("Expected a full list without a known revision");
     for (const run of scan.runs) {
       console.log(
         `[live] ${run.id} state=${run.state} liveness=${run.liveness} turns=${run.turns} tools=${run.toolCalls} ` +

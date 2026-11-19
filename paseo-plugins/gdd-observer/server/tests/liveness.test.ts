@@ -7,7 +7,7 @@ const execFileMock = vi.hoisted(() => vi.fn());
 // before importing it. Each invocation stays pending until the test settles it.
 vi.mock("node:child_process", () => ({ execFile: execFileMock }));
 
-import { createLivenessProbe } from "../liveness";
+import { createLivenessProbe, MAX_TRACKED_PIDS } from "../liveness";
 import { mapRun, type RunFiles } from "../state";
 
 type ExecCallback = (error: Error | null, result?: { stdout: string; stderr: string }) => void;
@@ -88,6 +88,22 @@ describe("liveness probe", () => {
     expect(calls).toHaveLength(0);
   });
 
+  it("keeps no posix verdict history: an ambiguous check reads unknown, never a remembered verdict", () => {
+    const probe = createLivenessProbe("linux");
+    killCheck([100]);
+    expect(probe.verdicts([100]).get(100)).toBe("alive");
+
+    killCheck([], "EIO");
+    expect(probe.verdicts([100]).get(100)).toBe("unknown"); // fresh ambiguity, not the earlier proof of life
+
+    killCheck([], "ESRCH");
+    expect(probe.verdicts([100]).get(100)).toBe("dead"); // absence is authoritative on posix
+
+    killCheck([], "EIO");
+    expect(probe.verdicts([100]).get(100)).toBe("unknown"); // and no dead verdict is remembered either
+    expect(calls).toHaveLength(0);
+  });
+
   it("treats access denial on Windows as proof of life", () => {
     const probe = createLivenessProbe("win32");
     killCheck([], "EPERM");
@@ -105,11 +121,12 @@ describe("liveness probe", () => {
     expect(calls).toHaveLength(1);
   });
 
-  it("does not list for values that cannot be run pids", () => {
+  it("does not list for values that cannot be run pids", async () => {
     const probe = createLivenessProbe("win32");
     killCheck([]);
     const verdicts = probe.verdicts([0, -1, 1.5]);
     expect([...verdicts.values()]).toEqual(["unknown", "unknown", "unknown"]);
+    await probe.refresh([0, -1, 1.5]);
     expect(calls).toHaveLength(0);
   });
 
@@ -362,6 +379,70 @@ describe("liveness probe", () => {
     await resolveListing([]);
     expect(probe.verdicts([777]).get(777)).toBe("dead");
     expect(calls).toHaveLength(2);
+  });
+
+  it("caps retained Windows history and re-observes an evicted pid without inventing death", async () => {
+    const probe = createLivenessProbe("win32");
+    killCheck([]);
+    // t = 0: one listing omits both pids, marking them dead within its reuse window.
+    expect(probe.verdicts([100, 101]).get(100)).toBe("unknown");
+    expect(calls).toHaveLength(1);
+    await resolveListing([]);
+    const confirmed = probe.verdicts([100, 101]);
+    expect(confirmed.get(100)).toBe("dead");
+    expect(confirmed.get(101)).toBe("dead");
+
+    // Overflow the cap with fresh pids. Every scan is answered from the settled listing's reuse
+    // window, so no extra tasklist subprocess is spawned per poll.
+    for (let pid = 200; pid < 200 + MAX_TRACKED_PIDS; pid++) {
+      expect(probe.verdicts([pid]).get(pid)).toBe("unknown");
+    }
+    expect(calls).toHaveLength(1);
+
+    // The oldest history was evicted: pid 100 is re-observed and reads unknown — never the `dead`
+    // the cap can no longer justify, and the listing older than the re-observation cannot re-prove it.
+    expect(probe.verdicts([100]).get(100)).toBe("unknown");
+    expect(calls).toHaveLength(1);
+
+    // A listing invoked at 30 s starts for pid 999; pid 101 is re-observed while it is in flight.
+    advanceTo(30_000);
+    expect(probe.verdicts([999]).get(999)).toBe("unknown");
+    expect(calls).toHaveLength(2);
+    advanceTo(31_000);
+    expect(probe.verdicts([101]).get(101)).toBe("unknown");
+    expect(calls).toHaveLength(2);
+
+    // The listing predates pid 101's re-observation, so its omission proves nothing about it, while
+    // pid 999, observed before the listing was invoked, is confirmed absent.
+    await resolveListing([]);
+    expect(probe.verdicts([999]).get(999)).toBe("dead");
+    expect(probe.verdicts([101]).get(101)).toBe("unknown");
+    expect(calls).toHaveLength(2);
+
+    // Once a listing is invoked after the re-observation, absence is proven normally.
+    await probe.refresh([100]);
+    expect(probe.verdicts([100]).get(100)).toBe("dead");
+    expect(calls).toHaveLength(2);
+  });
+
+  it("never lets a listing kill a pending pid whose history was evicted mid-flight", async () => {
+    const probe = createLivenessProbe("win32");
+    killCheck([]);
+    expect(probe.verdicts([5]).get(5)).toBe("unknown"); // t = 0: pid 5 starts and waits on the listing
+    expect(calls).toHaveLength(1);
+
+    // Fresh unknown pids evict pid 5's record while the listing is still in flight; their own scans
+    // share that listing instead of spawning new subprocesses.
+    for (let pid = 200; pid < 200 + MAX_TRACKED_PIDS; pid++) {
+      expect(probe.verdicts([pid]).get(pid)).toBe("unknown");
+    }
+    expect(calls).toHaveLength(1);
+
+    // The listing an evicted pid was waiting on predates anything still known about it; re-observing
+    // it must read unknown rather than let that omission mark it dead.
+    await resolveListing([]);
+    expect(probe.verdicts([5]).get(5)).toBe("unknown");
+    expect(calls).toHaveLength(1);
   });
 
   it("first displays stale at the 46-second scan after a skipped in-flight listing", async () => {

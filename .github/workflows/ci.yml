@@ -67,16 +67,28 @@ jobs:
         timeout-minutes: 5
         run: python skills/gdd/scripts/tests/mutate_verdict_matrix.py
 
-      # Paseo gdd-observer plugin
+  # Paseo gdd-observer plugin: every OS the plugin ships to runs the same checks
+  # in parallel, and one platform failing must not cancel the others.
+  gdd-observer:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: paseo-plugins/gdd-observer
+    steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "20.19.4"  # plugin README minimum
           cache: npm
           cache-dependency-path: paseo-plugins/gdd-observer/package-lock.json
-      - name: Paseo gdd-observer typecheck and tests
-        working-directory: paseo-plugins/gdd-observer
-        timeout-minutes: 5
-        run: npm ci && npm run typecheck && npm test
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
 
   gdd-runner:
     strategy:

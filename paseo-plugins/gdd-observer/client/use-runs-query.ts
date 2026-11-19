@@ -6,7 +6,13 @@ import {
   type UseQueryResult,
 } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
-import { listRuns, type ListRunsOutput } from "../shared/runs";
+import {
+  listRuns,
+  type ListRunsDelta,
+  type ListRunsOutput,
+  type ListRunsUpdate,
+  type RunSummary,
+} from "../shared/runs";
 
 /**
  * The one run-scan query every surface reads. The panel and the settings screen both mount over
@@ -14,6 +20,87 @@ import { listRuns, type ListRunsOutput } from "../shared/runs";
  * per tick. The detail views keep their own `runs.follow`/`runs.paths` queries.
  */
 export const RUNS_LIST_QUERY_KEY = ["gddRuns", "list"] as const;
+
+/**
+ * Cached with the data it describes so a canceled or failed poll cannot relabel an older scan.
+ * A snapshot seeded without a revision (e.g. by a test) asks for a full response.
+ */
+type CachedList = ListRunsOutput & { revision?: string };
+
+/** The full variant; `runs` is the union's only discriminator. */
+type FullListRunsUpdate = Extract<ListRunsUpdate, { runs: RunSummary[] }>;
+
+function isFullListRunsUpdate(update: ListRunsUpdate): update is FullListRunsUpdate {
+  return "runs" in update;
+}
+
+/**
+ * Folds one delta into the snapshot it was computed against: listed summaries replace their run
+ * (or add it), `removed` drops ids, and `order` restates the whole sequence when it changed.
+ * Unchanged rows keep their summary objects, and a delta with no row change keeps the run array
+ * itself, so a poll that changed nothing leaves the list's data and its mounted window alone.
+ */
+function applyListDelta(base: ListRunsOutput, delta: ListRunsDelta): CachedList {
+  const { changes, removed, order, ...facts } = delta;
+  if (changes.length === 0 && removed.length === 0 && order === undefined) {
+    return { ...facts, runs: base.runs };
+  }
+  if (order === undefined) {
+    // Only summaries changed, the common poll: index the changes, not the whole population.
+    const replacements = new Map(changes.map((run) => [run.id, run]));
+    const dropped = removed.length === 0 ? null : new Set(removed);
+    const runs: RunSummary[] = [];
+    for (const run of base.runs) {
+      if (dropped !== null && dropped.has(run.id)) continue;
+      runs.push(replacements.get(run.id) ?? run);
+    }
+    return { ...facts, runs };
+  }
+  const byId = new Map(base.runs.map((run) => [run.id, run]));
+  for (const run of changes) byId.set(run.id, run);
+  for (const id of removed) byId.delete(id);
+  const runs: RunSummary[] = [];
+  for (const id of order) {
+    const run = byId.get(id);
+    if (run === undefined) throw new Error(`runs.list delta order names unknown run: ${id}`);
+    runs.push(run);
+  }
+  return { ...facts, runs };
+}
+
+type FetchRunsList = (input: { knownRevision?: string }) => Promise<ListRunsUpdate>;
+
+/**
+ * One scan step for one host: ask from the revision of the snapshot in this host's cache, then
+ * fold the answer back into that snapshot so a poll transfers only what changed. React Query
+ * aborts the step when a newer scan replaces it, so a superseded step never claims a revision it
+ * did not store; a delta that arrives after its base left the cache has nothing to fold into and
+ * is answered with one full read instead of a corrupted list.
+ */
+async function fetchRunsList(
+  client: QueryClient,
+  list: FetchRunsList,
+  signal: AbortSignal,
+): Promise<CachedList> {
+  const base = client.getQueryData<CachedList>(RUNS_LIST_QUERY_KEY);
+  const knownRevision = base?.revision;
+  const update = await list(knownRevision === undefined ? {} : { knownRevision });
+  // A canceled step was replaced by a newer scan; its answer must not relabel a cache that
+  // belongs to the replacement.
+  if (signal.aborted) throw new Error("runs.list scan was superseded by a newer one");
+  if (isFullListRunsUpdate(update)) return update;
+  if (base === undefined || client.getQueryData(RUNS_LIST_QUERY_KEY) !== base) {
+    // The delta's base is no longer cached, so the delta cannot be folded anywhere: replace it
+    // with one full read.
+    const full = await list({});
+    if (signal.aborted) throw new Error("runs.list scan was superseded by a newer one");
+    if (!isFullListRunsUpdate(full)) {
+      throw new Error("runs.list answered a request without a known revision with a delta");
+    }
+    return full;
+  }
+  return applyListDelta(base, update);
+}
 
 type Registration = { id: symbol; intervalMs: number };
 
@@ -83,10 +170,11 @@ function pollingFor(client: QueryClient): RunsListPolling {
 }
 
 /**
- * Observes the shared run scan and joins its polling election with this surface's requested
- * cadence. The elected surface's cadence plus explicit invalidations (a saved run root) are the
- * scan triggers, so staggered mounts cannot multiply RPCs; scan loading and error state stay on
- * the shared cache entry, so every surface renders the same result.
+ * Observes the shared, revisioned run scan — each step folds the server's full snapshot or delta
+ * onto the cached snapshot — and joins its polling election with this surface's requested cadence.
+ * The elected surface's cadence plus explicit invalidations (a saved run root) are the scan
+ * triggers, so staggered mounts cannot multiply RPCs; scan loading and error state stay on the
+ * shared cache entry, so every surface renders the same result.
  */
 export function useRunsListQuery(
   requestedIntervalMs: number,
@@ -122,7 +210,9 @@ export function useRunsListQuery(
   // `<= 1` means "no other active observer", including a sole-surface replacement in one commit.
   return useQuery({
     queryKey: RUNS_LIST_QUERY_KEY,
-    queryFn: () => list({}),
+    // Reading the context signal opts this step into React Query's cancellation: a newer scan
+    // aborts it, and the aborted step then leaves the revision and the cache to the newer one.
+    queryFn: ({ signal }) => fetchRunsList(client, list, signal),
     // Only the elected surface holds a timer; every other surface passes `false` so a previous
     // ownership does not keep ticking.
     refetchInterval: pollInterval,

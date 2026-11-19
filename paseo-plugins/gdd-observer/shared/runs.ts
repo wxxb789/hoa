@@ -141,22 +141,70 @@ export type RunLiveness = (typeof RUN_LIVENESS)[number];
 export type RunWarning = (typeof RUN_WARNINGS)[number];
 export type RunRootSource = (typeof RUN_ROOT_SOURCES)[number];
 
+/**
+ * The scan facts every list result carries: root resolution, diagnostics, and totals. The runs are
+ * versioned separately below, so a delta can restate just these facts plus what changed.
+ */
+const listRunsSnapshotSchema = z.object({
+  runRoot: z.string(),
+  rootSource: z.enum(RUN_ROOT_SOURCES),
+  rootExists: z.boolean(),
+  candidates: z.array(
+    z.object({ path: z.string(), source: z.enum(RUN_ROOT_SOURCES), exists: z.boolean() }),
+  ),
+  probe: z.enum(LIVENESS_PROBES),
+  scannedAt: z.string(),
+  stats: runStatsSchema,
+  warnings: z.array(z.string()),
+});
+
+/** A complete population with no revision: the snapshot a surface renders. */
+export const listRunsOutputSchema = listRunsSnapshotSchema.extend({
+  runs: z.array(runSummarySchema),
+});
+
+/**
+ * A list result relative to a known revision. `changes` replaces the listed summaries and adds
+ * runs that the base revision did not have; `removed` drops run ids; `order` is the complete id
+ * sequence of the resulting snapshot and is present only when that sequence changed. A delta
+ * without `order` keeps the base order and only restates summaries in place.
+ */
+export const listRunsDeltaSchema = listRunsSnapshotSchema.extend({
+  revision: z.string(),
+  changes: z.array(runSummarySchema),
+  removed: z.array(z.string()),
+  order: z.array(z.string()).optional(),
+});
+
+/** A list result that restates the whole population at `revision`. */
+export const listRunsFullSchema = listRunsOutputSchema.extend({
+  revision: z.string(),
+});
+
+/**
+ * One versioned list answer. `runs` marks the full variant and a delta never carries it, so the
+ * full variant is tried first: any payload that carries `runs` stays a full population even if it
+ * also carries delta fields.
+ */
+export const listRunsUpdateSchema = z.union([listRunsFullSchema, listRunsDeltaSchema]);
+
+export type ListRunsDelta = z.infer<typeof listRunsDeltaSchema>;
+export type ListRunsUpdate = z.infer<typeof listRunsUpdateSchema>;
+
+/**
+ * The whole run population plus its root diagnostics. The caller sends the revision of the
+ * snapshot it already holds (`knownRevision`); the server answers with a delta against that
+ * revision while it still describes the current state, and with a full snapshot when the caller
+ * names no revision or one the server cannot delta from. The two answers are told apart by `runs`
+ * alone: the full variant carries it, the delta variant carries `changes`/`removed` instead.
+ */
 export const listRuns = defineRpc({
   name: "runs.list",
-  input: z.object({}),
-  output: z.object({
-    runRoot: z.string(),
-    rootSource: z.enum(RUN_ROOT_SOURCES),
-    rootExists: z.boolean(),
-    candidates: z.array(
-      z.object({ path: z.string(), source: z.enum(RUN_ROOT_SOURCES), exists: z.boolean() }),
-    ),
-    probe: z.enum(LIVENESS_PROBES),
-    scannedAt: z.string(),
-    runs: z.array(runSummarySchema),
-    stats: runStatsSchema,
-    warnings: z.array(z.string()),
+  input: z.object({
+    /** Revision of the snapshot the caller holds; omit to force a full population. */
+    knownRevision: z.string().optional(),
   }),
+  output: listRunsUpdateSchema,
 });
 
 /**
@@ -171,6 +219,12 @@ export const runPaths = defineRpc({
     paths: z.array(runPathSchema),
     scannedAt: z.string(),
   }),
+});
+
+export const runLineageSchema = z.object({
+  goal: z.string().trim().min(1).max(256),
+  stage: z.string().trim().min(1).max(32),
+  parentAgentId: z.string().trim().regex(/^[A-Za-z0-9._-]{1,128}$/).optional(),
 });
 
 /**
@@ -191,11 +245,12 @@ export const followRun = defineRpc({
   output: z.object({
     found: z.boolean(),
     summary: runSummarySchema.nullable(),
+    lineage: runLineageSchema.optional(),
     events: z.array(runEventSchema),
     answerTail: z.string().nullable(),
   }),
 });
 
-export type ListRunsOutput = z.infer<typeof listRuns.output>;
+export type ListRunsOutput = z.infer<typeof listRunsOutputSchema>;
 export type RunPathsOutput = z.infer<typeof runPaths.output>;
 export type FollowRunOutput = z.infer<typeof followRun.output>;

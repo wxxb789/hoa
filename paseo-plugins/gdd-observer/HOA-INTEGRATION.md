@@ -61,13 +61,17 @@ The store scans `<run-root>/<YYYY-MM-DD>/<slug>/`. The contract is defined by
 | `answer.md` | Answer presence and a bounded tail for display, not an accepted delivery result. |
 | `finalized` | Settled-run marker and exit code; if declared state is absent or still `running`, the exit code determines the displayed terminal state. |
 | `run.json`, `runner.log` | Launcher invocation and runner diagnostics. These are inspection artifacts, not parsed by the observer. |
+| `lineage.json` | Goal, stage, and optional initiating Paseo agent ID, recorded once by the GDD dispatcher. It is not the selected run's own `session_id`. |
 
 The detail view lists paths and sizes for `prompt.md` and `stderr.log` without rendering their bodies.
 `events.stats.json`, `lock`, `session.id`, and `runner.out` are legacy adapter artifacts; the shared
 runner does not create them. Three read-only RPCs are registered: `runs.list` returns the resolved root
-with its candidates, the run summaries, and the scan stats; `runs.paths` lists one run's files for
-the detail view; and `runs.follow` polls the selected run's summary, bounded event tail, and answer
-tail. Host settings persistence is separate from these run-data RPCs.
+with its candidates, the scan stats, and a full list or changes relative to the caller's known
+revision; `runs.paths` lists one run's files for the detail view; and `runs.follow` polls the
+selected run's summary, bounded event and answer
+tails, and optional lineage. Missing or invalid lineage does not hide the rest of the run.
+The observer persists only one bounded settings document per plugin installation on a daemon.
+It does not copy, archive, or delete launcher artifacts.
 
 Liveness is separate from state. A finalized marker means `settled`; recorded live PIDs mean
 `running`; confirmed dead PIDs without finalization mean `stale`; insufficient evidence means
@@ -78,8 +82,9 @@ State counters take precedence for finalized runs, non-OMP/Pi headless routes an
 Without state counters, counts derived from events are marked partial once the previous segment
 exists or a legacy truncation marker reports loss. The observer does not invent missing turns,
 tools, or cost. Event tails read at most 256 KiB and answer tails at
-most 64 KiB before the line limit is applied. Polling, event vocabulary, and liveness limits remain
-those of the imported plugin; see [README](README.md#known-limits).
+most 64 KiB before the line limit is applied. The observer keeps bounded in-memory tail and PID
+caches; compact detail stops polling its hidden list. See [README](README.md#known-limits) for cache
+budgets, freshness, and liveness limits.
 
 ## Optional installation and trust removal
 

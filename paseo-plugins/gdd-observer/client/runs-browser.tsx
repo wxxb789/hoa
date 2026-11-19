@@ -10,10 +10,11 @@ import {
   useToast,
 } from "@getpaseo/plugin/client/ui";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import {
   followRun,
+  type FollowRunOutput,
   type ListRunsOutput,
   type RunEvent,
   type RunPath,
@@ -58,9 +59,6 @@ export function RunsScreen({ theme, layout, host }: PluginScreenProps) {
   const follow = useRpc(followRun);
   const paths = useRpc(runPaths);
 
-  // Shares the scan with the settings screen: this surface asks for its configured cadence and the
-  // polling election uses whichever mounted surface asked for the fastest one.
-  const listQuery = useRunsListQuery(values.pollIntervalMs);
   const followQuery = useQuery({
     queryKey: ["gddRuns", "follow", selected, values.tailLines],
     queryFn: () => follow({ id: selected ?? "", tailLines: values.tailLines }),
@@ -75,69 +73,22 @@ export function RunsScreen({ theme, layout, host }: PluginScreenProps) {
     staleTime: 30_000,
   });
 
-  const scan = listQuery.data;
   const summary = followQuery.data?.summary ?? null;
   const gone = followQuery.data !== undefined && !followQuery.data.found;
 
   const listPane = (
-    <View style={layout.compact ? styles.listCompact : styles.listWide}>
-      {scan === undefined ? (
-        <View style={styles.listLoading}>
-          {listQuery.error ? (
-            <Text style={styles.error}>
-              {t("error.list", { error: errorText(listQuery.error) })}
-            </Text>
-          ) : (
-            <Loading />
-          )}
-        </View>
-      ) : (
-        // The host list owns virtualization: rows mount in a bounded window around the viewport
-        // instead of every run in the scan. Run ids stay the row keys, and the header, warnings
-        // and empty guidance ride in their list slots so their content and order do not change.
-        <FlatList
-          data={scan.runs}
-          keyExtractor={(run) => run.id}
-          renderItem={({ item }) => (
-            <RunRow
-              run={item}
-              theme={theme}
-              layout={layout}
-              selected={item.id === selected}
-              onPress={() => onSelect(item.id)}
-            />
-          )}
-          ListHeaderComponent={
-            <>
-              <ListHeader scan={scan} theme={theme} layout={layout} locale={locale} />
-              {!scan.rootExists ? (
-                <View style={styles.warningCard}>
-                  <Text style={styles.warningRow}>{t("list.missing")}</Text>
-                </View>
-              ) : null}
-              {scan.warnings.map((warning) => (
-                <Text key={warning} style={styles.warn}>
-                  {warning}
-                </Text>
-              ))}
-            </>
-          }
-          ListEmptyComponent={
-            <EmptyBlock
-              title={t("list.emptyTitle")}
-              body={t("list.empty", { root: scan.runRoot })}
-              hint={t("list.emptyHint")}
-              theme={theme}
-              layout={layout}
-            />
-          }
-          contentContainerStyle={styles.listContent}
-          initialNumToRender={10}
-          maxToRenderPerBatch={10}
-          windowSize={3}
-        />
-      )}
-    </View>
+    // The list owns the shared scan as its own component: compact mode unmounts it while a run's
+    // detail covers it, so a hidden list holds no scan observer and joins no polling election.
+    // Returning to it then re-runs the mount behaviour — an immediate refresh when it is the only
+    // watcher, reuse of an already active scan otherwise.
+    <RunsListPane
+      theme={theme}
+      layout={layout}
+      locale={locale}
+      selected={selected}
+      pollIntervalMs={values.pollIntervalMs}
+      onSelect={onSelect}
+    />
   );
 
   const detailPane = (
@@ -166,6 +117,9 @@ export function RunsScreen({ theme, layout, host }: PluginScreenProps) {
         ) : (
           <Text style={styles.muted}>{t("list.scanning")}</Text>
         )}
+        {summary ? (
+          <RunLineageCard lineage={followQuery.data?.lineage} theme={theme} layout={layout} />
+        ) : null}
         <EventTail
           events={followQuery.data?.events ?? []}
           answerTail={followQuery.data?.answerTail ?? null}
@@ -218,7 +172,101 @@ export function RunsScreen({ theme, layout, host }: PluginScreenProps) {
   );
 }
 
-function ListHeader({
+/**
+ * The windowed run list and the shared scan behind it. Keeping it a separate component lets
+ * compact mode unmount the scan together with the list it feeds: only a mounted pane observes,
+ * polls, or fetches the scan, and a detail view's own `runs.follow` polling does not re-render it.
+ */
+const RunsListPane = memo(function RunsListPane({
+  theme,
+  layout,
+  locale,
+  selected,
+  pollIntervalMs,
+  onSelect,
+}: {
+  theme: ObserverTheme;
+  layout: ObserverLayout;
+  locale: string;
+  selected: string | null;
+  pollIntervalMs: number;
+  onSelect(id: string): void;
+}) {
+  const styles = useObserverStyles(theme, layout);
+  const { t } = useTranslation(messages);
+  // Shares the scan with the settings screen: this surface asks for its configured cadence and the
+  // polling election uses whichever mounted surface asked for the fastest one.
+  const listQuery = useRunsListQuery(pollIntervalMs);
+  const scan = listQuery.data;
+  const keyExtractor = useCallback((run: RunSummary) => run.id, []);
+  // Stable row props let `RunRow`'s memo skip every run a delta did not touch.
+  const renderItem = useCallback(
+    ({ item }: { item: RunSummary }) => (
+      <RunRow
+        run={item}
+        theme={theme}
+        layout={layout}
+        selected={item.id === selected}
+        onSelect={onSelect}
+      />
+    ),
+    [theme, layout, selected, onSelect],
+  );
+  return (
+    <View style={layout.compact ? styles.listCompact : styles.listWide}>
+      {scan === undefined ? (
+        <View style={styles.listLoading}>
+          {listQuery.error ? (
+            <Text style={styles.error}>
+              {t("error.list", { error: errorText(listQuery.error) })}
+            </Text>
+          ) : (
+            <Loading />
+          )}
+        </View>
+      ) : (
+        // The host list owns virtualization: rows mount in a bounded window around the viewport
+        // instead of every run in the scan. Run ids stay the row keys, and the header, warnings
+        // and empty guidance ride in their list slots so their content and order do not change.
+        <FlatList
+          data={scan.runs}
+          keyExtractor={keyExtractor}
+          renderItem={renderItem}
+          ListHeaderComponent={
+            <>
+              <ListHeader scan={scan} theme={theme} layout={layout} locale={locale} />
+              {!scan.rootExists ? (
+                <View style={styles.warningCard}>
+                  <Text style={styles.warningRow}>{t("list.missing")}</Text>
+                </View>
+              ) : null}
+              {scan.warnings.map((warning) => (
+                <Text key={warning} style={styles.warn}>
+                  {warning}
+                </Text>
+              ))}
+            </>
+          }
+          ListEmptyComponent={
+            <EmptyBlock
+              title={t("list.emptyTitle")}
+              body={t("list.empty", { root: scan.runRoot })}
+              hint={t("list.emptyHint")}
+              theme={theme}
+              layout={layout}
+            />
+          }
+          contentContainerStyle={styles.listContent}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={3}
+        />
+      )}
+    </View>
+  );
+});
+
+const ListHeader = memo(function ListHeader({
   scan,
   theme,
   layout,
@@ -249,20 +297,20 @@ function ListHeader({
       </Text>
     </View>
   );
-}
+});
 
-function RunRow({
+const RunRow = memo(function RunRow({
   run,
   theme,
   layout,
   selected,
-  onPress,
+  onSelect,
 }: {
   run: RunSummary;
   theme: ObserverTheme;
   layout: ObserverLayout;
   selected: boolean;
-  onPress(): void;
+  onSelect(id: string): void;
 }) {
   const styles = useObserverStyles(theme, layout);
   const { t, locale } = useTranslation(messages);
@@ -279,7 +327,7 @@ function RunRow({
         liveness: t(livenessKey(run.liveness)),
         model: usageLabel(firstUsage(run.model)) ?? run.model.requested ?? t("model.none"),
       })}
-      onPress={onPress}
+      onPress={() => onSelect(run.id)}
       style={[styles.row, selected ? styles.rowSelected : null]}
     >
       <View style={styles.rowTop}>
@@ -317,7 +365,7 @@ function RunRow({
       ) : null}
     </Pressable>
   );
-}
+});
 
 function RunSummaryHeader({
   summary,
@@ -440,7 +488,49 @@ function RunFacts({
   );
 }
 
-function EventTail({
+/**
+ * Dispatch context for one found run: the GDD goal and stage it was launched for and, when the
+ * dispatch came from a Paseo agent, that agent's id. Older runs and direct adapter starts have
+ * none; the run's own session and pids are never shown as a substitute.
+ */
+function RunLineageCard({
+  lineage,
+  theme,
+  layout,
+}: {
+  lineage: FollowRunOutput["lineage"];
+  theme: ObserverTheme;
+  layout: ObserverLayout;
+}) {
+  const styles = useObserverStyles(theme, layout);
+  const { t } = useTranslation(messages);
+  if (!lineage) {
+    return (
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Icon name="GitBranch" size={13} color={theme.colors.foregroundMuted} />
+          <Text style={styles.cardTitle}>{t("detail.lineage")}</Text>
+        </View>
+        <Text style={styles.muted}>{t("detail.lineageMissing")}</Text>
+      </View>
+    );
+  }
+  return (
+    <FactsCard
+      title={t("detail.lineage")}
+      icon="GitBranch"
+      theme={theme}
+      layout={layout}
+      facts={[
+        [t("detail.lineageGoal"), lineage.goal],
+        [t("detail.lineageStage"), lineage.stage],
+        [t("detail.lineageAgent"), lineage.parentAgentId ?? t("detail.lineageAgentMissing")],
+      ]}
+    />
+  );
+}
+
+const EventTail = memo(function EventTail({
   events,
   answerTail,
   tailLines,
@@ -496,7 +586,7 @@ function EventTail({
       </View>
     </>
   );
-}
+});
 
 function FilePaths({
   paths,

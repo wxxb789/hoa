@@ -1,13 +1,15 @@
 import { act } from "react-test-renderer";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OBSERVER_DEFAULTS, type ObserverSettings } from "../../shared/settings";
-import type { ListRunsOutput } from "../../shared/runs";
+import type { ListRunsOutput, ListRunsUpdate } from "../../shared/runs";
 import { RunsScreen } from "../runs-browser";
 import { ObserverSettingsScreen } from "../settings-screen";
 import {
   hostProps,
+  LIST_SCAN_REVISION,
   makeRun,
   makeScan,
+  makeScanFacts,
   mountedListRows,
   mountedRowCount,
   nodes,
@@ -278,7 +280,7 @@ describe("shared list polling", () => {
     const view = await renderClient(<Surfaces list settings />, {
       scan: makeScan(),
       invoke: async (method) => {
-        if (method === "runs.list") return refreshed;
+        if (method === "runs.list") return { revision: "scan-revision-2", ...refreshed };
         throw new Error(`Unexpected RPC: ${method}`);
       },
     });
@@ -361,5 +363,250 @@ describe("shared list polling", () => {
     await view.update(<Surfaces list={false} settings={false} />);
     await view.update(<Surfaces list settings={false} />);
     expect(listCalls(view)).toBe(3);
+  });
+});
+
+// The versioned scan: every poll names the revision of the snapshot the surface already holds and
+// folds the answer (a full snapshot or a delta) into that snapshot instead of replacing it whole.
+
+describe("versioned run scan", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] });
+  });
+
+  it("asks from the cached scan's revision and adopts each full scan's revision", async () => {
+    readySettings({ pollIntervalMs: 30_000 });
+    const inputs: unknown[] = [];
+    const scan = makeScan();
+    const view = await renderClient(<Surfaces list settings={false} />, {
+      scan,
+      queryDefaults: { staleTime: 0 },
+      invoke: async (method, input) => {
+        if (method !== "runs.list") throw new Error(`Unexpected RPC: ${method}`);
+        inputs.push(input);
+        return { revision: `scan-revision-${inputs.length}`, ...scan };
+      },
+    });
+
+    // No revision is held yet, so the first scan must ask for a full population.
+    expect(inputs).toEqual([{}]);
+    await advance(30_000);
+    expect(inputs).toEqual([{}, { knownRevision: "scan-revision-1" }]);
+    await advance(30_000);
+    expect(inputs).toEqual([
+      {},
+      { knownRevision: "scan-revision-1" },
+      { knownRevision: "scan-revision-2" },
+    ]);
+  });
+
+  it("merges a delta's changes, removals and order onto the cached snapshot", async () => {
+    readySettings({ pollIntervalMs: 30_000 });
+    const [a, b, c] = populationScan(3).runs;
+    const settled = makeRun({ id: a.id, slug: a.slug, name: a.name, state: "done", liveness: "settled" });
+    const fresh = makeRun({ id: "2026-11-14/fresh", slug: "fresh", name: "fresh" });
+    const inputs: unknown[] = [];
+    const view = await renderClient(<RunsScreen {...hostProps} params={{}} />, {
+      queryDefaults: { staleTime: 0 },
+      invoke: async (method, input) => {
+        if (method !== "runs.list") throw new Error(`Unexpected RPC: ${method}`);
+        inputs.push(input);
+        if (inputs.length === 1) return { revision: "scan-r1", ...makeScan({ runs: [a, b, c] }) };
+        const delta: ListRunsUpdate = {
+          ...makeScanFacts(),
+          revision: "scan-r2",
+          changes: [settled, fresh],
+          removed: [b.id],
+          order: [fresh.id, a.id, c.id],
+        };
+        return delta;
+      },
+    });
+
+    const before = view.query.getQueryData<ListRunsOutput>(["gddRuns", "list"])!;
+
+    await advance(30_000);
+    expect(inputs).toEqual([{}, { knownRevision: "scan-r1" }]);
+    const after = view.query.getQueryData<ListRunsOutput>(["gddRuns", "list"])!;
+    expect(before.runs.map((run) => run.id)).toEqual([a.id, b.id, c.id]);
+    expect(after.runs.map((run) => run.id)).toEqual([fresh.id, a.id, c.id]);
+    expect(after.runs[1].state).toBe("done");
+    expect(after.runs[1].liveness).toBe("settled");
+    // The untouched run keeps the summary the base snapshot already held.
+    expect(after.runs[2]).toBe(before.runs[2]);
+    expect(after.runs[1]).not.toBe(before.runs[0]);
+  });
+
+  it("keeps the run array when a delta restates no runs", async () => {
+    readySettings({ pollIntervalMs: 30_000 });
+    const population = populationScan(3);
+    const inputs: unknown[] = [];
+    const view = await renderClient(<RunsScreen {...hostProps} params={{}} />, {
+      queryDefaults: { staleTime: 0 },
+      invoke: async (method, input) => {
+        if (method !== "runs.list") throw new Error(`Unexpected RPC: ${method}`);
+        inputs.push(input);
+        if (inputs.length === 1) return { revision: "scan-r1", ...makeScan({ runs: population.runs }) };
+        const delta: ListRunsUpdate = {
+          ...makeScanFacts({ scannedAt: `2026-11-14T12:35:0${inputs.length}Z` }),
+          revision: `scan-r${inputs.length}`,
+          changes: [],
+          removed: [],
+        };
+        return delta;
+      },
+    });
+
+    const first = view.query.getQueryData<ListRunsOutput>(["gddRuns", "list"])!;
+    await advance(30_000);
+    const second = view.query.getQueryData<ListRunsOutput>(["gddRuns", "list"])!;
+    await advance(30_000);
+    const third = view.query.getQueryData<ListRunsOutput>(["gddRuns", "list"])!;
+
+    // Every empty delta restates the facts, and each time the run array (so every row identity in
+    // it) is the same array the previous snapshot carried.
+    expect(second.scannedAt).toBe("2026-11-14T12:35:02Z");
+    expect(second).not.toBe(first);
+    expect(second.runs).toBe(first.runs);
+    expect(third.scannedAt).toBe("2026-11-14T12:35:03Z");
+    expect(third.runs).toBe(first.runs);
+    expect(third.runs[0]).toBe(first.runs[0]);
+  });
+
+  it("answers a delta whose base was replaced mid-flight with one full read", async () => {
+    readySettings({ pollIntervalMs: 30_000 });
+    const [a, b] = populationScan(2).runs;
+    const inputs: unknown[] = [];
+    const view = await renderClient(<RunsScreen {...hostProps} params={{}} />, {
+      queryDefaults: { staleTime: 0 },
+      invoke: async (method, input) => {
+        if (method !== "runs.list") throw new Error(`Unexpected RPC: ${method}`);
+        inputs.push(input);
+        if (inputs.length === 1) return { revision: "scan-r1", ...makeScan({ runs: [a, b] }) };
+        if (inputs.length === 2) {
+          // Replace the base while its delta is being produced.
+          view.query.setQueryData(["gddRuns", "list"], makeScan({ runs: [b] }));
+          const delta: ListRunsUpdate = {
+            ...makeScanFacts(),
+            revision: "scan-r2",
+            changes: [],
+            removed: [],
+          };
+          return delta;
+        }
+        return { revision: "scan-r9", ...makeScan({ runs: [b] }) };
+      },
+    });
+    expect(inputs).toEqual([{}]);
+
+    // The poll asks from scan-r1, but by the time its delta lands the cached base is gone.
+    await advance(30_000);
+
+    // The delta had no base to fold into, so the client read the full population once instead.
+    expect(inputs).toEqual([{}, { knownRevision: "scan-r1" }, {}]);
+    const scan = view.query.getQueryData<ListRunsOutput>(["gddRuns", "list"])!;
+    expect(scan.runs.map((run) => run.id)).toEqual([b.id]);
+    // The recovery read adopted its revision: the next poll asks from it.
+    await advance(30_000);
+    expect(inputs[3]).toEqual({ knownRevision: "scan-r9" });
+  });
+});
+
+// A compact list a detail view covers must cost nothing: its pane unmounts the scan (observer,
+// election registration, cadence) and the return re-runs the shared mount behaviour.
+
+describe("hidden compact scan", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] });
+  });
+
+  it("stops scanning while a detail covers the list and refreshes on re-entry", async () => {
+    readySettings({ pollIntervalMs: 30_000 });
+    const population = populationScan(3);
+    const target = population.runs[0];
+    const view = await renderClient(<RunsScreen {...compactProps} params={{}} />, {
+      scan: population,
+      follow: { found: true, summary: target, events: [], answerTail: null },
+      queryDefaults: { staleTime: 0 },
+    });
+    // Alone, the surface refreshes the stale cached scan once, then keeps its own cadence.
+    expect(listCalls(view)).toBe(1);
+    await advance(30_000);
+    expect(listCalls(view)).toBe(2);
+    // The default mock answers full scans with a revision, and the surface asks from it next.
+    const inputs = view.invoke.mock.calls
+      .filter(([method]) => method === "runs.list")
+      .map(([, input]) => input);
+    expect(inputs).toEqual([{}, { knownRevision: LIST_SCAN_REVISION }]);
+
+    const row = mountedListRows(view).find((candidate) =>
+      String(candidate.props.accessibilityLabel).includes(target.name),
+    );
+    expect(row).toBeDefined();
+    await view.change(() => row!.props.onPress());
+    expect(mountedRowCount(view)).toBe(0);
+
+    // Hidden: no scan of its own and no cadence.
+    await advance(300_000);
+    expect(listCalls(view)).toBe(2);
+
+    const back = nodes(view.root, "Pressable").find((node) => node.props.accessibilityLabel === "All runs");
+    expect(back).toBeDefined();
+    await view.change(() => back!.props.onPress());
+    // Back alone: the return refresh is immediate, not the next cadence tick.
+    expect(listCalls(view)).toBe(3);
+    expect(mountedRowCount(view)).toBeGreaterThan(0);
+  });
+
+  it("keeps the settings cadence while hidden and joins the active scan on return", async () => {
+    readySettings({ pollIntervalMs: 30_000 });
+    const population = populationScan(3);
+    const target = population.runs[0];
+    const view = await renderClient(<Surfaces list settings />, {
+      scan: population,
+      follow: { found: true, summary: target, events: [], answerTail: null },
+      queryDefaults: { staleTime: 0 },
+    });
+    // Both surfaces share one baseline refresh; the settings screen's fixed 10 s is the cadence.
+    expect(listCalls(view)).toBe(1);
+
+    const pressTarget = async (): Promise<void> => {
+      const row = mountedListRows(view).find((candidate) =>
+        String(candidate.props.accessibilityLabel).includes(target.name),
+      );
+      expect(row).toBeDefined();
+      await view.change(() => row!.props.onPress());
+    };
+    const pressBack = async (): Promise<void> => {
+      const back = nodes(view.root, "Pressable").find(
+        (node) => node.props.accessibilityLabel === "All runs",
+      );
+      expect(back).toBeDefined();
+      await view.change(() => back!.props.onPress());
+    };
+
+    await pressTarget();
+    expect(mountedRowCount(view)).toBe(0);
+    await advance(9_999);
+    expect(listCalls(view)).toBe(1);
+    await advance(1);
+    expect(listCalls(view)).toBe(2);
+
+    // The list returns while settings still watches the scan: it joins that scan instead of
+    // adding a refresh, and the settings cadence keeps running.
+    await pressBack();
+    expect(listCalls(view)).toBe(2);
+    await advance(10_000);
+    expect(listCalls(view)).toBe(3);
+
+    // Hide again, then drop settings: a hidden list registers nothing, so nothing polls the scan.
+    await pressTarget();
+    await view.update(<Surfaces list settings={false} />);
+    await advance(60_000);
+    expect(listCalls(view)).toBe(3);
+
+    // Re-entered alone once more: the immediate refresh comes back.
+    await pressBack();
+    expect(listCalls(view)).toBe(4);
   });
 });

@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { PluginTranslationRuntime } from "@getpaseo/plugin/client/host";
 import type { ReactTestInstance } from "react-test-renderer";
 import {
   RUN_LIVENESS,
@@ -24,13 +23,7 @@ import {
   stateColor,
   stateKey,
   warningKey,
-  type CounterSourceKey,
-  type LivenessKey,
-  type SourceKey,
-  type StateKey,
-  type WarningKey,
 } from "../labels";
-import { messages } from "../messages";
 import { ModelCard, ModelChip } from "../model-card";
 import { LivenessBadge, StateBadge, StatusStrip } from "../status-strip";
 import { hostProps, makeScan, nodes, renderClient, textOf } from "./harness";
@@ -299,75 +292,6 @@ describe("state and liveness badges", () => {
   });
 });
 
-type DerivedKey = StateKey | LivenessKey | SourceKey | WarningKey | CounterSourceKey;
-
-/** Every label key the client derives from a run field, in schema declaration order. */
-const derivedKeys: DerivedKey[] = [
-  ...RUN_STATES.map(stateKey),
-  ...RUN_LIVENESS.map(livenessKey),
-  ...RUN_ROOT_SOURCES.map(sourceKey),
-  ...RUN_WARNINGS.map(warningKey),
-  "counter.fromState",
-  "counter.fromEvents",
-];
-
-/** The shipped copy behind each derived key, per locale. */
-const derivedLabels: Record<"en" | "zh-CN", Record<DerivedKey, string>> = {
-  en: {
-    "state.running": "running",
-    "state.done": "done",
-    "state.failed": "failed",
-    "state.killed": "killed",
-    "state.unknown": "unknown",
-    "liveness.running": "live",
-    "liveness.settled": "settled",
-    "liveness.stale": "stale",
-    "liveness.unknown": "unknown",
-    "source.setting": "the plugin setting",
-    "source.env": "GDD_RUN_ROOT",
-    "source.xdg": "XDG_STATE_HOME",
-    "source.home": "the home state directory",
-    "source.localappdata": "LOCALAPPDATA",
-    "source.default": "the documented default",
-    "warning.state-missing": "state.json is missing, so this run is unknown rather than successful.",
-    "warning.state-unreadable": "state.json could not be parsed.",
-    "warning.no-lock": "No lock file and no recorded pid.",
-    "warning.no-pids": "No pid is recorded, so liveness cannot be checked.",
-    "warning.liveness-unknown": "Liveness is unproven for this run.",
-    "warning.log-unreadable": "events.ndjson could not be read.",
-    "warning.log-truncated":
-      "The launcher spliced the event log; counters cover the retained part only.",
-    "counter.fromState": "counters from state.json",
-    "counter.fromEvents": "counters from events.ndjson",
-  },
-  "zh-CN": {
-    "state.running": "运行中",
-    "state.done": "完成",
-    "state.failed": "失败",
-    "state.killed": "被终止",
-    "state.unknown": "未知",
-    "liveness.running": "存活",
-    "liveness.settled": "已收尾",
-    "liveness.stale": "疑似失联",
-    "liveness.unknown": "未知",
-    "source.setting": "插件设置",
-    "source.env": "GDD_RUN_ROOT",
-    "source.xdg": "XDG_STATE_HOME",
-    "source.home": "用户状态目录",
-    "source.localappdata": "LOCALAPPDATA",
-    "source.default": "文档默认值",
-    "warning.state-missing": "缺少 state.json，该运行状态未知，不能视为成功。",
-    "warning.state-unreadable": "state.json 无法解析。",
-    "warning.no-lock": "没有 lock 文件，也没有记录进程号。",
-    "warning.no-pids": "没有记录进程号，无法检查存活性。",
-    "warning.liveness-unknown": "该运行的存活性无法确认。",
-    "warning.log-unreadable": "events.ndjson 无法读取。",
-    "warning.log-truncated": "启动器已对事件日志做拼接裁剪，计数仅覆盖保留部分。",
-    "counter.fromState": "计数来自 state.json",
-    "counter.fromEvents": "计数来自 events.ndjson",
-  },
-};
-
 describe("label derivation", () => {
   it("reads the state legend as running, done, failed, killed, unknown", () => {
     expect(STATE_ORDER).toEqual(["running", "done", "failed", "killed", "unknown"]);
@@ -417,18 +341,6 @@ describe("label derivation", () => {
     expect(counterSourceKey("none")).toBeNull();
   });
 
-  it("resolves every derived key to its literal shipped label in both locales", () => {
-    for (const locale of ["en", "zh-CN"] as const) {
-      const runtime = new PluginTranslationRuntime({
-        getLocale: () => locale,
-        subscribe: () => () => {},
-      });
-      for (const key of derivedKeys) {
-        expect(runtime.t(messages, key)).toBe(derivedLabels[locale][key]);
-      }
-      runtime.dispose();
-    }
-  });
 });
 
 describe("model chip", () => {

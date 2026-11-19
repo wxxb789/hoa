@@ -518,10 +518,12 @@ describe("run store", () => {
     });
     const runs = store([222]);
     const id = `${DATE}/stage-implement`;
-    const parsedList = listRuns.output.safeParse(await runs.listRuns());
+    const parsedList = listRuns.output.safeParse(await runs.listUpdate());
+    const parsedDelta = listRuns.output.safeParse(await runs.listUpdate(parsedList.data?.revision));
     const parsedPaths = runPaths.output.safeParse(await runs.paths(id));
     const parsedFollow = followRun.output.safeParse(await runs.follow(id));
-    for (const parsed of [parsedList, parsedPaths, parsedFollow]) {
+    expect(parsedDelta.data).toMatchObject({ changes: [], removed: [] });
+    for (const parsed of [parsedList, parsedDelta, parsedPaths, parsedFollow]) {
       expect(parsed.success ? "" : JSON.stringify(parsed.error.issues)).toBe("");
     }
   });
@@ -568,20 +570,130 @@ describe("run store", () => {
   });
 });
 
-describe("liveness probe", () => {
-  it(
-    "proves this process is alive and confirms a reserved pid through the OS listing",
-    async () => {
-      const probe = createLivenessProbe();
-      const bogus = 2_147_483_632;
-      const first = probe.verdicts([process.pid, bogus, 0]);
-      expect(first.get(process.pid)).toBe("alive");
-      expect(first.get(bogus)).not.toBe("alive");
-      expect(probe.verdicts([0]).get(0)).toBe("unknown");
+describe("run store lineage", () => {
+  const BASE_FILES = {
+    "state.json": STATE_RUNNING,
+    lock: JSON.stringify({ pid: 111, agent_pid: 222 }),
+    "events.ndjson": event({ type: "turn_end" }),
+  };
+  const LINEAGE = JSON.stringify({
+    goal: "  ship the observer lineage  ",
+    stage: " stage-implement ",
+    parentAgentId: "Paseo.Main-1",
+  });
 
-      await probe.refresh([bogus]);
-      expect(probe.verdicts([bogus]).get(bogus)).toBe("dead");
-    },
-    30_000,
-  );
+  it("carries a validated sidecar on follow and nothing else", async () => {
+    await writeRun("stage-implement", { ...BASE_FILES, "lineage.json": LINEAGE });
+    await writeRun("stage-no-parent", {
+      ...BASE_FILES,
+      "lineage.json": JSON.stringify({ goal: "goal-only", stage: "stage-fix" }),
+    });
+    const runs = store([222]);
+    const id = `${DATE}/stage-implement`;
+
+    const follow = await runs.follow(id);
+    expect(follow.lineage).toEqual({
+      goal: "ship the observer lineage",
+      stage: "stage-implement",
+      parentAgentId: "Paseo.Main-1",
+    });
+    // The sidecar annotates the run; the standard summary and tails are untouched.
+    expect(follow.summary?.turns).toBe(1);
+    expect(follow.events).toHaveLength(1);
+    expect(follow.answerTail).toBeNull();
+    expect(followRun.output.safeParse(follow).success).toBe(true);
+    // A warmed poll answers from the revision-checked cache with the same lineage.
+    expect((await runs.follow(id)).lineage).toEqual(follow.lineage);
+
+    // The parent id is optional in the published shape.
+    expect((await runs.follow(`${DATE}/stage-no-parent`)).lineage).toEqual({
+      goal: "goal-only",
+      stage: "stage-fix",
+    });
+
+    // The scan carries no lineage, and the path listing does not read the sidecar.
+    expect((await runs.listRuns()).runs[0]).not.toHaveProperty("lineage");
+    expect((await runs.paths(id)).paths.some((path) => path.label === "lineage.json")).toBe(false);
+  });
+
+  it("omits lineage entirely when the sidecar is missing", async () => {
+    await writeRun("stage-implement", BASE_FILES);
+    const follow = await store([222]).follow(`${DATE}/stage-implement`);
+    expect(follow.found).toBe(true);
+    expect(follow.lineage).toBeUndefined();
+    expect(follow.summary?.turns).toBe(1);
+    expect(follow.events).toHaveLength(1);
+    expect(followRun.output.safeParse(follow).success).toBe(true);
+  });
+
+  it("omits lineage for malformed, invalid, and oversized sidecars without disturbing the run", async () => {
+    const cases: Record<string, string> = {
+      "empty file": "",
+      "truncated JSON": '{"goal":"goal","stage":"stage"',
+      "not an object": JSON.stringify(["goal", "stage"]),
+      "whitespace-only goal": JSON.stringify({ goal: "   ", stage: "stage" }),
+      "invalid parent id": JSON.stringify({ goal: "goal", stage: "stage", parentAgentId: "not an id" }),
+      // This file's last 4 KiB parse as valid JSON; only the size check stops the window from passing.
+      oversized: `${" ".repeat(5000)}${JSON.stringify({ goal: "goal", stage: "stage" })}`,
+    };
+    const runs = store([222]);
+    for (const [index, [name, content]] of Object.entries(cases).entries()) {
+      const slug = `stage-${index}`;
+      await writeRun(slug, { ...BASE_FILES, "lineage.json": content });
+      const follow = await runs.follow(`${DATE}/${slug}`);
+      expect(follow.found, name).toBe(true);
+      expect(follow.lineage, name).toBeUndefined();
+      expect(follow.summary?.turns, name).toBe(1);
+      expect(follow.events, name).toHaveLength(1);
+      expect(followRun.output.safeParse(follow).success, name).toBe(true);
+    }
+  });
+
+  it("omits lineage when the sidecar path is not a readable document", async () => {
+    const dir = await writeRun("stage-implement", BASE_FILES);
+    await mkdir(join(dir, "lineage.json"));
+    const follow = await store([222]).follow(`${DATE}/stage-implement`);
+    expect(follow.lineage).toBeUndefined();
+    expect(follow.summary?.turns).toBe(1);
+    expect(follow.events).toHaveLength(1);
+  });
+
+  it("re-reads a replaced sidecar on the next follow", async () => {
+    const dir = await writeRun("stage-implement", {
+      ...BASE_FILES,
+      "lineage.json": JSON.stringify({ goal: "first", stage: "stage-a" }),
+    });
+    const runs = store([222]);
+    const id = `${DATE}/stage-implement`;
+    expect((await runs.follow(id)).lineage?.goal).toBe("first");
+
+    await writeFile(
+      join(dir, "lineage.json"),
+      JSON.stringify({ goal: "second sidecar", stage: "stage-b" }),
+      "utf8",
+    );
+    expect((await runs.follow(id)).lineage).toEqual({ goal: "second sidecar", stage: "stage-b" });
+  });
+
+  it("reads a sidecar that fills the cap exactly", async () => {
+    const document = JSON.stringify({ goal: "boundary", stage: "stage-boundary" });
+    const padded = `${" ".repeat(4096 - document.length)}${document}`;
+    expect(padded).toHaveLength(4096);
+    await writeRun("stage-implement", { ...BASE_FILES, "lineage.json": padded });
+    const follow = await store([222]).follow(`${DATE}/stage-implement`);
+    expect(follow.lineage).toEqual({ goal: "boundary", stage: "stage-boundary" });
+  });
+});
+
+describe("liveness probe", () => {
+  it("proves this process is alive and rejects invalid pids on this host", () => {
+    const probe = createLivenessProbe();
+    const verdicts = probe.verdicts([process.pid, 0]);
+    expect(verdicts.get(process.pid)).toBe("alive");
+    expect(verdicts.get(0)).toBe("unknown");
+    if (process.platform !== "win32") {
+      const absentPid = 2_147_483_632;
+      expect(probe.verdicts([absentPid]).get(absentPid)).toBe("dead");
+    }
+  });
 });
