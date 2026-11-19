@@ -44,13 +44,13 @@ targets:  runtime-agnostic | repo-only |
 | generated-runtime-repairs | skill | software-development,work-management | runtime-agnostic | `skills/generated-runtime-repairs/` | 修模板/生成器、验证暂存产物，再部署并回读线上运行时 |
 | ghc-search | skill | software-development | runtime-agnostic | `skills/ghc-search/` | 经本机 `ghc-proxy` Responses API 做 web 与 X/Twitter 搜索；返回答案加去重来源 |
 | git-auto-sync-pipelines | skill | software-development,work-management | runtime-agnostic | `skills/git-auto-sync-pipelines/` | 手改仓库的定时提交推送：固定门序、白名单与体积上限、暂存区密钥扫描、心跳与去重告警 |
-| harness-engineering | skill | software-development | runtime-agnostic | `skills/harness-engineering/` | 审计与重构 harness 脚本：自包含、检查绑定 owner 决策、纯函数检查加薄 runner、净减行数 |
+| harness-engineering | skill | software-development | runtime-agnostic | `skills/harness-engineering/` | 重构与设计 harness 脚本：自包含、检查绑定 owner 决策、纯函数检查加薄 runner、净减行数 |
 | hermes-context-file-loading | skill | software-development | hermes | `skills/hermes-context-file-loading/` | Hermes 指令文件各自从何处加载、哪个项目文件生效，以及规则该放进哪个 prompt 层 |
 | hermes-models | skill | software-development | hermes | `skills/hermes-models/` | 配置 Hermes provider、传输与路由；用实时信号证明路由，而非 `config get` |
 | hermes-models-cutover | skill | software-development | hermes | `skills/hermes-models-cutover/` | 跨 Hermes home 与 harness 切换供应商路由，实时验证并保留回滚 |
 | hermes-updates | skill | software-development | hermes | `skills/hermes-updates/` | 升级运行中的 Hermes 并诊断漂移：快照、官方更新器、更新后检查、故障索引 |
-| hoa-introspect | skill | self-management,work-management | runtime-agnostic | `skills/hoa-introspect/` | 分层自省报告：确定性使用 facets（L1）+ 带证据的盲点审计（L2） |
-| hoa-introspect-distill | skill | self-management,software-development | runtime-agnostic | `skills/hoa-introspect-distill/` | 评估给定的重复工作发现为候选；逐项批准后才创建资产 |
+| hoa-practice-retro | skill | self-management,work-management | runtime-agnostic | `skills/hoa-practice-retro/` | 定期复盘负责人跨仓库、会话与记忆的工程实践：应停止的习惯、未执行的决定、未知的未知，每条都有两个独立来源 |
+| hoa-repo-reckoning | skill | software-development,work-management | runtime-agnostic | `skills/hoa-repo-reckoning/` | 定期深度审计单个仓库：分维度查找、对抗验证与补漏评审，产出排序的停止清单与未知的未知 |
 | hoa-skill-create | skill | software-development,work-management,self-management | runtime-agnostic | `skills/hoa-skill-create/` | 直接创建、演进或组合已定义的 skill，并按风险聚焦验证 |
 | hoa-skill-curate | skill | software-development,self-management | runtime-agnostic | `skills/hoa-skill-curate/` | 追溯已安装技能的来源与上游新鲜度，执行上游退役规则，仅在所有者确认后变更技能库 |
 | hoa-skill-port | skill | software-development,work-management | runtime-agnostic | `skills/hoa-skill-port/` | 把私有 skill 解耦到可发布仓库：确定权威副本、五轴改造、配置解析、目录与 CI 校验、走分支与 PR 发布 |
@@ -105,7 +105,7 @@ targets:  runtime-agnostic | repo-only |
 把你从其它来源安装的同名 skill 从命令中去掉：
 
 ```bash
-npx skills remove -g arch-improvement-plan design-an-interface design-md dsh-headless-gdd find-nearby git-worktree-workflow github-code-review github-repo-management grounded-citations hoa-agent-retrieve hoa-skill-work html-artifact improve-codebase-architecture jupyter-live-kernel m365-copilot-cdp microsoft-office my-ado-cppr notes-to-prd ocr-and-documents omp-headless-orchestration plan-to-issues rss-feeds skill-library-curation skill-porting-and-publishing subagent-driven-development systematic-debugging teams-cdp to-issues to-prd whisper writing-plans
+npx skills remove -g arch-improvement-plan design-an-interface design-md dsh-headless-gdd find-nearby git-worktree-workflow github-code-review github-repo-management grounded-citations hoa-agent-retrieve hoa-introspect hoa-introspect-distill hoa-skill-work html-artifact improve-codebase-architecture jupyter-live-kernel m365-copilot-cdp microsoft-office my-ado-cppr notes-to-prd ocr-and-documents omp-headless-orchestration plan-to-issues rss-feeds skill-library-curation skill-porting-and-publishing subagent-driven-development systematic-debugging teams-cdp to-issues to-prd whisper writing-plans
 ```
 
 > reflections 与 eval 结果属于文章 / 知识类，不在此索引。

@@ -6,10 +6,9 @@ description: >-
   Use when the user asks to create or change a skill. Use hoa-skill-review for
   read-only reviews of one skill and candidate-output judgments; use
   hoa-skill-port to de-couple and publish a private skill into a shared repo;
-  use hoa-introspect-distill for recurring-work findings that need
-  qualification and item approval, when available.
+  for qualifying recurring work from history, suggest the user run hoa-practice-retro.
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "software-development,work-management,self-management"
   targets: "runtime-agnostic"
   summary: "directly create, evolve or compose a defined skill with focused, risk-scaled validation"
@@ -62,8 +61,9 @@ that authority, such as an external or destructive change, or when only the
 user can supply a material decision.
 
 A recurring-work finding by itself is evidence, not authorization to create an
-asset. When the request is to qualify a pattern or seek item-specific approval,
-route to the optional `hoa-introspect-distill` skill if installed. When the user
+asset. When the request is to qualify a pattern from history, suggest the user
+run the explicit-only `hoa-practice-retro` if installed; the model cannot invoke
+it. Its candidates come here once the owner accepts one. When the user
 directly asks to create from that finding, use the creation path and label the
 basis accurately; do not claim an audit or history analysis that did not occur.
 If qualification is the only request and that sibling is unavailable, leave

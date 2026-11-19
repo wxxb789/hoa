@@ -1,16 +1,17 @@
 ---
 name: harness-engineering
 description: >-
-  Audit, restructure, and design harnesses — scheduled operational scripts, drift checkers,
+  Restructure and design harnesses — scheduled operational scripts, drift checkers,
   watchdogs, gated data pipelines wrapped around a repo or agent system. Use when helper scripts
   have grown past one screen, checkers are multiplying, or a harness subsystem needs a home.
-  Not for one-off scripts, and not for application code that no scheduled check or gate runs.
+  Not for one-off scripts or application code. For a repo-wide audit, suggest the user run
+  hoa-repo-reckoning.
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "software-development"
   targets: "runtime-agnostic"
-  summary: "audit and restructure harness scripts: self-containment, obligations bound to owner decisions, pure checks plus one thin runner, net-negative line budget"
-  summary_zh: "审计与重构 harness 脚本：自包含、检查绑定 owner 决策、纯函数检查加薄 runner、净减行数"
+  summary: "restructure and design harness scripts: self-containment, obligations bound to owner decisions, pure checks plus one thin runner, net-negative line budget"
+  summary_zh: "重构与设计 harness 脚本：自包含、检查绑定 owner 决策、纯函数检查加薄 runner、净减行数"
   kind: "entry"
 ---
 

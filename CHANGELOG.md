@@ -18,6 +18,13 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
   child without relaxing mutation authorization. Document shared installation and Hermes visibility.
 - Restore operating-contract wording, traceable deliverable references, target-repo port gates and
   delegated publishing, and Kanban checkout and review recovery rules after the references split.
+- Added the explicit-only `hoa-practice-retro` and `hoa-repo-reckoning` with a shared audit
+  panel and findings ledger. Retired `hoa-introspect` and `hoa-introspect-distill` in favor of
+  the practice retro, retaining the deterministic usage facets, citation floor and PII gate.
+- Extended `hoa-skill-set-audit` with adversarial verification, necessity verdicts, the local
+  180-day staleness rule and weekly recommendations shared with `hoa-skill-curate`.
+- Added single-workflow protocol integrity to `hoa-skill-review` and narrowed
+  `harness-engineering` to harness design and restructuring.
 
 - Trigger evals now route on visible skills' frontmatter descriptions, accept `none` when no
   artifact fits, and include three no-trigger cases.

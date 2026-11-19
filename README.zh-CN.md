@@ -170,7 +170,7 @@ scope-seal）。每条规则都由该命令执行：
 | Vendored shared scripts drift | `python scripts/vendor_shared.py --check` | 分发到 skill 内的共享脚本副本与权威文件一致。 |
 | PR bumps changed skills' revision（pull request） | `python scripts/version.py check-revisions` | 自 merge base 以来改动过的每个 skill 目录都提高了 `metadata.revision`。 |
 | pytest | `python -m pytest` | `scripts/`、`evals/`、`skills/` 下每个 `test_*.py` unittest/pytest 文件（`pytest.ini`）；每个测试 120 秒上限。 |
-| 脚本检查 | `python evals/run_trigger_evals.py`、`evals/validate_skill_method_cases.py`、`skills/define-goal/evals/validate_fixtures.py`、`skills/hoa-introspect/evals/run.py`、`skills/hoa-introspect-distill/evals/run_evals.py`、`skills/hermes-models/scripts/tests/test-*.py`、`skills/gdd/scripts/tests/test_verdict_matrix.py`、`mutate_verdict_matrix.py` | 以退出码为契约的独立检查；每个一个 step。 |
+| 脚本检查 | `python evals/run_trigger_evals.py`、`evals/validate_skill_method_cases.py`、`skills/define-goal/evals/validate_fixtures.py`、`skills/hermes-models/scripts/tests/test-*.py`、`skills/gdd/scripts/tests/test_verdict_matrix.py`、`mutate_verdict_matrix.py` | 以退出码为契约的独立检查；每个一个 step。 |
 | gdd shell 套件 | `bash skills/gdd/scripts/tests/run-gdd-selftest.sh`、`test-omp-run-stale.sh`、`test-omp-run-setsid.sh` | gdd 端到端循环（含 `test-dispatch-guards.py`）与 `omp-run.sh` forwarder。 |
 | Paseo gdd-run-observer | 在 `paseo-plugins/gdd-run-observer` 中 `npm ci && npm run typecheck && npm test` | 插件的 typecheck 与 Vitest 套件。 |
 
@@ -341,12 +341,12 @@ OpenCode 用 `@hermes-models-cutover`。
 |---|---|---|
 | 审计已有 skill、评审拟议修改，或判断其行为 | `hoa-skill-review` | 带证据的发现项；不修改被审查的 skill |
 | 根据明确能力创建 skill，或演进、组合已有 skill | `hoa-skill-create` | 完整的 skill 修改，以及验证结果与未验证路径 |
-| 从 agent 历史中发现重复工作 | `hoa-introspect` | 带证据的工作模式发现；不会自动创建资产 |
-| 在选择资产前评估给定的重复工作发现 | `hoa-introspect-distill` | 逐项批准的候选，以及获批后创建的资产 |
-| 审计会话实际提供的整套 skill：重叠、遮蔽、漂移、可见性与清单预算（隐藏 skill：手动运行 `/hoa-skill-set-audit`，Codex 用 `$hoa-skill-set-audit`） | `hoa-skill-set-audit` | 按危害排序、带证据的整体发现项；不做任何修改 |
+| 复盘跨仓库和 agent 会话的工程实践（隐藏 skill：手动运行 `/hoa-practice-retro`，Codex 用 `$hoa-practice-retro`） | `hoa-practice-retro` | 带证据的发现及符合条件的重复工作候选；不会自动创建资产 |
+| 深度审计单个仓库的运作机制（隐藏 skill：手动运行 `/hoa-repo-reckoning`，Codex 用 `$hoa-repo-reckoning`） | `hoa-repo-reckoning` | 验证后的发现、排序的停止事项和上轮跟进 |
+| 审计会话实际提供的整套 skill（隐藏 skill：手动运行 `/hoa-skill-set-audit`，Codex 用 `$hoa-skill-set-audit`） | `hoa-skill-set-audit` | 验证后的整套发现、必要性结论或每周推荐；不做任何修改 |
 
 对行为变更，`hoa-skill-create` 默认使用聚焦检查；只有覆盖面、风险或相互矛盾的证据需要时，
-才扩大到多版本、多模型或多 runtime。`hoa-introspect-distill` 保留逐候选批准门槛；
+才扩大到多版本、多模型或多 runtime。复盘候选须经负责人逐项批准后才能进入创建流程；
 直接请求创建或改进一个明确的 skill，不需要走该提名流程。
 `evals/skill-method-cases.json` 保存聚焦行为场景；CI 只校验结构与隔离路径，
 模型和 runtime 行为须在全新运行中判断，不能把 fixture 检查当成行为证明。
@@ -401,9 +401,8 @@ type 从目录推导。两个轴都可多值。
 
 ## 复盘节奏
 
-复盘是排期的，不是随缘的：每月跑一次 **hoa-introspect** 自我复盘，产出写入
-`reflections/`。distill 循环（introspect → retrieve → distill）应在下一个
-phase 收尾前产出第一个自产 skill。
+每月在仓库审计后运行 **hoa-practice-retro**，以复用审计账本。复盘产出保存在配置的
+私有审计状态目录中，不提交到 Git。
 
 ## 请求一个 skill
 

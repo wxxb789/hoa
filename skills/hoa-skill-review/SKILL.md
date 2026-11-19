@@ -4,10 +4,10 @@ description: >-
   Evidence-ranks skill behavior against its intended outcome and next consumer
   without changing the subject. Use when reviewing one skill or a changed
   skill block. Use when candidate skill replies need judgment against task requirements.
-  Use hoa-skill-create for requested skill creation or evolution; use
-  hoa-introspect-distill for recurring-work candidates considered for distillation.
+  Use hoa-skill-create for requested skill creation or evolution; for whole-set verdicts,
+  suggest the user run hoa-skill-set-audit.
 metadata:
-  revision: "2"
+  revision: "3"
   areas: "software-development,work-management,self-management"
   targets: "runtime-agnostic"
   summary: "review skill behavior and changes against consumer evidence without editing the target"
@@ -51,9 +51,34 @@ Return the conclusion, the scope actually inspected, and findings under Change, 
 
 List **Verified paths** and **Unverified paths** separately. A deterministic static trace may verify that an inspected path necessarily fails; label it **statically established**, not runtime-exercised. Reserve **runtime-verified** for an observed run. Name the host, consumer, fixture, simulation, or static trace and make its evidence boundary explicit. Put unavailable hosts, unexecuted triggers, mocked boundaries, ambiguous candidate contexts, and runtime or consumer behavior conclusions based only on static inspection under Unverified paths. Never imply that a simulation proves automatic activation or real downstream behavior.
 
+## Protocol integrity of one workflow skill
+
+When asked to make a workflow skill more general, check whether one protocol lives in several
+files and has drifted. Keep the judgment scoped to the skill under review:
+
+1. **Inventory the protocol.** Count lines in the body, references and profiles. Read headings
+   of named peers to see whether they restate the same stage order or gate.
+2. **Count copies.** Search the skill tree for a distinctive role marker, wrapper command or
+   gate script name. Inspect hits to distinguish independent definitions from references.
+3. **Check current defaults.** Compare stated transports, commands and configuration with
+   their effective values. Report stale claims as Change findings.
+4. **Compare same-purpose scripts.** Normalize whitespace to spot copies, then verify behavior
+   and callers before recommending deletion.
+5. **Check profiles against real projects.** Verify that active projects have needed profiles and
+   that profiles carry only local deltas, not competing protocol definitions.
+6. **Check recovery where interruption matters.** Verify persistent per-increment state and a
+   ledger that records review rounds and durations.
+
+Deliver counts, duplication and drift evidence, and two or three options sized by effort. Do not
+rewrite the skill during review.
+
 ## Optional routes
 
-Use `hoa-skill-create` when the user requests skill creation or evolution; this review does not acquire write authority from that handoff. Use `hoa-introspect-distill` when the user wants recurring-work candidates assessed for distillation; its own process determines whether a candidate is approved for creation. These routes are optional; if unavailable, finish the review within this skill's boundary and report any resulting limit.
+Use `hoa-skill-create` when the user requests skill creation or evolution; this review does not
+acquire write authority from that handoff. For keep, merge or cut verdicts across a skill set,
+suggest the user run the explicit-only `hoa-skill-set-audit`; the model cannot invoke it. For
+qualifying recurring work from history, suggest the user run the explicit-only `hoa-practice-retro`
+instead. If a route is unavailable, finish within this skill's boundary and report the limit.
 
 ## Provenance
 

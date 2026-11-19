@@ -1,11 +1,11 @@
 {
-  "case_count": 23,
+  "case_count": 22,
   "model": "gemini-4-carbon",
   "effort": "low",
-  "passed": 23,
-  "total": 23,
+  "passed": 22,
+  "total": 22,
   "judge_endpoint_host": "127.0.0.1:4141",
-  "generated_at": "2026-11-19T00:35:01Z",
+  "generated_at": "2026-11-19T00:53:58Z",
   "per_case": [
     {
       "id": "route-to-search",
@@ -33,18 +33,8 @@
       "passed": true
     },
     {
-      "id": "route-to-retrieve-not-introspect",
+      "id": "route-to-retrieve-history",
       "pick": "cross-agent-history-retrieval",
-      "passed": true
-    },
-    {
-      "id": "route-to-introspect-not-retrieve",
-      "pick": "hoa-introspect",
-      "passed": true
-    },
-    {
-      "id": "route-to-distill",
-      "pick": "hoa-introspect-distill",
       "passed": true
     },
     {
@@ -75,6 +65,11 @@
     {
       "id": "route-to-skill-scout",
       "pick": "skill-scout",
+      "passed": true
+    },
+    {
+      "id": "route-to-harness-restructure",
+      "pick": "harness-engineering",
       "passed": true
     },
     {

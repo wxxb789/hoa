@@ -57,10 +57,6 @@ jobs:
         run: python evals/validate_skill_method_cases.py
       - name: define-goal fixtures
         run: python skills/define-goal/evals/validate_fixtures.py
-      - name: hoa-introspect evals
-        run: python skills/hoa-introspect/evals/run.py
-      - name: hoa-introspect-distill evals
-        run: python skills/hoa-introspect-distill/evals/run_evals.py
       - name: hermes-models routing inventory
         run: python skills/hermes-models/scripts/tests/test-routing-inventory.py
       - name: hermes-models provider metadata
