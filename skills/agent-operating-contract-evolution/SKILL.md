@@ -1,13 +1,12 @@
 ---
 name: agent-operating-contract-evolution
 description: >-
-  Evolve an agent's operating contract: its identity file, operating protocol, layered memory /
-  skills / config, and any repo whose product IS an agent contract or control plane. Use when asked
-  to optimize, review, or refactor those files, or when the owner corrects how the agent approached
-  identity, routing, delegation, or persistence. Not for ordinary repo coding rules, and not for
-  one-off task notes.
+  Evolve an agent's operating contract: identity file, operating protocol, layered memory / skills
+  / config, or a repo whose product is an agent control plane. Use to optimize, review, or
+  refactor them, or when the owner corrects the agent's identity, routing, delegation, or
+  persistence. Not for ordinary repo coding rules or one-off task notes.
 metadata:
-  revision: "3"
+  revision: "4"
   areas: "software-development,work-management,self-management"
   targets: "runtime-agnostic"
   summary: "evolve an agent's identity file and operating protocol by layer, with coverage markers, behavioral evals, and load-scope probes"

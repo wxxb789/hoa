@@ -1,13 +1,12 @@
 ---
 name: writing
 description: >-
-  Draft and revise publishable prose per channel — technical blog, academic, X/Twitter, Reddit,
-  Xiaohongshu, WeChat MP, tutorial, changelog, a-little-book notes — behind one shared layer of
-  content-first rules, measurable self-checks, and an AI-smell audit. Use when the text has a
-  destination and a reader whose decision it must move. Not for chat replies, commit messages, or
-  any piece where the content is still missing and only the packaging is being polished.
+  Draft and revise publishable prose per channel (technical blog, academic, X, Reddit, Xiaohongshu,
+  WeChat MP, tutorial, changelog, a-little-book notes) with content-first rules and an AI-smell
+  audit. Use when text has a destination and a reader to move. Not for chat replies, commit
+  messages, or polishing packaging when content is still missing.
 metadata:
-  revision: "2"
+  revision: "3"
   areas: "work-management,self-management"
   targets: "runtime-agnostic"
   summary: "per-channel prose contracts behind one content-first layer: blog, academic, X, Reddit, 小红书, 公众号, tutorial, changelog; plus a measurable AI-smell audit"

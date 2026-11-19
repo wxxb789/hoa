@@ -1,14 +1,12 @@
 ---
 name: report-claim-audit
 description: >-
-  Audit a status report, dispatch digest, or closeout handoff by re-deriving every claim from the
-  artifact that owns it, accounting for what the report omitted, and pricing each decision so the
-  operator can reply with a number instead of re-reading the repo. Use when a report is about to
-  drive a decision and its numbers have not been independently recomputed. Not for writing the
-  report, repairing what the audit finds, or reviewing a diff — an audit that edits its subject
-  destroys its own evidence.
+  Audit a status report, dispatch digest, or closeout handoff: re-derive every claim from the
+  artifact that owns it, diff the deliverable set for omissions, and price each open decision. Use
+  when a report will drive a decision and its numbers were not independently recomputed. Not for
+  writing the report, repairing findings, or reviewing a diff.
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
   summary: "recount every report claim from the artifact that owns it, diff the deliverable set, and price the open decisions"

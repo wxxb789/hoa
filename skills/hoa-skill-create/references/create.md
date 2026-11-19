@@ -92,7 +92,8 @@ The description is paid for on every turn and is all a selector sees.
   reject: [Claude Code](https://code.claude.com/docs/en/skills) 1,536 chars for
   `description` plus `when_to_use` combined; the
   [agentskills spec](https://agentskills.io/specification) and Codex 1,024;
-  DSH `catalogDescriptionMaxLength` default 500.
+  DSH `catalogDescriptionMaxLength` default 500. A target repo's own gate wins
+  when stricter (hoa rejects a model-visible description over 350).
 - The always-on listing has a budget. Claude Code gives it about 1% of the
   context window and drops descriptions of the least-invoked skills first;
   [Codex](https://github.com/openai/codex/blob/main/codex-rs/ext/skills/src/render.rs)

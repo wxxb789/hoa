@@ -163,7 +163,7 @@ scope-seal）。每条规则都由该命令执行：
 
 | Step | 命令 | 保护什么 |
 |---|---|---|
-| Frontmatter | `python scripts/check_frontmatter.py` | 每个 `SKILL.md` 的 frontmatter 与目录字段；description 上限 1024 字符；隐藏标记与 `agents/openai.yaml` 一致。 |
+| Frontmatter | `python scripts/check_frontmatter.py` | 每个 `SKILL.md` 的 frontmatter 与目录字段；description 上限：可见 350 字符、隐藏 1024 字符；隐藏标记与 `agents/openai.yaml` 一致。 |
 | Contract graph | `python scripts/check_contract_graph.py` | 上面的 R1–R10。 |
 | Skill links | `python scripts/check_skill_links.py` | skill 中每个 `../<name>/` 引用都指向存在的同级 skill 与路径（相对所在文件解析）；skill Markdown 里每个 `uv run <path>.py` 指向带 PEP 723 块的脚本，`uv run python` 带 `--no-project`，且不用裸 `python`/`python3` 运行 skill 脚本。 |
 | Catalog index drift | `python scripts/generate_index.py --check` | `index.md` / `index.zh-CN.md` 与 artifact 元数据一致。 |

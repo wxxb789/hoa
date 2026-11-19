@@ -1,13 +1,12 @@
 ---
 name: research-stream-consolidation
 description: >-
-  Merge parallel research streams that cover the same topic into one project: inventory both
-  trees, relocate a stream as a single unit, dedup by content identity exactly once, and repair
-  the path-bound records the move invalidated. Use when two agents or models produced overlapping
-  research and the deliverable must become one tree without losing provenance. Not for copying
-  files between projects or for reconciling divergent code branches.
+  Merge research streams on one topic into one project: inventory both trees, relocate a stream as
+  one unit, dedup by content identity once, and repair the path-bound records the move broke. Use
+  when two agents or models produced overlapping research that must become one tree with
+  provenance intact. Not for copying files or reconciling code branches.
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "work-management"
   targets: "runtime-agnostic"
   summary: "merge overlapping research streams into one project and repair the records that bound the old paths"

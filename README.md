@@ -175,7 +175,7 @@ UI; a newer push to a pull request cancels the older run.
 
 | Step | Command | Protects |
 |---|---|---|
-| Frontmatter | `python scripts/check_frontmatter.py` | Every `SKILL.md` frontmatter and catalog field; 1024-char description cap; hidden flag agrees with `agents/openai.yaml`. |
+| Frontmatter | `python scripts/check_frontmatter.py` | Every `SKILL.md` frontmatter and catalog field; description cap 350 chars when model-visible, 1024 when hidden; hidden flag agrees with `agents/openai.yaml`. |
 | Contract graph | `python scripts/check_contract_graph.py` | Rules R1–R10 above. |
 | Skill links | `python scripts/check_skill_links.py` | Every `../<name>/` reference in a skill names an existing sibling skill and path, relative to the file that holds it; every `uv run <path>.py` in skill Markdown runs a script with a PEP 723 block, `uv run python` carries `--no-project`, and no bare `python`/`python3` runs a skill script. |
 | Catalog index drift | `python scripts/generate_index.py --check` | `index.md` / `index.zh-CN.md` match artifact metadata. |

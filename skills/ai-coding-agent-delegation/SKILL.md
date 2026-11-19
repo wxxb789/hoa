@@ -1,13 +1,12 @@
 ---
 name: ai-coding-agent-delegation
 description: >-
-  Hand a bounded coding or review task to an external autonomous coding-agent CLI in its own git
-  worktree, then verify the diff, the tests and every acceptance claim yourself before integrating.
-  Use when work should outlive the current turn, run isolated from the operator's checkout, or be
-  compared across agents. Not for a quick bounded subtask in the current turn, and not for work with
-  no written task spec or acceptance command.
+  Hand a bounded coding or review task to an external coding-agent CLI in its own git worktree, then
+  verify the diff, tests and acceptance claims yourself before integrating. Use when work should
+  outlive the current turn, stay isolated from your checkout, or be compared across agents. Not for
+  quick in-turn subtasks or work with no written task spec.
 metadata:
-  revision: "3"
+  revision: "4"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "hand a bounded coding task to an external agent CLI in an isolated worktree, then verify the diff, tests and every acceptance claim yourself"
