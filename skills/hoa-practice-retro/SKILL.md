@@ -43,8 +43,9 @@ never evidence of absence.
    `hoa-repo-reckoning` and prior `hoa-practice-retro` runs. A finding kind that recurs in two or more repos, or
    in three or more runs, is promoted to a practice finding. This is the cheapest strong signal.
 
-Config keys (same file): `roots` (list of workspace paths), `report_language` (default `en-US`;
-narrative only, never numbers, ids or citations).
+Config keys (same file): `roots` (list of workspace paths; no default), `report_language`
+(default `en-US`; narrative only, never numbers, ids or citations). See [the panel](references/panel.md)
+for their environment overrides.
 
 ## L1: usage facets (deterministic)
 
@@ -83,9 +84,14 @@ run `uv run scripts/audit.py --bundle <bundle> --run <run>` before the verifiers
 ## Repeatable-work candidates
 
 A candidate qualifies only when observed three or more times across two or more projects and not
-already covered by an installed skill. At most three per report. Creation routes to `hoa-skill-create`
-only after the owner accepts that candidate, recorded with
-`uv run scripts/findings.py decide <run> <id> accepted "<reason>"`.
+already covered by an installed skill. Before citation checks and verification, write each candidate
+as a finding in `find-recurrence.json`. Run the panel's `findings.py report` to build `ledger.jsonl`;
+present at most three candidates from that ledger, using their finding ids.
+
+Only an approval that names a single candidate id records `accepted`. A vague or grouped approval
+("looks good", "all of them") records nothing; ask which candidate the owner means. Record the
+named decision with `uv run scripts/findings.py decide <run> <id> accepted "<reason>"` and route
+creation to `hoa-skill-create` only after that succeeds.
 
 ## Privacy
 

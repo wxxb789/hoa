@@ -25,6 +25,11 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
   180-day staleness rule and weekly recommendations shared with `hoa-skill-curate`.
 - Added single-workflow protocol integrity to `hoa-skill-review` and narrowed
   `harness-engineering` to harness design and restructuring.
+- Linked repeatable-work candidates to verified recurrence findings and required approval of a
+  single named candidate before recording acceptance. Restored lightweight qualification for
+  user-provided patterns in `hoa-skill-create`.
+- Restored audit CLI regression coverage for unresolved Git markers, manifest ordering, file size,
+  and unreadable sources. Documented the shared audit state namespace and retro config overrides.
 
 - Trigger evals now route on visible skills' frontmatter descriptions, accept `none` when no
   artifact fits, and include three no-trigger cases.

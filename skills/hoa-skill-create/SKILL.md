@@ -66,9 +66,13 @@ run the explicit-only `hoa-practice-retro` if installed; the model cannot invoke
 it. Its candidates come here once the owner accepts one. When the user
 directly asks to create from that finding, use the creation path and label the
 basis accurately; do not claim an audit or history analysis that did not occur.
-If qualification is the only request and that sibling is unavailable, leave
-files unchanged and state that the route is unavailable. This skill's direct
-create and evolve paths do not depend on either sibling.
+If the request is only to qualify a pattern from history and that sibling is
+unavailable, leave files unchanged and state that the route is unavailable.
+This skill's direct create and evolve paths do not depend on either sibling.
+
+For a recurring pattern the user describes without history evidence, label it `user-provided`.
+Qualify it before creation: it must recur at least three times across at least two projects and
+not be covered by an existing skill. If either condition is not established, say why and stop.
 
 If the task is only to audit a skill or judge supplied outputs without changing
 the skill, use the optional `hoa-skill-review` route when available. This skill
