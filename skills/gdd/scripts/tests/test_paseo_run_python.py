@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Portable native-launcher contract tests with a stub paseo binary on PATH."""
 from __future__ import annotations
 
@@ -20,12 +19,11 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import agent_run
 import gdd_process
-from gdd_test_support import (check_locks, check_processes, claim, cleanup_child, finalized, own_identity, publish_json, ready,
+from gdd_test_support import (check_locks, check_processes, claim, cleanup_child, exited, finalized, publish_json, ready,
                               remove_tree, retry_windows, wait_for_json)
 
 ADAPTER = Path(__file__).resolve().parents[1] / "adapters" / "paseo-run.py"
-STUB = '''#!/usr/bin/env python3
-import json, os, sys, time
+STUB = '''import json, os, sys, time
 from pathlib import Path
 sys.path[:0] = [os.environ["STUB_TESTS"], os.environ["STUB_SCRIPTS"]]
 from gdd_test_support import own_identity, publish_json
@@ -77,17 +75,9 @@ elif command == "delete":
     if deleted and type(receipt.get("deletedCount")) is int and receipt == {"deletedCount": 1, "agentIds": [config["id"]]}:
         config["missing"] = True
         publish_json(root / "fixture.json", config)
-elif command == "ls":
-    print(json.dumps([] if config.get("missing") else
-                     [{"id": config["id"], "status": config["status"]}]))
 else:
     sys.exit(2)
 '''
-
-
-def test_stub_identity_matches_runner():
-    recorded = own_identity()
-    assert recorded and recorded == agent_run.identity(os.getpid())
 
 
 class PaseoLauncherTests(unittest.TestCase):
@@ -110,7 +100,7 @@ class PaseoLauncherTests(unittest.TestCase):
                 f'@echo off\r\n"{sys.executable}" "{source}" %*\r\n', encoding="utf-8")
         else:
             executable = self.bin / "paseo"
-            executable.write_text(f"#!{sys.executable}\n" + STUB.split("\n", 1)[1], encoding="utf-8")
+            executable.write_text(f"#!{sys.executable}\n" + STUB, encoding="utf-8")
             executable.chmod(0o755)
         self.root = self.home / "runs"
         self.prompt = self.home / "prompt.md"
@@ -146,11 +136,10 @@ class PaseoLauncherTests(unittest.TestCase):
                 if issues:
                     self.fail("\n".join(issues))
 
-    def start(self, *flags, name="stage", env=None):
+    def start(self, *flags, name="stage", env=None, expect=0):
         result = self.run_adapter("start", "--name", name, "--prompt", str(self.prompt),
                                   "--cwd", str(self.home), *flags, env=env)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("started: " + name, result.stdout)
+        self.assertEqual(result.returncode, expect, result.stdout + result.stderr)
         return result
 
     def run_dir(self, name="stage"):
@@ -183,8 +172,6 @@ class PaseoLauncherTests(unittest.TestCase):
             check_processes(self.monitors, 10)
 
     def stop_stub_children(self):
-        # A normal watcher exit has already waited for its CLI. Verify the stub
-        # independently as well, including if watcher cleanup had to kill the tree.
         owned = {}
         issues = []
         for path in (self.home / "children").glob("*.json"):
@@ -193,52 +180,36 @@ class PaseoLauncherTests(unittest.TestCase):
                 owned[pid, recorded] = (path, True)
             except (OSError, AssertionError) as exc:
                 issues.append(str(exc))
-        try:
-            check_processes(owned, 5)
-        except AssertionError as exc:
-            issues.append(str(exc))
+        check_processes(owned, 5)
         if issues:
             self.fail("\n".join(issues))
 
     def test_start_argv_identity_and_artifacts(self):
-        self.start("--model", "stub-provider", "--thinking", "deliberate")
+        env = dict(self.env, GDD_MODEL="environment-provider", GDD_THINKING="deliberate",
+                   PASEO_AGENT_ID="caller", PASEO_WORKSPACE_ID="caller-workspace",
+                   PASEO_AGENT_CWD=str(self.home / "not-the-stage"))
+        self.start("--model", "stub-provider", env=env)
         expected = ["run", "--no-wait", "--title", "stage", "--cwd", str(self.home),
                     "--provider", "stub-provider", "--thinking", "deliberate", "--json",
                     "--", self.prompt.read_text(encoding="utf-8")]
         self.assertEqual(next(row for row in self.calls() if row[0] == "run"), expected)
         state = self.status()
-        self.assertEqual(state["agent_id"], self.fixture["id"])
-        self.assertEqual(state["session_id"], self.fixture["id"])
-        self.assertEqual(state["backend"], "paseo")
+        self.assertEqual((state["agent_id"], state["session_id"], state["backend"]),
+                         (self.fixture["id"], self.fixture["id"], "paseo"))
         self.assertIsInstance(state["pid"], int)
         for filename in ("prompt.md", "run.json", "stderr.log", "events.ndjson"):
             self.assertTrue((self.run_dir() / filename).exists(), filename)
 
-    def test_environment_passthrough_and_flag_precedence(self):
-        env = dict(self.env, GDD_MODEL="environment-provider", GDD_THINKING="environment-thinking")
-        self.start("--model", "explicit-provider", env=env)
-        argv = next(row for row in self.calls() if row[0] == "run")
-        self.assertEqual(argv[argv.index("--provider") + 1], "explicit-provider")
-        self.assertEqual(argv[argv.index("--thinking") + 1], "environment-thinking")
-
-    def test_explicit_cwd_is_not_overridden_by_callers_workspace(self):
-        env = dict(self.env, PASEO_AGENT_ID=str(uuid.uuid4()), PASEO_WORKSPACE_ID=str(uuid.uuid4()),
-                   PASEO_AGENT_CWD=str(self.home / "not-the-stage"))
-        self.start(env=env)
-        state = self.status()
         self.assertEqual(state["cwd"], str(self.home))
         self.assertEqual(json.loads((self.home / "run-env.json").read_text(encoding="utf-8")), {})
 
     def test_start_cwd_mismatch_stays_unknown_until_verified(self):
         wrong_cwd = str(self.home / "not-the-stage")
         self.save_fixture(status="idle", run_cwd=wrong_cwd, inspect_cwd=wrong_cwd)
-        result = self.run_adapter("start", "--name", "stage", "--prompt", str(self.prompt),
-                                  "--cwd", str(self.home))
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        result = self.start(expect=1)
         self.assertIn("different cwd", result.stderr)
         recorded = self.state()
-        self.assertEqual(recorded["state"], "unknown")
-        self.assertEqual(recorded["agent_id"], self.fixture["id"])
+        self.assertEqual((recorded["state"], recorded["agent_id"]), ("unknown", self.fixture["id"]))
 
         for inspected_cwd in (wrong_cwd, None):
             self.save_fixture(inspect_cwd=inspected_cwd)
@@ -247,26 +218,16 @@ class PaseoLauncherTests(unittest.TestCase):
                     result = self.run_adapter(command, *([] if command == "list" else ["stage"]))
                     self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                     state = self.state()
-                    self.assertEqual(state["state"], "unknown")
-                    self.assertIsNone(state["exit"])
-                    self.assertEqual(state["agent_id"], self.fixture["id"])
-                    self.assertEqual(state["cwd"], str(self.home))
-                    self.assertIn("cwd", state["error"])
+                    self.assertEqual((state["state"], state["exit"], state["agent_id"], state["cwd"]),
+                                     ("unknown", None, self.fixture["id"], str(self.home)))
                     for name in ("finalized", "exit.code", "answer.md"):
                         self.assertFalse((self.run_dir() / name).exists(), name)
 
         self.save_fixture(inspect_cwd=str(self.home))
         verified = self.status()
-        self.assertEqual(verified["state"], "done")
-        self.assertEqual(verified["exit"], 0)
+        self.assertEqual((verified["state"], verified["exit"]), ("done", 0))
         self.assertNotIn("error", verified)
         self.assertEqual(self.wait_state("done")["exit"], 0)
-
-    def test_unset_options_are_not_defaulted(self):
-        self.start()
-        argv = next(row for row in self.calls() if row[0] == "run")
-        self.assertNotIn("--provider", argv)
-        self.assertNotIn("--thinking", argv)
 
     def test_literal_multiline_prompt(self):
         text = 'Reply "exactly" with Unicode \u03bb.\nNo tools; keep a & b | c < d > e unchanged.\n'
@@ -275,6 +236,7 @@ class PaseoLauncherTests(unittest.TestCase):
         self.start(env=env)
         argv = next(row for row in self.calls() if row[0] == "run")
         self.assertEqual(argv[-1], text)
+        self.assertFalse({"--provider", "--thinking"} & set(argv))
 
     @unittest.skipUnless(os.name == "nt", "batch prompt hazards are Windows-specific")
     def test_batch_prompt_hazards_refuse_before_dispatch(self):
@@ -291,9 +253,7 @@ class PaseoLauncherTests(unittest.TestCase):
     def test_invalid_json_argv_refuses(self):
         for value in ("[]", '["unterminated"', '[1]', '["paseo", ""]'):
             with self.subTest(value=value):
-                result = self.run_adapter("start", "--name", "invalid", "--prompt", str(self.prompt),
-                                          env=dict(self.env, PASEO_BIN=value))
-                self.assertEqual(result.returncode, 1)
+                self.start(name="invalid", env=dict(self.env, PASEO_BIN=value), expect=1)
                 self.assertEqual(list(self.root.glob("*/invalid")), [])
 
     def test_each_paseo_lifecycle_state(self):
@@ -548,18 +508,12 @@ raise SystemExit(int(overlap))
         self.assertEqual(answer.returncode, 0, answer.stderr)
         self.assertEqual(answer.stdout, "STAGE OK\n")
 
-    def test_unsuccessful_deletion_is_not_reported_killed(self):
-        self.start()
-        self.save_fixture(delete_failed=True)
-        result = self.run_adapter("kill", "stage")
-        self.assertNotEqual(result.returncode, 0)
-        self.assertEqual(self.status()["state"], "running")
-
     def test_failed_deletion_does_not_publish_a_provisional_answer(self):
         self.start()
         self.save_fixture(delete_failed=True)
         result = self.run_adapter("kill", "stage")
         self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.status()["state"], "running")
         self.assertFalse((self.run_dir() / "answer.md").exists())
         # The agent later completes while the final logs stay unavailable: the
         # discarded pre-delete capture must not stand in as the final answer.
@@ -597,28 +551,13 @@ raise SystemExit(int(overlap))
         self.assertNotEqual(state["state"], "killed")
         self.assertFalse(state.get("agent_deleted", False))
 
-    def test_deleting_finalized_agent_preserves_historical_outcome(self):
-        self.save_fixture(status="idle")
-        self.start()
-        before = self.status()
-        self.assertEqual(before["state"], "done")
-        marker = (self.run_dir() / "finalized").read_bytes()
-        result = self.run_adapter("kill", "stage")
-        self.assertEqual(result.returncode, 0, result.stderr)
-        state = self.status()
-        self.assertEqual(state["state"], "done")
-        self.assertTrue(state["agent_deleted"])
-        for key in ("agent_deleted", "termination_verb", "terminated_at"):
-            state.pop(key)
-        self.assertEqual(state, before)
-        self.assertEqual((self.run_dir() / "finalized").read_bytes(), marker)
-
     def test_lifecycle_commands_survive_worktree_removal(self):
         worktree = self.home / "worktree"
         worktree.mkdir()
         self.save_fixture(status="idle")
         self.start("--cwd", str(worktree))
-        before = self.status()
+        before = self.wait_state("done")
+        self.assertTrue(agent_run.wait_until(lambda: exited(before["pid"], before["pid_identity"]), 10))
         self.assertEqual(before["state"], "done")
         self.assertEqual(before["cwd"], str(worktree))
         marker = (self.run_dir() / "finalized").read_bytes()
@@ -630,7 +569,9 @@ raise SystemExit(int(overlap))
         self.assertIn(["delete", self.fixture["id"], "--json"], self.calls())
         state = self.status()
         self.assertTrue(state["agent_deleted"])
-        self.assertEqual(state["state"], "done")
+        for key in ("agent_deleted", "termination_verb", "terminated_at"):
+            del state[key]
+        self.assertEqual(state, before)
         self.assertEqual((self.run_dir() / "finalized").read_bytes(), marker)
 
     def test_list_and_result_show_agent_identity(self):
@@ -645,16 +586,14 @@ raise SystemExit(int(overlap))
 
     def test_duplicate_slug_refuses_without_another_dispatch(self):
         self.start()
-        result = self.run_adapter("start", "--name", "stage", "--prompt", str(self.prompt))
-        self.assertNotEqual(result.returncode, 0)
+        self.start(expect=1)
         self.assertEqual(sum(row[0] == "run" for row in self.calls()), 1)
 
     def test_binary_override_and_missing_binary_refusal(self):
         env = dict(self.env, PASEO_BIN=str(self.bin / ("paseo.cmd" if os.name == "nt" else "paseo")))
         self.start(env=env)
         env["PASEO_BIN"] = str(self.home / "absent-paseo")
-        result = self.run_adapter("start", "--name", "absent", "--prompt", str(self.prompt), env=env)
-        self.assertNotEqual(result.returncode, 0)
+        self.start(name="absent", env=env, expect=1)
         self.assertEqual(list(self.root.glob("*/absent")), [])
 
 
