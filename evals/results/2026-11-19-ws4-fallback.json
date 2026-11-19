@@ -1,0 +1,169 @@
+{
+  "schema_version": 1,
+  "task": "ws4-fallback",
+  "generated_at": "2026-11-19T23:54:30.328679+08:00",
+  "skill": "hoa-repo-reckoning",
+  "skill_revision": "2",
+  "cli_version": "2.1.328 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 1,
+  "mode": "acceptance",
+  "order": [
+    "skill"
+  ],
+  "rubric": {
+    "single-context-header": {
+      "file": "report.md",
+      "contains": "verification: single-context"
+    },
+    "external-lane-not-run": {
+      "file": "scope.md",
+      "contains": "external lane: not run"
+    }
+  },
+  "summary": {
+    "skill": {
+      "valid": true,
+      "passed": 0,
+      "pass^k": false,
+      "mean_score": 0.0,
+      "sample_stddev": null
+    }
+  },
+  "runs": {
+    "skill": [
+      {
+        "error": null,
+        "contaminated": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false
+          },
+          {
+            "tool": "Skill",
+            "skill_access": true
+          },
+          {
+            "tool": "Read",
+            "skill_access": true
+          },
+          {
+            "tool": "Read",
+            "skill_access": true
+          },
+          {
+            "tool": "Read",
+            "skill_access": true
+          },
+          {
+            "tool": "Read",
+            "skill_access": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false
+          }
+        ],
+        "output": "Quick reckoning of `subject/` is done, run by hand. Two low-severity findings, no decisions recorded, and nothing in `subject/` was changed.\n\n**Caveats on how it ran**\n- The `hoa-repo-reckoning` skill wasn't in the skill list, so I read its files directly from the additional directory and followed the protocol manually.\n- The tooling wasn't available: no shell, so `findings.py check`, `report` and `decide` didn't run. `report.md` is hand-assembled and `ledger.jsonl` was not written.\n- No worker fan-out, so this was single-context: I wrote the findings and verified them myself.\n- No web search (external lane not run), and I didn't consult the state dir for a prior run.\n\n**Dimensions:** enforcement, reach and boundary, plus the critic. Skipped history, ceremony, tests, code-shape, agent-stack and external, since the snapshot has no git history, no tests and no server config.\n\n**Findings**\n- **A1 (low):** The only CI check, `test -f queue.txt`, only checks that the file exists. Whether it is a required status can't be verified from the snapshot.\n- **A2 (low):** `desk-card` appears on lines 1 and 3 of `queue.txt`. It may be intentional.\n- **B1 (low):** The snapshot lacks history and server settings, so the enforcement and history checks are blind. This is a scope limit, not a repo defect.\n\n**Outputs** are in `Q:\\tmp\\hoa-eval-skill-239ia_bh\\work\\audit-runs\\subject-snapshot\\2026-11-19\\`: `scope.md`, the find and verify JSON files for each dimension, critic files, `spot.json` (empty) and `report.md`.",
+        "artifacts": {},
+        "checks": {
+          "single-context-header": false,
+          "external-lane-not-run": false
+        },
+        "score": 0.0,
+        "passed": false,
+        "seconds": 44.405,
+        "usage": {
+          "input_tokens": 14,
+          "cache_creation_input_tokens": 21621,
+          "cache_read_input_tokens": 81615,
+          "output_tokens": 8303,
+          "output_tokens_details": {
+            "thinking_tokens": 2561
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 21621
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.007671675,
+        "turns": 22
+      }
+    ]
+  },
+  "outcome": "fail",
+  "limits": {
+    "turns_per_run": 24,
+    "usd_per_run": 1.5,
+    "seconds_per_run": 300
+  }
+}
