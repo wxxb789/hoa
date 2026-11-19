@@ -30,7 +30,7 @@ KEY=$(grep -E "^${ENVVAR}=" "$ENVFILE" | head -1 | cut -d= -f2- | tr -d '"' | tr
 if [ -z "${KEY:-}" ]; then echo "!! ${ENVVAR} not found in ${ENVFILE}" >&2; exit 1; fi
 
 redact() { sed -e "s/${KEY}/<KEY>/g"; }
-python3 - "$KEY" <<'PY'
+uv run --no-project python - "$KEY" <<'PY'
 import sys, hashlib, re
 k = sys.argv[1]
 print("key fingerprint: %d chars | %s...%s | sha256[:12]=%s | clean_shape=%s" % (

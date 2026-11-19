@@ -6,7 +6,7 @@ description: >-
   execute an owner-confirmed retirement, merge or deletion. Not for loaded-set overlap or pruning
   (hoa-skill-set-audit), or creating, editing or porting a skill.
 metadata:
-  revision: "3"
+  revision: "4"
   areas: "software-development,self-management"
   targets: "runtime-agnostic"
   summary: "trace installed skills' provenance and upstream freshness, apply the upstream-retirement rule, and execute only owner-confirmed library changes"

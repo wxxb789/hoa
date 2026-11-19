@@ -1,5 +1,5 @@
 # /// script
-# requires-python = ">=3.9"
+# requires-python = ">=3.13"
 # dependencies = []
 # ///
 """The gdd stage-result contract: references/stage-result.schema.json, how a result is found in an

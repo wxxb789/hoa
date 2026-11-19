@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.13"
+# dependencies = ["pyyaml>=6"]
+# ///
 """Offline validation for the trigger (routing) eval suite.
 
 trigger-cases.json is graded by an LLM judge in a fresh context (see its

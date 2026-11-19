@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.13"
+# dependencies = []
+# ///
 """Mechanical pass over one print of a bill or statute.
 
 Counts section-number hits, shows the window around each citation of an older law, and counts the
@@ -6,7 +10,7 @@ named things an absence claim rests on. It answers "what does this fetched text 
 "what does the bill say", and never a procedural forecast.
 
 Usage:
-    python3 scan_bill_text.py <file> [--section 904] [--cite "42 U.S.C. 1396"] [--term "renewal"] ...
+    uv run scan_bill_text.py <file> [--section 904] [--cite "42 U.S.C. 1396"] [--term "renewal"] ...
 
 Output is JSON on stdout so the caller can quote exact counts in the evidence note.
 """

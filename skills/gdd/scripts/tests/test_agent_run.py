@@ -702,6 +702,20 @@ if sys.stdin.readline().strip() != "RELEASE":
 
 
 class RunnerMechanicsTests(unittest.TestCase):
+    def test_child_env_drops_the_uv_script_venv_only(self):
+        with tempfile.TemporaryDirectory() as venv:
+            bindir = os.path.join(venv, "Scripts" if IS_WINDOWS else "bin")
+            caller = os.pathsep.join([bindir, "/usr/bin"])
+            uv = {"VIRTUAL_ENV": venv, "UV_RUN_RECURSION_DEPTH": "1", "PATH": caller, "KEEP": "1",
+                  "DROP": "1"}
+            with mock.patch.dict(os.environ, uv, clear=True), mock.patch.object(sys, "prefix", venv):
+                env = agent_run.child_env({"DROP"})
+            self.assertEqual(env, {"PATH": "/usr/bin", "KEEP": "1"})
+            # A venv the caller activated (not uv run's) is theirs: keep it.
+            own = {"VIRTUAL_ENV": venv, "PATH": caller}
+            with mock.patch.dict(os.environ, own, clear=True), mock.patch.object(sys, "prefix", venv):
+                self.assertEqual(agent_run.child_env(set()), own)
+
     def test_finalize_keeps_first_terminal_state(self):
         with tempfile.TemporaryDirectory() as tmp:
             run = Path(tmp)

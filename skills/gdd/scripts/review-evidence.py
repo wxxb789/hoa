@@ -1,6 +1,6 @@
 #!/usr/bin/env -S uv run --script
 # /// script
-# requires-python = ">=3.6"
+# requires-python = ">=3.13"
 # dependencies = []
 # ///
 """Generate a PR comment from a real completed UTF-8 machine-review report.

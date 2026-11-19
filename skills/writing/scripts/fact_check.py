@@ -1,6 +1,6 @@
 #!/usr/bin/env -S uv run --script
 # /// script
-# requires-python = ">=3.6"
+# requires-python = ">=3.13"
 # dependencies = []
 # ///
 """Check that every number in a draft traces back to the source corpus.

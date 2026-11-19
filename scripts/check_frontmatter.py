@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.13"
+# dependencies = ["pyyaml>=6"]
+# ///
 """Check every custom skill's SKILL.md frontmatter.
 
 One implementation of the rule CI used to inline: the file starts with YAML

@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.13"
+# dependencies = []
+# ///
 """Check every `../<name>/` reference that leaves a skill directory.
 
 A parent chains to a sibling skill with a path relative to its own file, e.g.
@@ -24,7 +28,12 @@ code blocks and inline code:
   `--project`), or it syncs the user's project environment too;
 - a bare `python`/`python3` command (not `uv run ... python`) must not run a
   file under `skills/` (write `uv run <path>`); a `test_*`/`test-*` file is
-  exempt, since dated evidence quotes how a suite was run.
+  exempt, since dated evidence quotes how a suite was run;
+- a skill's `.py` file outside `tests/` that starts with a shebang must use
+  `#!/usr/bin/env -S uv run --script`, so running it directly also honours its
+  `requires-python` (a bare `python3` is often older; test files are exempt).
+- a skill's `.sh`/`.bash`/`.ps1` launcher outside `tests/` must not call a bare
+  `python`/`python3`: it goes through `uv run` too.
 
 Script paths resolve against the skill directory, the file holding them,
 `skills/` and the repository root, after dropping a leading `$VAR/`, `${...}/`,
@@ -62,6 +71,9 @@ TEST_FILE = re.compile(r"test[_-]")
 UV_VALUE_OPTIONS = {"--with", "--with-requirements", "--with-editable", "--project", "--directory",
                     "--python", "-p", "--env-file", "--extra", "--group", "--index", "--package"}
 LEADING_VARIABLE = re.compile(r"^(?:\$\{[^}]*\}|\$\w+|<[^>]*>|~)/")
+UV_SHEBANG = "#!/usr/bin/env -S uv run --script"
+SCRIPT_SUFFIXES = {".py", ".sh", ".bash", ".ps1"}
+SHELL_PYTHON = re.compile(r"(?<![\w./$<'\"-])python3?(?:\.exe)?(?=\s|$)")
 PEP_723 = re.compile(r"^# /// script\s*$", re.M)
 
 
@@ -206,12 +218,35 @@ def script_errors(skill_dir: Path, skills_root: Path) -> list[str]:
     return errors
 
 
+def shebang_errors(skill_dir: Path, skills_root: Path) -> list[str]:
+    """Errors for a non-test skill script whose shebang or shell launcher bypasses uv."""
+    errors = []
+    for path in sorted(p for p in skill_dir.rglob("*") if p.suffix in SCRIPT_SUFFIXES):
+        relative = path.relative_to(skill_dir)
+        if "tests" in relative.parts or TEST_FILE.match(path.name):
+            continue
+        where = path.relative_to(skills_root.parent).as_posix()
+        lines = path.read_text(encoding="utf-8").splitlines()
+        if path.suffix == ".py":
+            if lines and lines[0].startswith("#!") and lines[0].rstrip() != UV_SHEBANG:
+                errors.append(f"{where}:1: shebang {lines[0].rstrip()!r} bypasses uv; "
+                              f"write {UV_SHEBANG}")
+            continue
+        for number, line in enumerate(lines, 1):
+            code = line.split("#", 1)[0] if path.suffix != ".ps1" else line
+            if SHELL_PYTHON.search(code) and not UV_PREFIX.search(code):
+                errors.append(f"{where}:{number}: bare python in a launcher; write "
+                              f"uv run <script> or uv run --no-project python")
+    return errors
+
+
 def check(skills_root: Path) -> list[str]:
     """Return the errors for every skill under skills_root."""
     errors = []
     for skill_dir in sorted(path for path in skills_root.iterdir()
                             if path.is_dir() and not path.name.startswith(".")):
         errors.extend(script_errors(skill_dir, skills_root))
+        errors.extend(shebang_errors(skill_dir, skills_root))
         for ref in references(skill_dir):
             where = f"{ref.source.relative_to(skills_root.parent).as_posix()}:{ref.line}"
             if ref.scope == "skill-relative":

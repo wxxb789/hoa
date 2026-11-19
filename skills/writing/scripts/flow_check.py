@@ -1,6 +1,6 @@
 #!/usr/bin/env -S uv run --script
 # /// script
-# requires-python = ">=3.6"
+# requires-python = ">=3.13"
 # dependencies = []
 # ///
 """流水账探测器：按节统计事实密度、结论句、段落节奏。

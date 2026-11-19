@@ -7,7 +7,7 @@ description: >-
   agent-session friction (ce-retro), or skill-catalog verdicts (suggest the user run hoa-skill-set-audit).
 disable-model-invocation: true
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "periodic deep audit of one whole repository: dimension finders, adversarial verifiers and a critic yield a ranked stop-doing list plus unknown unknowns"

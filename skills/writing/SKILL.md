@@ -6,7 +6,7 @@ description: >-
   audit. Use when text has a destination and a reader to move. Not for chat replies, commit
   messages, or polishing packaging when content is still missing.
 metadata:
-  revision: "3"
+  revision: "4"
   areas: "work-management,self-management"
   targets: "runtime-agnostic"
   summary: "per-channel prose contracts behind one content-first layer: blog, academic, X, Reddit, 小红书, 公众号, tutorial, changelog; plus a measurable AI-smell audit"

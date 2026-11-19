@@ -9,7 +9,7 @@ description: >-
   (hoa-skill-curate), or editing skills.
 disable-model-invocation: true
 metadata:
-  revision: "2"
+  revision: "3"
   areas: "software-development,self-management"
   targets: "runtime-agnostic"
   summary: "audit the whole offered skill set: per-skill quality, overlap, shadowing, contradictions, same-name drift, visibility, ../ closure, listing budget; report-only"

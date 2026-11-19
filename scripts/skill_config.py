@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.13"
+# dependencies = []
+# ///
 """One resolver for the configuration chain every skill documents.
 
 Resolution order, everywhere:
@@ -14,7 +18,7 @@ Usage::
     from skill_config import resolve
     value = resolve("gdd", "GDD_STATE_FILE", default="/tmp/ledger.tsv")
 
-    python scripts/skill_config.py --skill gdd --key GDD_STATE_FILE
+    uv run scripts/skill_config.py --skill gdd --key GDD_STATE_FILE
 
 CLI output is one provenance line: ``<KEY>=<value> (from flag|env VAR|config PATH|default)``.
 

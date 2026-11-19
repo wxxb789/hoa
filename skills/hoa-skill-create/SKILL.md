@@ -6,7 +6,7 @@ description: >-
   Not for read-only reviews (hoa-skill-review), porting to a shared repo (hoa-skill-port), or
   qualifying recurring work from history (hoa-practice-retro).
 metadata:
-  revision: "3"
+  revision: "4"
   areas: "software-development,work-management,self-management"
   targets: "runtime-agnostic"
   summary: "directly create, evolve or compose a defined skill with focused, risk-scaled validation"

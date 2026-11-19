@@ -1,11 +1,15 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.13"
+# dependencies = []
+# ///
 """Offline schema check for the define-goal judge fixtures.
 
 cardinality.json / domain-transfer.json are graded by an LLM judge in a fresh
 context; this script only validates their structure so a malformed fixture
 fails in CI instead of producing a silently ungradeable judge run.
 
-Run: python evals/validate_fixtures.py
+Run: uv run evals/validate_fixtures.py
 """
 from __future__ import annotations
 

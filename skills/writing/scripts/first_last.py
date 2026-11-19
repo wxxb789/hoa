@@ -1,6 +1,6 @@
 #!/usr/bin/env -S uv run --script
 # /// script
-# requires-python = ">=3.6"
+# requires-python = ">=3.13"
 # dependencies = []
 # ///
 """Extract the first and last real paragraph of each post (style study).

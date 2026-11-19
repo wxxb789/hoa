@@ -6,7 +6,7 @@ description: >-
   endpoint, a profile ignores its key, root and profiles drift, vision or image-gen errors, or a
   relay's effort/cost is wrong. Not for another harness's models.
 metadata:
-  revision: "5"
+  revision: "6"
   areas: "software-development"
   targets: "hermes"
   summary: "configure Hermes providers, transports and routing; prove every route with live signals, not `config get`"
