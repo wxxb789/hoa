@@ -21,33 +21,18 @@ on any other basis:
    checks` (sole blocking reason; items 2–4 pass in the same output). The operator's closeout note
    and PR body record `workflows: 0`, `checks: 0` beside the script's literal `checks: 0 total, 0 ok,
    0 pending, 0 failing (no checks)` line. Not `--allow-no-checks`: red or pending checks, or a repo
-   that *has* workflows but shows none on this head, stay blocked. A table-only read reports
-   `checks unreadable`, not `no checks`; `--allow-table-only-checks` stays the operator's own
-   opt-in.
+   that *has* workflows but shows none on this head, stay blocked.
 2. newest `machine-review-state:v1` evidence: `status: completed`, `has_any_findings: false`,
    **full 40-hex `commit_sha` exactly equal to that head**, nonempty operator-selected `model` and
    configured `provider`, full UTF-8 `report`, and matching `report_sha256`;
 3. unresolved review threads = 0;
 4. local gate re-run recorded for this tree (no `--gates-rc` ⇒ `UNKNOWN` ⇒ blocked).
 
-The checks clause reads gh's structured output (`gh pr checks --json name,state,bucket`). When that
-read is unavailable and only gh's human table remains, the parsed table is **advisory**: a non-green
-row blocks as always, and an all-green or empty table blocks too, with `verdict: BLOCKED: checks
-unreadable`. A table-only read can never produce MERGE-OK — gh's table is a display format whose
-field count, emptiness, case and row set are not a contract, and every parse of it has produced
-another way to lose a row. An operator whose gh cannot do `--json` restores the table's authority
-explicitly with `--allow-table-only-checks` (named in `pr-merge-check.py`'s docstring as well); the
-default fails closed, and the opt-in bypasses neither the exact-header rule nor the unknown-verdict
-rule. A nonblank line without a tab is not a row either: it carries no STATUS field, so the parser
-ignores it and prints one `pr-merge-check: ignored table line without a tab (not a row): '…'`
-diagnostic per such line on stderr — the only trace of a truncated row, and the parsing limitation
-the opt-in accepts. In that fallback only gh's check-result exits carry CI state — 1 (a check
-failed) and 8 (a check is pending). Any other non-zero exit is an operator error: it exits 2 with
-its own exit code and message preserved, so an interrupted (2) or unauthorised (4) read cannot
-become a `checks pending` verdict. `--allow-no-checks` forgives a zero-check read, but on its own
-cannot authorise table-only evidence; together with `--allow-table-only-checks` the table is
-authoritative and an empty one is accepted. Neither opt-in forgives a reported pending or failing
-check, with or without the other.
+The manual gate requires structured output from `gh pr checks --json name,state,bucket`.
+Upgrade gh if it cannot export these fields; the human table is never used as merge evidence.
+Malformed JSON, a missing response, or a command error exits 2. A successful empty list or gh's
+explicit zero-check result blocks as `no checks`; the CLI's `--allow-no-checks` is only for
+repositories with no CI and never forgives pending or failed checks.
 
 `--marker TEXT` changes only the token, not the required evidence schema. The newest malformed,
 incomplete, stale, or hash-invalid marker blocks older clean evidence and cannot be overridden by
@@ -86,7 +71,7 @@ raising each `metadata.revision` the gate names above the rebased base.
 - **Manual:** If capability is absent or unreadable, the same invocation runs the existing manual
   gate. On `MERGE-OK` (or the explicit no-CI exception above), recheck that
   `gh pr view <N> --json headRefOid` still equals the verified head, then run
-  `gh pr merge <N> --squash --delete-branch`.
+  `gh pr merge <N> --squash --delete-branch --match-head-commit <full-sha>`.
 
 On `MERGE-QUEUED`, record the PR, full verified head, and target branch in the ledger before waiting:
 
