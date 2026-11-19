@@ -409,8 +409,7 @@ describe("liveness probe", () => {
     }
 
     // The in-flight listing settles 1 ms inside its 8 s budget and omits the pid. Its invocation predates
-    // that proof of life, so it is skipped, and its completion — not the proof of life — anchors the reuse
-    // window: it closes at 37,999 ms, not the 32,000 ms the former disclosure assumed.
+    // that proof of life, so it is skipped. Its completion anchors the reuse window.
     advanceTo(7_999);
     await resolveListing([]);
     advanceTo(8_000);
@@ -431,8 +430,7 @@ describe("liveness probe", () => {
     expect(calls).toHaveLength(2);
     expect(calls[1].at).toBe(38_000);
 
-    // That listing can prove absence, but until it settles the displayed verdict stays `alive`, including
-    // the 44 s tick, where the former 42 s budget (2 s proof of life + 42 s) already promised stale.
+    // That listing can prove absence, but until it settles the displayed verdict stays `alive`.
     for (let t = 40_000; t <= 44_000; t += 2_000) {
       advanceTo(t);
       expect(scan()).toBe("running");
@@ -441,8 +439,6 @@ describe("liveness probe", () => {
     advanceTo(45_999);
     await resolveListing([]); // 43,999 ms after the proof of life the omission turns the pid `dead`
 
-    // This timeline first displays stale 44 s after proof of life, not at the former 42 s budget.
-    // It is one measured phase arrangement, not the worst case over independently phased callers.
     advanceTo(46_000);
     expect(scan()).toBe("stale");
     expect(scans.find((entry) => entry.liveness === "stale")?.at).toBe(46_000);

@@ -15,6 +15,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
 import { Text } from "react-native";
 import { observerSettings, type ObserverSettings } from "../shared/settings";
+import { errorText } from "./format";
 import { sourceKey } from "./labels";
 import { messages } from "./messages";
 import { StatusStrip } from "./status-strip";
@@ -169,11 +170,7 @@ export function ObserverSettingsScreen({ theme, layout }: PluginSurfaceProps) {
             </Text>
           </SettingsRow>
           {scan.error ? (
-            <Text style={styles.error}>
-              {t("error.list", {
-                error: scan.error instanceof Error ? scan.error.message : String(scan.error),
-              })}
-            </Text>
+            <Text style={styles.error}>{t("error.list", { error: errorText(scan.error) })}</Text>
           ) : null}
         </SettingsCard>
       </SettingsSection>

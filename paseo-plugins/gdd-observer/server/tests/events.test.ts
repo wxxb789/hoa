@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyEventLine, createCounters, parseEventWindow, snapshotCounters, summarizeValue } from "../events";
+import { applyEventLine, createCounters, snapshotCounters, summarizeValue } from "../events";
 
 function line(event: unknown): string {
   return JSON.stringify(event);
@@ -98,19 +98,6 @@ describe("applyEventLine", () => {
     expect(event?.detail).toContain("npm test");
     expect(event?.detail).toContain("[…]");
     expect(event?.detail?.length).toBeLessThanOrEqual(161);
-  });
-
-  it("keeps only the requested event window", () => {
-    const text = [
-      line({ type: "turn_start" }),
-      line({ type: "tool_execution_start", toolCallId: "1", toolName: "read" }),
-      "garbage",
-      line({ type: "turn_end" }),
-      line({ type: "message_end", message: { role: "assistant" } }),
-    ].join("\n");
-    const events = parseEventWindow(text, 2);
-    expect(events.map((event) => event.type)).toEqual(["turn_end", "message_end"]);
-    expect(events[1].role).toBe("assistant");
   });
 
   it("attributes assistant messages to the model that produced them", () => {

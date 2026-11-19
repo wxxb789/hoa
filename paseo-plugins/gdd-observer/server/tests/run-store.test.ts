@@ -35,7 +35,7 @@ function fakeProbe(alive: number[]): LivenessProbe {
 function store(alive: number[] = [], config: Partial<StoreConfig> = {}, env: NodeJS.ProcessEnv = {}) {
   return createRunStore({
     probe: fakeProbe(alive),
-    config: () => ({ runRoot: root, pollIntervalMs: 2000, tailLines: 20, ...config }),
+    config: () => ({ runRoot: root, tailLines: 20, ...config }),
     env,
     now: () => NOW,
   });
@@ -116,7 +116,7 @@ describe("run store", () => {
     const missing = join(root, "absent");
     const result = await createRunStore({
       probe: fakeProbe([]),
-      config: () => ({ runRoot: missing, pollIntervalMs: 2000, tailLines: 20 }),
+      config: () => ({ runRoot: missing, tailLines: 20 }),
       env: {},
       now: () => NOW,
     }).listRuns();
@@ -286,7 +286,7 @@ describe("run store", () => {
     const logs: string[] = [];
     const runs = createRunStore({
       probe: fakeProbe([222]),
-      config: () => ({ runRoot: root, pollIntervalMs: 2000, tailLines: 20 }),
+      config: () => ({ runRoot: root, tailLines: 20 }),
       env: {},
       now: () => NOW,
       log: (message) => logs.push(message),
@@ -378,7 +378,7 @@ describe("run store", () => {
     const logs: string[] = [];
     const runs = createRunStore({
       probe: fakeProbe([222]),
-      config: () => ({ runRoot: root, pollIntervalMs: 2000, tailLines: 20 }),
+      config: () => ({ runRoot: root, tailLines: 20 }),
       env: {},
       now: () => NOW,
       log: (message) => logs.push(message),
@@ -405,7 +405,7 @@ describe("run store", () => {
         verdicts: (pids) => new Map(pids.map((pid) => [pid, "unknown" as PidVerdict])),
         refresh: () => new Promise<void>(() => {}),
       },
-      config: () => ({ runRoot: root, pollIntervalMs: 2000, tailLines: 20 }),
+      config: () => ({ runRoot: root, tailLines: 20 }),
       env: {},
       now: () => NOW,
     });
@@ -532,7 +532,7 @@ describe("run store", () => {
       await writeRun("stage-implement", { "state.json": STATE_RUNNING });
       const fromEnv = await createRunStore({
         probe: fakeProbe([222]),
-        config: () => ({ runRoot: "", pollIntervalMs: 2000, tailLines: 20 }),
+        config: () => ({ runRoot: "", tailLines: 20 }),
         env: { GDD_RUN_ROOT: root, HOME: stateDir, LOCALAPPDATA: stateDir },
         now: () => NOW,
       }).listRuns();
@@ -545,7 +545,7 @@ describe("run store", () => {
       await writeFile(join(localAppRuns, DATE, "from-localappdata", "state.json"), STATE_RUNNING, "utf8");
       const fromLocal = await createRunStore({
         probe: fakeProbe([222]),
-        config: () => ({ runRoot: "", pollIntervalMs: 2000, tailLines: 20 }),
+        config: () => ({ runRoot: "", tailLines: 20 }),
         env: { HOME: join(stateDir, "no-home"), LOCALAPPDATA: stateDir },
         now: () => NOW,
       }).listRuns();
@@ -555,7 +555,7 @@ describe("run store", () => {
 
       const unresolved = await createRunStore({
         probe: fakeProbe([]),
-        config: () => ({ runRoot: "", pollIntervalMs: 2000, tailLines: 20 }),
+        config: () => ({ runRoot: "", tailLines: 20 }),
         env: { HOME: join(stateDir, "empty-home") },
         now: () => NOW,
       }).listRuns();

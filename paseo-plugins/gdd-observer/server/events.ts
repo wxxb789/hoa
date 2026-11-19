@@ -165,19 +165,6 @@ export function applyEventLine(counters: RunCounters, line: string): RunEvent | 
   return { type, at, tool, intent: asString(event.intent), detail: detailOf(type, event), role };
 }
 
-export function parseEventWindow(text: string, limit: number): RunEvent[] {
-  const counters = createCounters();
-  const events: RunEvent[] = [];
-  const lines = text.split("\n");
-  for (let index = lines.length - 1; index >= 0 && events.length < limit; index -= 1) {
-    const event = applyEventLine(counters, lines[index]);
-    if (!event) continue;
-    events.push(event);
-  }
-  events.reverse();
-  return events;
-}
-
 export function summarizeValue(value: unknown, limit = DETAIL_LIMIT): string | null {
   if (value === undefined || value === null) return null;
   if (typeof value === "string") return clip(value, limit);

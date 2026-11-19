@@ -197,7 +197,7 @@ function fakeProbe(alive: number[] = []): LivenessProbe {
 }
 
 function makeStore(alive: number[] = [], config: Partial<StoreConfig> = {}) {
-  const settings: StoreConfig = { runRoot: root, pollIntervalMs: 2000, tailLines: 5, ...config };
+  const settings: StoreConfig = { runRoot: root, tailLines: 5, ...config };
   const logs: string[] = [];
   const store = createRunStore({
     probe: fakeProbe(alive),

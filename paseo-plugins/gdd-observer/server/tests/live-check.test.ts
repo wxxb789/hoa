@@ -16,7 +16,7 @@ describe.skipIf(root === "")("live run root", () => {
     const probe = createLivenessProbe();
     const store = createRunStore({
       probe,
-      config: () => ({ runRoot: root, pollIntervalMs: 2000, tailLines: 10 }),
+      config: () => ({ runRoot: root, tailLines: 10 }),
     });
 
     const first = await store.listRuns();

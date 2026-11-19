@@ -10,7 +10,6 @@ import {
   makeScan,
   mountedListRows,
   mountedRowCount,
-  mountedRowRange,
   nodes,
   renderClient,
   testListViewport,
@@ -54,8 +53,6 @@ function populationScan(count: number): ListRunsOutput {
   });
 }
 
-const listBounds = { initialNumToRender: 10, windowSize: 3, maxToRenderPerBatch: 10 };
-
 function listCalls(view: RenderedClient): number {
   return view.invoke.mock.calls.filter(([method]) => method === "runs.list").length;
 }
@@ -85,7 +82,11 @@ async function advance(ms: number): Promise<void> {
 
 describe("windowed run list", () => {
   it("mounts a bounded window of rows while the header keeps the whole-scan facts", async () => {
-    testListViewport.setRows(10);
+    // The 4-row viewport is the case that discriminates the production FlatList props from the
+    // adapter defaults: windowSize 3 clips the mount window to 3 × 4 = 12 rows, while the
+    // adapter's own windowSize 21 would leave the viewport plus one 10-row batch — 14 rows —
+    // unclipped.
+    testListViewport.setRows(4);
     const view = await renderClient(<RunsScreen {...hostProps} params={{}} />, {
       scan: populationScan(2000),
       queryDefaults: { staleTime: 0 },
@@ -95,26 +96,21 @@ describe("windowed run list", () => {
     expect(view.texts()).toContain("2000 runs");
 
     const mounted = mountedListRows(view);
-    const window = mountedRowRange(2000, listBounds);
-    expect(window).toEqual({ start: 0, end: 20 });
-    expect(mounted).toHaveLength(window.end - window.start);
+    expect(mounted).toHaveLength(12);
     expect(mounted[0].props.accessibilityLabel).toContain("run-0");
-    expect(mounted[19].props.accessibilityLabel).toContain("run-19");
+    expect(mounted[11].props.accessibilityLabel).toContain("run-11");
     expect(
-      mounted.some((row) => String(row.props.accessibilityLabel).includes("run-20")),
+      mounted.some((row) => String(row.props.accessibilityLabel).includes("run-12")),
     ).toBe(false);
 
-    // The mounted count follows the viewport, not the population.
-    const small = await renderClient(<RunsScreen {...hostProps} params={{}} />, {
-      scan: populationScan(20),
-      queryDefaults: { staleTime: 0 },
-    });
-    expect(mountedRowCount(small)).toBe(20);
-
-    // A resized viewport re-windows the mounted list: 12 rows here is a literal from the renderer
-    // adapter's arithmetic, never read back from `mountedRowRange`.
-    await small.change(() => testListViewport.setRows(4));
-    expect(mountedRowCount(small)).toBe(12);
+    // A resized viewport re-windows the mounted list: 10 visible rows plus the next 10-row batch.
+    await view.change(() => testListViewport.setRows(10));
+    const resized = mountedListRows(view);
+    expect(resized).toHaveLength(20);
+    expect(resized[19].props.accessibilityLabel).toContain("run-19");
+    expect(
+      resized.some((row) => String(row.props.accessibilityLabel).includes("run-20")),
+    ).toBe(false);
   });
 
   it("keys mounted rows by run id so a new head run does not remount the visible window", async () => {
@@ -140,21 +136,23 @@ describe("windowed run list", () => {
   });
 
   it("reaches offscreen runs by scroll and selects one without mounting the population", async () => {
-    testListViewport.setRows(10);
+    testListViewport.setRows(4);
     const population = populationScan(2000);
-    const target = population.runs[1999];
+    const target = population.runs[1003];
     const view = await renderClient(<RunsScreen {...hostProps} params={{}} />, {
       scan: population,
       follow: { found: true, summary: target, events: [], answerTail: null },
       queryDefaults: { staleTime: 0 },
     });
-    expect(mountedRowCount(view)).toBe(20);
+    expect(mountedRowCount(view)).toBe(12);
 
-    await view.change(() => testListViewport.scrollTo(1990));
-    const window = mountedRowRange(2000, listBounds);
-    expect(window).toEqual({ start: 1980, end: 2000 });
+    // Scrolling mid-scan mounts one viewport of rows on either side of the visible four, clipped
+    // by windowSize and by neither data edge: rows 996-1007.
+    await view.change(() => testListViewport.scrollTo(1000));
     const scrolled = mountedListRows(view);
-    expect(scrolled).toHaveLength(window.end - window.start);
+    expect(scrolled).toHaveLength(12);
+    expect(scrolled[0].props.accessibilityLabel).toContain("run-996");
+    expect(scrolled[11].props.accessibilityLabel).toContain("run-1007");
 
     const targetRow = scrolled.find((row) =>
       String(row.props.accessibilityLabel).includes(target.name),
@@ -162,7 +160,7 @@ describe("windowed run list", () => {
     expect(targetRow).toBeDefined();
     await view.change(() => targetRow!.props.onPress());
     expect(view.texts()).toContain(target.id);
-    expect(mountedRowCount(view)).toBe(20);
+    expect(mountedRowCount(view)).toBe(12);
   });
 
   it("returns from a selected run to the compact windowed list", async () => {

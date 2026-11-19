@@ -14,7 +14,6 @@ export default function contribute(server: PluginServerContext) {
     probe,
     config: () => ({
       runRoot: current.runRoot,
-      pollIntervalMs: current.pollIntervalMs,
       tailLines: current.tailLines,
     }),
     log: (message) => console.log(`[observer] ${message}`),

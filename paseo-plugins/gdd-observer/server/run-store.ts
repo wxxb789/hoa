@@ -31,7 +31,7 @@ import {
   type RunStateFile,
 } from "./state";
 
-export type StoreConfig = { runRoot: string; pollIntervalMs: number; tailLines: number };
+export type StoreConfig = { runRoot: string; tailLines: number };
 
 export type StoreDeps = {
   probe: LivenessProbe;
@@ -156,8 +156,7 @@ export function createRunStore(deps: StoreDeps): RunStore {
   const eventTailPasses = new Map<string, Promise<EventTailState | null>>();
   const answerTails = new Map<string, AnswerTailState>();
   const answerTailPasses = new Map<string, Promise<AnswerTailState | null>>();
-  let rootCache: RunRootResolution | null = null;
-  let rootKey = "";
+  let rootKey: string | null = null;
 
   /**
    * Every cache is keyed under the resolved root, so a root change or a dispose retires all of them
@@ -178,12 +177,11 @@ export function createRunStore(deps: StoreDeps): RunStore {
     const { runRoot } = deps.config();
     const next = resolveRunRoot(runRoot, env);
     const nextKey = `${next.root}|${next.source}`;
-    if (rootCache === null || nextKey !== rootKey) {
-      if (rootCache !== null) {
+    if (nextKey !== rootKey) {
+      if (rootKey !== null) {
         deps.log?.(`run root changed to ${next.root} (${next.source}); clearing caches`);
         clearCaches();
       }
-      rootCache = next;
       rootKey = nextKey;
     }
     return next;
@@ -217,7 +215,7 @@ export function createRunStore(deps: StoreDeps): RunStore {
       tailers.set(dir, tailer);
     }
     const current = tailer;
-    const path = join(dir, "events.ndjson");
+    const path = join(dir, RUN_FILES.events);
     let info: Stats;
     try {
       info = await stat(path);
@@ -569,7 +567,7 @@ export function createRunStore(deps: StoreDeps): RunStore {
         lost = true;
       } else {
         // The window may begin inside a line; that fragment is not an event, so the tail starts at
-        // the first line boundary in it — the rule the whole-window read used to apply.
+        // the first line boundary in it.
         parseBytes = bytes.subarray(firstNewline + 1);
         parseStart = windowStart + firstNewline + 1;
       }
@@ -867,8 +865,7 @@ export function createRunStore(deps: StoreDeps): RunStore {
 
     dispose(): void {
       clearCaches();
-      rootCache = null;
-      rootKey = "";
+      rootKey = null;
     },
   };
 }

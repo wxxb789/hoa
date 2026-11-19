@@ -166,26 +166,20 @@ function countersOf(
     asNumber(files.state.values.tool_calls) !== null ||
     asNumber(files.state.values.cost_usd) !== null;
   const eventsHaveCounters = counters !== null && counters.lines > 0;
-  const from: RunSummary["countersFrom"] =
-    files.finalized.present && stateHasCounters
-      ? "state"
-      : eventsHaveCounters
-        ? "events"
-        : stateHasCounters
-          ? "state"
-          : "none";
-  if (from === "state") {
+  if (stateHasCounters && (files.finalized.present || !eventsHaveCounters)) {
     const values = files.state.values;
     return {
-      from,
+      from: "state",
       partial:
         values.turns_partial === true ||
         values.tool_calls_partial === true ||
         values.cost_partial === true,
     };
   }
-  if (from === "events") return { from, partial: truncated || (counters?.badLines ?? 0) > 0 };
-  return { from, partial: false };
+  if (eventsHaveCounters) {
+    return { from: "events", partial: truncated || counters.badLines > 0 };
+  }
+  return { from: "none", partial: false };
 }
 
 function stateErrors(values: Record<string, unknown>): string[] {
