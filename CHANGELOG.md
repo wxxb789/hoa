@@ -8,6 +8,8 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 - Retired four stubs: `design-an-interface` (`codebase-design`), `arch-improvement-plan` and
   `notes-to-prd` (`ce-plan`), and `plan-to-issues` (`to-tickets`).
+- Keep portability and release gates at activation and move runtime-swap and publishing detail to references.
+
 - Front-load Hermes routing gates, remove a dead route, and chain fleet changes to `hermes-models-cutover`.
 
 - Keep the deliverable acceptance spine at activation; load evidence, generation, and publishing details on demand.
