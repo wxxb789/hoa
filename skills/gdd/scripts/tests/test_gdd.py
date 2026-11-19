@@ -3,10 +3,12 @@
 import glob
 import json
 import os
-import shutil
+import subprocess
 import sys
 import tempfile
+import time
 import unittest
+import uuid
 from datetime import datetime, timedelta, timezone
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -14,6 +16,7 @@ SCRIPTS = os.path.dirname(HERE)
 sys.path.insert(0, SCRIPTS)
 import gdd_process
 import agent_run
+from gdd_test_support import check_locks, cleanup_child, exited, ready, remove_tree, stop_headless, wait_for_json
 GDD = os.path.join(SCRIPTS, "gdd.py")
 DELIVERY = os.path.join(SCRIPTS, "delivery-state.py")
 STUB = os.path.join(HERE, "stub_agent.py")
@@ -31,16 +34,26 @@ def write(path, text):
         handle.write(text)
 
 
-def dead_pid():
-    proc = gdd_process.popen([sys.executable, "-c", "pass"])
-    proc.wait()
-    return proc.pid
+def dead_pid(children):
+    proc = gdd_process.popen(
+        [sys.executable, "-c", 'import sys; print("READY", flush=True); sys.exit(sys.stdin.readline() != "RELEASE\\n")'],
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, encoding="utf-8")
+    children.append(proc)
+    ready(proc)
+    recorded = agent_run.identity(proc.pid)
+    proc.communicate("RELEASE\n", timeout=5)
+    assert proc.returncode == 0 and exited(proc.pid, recorded), (proc.pid, recorded, proc.returncode)
+    return proc.pid, recorded
 
 
 class GddCase(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="gdd-test-")
-        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.addCleanup(remove_tree, self.tmp)
+        self.addCleanup(check_locks, self.tmp)
+        self.addCleanup(stop_headless, self.tmp)
+        self.children = []
+        self.addCleanup(cleanup_child, self.children)
         self.state_home = os.path.join(self.tmp, "state")
         self.record = os.path.join(self.tmp, "record.json")
         drop = ("GDD_", "STUB_", "DSH_", "OMP_", "XDG_")
@@ -52,7 +65,6 @@ class GddCase(unittest.TestCase):
                         GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@example.invalid")
         self.repo = os.path.realpath(os.path.join(self.tmp, "workrepo"))
         os.makedirs(self.repo)
-        self.addCleanup(self.stop_runners)
         self.git("init", "-q", "-b", "main")
         write(os.path.join(self.repo, "docs", "goals", "0001-first.md"), "# Goal 0001\nState: active\n")
         self.commit("contract")
@@ -75,7 +87,9 @@ class GddCase(unittest.TestCase):
                               env={**self.env, **(env or {})}, timeout=120)
 
     def stage(self, stage, *args, env=None):
-        return self.run_tool(GDD, "stage", "--repo", self.repo, "--goal", "0001", "--stage", stage, *args, env=env)
+        self.record = os.path.join(self.tmp, f"record-{uuid.uuid4().hex}.json")
+        return self.run_tool(GDD, "stage", "--repo", self.repo, "--goal", "0001", "--stage", stage, *args,
+                             env={"STUB_RECORD": self.record, **(env or {})})
 
     def ledger(self, path=None):
         path = path or os.path.join(self.state_home, "gdd", "ledger.tsv")
@@ -86,22 +100,12 @@ class GddCase(unittest.TestCase):
     def run_dirs(self, root=None):
         return glob.glob(os.path.join(root or os.path.join(self.state_home, "gdd", "runs"), "*", "*"))
 
-    def stop_runners(self):
-        for path in glob.glob(os.path.join(self.tmp, "**", "run.json"), recursive=True):
-            run_dir = os.path.dirname(path)
-            state = agent_run.read_state(run_dir)
-            if not state.get("backend") or not agent_run.run_alive(run_dir, state):
-                continue
-            self.assertEqual(agent_run.stop_run(run_dir), "")
-            pid, recorded = state.get("pid"), state.get("pid_identity")
-            if recorded:
-                self.assertTrue(agent_run.wait_until(lambda: agent_run.identity(pid) != recorded, 10))
-
-    def craft_run(self, name, **state):
-        run_dir = os.path.join(self.state_home, "gdd", "runs", datetime.now().strftime("%Y-%m-%d"), name)
+    def craft_run(self, name, *, pid=None, pid_identity=None, **state):
+        run_dir = os.path.join(self.state_home, "gdd", "runs", "2000-01-01", name)
         write(os.path.join(run_dir, "state.json"), json.dumps(
             {"name": name, "agent": "omp", "state": "running", "exit": None, "cwd": self.repo,
-             "started": datetime.now(timezone.utc).isoformat(), "pid": None, "agent_pid": None, **state}))
+             "started": datetime.now(timezone.utc).isoformat(), "pid": pid, "pid_identity": pid_identity,
+             "agent_pid": None, **state}))
         return run_dir
 
 
@@ -228,18 +232,22 @@ class LaunchTests(GddCase):
         self.assertEqual(self.run_dirs(), [])
 
     def test_live_run_blocks_and_stale_run_does_not(self):
-        self.craft_run("workrepo-0001-implement", pid=os.getpid())
+        self.craft_run("workrepo-0001-implement", pid=os.getpid(), pid_identity=agent_run.identity(os.getpid()))
         refused = self.stage("implement")
         self.assertEqual(refused.returncode, 3)
         self.assertIn("still active", refused.stderr)
         old = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
-        stale = self.craft_run("workrepo-0001-implement", pid=dead_pid(), started=old)
+        pid, recorded = dead_pid(self.children)
+        self.craft_run("workrepo-0001-implement", pid=pid, pid_identity=recorded, started=old)
         show = self.run_tool(GDD, "status", "--repo", self.repo, "--goal", "0001")
         self.assertEqual(show.returncode, 0, show.stderr)
         self.assertIn("last_run: workrepo-0001-implement stale exit=- dur=-", show.stdout.splitlines())
         done = self.stage("implement", "--wait")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        self.assertEqual(len(glob.glob(stale + ".prev-*")), 1)
+        real_run = os.path.dirname(next(path for path in glob.glob(os.path.join(self.tmp, "**", "run.json"),
+                                                                  recursive=True)))
+        self.assertEqual(wait_for_json(os.path.join(real_run, "state.json"), bool, time.monotonic() + 5)["state"],
+                         "done")
 
     def test_custom_launcher_without_pids_keeps_its_recorded_state(self):
         old = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()

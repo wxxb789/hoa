@@ -10,7 +10,6 @@ is asserted here instead of by hand.
 from __future__ import annotations
 
 import os
-import shutil
 import sys
 import tempfile
 import unittest
@@ -20,6 +19,7 @@ HERE = Path(__file__).resolve().parent
 SCRIPTS = HERE.parent
 sys.path.insert(0, str(SCRIPTS))
 import gdd_process
+from gdd_test_support import remove_tree
 WATCHER = SCRIPTS / "watch-pr-checks.py"
 IS_WINDOWS = os.name == "nt"
 BASE_ENV = {
@@ -87,7 +87,7 @@ PENDING_ROW = "test\tpending\t0\thttps://github.com/o/r/actions/runs/11/job/1\n"
 class WatchTests(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix="watch-pr."))
-        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        self.addCleanup(remove_tree, self.tmp)
         self.state = self.tmp / "gh-state"
         self.state.mkdir()
         self.bin = self.tmp / "bin with spaces"

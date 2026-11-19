@@ -14,6 +14,8 @@ from unittest import mock
 
 import agent_run
 import gdd_process
+from gdd_test_support import check_locks, remove_tree, stop_headless
+
 HERE = Path(__file__).resolve().parent
 RUNNER = str(HERE.parent / "agent_run.py")
 STUB = str(HERE / "stub_agent.py")
@@ -70,9 +72,10 @@ elif args[:2] == ["tab", "close"]:
 
 class SupervisorTests(unittest.TestCase):
     def setUp(self):
-        tmp = tempfile.TemporaryDirectory(prefix="gdd-detach-test-")
-        self.addCleanup(tmp.cleanup)
-        self.root = Path(tmp.name)
+        self.root = Path(tempfile.mkdtemp(prefix="gdd-detach-test-"))
+        self.addCleanup(remove_tree, self.root)
+        self.addCleanup(check_locks, self.root)
+        self.addCleanup(stop_headless, self.root)
         self.run_dir = self.root / "2026-01-01" / "test"
         self.run_dir.mkdir(parents=True)
         self.argv = [sys.executable, "-B", RUNNER, "_run", "--run-dir", str(self.run_dir)]
@@ -145,16 +148,9 @@ agent_run.supervisor_call = lambda argv, env=None: gdd_process.run(
     [sys.executable, "-c", stub, root, *argv], env=env, capture_output=True, text=True, timeout=5)
 sys.exit(agent_run.main(args))
 """
-        try:
-            return gdd_process.run([sys.executable, "-c", source, RUNNER, SUPERVISOR, str(self.root),
-                                    *argv[2:]], cwd=self.root, capture_output=True, text=True,
-                                   timeout=15, **kwargs)
-        finally:
-            state = agent_run.read_state(self.run_dir)
-            for key in ("agent_pid", "pid"):
-                pid = state.get(key)
-                if (recorded := state.get(f"{key}_identity")) and agent_run.identity(pid) == recorded:
-                    agent_run.terminate(pid, single=key == "pid")
+        return gdd_process.run([sys.executable, "-c", source, RUNNER, SUPERVISOR, str(self.root),
+                                *argv[2:]], cwd=self.root, capture_output=True, text=True,
+                               timeout=15, **kwargs)
 
     def test_launchd_submit_and_stale_status_cleanup(self):
         (self.root / "unsupported").touch()
