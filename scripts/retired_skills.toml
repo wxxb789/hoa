@@ -49,6 +49,14 @@ reason = "retired to a one-shot prompt after a necessity eval (2026-11-06)"
 replacement = "prompts/parallel-agent-worktrees.md"
 reason = "retired to a one-shot prompt after a necessity eval (2026-11-06)"
 
+[retired.hoa-introspect]
+replacement = "hoa-practice-retro"
+reason = "Replaced by the explicit-only engineering practice retrospective (2026-11-18)"
+
+[retired.hoa-introspect-distill]
+replacement = "hoa-practice-retro"
+reason = "Recurring-work qualification and candidate approval are part of the retrospective (2026-11-18)"
+
 [retired.hoa-skill-work]
 replacement = "hoa-skill-create"
 reason = "renamed: vague verb `work`, joins the hoa-skill-<verb> family (2026-11-17)"

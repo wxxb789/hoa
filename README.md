@@ -182,7 +182,7 @@ UI; a newer push to a pull request cancels the older run.
 | Vendored shared scripts drift | `python scripts/vendor_shared.py --check` | Vendored copies of shared scripts match their canonical file. |
 | PR bumps changed skills' revision (pull requests) | `python scripts/version.py check-revisions` | Every skill directory changed since the merge base raises its `metadata.revision`. |
 | pytest | `python -m pytest` | Every `test_*.py` unittest/pytest file under `scripts/`, `evals/` and `skills/` (`pytest.ini`); 120 s per test. |
-| Script checks | `python evals/run_trigger_evals.py`, `evals/validate_skill_method_cases.py`, `skills/define-goal/evals/validate_fixtures.py`, `skills/hoa-introspect/evals/run.py`, `skills/hoa-introspect-distill/evals/run_evals.py`, `skills/hermes-models/scripts/tests/test-*.py`, `skills/gdd/scripts/tests/test_verdict_matrix.py`, `mutate_verdict_matrix.py` | Standalone checks whose exit code is the contract; one step each. |
+| Script checks | `python evals/run_trigger_evals.py`, `evals/validate_skill_method_cases.py`, `skills/define-goal/evals/validate_fixtures.py`, `skills/hermes-models/scripts/tests/test-*.py`, `skills/gdd/scripts/tests/test_verdict_matrix.py`, `mutate_verdict_matrix.py` | Standalone checks whose exit code is the contract; one step each. |
 | gdd shell suites | `bash skills/gdd/scripts/tests/run-gdd-selftest.sh`, `test-omp-run-stale.sh`, `test-omp-run-setsid.sh` | The gdd loop end to end (including `test-dispatch-guards.py`) and the `omp-run.sh` forwarder. |
 | Paseo gdd-run-observer | `npm ci && npm run typecheck && npm test` in `paseo-plugins/gdd-run-observer` | The plugin's typecheck and Vitest suite. |
 
@@ -376,13 +376,13 @@ Choose the capability by the work you want done, not by the model running it:
 |---|---|---|
 | Audit an existing skill, review a proposed change, or judge its behavior | `hoa-skill-review` | Evidence-backed findings; no changes to the reviewed skill |
 | Create a skill from a defined capability, or evolve or compose an existing skill | `hoa-skill-create` | A complete skill change with validation results and any unverified paths |
-| Discover recurring work in agent history | `hoa-introspect` | Evidence-cited work-pattern findings; no automatic creation |
-| Qualify a supplied recurring-work finding before choosing an asset | `hoa-introspect-distill` | Individually approved candidate and, when approved, its created asset |
-| Audit the whole skill set a session is offered for overlap, shadowing, drift, visibility and budget (hidden: run `/hoa-skill-set-audit`, Codex `$hoa-skill-set-audit`) | `hoa-skill-set-audit` | Ranked set-level findings with evidence; nothing changed |
+| Review engineering practice across repos and agent sessions (hidden: run `/hoa-practice-retro`, Codex `$hoa-practice-retro`) | `hoa-practice-retro` | Evidence-cited findings and qualified recurring-work candidates; no automatic creation |
+| Deep-audit the machinery of one repo (hidden: run `/hoa-repo-reckoning`, Codex `$hoa-repo-reckoning`) | `hoa-repo-reckoning` | Verified findings, a ranked stop-doing list and follow-through |
+| Audit the whole skill set a session is offered (hidden: run `/hoa-skill-set-audit`, Codex `$hoa-skill-set-audit`) | `hoa-skill-set-audit` | Verified set-level findings, necessity verdicts or weekly recommendations; nothing changed |
 
 For behavior changes, `hoa-skill-create` starts with focused checks and expands to multiple
 variants, models, or runtimes when reach, risk, or conflicting evidence warrants
-it. `hoa-introspect-distill` retains its per-candidate approval gate; a direct
+it. A retro candidate needs individual owner acceptance before routing to creation; a direct
 request to create or improve a defined skill does not need that intake flow.
 `evals/skill-method-cases.json` holds the focused behavior scenarios; CI checks
 their structure and isolation paths, while model/host behavior is judged in
@@ -443,10 +443,8 @@ densest page in this repo if you are designing your own agent setup.
 
 ## Reflect cadence
 
-Reflection is scheduled, not aspirational: run **hoa-introspect** monthly as a
-self-retro and land the write-up in `reflections/`. The distill loop
-(introspect → retrieve → distill) should produce its first self-authored skill
-before the next phase closes.
+Run **hoa-practice-retro** monthly after the repo reckoning runs so it can reuse their
+ledgers. Keep its artifacts in the configured private audit state directory, not in Git.
 
 ## Request a skill
 

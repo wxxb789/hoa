@@ -30,9 +30,17 @@ SOURCES: dict[str, Path] = {
 # shared file name → destination skill dirs
 CONSUMERS: dict[str, list[str]] = {
     "skill_config.py": ["skills/gdd/scripts"],
-    "safety.py": [
-        "skills/hoa-introspect/scripts",
-        "skills/hoa-introspect-distill/scripts",
+    "findings.py": [
+        "skills/hoa-practice-retro/scripts",
+        "skills/hoa-repo-reckoning/scripts",
+    ],
+    "panel.md": [
+        "skills/hoa-practice-retro/references",
+        "skills/hoa-repo-reckoning/references",
+    ],
+    "usage-based-recommendations.md": [
+        "skills/hoa-skill-curate/references",
+        "skills/hoa-skill-set-audit/references",
     ],
     # The configuration resolution order; skills that document configuration keys.
     "configuration.md": [
@@ -51,8 +59,8 @@ CONSUMERS: dict[str, list[str]] = {
         "skills/gdd/references",
         "skills/ghc-search/references",
         "skills/hermes-models/references",
-        "skills/hoa-introspect/references",
-        "skills/hoa-introspect-distill/references",
+        "skills/hoa-practice-retro/references",
+        "skills/hoa-repo-reckoning/references",
         "skills/hoa-skill-curate/references",
         "skills/hoa-skill-set-audit/references",
         "skills/writing/references",

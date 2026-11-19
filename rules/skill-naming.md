@@ -41,8 +41,10 @@ A standing constraint for naming a new skill and for renaming one. Visibility an
 5. **Prefixes.** `hoa-` is only for the skill-library family (skills that act on skills or on the
    agent's own usage history). A domain skill takes its tool or domain as prefix (`tmux-`, `ghc-`); a
    skill coupled to the Hermes runtime takes `hermes-` and may keep a `hermes-<topic>` noun form, as
-   `AGENTS.md` requires. `hoa-introspect` and `hoa-introspect-distill` keep their names as an
-   existing parent/child pair outside the `<family>-<object>-<verb>` form.
+   `AGENTS.md` requires. The owner-approved explicit-only audit entries `hoa-practice-retro`
+   (own usage history) and `hoa-repo-reckoning` (one repository's practices and machinery) use
+   noun phrases with the `hoa-` prefix. The latter is a specific exception to the prefix scope,
+   not a precedent for unrelated repository skills.
 6. **Banned words.** `work`, `do`, `handle`, `helper`, `utils`, `tools`, `misc`; a single generic word
    as the whole name; a verb that misdescribes the behaviour; superlatives (`best`, `ultimate`);
    numeric suffixes; implementation details (`cdp`, `headless`) in a new name. `workflow`,

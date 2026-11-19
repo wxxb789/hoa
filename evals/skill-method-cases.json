@@ -103,7 +103,7 @@
       ],
       "must_not_hold": [
         "Only describe a proposed skill instead of creating it in the disposable workspace.",
-        "Require hoa-introspect-distill's per-candidate approval token for this direct request."
+        "Require a separate per-candidate approval token for this direct request."
       ]
     },
     {

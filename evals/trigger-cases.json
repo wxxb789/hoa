@@ -39,58 +39,52 @@
       "distractors": ["parallel-agent-worktrees", "ghc-search"]
     },
     {
-      "id": "route-to-retrieve-not-introspect",
+      "id": "route-to-retrieve-history",
       "request": "Find every session across my Claude Code and Codex history where I touched the auth module.",
       "must_pick": ["cross-agent-history-retrieval"],
-      "distractors": ["hoa-introspect", "hoa-introspect-distill"]
-    },
-    {
-      "id": "route-to-introspect-not-retrieve",
-      "request": "Audit my work patterns for blind spots and wasted effort over the last month.",
-      "must_pick": ["hoa-introspect"],
-      "distractors": ["cross-agent-history-retrieval", "hoa-introspect-distill", "hoa-skill-review"]
-    },
-    {
-      "id": "route-to-distill",
-      "request": "From this work-pattern report, qualify recurring deployment-checklist findings as candidates for a skill; ask me to approve a candidate before creating anything.",
-      "must_pick": ["hoa-introspect-distill"],
-      "distractors": ["hoa-introspect", "cross-agent-history-retrieval", "hoa-skill-create"]
+      "distractors": ["hoa-practice-retro", "hoa-skill-review"]
     },
     {
       "id": "route-recurring-pattern-direct-create",
       "request": "This recurring deployment checklist is the capability I want. Create a reusable skill for it now, using this detailed checklist as the specification.",
       "must_pick": ["hoa-skill-create"],
-      "distractors": ["hoa-introspect-distill", "hoa-introspect", "skill-scout"]
+      "distractors": ["hoa-practice-retro", "skill-scout"]
     },
     {
       "id": "route-to-skill-review",
       "request": "Audit the existing define-goal skill against its promised behavior and actual goal consumers. Report only evidence-backed findings; do not change it.",
       "must_pick": ["hoa-skill-review"],
-      "distractors": ["hoa-skill-create", "hoa-introspect", "define-goal"]
+      "distractors": ["hoa-skill-create", "hoa-skill-set-audit", "define-goal"]
     },
     {
       "id": "route-to-skill-judgment",
       "request": "Judge whether these two candidate SKILL.md responses satisfy the acceptance rubric, without editing the skill.",
       "must_pick": ["hoa-skill-review"],
-      "distractors": ["hoa-skill-create", "fresh-context-grader", "hoa-introspect-distill"]
+      "distractors": ["hoa-skill-create", "fresh-context-grader", "hoa-practice-retro"]
     },
     {
       "id": "route-to-skill-creation",
       "request": "Create a portable agent skill for reviewing SQL migration plans from this defined capability and validate it.",
       "must_pick": ["hoa-skill-create"],
-      "distractors": ["hoa-skill-review", "hoa-introspect-distill", "skill-scout"]
+      "distractors": ["hoa-skill-review", "hoa-practice-retro", "skill-scout"]
     },
     {
       "id": "route-to-skill-evolution",
       "request": "Our existing report-writing skill asks questions even when the request is complete. Revise the skill and validate that behavior without regressing its other paths.",
       "must_pick": ["hoa-skill-create"],
-      "distractors": ["hoa-skill-review", "hoa-introspect-distill", "define-goal"]
+      "distractors": ["hoa-skill-review", "hoa-practice-retro", "define-goal"]
     },
     {
       "id": "route-to-skill-scout",
       "request": "Before I write a new skill for slide generation, check whether a good one already exists somewhere public.",
       "must_pick": ["skill-scout"],
-      "distractors": ["ghc-search", "hoa-introspect-distill", "hoa-skill-create"]
+      "distractors": ["ghc-search", "hoa-practice-retro", "hoa-skill-create"]
+    },
+    {
+      "id": "route-to-harness-restructure",
+      "request": "The repo's scheduled drift checkers and watchdog scripts have multiplied and repeat the same logic. Help me restructure that harness, not audit the rest of the repository.",
+      "must_pick": ["harness-engineering"],
+      "distractors": ["hoa-repo-reckoning", "hoa-skill-set-audit"]
     },
     {
       "id": "route-to-typed-gates",

@@ -4,7 +4,7 @@
 
 A one-shot request template for finding or exporting records from local
 AI-agent histories (Claude Code, Codex, pi, Kimi Code, OpenCode, and others)
-with honest coverage. The output can feed `hoa-introspect`.
+with honest coverage. The output can feed the user-run `hoa-practice-retro`.
 
 ## Template
 
@@ -59,8 +59,8 @@ Safety
   tokens, passwords, connection strings) in the local export, not the
   response.
 
-If the output will feed hoa-introspect, write the bundle described in
-skills/hoa-introspect/references/bundle-schema.md: JSONL whose first line is
+If the output will feed hoa-practice-retro, write the bundle described in
+skills/hoa-practice-retro/references/bundle-schema.md: JSONL whose first line is
 the coverage manifest ({"kind": "coverage_manifest", ...}) followed by one
 normalized record per line with origin_fingerprint and locator. Usage fields
 (skills, mcp, agent_types, friction_events) only when the source lists them

@@ -1,0 +1,14 @@
+{
+  "dim": "habits",
+  "findings": [
+    {"id": "must-drop", "kind": "dumb", "title": "Broken citation", "claim": "This synthetic finding cites a line that does not exist.",
+     "evidence": ["bundle:origin-demo-c#source-c.txt?line=99", "bundle:origin-demo-d#source-d.txt?line=1"],
+     "impact": "none", "action": "none", "owner": "here", "effort": "S", "severity": "low"},
+    {"id": "single-origin", "kind": "dumb", "title": "One origin", "claim": "This synthetic finding has one origin.",
+     "evidence": ["bundle:origin-demo-d#source-d.txt?line=1"],
+     "impact": "none", "action": "none", "owner": "here", "effort": "S", "severity": "low"},
+    {"id": "two-origins", "kind": "dumb", "title": "Two origins", "claim": "This synthetic finding has two resolvable origins.",
+     "evidence": ["bundle:origin-demo-c#source-c.txt?line=1", "bundle:origin-demo-d#source-d.txt?line=1"],
+     "impact": "none", "action": "none", "owner": "here", "effort": "S", "severity": "low"}
+  ]
+}

@@ -4,11 +4,12 @@ description: >-
   Use when asked to audit, prune or consolidate the whole set of skills a session is offered,
   across plugin, hub, project and repo sources. Finds overlapping or contradictory skills,
   shadowing, same-name drift, visibility mistakes, broken ../ closure and listing-budget
-  truncation, and ranks fixes. Not for reviewing one skill (hoa-skill-review), provenance or
-  upstream freshness (hoa-skill-curate), or editing skills.
+  truncation, ranks fixes and gives necessity verdicts. Also offers weekly recommendations from
+  recent work. Not for reviewing one skill (hoa-skill-review), provenance or upstream freshness
+  (hoa-skill-curate), or editing skills.
 disable-model-invocation: true
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "software-development,self-management"
   targets: "runtime-agnostic"
   summary: "audit the whole offered skill set: per-skill quality, overlap, shadowing, contradictions, same-name drift, visibility, ../ closure, listing budget; report-only"
@@ -48,6 +49,11 @@ budgets: [references/hosts.md](references/hosts.md).
 
 ## Procedure
 
+For a request to recommend skills from recent work, skip the audit and follow sections 1–3 of
+[usage-based recommendations](references/usage-based-recommendations.md). Use a seven-day window,
+return at most three Simplified Chinese bullets or `[SILENT]`, and never change state or schedule
+a job in this mode.
+
 1. **Capture the offered set.** Copy the host's skill listing from this session's context
    verbatim into a scratch file outside the repo, one `- name: description` line per entry.
    Keep entries that show no description — they are truncation evidence. If the host shows no
@@ -68,12 +74,38 @@ budgets: [references/hosts.md](references/hosts.md).
    not know they exist.
 4. **Set pass.** Work through the checks below on visible skills first, then hidden ones.
 5. **Pruning and consolidation.** Assess each skill named in a set finding (or every skill when
-   the owner asked for a full prune) on four axes: usage (recent, historical, unobserved — from
+   the owner asked for a full prune) on five axes: usage (recent, historical, unobserved — from
    the host's usage data, never from the name), overlap (unique, complementary, replacement
    candidate), core value (owner's main workflows, on demand, non-core), quality (clear, bulky or
-   ambiguous, stale, risky, malformed). Protocol duplicated across a skill family: read
+   ambiguous, stale, risky, malformed), and necessity (non-inferable behavior or knowledge vs advice
+   a capable model already follows unaided). Protocol duplicated across a skill family: read
    [skill family integrity](../hoa-skill-create/references/skill-family-integrity.md) and follow it.
-6. **Report** and stop.
+6. **Verify adversarially.** Give an independent reviewer the claims, their evidence anchors and
+   scope, not the finder's reasoning. Re-read the evidence or rerun the probe, try to refute each
+   claim, and record what was checked and a `confirmed`, `weakened` or `refuted` verdict. Drop
+   refutations and narrow weakened claims. Personally re-check the evidence for high-impact fixes
+   and proposed deletions. If fresh context is unavailable, perform a separate verification pass
+   and label it `single-context`; do not present missing evidence as verified.
+7. **Report** and stop.
+
+## Necessity verdicts
+
+Give each assessed skill exactly one: `keep`, `keep explicit-only`, `merge into <name>`,
+`cut`, `needs A/B`, or `needs owner`. State the evidence that earns it. Do not equate no
+observed usage with no value. `keep explicit-only` is for valuable manual workflows; verify that
+required sibling Read links still resolve. A single skill needing deeper judgment goes to
+`hoa-skill-review`; provenance and upstream freshness stay with `hoa-skill-curate`.
+
+For a locally authored skill with no upstream, the owner's rule is **180 days unloaded, or
+never loaded** makes it a cut candidate, unless current projects suggest a plausible near-term
+use. Use usage records with known coverage and directory history, not `SKILL.md` mtimes. Missing
+usage data is `unobserved`, not evidence for a cut. Every cut stays a proposal pending explicit
+owner confirmation.
+
+Nominate at most five uncertain skills for A/B, and run probes only if the owner authorizes
+the cost. Write two or three representative prompts and a rubric first. Run with and without the
+skill in isolated environments, check the no-skill trace never loaded it, and grade responses
+blind against the rubric. A skill that adds no verified value is a cut or merge candidate.
 
 ## Set-level checks
 
@@ -96,7 +128,8 @@ Lead with counts (offered, on disk, visible, hidden, per root) and the highest-c
 Then findings ranked by harm — wrong skill selected or unreachable first, drift and budget next,
 hygiene last — each with evidence and one concrete fix: `merge`, `narrow description`, `hide`,
 `retire`, `move to always-on index`, `retain`, or `needs confirmation`. A deletion or merge
-proposal states the replacement or the scope reason. For more than ~20 rows, write the full table
+proposal states the replacement or the scope reason. Include the necessity verdicts with evidence
+and the verification mode. For more than ~20 rows, write the full table
 as CSV/JSON in the scratch directory and link it; never let a large inventory hide the decision.
 End with what was not verified and an explicit statement that nothing was changed.
 
