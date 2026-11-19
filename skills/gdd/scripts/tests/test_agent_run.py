@@ -18,6 +18,7 @@ import tempfile
 import time
 import unittest
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
@@ -279,13 +280,15 @@ sys.exit(agent_run.main())
                 self.assertEqual((state["state"], state["exit"]), (verdict, code))
 
     def test_t5_kill_a_hanging_run(self):
-        self.start("hang", env={"STUB_HANG": "1"})
-        before = self.state("hang")
-        killed = self.cli("kill", "hang")
-        self.assertEqual(killed.returncode, 0, killed.stderr)
-        state = self.finished("hang")
-        self.assertEqual((state["state"], state["exit"]), ("killed", 143))
-        self.assertTrue(agent_run.wait_until(lambda: exited(before["agent_pid"], before["agent_pid_identity"]), 10))
+        with self.stdout_holder("hang", STUB_HANG="1") as (_, descendant):
+            before = self.state("hang")
+            killed = self.cli("kill", "hang")
+            self.assertEqual(killed.returncode, 0, killed.stderr)
+            state = self.finished("hang")
+            self.assertEqual((state["state"], state["exit"]), ("killed", 143))
+            self.assertTrue(agent_run.wait_until(lambda: exited(before["agent_pid"], before["agent_pid_identity"]), 10))
+            self.assertTrue(agent_run.wait_until(lambda: exited(*descendant), 5),
+                            f"Grandchild PID {descendant[0]} survived kill")
         again = self.cli("kill", "hang")
         self.assertEqual(again.returncode, 1)
         self.assertIn("already finished", again.stderr)
@@ -531,11 +534,12 @@ sys.exit(agent_run.main())
         self.assertEqual((state["turns"], state["tool_calls"], state["state"]), (2, 1, "done"))
         self.assertNotIn("tool_calls_partial", state)
 
-    def test_t12_drain_timeout_marks_stream_incomplete(self):
+    @contextmanager
+    def stdout_holder(self, name, **env):
         def verify_child_exit():
-            child_path = Path(self.record + ".child")
-            pid, recorded = wait_for_json(child_path, lambda row: len(row) == 2, time.monotonic() + 5)
-            check_processes({(pid, recorded): (child_path, True)}, 5)
+            path = Path(self.record + ".child")
+            child = wait_for_json(path, lambda row: len(row) == 2 and row[1], time.monotonic() + 5)
+            check_processes({tuple(child): (path, True)}, 5)
 
         with socket.socket(socket.AF_INET if IS_WINDOWS else socket.AF_UNIX) as listener:
             endpoint = os.path.join(self.tmp, "drain.sock")
@@ -545,16 +549,22 @@ sys.exit(agent_run.main())
             listener.listen()
             listener.settimeout(10)
             self.addCleanup(verify_child_exit)
-            self.start("drain", env={"STUB_DRAIN_ENDPOINT": endpoint,
-                                     "GDD_RUN_DRAIN_TIMEOUT_SECONDS": "1"})
+            self.start(name, env={"STUB_DRAIN_ENDPOINT": endpoint, **env})
             peer, _ = listener.accept()
             with peer, peer.makefile("rb") as stream:
                 peer.settimeout(5)
                 self.assertEqual(stream.readline(16), b"READY\n")
-                state = self.finished("drain")
-                self.assertTrue(state.get("stream_incomplete"), state)
-                self.assertEqual(state["state"], "done")
-                peer.sendall(b"R")
+                child = wait_for_json(self.record + ".child", lambda row: len(row) == 2 and row[1],
+                                      time.monotonic() + 5)
+                self.assertFalse(exited(*child), f"Grandchild PID {child[0]} did not stay alive")
+                yield peer, child
+
+    def test_t12_drain_timeout_marks_stream_incomplete(self):
+        with self.stdout_holder("drain", GDD_RUN_DRAIN_TIMEOUT_SECONDS="1") as (peer, _):
+            state = self.finished("drain")
+            self.assertTrue(state.get("stream_incomplete"), state)
+            self.assertEqual(state["state"], "done")
+            peer.sendall(b"R")
 
     def test_t13_dsh_env_scrub(self):
         scrubbed = {"DSH_PROFILE": "caller", "DSH_PROFILE_DIR": "/caller", "DSH_SESSION_ID": "caller-session"}
@@ -692,6 +702,32 @@ if sys.stdin.readline().strip() != "RELEASE":
 
 
 class RunnerMechanicsTests(unittest.TestCase):
+    def test_finalize_keeps_first_terminal_state(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run = Path(tmp)
+            agent_run.write_json(run / "state.json", {"state": "running"})
+            first = agent_run.finalize(run, 0)
+            self.assertEqual((first["state"], first["exit"]), ("done", 0))
+            self.assertEqual(agent_run.finalize(run, 2), first)
+            self.assertEqual(agent_run.read_state(run), first)
+            self.assertEqual((run / "exit.code").read_text(encoding="utf-8").strip(), "0")
+            self.assertTrue(finalized(run, first))
+
+    def test_terminate_stops_when_pid_is_reused_after_first_signal(self):
+        pid = 12345
+        recorded = current = "win:1" if IS_WINDOWS else "linux:1"
+
+        def replaced(*args, **kwargs):
+            nonlocal current
+            current = different_identity(recorded)
+
+        signal_target, method = (gdd_process, "run") if IS_WINDOWS else (os, "killpg")
+        with mock.patch.object(agent_run, "identity", side_effect=lambda _: current), \
+                mock.patch.object(agent_run, "pid_alive", return_value=True), \
+                mock.patch.object(signal_target, method, side_effect=replaced) as send:
+            self.assertTrue(agent_run.terminate(pid, recorded=recorded))
+        send.assert_called_once()
+
     def test_detach_modes(self):
         for platform, available, response, expected in (
             ("linux", True, "running", "systemd"), ("linux", True, "degraded", "systemd"),

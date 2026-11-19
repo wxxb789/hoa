@@ -7,6 +7,7 @@ import shutil
 import signal
 import stat
 import subprocess
+import sys
 import threading
 import time
 import uuid
@@ -40,6 +41,45 @@ def publish_json(path, value):
         retry_windows(lambda: os.replace(temp, path), time.monotonic() + 2)
     finally:
         retry_windows(lambda: temp.unlink(missing_ok=True), time.monotonic() + 2)
+
+
+def own_identity():
+    """Record the stub's start time without importing the runner in each CLI process."""
+    pid = os.getpid()
+    if os.name == "nt":
+        import ctypes
+        from ctypes import wintypes
+
+        times = [wintypes.FILETIME() for _ in range(4)]
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        if kernel.GetProcessTimes(wintypes.HANDLE(-1), *(ctypes.byref(t) for t in times)):
+            created = (times[0].dwHighDateTime << 32) | times[0].dwLowDateTime
+            return f"win:{created}" if created else ""
+        return ""
+    if sys.platform.startswith("linux"):
+        try:
+            data = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8", errors="replace")
+            ticks = data.rsplit(")", 1)[1].split()[19]
+            return f"linux:{ticks}" if ticks.isascii() and ticks.isdecimal() else ""
+        except (OSError, IndexError):
+            return ""
+
+    from datetime import datetime, timezone
+
+    import gdd_process
+
+    try:
+        result = gdd_process.run(["ps", "-o", "lstart=", "-p", str(pid)], capture_output=True, text=True,
+                                 env={**os.environ, "TZ": "UTC", "LC_ALL": "C"}, stdin=subprocess.DEVNULL)
+        if result.returncode:
+            return ""
+        _, month, day, clock, year = result.stdout.split()
+        month = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split().index(month) + 1
+        hour, minute, second = map(int, clock.split(":"))
+        started = datetime(int(year), month, int(day), hour, minute, second, tzinfo=timezone.utc)
+        return f"ps-utc:{int(started.timestamp())}"
+    except (OSError, ValueError):
+        return ""
 
 
 def wait_for_json(path, predicate, deadline):
@@ -166,7 +206,11 @@ def remove_tree(path):
             raise error
 
     if Path(path).exists():
-        retry_windows(lambda: shutil.rmtree(path, onexc=remove_readonly), time.monotonic() + 5)
+        if sys.version_info >= (3, 12):
+            callbacks = {"onexc": remove_readonly}
+        else:
+            callbacks = {"onerror": lambda operation, name, info: remove_readonly(operation, name, info[1])}
+        retry_windows(lambda: shutil.rmtree(path, **callbacks), time.monotonic() + 5)
 
 
 def check_processes(owned, seconds):
@@ -189,6 +233,7 @@ def check_processes(owned, seconds):
                     issues.append(f"{path}: PID {pid} has no isolated process group ({group})")
                     agent_run.terminate(pid, single=True, recorded=recorded)
                 elif agent_run.identity(pid) == recorded:
+                    # Check and signal are not atomic; macOS start times also have one-second resolution.
                     os.killpg(group, signal.SIGKILL)
                     if not agent_run.wait_until(lambda: not agent_run.group_alive(group), 5):
                         issues.append(f"{path}: process group {group} survived cleanup")
@@ -235,7 +280,7 @@ def stop_headless(root):
             issues.append(str(exc))
 
     try:
-        check_processes(owned, 5)
+        check_processes(owned, agent_run.STOP_WAIT_SECONDS)
     except AssertionError as exc:
         issues.append(str(exc))
     if issues:

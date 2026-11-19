@@ -19,7 +19,7 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import agent_run
 import gdd_process
-from gdd_test_support import (check_locks, check_processes, claim, cleanup_child, finalized, publish_json, ready,
+from gdd_test_support import (check_locks, check_processes, claim, cleanup_child, finalized, own_identity, publish_json, ready,
                               remove_tree, retry_windows, wait_for_json)
 
 ADAPTER = Path(__file__).resolve().parents[1] / "adapters" / "paseo-run.py"
@@ -27,12 +27,11 @@ STUB = '''#!/usr/bin/env python3
 import json, os, sys, time
 from pathlib import Path
 sys.path[:0] = [os.environ["STUB_TESTS"], os.environ["STUB_SCRIPTS"]]
-import agent_run
-from gdd_test_support import publish_json
+from gdd_test_support import own_identity, publish_json
 args = sys.argv[1:]
 root = Path(os.environ["STUB_HOME"])
 pid = os.getpid()
-publish_json(root / "children" / f"{pid}.json", [pid, agent_run.identity(pid)])
+publish_json(root / "children" / f"{pid}.json", [pid, own_identity()])
 with (root / "argv.ndjson").open("a", encoding="utf-8") as f:
     f.write(json.dumps(args) + "\\n")
 deadline = time.monotonic() + 2
@@ -83,6 +82,11 @@ elif command == "ls":
 else:
     sys.exit(2)
 '''
+
+
+def test_stub_identity_matches_runner():
+    recorded = own_identity()
+    assert recorded and recorded == agent_run.identity(os.getpid())
 
 
 class PaseoLauncherTests(unittest.TestCase):

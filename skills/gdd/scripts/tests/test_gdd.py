@@ -16,7 +16,7 @@ SCRIPTS = os.path.dirname(HERE)
 sys.path.insert(0, SCRIPTS)
 import gdd_process
 import agent_run
-from gdd_test_support import check_locks, cleanup_child, exited, ready, remove_tree, stop_headless, wait_for_json
+from gdd_test_support import check_locks, cleanup_child, exited, finalized, ready, remove_tree, stop_headless, wait_for_json
 GDD = os.path.join(SCRIPTS, "gdd.py")
 DELIVERY = os.path.join(SCRIPTS, "delivery-state.py")
 STUB = os.path.join(HERE, "stub_agent.py")
@@ -100,8 +100,8 @@ class GddCase(unittest.TestCase):
     def run_dirs(self, root=None):
         return glob.glob(os.path.join(root or os.path.join(self.state_home, "gdd", "runs"), "*", "*"))
 
-    def craft_run(self, name, *, pid=None, pid_identity=None, **state):
-        run_dir = os.path.join(self.state_home, "gdd", "runs", "2000-01-01", name)
+    def craft_run(self, name, *, date="2000-01-01", pid=None, pid_identity=None, **state):
+        run_dir = os.path.join(self.state_home, "gdd", "runs", date, name)
         write(os.path.join(run_dir, "state.json"), json.dumps(
             {"name": name, "agent": "omp", "state": "running", "exit": None, "cwd": self.repo,
              "started": datetime.now(timezone.utc).isoformat(), "pid": pid, "pid_identity": pid_identity,
@@ -232,13 +232,18 @@ class LaunchTests(GddCase):
         self.assertEqual(self.run_dirs(), [])
 
     def test_live_run_blocks_and_stale_run_does_not(self):
-        self.craft_run("workrepo-0001-implement", pid=os.getpid(), pid_identity=agent_run.identity(os.getpid()))
+        name = "workrepo-0001-implement"
+        date = datetime.now().strftime("%Y-%m-%d")
+        self.craft_run(name, date=date, pid=os.getpid(), pid_identity=agent_run.identity(os.getpid()))
         refused = self.stage("implement")
         self.assertEqual(refused.returncode, 3)
         self.assertIn("still active", refused.stderr)
         old = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
         pid, recorded = dead_pid(self.children)
-        self.craft_run("workrepo-0001-implement", pid=pid, pid_identity=recorded, started=old)
+        history = self.craft_run(name, pid=pid, pid_identity=recorded, started="2000-01-01T00:00:00+00:00")
+        history_state = read(os.path.join(history, "state.json"))
+        stale = self.craft_run(name, date=date, pid=pid, pid_identity=recorded, started=old)
+        original = agent_run.read_state(stale)
         show = self.run_tool(GDD, "status", "--repo", self.repo, "--goal", "0001")
         self.assertEqual(show.returncode, 0, show.stderr)
         self.assertIn("last_run: workrepo-0001-implement stale exit=- dur=-", show.stdout.splitlines())
@@ -248,6 +253,15 @@ class LaunchTests(GddCase):
                                                                   recursive=True)))
         self.assertEqual(wait_for_json(os.path.join(real_run, "state.json"), bool, time.monotonic() + 5)["state"],
                          "done")
+        if real_run == stale:
+            stale, = glob.glob(stale + ".prev-*")
+        self.assertTrue(os.path.isdir(history))
+        self.assertEqual(read(os.path.join(history, "state.json")), history_state)
+        self.assertTrue(os.path.isdir(stale))
+        saved = agent_run.read_state(stale)
+        self.assertEqual({key: saved[key] for key in original}, {**original, "state": "failed", "exit": -1})
+        self.assertEqual((saved["state"], saved["exit"], saved["stale_recovered"]), ("failed", -1, True))
+        self.assertTrue(finalized(stale, saved))
 
     def test_custom_launcher_without_pids_keeps_its_recorded_state(self):
         old = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()

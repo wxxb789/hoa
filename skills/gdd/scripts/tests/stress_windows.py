@@ -2,13 +2,22 @@
 
 import argparse
 import os
+import shutil
+import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 import gdd_process
+
+ROUNDS = 10
+ROUND_TIMEOUT = 240
+AUDIT_TIMEOUT = 60
+# Leave the workflow's last minute for ending the step and starting the upload.
+RUN_TIMEOUT = 19 * 60
 
 CASES = (
     "test_agent_run.py::ContractTests::test_concurrent_starts_cannot_move_a_starting_run",
@@ -26,18 +35,48 @@ CASES = (
 
 def leftovers_in(tmp):
     command = """
-$paths = $env:GDD_STRESS_TMP, $env:GDD_STRESS_STUB
-Get-CimInstance Win32_Process | Where-Object {
-    $line = $_.CommandLine
-    $line -and ($paths | Where-Object { $line.IndexOf($_, [StringComparison]::OrdinalIgnoreCase) -ge 0 })
-} | Select-Object ProcessId, Name, CommandLine | Format-List
+$ErrorActionPreference = 'Stop'
+$prefix = $env:GDD_STRESS_TMP
+function Owned-Processes {
+    Get-CimInstance Win32_Process -Filter "CommandLine LIKE '%gdd-stress-run-%'" | Where-Object {
+        $_.CommandLine -and $_.CommandLine.IndexOf($prefix, [StringComparison]::OrdinalIgnoreCase) -ge 0
+    }
+}
+foreach ($entry in @(Owned-Processes)) {
+    Write-Output "leftover PID $($entry.ProcessId): $($entry.CommandLine)"
+    try {
+        $process = [Diagnostics.Process]::GetProcessById($entry.ProcessId)
+        try {
+            # Hold the handle and compare the creation time before signaling this PID.
+            $null = $process.Handle
+            $ticks = $process.StartTime.ToUniversalTime().Ticks - $entry.CreationDate.ToUniversalTime().Ticks
+            if ($ticks -lt 0 -or $ticks -ge 10) {
+                Write-Output "PID $($entry.ProcessId) no longer matches the audit"
+            } else {
+                $process.Kill()
+                if (-not $process.WaitForExit(5000)) { throw "process did not exit" }
+                Write-Output "killed PID $($entry.ProcessId)"
+            }
+        } finally { $process.Dispose() }
+    } catch {
+        Write-Output "PID $($entry.ProcessId) cleanup: $_"
+    }
+}
+foreach ($entry in @(Owned-Processes)) {
+    Write-Output "still running PID $($entry.ProcessId): $($entry.CommandLine)"
+}
 """
-    audit = gdd_process.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", command],
-                            env={**os.environ, "GDD_STRESS_TMP": str(tmp),
-                                 "GDD_STRESS_STUB": str(HERE / "stub_agent.py")},
-                            capture_output=True, text=True, timeout=15)
+    argv = ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", command]
+    try:
+        audit = gdd_process.run(argv, env={**os.environ, "GDD_STRESS_TMP": str(tmp) + os.sep},
+                                capture_output=True, text=True, timeout=AUDIT_TIMEOUT)
+    except subprocess.TimeoutExpired as exc:
+        partial = (exc.stdout or b"").decode("utf-8", "replace")
+        return f"process audit timed out after {AUDIT_TIMEOUT}s\n{partial}".rstrip()
+    except OSError as exc:
+        return f"process audit failed: {exc}"
     if audit.returncode or audit.stderr:
-        return f"process audit failed (exit {audit.returncode}): {audit.stderr.strip()}"
+        return f"process audit failed (exit {audit.returncode}): {audit.stderr.strip()}\n{audit.stdout.strip()}"
     return audit.stdout.strip()
 
 
@@ -49,38 +88,65 @@ def main():
         parser.error("this stress job requires native Windows")
     out = args.out.resolve()
     out.mkdir(parents=True, exist_ok=True)
+    out = Path(tempfile.mkdtemp(prefix="gdd-stress-run-", dir=out))
+    print(f"Diagnostics: {out}", flush=True)
+    guard_log = Path(os.environ.setdefault("NOWINDOW_GUARD_LOG", str(out / "guard.log")))
     env = dict(os.environ)
     guard = str(HERE / "nowindow")
     env["PYTHONPATH"] = os.pathsep.join(filter(None, (env.get("PYTHONPATH"), guard)))
-    guard_log = Path(env.setdefault("NOWINDOW_GUARD_LOG", str(out / "guard.log")))
-    for iteration in range(1, 11):
+    deadline = time.monotonic() + RUN_TIMEOUT
+    for iteration in range(1, ROUNDS + 1):
         started = time.monotonic()
         label = f"iteration-{iteration:02d}"
-        print(f"{label}/10", flush=True)
+        print(f"{label}/{ROUNDS}", flush=True)
         tmp = out / (label + "-tmp")
         tmp.mkdir()
+        # All Python entry points, including orphaned stubs, carry this round's
+        # unique path in their command line even after their parent exits.
+        source = tmp / "source"
+        shutil.copytree(HERE.parents[1], source, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        tests = source / "scripts" / "tests"
         before = guard_log.stat().st_size if guard_log.exists() else 0
         log = out / (label + ".log")
-        with log.open("wb") as stream:
-            result = gdd_process.run(
-                [sys.executable, "-m", "pytest", "-vv", "-x", "--durations=0",
-                 *(str(HERE / case) for case in CASES)],
-                env={**env, "TEMP": str(tmp), "TMP": str(tmp)}, stdout=stream, stderr=stream)
-        summary = f"{label}: {time.monotonic() - started:.2f}s (pytest exit {result.returncode})"
-        paths = list(tmp.iterdir())
+        # Reserve enough time for both audit attempts, including on the last round.
+        timeout = min(ROUND_TIMEOUT, int(deadline - time.monotonic() - 2 * AUDIT_TIMEOUT))
+        code, outcome = 1, "stress budget exhausted"
+        try:
+            with log.open("wb") as stream:
+                if timeout > 0:
+                    # Windows has no SIGALRM; pytest-timeout's thread method exits the entire
+                    # pytest child. Keep it as a stack dump, with the round bounded separately.
+                    result = gdd_process.run(
+                        [sys.executable, "-m", "pytest", "-vv", "-x", "--durations=0",
+                         "-c", str(HERE.parents[3] / "pytest.ini"), *(str(tests / case) for case in CASES)],
+                        env={**env, "TEMP": str(tmp), "TMP": str(tmp), "PYTHONDONTWRITEBYTECODE": "1"},
+                        stdout=stream, stderr=stream, timeout=timeout)
+                    code, outcome = result.returncode, f"pytest exit {result.returncode}"
+        except subprocess.TimeoutExpired:
+            code, outcome = 1, f"pytest timed out after {timeout}s"
+        except OSError as exc:
+            code, outcome = 1, f"could not run pytest: {exc}"
+        summary = f"{label}: {time.monotonic() - started:.2f}s ({outcome})"
+        with log.open("a", encoding="utf-8") as stream:
+            print(summary, file=stream)
         processes = leftovers_in(tmp)
-        summary += f"\nleftover processes: {processes or '0'}\nleftover test paths: {paths or '0'}"
+        if processes.startswith("process audit "):
+            retry = leftovers_in(tmp)
+            processes += f"\ncleanup retry: {retry or '0 leftovers'}"
+        paths = [path for path in tmp.iterdir() if path != source]
+        details = f"leftover processes: {processes or '0'}\nleftover test paths: {paths or '0'}"
         refused = guard_log.exists() and guard_log.stat().st_size > before
         if refused:
             with guard_log.open("rb") as stream:
                 stream.seek(before)
                 (out / (label + "-guard.log")).write_bytes(stream.read())
         with log.open("a", encoding="utf-8") as stream:
-            print(summary, file=stream)
-        print(summary, flush=True)
-        if result.returncode or paths or processes or refused:
+            print(details, file=stream)
+        print(f"{summary}\n{details}", flush=True)
+        if code or paths or processes or refused:
             print(log.read_text(encoding="utf-8", errors="replace"), end="")
-            return result.returncode or 1
+            return code or 1
+        shutil.rmtree(source)
         tmp.rmdir()
     return 0
 

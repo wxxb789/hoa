@@ -6,6 +6,10 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 ## 2026-11-18
 
+- Bound Windows stress rounds, retain failure diagnostics, and clean up round-owned processes.
+  Verify descendant shutdown, stale-run preservation, PID reuse, and first terminal state; keep
+  lifecycle cleanup compatible with Python 3.9-3.11 and lighten the Paseo stub.
+
 - gdd (revision 7): harden lifecycle tests with atomic records, explicit readiness, identity-checked
   cleanup, and a nightly and manual Windows stress run.
 

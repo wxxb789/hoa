@@ -82,6 +82,7 @@ WINDOWS_DETACH = gdd_process.NO_WINDOW | gdd_process.NEW_GROUP
 # Ubuntu 22.04 leaves standard support in 2027-04; then move the floor to 24.04's 3.4.
 TMUX_MIN_VERSION = (3, 2, "a")
 POLL, PROGRESS_SECONDS = 0.25, 2.0
+STOP_WAIT_SECONDS = 20
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 SLUG_RE = re.compile(r"[^a-z0-9._-]+")
 CMD_UNSAFE = re.compile(r'[\r\n"&|<>^()%!]')
@@ -1188,7 +1189,7 @@ def stop_run(run_dir):
 
     if not os.path.exists(marker):
         write_json(os.path.join(run_dir, "stop"), {"requested_at": now_iso(), "by": os.getpid()})
-        wait_until(settled, knob("GDD_RUN_STOP_WAIT_SECONDS", 20))
+        wait_until(settled, knob("GDD_RUN_STOP_WAIT_SECONDS", STOP_WAIT_SECONDS))
     if os.path.exists(marker):
         cleanup_supervisor(run_dir, read_state(run_dir))
         return ""
@@ -1279,7 +1280,7 @@ def start_locked(args, spec, slug, cwd, run_dir, command, prompt, max_time, mode
             die(f"start: could not stop run '{slug}': {problem}")
     try:
         if os.path.isdir(run_dir):  # keep the previous run; on Windows its exiting runner still holds files
-            wait_until(lambda: not run_alive(run_dir), knob("GDD_RUN_STOP_WAIT_SECONDS", 20))
+            wait_until(lambda: not run_alive(run_dir), knob("GDD_RUN_STOP_WAIT_SECONDS", STOP_WAIT_SECONDS))
             archive = f"{run_dir}.prev-{datetime.now():%H%M%S%f}"
             before = os.stat(run_dir)
             for attempt in range(10):
