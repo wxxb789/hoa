@@ -7,6 +7,9 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 ## 2026-11-19
 
 - Use the public npm registry for GDD Observer and reject corporate package-feed hosts in CI.
+- Remove completed records, unused skill-method fixtures and the redundant proxy catalog entry; repair relative links and track deferred maintenance in TODO.md.
+- Recommend shallow clones for reference submodules without changing pins or update behavior.
+- Keep the upstream `improve-codebase-architecture` skill out of the generated uninstall command.
 - Share overlapping GDD Observer scans and send revision deltas, bound tail and PID caches, and
   stop polling the hidden list in compact detail.
 - Verify GDD Observer on Windows, macOS, and Linux in CI, bound its persisted settings, and show
@@ -1375,7 +1378,7 @@ was the tree *before* the final stage. More than 80% of merged PRs were absent f
 
 ## 2026-11-10 — cross-platform increments in goal-driven-delivery
 
-- Added **goal-driven-delivery** [`references/cross-platform-increments.md`](skills/goal-driven-delivery/references/cross-platform-increments.md)
+- Added **goal-driven-delivery** `references/cross-platform-increments.md`
   and a pointer section in its controller. A Linux-only green is not evidence for a repo that ships on
   more than one OS: fixtures with `/tmp/...` literals, path substitution into serialised JSON, POSIX
   signals and mode bits each fail on Windows without failing locally, and a gate that reports a test

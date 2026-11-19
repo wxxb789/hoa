@@ -26,7 +26,7 @@ This repo is a practice ground for two crafts:
   permissions, output handling. `hoa` doesn't store whole harnesses — a harness
   is an *assembly*: the runtime's own **settings** (managed by chezmoi) plus
   **portable parts** from here (`skills/` installed via `npx skills`, with
-  `agents/` `prompts/` `rules/` `mcps/` as the library they draw on).
+  `agents/` `prompts/` `rules/` as the library they draw on).
 - **Orchestration & loop engineering** — the control structures that drive
   iterative, multi-agent work: continuation, termination, retry, handoff,
   fan-out / fan-in, best-of-N. Loops are one shape of orchestration, so they
@@ -60,7 +60,7 @@ agents `npx skills` supports)*
 | Concern | Owner | Mechanism |
 |---|---|---|
 | Skills (`SKILL.md` packages) | **hoa** | `npx skills add wxxb789/hoa -s <skill>` → `~/<agent>/skills/` |
-| Agent roles, orchestration, prompts, rules, mcps, workflows, evals | **hoa** | version-controlled library / knowledge (composed into skills or used by hand) |
+| Agent roles, orchestration, prompts, rules, workflows, evals | **hoa** | version-controlled library / knowledge (composed into skills or used by hand) |
 | Reflections & external refs | **hoa** | knowledge, never deployed |
 | Runtime **settings** — LLM provider, models, plugins, `settings.json` / `config.toml` / `opencode.json` | **chezmoi** | `chezmoi apply` |
 
@@ -78,7 +78,6 @@ hoa/
 ├── paseo-plugins/ # optional Paseo plugin source; explicitly installed, never auto-deployed
 ├── agents/        # portable, runtime-agnostic role / persona / authority / I-O contracts
 ├── orchestration/ # scheduling, handoff, retry, continuation, termination, aggregation (loops, crews, fan-out/in, best-of-N)
-├── mcps/          # portable MCP server definitions & catalogs
 ├── prompts/       # per-task prompt templates
 ├── rules/         # always-on normative constraints / reusable rulesets
 ├── workflows/     # outcome-oriented finite recipes (no retry / termination controller)
@@ -97,7 +96,7 @@ hoa/
 `metadata.areas` / `metadata.targets` for custom skills, or `<!-- index: ... -->`
 comments for library artifacts (CI fails on drift). Artifacts are
 skills (`skills/<name>/SKILL.md`) and library files (`<folder>/<name>.md` or
-`<folder>/<name>/README.md` under `agents/`, `mcps/`, `orchestration/`,
+`<folder>/<name>/README.md` under `agents/`, `orchestration/`,
 `prompts/`, `rules/`, `workflows/`). Each catalog name must be unique, every
 configured library folder must hold at least one artifact, and each artifact's
 index note comes from its own metadata: `metadata.summary` /
@@ -129,12 +128,11 @@ the layer is a fact about the tree, not a label someone remembers to add.
 | `skills/` | `SKILL.md` packages: the only deployable artifact. `npx skills add wxxb789/hoa -s <skill>` installs the ones you pick. | yes |
 | `paseo-plugins/` | Optional Paseo plugin source, including the read-only GDD run observer. | manual opt-in only |
 | `agents/` | 1 role / authority / I-O contract (`skill-scout`). | no — library |
-| `mcps/` | 1 portable MCP definition (`ghc-proxy`). | no — library |
 | `orchestration/` | 1 scheduling/handoff/termination pattern (`typed-verification-gates`). | no — library |
 | `prompts/` | 5 per-task request templates. | no — library |
 | `rules/` | 1 standing constraint (`generated-means-generated`). | no — library |
 | `workflows/` | 1 finite outcome-oriented recipe (`adopt-a-pattern`). | no — library |
-| `evals/` | Two case suites (`trigger-cases.json`, `skill-method-cases.json`) and their offline validators. | no — repo only |
+| `evals/` | Trigger cases and their offline validator. | no — repo only |
 | `reflections/`, `ref/` | Write-ups and external reference submodules; study material, never deployed. | no |
 | `scripts/` | Repo maintenance: catalog and install commands, version/revision gates, contract graph, config resolver. | no |
 
@@ -183,7 +181,7 @@ UI; a newer push to a pull request cancels the older run.
 | Vendored shared scripts drift | `python scripts/vendor_shared.py --check` | Vendored copies of shared scripts match their canonical file. |
 | PR bumps changed skills' revision (pull requests) | `python scripts/version.py check-revisions` | Every skill directory changed since the merge base raises its `metadata.revision`. |
 | pytest | `python -m pytest` | Every `test_*.py` unittest/pytest file under `scripts/`, `evals/` and `skills/` (`pytest.ini`); 120 s per test. |
-| Script checks | `python evals/run_trigger_evals.py`, `evals/validate_skill_method_cases.py`, `skills/define-goal/evals/validate_fixtures.py`, `skills/hermes-models/scripts/tests/test-*.py`, `skills/gdd/scripts/tests/test_verdict_matrix.py`, `mutate_verdict_matrix.py` | Standalone checks whose exit code is the contract; one step each. |
+| Script checks | `python evals/run_trigger_evals.py`, `skills/define-goal/evals/validate_fixtures.py`, `skills/hermes-models/scripts/tests/test-*.py`, `skills/gdd/scripts/tests/test_verdict_matrix.py`, `mutate_verdict_matrix.py` | Standalone checks whose exit code is the contract; one step each. |
 | Paseo gdd-observer | `npm ci && npm run typecheck && npm test` in `paseo-plugins/gdd-observer` | The plugin's typecheck and Vitest suite. |
 | `gdd-runner` (Ubuntu, macOS, Windows) | `python -m pytest -q` on `test_agent_run.py`, `test_detach_supervisors.py`, `test_gdd.py`, `test_no_window.py`, `test_paseo_run_python.py`, and `test_watch_pr_checks.py` under `skills/gdd/scripts/tests/` | Cross-platform runner, detach supervisors, stage dispatch, console suppression, Paseo adapter, and PR watcher contracts. |
 
@@ -266,9 +264,9 @@ only hand-written docs pay the translation tax.
 git clone https://github.com/wxxb789/hoa   # submodules NOT needed for skills/tests
 ```
 
-`ref/` holds 35 reference repos as submodules — heavy, and only needed when
-studying an upstream. A plain clone (no `--recursive`) is fully sufficient to
-use and test everything else. Refresh the references when needed:
+`ref/` holds reference repos as submodules, needed only when studying an
+upstream. A plain clone (no `--recursive`) is enough to use and test everything
+else. New submodule clones are shallow by default. Refresh the references when needed:
 `git submodule update --init --remote --merge`.
 
 ## Where does it go? (classification)
@@ -282,7 +280,6 @@ internally.
 | `paseo-plugins/` | portable source packages explicitly installed as Paseo plugins | machine-specific plugin registration or runtime settings (→ chezmoi) |
 | `agents/` | a single-agent role contract many runtimes could implement | vendor-specific runtime settings (→ chezmoi); crew scheduling (→ `orchestration/`) |
 | `orchestration/` | decides who runs when, how results flow, whether to retry / stop | a concrete business recipe (→ `workflows/`) |
-| `mcps/` | portable MCP endpoint / tool definition | vendor-specific registration in `settings.json` (→ chezmoi) |
 | `prompts/` | a one-shot, per-task request template | standing behavioral constraints (→ `rules/`); persona (→ `agents/`) |
 | `rules/` | "always / never / must" standing constraints | one-off task instructions (→ `prompts/`) |
 | `workflows/` | outcome-centered finite steps | anything owning retry / continuation / agent scheduling (→ `orchestration/`) |
@@ -387,9 +384,6 @@ For behavior changes, `hoa-skill-create` starts with focused checks and expands 
 variants, models, or runtimes when reach, risk, or conflicting evidence warrants
 it. A retro candidate needs individual owner acceptance before routing to creation; a direct
 request to create or improve a defined skill does not need that intake flow.
-`evals/skill-method-cases.json` holds the focused behavior scenarios; CI checks
-their structure and isolation paths, while model/host behavior is judged in
-fresh runs rather than claimed from the CI fixture check.
 Claude Code's native `plugin eval` tests plugin-shaped packages; Anthropic's
 `skill-creator` is a separate first-party plugin, and the earlier
 `define-goal` review used CE guidance plus a session-written runner. None is
@@ -423,8 +417,8 @@ Type is derived from the folder. Both axes are multi-valued.
 
 ## Reference map
 
-[`ref/README.md`](./ref/README.md) maps **35 external agent/skill/harness
-repos** to what each is and the specific pattern worth stealing from it — the
+[`ref/README.md`](./ref/README.md) maps external agent/skill/harness
+repos to what each is and the specific pattern worth stealing from it — the
 densest page in this repo if you are designing your own agent setup.
 
 ## Roadmap

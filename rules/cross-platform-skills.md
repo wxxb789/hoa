@@ -94,7 +94,7 @@ uv is a prerequisite for skills with scripts. A missing uv is handled on demand,
 `scripts/shared/troubleshooting.md` is vendored by `scripts/vendor_shared.py` to
 `references/troubleshooting.md` in every skill whose docs run its own scripts with `uv run`, and
 SKILL.md carries one line: "Only if a script command fails (for example `uv` is not found), read
-[references/troubleshooting.md](references/troubleshooting.md)." The reference asks the user before
+`[references/troubleshooting.md](references/troubleshooting.md)`." The reference asks the user before
 installing uv and never auto-installs; if the user declines, the skill stops: uv is required, and a
 bare `python3` is not a fallback because the system interpreter is often older than
 `requires-python` (Ubuntu 24.04 ships 3.12, macOS `/usr/bin/python3` is 3.9).

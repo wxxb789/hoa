@@ -37,6 +37,7 @@ the port review gate above — never as a sync or a copy.
 Scripts and tests follow one bar: default to deletion. Keep a gate, check, or abstraction only when
 removing it risks real, irreversible harm, or after the same pain has hit three times.
 
+- Record verified dead-code candidates and dated maintenance tasks in [TODO.md](TODO.md).
 - Stdlib first; no single-caller wrapper layers, custom verification envelopes, or lockfile ceremony
   on zero-dependency code. Diagnostics name the exact offending key, path, or value.
 - Tests target public contracts and CLI behaviour, not private functions. No tests that pin prose.

@@ -1,189 +1,227 @@
 [submodule "ref/compound-engineering-plugin"]
+	shallow = true
 	path = ref/compound-engineering-plugin
 	url = https://github.com/EveryInc/compound-engineering-plugin
 	branch = main
 	ignore = dirty
 [submodule "ref/superpowers"]
+	shallow = true
 	path = ref/superpowers
 	url = https://github.com/obra/superpowers
 	branch = main
 	ignore = dirty
 [submodule "ref/mattpocock-skills"]
+	shallow = true
 	path = ref/mattpocock-skills
 	url = https://github.com/mattpocock/skills
 	branch = main
 	ignore = dirty
 [submodule "ref/caveman"]
+	shallow = true
 	path = ref/caveman
 	url = https://github.com/juliusbrussee/caveman
 	branch = main
 	ignore = dirty
 [submodule "ref/baoyu-skills"]
+	shallow = true
 	path = ref/baoyu-skills
 	url = https://github.com/JimLiu/baoyu-skills
 	branch = main
 	ignore = dirty
 [submodule "ref/baoyu-design"]
+	shallow = true
 	path = ref/baoyu-design
 	url = https://github.com/JimLiu/baoyu-design
 	branch = main
 	ignore = dirty
 [submodule "ref/ljg-skills"]
+	shallow = true
 	path = ref/ljg-skills
 	url = https://github.com/lijigang/ljg-skills
 	branch = master
 	ignore = dirty
 [submodule "ref/zhijian-skills"]
+	shallow = true
 	path = ref/zhijian-skills
 	url = https://github.com/zjp1997720/zhijian-skills
 	branch = main
 	ignore = dirty
 [submodule "ref/dbskill"]
+	shallow = true
 	path = ref/dbskill
 	url = https://github.com/dontbesilent2025/dbskill
 	branch = main
 	ignore = dirty
 [submodule "ref/Waza"]
+	shallow = true
 	path = ref/Waza
 	url = https://github.com/tw93/Waza
 	branch = main
 	ignore = dirty
 [submodule "ref/Kami"]
+	shallow = true
 	path = ref/Kami
 	url = https://github.com/tw93/Kami
 	branch = main
 	ignore = dirty
 [submodule "ref/zhengxi-views"]
+	shallow = true
 	path = ref/zhengxi-views
 	url = https://github.com/lyra81604/zhengxi-views
 	branch = main
 	ignore = dirty
 [submodule "ref/looper"]
+	shallow = true
 	path = ref/looper
 	url = https://github.com/ksimback/looper
 	branch = main
 	ignore = dirty
 [submodule "ref/no-mistakes"]
+	shallow = true
 	path = ref/no-mistakes
 	url = https://github.com/kunchenguid/no-mistakes
 	branch = main
 	ignore = dirty
 [submodule "ref/gnhf"]
+	shallow = true
 	path = ref/gnhf
 	url = https://github.com/kunchenguid/gnhf
 	branch = main
 	ignore = dirty
 [submodule "ref/lavish-axi"]
+	shallow = true
 	path = ref/lavish-axi
 	url = https://github.com/kunchenguid/lavish-axi
 	branch = main
 	ignore = dirty
 [submodule "ref/no-ai-slop"]
+	shallow = true
 	path = ref/no-ai-slop
 	url = https://github.com/petergyang/no-ai-slop
 	branch = main
 	ignore = dirty
 [submodule "ref/last30days-skill"]
+	shallow = true
 	path = ref/last30days-skill
 	url = https://github.com/mvanhorn/last30days-skill
 	branch = main
 	ignore = dirty
 [submodule "ref/colleague-skill"]
+	shallow = true
 	path = ref/colleague-skill
 	url = https://github.com/titanwings/colleague-skill
 	branch = dot-skill
 	ignore = dirty
 [submodule "ref/nuwa-skill"]
+	shallow = true
 	path = ref/nuwa-skill
 	url = https://github.com/alchaincyf/nuwa-skill
 	branch = main
 	ignore = dirty
 [submodule "ref/huashu-design"]
+	shallow = true
 	path = ref/huashu-design
 	url = https://github.com/alchaincyf/huashu-design
 	branch = master
 	ignore = dirty
 [submodule "ref/yao-open-skills"]
+	shallow = true
 	path = ref/yao-open-skills
 	url = https://github.com/yaojingang/yao-open-skills
 	branch = main
 	ignore = dirty
 [submodule "ref/yao-open-prompts"]
+	shallow = true
 	path = ref/yao-open-prompts
 	url = https://github.com/yaojingang/yao-open-prompts
 	branch = main
 	ignore = dirty
 [submodule "ref/yao-meta-skill"]
+	shallow = true
 	path = ref/yao-meta-skill
 	url = https://github.com/yaojingang/yao-meta-skill
 	branch = main
 	ignore = dirty
 [submodule "ref/dexter"]
+	shallow = true
 	path = ref/dexter
 	url = https://github.com/virattt/dexter
 	branch = main
 	ignore = dirty
 [submodule "ref/say-it-human"]
+	shallow = true
 	path = ref/say-it-human
 	url = https://github.com/taxueseek/say-it-human
 	branch = main
 	ignore = dirty
 [submodule "ref/humanizer"]
+	shallow = true
 	path = ref/humanizer
 	url = https://github.com/blader/humanizer
 	branch = main
 	ignore = dirty
 [submodule "ref/Humanizer-zh"]
+	shallow = true
 	path = ref/Humanizer-zh
 	url = https://github.com/op7418/Humanizer-zh
 	branch = main
 	ignore = dirty
 [submodule "ref/shuorenhua"]
+	shallow = true
 	path = ref/shuorenhua
 	url = https://github.com/MrGeDiao/shuorenhua
 	branch = main
 	ignore = dirty
 [submodule "ref/taste-skill"]
+	shallow = true
 	path = ref/taste-skill
 	url = https://github.com/Leonxlnx/taste-skill
 	branch = main
 	ignore = dirty
 [submodule "ref/ECC"]
+	shallow = true
 	path = ref/ECC
 	url = https://github.com/affaan-m/ECC
 	branch = main
 	ignore = dirty
 [submodule "ref/gstack"]
+	shallow = true
 	path = ref/gstack
 	url = https://github.com/garrytan/gstack
 	branch = main
 	ignore = dirty
 [submodule "ref/anthropics-skills"]
+	shallow = true
 	path = ref/anthropics-skills
 	url = https://github.com/anthropics/skills
 	branch = main
 	ignore = dirty
 [submodule "ref/auto_research-site"]
+	shallow = true
 	path = ref/auto_research-site
 	url = https://github.com/victorchen96/victorchen96.github.io
 	branch = main
 	ignore = dirty
 [submodule "ref/knowledge-work-plugins"]
+	shallow = true
 	path = ref/knowledge-work-plugins
 	url = https://github.com/anthropics/knowledge-work-plugins
 	branch = main
 	ignore = dirty
 [submodule "ref/i-have-adhd"]
+	shallow = true
 	path = ref/i-have-adhd
 	url = https://github.com/ayghri/i-have-adhd
 	branch = main
 	ignore = dirty
 [submodule "ref/pstack"]
+	shallow = true
 	path = ref/pstack
 	url = https://github.com/backnotprop/pstack
 	branch = main
 	ignore = dirty
 [submodule "ref/academic-research-skills"]
+	shallow = true
 	path = ref/academic-research-skills
 	url = https://github.com/Imbad0202/academic-research-skills
 	branch = main

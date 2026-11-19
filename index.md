@@ -72,7 +72,6 @@ targets:  runtime-agnostic | repo-only |
 | tmux-agent-control | skill | software-development,work-management | runtime-agnostic | `skills/tmux-agent-control/` | drive a live TUI agent in tmux: find the pane, prove idle, send one complete instruction |
 | writing | skill | work-management,self-management | runtime-agnostic | `skills/writing/` | per-channel prose contracts behind one content-first layer: blog, academic, X, Reddit, 小红书, 公众号, tutorial, changelog; plus a measurable AI-smell audit |
 | skill-scout | agent | software-development,work-management | repo-only | `agents/skill-scout.md` | read-only search for an existing skill when asked to check before authoring; never create one |
-| ghc-proxy | mcp | software-development | repo-only | `mcps/ghc-proxy.md` | portable definition of the local ghc-proxy search service; registration stays in chezmoi |
 | typed-verification-gates | orchestration | software-development | repo-only | `orchestration/typed-verification-gates.md` | every loop iteration ends at a gate typed programmatic / judge / human, declared before the work |
 | ado-commit-push-pr | prompt | software-development | repo-only | `prompts/ado-commit-push-pr.md` | one-shot commit → push → PR request for Azure DevOps or GitHub, with house conventions and az/gh pitfalls |
 | cross-agent-history-retrieval | prompt | self-management,software-development | repo-only | `prompts/cross-agent-history-retrieval.md` | one-shot search/export of local agent histories with per-source coverage, dedup, and redaction |
@@ -108,7 +107,7 @@ no-op, but removal matches names across sources, so check `npx skills ls -g` fir
 name you installed from elsewhere.
 
 ```bash
-npx skills remove -g arch-improvement-plan design-an-interface design-md dsh-headless-gdd find-nearby generated-runtime-repairs git-worktree-workflow github-code-review github-repo-management grounded-citations hoa-agent-retrieve hoa-introspect hoa-introspect-distill hoa-skill-work html-artifact improve-codebase-architecture jupyter-live-kernel kanban-workflows m365-copilot-cdp microsoft-office my-ado-cppr notes-to-prd ocr-and-documents omp-headless-orchestration ops-claim-verification plan-to-issues rss-feeds skill-library-curation skill-porting-and-publishing subagent-driven-development systematic-debugging teams-cdp to-issues to-prd whisper writing-plans
+npx skills remove -g arch-improvement-plan design-an-interface design-md dsh-headless-gdd find-nearby generated-runtime-repairs git-worktree-workflow github-code-review github-repo-management grounded-citations hoa-agent-retrieve hoa-introspect hoa-introspect-distill hoa-skill-work html-artifact jupyter-live-kernel kanban-workflows m365-copilot-cdp microsoft-office my-ado-cppr notes-to-prd ocr-and-documents omp-headless-orchestration ops-claim-verification plan-to-issues rss-feeds skill-library-curation skill-porting-and-publishing subagent-driven-development systematic-debugging teams-cdp to-issues to-prd whisper writing-plans
 ```
 
 > Reflections and eval results are prose/knowledge, not indexed here.

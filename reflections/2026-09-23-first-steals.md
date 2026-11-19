@@ -21,7 +21,8 @@ folders were `.gitkeep`.
   - `prompts/fresh-context-grader.md` — the judge shape behind define-goal's
     fixtures
   - `workflows/adopt-a-pattern.md` — the recipe, distilled from doing it
-  - `mcps/ghc-proxy.md` — the portable definition, registration left to chezmoi
+  - ghc-proxy — originally a separate catalog entry; the [search skill](../skills/ghc-search/SKILL.md)
+    documents the API setup, and runtime registration stays with chezmoi
 - **The taxonomy took real content, and held.** The classification table
   resolved every one of the six placements without strain. The one soft spot:
   an exemplar artifact written *as a pattern* (typed-verification-gates)
