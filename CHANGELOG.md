@@ -17,6 +17,11 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
   first paired trial and quick, single-context WS4 fallback pilot.
 - Redact host paths and credentials from necessity-eval results, and replace the pilot artifacts
   with runs that identify the exact runner commit.
+- Target Hermes for `hermes-ops-claim-verification` and regenerate both catalogs.
+- Document the required CI matrix and separate nightly Windows stress workflow in both READMEs.
+- Refresh maintenance anchors and cover the intermittent Paseo historical-outcome test in the
+  bounded Windows stress run.
+- Use `uv run` in Python script usage examples and regeneration diagnostics.
 - The README and the generated index tell users who do not run Hermes to skip the `hermes-*` skills, and
   the index carries an install-everything-but-Hermes command; `generate_index.py` fails if any other
   skill starts linking to a `hermes-*` skill.

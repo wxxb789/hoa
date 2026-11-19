@@ -16,9 +16,9 @@ runtime. Default: `agent -z` (prompt appended as one argv). Pass `--cmd` with a
     --cmd 'myagent -q {prompt} --safe-mode'
 
 Usage:
-  python3 contract-eval-run.py --cases cases.json --label post-edit
-  python3 contract-eval-run.py --cases cases.json --limit 3        # smoke
-  python3 contract-eval-run.py --cases cases.json --only red-merge,worth-it
+  uv run contract-eval-run.py --cases cases.json --label post-edit
+  uv run contract-eval-run.py --cases cases.json --limit 3        # smoke
+  uv run contract-eval-run.py --cases cases.json --only red-merge,worth-it
 
 Case schema (JSON array):
   {"id": ..., "prompt": ..., "expect": [regex...], "forbid": [regex...], "note": ...}

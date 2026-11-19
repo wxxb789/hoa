@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.13"
+# dependencies = []
+# ///
 """Mutation harness over the verdict matrix.
 
 Every mutation below is a plausible wrong implementation of `pr-merge-check.py`. Each is applied in
@@ -39,7 +43,7 @@ Two catalogues make up the run:
   tokens' meanings at once — the shape that was invisible while the cells read the gate for what
   was correct (round-5 finding F2).
 
-Run: python3 skills/gdd/scripts/tests/mutate_verdict_matrix.py
+Run: uv run skills/gdd/scripts/tests/mutate_verdict_matrix.py
 """
 
 from __future__ import annotations

@@ -19,7 +19,7 @@ descriptions in one shared, size-limited catalog. A hidden skill is not listed, 
 the 1024-character agentskills spec cap applies to it.
 
 Usage:
-    python scripts/check_frontmatter.py
+    uv run scripts/check_frontmatter.py
 
 Exit codes: 0 every skill is valid, 1 at least one finding.
 """

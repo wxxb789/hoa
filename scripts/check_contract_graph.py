@@ -17,6 +17,8 @@ mechanism must be named in another skill's SKILL.md or Markdown references.
 Usage:
     uv run --script scripts/check_contract_graph.py          # exit 1 on violations
     uv run --script scripts/check_contract_graph.py --list   # print the graph
+    uv run scripts/check_contract_graph.py          # exit 1 on violations
+    uv run scripts/check_contract_graph.py --list   # print the graph
 """
 from __future__ import annotations
 

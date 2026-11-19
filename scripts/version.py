@@ -6,7 +6,7 @@
 """Per-skill revision gate.
 
 Usage:
-    python scripts/version.py check-revisions   # PR gate: changed skills bump metadata.revision
+    uv run scripts/version.py check-revisions   # PR gate: changed skills bump metadata.revision
 
 Each skills/<name>/SKILL.md carries `metadata.revision`, an integer string counting
 that skill's own iterations: a pull request bumps it only for the skill

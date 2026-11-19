@@ -1,17 +1,25 @@
 # Maintenance
 
-- **Compatibility candidates:** Remove the hidden `agent_run.py start` flags only after checking
-  external callers. The parser still accepts them (`skills/gdd/scripts/agent_run.py:1536`).
-  `--backend` only warns; `--session-id` aliases `--resume` for DSH
-  (`skills/gdd/scripts/agent_run.py:1226`), and OMP's `--profile` still reaches the CLI
-  (`skills/gdd/scripts/agent_run.py:914`). The legacy-flags test is the only tracked direct caller
-  found (`skills/gdd/scripts/tests/test_agent_run.py:224`).
+- **Compatibility candidates:** Check external callers before removing the hidden `start` flags
+  registered in `main` in [agent_run.py](skills/gdd/scripts/agent_run.py). In `cmd_start`,
+  `--backend` only warns and `--session-id` aliases `--resume` for DSH. `omp_argv` still
+  forwards `--profile`. The tracked direct calls found are in `test_legacy_start_flags`
+  in [test_agent_run.py](skills/gdd/scripts/tests/test_agent_run.py).
 - **Keep the OMP forwarder:** `skills/gdd-route-omp/scripts/omp-run.sh` is a documented POSIX
-  entry point (`skills/gdd-route-omp/SKILL.md:59`) exercised by
-  `skills/gdd/scripts/tests/test_agent_run.py:632`.
+  entry point in [gdd-route-omp's detach rules](skills/gdd-route-omp/SKILL.md#rule-never-launch-omp-as-a-bare-background-job-of-the-session).
+  See `test_t15_omp_headless_forwarder_resolves_the_sibling_runner` in
+  [test_agent_run.py](skills/gdd/scripts/tests/test_agent_run.py).
 - **2027-04: Ubuntu 22.04 leaves standard support.** Raise `TMUX_MIN_VERSION` to 24.04's 3.4
-  (`skills/gdd/scripts/agent_run.py:83`). Update the 3.2a documentation at
-  `skills/gdd/references/transport.md:49`, `skills/gdd/references/run-failure-modes.md:121`,
-  `skills/gdd-route-omp/SKILL.md:50`, and `skills/gdd-route-dsh/SKILL.md:168`. Update the fake
-  tmux version and boundary cases at `skills/gdd/scripts/tests/test_detach_supervisors.py:50`
-  and `skills/gdd/scripts/tests/test_detach_supervisors.py:264`.
+  in [agent_run.py](skills/gdd/scripts/agent_run.py). Update the 3.2a documentation in
+  [transport.md](skills/gdd/references/transport.md#headless-platform-rules),
+  [run-failure-modes.md](skills/gdd/references/run-failure-modes.md) (detach-mode table),
+  [gdd-route-omp](skills/gdd-route-omp/SKILL.md#rule-never-launch-omp-as-a-bare-background-job-of-the-session),
+  and [gdd-route-dsh](skills/gdd-route-dsh/SKILL.md#configuration). Update the default version
+  in `SUPERVISOR` and the cases in `test_tmux_version_floor` in
+  [test_detach_supervisors.py](skills/gdd/scripts/tests/test_detach_supervisors.py).
+- **Windows flake:** Investigate why the monitor PID changed between two status reads in
+  `test_deleting_finalized_agent_preserves_historical_outcome` in
+  [test_paseo_run_python.py](skills/gdd/scripts/tests/test_paseo_run_python.py). Observed once on
+  Windows; not reproduced in three reruns on `d181c40`. Reproduced in round 1 of the local
+  guarded Windows stress run after adding the test to the stress set; its teardown audit
+  found no leftover processes or test paths.

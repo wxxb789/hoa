@@ -1,16 +1,16 @@
 ---
 name: hermes-ops-claim-verification
 description: >-
-  Turn a scheduled-job, repair or deployment claim into evidence: find the surface that records it,
+  Verify a Hermes scheduled-job, repair or deployment claim: find the surface that records it,
   separate a manual rerun from the scheduled run, re-verify auditor verdicts. Use when checking a
   cron result, a "fixed" claim, a CI/review-bot gate or an environment status report. Not for
   auditing a written report or accepting a teammate's delivery.
 metadata:
-  revision: "2"
+  revision: "3"
   areas: "software-development,work-management"
-  targets: "runtime-agnostic"
-  summary: "turn a scheduled-job, repair or deployment claim into evidence: find the recording surface, separate manual from scheduled runs, audit the auditor"
-  summary_zh: "把定时任务、修复或部署的说法变成证据：找准记录面、区分手动与调度运行、审查审计者"
+  targets: "hermes"
+  summary: "verify Hermes scheduled-job, repair or deployment claims: find the recording surface, separate manual from scheduled runs, audit the auditor"
+  summary_zh: "验证 Hermes 定时任务、修复或部署的说法：找准记录面、区分手动与调度运行、审查审计者"
   kind: "entry"
 ---
 
@@ -31,14 +31,13 @@ are the one who authorized what the owner still gates — and the teammate who r
 
 Absence in one file is your search error, not the sender's fabrication. Locate the record first, rule second.
 
-- **Scheduled job outcomes** live in the scheduler's per-run output, not the agent log. Hermes example:
+- **Scheduled job outcomes** live in the Hermes scheduler's per-run output, not the agent log:
   `<home>/cron/output/<job_id>/<timestamp>.md` (full stdout/stderr, `Script exited with code N`), while
   the agent log prints only the first line of the injected prompt. Grepping the log for a traceback
   returns 0 on a genuine failure.
 - **Read the scheduler's gate decision.** In Hermes, `wake=false, skipping agent run` means the gate
   returned false (healthy). `Running job` followed by an inbound message carrying the job output = the
-  gate did not return false, so the agent was woken by an error or by real work. For other schedulers,
-  find the equivalent gate record and check the run output for the payload.
+  gate did not return false, so the agent was woken by an error or by real work.
 - **Repairs** are proven by `git apply --check` against the current tree, `git show --stat` on the landed
   commit, `rev-list --left-right --count origin/main...HEAD` for publication, and a re-run of the gates.
   A patch file that applies cleanly is not a deployed fix.

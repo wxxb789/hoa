@@ -155,10 +155,14 @@ scope-seal）。每条规则都由该命令执行：
 
 ### CI 跑什么
 
-CI（`.github/workflows/ci.yml`）有两个 job：Ubuntu 上的 `test`，以及覆盖 Ubuntu、macOS 和
-Windows 的 `gdd-runner`。两者都在每次 push 到 `main`、每个 pull request 与
-`workflow_dispatch` 时运行。没有 release job：`npx skills` 直接从 GitHub 安装，因此不打 tag、不发布。
-每项检查都是一个具名 step，失败时在 Actions 界面里直接显示是哪一步；同一 pull request 的新 push 会取消旧的运行。
+CI（[`ci.yml`](.github/workflows/ci.yml)）在 Ubuntu 上运行 `test`，并在 Ubuntu、macOS 和
+Windows 上各运行 `gdd-runner` 和 `gdd-observer`。触发条件是 push 到 `main`、pull request 或
+`workflow_dispatch`。`main` 的 ruleset 要求全部七项 job 检查通过。没有 release job：
+`npx skills` 直接从 GitHub 安装。每项检查都是具名 step，失败时可在 Actions 界面定位；
+同一 pull request 的新 push 会取消旧的运行。
+
+独立的 [`gdd-windows-stress.yml`](.github/workflows/gdd-windows-stress.yml) 每晚及手动触发时运行
+带 no-window guard 的 Windows 生命周期测试，不属于必需检查。
 
 | Job / Step | 命令 | 保护什么 |
 |---|---|---|
@@ -170,7 +174,7 @@ Windows 的 `gdd-runner`。两者都在每次 push 到 `main`、每个 pull requ
 | PR bumps changed skills' revision（pull request） | `python scripts/version.py check-revisions` | 自 merge base 以来改动过的每个 skill 目录都提高了 `metadata.revision`。 |
 | pytest | `python -m pytest` | `scripts/`、`evals/`、`skills/` 下每个 `test_*.py` unittest/pytest 文件（`pytest.ini`）；每个测试 120 秒上限。 |
 | 脚本检查 | `python evals/run_trigger_evals.py`、`skills/define-goal/evals/validate_fixtures.py`、`skills/hermes-models/scripts/tests/test-*.py`、`skills/gdd/scripts/tests/test_verdict_matrix.py`、`mutate_verdict_matrix.py` | 以退出码为契约的独立检查；每个一个 step。 |
-| Paseo gdd-observer | 在 `paseo-plugins/gdd-observer` 中 `npm ci && npm run typecheck && npm test` | 插件的 typecheck 与 Vitest 套件。 |
+| `gdd-observer`（Ubuntu、macOS、Windows） | 在 `paseo-plugins/gdd-observer` 中 `npm ci && npm run typecheck && npm test` | 插件的 typecheck 与 Vitest 套件。 |
 | `gdd-runner`（Ubuntu、macOS、Windows） | 对 `skills/gdd/scripts/tests/` 下的 `test_agent_run.py`、`test_detach_supervisors.py`、`test_gdd.py`、`test_no_window.py`、`test_paseo_run_python.py`、`test_watch_pr_checks.py` 运行 `python -m pytest -q` | 跨平台 runner、分离进程 supervisor、阶段派发、控制台抑制、Paseo adapter 和 PR watcher 契约。 |
 
 本地运行 Python 测试：
