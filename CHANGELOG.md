@@ -10,6 +10,8 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 - Remove completed records, unused skill-method fixtures and the redundant proxy catalog entry; repair relative links and track deferred maintenance in TODO.md.
 - Recommend shallow clones for reference submodules without changing pins or update behavior.
 - Keep the upstream `improve-codebase-architecture` skill out of the generated uninstall command.
+- Verify gdd detachment and teardown against a private tmux server on Ubuntu CI, and exercise
+  simultaneous Paseo refresh-claim takeovers after an abrupt holder exit.
 - Share overlapping GDD Observer scans and send revision deltas, bound tail and PID caches, and
   stop polling the hidden list in compact detail.
 - Verify GDD Observer on Windows, macOS, and Linux in CI, bound its persisted settings, and show

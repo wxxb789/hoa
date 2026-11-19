@@ -12,6 +12,7 @@ import tempfile
 import time
 import unittest
 import uuid
+from contextlib import ExitStack
 from datetime import datetime
 from pathlib import Path
 from unittest import mock
@@ -334,45 +335,67 @@ class PaseoLauncherTests(unittest.TestCase):
     @unittest.skipIf(os.name == "nt", "POSIX abrupt holder exit and competing processes")
     def test_only_one_contender_takes_over_a_dead_refresh_holder(self):
         source = """
-import importlib.util, os, sys
+import importlib.util, os, sys, time
 from pathlib import Path
 spec = importlib.util.spec_from_file_location('adapter', sys.argv[1])
 adapter = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(adapter)
-root, role = Path(sys.argv[2]), sys.argv[3]
-if role != 'holder':
-    with (root / 'refresh').open('a+b') as handle:
-        if adapter.gdd_process.try_file_lock(handle):
-            raise SystemExit('contender acquired the live holder lock')
-    print('READY', flush=True)
-    if sys.stdin.readline().strip() != 'RELEASE':
-        raise SystemExit(2)
-with adapter.claim(str(root / 'refresh')):
-    if role == 'holder':
+root, *gates = sys.argv[2:]
+root = Path(root)
+if not gates:
+    with adapter.claim(str(root / 'refresh')):
         print('READY', flush=True)
         os._exit(0 if sys.stdin.readline().strip() == 'RELEASE' else 2)
-    (root / 'inside').touch(exist_ok=False)
-    (root / 'inside').unlink()
+
+overlap = False
+for number, fd in enumerate(gates):
+    round_dir = root / f'takeover-{number}'
+    print('READY', flush=True)
+    with os.fdopen(int(fd), 'rb') as gate:
+        gate.read()  # EOF releases all contenders in this round.
+    with adapter.claim(str(round_dir / 'refresh')):
+        inside = round_dir / 'inside'
+        try:
+            inside.touch(exist_ok=False)
+        except FileExistsError:
+            print(f'round {number}: two contenders held the refresh claim at once', file=sys.stderr)
+            overlap = True
+        else:
+            try:
+                time.sleep(0.04)
+            finally:
+                inside.unlink()
+raise SystemExit(int(overlap))
 """
-        def start(role):
-            child = gdd_process.popen([sys.executable, "-B", "-c", source, str(ADAPTER), str(self.home), role],
-                                      stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, encoding="utf-8")
+        def start(root, *gates):
+            child = gdd_process.popen([sys.executable, "-B", "-c", source, str(ADAPTER), str(root),
+                                       *map(str, gates)], pass_fds=gates,
+                                      stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                      text=True, encoding="utf-8")
             self.children.append(child)
             return child
 
-        holder = start("holder")
-        ready(holder, 5)
-        contenders = [start(str(i)) for i in range(8)]
-        deadline = time.monotonic() + 5
-        for contender in contenders:
-            ready(contender, max(0, deadline - time.monotonic()))
-        holder.communicate("RELEASE\n", timeout=5)
-        self.assertEqual(holder.returncode, 0)
-        for contender in contenders:
-            contender.stdin.write("RELEASE\n")
-            contender.stdin.close()
-        for contender in contenders:
-            self.assertEqual(contender.wait(timeout=10), 0)
+        with ExitStack() as stack:
+            readers, writers = [], []
+            for _ in range(5):
+                read_fd, write_fd = os.pipe()
+                readers.append(stack.enter_context(os.fdopen(read_fd, "rb")))
+                writers.append(stack.enter_context(os.fdopen(write_fd, "wb")))
+            contenders = [start(self.home, *(reader.fileno() for reader in readers)) for _ in range(10)]
+            for round_number, gate in enumerate(writers):
+                root = self.home / f"takeover-{round_number}"
+                root.mkdir()
+                holder = start(root)
+                ready(holder, 5)
+                deadline = time.monotonic() + 5
+                for contender in contenders:
+                    ready(contender, max(0, deadline - time.monotonic()))
+                _, stderr = holder.communicate("RELEASE\n", timeout=5)
+                self.assertEqual(holder.returncode, 0, stderr)
+                gate.close()
+            results = [contender.communicate(timeout=10)[1] for contender in contenders]
+        self.assertEqual([child.returncode for child in contenders], [0] * len(contenders),
+                         "\n".join(filter(None, results)))
 
     def test_unknown_native_run_reserves_worktree_until_confirmed_termination(self):
         spec = importlib.util.spec_from_file_location("gdd_under_test", ADAPTER.parent.parent / "gdd.py")
