@@ -1,0 +1,256 @@
+{
+  "schema_version": 1,
+  "task": "claim-audit",
+  "generated_at": "2026-11-20T07:46:47.993387+08:00",
+  "skill": "report-claim-audit",
+  "skill_revision": "2",
+  "cli_version": "2.1.328 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 1,
+  "mode": "necessity",
+  "order": [
+    "skill",
+    "baseline"
+  ],
+  "rubric": {
+    "correct-signoff": {
+      "field": "verdict",
+      "equals": "hold"
+    },
+    "recount": {
+      "field": "actual_count",
+      "equals": 4
+    },
+    "omissions": {
+      "field": "untracked",
+      "equals": [
+        "C-04"
+      ]
+    },
+    "acceptance-diff": {
+      "field": "unaccepted",
+      "equals": [
+        "C-03"
+      ]
+    },
+    "pending-only": {
+      "field": "pending",
+      "equals": [
+        "D-02"
+      ]
+    }
+  },
+  "summary": {
+    "skill": {
+      "valid": true,
+      "passed": 1,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": null
+    },
+    "baseline": {
+      "valid": true,
+      "passed": 1,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": null
+    }
+  },
+  "runs": {
+    "skill": [
+      {
+        "error": null,
+        "contaminated": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"verdict\": \"hold\", \"actual_count\": 4, \"untracked\": [\"C-04\"], \"unaccepted\": [\"C-03\"], \"pending\": [\"D-02\"], \"brief\": \"Hold. Do not sign: closeout.md says the three manifest deliverables are accepted and ready, but C-03 is rejected in acceptance.json (needs a second reviewer), C-04 is on disk but missing from manifest.json, and D-02 is pending. Rule on D-02 by choosing one of two paths. (a) Reopen the closeout, which costs one additional reviewer pass, to get C-03 its second reviewer and bring C-04 through intake; this is the choice I recommend because it gives a signed record that matches the files on disk. (b) Exclude C-04 from scope and record that as a decision, which is cheaper but signs a closeout that leaves out a deliverable and still has C-03 unaccepted, so C-03 would need a separate resolution first. Also fix closeout.md: it says D-01 still needs a decision, but decisions.json shows D-01 approved, so the text is stale.\"}",
+        "artifacts": {},
+        "checks": {
+          "correct-signoff": true,
+          "recount": true,
+          "omissions": true,
+          "acceptance-diff": true,
+          "pending-only": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 12.854,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 9395,
+          "cache_read_input_tokens": 15710,
+          "output_tokens": 1793,
+          "output_tokens_details": {
+            "thinking_tokens": 477
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 9395
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002228575,
+        "turns": 10
+      }
+    ],
+    "baseline": [
+      {
+        "error": null,
+        "contaminated": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"verdict\": \"hold\", \"actual_count\": 4, \"untracked\": [\"C-04\"], \"unaccepted\": [\"C-03\"], \"pending\": [\"D-02\"], \"brief\": \"Hold. Closeout.md says three deliverables are on disk and ready to sign, but four exist (C-01 to C-04). C-04 is not in manifest.json, so it is untracked. C-03 is in the manifest but rejected in acceptance.json, pending a second reviewer. D-02 is pending and asks whether to reopen the closeout or exclude C-04. D-01 is already approved, so it is not an open decision. Rule on D-02 first. Option A: reopen and add C-04 to the manifest, then get acceptance and review. This costs one additional reviewer pass, and C-03 still needs its second reviewer. Option B: exclude C-04 and document the exclusion in closeout.md. This is cheaper, but the signed closeout would not match the directory contents, and C-04's note ('Late reconciliation note') suggests it may matter. I recommend Option A, and I would not sign until C-03 is resolved either way. I did not modify files or run anything.\"}",
+        "artifacts": {},
+        "checks": {
+          "correct-signoff": true,
+          "recount": true,
+          "omissions": true,
+          "acceptance-diff": true,
+          "pending-only": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 11.844,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4716,
+          "cache_read_input_tokens": 20621,
+          "output_tokens": 1805,
+          "output_tokens_details": {
+            "thinking_tokens": 406
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4716
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00169881,
+        "turns": 11
+      }
+    ]
+  },
+  "outcome": "inconclusive",
+  "limits": {
+    "turns_per_run": 10,
+    "usd_per_run": 0.75,
+    "seconds_per_run": 300
+  }
+}

@@ -1,0 +1,153 @@
+{
+  "schema_version": 1,
+  "task": "ws4-fallback-fixed-paths",
+  "generated_at": "2026-11-20T07:47:38.248380+08:00",
+  "skill": "hoa-repo-reckoning",
+  "skill_revision": "2",
+  "cli_version": "2.1.328 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 1,
+  "mode": "acceptance",
+  "order": [
+    "skill"
+  ],
+  "rubric": {
+    "single-context-header": {
+      "file": "audit-run/report.md",
+      "contains": "verification: single-context"
+    },
+    "external-lane-not-run": {
+      "file": "audit-run/scope.md",
+      "contains": "external lane: not run"
+    },
+    "external-status-reported": {
+      "file": "audit-run/report.md",
+      "contains": "not run"
+    }
+  },
+  "summary": {
+    "skill": {
+      "valid": true,
+      "passed": 1,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": null
+    }
+  },
+  "runs": {
+    "skill": [
+      {
+        "error": null,
+        "contaminated": false,
+        "trace": [
+          {
+            "tool": "Skill",
+            "skill_access": true,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": true,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "The quick audit is written, but it's a hand-written approximation. The `hoa-repo-reckoning` skill isn't in the listed skills, so I read it from the additional skills directory instead.\n\n**Files written** (under `work/audit-run/`, no subdirectories):\n- `scope.md`: depth, the three dimensions picked and why, and the capabilities that were missing.\n- `report.md`: two findings in table A and an empty table B.\n\n**Findings**\n- **A1 (low, S):** The README says the workflow checks the queue weekly, but `check.yml` only triggers on `pull_request`. Evidence: `README.md:3-4` and `check.yml:2-3`.\n- **A2 (low, S, weakened):** `queue.txt` lists `desk-card` twice. It may be intentional. The check only runs `test -f queue.txt`, so it wouldn't catch this either way.\n\n**What didn't run, and why**\n- **No workers, web, git, or shell.** The skill's `scripts/findings.py` needs `uv` and a shell, so I did not generate `report.md` with it. I also wrote no `ledger.jsonl`, `find-*.json`, `verify-*.json`, `spot.json`, or `decisions.jsonl`.\n- **Dimensions:** reach, enforcement, and boundary only. History-forensics needs git metadata, which the snapshot doesn't include. Tests, code-shape, and agent-stack had nothing meaningful to measure.\n- **Verification:** `single-context`. The same context produced and checked each finding, and there was no critic pass. Treat the severities as provisional.\n- **External lane:** not run.\n- **Enforcement:** I could not check whether `Queue` is a required status on `main`, so that gap is open.\n\nI did not edit anything in `subject/`, record any decisions, or look outside the snapshot.",
+        "artifacts": {
+          "audit-run/report.md": "# hoa-repo-reckoning report: subject (quick)\n\nverification: single-context\nexternal lane: not run\nRun directory: `audit-run/` · Prior run: none · Ledger and decisions: not written (no shell, no `findings.py`)\n\n## Meta-diagnosis\n\nThe subject's docs and its one check drift apart: the README promises a weekly check of the queue, but the workflow only runs on pull requests, and the check tests only that the file exists. Nothing here is large; the pattern is that the claims outrun the machinery.\n\n## Suggested order\n\n- Day 0: confirm the duplicate `desk-card` line in `queue.txt` is intentional; if not, delete one (no tool needed).\n- Week 1: make the README and `check.yml` agree (either add a `schedule` trigger or correct the README wording).\n- Later: decide whether an existence-only check is enough, or whether the check should also catch duplicates. Owner decision.\n\n## A. Dumb things still being done\n\n| # | ID | Title | Severity | Effort | Owner | Evidence | Verification |\n|---|---|---|---|---|---|---|---|\n| A1 | readme-weekly-claim-vs-pr-trigger | README says the workflow runs weekly; the workflow only runs on `pull_request` | low | S | here | `README.md:3-4` (\"The weekly workflow checks that the file exists\"); `.github/workflows/check.yml:2-3` (`on: pull_request:` only, no `schedule`) | parent re-read both files (not spot-checked by a second context) |\n| A2 | queue-duplicate-entry | `queue.txt` lists `desk-card` twice (lines 1 and 3); the check does not look at content | low (weakened: may be intentional) | S | here | `queue.txt:1` and `queue.txt:3`; `check.yml:10` (`test -f queue.txt` only) | parent re-read both files |\n\n## B. Unknown unknowns\n\nNot run: the external lane was not run (no web search). Table B is empty for that reason, not because nothing was found.\n\n## Not covered / caveats\n\n- **History-forensics:** no git metadata in the snapshot. Churn, revert chains and direct pushes are unknown.\n- **Enforcement on the server:** whether `Queue` is a required status check on `main` cannot be read from the snapshot (no `gh api`, no rulesets). Only the workflow file was judged. This is a gap, not a finding.\n- **Boundary:** a quick read found no secrets, corporate hostnames or personal identities in the four tracked files. Author identities could not be checked (no git log).\n- **Verification:** every finding was checked by the same context that wrote it. There was no independent verifier and no critic pass. Treat the severities as provisional.\n- **Tooling:** `uv run scripts/findings.py check|report|decide` was not run. This report was written by hand and has no generated tables or ledger.\n- **Decisions:** none recorded. Nothing in `subject/` was edited.\n",
+          "audit-run/scope.md": "# Scope: hoa-repo-reckoning (quick depth)\n\n- Subject: `subject/` (tiny documentation project; snapshot, read-only)\n- Pinned ref: none; no git metadata accompanies the snapshot\n- Window: none (no history); prior run: none found in this run\n- Depth: quick (3 dimensions, no external lane)\n- Run directory: `audit-run/` (used directly, no slug or date subdirectory)\n\n## Dimensions and why\n\n| Dimension | Risk class | Why picked |\n|---|---|---|\n| reach | recurring cost | README describes a weekly check; the workflow must match what the docs claim |\n| enforcement | irreversible state | the only CI gate is a file-existence check; need to see whether it binds to a decision |\n| boundary | trust boundary | quick scan for secrets, identity or corporate URLs in a public snapshot |\n\nNot run: history-forensics (no git metadata), ceremony, tests, code-shape (only a 4-line queue and one workflow exist; nothing to measure), agent-stack (not an agent repo), external (see below).\n\n## Capabilities\n\n- Workers / fan-out: none. Each dimension was run by the parent, sequentially. `verification: single-context`.\n- Web search: none. `external lane: not run`.\n- Git metadata / `gh` / shell: not available. Commit history, rulesets and branch protection could not be read; enforcement is therefore judged from the workflow file alone.\n- `uv` / `scripts/findings.py`: not run (no shell). `report.md` was written by hand following the report layout; `ledger.jsonl`, `find-*.json`, `verify-*.json`, `spot.json` and `decisions.jsonl` were not written.\n\n## Cost estimate\n\nQuick run: a tenth of a standard run's worker budget. Actual cost here: one subject read, one pass by the parent.\n\n## Lens\n\nDefault lens from the panel protocol (the subject's AGENTS.md has no conflicting rule beyond \"do not change any file during an audit\"). Subject contents: `AGENTS.md`, `README.md`, `queue.txt`, `.github/workflows/check.yml`.\n"
+        },
+        "checks": {
+          "single-context-header": true,
+          "external-lane-not-run": true,
+          "external-status-reported": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 34.771,
+        "usage": {
+          "input_tokens": 14,
+          "cache_creation_input_tokens": 19744,
+          "cache_read_input_tokens": 75622,
+          "output_tokens": 5132,
+          "output_tokens_details": {
+            "thinking_tokens": 1174
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 19744
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.005791620000000001,
+        "turns": 13
+      }
+    ]
+  },
+  "outcome": "pass",
+  "limits": {
+    "turns_per_run": 24,
+    "usd_per_run": 1.5,
+    "seconds_per_run": 300
+  }
+}
