@@ -66,6 +66,8 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
   starts on one slug and preserve state writes after Windows replace retries are exhausted.
 - gdd: prevent console flashes for the runner, dispatch, watcher, and helper subprocesses; enforce
   the Windows spawn flags in tests.
+- gdd: detach through a one-shot macOS LaunchAgent or POSIX double fork when a Linux user unit
+  is unavailable; record the effective mode and support explicit, unfocused tmux and Herdr runs.
 
 - Trigger evals now route on visible skills' frontmatter descriptions, accept `none` when no
   artifact fits, and include three no-trigger cases.

@@ -46,7 +46,7 @@ class GddCase(unittest.TestCase):
         drop = ("GDD_", "STUB_", "DSH_", "OMP_", "XDG_")
         self.env = {k: v for k, v in os.environ.items() if not k.startswith(drop)}
         self.env.update(XDG_STATE_HOME=self.state_home, XDG_CONFIG_HOME=os.path.join(self.tmp, "config"),
-                        GDD_RUN_DETACH="session",
+                        GDD_RUN_DETACH="windows" if os.name == "nt" else "setsid",
                         OMP_BIN=STUB, DSH_BIN=STUB, CLAUDE_BIN=STUB, STUB_FIXTURE=OK_FIXTURE, STUB_RECORD=self.record,
                         PYTHONDONTWRITEBYTECODE="1", GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@example.invalid",
                         GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@example.invalid")

@@ -11,8 +11,7 @@ panes, its stdout pipe broke, and the run died with `EPIPE: broken pipe` eleven 
 producing several hundred lines of uncommitted work and no `answer.md`.
 
 - Never `tmux kill-server`, and never kill a session you did not create, from inside a stage.
-- Tests that need tmux use a stub binary on `PATH` (`fake-tmux` that records its argv) or an isolated
-  socket: `tmux -L <unique-name>` or `TMUX_TMPDIR=<temp dir>`.
+- Tests for the runner's tmux and Herdr backends use recording stubs, never either live server.
 - Same class of hazard: killing by process name (`pkill -f python`), `kill 0`, and anything that
   addresses "the" server rather than your own handle.
 
@@ -107,12 +106,20 @@ launcher that merely returns may leave that child running, and a killed tmux ses
   in the **foreground** of the stage, or start it in the background and await its completion before the
   stage returns.
 - A gate that must outlive the stage needs a lifetime outside the stage's teardown boundary — a new
-  session or process group is **not** that boundary: a runner detached with `start_new_session` stays in
+  session or process group is **not** that boundary: even a double-forked runner stays in
   the launcher's cgroup and still dies when a `KillMode=control-group` unit finalizes. Hand the gate
   **and whatever records its result** to a separate detached unit/job whose id the operator can poll.
-- The runner survives the dispatching session in every detach mode. It survives a systemd-managed
-  gateway or service restart only in `systemd` mode (separate user unit), not a restart of the user
-  manager itself. On macOS, Windows, or Linux/WSL without a user manager, plain detachment does not
-  protect against a manager that kills its process group, cgroup, or job.
 - Record the result as an exit code; until one exists, treat "I started the verification in the
   background" in a stage report as **unverified**.
+
+| Mode | Dispatch session | Gateway/service restart | Logout/reboot |
+|---|---|---|---|
+| `systemd` | Yes | Yes, separate user unit; not a user-manager restart | No |
+| `launchd` | Yes | Yes, separate job; not a GUI-domain restart | No |
+| `setsid` | Yes | No guarantee against cgroup or job teardown | No |
+| `windows` | Yes | Only if the runner is outside the terminating job | No |
+| `tmux` (optional) | Yes | Only if the tmux server is outside the gateway's cgroup/job | No |
+| `herdr` (optional) | Yes | Only if the Herdr server survives the restart | No |
+
+Launchd was tested only with stubs. The double fork was tested against dispatch-group death on WSL2,
+not against a real macOS/BSD service restart.

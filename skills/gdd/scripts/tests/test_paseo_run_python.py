@@ -97,7 +97,8 @@ class PaseoLauncherTests(unittest.TestCase):
         self.env = dict(os.environ)
         for key in ("PASEO_BIN", "GDD_MODEL", "GDD_THINKING"):
             self.env.pop(key, None)
-        self.env.update(GDD_RUN_ROOT=str(self.root), STUB_HOME=str(self.home), GDD_RUN_DETACH="session",
+        self.env.update(GDD_RUN_ROOT=str(self.root), STUB_HOME=str(self.home),
+                        GDD_RUN_DETACH="windows" if os.name == "nt" else "setsid",
                         PATH=str(self.bin) + os.pathsep + os.environ.get("PATH", ""))
         self.monitors = {}
         self.addCleanup(self.stop_monitors)
@@ -154,7 +155,9 @@ class PaseoLauncherTests(unittest.TestCase):
         self.save_fixture(status="closed", offline=False, missing=False)
         for pid, recorded in self.monitors.items():
             if not agent_run.wait_until(lambda: agent_run.identity(pid) != recorded, 4):
-                self.assertTrue(agent_run.terminate(pid), f"monitor {pid} did not stop for {self.root}")
+                if agent_run.identity(pid) == recorded:
+                    self.assertTrue(agent_run.terminate(pid, single=True),
+                                    f"monitor {pid} did not stop for {self.root}")
 
     def test_start_argv_identity_and_artifacts(self):
         self.start("--model", "stub-provider", "--thinking", "deliberate")

@@ -290,7 +290,10 @@ def refresh_locked(run_dir):
 
 def refresh(run_dir):
     with claim(os.path.join(run_dir, "refresh")):
-        return refresh_locked(run_dir)
+        state = refresh_locked(run_dir)
+    if os.path.exists(os.path.join(run_dir, "finalized")):
+        support.cleanup_supervisor(run_dir, state)
+    return state
 
 
 def find_run(name):
@@ -387,20 +390,10 @@ def start_locked(args, slug, prefix, cwd, prompt, schema, run_dir, mode, launche
                 fail(state["cwd_error"])
             state["cwd_verified"] = True
             runner = [support.interpreter(), "-B", ADAPTER, "_watch", "--run-dir", run_dir]
-            unit = support.unit_name(slug) if mode == "systemd" else None
-            process, creationflags = support.spawn_detached(runner, run_dir, run_dir, dict(os.environ),
-                                                            mode, launcher, unit)
-            state.update(detach=mode, spawn={"creationflags": creationflags, "platform": sys.platform})
-            if unit:
-                state["unit"] = unit
-                status = gdd_process.run(["systemctl", "--user", "show", "-p", "MainPID", "--value", unit],
-                                        stdin=subprocess.DEVNULL, capture_output=True, encoding="utf-8",
-                                        errors="replace", timeout=2)
-                if status.returncode == 0 and status.stdout.strip().isdigit():
-                    state["pid"] = int(status.stdout.strip()) or None
-            else:
-                state["pid"] = process.pid
-            state["pid_identity"] = support.identity(state.get("pid"))
+            pid, flags = support.spawn_detached(runner, run_dir, run_dir, dict(os.environ),
+                                               state, mode, launcher)
+            state["spawn"] = {"creationflags": flags, "platform": sys.platform}
+            state.update(pid=pid, pid_identity=support.identity(pid))
             publish(state)
         except (RuntimeError, OSError, subprocess.TimeoutExpired) as exc:
             state.update(state="unknown", error=str(exc))
@@ -411,10 +404,18 @@ def start_locked(args, slug, prefix, cwd, prompt, schema, run_dir, mode, launche
 
 
 def watch(args):
-    if args.restore_env:
-        support.restore_detached_env(args.run_dir)
+    if not support.enter_detached(args):
+        return 1
+    recorded = False
     while True:
         try:
+            if not recorded:
+                with claim(os.path.join(args.run_dir, "refresh")):
+                    state = support.read_state(args.run_dir)
+                    if state.get("pid") != os.getpid():
+                        state.update(pid=os.getpid(), pid_identity=support.identity(os.getpid()))
+                        publish(state)
+                recorded = True
             state = refresh(args.run_dir)
         except ClaimTimeout:
             # Another reader may still be inside a permitted CLI call. Preserve
@@ -474,8 +475,7 @@ def main(argv=None):
     launch.add_argument("--schema", help="stage-result schema; the answer's ```json block is checked against it")
     monitor = commands.add_parser("_watch", help=argparse.SUPPRESS)
     monitor.add_argument("--run-dir", required=True)
-    monitor.add_argument("--restore-env", action="store_true")
-    monitor.add_argument("--creationflags", type=int, default=0, help=argparse.SUPPRESS)
+    support.add_detach_arguments(monitor)
     for name in ("status", "result", "answer", "kill"):
         sub = commands.add_parser(name)
         sub.add_argument("name")
@@ -500,6 +500,8 @@ def main(argv=None):
         return 0
     run_dir = find_run(args.name)
     state = kill(run_dir) if args.command == "kill" else refresh(run_dir)
+    if args.command == "kill" and (problem := support.cleanup_supervisor(run_dir, state)):
+        fail(problem)
     if args.command == "tail":
         with open(os.path.join(run_dir, "events.ndjson"), encoding="utf-8") as handle:
             sys.stdout.write("".join(handle.readlines()[-max(1, args.lines):]))

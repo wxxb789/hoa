@@ -97,6 +97,7 @@ jobs:
         run: >-
           python -m pytest -q
           skills/gdd/scripts/tests/test_agent_run.py
+          skills/gdd/scripts/tests/test_detach_supervisors.py
           skills/gdd/scripts/tests/test_gdd.py
           skills/gdd/scripts/tests/test_no_window.py
           skills/gdd/scripts/tests/test_paseo_run_python.py

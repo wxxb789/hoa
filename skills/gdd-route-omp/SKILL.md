@@ -39,11 +39,20 @@ uv run ../gdd/scripts/agent_run.py status example
 
 `--max-time` takes seconds or one unit (`90m`, `2h`); the runner enforces it (exit `124`, `failed`).
 
-The runner survives the session that dispatched it. It survives a systemd-managed gateway or service
-restart only when `state.json` records `detach: systemd` (a separate transient user unit). On macOS,
-Windows, or Linux/WSL without a reachable user manager, detaching does not protect it from a service
-manager that kills its process group, cgroup, or job. See
-[transport](../gdd/references/transport.md#headless-platform-rules) for `GDD_RUN_DETACH`.
+The runner records its effective `detach` mode in `state.json`.
+
+| Mode | Dispatch session | Gateway/service restart | Logout/reboot |
+|---|---|---|---|
+| `systemd` | Yes | Yes, separate user unit; not a user-manager restart | No |
+| `launchd` | Yes | Yes, separate job; not a GUI-domain restart | No |
+| `setsid` | Yes | No guarantee against cgroup or job teardown | No |
+| `windows` | Yes | Only if the runner is outside the terminating job | No |
+| `tmux` (optional) | Yes | Only if the tmux server is outside the gateway's cgroup/job | No |
+| `herdr` (optional) | Yes | Only if the Herdr server survives the restart | No |
+
+Launchd is verified with stubs only; double-fork session and process-group survival is exercised on
+WSL2, not on macOS/BSD. See [transport](../gdd/references/transport.md#headless-platform-rules)
+for selection and cleanup.
 
 This skill requires skill `gdd`: the runner is maintained once, as gdd's `../gdd/scripts/agent_run.py`
 (cross-platform, stdlib Python), because that skill's `gdd.py` launches through it too. Existing

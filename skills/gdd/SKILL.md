@@ -102,7 +102,7 @@ matching the current stage directly — do not create per-phase skills.
 | `GDD_TASK_ROOT` | task/state root | `${XDG_STATE_HOME:-$HOME/.local/state}/gdd/tasks` |
 | `GDD_RUN_ROOT` | launcher run root | `${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs` |
 | `GDD_LAUNCHER`, `GDD_AGENT` | explicit launcher selection (custom launchers must accept `--schema`); the headless agent CLI, exported to the launcher when set | bundled `scripts/agent_run.py`, agent `omp` (or `dsh`, `codex`, `claude`, `pi`, `opencode`); opt in to native Paseo with `scripts/adapters/paseo-run.py` |
-| `GDD_RUN_DETACH` | detach mode for bundled launchers: `auto`, `systemd`, or `session` | `auto` (prefer a separate Linux user unit when available; otherwise platform-native detachment) |
+| `GDD_RUN_DETACH` | detach mode: `auto`, `systemd`, `launchd`, `setsid`, `windows`, or environment-only `tmux` / `herdr` | `auto` (Linux user unit, macOS LaunchAgent, POSIX double fork, or native Windows) |
 | `GDD_TEMPLATES` | stage-template root | the bundled `references/stage-templates` |
 | `GDD_GOAL_GLOB` | goal-contract glob | `docs/goals/*<goal>*.md` |
 | round caps | `implement` / `simplify` / `review` run at most **2x** — enforced by `gdd.py stage`, override with `--over-budget` | `scripts/gdd.py` |

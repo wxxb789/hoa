@@ -31,23 +31,35 @@ routes and the shared `GDD_RUN_ROOT`. Installing it executes trusted, unsandboxe
 Windows in the `gdd-runner` CI job; the real-CLI smoke is an opt-in operator step
 (`GDD_SMOKE_AGENTS=omp`), because CI has no agent credentials.
 
-1. **Session survival is not service survival.** A detached run survives the dispatching session.
-   It survives a systemd-managed gateway or service restart only with `detach: systemd` in
-   `state.json`: the recorded `unit` is a separate transient user service. It does not survive
-   shutdown of the user manager itself. Linux (including WSL2) probes the user manager for at most
-   one second and accepts `running` or `degraded`. Without it, or on macOS, the runner uses
-   `start_new_session` (`detach: session`); that does not escape a service's cgroup.
+| Recorded `detach` | Dispatch session | Gateway/service restart | Logout/reboot |
+|---|---|---|---|
+| `systemd` | Yes | Yes, separate user unit; not a user-manager restart | No |
+| `launchd` | Yes | Yes, separate job; not a GUI-domain restart | No |
+| `setsid` | Yes | No guarantee; the double fork does not leave a cgroup | No |
+| `windows` | Yes | Only if the runner is outside the terminating job | No |
+| `tmux` (optional, POSIX) | Yes | Only if the tmux server is outside the gateway's cgroup/job | No |
+| `herdr` (optional) | Yes | Only if the Herdr server survives the restart | No |
+
+1. **Auto selects the platform ladder.** Linux/WSL2 checks its user manager for at most one
+   second and uses a transient unit if it reports `running` or `degraded`. macOS bootstraps a one-shot
+   LaunchAgent in the current GUI domain, using legacy submit only if bootstrap is unavailable.
+   A launchctl failure falls back to double-fork plus `setsid` and records `detach_fallback`.
+   Other POSIX hosts use that double fork directly. Launchd is verified only with stubs; a real
+   WSL2 test exercises double-fork session/process-group survival, not a macOS/BSD live run.
 2. **Windows detaches the runner, not the agent from the runner.** The runner uses
    `CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW` and tries `CREATE_BREAKAWAY_FROM_JOB` first;
-   access denied retries without breakaway. State records `detach: windows` and actual
-   `spawn.creationflags`. Plain detachment on macOS,
-   Windows or Linux/WSL without a user manager is not protection against a manager that kills the
-   process group, cgroup, or job.
-3. **Use native Python and a native agent inside WSL2.** Both bundled launchers warn, but do not
+   access denied retries without breakaway. State records the actual `spawn.creationflags`.
+3. **Opt in to a watchable supervisor in the environment.** `GDD_RUN_DETACH=tmux` creates a
+   detached session; `GDD_RUN_DETACH=herdr` creates an unfocused tab in an existing Herdr 0.9.5
+   server. Herdr submits shell input to the pane (POSIX shell syntax, or PowerShell on Windows).
+   Neither is selected by auto; a missing executable or failed request refuses startup.
+   State records the handle under `supervisor`; the runner or a subsequent reader removes the
+   job, session or tab at completion. Use the runner's `kill` to stop the agent as well.
+4. **Use native Python and a native agent inside WSL2.** Both bundled launchers warn, but do not
    fail, for an interop Windows `.exe` or a run directory on `/mnt/<drive>`. Interop can prevent
    clean process exit; a mounted Windows drive can also cause file-lock and rename problems.
    Keep the run root on the Linux filesystem and map it separately for any Windows observer.
-4. **Bundled spawns do not open console windows.** All Windows subprocesses (including npm shims)
+5. **Bundled spawns do not open console windows.** All Windows subprocesses (including npm shims)
    use `CREATE_NO_WINDOW`; Python children use `python.exe` rather than `pythonw.exe` when available.
    On macOS and Linux/WSL2, commands run directly without a terminal emulator or shell window.
 
@@ -172,7 +184,7 @@ The CLI flags below were verified with these versions. Older versions were not v
 | `GDD_AGENT` | agent CLI | `omp` |
 | `OMP_BIN`, `DSH_BIN`, `CODEX_BIN`, `CLAUDE_BIN`, `PI_BIN`, `OPENCODE_BIN` | agent binary | the agent's name on `PATH` |
 | `GDD_RUN_ROOT` | run root (env, then the gdd config file) | `${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs` — on Windows that resolves under `%USERPROFILE%`, deliberately not `%LOCALAPPDATA%`, so both platforms and every script see one tree |
-| `GDD_RUN_DETACH` | `auto` probes Linux for systemd and falls back; `systemd` requires a reachable Linux user manager; `session` skips the probe and uses POSIX session or native Windows detachment | `auto` |
+| `GDD_RUN_DETACH` | `auto` uses the platform ladder above. Force `systemd`, `launchd`, `setsid` or `windows` on a compatible platform; `tmux` and `herdr` are environment-only opt-ins | `auto` |
 | `GDD_RUN_EVENTS_MAX_BYTES` | bound for the retained event log | `8388608` |
 | `GDD_RUN_START_GRACE_SECONDS` | how long a run that has recorded no pid is still *starting*, not dead | `60` |
 | `GDD_RUN_STOP_WAIT_SECONDS` | how long `kill` waits for the runner to finalize before it acts itself | `20` |

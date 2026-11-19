@@ -144,7 +144,7 @@ class RunnerCase(unittest.TestCase):
         drop = ("GDD_", "STUB_", "DSH_", "OMP_")
         self.env = {k: v for k, v in os.environ.items() if not k.startswith(drop)}
         self.env.update(GDD_RUN_ROOT=self.root, XDG_CONFIG_HOME=os.path.join(self.tmp, "config"),
-                        GDD_RUN_DETACH="session",
+                        GDD_RUN_DETACH="windows" if IS_WINDOWS else "setsid",
                         **{f"{agent.upper()}_BIN": STUB for agent in EXPECTED}, STUB_RECORD=self.record,
                         PYTHONDONTWRITEBYTECODE="1")
 
@@ -555,17 +555,56 @@ sys.exit(agent_run.main())
             self.assertEqual(state["detach"], "windows")
             self.assertIn(state["spawn"]["creationflags"], (0x08000200, 0x09000200))
         else:
-            self.assertEqual(state["detach"], "session")
-            self.assertEqual(os.getsid(state["pid"]), state["pid"])
+            self.assertEqual(state["detach"], "setsid")
+            self.assertNotEqual(os.getsid(state["pid"]), state["pid"])
+            self.assertNotEqual(os.getsid(state["pid"]), os.getsid(0))
             self.assertEqual(os.getsid(state["agent_pid"]), state["agent_pid"])
+
+    @unittest.skipUnless(sys.platform == "linux", "requires Linux process/session inspection")
+    def test_double_fork_survives_dispatcher_process_group_death(self):
+        wrapper = """
+import sys, time
+from pathlib import Path
+sys.path.insert(0, str(Path(sys.argv[3]).parent))
+import gdd_process
+gdd_process.run(sys.argv[1:], check=True)
+time.sleep(60)
+"""
+        argv = [sys.executable, "-B", RUNNER, "start", "--name", "survival", "--prompt", self.prompt]
+        with gdd_process.popen([sys.executable, "-c", wrapper, *argv], start_new_session=True,
+                               env={**self.env, "STUB_HANG": "1"}, cwd=self.work) as caller:
+            try:
+                def started():
+                    paths = glob.glob(os.path.join(self.root, "*", "survival"))
+                    return paths and agent_run.read_state(paths[0]).get("agent_pid")
+
+                self.assertTrue(wait_for(lambda: started() or caller.poll() is not None, 25))
+                self.assertIsNone(caller.poll())
+                state = self.state("survival")
+                pid = state["pid"]
+                self.assertNotEqual(os.getsid(pid), os.getsid(caller.pid))
+                self.assertNotEqual(os.getpgid(pid), os.getpgid(caller.pid))
+                self.assertNotEqual(os.getsid(pid), pid)  # grandchild, not the setsid leader
+                os.killpg(caller.pid, signal.SIGKILL)
+                self.assertEqual(caller.wait(timeout=5), -signal.SIGKILL)
+                self.assertEqual(agent_run.identity(pid), state["pid_identity"])
+                self.assertEqual(agent_run.identity(state["agent_pid"]), state["agent_pid_identity"])
+                stopped = self.cli("kill", "survival")
+                self.assertEqual(stopped.returncode, 0, stopped.stderr)
+                self.assertEqual(self.finished("survival")["state"], "killed")
+            finally:
+                if caller.poll() is None:
+                    os.killpg(caller.pid, signal.SIGKILL)
+                    caller.wait(timeout=5)
 
 
 class RunnerMechanicsTests(unittest.TestCase):
     def test_detach_modes(self):
         for platform, available, response, expected in (
             ("linux", True, "running", "systemd"), ("linux", True, "degraded", "systemd"),
-            ("linux", True, "offline", "session"), ("linux", False, "", "session"),
-            ("darwin", True, "running", "session"), ("win32", True, "running", "windows"),
+            ("linux", True, "offline", "setsid"), ("linux", False, "", "setsid"),
+            ("darwin", True, "", "launchd"), ("darwin", False, "", "launchd"),
+            ("freebsd14", True, "", "setsid"), ("win32", True, "", "windows"),
         ):
             with self.subTest(platform=platform, available=available, response=response), \
                     mock.patch.object(agent_run.sys, "platform", platform), \
@@ -573,11 +612,11 @@ class RunnerMechanicsTests(unittest.TestCase):
                     mock.patch.object(agent_run.shutil, "which", side_effect=lambda name: name if available else None), \
                     mock.patch.object(agent_run.subprocess, "run",
                                       return_value=subprocess.CompletedProcess([], int(response != "running"), response)) as probe:
-                plain = "windows" if platform == "win32" else "session"
-                self.assertEqual(agent_run.select_detach("session"), (plain, None))
+                plain = "windows" if platform == "win32" else "setsid"
+                self.assertEqual(agent_run.select_detach(plain), (plain, None))
                 probe.assert_not_called()
-                self.assertEqual(agent_run.select_detach("auto"),
-                                 (expected, "systemd-run" if expected == "systemd" else None))
+                tool = {"systemd": "systemd-run", "launchd": "launchctl"}.get(expected) if available else None
+                self.assertEqual(agent_run.select_detach("auto"), (expected, tool))
                 if expected == "systemd":
                     self.assertEqual(agent_run.select_detach("systemd"), ("systemd", "systemd-run"))
                 else:
@@ -588,18 +627,18 @@ class RunnerMechanicsTests(unittest.TestCase):
                 mock.patch.object(agent_run.shutil, "which", side_effect=lambda name: name), \
                 mock.patch.object(agent_run.subprocess, "run",
                                   side_effect=subprocess.TimeoutExpired("systemctl", 1)) as probe:
-            self.assertEqual(agent_run.select_detach("auto"), ("session", None))
+            self.assertEqual(agent_run.select_detach("auto"), ("setsid", None))
             self.assertEqual(probe.call_args.kwargs["timeout"], 1)
 
     def test_windows_detach_retries_without_breakaway_on_access_denied(self):
         error = PermissionError("job denies breakaway")
         error.winerror = 5
-        process = object()
+        process = mock.Mock(pid=1234)
         with tempfile.TemporaryDirectory() as tmp, \
                 mock.patch.object(gdd_process, "IS_WINDOWS", True), \
                 mock.patch.object(subprocess, "Popen", side_effect=[error, process]) as spawn:
-            self.assertEqual(agent_run.spawn_detached(["python", "runner.py"], tmp, tmp, {}, "windows"),
-                             (process, 0x08000200))
+            self.assertEqual(agent_run.spawn_detached(["python", "runner.py"], tmp, tmp, {},
+                                                       {"name": "demo"}, "windows"), (1234, 0x08000200))
             self.assertEqual([call.kwargs["creationflags"] for call in spawn.call_args_list],
                              [0x09000200, 0x08000200])
 
@@ -610,22 +649,24 @@ class RunnerMechanicsTests(unittest.TestCase):
             self.assertRegex(unit, r"^gdd-demo\.slug-[0-9a-f]{12}$")
             self.assertNotEqual(unit, agent_run.unit_name("demo.slug"))
 
+            state = {"name": "demo.slug"}
+
             def submit(argv, **kwargs):
                 self.assertEqual(argv, [
-                    "systemd-run", "--user", "--collect", "--quiet", "--unit", unit, "--service-type=exec",
+                    "systemd-run", "--user", "--collect", "--quiet", "--unit", state["unit"], "--service-type=exec",
                     "--no-ask-password", "--working-directory=/work/with spaces",
                     f"--property=StandardOutput=append:{run / 'runner.log'}", "--property=StandardError=inherit",
                     "--", "/python", "-B", "/runner.py", "_run", "--run-dir", "/runs/$$literal", "--restore-env",
                 ])
-                self.assertTrue(kwargs["check"])
                 with mock.patch.dict(os.environ, {"MANAGER_ONLY": "unused"}, clear=True):
                     agent_run.restore_detached_env(run)
                     self.assertEqual(dict(os.environ), {"SECRET": "value with \n and $"})
+                return subprocess.CompletedProcess(argv, 0, "", "")
 
             with mock.patch.object(agent_run.subprocess, "run", side_effect=submit):
                 agent_run.spawn_detached(["/python", "-B", "/runner.py", "_run", "--run-dir", "/runs/$literal"],
                                          run, "/work/with spaces", {"SECRET": "value with \n and $"},
-                                         "systemd", "systemd-run", unit)
+                                         state, "systemd", "systemd-run")
             self.assertFalse((run / ".runner-env").exists())
 
     def test_winerror_5_falls_back_to_in_place_write(self):

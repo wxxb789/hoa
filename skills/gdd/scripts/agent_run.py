@@ -32,9 +32,9 @@ the next reader; a pid-less run younger than GDD_RUN_START_GRACE_SECONDS (60) is
 taskkill /T /F) and finalizes killed/143. With the runner gone, `kill` signals a recorded pid
 only if its live start time equals the one recorded at spawn, else exits 1 naming the pid.
 
-Detachment: GDD_RUN_DETACH=auto|systemd|session. Linux prefers a transient user unit;
-other POSIX hosts use start_new_session. Windows uses a detached process group and
-breaks away from the caller's job when allowed.
+Detachment: GDD_RUN_DETACH=auto|systemd|launchd|setsid|windows|tmux|herdr.
+Auto prefers a Linux user unit or a macOS LaunchAgent, then a POSIX double fork
+or a Windows process group. tmux and herdr require explicit environment opt-in.
 
 Knobs: GDD_RUN_EVENTS_MAX_BYTES (8388608), GDD_RUN_START_GRACE_SECONDS (60),
 GDD_RUN_STOP_WAIT_SECONDS (20), GDD_RUN_DRAIN_TIMEOUT_SECONDS (30; 5 after a stop).
@@ -51,6 +51,7 @@ import errno
 import glob
 import json
 import os
+import plistlib
 import re
 import shlex
 import shutil
@@ -90,7 +91,7 @@ _RENAMED = ("EVENTS_MAX_BYTES", "START_GRACE_SECONDS", "STOP_WAIT_SECONDS", "DRA
 RETIRED = {
     "OMP_RUN_ROOT": "GDD_RUN_ROOT", "DSH_RUN_ROOT": "GDD_RUN_ROOT",
     "OMP_LEDGER": "nothing (no runner ledger; `list` shows every run)",
-    "OMP_RUN_BACKEND": "nothing (the tmux backend is gone)", "DSH_RUN_SETTLE_WAIT_SECONDS": "nothing",
+    "OMP_RUN_BACKEND": "GDD_RUN_DETACH", "DSH_RUN_SETTLE_WAIT_SECONDS": "nothing",
     **{f"{p}_RUN_{k}": f"GDD_RUN_{k}" for p in ("OMP", "DSH") for k in _RENAMED},
 }
 
@@ -123,15 +124,26 @@ def run_root():
 
 def detach_config():
     try:
-        return skill_config.resolve("gdd", "GDD_RUN_DETACH", default="auto")
+        requested = skill_config.resolve("gdd", "GDD_RUN_DETACH", default="auto")
     except skill_config.ConfigError as exc:
         raise ValueError(f"GDD_RUN_DETACH: {exc}") from exc
+    if requested in ("tmux", "herdr") and os.environ.get("GDD_RUN_DETACH") != requested:
+        raise ValueError(f"GDD_RUN_DETACH={requested} must be set in the environment")
+    return requested
 
 
 def select_detach(requested):
-    if requested not in ("auto", "systemd", "session"):
-        raise ValueError(f"GDD_RUN_DETACH={requested!r}: expected auto, systemd or session")
-    if requested != "session" and sys.platform == "linux":
+    modes = ("auto", "systemd", "launchd", "setsid", "windows", "tmux", "herdr")
+    if requested not in modes:
+        raise ValueError(f"GDD_RUN_DETACH={requested!r}: expected {', '.join(modes)}")
+    if requested in ("tmux", "herdr"):
+        if requested == "tmux" and IS_WINDOWS:
+            raise ValueError("GDD_RUN_DETACH=tmux is not supported on native Windows")
+        launcher = shutil.which(requested)
+        if not launcher:
+            raise ValueError(f"GDD_RUN_DETACH={requested}: {requested} executable not found on PATH")
+        return requested, launcher
+    if requested in ("auto", "systemd") and sys.platform == "linux":
         if (launcher := shutil.which("systemd-run")) and (ctl := shutil.which("systemctl")):
             try:
                 status = gdd_process.run([ctl, "--user", "is-system-running"], stdin=subprocess.DEVNULL,
@@ -142,7 +154,14 @@ def select_detach(requested):
                 pass
     if requested == "systemd":
         raise ValueError("GDD_RUN_DETACH=systemd requires systemd-run and a reachable Linux user manager")
-    return ("windows" if IS_WINDOWS else "session"), None
+    if requested == "launchd" and sys.platform != "darwin":
+        raise ValueError("GDD_RUN_DETACH=launchd requires macOS")
+    if requested in ("auto", "launchd") and sys.platform == "darwin":
+        return "launchd", shutil.which("launchctl")
+    native = "windows" if IS_WINDOWS else "setsid"
+    if requested not in ("auto", native):
+        raise ValueError(f"GDD_RUN_DETACH={requested} is not supported on {sys.platform}")
+    return native, None
 
 
 def systemd_argv(launcher, unit, cwd, log, runner):
@@ -153,33 +172,151 @@ def systemd_argv(launcher, unit, cwd, log, runner):
             *(arg.replace("$", "$$") for arg in runner[1:]), "--restore-env"]
 
 
-def spawn_detached(runner, run_dir, cwd, env, mode, launcher=None, unit=None):
-    log_path = Path(run_dir) / "runner.log"
+def private_file(path):
+    return os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+
+
+def save_detached_env(run_dir, env):
+    # Supervisors have their own environment. Restore ours without exposing credentials in argv.
+    with os.fdopen(private_file(Path(run_dir) / ".runner-env"), "w", encoding="utf-8") as stream:
+        json.dump(env, stream)
+
+
+def supervisor_call(argv, *, env=None):
+    return gdd_process.run(argv, stdin=subprocess.DEVNULL, capture_output=True, text=True, env=env, timeout=10)
+
+
+def supervisor_error(result):
+    return result.stderr.strip() or f"exit {result.returncode}"
+
+
+def require_success(result):
+    if result.returncode:
+        raise OSError(supervisor_error(result))
+    return result
+
+
+def launchd_start(runner, run_dir, cwd, env, state):
+    target = state["supervisor"]
+    plist = run_dir / "runner.plist"
+    runner = [*runner, "--launchd-start"]
+    launcher, domain, label = target["argv"][0], target["domain"], target["label"]
+    with os.fdopen(private_file(plist), "wb") as stream:
+        plistlib.dump({"Label": label, "ProgramArguments": runner, "WorkingDirectory": cwd,
+                       "EnvironmentVariables": env, "StandardOutPath": str(run_dir / "runner.log"),
+                       "StandardErrorPath": str(run_dir / "runner.log"), "AbandonProcessGroup": True,
+                       "RunAtLoad": True}, stream)
+    result = supervisor_call([launcher, "bootstrap", domain, str(plist)])
+    if result.returncode and (result.returncode == 64 or re.search(
+            r"(?:unknown|unrecognized|unsupported) (?:sub)?command", result.stderr, re.IGNORECASE)):
+        target["submit"] = True
+        write_json(run_dir / "state.json", state)
+        save_detached_env(run_dir, env)
+        result = supervisor_call([launcher, "submit", "-l", label, "-o", str(run_dir / "runner.log"),
+                                  "-e", str(run_dir / "runner.log"), "--", *runner, "--restore-env",
+                                  "--runner-cwd", cwd])
+    require_success(result)
+    (run_dir / ".launchd-ready").touch()
+
+
+def herdr_response(result):
+    require_success(result)
+    response = json.loads(result.stdout)
+    if not isinstance(response, dict) or not isinstance(response.get("result"), dict):
+        raise ValueError("expected a Herdr JSON result")
+    return response["result"]
+
+
+def herdr_command(runner):
+    # Herdr 0.9.5 joins arguments as shell input; it does not preserve argv boundaries.
+    if any(re.search(r"[\x00-\x1f\x7f]", arg) for arg in runner):
+        raise ValueError("control characters cannot be sent to a Herdr pane")
+    if IS_WINDOWS:  # Herdr defaults to PowerShell on native Windows.
+        return "& " + " ".join("'" + arg.replace("'", "''") + "'" for arg in runner)
+    return shlex.join(runner)
+
+
+def spawn_detached(runner, run_dir, cwd, env, state, mode, launcher=None):
+    run_dir = Path(run_dir)
+    log_path = run_dir / "runner.log"
+    state["detach"] = mode
+    if state.get("backend") != "paseo":
+        state["backend"] = mode
+    suffix = uuid.uuid4().hex[:12]
+    target = {}
+    if mode == "launchd" and launcher:
+        target = {"mode": mode, "argv": [launcher], "domain": f"gui/{os.getuid()}",
+                  "label": f"gdd.{state['name']}.{suffix}"}
+    elif mode == "tmux":
+        socket = os.environ.get("TMUX", "").partition(",")[0]
+        target = {"mode": mode, "argv": [launcher, *(["-S", socket] if socket else [])],
+                  "env": {key: os.environ[key] for key in ("TMUX_TMPDIR", "TMPDIR") if key in os.environ},
+                  "session": f"gdd-{state['name']}-{suffix}"}
+    elif mode == "herdr":
+        target = {"mode": mode, "argv": [launcher], "env": {
+            key: os.environ[key] for key in ("HERDR_SESSION", "HERDR_SOCKET_PATH", "HERDR_CONFIG_PATH", "XDG_CONFIG_HOME")
+            if key in os.environ}}
+    if target:
+        state["supervisor"] = target
     if mode == "systemd":
-        # A transient unit inherits the manager's environment, not the dispatcher's.
-        # Pass the exact environment privately; don't put credentials in argv or unit properties.
-        path = Path(run_dir) / ".runner-env"
-        handle = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-        try:
-            with os.fdopen(handle, "w", encoding="utf-8") as stream:
-                json.dump(env, stream)
-            gdd_process.run(systemd_argv(launcher, unit, cwd, log_path, runner), check=True,
-                           stdin=subprocess.DEVNULL, capture_output=True, encoding="utf-8", errors="replace")
-        except (OSError, subprocess.CalledProcessError) as exc:
-            path.unlink(missing_ok=True)
-            raise OSError(getattr(exc, "stderr", "").strip() or str(exc)) from exc
-        return None, 0
+        state["unit"] = unit_name(state["name"])
+    write_json(run_dir / "state.json", state)
+    try:
+        if mode == "systemd":
+            save_detached_env(run_dir, env)
+            require_success(supervisor_call(systemd_argv(launcher, state["unit"], cwd, log_path, runner)))
+            return None, 0
+        if mode == "launchd":
+            if not launcher:
+                raise OSError("launchctl executable not found on PATH")
+            launchd_start(runner, run_dir, cwd, env, state)
+            return None, 0
+        if mode in ("tmux", "herdr"):
+            save_detached_env(run_dir, env)
+            runner = [*runner, "--restore-env"]
+            setting = "-e" if mode == "tmux" else "--env"
+            options = [arg for key in ("PYTHONUNBUFFERED", "PYTHONPATH", "NOWINDOW_GUARD_LOG")
+                       if key in env or key == "PYTHONUNBUFFERED" for arg in (setting, f"{key}={env.get(key, '1')}")]
+            if mode == "tmux":
+                require_success(supervisor_call([*target["argv"], "new-session", "-d", "-s", target["session"],
+                                                 "-c", cwd, *options, "--", *runner]))
+                (run_dir / ".supervisor-started").touch()
+            else:
+                result = herdr_response(supervisor_call([launcher, "tab", "create", "--no-focus", "--cwd", cwd,
+                                                         "--label", f"gdd-{state['name']}", *options]))
+                tab = result["tab"]["tab_id"]
+                if not isinstance(tab, str) or not tab or tab.startswith("-"):
+                    raise ValueError("invalid Herdr tab ID")
+                target["tab"] = tab
+                write_json(run_dir / "state.json", state)
+                pane = result["root_pane"]["pane_id"]
+                if not isinstance(pane, str) or not pane or pane.startswith("-"):
+                    raise ValueError("invalid Herdr pane ID")
+                target["pane"] = pane
+                write_json(run_dir / "state.json", state)
+                require_success(supervisor_call([launcher, "pane", "run", pane, herdr_command(runner)]))
+            return None, 0
+    except (OSError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired) as exc:
+        (run_dir / ".runner-env").unlink(missing_ok=True)
+        if mode == "launchd":
+            cleanup_supervisor(run_dir, state)
+            state["detach_fallback"] = f"launchd: {exc}"
+            return spawn_detached(runner, run_dir, cwd, env, state, "setsid")
+        if mode in ("tmux", "herdr"):
+            cleanup_supervisor(run_dir, state)
+        raise OSError(f"{mode}: {exc}") from exc
+    if mode == "setsid":
+        return gdd_process.daemonize(runner, cwd, env, log_path), 0
     with log_path.open("ab", buffering=0) as log:
-        options = dict(cwd=cwd, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT, env=env)
-        if mode == "windows":
-            for creationflags in (WINDOWS_DETACH | gdd_process.BREAKAWAY, WINDOWS_DETACH):
-                try:
-                    return gdd_process.popen([*runner, "--creationflags", str(creationflags)],
-                                            creationflags=creationflags, **options), creationflags
-                except OSError as exc:
-                    if creationflags == WINDOWS_DETACH or getattr(exc, "winerror", None) != 5:
-                        raise
-        return gdd_process.popen(runner, start_new_session=True, **options), 0
+        for flags in (WINDOWS_DETACH | gdd_process.BREAKAWAY, WINDOWS_DETACH):
+            try:
+                process = gdd_process.popen([*runner, "--creationflags", str(flags)], cwd=cwd,
+                                            stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
+                                            env=env, creationflags=flags)
+                return process.pid, flags
+            except OSError as exc:
+                if flags == WINDOWS_DETACH or getattr(exc, "winerror", None) != 5:
+                    raise
 
 
 def restore_detached_env(run_dir):
@@ -189,6 +326,103 @@ def restore_detached_env(run_dir):
     path.unlink()
     os.environ.clear()
     os.environ.update(env)
+
+
+def enter_detached(args):
+    # RunAtLoad can execute before bootstrap returns. Never run a second copy after fallback.
+    if args.launchd_start:
+        ready = Path(args.run_dir, ".launchd-ready")
+        cancelled = lambda: read_state(args.run_dir).get("detach") != "launchd"
+        if not wait_until(lambda: ready.exists() or cancelled(), 25) or not ready.exists():
+            return False
+    if args.restore_env:
+        restore_detached_env(args.run_dir)
+    if args.runner_cwd:
+        os.chdir(args.runner_cwd)
+    return True
+
+
+def add_detach_arguments(parser):
+    parser.add_argument("--restore-env", action="store_true")
+    parser.add_argument("--runner-cwd")
+    parser.add_argument("--launchd-start", action="store_true")
+    parser.add_argument("--creationflags", type=int, default=0, help=argparse.SUPPRESS)
+
+
+def target_call(target, *args):
+    env = dict(os.environ)
+    keys = ("TMUX", "TMUX_TMPDIR", "TMPDIR") if target["mode"] == "tmux" else (
+        "HERDR_SESSION", "HERDR_SOCKET_PATH", "HERDR_CONFIG_PATH", "XDG_CONFIG_HOME")
+    for key in keys:
+        env.pop(key, None)
+    env.update(target.get("env", {}), LC_ALL="C")
+    return supervisor_call([*target["argv"], *args], env=env)
+
+
+def tmux_missing(result):
+    return result.returncode == 1 and any(phrase in result.stderr.lower() for phrase in (
+        "can't find session", "no server running", "no sessions", "no such file or directory"))
+
+
+def missing_tmux_session(state):
+    target = state.get("supervisor", {})
+    if target.get("mode") != "tmux":
+        return False
+    try:
+        return tmux_missing(target_call(target, "has-session", "-t", "=" + target["session"]))
+    except (OSError, subprocess.TimeoutExpired):
+        return False  # an unavailable probe is not evidence that the runner died
+
+
+def cleanup_supervisor(run_dir, state):
+    target = state.get("supervisor")
+    marker = Path(run_dir) / ".supervisor-cleaned"
+    if marker.exists():
+        return ""
+    mode = target["mode"] if target else state.get("detach")
+    try:
+        if target or mode == "systemd":
+            (Path(run_dir) / ".runner-env").unlink(missing_ok=True)
+        if not target:
+            return ""
+        if mode == "launchd":
+            service = f"{target['domain']}/{target['label']}"
+            (Path(run_dir) / "runner.plist").unlink(missing_ok=True)
+            result = supervisor_call([*target["argv"], "bootout", service])
+            if result.returncode and target.get("submit"):
+                result = supervisor_call([*target["argv"], "remove", target["label"]])
+            if result.returncode and result.returncode != 113 and not re.search(
+                    r"(?:could not find (?:specified )?service|no such process|not found)", result.stderr, re.IGNORECASE):
+                require_success(result)
+        elif mode == "tmux":
+            session = "=" + target["session"]
+            result = target_call(target, "has-session", "-t", session)
+            if not tmux_missing(result):
+                require_success(result)
+                result = target_call(target, "kill-session", "-t", session)
+                if not tmux_missing(result):
+                    require_success(result)
+        elif mode == "herdr" and target.get("tab"):
+            result = target_call(target, "tab", "close", target["tab"])
+            response = read_json_text(result.stdout if not result.returncode else result.stderr)
+            if result.returncode or "result" not in response:
+                error = response.get("error") or {}
+                if not isinstance(error, dict) or error.get("code") not in ("tab_not_found", "not_found"):
+                    raise OSError(supervisor_error(result) if result.returncode else "invalid tab close result")
+        marker.touch()
+        return ""
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        problem = f"{mode} cleanup: {exc}"
+        print(f"agent_run: warning: {problem}", file=sys.stderr)
+        return problem
+
+
+def read_json_text(value):
+    try:
+        result = json.loads(value)
+    except ValueError:
+        return {}
+    return result if isinstance(result, dict) else {}
 
 
 def unit_name(slug):
@@ -329,6 +563,13 @@ def pid_alive(pid):
     if IS_WINDOWS:
         code = ctypes.c_ulong()
         return bool(_windows_query(pid, lambda k, h: k.GetExitCodeProcess(h, ctypes.byref(code)) and code.value == 259))
+    if sys.platform == "linux":
+        try:
+            with open(f"/proc/{pid}/stat", encoding="utf-8", errors="replace") as handle:
+                if handle.read().rsplit(")", 1)[1].split()[0] in ("Z", "X"):
+                    return False
+        except (OSError, IndexError):
+            pass
     return _probe(os.kill, pid)
 
 
@@ -751,19 +992,33 @@ def finalize(run_dir, exit_code, acc=None, note=None, recovered=False, extra=Non
 def effective_state(run_dir):
     """(state, stale_recovered): settle a run whose runner died before finalizing."""
     state = read_state(run_dir)
-    if os.path.exists(os.path.join(run_dir, "finalized")) or state.get("state") not in STATES:
+    if os.path.exists(os.path.join(run_dir, "finalized")):
+        cleanup_supervisor(run_dir, state)
+        return state, False
+    if state.get("state") not in STATES:
         return state, False
     if state.get("backend") == "paseo" or not {"pid", "agent_pid"} & state.keys():
         return state, False  # another launcher's run: its liveness is not ours to settle
-    if run_alive(run_dir, state) or is_starting(state):
+    if is_starting(state) and not (Path(run_dir, ".supervisor-started").exists() and missing_tmux_session(state)):
+        return state, False
+    if run_alive(run_dir, state):
+        if missing_tmux_session(state):
+            # A vanished session can leave the agent's separate process group behind.
+            stop_run(run_dir)
+            return read_state(run_dir), False
         return state, False
     if state["state"] != "running":  # terminal state published but the marker is missing
         write_text(os.path.join(run_dir, "exit.code"), f"{state.get('exit')}\n")
         write_text(os.path.join(run_dir, "finalized"), str(state.get("exit")))
+        cleanup_supervisor(run_dir, state)
         return state, False
     if os.path.exists(os.path.join(run_dir, "stop")):
-        return finalize(run_dir, KILL_EXIT, note="stop requested and the runner is gone; recorded by a reader"), False
-    return finalize(run_dir, -1, recovered=True), True
+        state = finalize(run_dir, KILL_EXIT, note="stop requested and the runner is gone; recorded by a reader")
+        cleanup_supervisor(run_dir, state)
+        return state, False
+    state = finalize(run_dir, -1, recovered=True)
+    cleanup_supervisor(run_dir, state)
+    return state, True
 
 
 def reported_state(state):
@@ -790,10 +1045,10 @@ def stop_run(run_dir):
     """"" once the run is finalized after a stop request, else why the stop is unproven."""
     marker = os.path.join(run_dir, "finalized")
     if os.path.exists(marker):
-        return ""
+        return cleanup_supervisor(run_dir, read_state(run_dir))
     write_json(os.path.join(run_dir, "stop"), {"requested_at": now_iso(), "by": os.getpid()})
     if wait_until(lambda: os.path.exists(marker), knob("GDD_RUN_STOP_WAIT_SECONDS", 20)):
-        return ""
+        return cleanup_supervisor(run_dir, read_state(run_dir))
     state, problems = read_state(run_dir), []
     for key in ("agent_pid", "pid"):
         pid = state.get(key)
@@ -802,13 +1057,15 @@ def stop_run(run_dir):
         live = identity(pid)
         if not live or live != state.get(f"{key}_identity"):
             problems.append(f"{key} {pid} not signalled (start time {'unreadable' if not live else 'differs from the recorded one'})")
-        elif not terminate(pid, single=key == "pid" and state.get("detach") == "systemd"):
+        elif not terminate(pid, single=key == "pid" and state.get("detach") in
+                           ("systemd", "launchd", "setsid", "tmux", "herdr")):
             problems.append(f"{key} {pid} still alive after TERM/KILL")
     if problems:
         return "; ".join(problems)
-    if not wait_until(lambda: os.path.exists(marker), 5):
+    problem = cleanup_supervisor(run_dir, state)
+    if not os.path.exists(marker):
         finalize(run_dir, KILL_EXIT, note="stop requested; the runner did not finalize, so kill recorded the stop")
-    return ""
+    return problem
 
 
 def cmd_start(args):
@@ -898,21 +1155,19 @@ def start_locked(args, spec, slug, cwd, run_dir, command, prompt, max_time, mode
     with open(os.path.join(run_dir, "prompt.md"), "wb") as handle:
         handle.write(prompt)
     agent = spec.name
-    unit = unit_name(slug) if mode == "systemd" else None
     write_json(os.path.join(run_dir, "run.json"), {"agent": agent, "argv": command, "prompt": spec.prompt,
                                                    "cwd": cwd, "scrub_env": spec.scrub_env, "max_time_s": max_time,
                                                    "schema": args.schema})
-    write_json(os.path.join(run_dir, "state.json"), {
+    state = {
         "name": slug, "agent": agent, "state": "running", "exit": None, "cwd": cwd, "started": now_iso(),
         "ended": None, "duration_s": None, "run_dir": run_dir, "pid": None, "agent_pid": None,
         "session_id": args.resume or (command[command.index("--session-id") + 1] if "--session-id" in command else ""),
-        "backend": {"session": "setsid", "windows": "windows", "systemd": "systemd"}[mode],
-        "detach": mode, **({"unit": unit} if unit else {}), "model": args.model,
+        "model": args.model,
         "thinking": args.thinking, "max_time": args.max_time, "resumed_from": args.resume,
-        "spawn": {"creationflags": 0, "platform": sys.platform}})
+        "spawn": {"creationflags": 0, "platform": sys.platform}}
     runner = [interpreter(), "-B", os.path.abspath(__file__), "_run", "--run-dir", run_dir]
     try:
-        process, _ = spawn_detached(runner, run_dir, cwd, child_env(spec.scrub_env), mode, launcher, unit)
+        pid, _ = spawn_detached(runner, run_dir, cwd, child_env(spec.scrub_env), state, mode, launcher)
     except OSError as exc:
         finalize(run_dir, 127, note=f"could not spawn the runner: {exc}")
         die(f"start: could not spawn the runner: {exc}")
@@ -921,26 +1176,43 @@ def start_locked(args, spec, slug, cwd, run_dir, command, prompt, max_time, mode
     def started():
         seen.update(read_state(run_dir))
         return (seen.get("agent_pid") or seen.get("state") not in (None, "running")
-                or (process is not None and process.poll() is not None))
+                or (pid is not None and not pid_alive(pid)))
 
     if not wait_until(started, 20):
-        die(f"start: no agent pid recorded within 20 s (see {os.path.join(run_dir, 'runner.log')})")
+        problem = stop_run(run_dir)
+        die(f"start: {mode}: no agent pid recorded within 20 s (see {run_dir})"
+            + (f"; stop unconfirmed: {problem}" if problem else ""))
     if not seen.get("agent_pid"):
-        die(f"start: agent did not start: {seen.get('note') or seen.get('state')} (see {run_dir})")
+        if seen.get("state") == "running":
+            effective_state(run_dir)
+        die(f"start: {mode}: agent did not start: {seen.get('note') or seen.get('state')} (see {run_dir})")
     print(f"started: {slug}\n  agent     : {agent} (pid {seen['agent_pid']}, runner {seen.get('pid')})")
     print(f"  run dir   : {run_dir}")
     return 0
 
 
 def runner_main(args):
+    try:
+        return run_agent(args)
+    finally:
+        # A concurrent kill/status may also recover this handle after finalization.
+        state = read_state(args.run_dir)
+        if state.get("pid") == os.getpid():
+            cleanup_supervisor(args.run_dir, state)
+
+
+def run_agent(args):
     run_dir = os.path.abspath(args.run_dir)
-    if args.restore_env:
-        restore_detached_env(run_dir)
+    if not enter_detached(args):
+        return 1
     plan, state_path = read_json(os.path.join(run_dir, "run.json"), {}), os.path.join(run_dir, "state.json")
     spec, state = AGENTS[plan["agent"]], read_state(run_dir)
     state.update(pid=os.getpid(), pid_identity=identity(os.getpid()))
     state["spawn"]["creationflags"] = args.creationflags
     write_json(state_path, state)
+    if os.path.exists(os.path.join(run_dir, "stop")):
+        finalize(run_dir, KILL_EXIT, note="stop requested before agent startup")
+        return 1
     with open(os.path.join(run_dir, "prompt.md"), "rb") as handle:
         prompt = handle.read()
     argv = plan["argv"] + ([prompt.decode("utf-8", "replace")] if spec.prompt == "argv" else [])
@@ -1098,8 +1370,7 @@ def main(argv=None):
     start.set_defaults(func=cmd_start)
     internal = sub.add_parser("_run")
     internal.add_argument("--run-dir", required=True)
-    internal.add_argument("--restore-env", action="store_true")
-    internal.add_argument("--creationflags", type=int, default=0)
+    add_detach_arguments(internal)
     internal.set_defaults(func=runner_main)
     sub.add_parser("list").set_defaults(func=cmd_list)
     for name, func in (("status", cmd_status), ("result", cmd_status), ("answer", cmd_answer),

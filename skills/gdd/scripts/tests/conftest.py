@@ -14,5 +14,5 @@ if os.name == "nt":
     guard = str(guard_dir)
     paths = [path for path in os.environ.get("PYTHONPATH", "").split(os.pathsep) if path]
     if guard not in paths:
-        # Preserve a host-provided sitecustomize ahead of the repository guard.
+        # A host guard, when explicitly supplied, still takes precedence in children.
         os.environ["PYTHONPATH"] = os.pathsep.join([*paths, guard])
