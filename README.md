@@ -184,7 +184,7 @@ UI; a newer push to a pull request cancels the older run.
 | PR bumps changed skills' revision (pull requests) | `python scripts/version.py check-revisions` | Every skill directory changed since the merge base raises its `metadata.revision`. |
 | pytest | `python -m pytest` | Every `test_*.py` unittest/pytest file under `scripts/`, `evals/` and `skills/` (`pytest.ini`); 120 s per test. |
 | Script checks | `python evals/run_trigger_evals.py`, `evals/validate_skill_method_cases.py`, `skills/define-goal/evals/validate_fixtures.py`, `skills/hermes-models/scripts/tests/test-*.py`, `skills/gdd/scripts/tests/test_verdict_matrix.py`, `mutate_verdict_matrix.py` | Standalone checks whose exit code is the contract; one step each. |
-| Paseo gdd-run-observer | `npm ci && npm run typecheck && npm test` in `paseo-plugins/gdd-run-observer` | The plugin's typecheck and Vitest suite. |
+| Paseo gdd-observer | `npm ci && npm run typecheck && npm test` in `paseo-plugins/gdd-observer` | The plugin's typecheck and Vitest suite. |
 | `gdd-runner` (Ubuntu, macOS, Windows) | `python -m pytest -q` on `test_agent_run.py`, `test_detach_supervisors.py`, `test_gdd.py`, `test_no_window.py`, `test_paseo_run_python.py`, and `test_watch_pr_checks.py` under `skills/gdd/scripts/tests/` | Cross-platform runner, detach supervisors, stage dispatch, console suppression, Paseo adapter, and PR watcher contracts. |
 
 Run the Python tests locally with
@@ -361,11 +361,13 @@ that route requires a reachable daemon. Reachability never switches launchers au
 Read the [transport contract](./skills/gdd/references/transport.md) for configuration, answer
 retrieval, completion rules, and the separate headless/native platform evidence.
 
-[`paseo-plugins/gdd-run-observer`](./paseo-plugins/gdd-run-observer/README.md) is optional,
+[`paseo-plugins/gdd-observer`](./paseo-plugins/gdd-observer/README.md) is optional,
 read-only observer source, **not a launcher**. It is not auto-installed by `npx skills` and does
-not change the selected transport. Its [README](./paseo-plugins/gdd-run-observer/README.md)
-documents clean-checkout dependency installation, typecheck/tests, trust, disable, and removal;
-[HOA-INTEGRATION.md](./paseo-plugins/gdd-run-observer/HOA-INTEGRATION.md) documents the shared
+not change the selected transport. It keeps a single entry point — the sidebar footer
+**GDD runs** row that opens the global `runs` screen — plus its separate settings screen.
+Its [README](./paseo-plugins/gdd-observer/README.md) documents the observed run artifacts,
+settings, trust, development checks, install, and removal;
+[HOA-INTEGRATION.md](./paseo-plugins/gdd-observer/HOA-INTEGRATION.md) documents the shared
 `GDD_RUN_ROOT` and route integration. Review it before installing: plugins execute trusted,
 unsandboxed code in the Paseo daemon/client. Runtime registration and settings remain local.
 

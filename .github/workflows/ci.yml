@@ -67,14 +67,14 @@ jobs:
         timeout-minutes: 5
         run: python skills/gdd/scripts/tests/mutate_verdict_matrix.py
 
-      # Paseo run-observer plugin
+      # Paseo gdd-observer plugin
       - uses: actions/setup-node@v4
         with:
           node-version: "20.19.4"  # plugin README minimum
           cache: npm
-          cache-dependency-path: paseo-plugins/gdd-run-observer/package-lock.json
-      - name: Paseo gdd-run-observer typecheck and tests
-        working-directory: paseo-plugins/gdd-run-observer
+          cache-dependency-path: paseo-plugins/gdd-observer/package-lock.json
+      - name: Paseo gdd-observer typecheck and tests
+        working-directory: paseo-plugins/gdd-observer
         timeout-minutes: 5
         run: npm ci && npm run typecheck && npm test
 

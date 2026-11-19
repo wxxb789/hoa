@@ -1,0 +1,7 @@
+{
+  "id": "gdd-observer",
+  "name": "GDD Observer",
+  "requirements": {
+    "paseo": ">=0.15.4"
+  }
+}
