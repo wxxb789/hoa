@@ -1,7 +1,20 @@
 # Changelog
 
-Notable changes to this repo. `VERSION` is the one project version; each skill counts its own
-iterations in `metadata.revision`. Earlier entries retain historical per-skill versions.
+Entries are dated and optional; no CI gate requires one. There is no project version: each skill
+counts its own iterations in `metadata.revision`. Earlier entries retain the retired project
+`VERSION` numbers and historical per-skill versions.
+
+## 2026-11-18
+
+- Tests: `python -m pytest` (`pytest.ini`, 120 s per test) collects every `test_*.py` under
+  `scripts/`, `evals/` and `skills/` with no registration. `ci.yml` runs each static gate (previously manifest
+  suites), standalone check, gdd shell suite and the Paseo plugin as its own
+  named step, with job/step timeouts and cancel-in-progress for pull requests.
+- Removed the test discoverer (`scripts/run_all_tests.py`, `scripts/test_manifest.toml`,
+  `scripts/test_run_all_tests.py`) and `scripts/test_catalog_measurement.py`.
+- Removed the repo-wide `VERSION`, `version.py bump`/`check-bump` and the changelog gate
+  (`scripts/check_changelog.py`). `version.py check-revisions` stays the per-skill PR gate.
+- gdd (revision 4): the merge-time version gate in hoa is `check-revisions`.
 
 ## [0.1.71] — 2026-11-18
 

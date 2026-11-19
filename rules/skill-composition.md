@@ -75,7 +75,7 @@ Install and path mechanics live in [cross-platform-skills.md](cross-platform-ski
 
 ## Enforcement
 
-CI (`scripts/run_all_tests.py`) fails on:
+CI (`.github/workflows/ci.yml`) fails on:
 
 | Behavior | Check | Enforces |
 |---|---|---|

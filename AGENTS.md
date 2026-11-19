@@ -41,8 +41,9 @@ removing it risks real, irreversible harm, or after the same pain has hit three 
   on zero-dependency code. Diagnostics name the exact offending key, path, or value.
 - Tests target public contracts and CLI behaviour, not private functions. No tests that pin prose.
 - No mutation harnesses or self-tests of test infrastructure unless they clear the irreversible-harm bar.
-  `gate:merge-gate-mutations` and `scripts/test_run_all_tests.py` predate this rule and stay only
-  until the pending test-suite simplification removes or justifies them.
+  The gdd merge-gate mutation harness clears it: a fail-open merge gate means an irreversible merge.
+- New Python tests are `test_*.py` unittest or pytest files; `python -m pytest` collects them with no
+  registration. A standalone check that is not a test file gets its own named step in `ci.yml`.
 
 ## Composition contracts
 

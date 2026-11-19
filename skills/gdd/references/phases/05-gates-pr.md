@@ -20,7 +20,7 @@
    PR merged mid-increment and you must rebase onto `origin/main` first, or the review range is not
    exactly one increment. Pushing a branch does not freeze its version claim: if a sibling PR merges,
    re-run the profile's merge-time version gate (in `hoa`: `git fetch origin main && python
-   scripts/version.py check-bump`)
+   scripts/version.py check-revisions`)
    before asking for a merge. A repo whose profile declares no such gate skips it — never invent one
    and never skip one silently.
 7. The PR body is a contract artifact — shape in [`references/pr-body.md`](../pr-body.md):

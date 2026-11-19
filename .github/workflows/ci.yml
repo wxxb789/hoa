@@ -9,31 +9,84 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  # A newer push to a PR supersedes the older run; every other run gets its own group (run_id),
+  # because a shared group would still drop a queued main run when a newer one arrives.
+  group: ci-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      # ── provisioning: runtimes and dependencies the discoverer's suites declare ──
-      # The per-suite commands these steps used to spell out one by one now live in
-      # scripts/test_manifest.toml, which scripts/run_all_tests.py applies.
       - uses: actions/checkout@v4
         with:
-          # The version and changelog gates read origin/main.
-          fetch-depth: 0
-
+          fetch-depth: 0  # check-revisions needs the merge base with origin/main
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: scripts/requirements.txt
+      - run: python -m pip install -r scripts/requirements.txt
 
-      # The Paseo plugin package needs npm; its README documents Node 20.19.4+.
+      # Static gates
+      - name: Frontmatter
+        run: python scripts/check_frontmatter.py
+      - name: Contract graph
+        run: python scripts/check_contract_graph.py
+      - name: Skill links
+        run: python scripts/check_skill_links.py
+      - name: Catalog index drift
+        run: python scripts/generate_index.py --check
+      - name: Vendored shared scripts drift
+        run: python scripts/vendor_shared.py --check
+      - name: PR bumps changed skills' revision
+        if: github.event_name == 'pull_request'
+        run: python scripts/version.py check-revisions
+
+      # Python tests: every test_*.py under scripts/ evals/ skills/ (pytest.ini)
+      - name: pytest
+        timeout-minutes: 12
+        run: python -m pytest
+
+      # Script checks: the exit code is the contract
+      - name: Trigger cases
+        run: python evals/run_trigger_evals.py
+      - name: Skill-method cases
+        run: python evals/validate_skill_method_cases.py
+      - name: define-goal fixtures
+        run: python skills/define-goal/evals/validate_fixtures.py
+      - name: hoa-introspect evals
+        run: python skills/hoa-introspect/evals/run.py
+      - name: hoa-introspect-distill evals
+        run: python skills/hoa-introspect-distill/evals/run_evals.py
+      - name: hermes-models routing inventory
+        run: python skills/hermes-models/scripts/tests/test-routing-inventory.py
+      - name: hermes-models provider metadata
+        run: python skills/hermes-models/scripts/tests/test-provider-metadata.py
+      - name: gdd verdict matrix
+        run: python skills/gdd/scripts/tests/test_verdict_matrix.py
+      - name: gdd merge-gate mutation harness
+        timeout-minutes: 5
+        run: python skills/gdd/scripts/tests/mutate_verdict_matrix.py
+      - name: gdd selftest (also runs test-dispatch-guards.py)
+        timeout-minutes: 5
+        run: bash skills/gdd/scripts/tests/run-gdd-selftest.sh
+      - name: gdd omp-run.sh stale lock
+        timeout-minutes: 5
+        run: bash skills/gdd/scripts/tests/test-omp-run-stale.sh
+      - name: gdd omp-run.sh setsid and tmux backends
+        timeout-minutes: 5
+        run: bash skills/gdd/scripts/tests/test-omp-run-setsid.sh
+
+      # Paseo run-observer plugin
       - uses: actions/setup-node@v4
         with:
-          node-version: "20.19.4"
-
-      - name: Install repository script dependencies
-        run: python -m pip install -r scripts/requirements.txt
-
-      # ── every suite: discovered patterns, declared gates, declared packages ──
-      - name: Repository test discoverer
-        run: python scripts/run_all_tests.py
-
+          node-version: "20.19.4"  # plugin README minimum
+          cache: npm
+          cache-dependency-path: paseo-plugins/gdd-run-observer/package-lock.json
+      - name: Paseo gdd-run-observer typecheck and tests
+        working-directory: paseo-plugins/gdd-run-observer
+        timeout-minutes: 5
+        run: npm ci && npm run typecheck && npm test

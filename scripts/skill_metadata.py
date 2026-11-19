@@ -73,7 +73,7 @@ def catalog_metadata(text: str, source: Path) -> dict[str, str]:
     _, metadata = _value(root, fields, "metadata", "frontmatter", source)
     metadata_fields = _mapping(metadata, "metadata", source)
     if "version" in fields or "version" in metadata_fields:
-        raise ValueError(f"version is retired (the project VERSION is the only version); "
+        raise ValueError(f"version is retired; "
                          f"use metadata.revision in {source}")
     values = {}
     for key in ("revision", "areas", "targets", "summary", "summary_zh"):
