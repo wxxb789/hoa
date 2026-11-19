@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Contract tests for agent_run.py: a stub agent stands in for each CLI (`<AGENT>_BIN`).
 
-Opt-in smoke against real CLIs (costs tokens): GDD_SMOKE_AGENTS=omp,codex,claude python -B test_agent_run.py SmokeTests
+Opt-in smoke against real CLIs (costs tokens): GDD_SMOKE_AGENTS=omp,pi,codex,claude,opencode python -B test_agent_run.py SmokeTests
+(GDD_SMOKE_<AGENT>_MODEL passes --model when an agent's default model does not work on the host.)
 """
 import glob
 import json
@@ -40,9 +41,16 @@ EXPECTED = {
                "turns": 3, "tool_calls": 1, "cost_usd": 0.236953,
                "usage": {"input_tokens": 4, "output_tokens": 273, "cache_read_tokens": 44437, "total_tokens": 89232},
                "fail_error": "the result event outcome is 'api_error': API Error: 400 Model"},
+    "pi": {"answer": "done", "session_id": "00000000-0000-7000-8000-000000000006", "turns": 2, "tool_calls": 1,
+           "usage": {"input_tokens": 6, "output_tokens": 28, "cache_read_tokens": 14695, "total_tokens": 29460},
+           "cost_usd": 0.0, "fail_error": "the last assistant message_end stopReason is 'error': ghc API error (400)"},
+    "opencode": {"answer": "done", "session_id": "ses_000000000000000000000001", "turns": 2, "tool_calls": 1,
+                 "usage": {"input_tokens": 6, "output_tokens": 23, "cache_read_tokens": 15605, "total_tokens": 31269},
+                 "cost_usd": 0.040889, "fail_error": "the last step_finish reason is 'error': Model unavailable"},
 }
 CODEX = ["exec", "--json", "-c", "approval_policy=never", "-c", "sandbox_mode=workspace-write",
          "-c", "sandbox_workspace_write.network_access=true"]
+OPENCODE = ["run", "--standalone", "--format", "json", "--auto", "--title"]
 CLAUDE = ["-p", "--output-format", "stream-json", "--verbose", "--permission-mode", "bypassPermissions"]
 ARGV = {  # (new session, resumed session S1); the prompt follows for argv-prompt agents
     "omp": (["-p", "--mode=json", "--approval-mode", "yolo"], ["-p", "--mode=json", "--approval-mode", "yolo", "-r", "S1"]),
@@ -51,7 +59,10 @@ ARGV = {  # (new session, resumed session S1); the prompt follows for argv-promp
              "--approval-policy", "never", "-"]),
     "codex": (CODEX + ["-"], CODEX[:1] + ["resume"] + CODEX[1:] + ["S1", "-"]),
     "claude": (CLAUDE + ["--session-id", "<uuid>"], CLAUDE + ["--resume", "S1"]),
+    "pi": (["--mode", "json", "--no-approve"], ["--mode", "json", "--no-approve", "--session", "S1"]),
+    "opencode": (OPENCODE + ["opencode-new"], OPENCODE + ["opencode-resume", "-s", "S1"]),
 }
+ARGV_PROMPT = ("omp", "opencode")
 
 
 def uuid_masked(argv):
@@ -138,7 +149,7 @@ class RunnerCase(unittest.TestCase):
         drop = ("GDD_", "STUB_", "DSH_", "OMP_")
         self.env = {k: v for k, v in os.environ.items() if not k.startswith(drop)}
         self.env.update(GDD_RUN_ROOT=self.root, XDG_CONFIG_HOME=os.path.join(self.tmp, "config"),
-                        OMP_BIN=STUB, DSH_BIN=STUB, CODEX_BIN=STUB, CLAUDE_BIN=STUB, STUB_RECORD=self.record,
+                        **{f"{agent.upper()}_BIN": STUB for agent in EXPECTED}, STUB_RECORD=self.record,
                         PYTHONDONTWRITEBYTECODE="1")
 
     def tearDown(self):
@@ -191,7 +202,7 @@ class ContractTests(RunnerCase):
                     os.path.exists(self.record) and os.unlink(self.record)
                     self.start(f"{agent}-{label}", agent, "ok", "--max-time", "10m", *extra)
                     record = self.recorded()
-                    prompt_in_argv = agent == "omp"
+                    prompt_in_argv = agent in ARGV_PROMPT
                     self.assertEqual(uuid_masked(record["argv"]), golden + ([PROMPT] if prompt_in_argv else []))
                     self.assertEqual(record["stdin"], "" if prompt_in_argv else PROMPT)
                     self.assertEqual(os.path.realpath(record["cwd"]), os.path.realpath(self.work))
@@ -200,7 +211,9 @@ class ContractTests(RunnerCase):
     def test_t1_model_thinking_and_extra_reach_the_agent(self):
         tails = {"omp": ["--model", "m1", "--thinking", "high", "--no-tools", "-x", PROMPT],
                  "codex": ["-m", "m1", "-c", "model_reasoning_effort=high", "--no-tools", "-x", "-"],
-                 "claude": ["--model", "m1", "--effort", "high", "--no-tools", "-x"]}
+                 "claude": ["--model", "m1", "--effort", "high", "--no-tools", "-x"],
+                 "pi": ["--model", "m1", "--thinking", "high", "--no-tools", "-x"],
+                 "opencode": ["-m", "m1#high", "--no-tools", "-x", PROMPT]}
         for agent, tail in tails.items():
             with self.subTest(agent=agent):
                 os.path.exists(self.record) and os.unlink(self.record)
@@ -232,6 +245,12 @@ class ContractTests(RunnerCase):
                 self.assertIn(want["fail_error"], state["error"])
                 self.assertEqual(state["errors"], [state["error"]])
                 self.assertEqual(schema_errors(state), [])
+        aborted = os.path.join(self.tmp, "pi-aborted.ndjson")  # pi documents exit 0 on an aborted run
+        write(aborted, read(os.path.join(FIXTURES, "pi.ok.ndjson")).replace('"aborted": false', '"aborted": true'))
+        self.start("aborted-pi", "pi", env={"STUB_FIXTURE": aborted})
+        state = self.finished("aborted-pi")
+        self.assertEqual((state["state"], state["exit"]), ("failed", 0))
+        self.assertIn("agent_settled.aborted is true", state["error"])
 
     def test_t4_exit_codes(self):
         for code, verdict in ((3, "failed"), (130, "killed"), (143, "killed")):
@@ -331,6 +350,7 @@ class ContractTests(RunnerCase):
             (("--agent", "dsh", "--model", "m"), {}, "--model is not supported on the DSH route"),
             (("--agent", "dsh", "--thinking", "high"), {}, "--thinking is not supported on the DSH route"),
             (("--agent", "dsh"), {"DSH_APPROVAL_POLICY": "on-request"}, "DSH_APPROVAL_POLICY='on-request' is refused"),
+            (("--agent", "opencode", "--thinking", "high"), {}, "--thinking on the opencode route needs --model"),
             (("--agent", "nobody"), {}, "unknown agent 'nobody'"),
             (("--max-time", "soon"), {}, "--max-time must be"),
         ]
@@ -496,10 +516,12 @@ class SmokeTests(RunnerCase):
                            f"```json\n{json.dumps(STAGE_RESULT)}\n```\n")
         for agent in os.environ["GDD_SMOKE_AGENTS"].split(","):
             env, resume = {f"{agent.upper()}_BIN": os.environ.get(f"{agent.upper()}_BIN") or agent}, ()
+            model = os.environ.get(f"GDD_SMOKE_{agent.upper()}_MODEL")
             for name in (f"smoke-{agent}", f"smoke-{agent}-resume"):
                 with self.subTest(run=name):
                     proc = self.cli("start", "--name", name, "--prompt", self.prompt, "--agent", agent, "--cwd",
-                                    self.work, "--schema", RESULT_SCHEMA, *resume, env=env)
+                                    self.work, "--schema", RESULT_SCHEMA, *resume,
+                                    *(("--model", model) if model else ()), env=env)
                     self.assertEqual(proc.returncode, 0, proc.stderr)
                     state = self.finished(name, 300)
                     print(f"smoke {name}: state={state['state']} exit={state['exit']} turns={state['turns']} "

@@ -1,0 +1,4 @@
+# Trimmed from a real `opencode run --standalone --format json --auto -m <unknown model>` run
+# (opencode 2.3.2, 2026-11-18); that run exited 1, the contract test replays it with exit 0.
+# Session id sanitized.
+{"type": "error", "timestamp": 1794981319896, "sessionID": "ses_000000000000000000000002", "error": {"type": "provider.no-route", "message": "Model unavailable: nosuch/no-such-model-xyz"}}

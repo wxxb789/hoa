@@ -12,7 +12,7 @@ Paths below are relative to the installed `gdd` skill directory.
 
 | Route | Launcher | Runtime requirement |
 |---|---|---|
-| Headless CLI (default) | `scripts/agent_run.py` | One detached runner for every headless agent CLI; `GDD_AGENT` picks the CLI (`omp` by default, or `dsh`, `codex`, `claude`); stdlib Python 3, no bash, `setsid` or `tmux`. The DSH route's operating method is the [`gdd-route-dsh`](../../gdd-route-dsh/SKILL.md) mechanism skill |
+| Headless CLI (default) | `scripts/agent_run.py` | One detached runner for every headless agent CLI; `GDD_AGENT` picks the CLI (`omp` by default, or `dsh`, `codex`, `claude`, `pi`, `opencode`); stdlib Python 3, no bash, `setsid` or `tmux`. The DSH route's operating method is the [`gdd-route-dsh`](../../gdd-route-dsh/SKILL.md) mechanism skill |
 | Native Paseo (opt-in) | Set `GDD_LAUNCHER` to `scripts/adapters/paseo-run.py` | An installed Paseo CLI and a reachable Paseo daemon; each stage is a native Paseo agent |
 
 Select the route as configuration, never from a daemon reachability probe. An unreachable daemon
@@ -98,13 +98,15 @@ counter re-derived from a truncated stream is marked partial (`tool_calls_partia
 `agent_run.py --help` is authoritative. In short:
 
 - **Agent.** `--agent`, then `GDD_AGENT` (env, then the gdd config file), then `omp`. Binary:
-  `<AGENT>_BIN` (`OMP_BIN`, `DSH_BIN`, `CODEX_BIN`, `CLAUDE_BIN`), else the agent's name on `PATH`; a `.py` binary runs through
+  `<AGENT>_BIN`, else the agent's name on `PATH`; a `.py` binary runs through
   the interpreter, a Windows `.cmd`/`.bat` shim through `%COMSPEC%` — and `start` refuses a shim when
   an argument it would pass carries a `cmd.exe` metacharacter (`" & | < > ^ ( ) % !`, newline).
 - **Done** means exit 0 **and** the agent's own success marker: omp's last assistant `message_end`
   `stopReason` is not `error`/`aborted`/`length`; dsh's last `final.reason.kind` is `completed`;
   codex's last turn event is `turn.completed`; claude's `result` event is `subtype: success` with
-  `is_error: false`.
+  `is_error: false`; Pi uses the same `stopReason` rule as OMP and must not report
+  `agent_settled.aborted: true`; OpenCode's last `step_finish` reason is `stop`, with no
+  `error` event.
   `killed` covers this runner's stop (exit `143`) and an exit carrying a signal convention
   (`130`/`137`/`143` and their raw POSIX forms `-2`/`-9`/`-15`), which keeps its raw code.
   `--max-time` is enforced by the runner for every agent: exit `124`, `failed`, `note: max_time exceeded`.
@@ -134,11 +136,19 @@ counter re-derived from a truncated stream is marked partial (`tool_calls_partia
   `--thinking` maps to `model_reasoning_effort` / `--effort`. claude takes the schema inline
   (`--json-schema` has no file form), so on Windows `CLAUDE_BIN` must be a native `claude.exe`:
   `start` refuses npm's `claude.cmd` shim because the JSON carries `"`.
+- **Pi.** Runs `--mode json --no-approve` with the prompt on stdin. `--no-approve` opts out of
+  loading unapproved project-local files; it is not tool sandboxing. The runner passes
+  `--model` and `--thinking` through and maps `--resume` to `--session`.
+- **OpenCode.** Runs `run --standalone --format json --auto` with a slug-based title and the
+  prompt as an argument. `--standalone` keeps the server in the run's process tree rather than
+  using a shared server; `--auto` makes the run non-interactive. `--resume` maps to `-s`;
+  `--thinking` requires `--model` and maps to the `#variant` suffix of `-m MODEL#VARIANT`.
+  A Windows `.cmd` shim cannot take a multiline prompt on this route; use a native executable.
 
 | Key | Resolves | Default |
 |---|---|---|
 | `GDD_AGENT` | agent CLI | `omp` |
-| `OMP_BIN`, `DSH_BIN`, `CODEX_BIN`, `CLAUDE_BIN` | agent binary | the agent's name on `PATH` |
+| `OMP_BIN`, `DSH_BIN`, `CODEX_BIN`, `CLAUDE_BIN`, `PI_BIN`, `OPENCODE_BIN` | agent binary | the agent's name on `PATH` |
 | `GDD_RUN_ROOT` | run root (env, then the gdd config file) | `${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs` — on Windows that resolves under `%USERPROFILE%`, deliberately not `%LOCALAPPDATA%`, so both platforms and every script see one tree |
 | `GDD_RUN_EVENTS_MAX_BYTES` | bound for the retained event log | `8388608` |
 | `GDD_RUN_START_GRACE_SECONDS` | how long a run that has recorded no pid is still *starting*, not dead | `60` |

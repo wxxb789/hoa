@@ -1,0 +1,10 @@
+# Trimmed from a real `pi --mode json --no-approve` run whose default model did not resolve (pi
+# 1.5.2, 2026-11-18): the assistant message ends with stopReason "error" and pi exits 0.
+# The system message and agent_end removed, session id and cwd sanitized.
+{"type": "session", "version": 3, "id": "00000000-0000-7000-8000-000000000007", "timestamp": "2026-11-18T00:00:00.000Z", "cwd": "/work/repo"}
+{"type": "agent_start"}
+{"type": "turn_start"}
+{"type": "message_end", "message": {"role": "user", "content": [{"type": "text", "text": "Reply with the word done."}], "timestamp": 1794981225811}}
+{"type": "message_end", "message": {"role": "assistant", "content": [], "api": "openai-responses", "provider": "ghc", "model": "gpt-6.2-sol", "usage": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "totalTokens": 0, "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "total": 0}}, "stopReason": "error", "timestamp": 1794981225835, "errorMessage": "ghc API error (400): {\"message\":\"The selected model could not be resolved.\",\"type\":\"invalid_request_error\",\"param\":\"model\"}", "durationMs": 47, "thinkingLevel": "high"}}
+{"type": "turn_end", "message": {"role": "assistant", "stopReason": "error"}, "toolResults": []}
+{"type": "agent_settled", "aborted": false}

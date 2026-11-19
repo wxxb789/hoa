@@ -11,7 +11,7 @@
     agent_run.py list | status [SLUG] | tail SLUG [N] | result SLUG | answer SLUG | kill SLUG
     agent_run.py _run --run-dir DIR        (internal: the detached runner)
 
-Agent (omp, dsh, codex, claude): --agent, then GDD_AGENT (env, then the gdd config file), then
+Agent (omp, dsh, codex, claude, pi, opencode): --agent, then GDD_AGENT (env, then the gdd config file), then
 omp. Binary: <AGENT>_BIN (e.g. CODEX_BIN), else the agent's name on PATH; a `.py` binary runs
 through this interpreter, a Windows `.cmd`/`.bat` shim through %COMSPEC%.
 
@@ -286,10 +286,12 @@ def text_parts(content):
 
 
 def fold_pi(acc, event):
-    """omp and pi: `session`, assistant `message_end`, `tool_execution_start`, `turn_end`."""
+    """omp and pi: `session`, assistant `message_end`, `tool_execution_start`, `turn_end`, `agent_settled`."""
     kind = event.get("type")
     if kind == "session" and not acc["session_id"]:
         acc["session_id"] = event.get("id") or ""
+    elif kind == "agent_settled" and event.get("aborted") is True:
+        acc["success_marker"], acc["error"] = "aborted", acc["error"] or "agent_settled.aborted is true"
     elif kind == "tool_execution_start":
         acc["tool_calls"] += 1
     elif kind == "turn_end":
@@ -368,6 +370,31 @@ def fold_claude(acc, event):
         acc["cost_usd"] = round(cost, 6) if isinstance(cost, (int, float)) else acc["cost_usd"]
 
 
+def fold_opencode(acc, event):
+    """`step_finish` per step; the answer is the text after the last `step_start`; an `error` sticks."""
+    kind, part = event.get("type"), event.get("part") if isinstance(event.get("part"), dict) else {}
+    acc["session_id"] = acc["session_id"] or str(event.get("sessionID") or "")
+    if kind == "step_start":
+        acc["answer"] = ""
+    elif kind == "text":
+        acc["answer"] += str(part.get("text") or "")
+    elif kind == "tool_use":
+        acc["tool_calls"] += 1
+    elif kind == "step_finish":
+        acc["turns"] += 1
+        acc["success_marker"] = "error" if acc["success_marker"] == "error" else part.get("reason")
+        count = part.get("tokens") if isinstance(part.get("tokens"), dict) else {}
+        cache = count.get("cache") if isinstance(count.get("cache"), dict) else {}
+        usage = tokens({**count, "cache_read": cache.get("read"), "cache_write": cache.get("write")}, "input",
+                       "output", "cache_read", "reasoning", "cache_read", "cache_write")
+        acc["usage"] = {key: acc["usage"][key] + usage[key] for key in usage}
+        if isinstance(part.get("cost"), (int, float)):
+            acc["cost_usd"] = round((acc["cost_usd"] or 0) + part["cost"], 6)
+    elif kind == "error":
+        error = event.get("error") if isinstance(event.get("error"), dict) else {}
+        acc["success_marker"], acc["error"] = "error", str(error.get("message") or error.get("type") or "error event")
+
+
 def tokens(usage, input_key, output_key, cache_key, *also_total):
     """Normalized usage; total = input + output + the `also_total` keys (codex input includes its cache)."""
     usage = usage if isinstance(usage, dict) else {}
@@ -412,6 +439,21 @@ def claude_argv(args, extra):
             *flags(("--model", args.model), ("--effort", args.thinking), ("--json-schema", schema)), *extra]
 
 
+def pi_argv(args, extra):
+    """pi has no tool approvals; --no-approve ignores project-local files (repo extensions never run)."""
+    return ["--mode", "json", "--no-approve",
+            *flags(("--model", args.model), ("--thinking", args.thinking), ("--session", args.resume)), *extra]
+
+
+def opencode_argv(args, extra):
+    """--standalone runs a private server inside this process tree, so kill and liveness reach the work."""
+    if args.thinking and not args.model:
+        die("start: --thinking on the opencode route needs --model (thinking is the #variant suffix)")
+    model = args.model and (f"{args.model}#{args.thinking}" if args.thinking else args.model)
+    return ["run", "--standalone", "--format", "json", "--auto", "--title", sanitize(args.name),
+            *flags(("-s", args.resume), ("-m", model)), *extra]
+
+
 @dataclass(frozen=True)
 class Agent:
     name: str
@@ -424,15 +466,21 @@ class Agent:
     refuse: tuple = ()  # start flags this route rejects
 
 
+def pi_ok(marker):
+    return marker not in (None, "error", "aborted", "length")
+
+
 AGENTS = {
-    "omp": Agent("omp", "argv", omp_argv, fold_pi, "the last assistant message_end stopReason",
-                 lambda marker: marker not in (None, "error", "aborted", "length")),
+    "omp": Agent("omp", "argv", omp_argv, fold_pi, "the last assistant message_end stopReason", pi_ok),
+    "pi": Agent("pi", "stdin", pi_argv, fold_pi, "the last assistant message_end stopReason", pi_ok),
     "dsh": Agent("dsh", "stdin", dsh_argv, fold_dsh, "the last final.reason.kind", lambda marker: marker == "completed",
                  scrub_env=("DSH_PROFILE", "DSH_PROFILE_DIR", "DSH_SESSION_ID"), refuse=("model", "thinking")),
     "codex": Agent("codex", "stdin", codex_argv, fold_codex, "the last turn event",
                    lambda marker: marker == "turn.completed"),
     "claude": Agent("claude", "stdin", claude_argv, fold_claude, "the result event outcome",
                     lambda marker: marker == "success"),
+    "opencode": Agent("opencode", "argv", opencode_argv, fold_opencode, "the last step_finish reason",
+                      lambda marker: marker == "stop"),
 }
 
 

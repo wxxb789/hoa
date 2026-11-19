@@ -48,6 +48,7 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
   validation in state and saves valid results to `result.json`; `stage --wait` prints the verdict.
 - gdd: keep the report in `answer.md` on native structured-result routes. Custom launchers
   must accept `--schema`; failed runs retain both the runner's reason and the agent's error.
+- gdd: support Pi and OpenCode as headless routes, with recorded success and failure events.
 
 - Trigger evals now route on visible skills' frontmatter descriptions, accept `none` when no
   artifact fits, and include three no-trigger cases.
