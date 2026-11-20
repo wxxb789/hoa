@@ -1,0 +1,13 @@
+{
+  "id": "claim-audit",
+  "skill": "report-claim-audit",
+  "fixture": "fixtures/claim-audit",
+  "prompt": "Audit closeout.md before I sign it. Read the fixture's source records. Tell me what I should rule on and whether to sign; do not modify any files or claim to have executed anything. Return a bare JSON object (no fences) with verdict (sign or hold), actual_count, untracked (sorted IDs), unaccepted (sorted IDs of manifest entries not accepted), pending (sorted decision IDs), and brief (your recommendation with the cost of the other choice).",
+  "rubric": {
+    "correct-signoff": {"field": "verdict", "equals": "hold"},
+    "recount": {"field": "actual_count", "equals": 4},
+    "omissions": {"field": "untracked", "equals": ["C-04"]},
+    "acceptance-diff": {"field": "unaccepted", "equals": ["C-03"]},
+    "pending-only": {"field": "pending", "equals": ["D-02"]}
+  }
+}

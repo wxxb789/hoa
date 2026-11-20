@@ -1,0 +1,10 @@
+{
+  "id": "ws4-fallback",
+  "skill": "hoa-repo-reckoning",
+  "fixture": "fixtures/ws4-fallback",
+  "prompt": "Explicitly use the installed hoa-repo-reckoning skill at quick depth on the small repository snapshot in subject/. This read-only audit has no independent workers, web, Git metadata or shell execution. Read the skill and its panel protocol. Keep outputs in the working directory outside subject/. Follow the fallback as far as the available tools allow, including scope.md and report.md; disclose any blocked checks or generation instead of claiming to have run them. Do not edit the subject, record owner decisions, or look elsewhere for more evidence.",
+  "rubric": {
+    "single-context-header": {"file": "report.md", "contains": "verification: single-context"},
+    "external-lane-not-run": {"file": "scope.md", "contains": "external lane: not run"}
+  }
+}
