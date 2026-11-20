@@ -6,6 +6,8 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 ## 2026-11-21
 
+- Add the `no-mistakes` arm to the [B8 orchestration case study](evals/results/2026-11-20-b8-orchestration.md):
+  passing fix, review stage never ran (provider 403).
 - Add a [manual skill description distinctiveness measurement](evals/README.md#measure-description-distinctiveness)
   with offline BM25 and TF-IDF, optional LLM routing, and the development and public regression sets.
 
