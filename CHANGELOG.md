@@ -6,6 +6,8 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 ## 2026-11-20
 
+- Compare no skill, frozen terse guidance, and a full skill in the necessity runner. Add forced
+  and natural activation modes, isolated Codex trials, and threshold-based verdicts.
 - Update GDD Observer to the Paseo 0.16 SDK and matching React runtime dependencies while retaining
   bounded RPC polling and Node.js 20.19.4 support.
 - Group daily reference submodule updates in Dependabot and auto-merge them after required CI checks pass.

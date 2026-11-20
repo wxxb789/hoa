@@ -2,7 +2,9 @@
   "id": "claim-audit",
   "skill": "report-claim-audit",
   "fixture": "fixtures/claim-audit",
-  "prompt": "Audit closeout.md before I sign it. Read the fixture's source records. Tell me what I should rule on and whether to sign; do not modify any files or claim to have executed anything. Return a bare JSON object (no fences) with verdict (sign or hold), actual_count, untracked (sorted IDs), unaccepted (sorted IDs of manifest entries not accepted), pending (sorted decision IDs), and brief (your recommendation with the cost of the other choice).",
+  "prompt": "Audit closeout.md before I sign it. Read the fixture's source records with read tools or shell builtins only; do not launch external commands, modify files, or claim to have run validation. Tell me what I should rule on and whether to sign. Return a bare JSON object (no fences) with verdict (sign or hold), actual_count, untracked (sorted IDs), unaccepted (sorted IDs of manifest entries not accepted), pending (sorted decision IDs), and brief (your recommendation with the cost of the other choice).",
+  "terse": "Recompute reported counts from the source records. Diff on-disk, tracked, and accepted artifacts. Separate pending decisions from approved ones and state the cost of the alternative before making a signoff recommendation.",
+  "shell": ["codex"],
   "rubric": {
     "correct-signoff": {"field": "verdict", "equals": "hold"},
     "recount": {"field": "actual_count", "equals": 4},
