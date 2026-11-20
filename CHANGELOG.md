@@ -17,7 +17,6 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
   first paired trial and quick, single-context WS4 fallback pilot.
 - Redact host paths and credentials from necessity-eval results, and replace the pilot artifacts
   with runs that identify the exact runner commit.
-
 - The README and the generated index tell users who do not run Hermes to skip the `hermes-*` skills, and
   the index carries an install-everything-but-Hermes command; `generate_index.py` fails if any other
   skill starts linking to a `hermes-*` skill.

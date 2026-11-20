@@ -1,13 +1,22 @@
 # Necessity and WS4 pilots: 2026-11-20
 
-Runner, tasks, and fixtures: commit `5290f64b366b42845ed41e1ec6c46340e632e0e0`.
+Inputs, pinned by git object id (content hashes survive rebase and squash merge; check with
+`git rev-parse HEAD:<path>`):
+
+| Path | Object id |
+|---|---|
+| `evals/run_necessity_eval.py` | `41a1c4cfef7d2a8a75832f2d9a6242780b237148` |
+| `evals/tasks` (tasks and fixtures) | `29b924bcb60a0c565fd32b24fd37843f40d8debf` |
+| `skills/report-claim-audit` | `fef761eb1567457e4bb4b140e8fcce5e76a31c0e` |
+| `skills/hoa-repo-reckoning` | `0cda17e377621db45ca9b0d8aee820c53a30243b` |
+
 Native Windows, Claude Code 2.1.328, `claude-haiku-5.5`, low effort. Every trial
 had a fresh temporary profile and synthetic fixture, with no web, shell,
 workers, or MCP servers. The old artifacts were removed because they were
 produced by an earlier runner and included an unredacted host path. The WS4
 rerun uses the corrected fixed-directory task from the original pilot.
 
-Run these commands from the repository root at the pinned commit, with the
+Run these commands from the repository root at a commit where those ids match, with the
 same Claude Code model and an authorized endpoint configured:
 
 ```sh
