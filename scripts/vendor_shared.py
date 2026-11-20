@@ -29,11 +29,13 @@ SHARED = ROOT / "scripts" / "shared"
 # A root-level script that must be vendored like a shared one.
 SOURCES: dict[str, Path] = {
     "skill_config.py": ROOT / "scripts" / "skill_config.py",
+    "rubrics.json": ROOT / "evals" / "decision-rubrics.json",
 }
 
 # shared file name → destination skill dirs
 CONSUMERS: dict[str, list[str]] = {
-    "skill_config.py": ["skills/gdd/scripts"],
+    "skill_config.py": ["skills/gdd/scripts", "skills/ghc-decisions/scripts"],
+    "rubrics.json": ["skills/ghc-decisions/scripts"],
     "findings.py": ["skills/hoa-practice-retro/scripts"],
     "panel.md": ["skills/hoa-practice-retro/references"],
     "usage-based-recommendations.md": [
@@ -46,6 +48,7 @@ CONSUMERS: dict[str, list[str]] = {
         "skills/contract-bound-deliverables/references",
         "skills/evidence-boundary-discipline/references",
         "skills/gdd/references",
+        "skills/ghc-decisions/references",
         "skills/git-auto-sync-pipelines/references",
         "skills/hoa-skill-curate/references",
         "skills/hoa-skill-port/references",
@@ -55,6 +58,7 @@ CONSUMERS: dict[str, list[str]] = {
     "troubleshooting.md": [
         "skills/agent-operating-contract-evolution/references",
         "skills/gdd/references",
+        "skills/ghc-decisions/references",
         "skills/ghc-search/references",
         "skills/hermes-models/references",
         "skills/hoa-practice-retro/references",
