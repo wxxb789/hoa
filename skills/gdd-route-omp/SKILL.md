@@ -6,7 +6,7 @@ description: >-
   survive session restarts: NDJSON event log, polled completion, session-id recovery. Not for a short
   command (run inline) or work needing live steering (TUI).
 metadata:
-  revision: "4"
+  revision: "5"
   areas: "software-development,work-management"
   targets: "pi"
   summary: "detached runner for long `omp -p` runs; polled completion, session-id recovery (requires skill `gdd`)"
@@ -59,6 +59,10 @@ This skill requires skill `gdd`: the runner is maintained once, as gdd's `../gdd
 POSIX callers can still use the optional `scripts/omp-run.sh` forwarder; it sets `GDD_AGENT=omp`
 and resolves the sibling runner (no PATH fallback). `--profile P` still reaches OMP;
 `--backend` is accepted with a warning and has no effect, including for `tmux`.
+The route was verified on OMP 18.22.0. `OMP_BIN` overrides `omp` on PATH. The
+prompt is the last argv element; `--model` and `--thinking` pass through when
+set. On Windows, point `OMP_BIN` at a native executable for multiline prompts.
+The runner prompts for JSON results; this route has no native schema flag.
 Only if a script command fails (for example `uv` is not found), read
 [the runner troubleshooting reference](../gdd/references/troubleshooting.md).
 
@@ -106,7 +110,8 @@ Only if a script command fails (for example `uv` is not found), read
     signal. A run whose runner and agent died is finalized as failed (`stale_recovered: true`, exit
     `-1`) the next time `status`/`list`/`result`/`answer` reads it; a state file stuck at `running` is
     not evidence that the work is alive — read `finalized` or the `stale_recovered` flag.
-11. **`exit=0` means the process ended, not that the task finished.** A run can end its turn while a
+11. **`exit=0` means the process ended, not that the task finished.** The last assistant
+    `message_end.stopReason` must be present and not `error`, `aborted`, or `length`. A run can end its turn while a
     long command is still in flight and report "waiting for the test gate" as its last text. Read
     `answer.md` for trailing wait language before treating the phase as done; the fix is a continuation
     run (`-r <session-id>` plus a prompt that names the remaining steps), not a fresh restart.

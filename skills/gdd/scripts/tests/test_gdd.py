@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Contract tests for gdd.py and delivery-state.py, launching through agent_run.py and the stub agent."""
 import glob
 import json
@@ -17,11 +16,12 @@ SCRIPTS = os.path.dirname(HERE)
 sys.path.insert(0, SCRIPTS)
 import gdd_process
 import agent_run
-from gdd_test_support import check_locks, cleanup_child, exited, finalized, ready, remove_tree, stop_headless, wait_for_json
+from gdd_test_support import (check_locks, cleanup_child, exited, finalized, ready, remove_tree, route_fixture,
+                              stop_headless, wait_for_json)
 GDD = os.path.join(SCRIPTS, "gdd.py")
 DELIVERY = os.path.join(SCRIPTS, "delivery-state.py")
 STUB = os.path.join(HERE, "stub_agent.py")
-OK_FIXTURE = os.path.join(HERE, "fixtures", "events", "omp.ok.ndjson")
+OK_FIXTURE = route_fixture("omp")
 
 
 def read(path):
@@ -181,7 +181,7 @@ class LaunchTests(GddCase):
         self.assertEqual((state["agent"], state["state"], state["cwd"]), ("omp", "done", self.repo))
 
     def test_stage_result_reaches_the_agent_and_the_ledger(self):
-        env = {"GDD_AGENT": "claude", "STUB_FIXTURE": OK_FIXTURE.replace("omp.", "claude.")}
+        env = {"GDD_AGENT": "claude", "STUB_FIXTURE": route_fixture("claude")}
         done = self.stage("implement", "--wait", env=env)
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertEqual(done.stdout.rstrip().splitlines()[-1], "result: DONE")
@@ -207,7 +207,7 @@ class LaunchTests(GddCase):
     def test_config_file_run_root_and_agent_reach_the_launcher(self):
         root = os.path.join(self.tmp, "configured-runs")
         write(os.path.join(self.tmp, "config", "gdd", "config.yaml"), f"GDD_RUN_ROOT: {json.dumps(root)}\nGDD_AGENT: dsh\n")
-        done = self.stage("implement", "--wait", env={"STUB_FIXTURE": OK_FIXTURE.replace("omp.", "dsh.")})
+        done = self.stage("implement", "--wait", env={"STUB_FIXTURE": route_fixture("dsh")})
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         [run_dir] = self.run_dirs(root)
         self.assertEqual(json.loads(read(os.path.join(run_dir, "state.json")))["agent"], "dsh")

@@ -16,6 +16,10 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 - Update GDD Observer to the Paseo 0.16 SDK and matching React runtime dependencies while retaining
   bounded RPC polling and Node.js 20.19.4 support.
 - Group daily reference submodule updates in Dependabot and auto-merge them after required CI checks pass.
+- gdd (16) discovers installed headless routes at runtime and reports how to install a missing route.
+- gdd-route-omp and gdd-route-dsh (5) now ship their own runner definitions and route tests.
+- Add hidden gdd routes (1) for Codex, Claude Code, Pi, and OpenCode. Codex launches without
+  sandbox or approvals and disables optional integrations by default, while keeping user config.
 
 ## 2026-11-19
 

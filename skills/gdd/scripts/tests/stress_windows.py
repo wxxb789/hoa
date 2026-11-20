@@ -25,17 +25,17 @@ AUDIT_TIMEOUT = 60
 RUN_TIMEOUT = 19 * 60
 
 CASES = (
-    "test_agent_run.py::ContractTests::test_concurrent_starts_cannot_move_a_starting_run",
-    "test_agent_run.py::ContractTests::test_t5_kill_a_hanging_run",
-    "test_agent_run.py::ContractTests::test_t12_drain_timeout_marks_stream_incomplete",
-    "test_agent_run.py::ContractTests::test_t13_dsh_env_scrub",
-    "test_agent_run.py::ContractTests::test_t17_detachment_rule",
-    "test_agent_run.py::RunnerMechanicsTests::test_progress_tick_waits_out_windows_reader_before_replacing",
-    "test_agent_run.py::RunnerMechanicsTests::test_runner_retries_progress_when_replace_and_in_place_write_fail",
-    "test_gdd.py::LaunchTests::test_live_run_blocks_and_stale_run_does_not",
-    "test_paseo_run_python.py::PaseoLauncherTests::test_monitor_finalizes_without_status_and_answer_is_last_assistant",
-    "test_paseo_run_python.py::PaseoLauncherTests::test_missing_state_file_is_unknown_even_with_an_agent_lock",
-    "test_paseo_run_python.py::PaseoLauncherTests::test_lifecycle_commands_survive_worktree_removal",
+    "gdd/scripts/tests/test_agent_run.py::ContractTests::test_concurrent_starts_cannot_move_a_starting_run",
+    "gdd/scripts/tests/test_agent_run.py::ContractTests::test_t5_kill_a_hanging_run",
+    "gdd/scripts/tests/test_agent_run.py::ContractTests::test_t12_drain_timeout_marks_stream_incomplete",
+    "gdd-route-dsh/scripts/tests/test_dsh_route.py::DshIntegrationTests::test_t13_dsh_env_scrub",
+    "gdd/scripts/tests/test_agent_run.py::ContractTests::test_t17_detachment_rule",
+    "gdd/scripts/tests/test_agent_run.py::RunnerMechanicsTests::test_progress_tick_waits_out_windows_reader_before_replacing",
+    "gdd/scripts/tests/test_agent_run.py::RunnerMechanicsTests::test_runner_retries_progress_when_replace_and_in_place_write_fail",
+    "gdd/scripts/tests/test_gdd.py::LaunchTests::test_live_run_blocks_and_stale_run_does_not",
+    "gdd/scripts/tests/test_paseo_run_python.py::PaseoLauncherTests::test_monitor_finalizes_without_status_and_answer_is_last_assistant",
+    "gdd/scripts/tests/test_paseo_run_python.py::PaseoLauncherTests::test_missing_state_file_is_unknown_even_with_an_agent_lock",
+    "gdd/scripts/tests/test_paseo_run_python.py::PaseoLauncherTests::test_lifecycle_commands_survive_worktree_removal",
 )
 
 
@@ -110,8 +110,9 @@ def main():
         # All Python entry points, including orphaned stubs, carry this round's
         # unique path in their command line even after their parent exits.
         source = tmp / "source"
-        shutil.copytree(HERE.parents[1], source, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-        tests = source / "scripts" / "tests"
+        skills = HERE.parents[2]
+        for skill in (skills / "gdd", *skills.glob("gdd-route-*")):
+            shutil.copytree(skill, source / skill.name, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
         before = guard_log.stat().st_size if guard_log.exists() else 0
         log = out / (label + ".log")
         # Reserve enough time for both audit attempts, including on the last round.
@@ -124,7 +125,7 @@ def main():
                     # pytest child. Keep it as a stack dump, with the round bounded separately.
                     result = gdd_process.run(
                         [sys.executable, "-m", "pytest", "-vv", "-x", "--durations=0",
-                         "-c", str(HERE.parents[3] / "pytest.ini"), *(str(tests / case) for case in CASES)],
+                         "-c", str(HERE.parents[3] / "pytest.ini"), *(str(source / case) for case in CASES)],
                         env={**env, "TEMP": str(tmp), "TMP": str(tmp), "PYTHONDONTWRITEBYTECODE": "1"},
                         stdout=stream, stderr=stream, timeout=timeout)
                     code, outcome = result.returncode, f"pytest exit {result.returncode}"

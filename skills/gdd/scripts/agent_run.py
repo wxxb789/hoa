@@ -16,6 +16,7 @@ import json
 import os
 import plistlib
 import re
+import runpy
 import shlex
 import shutil
 import signal
@@ -27,9 +28,14 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable, Literal
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Keep the lexical install path: a linked skill's canonical directory may have different siblings.
+SCRIPT_DIR = Path(os.path.abspath(__file__)).parent
+SKILLS_ROOT = SCRIPT_DIR.parents[1]
+sys.path.insert(0, str(SCRIPT_DIR))
+# Route modules import this runner, including when it was launched as __main__.
+sys.modules.setdefault("agent_run", sys.modules[__name__])
 import gdd_process
 import skill_config
 import stage_result
@@ -758,8 +764,8 @@ def text_parts(content):
     return "".join(p.get("text") or "" for p in content if isinstance(p, dict) and p.get("type") == "text")
 
 
-def fold_pi(acc, event):
-    """omp and pi: `session`, assistant `message_end`, `tool_execution_start`, `turn_end`, `agent_settled`."""
+def fold_message_events(acc, event):
+    """Fold the message-event protocol shared by OMP and Pi."""
     kind = event.get("type")
     if kind == "session" and not acc["session_id"]:
         acc["session_id"] = event.get("id") or ""
@@ -785,91 +791,9 @@ def fold_pi(acc, event):
             acc["cost_usd"] = round((acc["cost_usd"] or 0) + cost, 6)
 
 
-def fold_dsh(acc, event):
-    kind = event.get("type")
-    if kind == "session":
-        acc["session_id"] = event.get("sessionId") or acc["session_id"]
-    elif kind == "tool_call":
-        acc["tool_calls"] += 1
-    elif kind == "status":
-        acc["turns"] += event.get("phase") == "turn_end"
-        usage = event.get("usage")
-        if isinstance(usage, dict):
-            acc["usage"] = {key: int(usage.get(source) or 0) for key, source in (
-                ("input_tokens", "inputTokens"), ("output_tokens", "outputTokens"),
-                ("cache_read_tokens", "cacheReadTokens"), ("total_tokens", "totalTokens"))}
-    elif kind == "text" and acc["success_marker"] is None and event.get("text"):
-        acc["answer"] = str(event["text"])
-    elif kind == "final":
-        acc["answer"] = str(event.get("text") or acc["answer"])
-        acc["success_marker"] = (event.get("reason") or {}).get("kind")
-    elif kind == "error":
-        acc["error"] = str(event.get("message") or "error event")
-
-
-def fold_codex(acc, event):
-    kind, item = event.get("type"), event.get("item") if isinstance(event.get("item"), dict) else {}
-    if kind == "thread.started":
-        acc["session_id"] = event.get("thread_id") or acc["session_id"]
-    elif kind == "item.completed":
-        if item.get("type") == "agent_message":  # under --output-schema the last one is the JSON
-            acc["report"], acc["answer"] = acc["answer"] or acc["report"], str(item.get("text") or "")
-        acc["tool_calls"] += item.get("type") in ("command_execution", "file_change", "mcp_tool_call", "web_search")
-    elif kind == "turn.completed":
-        acc["turns"], acc["success_marker"] = acc["turns"] + 1, kind
-        usage = tokens(event.get("usage"), "input_tokens", "output_tokens", "cached_input_tokens")
-        acc["usage"] = {key: acc["usage"][key] + usage[key] for key in usage}
-    elif kind in ("turn.failed", "error"):
-        acc["success_marker"] = kind
-        acc["error"] = str(event.get("message") or (event.get("error") or {}).get("message") or kind)
-
-
-def fold_claude(acc, event):
-    kind, message = event.get("type"), event.get("message") if isinstance(event.get("message"), dict) else {}
-    if kind == "system" and event.get("subtype") == "init":
-        acc["session_id"] = event.get("session_id") or acc["session_id"]
-    elif kind == "assistant":
-        blocks = [b for b in message.get("content") or [] if isinstance(b, dict)]
-        acc["tool_calls"] += sum(b.get("type") == "tool_use" and b.get("name") != "StructuredOutput" for b in blocks)
-        acc["answer"] = acc["report"] = text_parts(blocks) or acc["answer"]
-    elif kind == "result":
-        ok = event.get("subtype") == "success" and event.get("is_error") is False
-        acc["success_marker"] = "success" if ok else str(event.get("terminal_reason") or event.get("subtype"))
-        acc["answer"], acc["structured"] = str(event.get("result") or acc["answer"]), event.get("structured_output")
-        acc["turns"], acc["error"] = int(event.get("num_turns") or 0), "" if ok else acc["answer"]
-        acc["usage"] = tokens(event.get("usage"), "input_tokens", "output_tokens", "cache_read_input_tokens",
-                              "cache_read_input_tokens", "cache_creation_input_tokens")
-        cost = event.get("total_cost_usd")
-        acc["cost_usd"] = round(cost, 6) if isinstance(cost, (int, float)) else acc["cost_usd"]
-
-
-def fold_opencode(acc, event):
-    """`step_finish` per step; the answer is the text after the last `step_start`; an `error` sticks."""
-    kind, part = event.get("type"), event.get("part") if isinstance(event.get("part"), dict) else {}
-    acc["session_id"] = acc["session_id"] or str(event.get("sessionID") or "")
-    if kind == "step_start":
-        acc["answer"] = ""
-    elif kind == "text":
-        acc["answer"] += str(part.get("text") or "")
-    elif kind == "tool_use":
-        acc["tool_calls"] += 1
-    elif kind == "step_finish":
-        acc["turns"] += 1
-        acc["success_marker"] = "error" if acc["success_marker"] == "error" else part.get("reason")
-        count = part.get("tokens") if isinstance(part.get("tokens"), dict) else {}
-        cache = count.get("cache") if isinstance(count.get("cache"), dict) else {}
-        usage = tokens({**count, "cache_read": cache.get("read"), "cache_write": cache.get("write")}, "input",
-                       "output", "cache_read", "reasoning", "cache_read", "cache_write")
-        acc["usage"] = {key: acc["usage"][key] + usage[key] for key in usage}
-        if isinstance(part.get("cost"), (int, float)):
-            acc["cost_usd"] = round((acc["cost_usd"] or 0) + part["cost"], 6)
-    elif kind == "error":
-        error = event.get("error") if isinstance(event.get("error"), dict) else {}
-        acc["success_marker"], acc["error"] = "error", str(error.get("message") or error.get("type") or "error event")
-
 
 def tokens(usage, input_key, output_key, cache_key, *also_total):
-    """Normalized usage; total = input + output + the `also_total` keys (codex input includes its cache)."""
+    """Normalized usage; total = input + output + the `also_total` keys."""
     usage = usage if isinstance(usage, dict) else {}
     count = {key: int(usage.get(key) or 0) for key in (input_key, output_key, cache_key, *also_total)}
     return {"input_tokens": count[input_key], "output_tokens": count[output_key], "cache_read_tokens": count[cache_key],
@@ -881,81 +805,68 @@ def flags(*pairs):
     return [token for flag, value in pairs if value for token in (flag, value)]
 
 
-def omp_argv(args, extra):
-    return ["-p", "--mode=json", "--approval-mode", "yolo",
-            *flags(("--model", args.model), ("--thinking", args.thinking), ("-r", args.resume),
-                   ("--profile", args.profile)), *extra]
-
-
-def dsh_argv(args, extra):
-    policy = os.environ.get("DSH_APPROVAL_POLICY") or "never"
-    if policy != "never":
-        die(f"start: DSH_APPROVAL_POLICY={policy!r} is refused: a detached run has no approval channel")
-    argv = ["--profile", os.environ.get("DSH_RUN_PROFILE") or "headless", *extra, "--json"]
-    argv += ["--session-id", args.resume] if args.resume else []
-    mode = os.environ.get("DSH_PERMISSION_MODE") or "workspace-write"
-    return argv + ["--permission-mode", mode, "--approval-policy", "never", "-"]
-
-
-def codex_argv(args, extra):
-    """Unquoted -c values parse as literal strings, so a Windows `.cmd` shim can carry them too."""
-    effort = args.thinking and f"model_reasoning_effort={args.thinking}"
-    return ["exec", *(["resume"] if args.resume else []), "--json", "-c", "approval_policy=never",
-            "-c", "sandbox_mode=workspace-write", "-c", "sandbox_workspace_write.network_access=true",
-            *flags(("-m", args.model), ("-c", effort), ("--output-schema", args.schema)), *extra,
-            *([args.resume] if args.resume else []), "-"]
-
-
-def claude_argv(args, extra):
-    session = ["--resume", args.resume] if args.resume else ["--session-id", str(uuid.uuid4())]
-    schema = args.schema and json.dumps(read_json(args.schema), separators=(",", ":"))
-    return ["-p", "--output-format", "stream-json", "--verbose", "--permission-mode", "bypassPermissions", *session,
-            *flags(("--model", args.model), ("--effort", args.thinking), ("--json-schema", schema)), *extra]
-
-
-def pi_argv(args, extra):
-    """pi has no tool approvals; --no-approve ignores project-local files (repo extensions never run)."""
-    return ["--mode", "json", "--no-approve",
-            *flags(("--model", args.model), ("--thinking", args.thinking), ("--session", args.resume)), *extra]
-
-
-def opencode_argv(args, extra):
-    """--standalone runs a private server inside this process tree, so kill and liveness reach the work."""
-    if args.thinking and not args.model:
-        die("start: --thinking on the opencode route needs --model (thinking is the #variant suffix)")
-    model = args.model and (f"{args.model}#{args.thinking}" if args.thinking else args.model)
-    return ["run", "--standalone", "--format", "json", "--auto", "--title", sanitize(args.name),
-            *flags(("-s", args.resume), ("-m", model)), *extra]
-
-
-@dataclass(frozen=True)
-class Agent:
-    name: str
-    prompt: str  # "stdin" | "argv" (appended last)
-    argv: Callable  # (args, extra) -> flags after the binary
-    fold: Callable  # (acc, event) -> None
-    marker: str  # where the success marker lives, for the error an exit-0 failure records
-    succeeded: Callable  # success_marker -> bool
-    scrub_env: tuple = ()
-    refuse: tuple = ()  # start flags this route rejects
-
-
-def pi_ok(marker):
+def message_succeeded(marker):
     return marker not in (None, "error", "aborted", "length")
 
 
-AGENTS = {
-    "omp": Agent("omp", "argv", omp_argv, fold_pi, "the last assistant message_end stopReason", pi_ok),
-    "pi": Agent("pi", "stdin", pi_argv, fold_pi, "the last assistant message_end stopReason", pi_ok),
-    "dsh": Agent("dsh", "stdin", dsh_argv, fold_dsh, "the last final.reason.kind", lambda marker: marker == "completed",
-                 scrub_env=("DSH_PROFILE", "DSH_PROFILE_DIR", "DSH_SESSION_ID"), refuse=("model", "thinking")),
-    "codex": Agent("codex", "stdin", codex_argv, fold_codex, "the last turn event",
-                   lambda marker: marker == "turn.completed"),
-    "claude": Agent("claude", "stdin", claude_argv, fold_claude, "the result event outcome",
-                    lambda marker: marker == "success"),
-    "opencode": Agent("opencode", "argv", opencode_argv, fold_opencode, "the last step_finish reason",
-                      lambda marker: marker == "stop"),
-}
+@dataclass(frozen=True)
+class Route:
+    """Contract for ROUTE exports in sibling gdd-route-*/scripts/route.py modules."""
+
+    name: str
+    prompt: Literal["stdin", "argv"]  # "argv" appends the prompt last
+    argv: Callable[[argparse.Namespace, list[str]], list[str]]  # flags after the binary
+    fold: Callable[[dict[str, Any], dict[str, Any]], None]
+    marker: str  # diagnostic description of the exit-0 success marker
+    succeeded: Callable[[object], bool]
+    scrub_env: tuple[str, ...] = ()
+    prepare: Callable[[argparse.Namespace], None] | None = None  # pre-start validation
+    legacy: tuple[Literal["backend", "profile", "session_id"], ...] = ()
+
+
+class RouteError(ValueError):
+    pass
+
+
+def discover_routes(root: Path | None = None) -> dict[str, Path]:
+    root = SKILLS_ROOT if root is None else root
+    return {path.parents[1].name.removeprefix("gdd-route-"): path
+            for path in sorted(root.glob("gdd-route-*/scripts/route.py")) if path.is_file()}
+
+
+def load_route(name: str, root: Path | None = None) -> Route:
+    installed = discover_routes(root)
+    if name not in installed:
+        raise RouteError(f"agent {name!r} has no installed route (installed: {', '.join(installed) or 'none'}); "
+                         f"install with: npx skills add wxxb789/hoa -s gdd-route-{name}")
+    path = installed[name]
+    try:
+        exports = runpy.run_path(str(path))
+    except Exception as exc:
+        raise RouteError(f"{path}: could not load ROUTE: {exc}") from exc
+    if "ROUTE" not in exports:
+        raise RouteError(f"{path}: missing ROUTE export")
+    route = exports["ROUTE"]
+    if not isinstance(route, Route):
+        raise RouteError(f"{path}: invalid ROUTE: expected agent_run.Route")
+    checks = (
+        ("name", route.name == name, f"expected {name!r} to match the skill directory"),
+        ("prompt", route.prompt in ("stdin", "argv"), "expected 'stdin' or 'argv'"),
+        ("argv", callable(route.argv), "expected a callable"),
+        ("fold", callable(route.fold), "expected a callable"),
+        ("marker", isinstance(route.marker, str) and route.marker.strip(), "expected a non-empty string"),
+        ("succeeded", callable(route.succeeded), "expected a callable"),
+        ("scrub_env", isinstance(route.scrub_env, tuple) and all(isinstance(key, str) and key for key in route.scrub_env),
+         "expected a tuple of environment names"),
+        ("prepare", route.prepare is None or callable(route.prepare), "expected a callable or None"),
+        ("legacy", isinstance(route.legacy, tuple) and all(key in ("backend", "profile", "session_id")
+                                                         for key in route.legacy),
+         "expected a tuple of legacy start option names"),
+    )
+    for field, valid, detail in checks:
+        if not valid:
+            raise RouteError(f"{path}: invalid ROUTE.{field}: {detail}")
+    return route
 
 
 def fold_line(spec, acc, raw):
@@ -1064,13 +975,19 @@ def progress(acc):
     return {key: acc[key] for key in ("session_id", "turns", "tool_calls", "usage", "cost_usd")}
 
 
-def finalize(run_dir, exit_code, acc=None, note=None, recovered=False, extra=None):
+def finalize(run_dir, exit_code, acc=None, note=None, recovered=False, extra=None, *, spec=None):
     """First terminal state wins. Writes answer.md, state.json, exit.code, then `finalized`."""
     if os.path.exists(os.path.join(run_dir, "finalized")):
         return read_state(run_dir)
     state = read_state(run_dir)
-    spec, refolded = AGENTS.get(state.get("agent")), acc is None
+    refolded = acc is None
     if refolded:  # the runner died: re-fold whatever events were retained
+        if spec is None and (agent := state.get("agent")):
+            try:
+                spec = load_route(agent)
+            except RouteError:
+                # A removed or broken route must not prevent stopping or settling an old run.
+                pass
         acc = new_acc()
         for path in event_files(run_dir) if spec else []:
             with open(path, "rb") as handle:
@@ -1205,19 +1122,21 @@ def cmd_start(args):
         agent = skill_config.resolve("gdd", "GDD_AGENT", flag=args.agent, default="omp")
     except skill_config.ConfigError as exc:
         die(f"start: {exc}")
-    spec = AGENTS.get(agent) or die(f"start: unknown agent {agent!r} (known: {', '.join(AGENTS)})")
+    try:
+        spec = load_route(agent)
+    except RouteError as exc:
+        die(f"start: {exc}")
     if args.session_id is not None:
-        if agent != "dsh" or args.resume is not None:
+        if "session_id" not in spec.legacy or args.resume is not None:
             die("start: --session-id is a DSH alias for --resume; do not combine them")
         args.resume = args.session_id
-    if (args.backend is not None or args.profile is not None) and agent != "omp":
+    if any(getattr(args, key) is not None and key not in spec.legacy for key in ("backend", "profile")):
         die("start: --backend and --profile are OMP compatibility flags")
     if args.backend is not None:
         print(f"agent_run: warning: --backend {args.backend} is retired; using GDD_RUN_DETACH instead",
               file=sys.stderr)
-    for field in spec.refuse:
-        if getattr(args, field):
-            die(f"start: --{field} is not supported on the {agent.upper()} route")
+    if spec.prepare:
+        spec.prepare(args)
     slug = sanitize(args.name) or die(f"start: --name {args.name!r} does not sanitize to a usable slug")
     try:
         with open(os.path.expanduser(args.prompt), "rb") as handle:
@@ -1340,12 +1259,17 @@ def run_agent(args):
     if not enter_detached(args):
         return 1
     plan, state_path = read_json(os.path.join(run_dir, "run.json"), {}), os.path.join(run_dir, "state.json")
-    spec, state = AGENTS[plan["agent"]], read_state(run_dir)
+    state = read_state(run_dir)
     state.update(pid=os.getpid(), pid_identity=identity(os.getpid()))
     state["spawn"]["creationflags"] = args.creationflags
     write_json(state_path, state)
     if os.path.exists(os.path.join(run_dir, "stop")):
         finalize(run_dir, KILL_EXIT, note="stop requested before agent startup")
+        return 1
+    try:
+        spec = load_route(plan["agent"])
+    except RouteError as exc:
+        finalize(run_dir, 127, new_acc(), note=str(exc))
         return 1
     with open(os.path.join(run_dir, "prompt.md"), "rb") as handle:
         prompt = handle.read()
@@ -1425,7 +1349,7 @@ def run_agent(args):
         reader.join(min(drain, 5) if stop else drain)
         with lock:
             extra = {"stream_incomplete": True} if reader.is_alive() else {}
-            final = finalize(run_dir, exit_code, dict(acc), note=note, extra=extra)
+            final = finalize(run_dir, exit_code, dict(acc), note=note, extra=extra, spec=spec)
     print(f"[finalize] {final.get('name')} state={final.get('state')} exit={exit_code}", flush=True)
     return 0
 
@@ -1510,8 +1434,8 @@ def cmd_kill(args):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0], epilog=f"Agents: {', '.join(AGENTS)}.",
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     epilog=f"Installed routes: {', '.join(discover_routes()) or 'none'}.")
     sub = parser.add_subparsers(dest="command", required=True)
     start = sub.add_parser("start", help="start one detached run")
     for flag in ("--cwd", "--agent", "--model", "--thinking", "--max-time", "--resume", "--schema", "--extra"):

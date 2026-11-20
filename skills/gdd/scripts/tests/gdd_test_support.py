@@ -15,6 +15,11 @@ from contextlib import contextmanager
 from pathlib import Path
 
 
+def route_fixture(agent, case="ok"):
+    skills = Path(__file__).absolute().parents[3]
+    return str(skills / f"gdd-route-{agent}" / "scripts" / "tests" / "fixtures" / f"{agent}.{case}.ndjson")
+
+
 def transient_windows_error(exc):
     winerror = getattr(exc, "winerror", None)
     # CRT open() can collapse a Windows sharing failure to EACCES without winerror.

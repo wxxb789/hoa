@@ -18,78 +18,13 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-RUNNER = os.path.join(os.path.dirname(HERE), "agent_run.py")
-STUB = os.path.join(HERE, "stub_agent.py")
-FIXTURES = os.path.join(HERE, "fixtures", "events")
-RESULT_SCHEMA = os.path.join(os.path.dirname(os.path.dirname(HERE)), "references", "stage-result.schema.json")
-STAGE_RESULT = {"stage": "implement", "verdict": "DONE", "summary": "done", "changed_files": [], "gates": [],
-                "findings": [], "unmet_criteria": []}
-IS_WINDOWS = os.name == "nt"
-sys.path.insert(0, os.path.dirname(RUNNER))
+from runner_cases import (HERE, IS_WINDOWS, PROMPT, RESULT_SCHEMA, RUNNER, STAGE_RESULT, STUB, RunnerCase,
+                          fold_fixture, read, write)
 import agent_run
 import gdd_process
 import stage_result
-from gdd_test_support import (check_locks, check_processes, cleanup_child, exited, finalized, own_identity,
-                              ready, remove_tree, stop_headless, wait_for_json)
-PROMPT = "Do the task.\nReply with the word done.\n"
-EXPECTED = {
-    "omp": {"answer": "done", "session_id": "00000000-0000-7000-8000-000000000001", "turns": 2, "tool_calls": 1,
-            "usage": {"input_tokens": 6, "output_tokens": 54, "cache_read_tokens": 13420, "total_tokens": 26962},
-            "cost_usd": 0.035599, "fail_error": "the last assistant message_end stopReason is 'error'"},
-    "dsh": {"answer": "done", "session_id": "dsh-session-0001", "turns": 1, "tool_calls": 2,
-            "usage": {"input_tokens": 250, "output_tokens": 40, "cache_read_tokens": 80, "total_tokens": 290},
-            "cost_usd": None, "fail_error": "the last final.reason.kind is 'aborted'"},
-    "codex": {"answer": json.dumps(STAGE_RESULT, separators=(",", ":")), "session_id": "00000000-0000-7000-8000-000000000002",
-              "turns": 1, "tool_calls": 1, "cost_usd": None,
-              "usage": {"input_tokens": 25409, "output_tokens": 72, "cache_read_tokens": 0, "total_tokens": 25481},
-              "fail_error": "the last turn event is 'turn.failed': {\"error\":{\"message\":\"The selected model"},
-    "claude": {"answer": json.dumps(STAGE_RESULT, separators=(",", ":")), "session_id": "00000000-0000-4000-8000-000000000004",
-               "turns": 3, "tool_calls": 1, "cost_usd": 0.236953,
-               "usage": {"input_tokens": 4, "output_tokens": 273, "cache_read_tokens": 44437, "total_tokens": 89232},
-               "fail_error": "the result event outcome is 'api_error': API Error: 400 Model"},
-    "pi": {"answer": "done", "session_id": "00000000-0000-7000-8000-000000000006", "turns": 2, "tool_calls": 1,
-           "usage": {"input_tokens": 6, "output_tokens": 28, "cache_read_tokens": 14695, "total_tokens": 29460},
-           "cost_usd": 0.0, "fail_error": "the last assistant message_end stopReason is 'error': ghc API error (400)"},
-    "opencode": {"answer": "done", "session_id": "ses_000000000000000000000001", "turns": 2, "tool_calls": 1,
-                 "usage": {"input_tokens": 6, "output_tokens": 23, "cache_read_tokens": 15605, "total_tokens": 31269},
-                 "cost_usd": 0.040889, "fail_error": "the last step_finish reason is 'error': Model unavailable"},
-}
-CODEX = ["exec", "--json", "-c", "approval_policy=never", "-c", "sandbox_mode=workspace-write",
-         "-c", "sandbox_workspace_write.network_access=true"]
-OPENCODE = ["run", "--standalone", "--format", "json", "--auto", "--title"]
-CLAUDE = ["-p", "--output-format", "stream-json", "--verbose", "--permission-mode", "bypassPermissions"]
-ARGV = {  # (new session, resumed session S1); the prompt follows for argv-prompt agents
-    "omp": (["-p", "--mode=json", "--approval-mode", "yolo"], ["-p", "--mode=json", "--approval-mode", "yolo", "-r", "S1"]),
-    "dsh": (["--profile", "headless", "--json", "--permission-mode", "workspace-write", "--approval-policy", "never", "-"],
-            ["--profile", "headless", "--json", "--session-id", "S1", "--permission-mode", "workspace-write",
-             "--approval-policy", "never", "-"]),
-    "codex": (CODEX + ["-"], CODEX[:1] + ["resume"] + CODEX[1:] + ["S1", "-"]),
-    "claude": (CLAUDE + ["--session-id", "<uuid>"], CLAUDE + ["--resume", "S1"]),
-    "pi": (["--mode", "json", "--no-approve"], ["--mode", "json", "--no-approve", "--session", "S1"]),
-    "opencode": (OPENCODE + ["opencode-new"], OPENCODE + ["opencode-resume", "-s", "S1"]),
-}
-ARGV_PROMPT = ("omp", "opencode")
-
-
-def uuid_masked(argv):
-    """The claude route pre-assigns a fresh uuid4 session id: mask a valid one so goldens can compare."""
-    index = argv.index("--session-id") + 1 if "--session-id" in argv else None
-    try:
-        fresh = index is not None and uuid.UUID(argv[index]).version == 4
-    except ValueError:
-        fresh = False
-    return argv[:index] + ["<uuid>"] + argv[index + 1:] if fresh else argv
-
-
-def read(path):
-    with open(path, encoding="utf-8") as handle:
-        return handle.read()
-
-
-def write(path, text):
-    with open(path, "w", encoding="utf-8", newline="\n") as handle:
-        handle.write(text)
+from gdd_test_support import (check_processes, cleanup_child, exited, finalized, own_identity, ready, remove_tree,
+                              route_fixture, wait_for_json)
 
 
 SCHEMA = json.loads(read(os.path.join(HERE, "state.schema.json")))
@@ -107,54 +42,6 @@ def force_kill(pid, recorded):
 def different_identity(recorded):
     source, timestamp = recorded.split(":")
     return f"{source}:{int(timestamp) + 1}"
-
-
-class RunnerCase(unittest.TestCase):
-    def setUp(self):
-        self.tmp = tempfile.mkdtemp(prefix="agent-run-")
-        self.addCleanup(remove_tree, self.tmp)
-        self.addCleanup(check_locks, self.tmp)
-        self.addCleanup(lambda: stop_headless(self.root))
-        self.children = []
-        self.addCleanup(cleanup_child, self.children)
-        self.root = os.path.join(self.tmp, "runs")
-        self.work = os.path.join(self.tmp, "work")
-        os.makedirs(self.work)
-        self.record = os.path.join(self.tmp, "record.json")
-        self.prompt = os.path.join(self.tmp, "prompt.md")
-        write(self.prompt, PROMPT)
-        drop = ("GDD_", "STUB_", "DSH_", "OMP_")
-        self.env = {k: v for k, v in os.environ.items() if not k.startswith(drop)}
-        self.env.update(GDD_RUN_ROOT=self.root, XDG_CONFIG_HOME=os.path.join(self.tmp, "config"),
-                        GDD_RUN_DETACH="windows" if IS_WINDOWS else "setsid",
-                        **{f"{agent.upper()}_BIN": STUB for agent in EXPECTED}, STUB_RECORD=self.record,
-                        PYTHONDONTWRITEBYTECODE="1")
-
-    def cli(self, *args, env=None):
-        return gdd_process.run([sys.executable, "-B", RUNNER, *args], capture_output=True, text=True,
-                              env={**self.env, **(env or {})}, cwd=self.work, timeout=90)
-
-    def start(self, name, agent="omp", fixture="ok", *args, env=None, expect=0):
-        self.record = os.path.join(self.tmp, f"record-{uuid.uuid4().hex}.json")
-        env = {"STUB_FIXTURE": os.path.join(FIXTURES, f"{agent}.{fixture}.ndjson"),
-               "STUB_RECORD": self.record, **(env or {})}
-        proc = self.cli("start", "--name", name, "--prompt", self.prompt, "--cwd", self.work, "--agent", agent,
-                        *args, env=env)
-        self.assertEqual(proc.returncode, expect, proc.stdout + proc.stderr)
-        return proc
-
-    def run_dir(self, name):
-        return agent_run.newest_first(glob.glob(os.path.join(self.root, "*", name)))[0]
-
-    def state(self, name):
-        return wait_for_json(Path(self.run_dir(name)) / "state.json", bool, time.monotonic() + 5)
-
-    def finished(self, name, seconds=30.0):
-        run_dir = Path(self.run_dir(name))
-        return wait_for_json(run_dir / "state.json", lambda s: finalized(run_dir, s), time.monotonic() + seconds)
-
-    def recorded(self):
-        return wait_for_json(self.record, bool, time.monotonic() + 10)
 
 
 class ContractTests(RunnerCase):
@@ -175,7 +62,7 @@ agent_run.write_json = paused_write
 sys.exit(agent_run.main())
 """
         argv = ("start", "--name", "race", "--prompt", self.prompt)
-        fixture = {"STUB_FIXTURE": os.path.join(FIXTURES, "omp.ok.ndjson"), "STUB_HANG": "1"}
+        fixture = {"STUB_FIXTURE": route_fixture("omp"), "STUB_HANG": "1"}
         first = gdd_process.popen([sys.executable, "-B", "-c", wrapper, RUNNER, *argv],
                                   stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                   text=True, encoding="utf-8", env={**self.env, **fixture}, cwd=self.work)
@@ -189,65 +76,40 @@ sys.exit(agent_run.main())
                          stdout + stderr + second.stdout + second.stderr)
         self.assertEqual(list(Path(self.root).glob("*/race.prev-*")), [])
 
-    def test_t1_argv_golden_new_and_resume(self):
+    def test_t1_new_and_resume_process_contract_for_every_installed_route(self):
         metrics = ("session_id", "turns", "tool_calls", "usage", "cost_usd")
-        for agent, (new, resumed) in ARGV.items():
-            for label, extra, golden in (("new", (), new), ("resume", ("--resume", "S1"), resumed)):
+        for agent in agent_run.discover_routes():
+            route = agent_run.load_route(agent)
+            expected = fold_fixture(route, "ok")
+            for label, extra in (("new", ()), ("resume", ("--resume", "S1"))):
                 with self.subTest(agent=agent, session=label):
                     name = f"{agent}-{label}"
                     self.start(name, agent, "ok", "--max-time", "10m", *extra)
                     record = self.recorded()
-                    prompt_in_argv = agent in ARGV_PROMPT
-                    self.assertEqual(uuid_masked(record["argv"]), golden + ([PROMPT] if prompt_in_argv else []))
+                    run_dir = Path(self.run_dir(name))
+                    plan = json.loads(read(run_dir / "run.json"))
+                    prompt_in_argv = route.prompt == "argv"
+                    self.assertEqual(record["argv"], plan["argv"][2:] + ([PROMPT] if prompt_in_argv else []))
                     self.assertEqual(record["stdin"], "" if prompt_in_argv else PROMPT)
                     self.assertEqual(os.path.realpath(record["cwd"]), os.path.realpath(self.work))
                     state = self.finished(name)
-                    want = EXPECTED[agent]
                     self.assertEqual((state["state"], state["exit"]), ("done", 0), state)
-                    if label == "new":
-                        self.assertEqual(stage_result.error(state, SCHEMA), "")
-                        self.assertEqual({k: state[k] for k in metrics}, {k: want[k] for k in metrics})
-                        run_dir = Path(self.run_dir(name))
-                        self.assertEqual(read(run_dir / "answer.md"), want["answer"])
-                        self.assertEqual(read(run_dir / "exit.code").strip(), "0")
-                        answer = self.cli("answer", name)
-                        self.assertEqual((answer.returncode, answer.stdout), (0, want["answer"]))
-
-    def test_legacy_start_flags(self):
-        self.start("omp-old-flags", "omp", "ok", "--backend", "tmux", "--profile", "with spaces")
-        self.assertEqual(self.recorded()["argv"][-3:], ["--profile", "with spaces", PROMPT])
-        self.finished("omp-old-flags")
-        self.start("dsh-old-flags", "dsh", "ok", "--session-id", "S1")
-        self.assertEqual(self.recorded()["argv"], ARGV["dsh"][1])
-        self.finished("dsh-old-flags")
-
-    def test_t1_model_thinking_and_extra_reach_the_agent(self):
-        tails = {"omp": ["--model", "m1", "--thinking", "high", "--no-tools", "-x", PROMPT],
-                 "codex": ["-m", "m1", "-c", "model_reasoning_effort=high", "--no-tools", "-x", "-"],
-                 "claude": ["--model", "m1", "--effort", "high", "--no-tools", "-x"],
-                 "pi": ["--model", "m1", "--thinking", "high", "--no-tools", "-x"],
-                 "opencode": ["-m", "m1#high", "--no-tools", "-x", PROMPT]}
-        for agent, tail in tails.items():
-            with self.subTest(agent=agent):
-                self.start(f"flags-{agent}", agent, "ok", "--model", "m1", "--thinking", "high", "--extra", "--no-tools -x")
-                self.assertEqual(self.recorded()["argv"][-len(tail):], tail)
-                self.finished(f"flags-{agent}")
+                    self.assertEqual(stage_result.error(state, SCHEMA), "")
+                    self.assertEqual({key: state[key] for key in metrics}, {key: expected[key] for key in metrics})
+                    self.assertEqual(read(run_dir / "exit.code").strip(), "0")
+                    answer = self.cli("answer", name)
+                    self.assertEqual(read(run_dir / "answer.md"), expected["answer"])
+                    self.assertEqual((answer.returncode, answer.stdout), (0, expected["answer"]))
 
     def test_t3_exit_zero_without_success_marker_fails(self):
-        for agent, want in EXPECTED.items():
+        for agent in agent_run.discover_routes():
             with self.subTest(agent=agent):
                 self.start(f"fail-{agent}", agent, "fail")
                 state = self.finished(f"fail-{agent}")
                 self.assertEqual((state["state"], state["exit"]), ("failed", 0))
-                self.assertIn(want["fail_error"], state["error"])
+                self.assertIn(agent_run.load_route(agent).marker, state["error"])
                 self.assertEqual(state["errors"], [state["error"]])
                 self.assertEqual(stage_result.error(state, SCHEMA), "")
-        aborted = os.path.join(self.tmp, "pi-aborted.ndjson")  # pi documents exit 0 on an aborted run
-        write(aborted, read(os.path.join(FIXTURES, "pi.ok.ndjson")).replace('"aborted": false', '"aborted": true'))
-        self.start("aborted-pi", "pi", env={"STUB_FIXTURE": aborted})
-        state = self.finished("aborted-pi")
-        self.assertEqual((state["state"], state["exit"]), ("failed", 0))
-        self.assertIn("agent_settled.aborted is true", state["error"])
 
     def test_t4_exit_codes(self):
         for code, verdict in ((3, "failed"), (130, "killed"), (143, "killed")):
@@ -344,7 +206,7 @@ sys.exit(agent_run.main())
     def check_dispatcher_umask(self, mode):
         started = gdd_process.run(
             [sys.executable, "-B", RUNNER, "start", "--name", "umask", "--prompt", self.prompt],
-            env={**self.env, "GDD_RUN_DETACH": mode, "STUB_FIXTURE": os.path.join(FIXTURES, "omp.ok.ndjson")},
+            env={**self.env, "GDD_RUN_DETACH": mode, "STUB_FIXTURE": route_fixture("omp")},
             cwd=self.work, umask=0o027, capture_output=True, text=True, timeout=30)
         self.assertEqual(started.returncode, 0, started.stderr)
         self.assertEqual(self.finished("umask")["state"], "done")
@@ -440,11 +302,6 @@ sys.exit(agent_run.main())
         cases = [
             ((), {"OMP_BIN": os.path.join(self.tmp, "nope")}, "agent binary not found: OMP_BIN="),
             (("--name", ".."), {}, "does not sanitize"),
-            (("--agent", "dsh", "--model", "m"), {}, "--model is not supported on the DSH route"),
-            (("--agent", "dsh", "--thinking", "high"), {}, "--thinking is not supported on the DSH route"),
-            (("--agent", "dsh"), {"DSH_APPROVAL_POLICY": "on-request"}, "DSH_APPROVAL_POLICY='on-request' is refused"),
-            (("--agent", "opencode", "--thinking", "high"), {}, "--thinking on the opencode route needs --model"),
-            (("--agent", "nobody"), {}, "unknown agent 'nobody'"),
             (("--max-time", "soon"), {}, "--max-time must be"),
         ]
         if IS_WINDOWS:
@@ -539,17 +396,9 @@ sys.exit(agent_run.main())
             self.assertEqual(state["state"], "done")
             peer.sendall(b"R")
 
-    def test_t13_dsh_env_scrub(self):
-        scrubbed = {"DSH_PROFILE": "caller", "DSH_PROFILE_DIR": "/caller", "DSH_SESSION_ID": "caller-session"}
-        self.start("scrub", "dsh", env={**scrubbed, "DSH_KEEP": "1"})
-        seen = set(self.recorded()["env"])
-        self.assertIn("DSH_KEEP", seen)
-        self.assertFalse(seen & set(scrubbed), seen)
-        self.finished("scrub")
-
     def omp_fixture(self, answer):
         """omp.ok with every assistant message_end answering `answer`."""
-        events = [json.loads(line) for line in read(os.path.join(FIXTURES, "omp.ok.ndjson")).splitlines()
+        events = [json.loads(line) for line in read(route_fixture("omp")).splitlines()
                   if line.strip() and not line.startswith("#")]
         for event in events:
             if event["type"] == "message_end" and event["message"]["role"] == "assistant":
@@ -558,33 +407,7 @@ sys.exit(agent_run.main())
         write(path, "".join(json.dumps(event) + "\n" for event in events))
         return path
 
-    def reported_fixture(self, agent, report):
-        """<agent>.ok with an assistant `report` message before the structured result."""
-        lines = read(os.path.join(FIXTURES, f"{agent}.ok.ndjson")).splitlines()
-        events = [json.loads(line) for line in lines if line.strip() and not line.startswith("#")]
-        message = ({"type": "item.completed", "item": {"id": "item_r", "type": "agent_message", "text": report}}
-                   if agent == "codex" else
-                   {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "text", "text": report}]}})
-        events.insert(len(events) - (2 if agent == "codex" else 3), message)
-        path = os.path.join(self.tmp, f"{agent}-report.ndjson")
-        write(path, "".join(json.dumps(event) + "\n" for event in events))
-        return path
-
     def test_t14_structured_result(self):
-        native = {"codex": ("--output-schema", RESULT_SCHEMA), "claude": ("--json-schema", None)}
-        report = "## Findings\nnothing material"
-        for agent, (flag, value) in native.items():
-            with self.subTest(agent=agent):
-                self.start(f"native-{agent}", agent, "ok", "--schema", RESULT_SCHEMA,
-                           env={"STUB_FIXTURE": self.reported_fixture(agent, report)})
-                argv = self.recorded()["argv"]
-                carried = argv[argv.index(flag) + 1]
-                self.assertEqual(carried if value else json.loads(carried), value or json.loads(read(RESULT_SCHEMA)))
-                state = self.finished(f"native-{agent}")
-                self.assertEqual((state["state"], state["result"]), ("done", "valid"), state)
-                self.assertEqual(json.loads(read(os.path.join(self.run_dir(f"native-{agent}"), "result.json"))), STAGE_RESULT)
-                self.assertEqual(read(os.path.join(self.run_dir(f"native-{agent}"), "answer.md")),
-                                 f"{report}\n\n{EXPECTED[agent]['answer']}")
         bad = {**STAGE_RESULT, "gates": [{"command": "make test", "exit_code": "0", "counts": None}]}
         cases = (("fenced", f"Report.\n```json\n{json.dumps(STAGE_RESULT)}\n```\n", "valid", None),
                  ("invalid", f"```json\n{json.dumps(bad)}\n```", "invalid",
@@ -604,7 +427,7 @@ sys.exit(agent_run.main())
     @unittest.skipIf(IS_WINDOWS or not shutil.which("bash"), "the gdd-route-omp forwarder is bash")
     def test_t15_omp_headless_forwarder_resolves_the_sibling_runner(self):
         forwarder = os.path.join(HERE, "..", "..", "..", "gdd-route-omp", "scripts", "omp-run.sh")
-        env = {**self.env, "STUB_FIXTURE": os.path.join(FIXTURES, "omp.ok.ndjson"), "GDD_AGENT": "dsh"}
+        env = {**self.env, "STUB_FIXTURE": route_fixture("omp"), "GDD_AGENT": "dsh"}
         proc = gdd_process.run(["bash", forwarder, "start", "--name", "fwd", "--prompt", self.prompt, "--cwd", self.work],
                               capture_output=True, text=True, env=env, timeout=90)
         self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
@@ -832,7 +655,7 @@ class RunnerMechanicsTests(unittest.TestCase):
             self.assertEqual(len(stderr.getvalue().splitlines()), 1)
 
     def test_runner_retries_progress_when_replace_and_in_place_write_fail(self):
-        fixture = os.path.join(FIXTURES, "omp.ok.ndjson")
+        fixture = route_fixture("omp")
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp)
             agent_run.write_json(path / "state.json", {"name": "progress", "spawn": {}})
