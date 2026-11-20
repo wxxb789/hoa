@@ -17,9 +17,9 @@ from gdd_test_support import finalized, stop_headless, wait_for_json
 
 @pytest.mark.skipif(not (agent_run.SKILLS_ROOT.parent / "scripts" / "check_contract_graph.py").is_file(),
                     reason="hoa source checkout only")
-def test_checkout_has_all_six_routes():
+def test_checkout_has_all_eight_routes():
     installed = agent_run.discover_routes()
-    assert set(installed) == {"omp", "dsh", "codex", "claude", "pi", "opencode"}
+    assert set(installed) == {"omp", "dsh", "codex", "claude", "pi", "opencode", "omo", "copilot"}
     for name in installed:
         assert agent_run.load_route(name).name == name
 
@@ -85,7 +85,8 @@ def layout_runner(tmp_path, mode, *, with_route=True):
 class MissingRouteTests(RunnerCase):
     def test_missing_route_start_exits_before_creating_a_run(self):
         runner = layout_runner(Path(self.tmp), "copy", with_route=False)
-        for route, package in (("omp", "gdd-route-omp"), ("claude", "gdd-route-cc")):
+        for route, package in (("omp", "gdd-route-omp"), ("claude", "gdd-route-cc"),
+                               ("omo", "gdd-route-omo"), ("copilot", "gdd-route-copilot")):
             result = gdd_process.run([sys.executable, "-B", str(runner), "start",
                                       "--name", "missing", "--prompt", self.prompt],
                                      env={**self.env, "GDD_AGENT": route}, cwd=self.work,
@@ -97,6 +98,19 @@ class MissingRouteTests(RunnerCase):
             self.assertIn(f"npx skills add wxxb789/hoa -s {package}", result.stderr)
             self.assertIn(f"npx skills add wxxb789/hoa -g -s {package}", result.stderr)
             self.assertFalse(Path(self.root).exists())
+
+    @pytest.mark.skipif(os.name != "nt", reason="Windows batch shims only")
+    def test_native_routes_refuse_batch_shims(self):
+        for route in ("omo", "copilot"):
+            shim = Path(self.work) / f"{route}.cmd"
+            shim.write_text("@exit /b 99\n", encoding="utf-8")
+            for override in ("", str(shim)):
+                with self.subTest(route=route, override=bool(override)):
+                    result = self.cli("start", "--agent", route, "--name", "shim", "--prompt", self.prompt,
+                                      env={f"{route.upper()}_BIN": override, "PATH": self.work})
+                    self.assertEqual(result.returncode, 1)
+                    self.assertIn(f"{route.upper()}_BIN", result.stderr)
+                    self.assertFalse(Path(self.root).exists())
 
 
 @pytest.mark.parametrize("mode", ["copy", "symlink"] + (["junction"] if os.name == "nt" else []))

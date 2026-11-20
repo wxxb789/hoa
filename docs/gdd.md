@@ -25,6 +25,8 @@ does not install a route.
 | Claude Code | `claude` | `gdd-route-cc` | Hidden |
 | Pi | `pi` | `gdd-route-pi` | Hidden |
 | OpenCode | `opencode` | `gdd-route-opencode` | Hidden |
+| Omo | `omo` | `gdd-route-omo` | Hidden |
+| GitHub Copilot | `copilot` | `gdd-route-copilot` | Hidden |
 
 This table describes the separate-route design. Use the
 [generated install guide](../index.md#install) to see which packages are

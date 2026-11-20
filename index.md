@@ -43,7 +43,9 @@ targets:  runtime-agnostic | repo-only |
 | gdd | skill | software-development,work-management | runtime-agnostic | `skills/gdd/` | goal contract → agent-authored stages → operator-run gates → scripted merge gate → resumable ledger; ships `gdd.py`, `delivery-state.py`, `pr-merge-check.py` |
 | gdd-route-cc | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-cc/` | Claude Code stream-JSON route with session resume and native JSON schema |
 | gdd-route-codex | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-codex/` | Codex exec and resume route with native JSON schema and integrations off by default |
+| gdd-route-copilot | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-copilot/` | GitHub Copilot CLI prompt and JSONL result route with session resume |
 | gdd-route-dsh | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-dsh/` | hidden DeepSeek Harness headless route for gdd: configuration, session handling, and recovery |
+| gdd-route-omo | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-omo/` | Omo stdin and Senpi JSON event route with session resume |
 | gdd-route-omp | skill | software-development,work-management | pi | `skills/gdd-route-omp/` | detached runner for long `omp -p` runs; polled completion, session-id recovery (requires skill `gdd`) |
 | gdd-route-opencode | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-opencode/` | OpenCode standalone server route with session resume and model variant selection |
 | gdd-route-pi | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-pi/` | Pi stdin and JSON event route with session resume |
@@ -103,7 +105,9 @@ below. A skill without a row has no dependencies: `npx skills add wxxb789/hoa -g
 | gdd | delegated-work-acceptance | `npx skills add wxxb789/hoa -g -s gdd -s delegated-work-acceptance -y` |
 | gdd-route-cc | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-cc -s delegated-work-acceptance -s gdd -y` |
 | gdd-route-codex | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-codex -s delegated-work-acceptance -s gdd -y` |
+| gdd-route-copilot | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-copilot -s delegated-work-acceptance -s gdd -y` |
 | gdd-route-dsh | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-dsh -s delegated-work-acceptance -s gdd -y` |
+| gdd-route-omo | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-omo -s delegated-work-acceptance -s gdd -y` |
 | gdd-route-omp | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-omp -s delegated-work-acceptance -s gdd -y` |
 | gdd-route-opencode | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-opencode -s delegated-work-acceptance -s gdd -y` |
 | gdd-route-pi | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-pi -s delegated-work-acceptance -s gdd -y` |
@@ -114,7 +118,7 @@ Without Hermes, skip the `hermes-*` skills: they only operate a Hermes install, 
 links to them. Install everything else with:
 
 ```bash
-npx skills add wxxb789/hoa -g -s agent-harness-settings-parity -s agent-operating-contract-evolution -s ai-coding-agent-delegation -s contract-bound-deliverables -s cross-agent-repair-routing -s define-goal -s delegated-work-acceptance -s discord-rich-message -s dotnet-repo-workflow -s evidence-backed-analytical-writing -s evidence-boundary-discipline -s gdd -s gdd-route-cc -s gdd-route-codex -s gdd-route-dsh -s gdd-route-omp -s gdd-route-opencode -s gdd-route-pi -s ghc-decisions -s ghc-search -s git-auto-sync-pipelines -s harness-engineering -s hoa-practice-retro -s hoa-repo-reckoning -s hoa-skill-create -s hoa-skill-curate -s hoa-skill-port -s hoa-skill-review -s hoa-skill-set-audit -s measurement-campaign-evidence -s official-document-verification -s package-release-verification -s project-phase-closeout -s report-claim-audit -s research-stream-consolidation -s review-revision-candidates -s spec-convergence -s structural-validity-gates -s tmux-agent-control -s writing -y
+npx skills add wxxb789/hoa -g -s agent-harness-settings-parity -s agent-operating-contract-evolution -s ai-coding-agent-delegation -s contract-bound-deliverables -s cross-agent-repair-routing -s define-goal -s delegated-work-acceptance -s discord-rich-message -s dotnet-repo-workflow -s evidence-backed-analytical-writing -s evidence-boundary-discipline -s gdd -s gdd-route-cc -s gdd-route-codex -s gdd-route-copilot -s gdd-route-dsh -s gdd-route-omo -s gdd-route-omp -s gdd-route-opencode -s gdd-route-pi -s ghc-decisions -s ghc-search -s git-auto-sync-pipelines -s harness-engineering -s hoa-practice-retro -s hoa-repo-reckoning -s hoa-skill-create -s hoa-skill-curate -s hoa-skill-port -s hoa-skill-review -s hoa-skill-set-audit -s measurement-campaign-evidence -s official-document-verification -s package-release-verification -s project-phase-closeout -s report-claim-audit -s research-stream-consolidation -s review-revision-candidates -s spec-convergence -s structural-validity-gates -s tmux-agent-control -s writing -y
 ```
 
 After a release that renames or retires skills, remove the names this repo no longer ships

@@ -1,0 +1,8 @@
+{"type":"session.start","data":{"sessionId":"00000000-0000-7000-8000-000000000001","copilotVersion":"1.0.114"}}
+{"type":"user.message","data":{"content":"Reply with exactly PROBE_OK. Do not use tools."}}
+{"type":"assistant.turn_start","data":{"turnId":"0"}}
+{"type":"assistant.message_delta","ephemeral":true,"data":{"deltaContent":"PRO"}}
+{"type":"assistant.message","data":{"content":"PROBE_OK","phase":"final_answer","toolRequests":[]}}
+{"type":"assistant.turn_end","data":{"turnId":"0"}}
+{"type":"assistant.idle","ephemeral":true,"data":{}}
+{"type":"result","exitCode":0,"sessionId":"00000000-0000-7000-8000-000000000001"}

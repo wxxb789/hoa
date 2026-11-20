@@ -16,11 +16,14 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
   and both send results; test it against an isolated stub.
 - Make scheduled Git sync fail visibly and verify branch, operation state and
   publication scope before reporting success.
+- Add hidden Omo and GitHub Copilot CLI routes (1) with JSON event folding
+  and session resume; gdd (18) launches both without Windows batch shims.
 
 ## 2026-11-20
 
 - Keep Pi necessity trial homes, agent profiles, and session paths inside each trial,
   with natural skill discovery limited to the isolated installation.
+- See [2026-11-21](#2026-11-21) for the Omo and GitHub Copilot follow-up to the GDD route split below.
 - Rewrite all 37 model-visible skill descriptions for clearer routing; see the
   [held-out measurement](evals/results/2026-11-20-description-distinctiveness.md).
 - Keep recommendations based on recent work in `hoa-skill-curate` only; keep `hoa-skill-set-audit` report-only.

@@ -1,0 +1,3 @@
+{"type":"session.start","data":{"sessionId":"00000000-0000-7000-8000-000000000001","copilotVersion":"1.0.114"}}
+{"type":"assistant.message","data":{"content":"PROBE_OK","phase":"final_answer","toolRequests":[]}}
+{"type":"assistant.turn_end","data":{"turnId":"0"}}

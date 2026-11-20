@@ -5,7 +5,7 @@ description: >-
   merge, then branch the next goal. When asked to start the next goal or resume delivery, use fresh
   authoring sessions, operator-run gates and a saved stage ledger. Not for define-goal.
 metadata:
-  revision: "17"
+  revision: "18"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "goal contract → agent-authored stages → operator-run gates → scripted merge gate → resumable ledger; ships `gdd.py`, `delivery-state.py`, `pr-merge-check.py`"

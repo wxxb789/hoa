@@ -41,7 +41,9 @@ targets:  runtime-agnostic | repo-only |
 | gdd | skill | software-development,work-management | runtime-agnostic | `skills/gdd/` | 目标契约 → agent 分阶段产出 → operator 验收 → 脚本化合并门禁 → 可续跑账本；随附 `gdd.py`、`delivery-state.py`、`pr-merge-check.py` |
 | gdd-route-cc | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-cc/` | Claude Code stream-JSON 路由，支持会话恢复和原生 JSON schema |
 | gdd-route-codex | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-codex/` | Codex exec 与 resume 路由，支持原生 JSON schema，默认关闭集成 |
+| gdd-route-copilot | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-copilot/` | GitHub Copilot CLI prompt 与 JSONL 结果路由，支持会话恢复 |
 | gdd-route-dsh | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-dsh/` | gdd 的隐藏 DeepSeek Harness headless route：配置、会话管理和恢复 |
+| gdd-route-omo | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-omo/` | Omo stdin 与 Senpi JSON 事件路由，支持会话恢复 |
 | gdd-route-omp | skill | software-development,work-management | pi | `skills/gdd-route-omp/` | 脱离会话的 runner 跑 `omp -p` 长任务；轮询完成、按 session id 恢复（需要 skill `gdd`） |
 | gdd-route-opencode | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-opencode/` | OpenCode 独立服务器路由，支持会话恢复和模型变体选择 |
 | gdd-route-pi | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-pi/` | Pi stdin 与 JSON 事件路由，支持会话恢复 |
@@ -101,7 +103,9 @@ targets:  runtime-agnostic | repo-only |
 | gdd | delegated-work-acceptance | `npx skills add wxxb789/hoa -g -s gdd -s delegated-work-acceptance -y` |
 | gdd-route-cc | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-cc -s delegated-work-acceptance -s gdd -y` |
 | gdd-route-codex | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-codex -s delegated-work-acceptance -s gdd -y` |
+| gdd-route-copilot | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-copilot -s delegated-work-acceptance -s gdd -y` |
 | gdd-route-dsh | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-dsh -s delegated-work-acceptance -s gdd -y` |
+| gdd-route-omo | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-omo -s delegated-work-acceptance -s gdd -y` |
 | gdd-route-omp | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-omp -s delegated-work-acceptance -s gdd -y` |
 | gdd-route-opencode | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-opencode -s delegated-work-acceptance -s gdd -y` |
 | gdd-route-pi | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-pi -s delegated-work-acceptance -s gdd -y` |
@@ -112,7 +116,7 @@ targets:  runtime-agnostic | repo-only |
 安装其余全部 skill：
 
 ```bash
-npx skills add wxxb789/hoa -g -s agent-harness-settings-parity -s agent-operating-contract-evolution -s ai-coding-agent-delegation -s contract-bound-deliverables -s cross-agent-repair-routing -s define-goal -s delegated-work-acceptance -s discord-rich-message -s dotnet-repo-workflow -s evidence-backed-analytical-writing -s evidence-boundary-discipline -s gdd -s gdd-route-cc -s gdd-route-codex -s gdd-route-dsh -s gdd-route-omp -s gdd-route-opencode -s gdd-route-pi -s ghc-decisions -s ghc-search -s git-auto-sync-pipelines -s harness-engineering -s hoa-practice-retro -s hoa-repo-reckoning -s hoa-skill-create -s hoa-skill-curate -s hoa-skill-port -s hoa-skill-review -s hoa-skill-set-audit -s measurement-campaign-evidence -s official-document-verification -s package-release-verification -s project-phase-closeout -s report-claim-audit -s research-stream-consolidation -s review-revision-candidates -s spec-convergence -s structural-validity-gates -s tmux-agent-control -s writing -y
+npx skills add wxxb789/hoa -g -s agent-harness-settings-parity -s agent-operating-contract-evolution -s ai-coding-agent-delegation -s contract-bound-deliverables -s cross-agent-repair-routing -s define-goal -s delegated-work-acceptance -s discord-rich-message -s dotnet-repo-workflow -s evidence-backed-analytical-writing -s evidence-boundary-discipline -s gdd -s gdd-route-cc -s gdd-route-codex -s gdd-route-copilot -s gdd-route-dsh -s gdd-route-omo -s gdd-route-omp -s gdd-route-opencode -s gdd-route-pi -s ghc-decisions -s ghc-search -s git-auto-sync-pipelines -s harness-engineering -s hoa-practice-retro -s hoa-repo-reckoning -s hoa-skill-create -s hoa-skill-curate -s hoa-skill-port -s hoa-skill-review -s hoa-skill-set-audit -s measurement-campaign-evidence -s official-document-verification -s package-release-verification -s project-phase-closeout -s report-claim-audit -s research-stream-consolidation -s review-revision-candidates -s spec-convergence -s structural-validity-gates -s tmux-agent-control -s writing -y
 ```
 
 某次发布改名或退役了 skill 时：移除本仓库已不再提供的名称（由 `scripts/retired_skills.toml`

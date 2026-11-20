@@ -125,7 +125,9 @@ jobs:
           skills/gdd/scripts/tests/test_route_loading.py
           skills/gdd-route-cc/scripts/tests
           skills/gdd-route-codex/scripts/tests
+          skills/gdd-route-copilot/scripts/tests
           skills/gdd-route-dsh/scripts/tests
+          skills/gdd-route-omo/scripts/tests
           skills/gdd-route-omp/scripts/tests
           skills/gdd-route-opencode/scripts/tests
           skills/gdd-route-pi/scripts/tests

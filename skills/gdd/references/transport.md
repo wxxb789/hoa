@@ -92,6 +92,8 @@ live run. Real agent CLI smoke is opt-in via `GDD_SMOKE_AGENTS`.
 `<AGENT>_BIN` override takes precedence over PATH. A `.py` runs through the
 current interpreter; a Windows batch shim uses `%COMSPEC%` and is refused for
 metacharacters (`" & | < > ^ ( ) % !` or newlines).
+The Omo and Copilot routes require a native executable on Windows: set
+`OMO_BIN` or `COPILOT_BIN` if PATH would only find a batch shim.
 
 The runner discovers `gdd-route-*/scripts/route.py` beside the lexical path of
 the installed `gdd` skill. If the harness supplies the resolved path but a route
@@ -114,6 +116,8 @@ Route documentation (configuration, input, and exit-0 success marker):
 - [gdd-route-cc](https://github.com/wxxb789/hoa/blob/main/skills/gdd-route-cc/SKILL.md)
 - [gdd-route-pi](https://github.com/wxxb789/hoa/blob/main/skills/gdd-route-pi/SKILL.md)
 - [gdd-route-opencode](https://github.com/wxxb789/hoa/blob/main/skills/gdd-route-opencode/SKILL.md)
+- [gdd-route-omo](https://github.com/wxxb789/hoa/blob/main/skills/gdd-route-omo/SKILL.md)
+- [gdd-route-copilot](https://github.com/wxxb789/hoa/blob/main/skills/gdd-route-copilot/SKILL.md)
 
 - **End states:** stop is killed/143; signal exit codes are kept
   (`130/137/143/-2/-9/-15`). Max time ends the run as failed/124 with a
