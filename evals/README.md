@@ -28,6 +28,10 @@ uv run --script evals/run_necessity_eval.py evals/tasks/claim-audit.json --runti
 - Each repeat runs all three arms, reversing order on every other repeat.
   `--repeats` defaults to 3. Use `--timeout` on either runtime; Claude also accepts
   `--max-turns` and `--max-budget-usd`. Use matching limits within a comparison.
+- `--max-total-tokens N` stops starting trials once their cumulative CLI-reported
+  tokens reach the positive limit. There is no cap by default. A running trial
+  can exceed the remaining budget, and unreported usage does not count toward
+  the cap. The report lists each skipped arm and repeat.
 
 Each trial gets a fresh workspace, HOME/USERPROFILE, runtime profiles, XDG
 homes, APPDATA/LOCALAPPDATA and temp directories. Claude uses strict empty MCP
@@ -47,9 +51,13 @@ a successful `Skill` result for the named skill or `Read` of the installed
 `SKILL.md` is load evidence. For Codex, look for `item.completed` with
 `item.type: command_execution`, successful exit, the installed path in the
 command, and the skill header in `aggregated_output`. Catalog listings, plain
-mentions and untraced automatic injection do not count. A baseline tool call
-touching a skill path invalidates the run even if the call fails. This is a
-tool-trace check, not an OS-level file-access audit.
+mentions and untraced automatic injection do not establish a load. A control
+trial is contaminated by a `Skill` call or a read attempt targeting the installed
+skill copy, the task skill's catalog directory, or a `skills` location under the
+isolated home or config directories. Paths inside the fixture workspace do not
+count. Relative paths are interpreted from the workspace. This tool-trace check
+is necessary for a valid comparison, but is not a full file-access audit; it
+does not reconstruct all shell behavior or observe untraced reads.
 
 Run only trusted tasks, skills, executables and providers in an unmanaged
 environment. Profile and tool isolation do not constrain an arbitrary native
@@ -65,10 +73,16 @@ deviation (undefined for one repeat), mean gaps, and `pass^k` (all checks passed
 in all repeats). Invalid arms have no aggregate score or `pass^k`. The report
 also flags checks that are non-discriminating or flip within an arm.
 
+For field checks, the judge parses bare JSON, then the last JSON-labeled
+fenced block if it contains valid JSON, then the last complete top-level JSON
+object in the reply. Each trial records `answer_format` as `bare`, `fenced`,
+`extracted`, or `none`. Field checks require an object with the expected
+fields; file checks are unchanged.
+
 The runner records [the frozen thresholds](necessity-thresholds.json) or an
 explicit `--thresholds FILE`. Rules are evaluated in this order:
 
-1. **inconclusive** if any trial is invalid (including control contamination),
+1. **inconclusive** if any trial is skipped or invalid (including control contamination),
    no load was observed, or the skill load rate is below `min_natural_load_rate`.
    In forced mode, every skill trial must be valid regardless of this threshold.
 2. **skill-wins** if the skill meets `min_pass_rate` and its mean exceeds each
@@ -83,7 +97,7 @@ Use `--results DIR` to avoid overwriting a comparison. Review response and
 artifact excerpts for secrets before committing. Raw traces and stderr are
 not persisted. Token counts are CLI-reported; Codex cached input and reasoning
 output are subsets, not added a second time. Claude's CLI cost is not an invoice.
-Exit 1 indicates invalid trials; exit 2 indicates setup failure. Otherwise
+Exit 1 indicates skipped or invalid trials; exit 2 indicates setup failure. Otherwise
 inspect the verdict, including natural comparisons with unobserved treatment.
 
 ## Author a task
@@ -96,7 +110,7 @@ inspect the verdict, including natural comparisons with unobserved treatment.
    short substitute, not the answer key). Freeze both instructions and the
    rubric before running.
 3. Set a nonempty `rubric` keyed by check ID. Checks are
-   `{"field":"answer","equals":42}` against a top-level field of a bare JSON response,
+   `{"field":"answer","equals":42}` against a top-level field of the JSON answer,
    or `{"file":"report.md","contains":"expected text"}` against a relative UTF-8
    artifact no larger than 64 KiB. File checks enable Claude's Write tool.
 4. Shells are off by default. Set `"shell": true` to enable them for both

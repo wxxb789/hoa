@@ -53,9 +53,38 @@ assert HAS_SKILL == has_skill
 access = (has_skill and LOAD) or (not has_skill and LEAK_BASELINE) or FAKE_LOAD
 answer = json.dumps({"answer": SCORE, "cwd": str(Path.cwd()),
                      "secret": "private-token private-header" if RUNTIME == "codex" else ""})
+if RESPONSE is not None:
+    answer = RESPONSE
+    Path("artifact.txt").write_text("expected artifact", encoding="utf-8")
+if not HAS_SKILL and CONTROL_PATH:
+    access = True
+    catalog = Path(CATALOG)
+    config_read = r"../home\xdg/config/tool\skills/other/document.txt"
+    if os.name == "nt":
+        config_read = config_read.upper()
+    paths = {
+        "fixture": (Path.cwd() / "skills" / "report-claim-audit" / "input.txt").as_posix(),
+        "relative-fixture": "skills/report-claim-audit/input.txt",
+        "catalog": catalog / "report-claim-audit" / "SKILL.md",
+        "other-catalog": catalog / "not-the-task-skill" / "SKILL.md",
+        "config": config_read,
+        "skill-tool": "skills/report-claim-audit/input.txt",
+        "mcp-fixture": "skills/report-claim-audit/input.txt",
+        "mcp-catalog": catalog / "report-claim-audit" / "SKILL.md",
+    }
+    read_path = str(paths[CONTROL_PATH])
+    assert CONTROL_PATH not in {"fixture", "relative-fixture"} or Path(read_path).is_file()
+else:
+    read_path = str(skill)
 if RUNTIME == "codex":
-    if access:
-        command = f'Get-Content "{skill}"' if HAS_SKILL else "Get-Content skills/alien/reference.txt"
+    if not HAS_SKILL and CONTROL_PATH and CONTROL_PATH.startswith("mcp-"):
+        print(json.dumps({"type": "item.completed", "item": {
+            "type": "mcp_tool_call", "id": "read1", "tool": "read_file",
+            "arguments": {"paths": [read_path]},
+            "result": {"content": [{"text": str(Path(CATALOG) / "report-claim-audit" / "SKILL.md")}]},
+        }}))
+    elif access:
+        command = f"powershell -Command 'Get-Content -LiteralPath \"{read_path}\"'"
         item = {"type": "command_execution", "id": "read1", "command": command}
         print(json.dumps({"type": "item.started", "item": item}))
         item.update(status="completed", exit_code=0 if has_skill else 1,
@@ -66,8 +95,9 @@ if RUNTIME == "codex":
                                                         "output_tokens": 3, "reasoning_output_tokens": 1}}))
     sys.exit(0)
 if access:
+    name = "Skill" if not HAS_SKILL and CONTROL_PATH == "skill-tool" else "Read"
     print(json.dumps({"type": "assistant", "message": {"content": [
-        {"type": "tool_use", "id": "read1", "name": "Read", "input": {"file_path": str(skill)}}
+        {"type": "tool_use", "id": "read1", "name": name, "input": {"file_path": read_path}}
     ]}}))
     print(json.dumps({"type": "user", "message": {"content": [
         {"type": "tool_result", "tool_use_id": "read1", "is_error": not has_skill}
@@ -79,7 +109,8 @@ print(json.dumps({"type": "result", "subtype": "success", "num_turns": 2,
 
 
 def setup_trial(tmp_path, monkeypatch, *, runtime="claude", mode="forced", leak=False,
-                load=True, shell=False, fake_load=False, scores=None, thresholds=None):
+                load=True, shell=False, fake_load=False, scores=None, thresholds=None,
+                control_path=None, response=None):
     outside = tmp_path / "outside"
     outside.mkdir()
     (outside / "sentinel").write_bytes(b"untouched")
@@ -105,14 +136,22 @@ command = "do-not-run"
     monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "not-for-codex")
     # tempfile chooses its base independently of the untrusted agent profile.
     monkeypatch.setattr(runner.tempfile, "tempdir", str(tmp_path))
+    monkeypatch.setattr(runner, "codex_host_skill_rules", lambda: [])
     fixture = tmp_path / "fixture"
     fixture.mkdir()
     (fixture / "input.txt").write_text("original", encoding="utf-8")
+    if control_path:
+        fixture_skill = fixture / "skills" / "report-claim-audit"
+        fixture_skill.mkdir(parents=True)
+        (fixture_skill / "input.txt").write_text("fixture, not treatment", encoding="utf-8")
+    rubric = {"answer": {"field": "answer", "equals": 42}}
+    if response is not None:
+        rubric["artifact"] = {"file": "artifact.txt", "contains": "expected artifact"}
     task = tmp_path / "task.json"
     task.write_text(json.dumps({
         "id": "test-eval", "skill": "report-claim-audit", "fixture": "fixture",
         "prompt": "same prompt for every arm", "terse": "frozen terse text", "shell": shell,
-        "rubric": {"answer": {"field": "answer", "equals": 42}},
+        "rubric": rubric,
     }), encoding="utf-8")
     process = runner.run_process
     seen = []
@@ -124,8 +163,10 @@ command = "do-not-run"
             f"hoa-eval-{name}-")), None)
         has_skill, is_terse = arm == "skill", arm == "terse"
         score = next(scores) if scores is not None and arm else (42 if has_skill else 0)
-        constants = (runtime, mode, has_skill, is_terse, shell, load, leak, fake_load and has_skill, score)
-        header = "RUNTIME, MODE, HAS_SKILL, IS_TERSE, SHELL, LOAD, LEAK_BASELINE, FAKE_LOAD, SCORE"
+        constants = (runtime, mode, has_skill, is_terse, shell, load, leak, fake_load and has_skill,
+                     score, control_path, str(runner.SKILLS), response)
+        header = ("RUNTIME, MODE, HAS_SKILL, IS_TERSE, SHELL, LOAD, LEAK_BASELINE, FAKE_LOAD, SCORE, "
+                  "CONTROL_PATH, CATALOG, RESPONSE")
         return process([sys.executable, "-c", f"{header} = {constants!r}\n" + STUB, *argv[1:]], **kwargs)
 
     monkeypatch.setattr(runner, "run_process", launch)
@@ -193,16 +234,79 @@ def test_redact_windows_paths_and_credentials(monkeypatch):
     assert clean[6:] == ["<redacted>: <redacted>", "subject/README.md"]
 
 
-@pytest.mark.parametrize("runtime", ["claude", "codex"])
-def test_control_skill_access_invalidates_result(tmp_path, monkeypatch, runtime):
-    results, _ = setup_trial(tmp_path, monkeypatch, runtime=runtime, leak=True)
-    assert runner.main() == 1
+@pytest.mark.parametrize(("runtime", "path", "contaminated"), [
+    ("claude", "fixture", False),
+    ("codex", "relative-fixture", False),
+    ("claude", "other-catalog", False),
+    ("codex", "mcp-fixture", False),
+    ("claude", "catalog", True),
+    ("codex", "mcp-catalog", True),
+    ("claude", "config", True),
+    ("codex", "config", True),
+    ("claude", "skill-tool", True),
+    ("claude", None, True),
+    ("codex", None, True),
+])
+def test_control_skill_access_uses_trial_paths(tmp_path, monkeypatch, runtime, path, contaminated):
+    results, _ = setup_trial(tmp_path, monkeypatch, runtime=runtime, leak=path is None, control_path=path)
+    assert runner.main() == int(contaminated)
     report, = results.glob("*.json")
     record = json.loads(report.read_text(encoding="utf-8"))
     for arm in ("none", "terse"):
-        assert record["runs"][arm][0]["contaminated"]
-        assert record["summary"][arm]["pass^k"] is None
-    assert record["verdict"] == "inconclusive"
+        assert record["runs"][arm][0]["contaminated"] is contaminated
+        assert record["summary"][arm]["pass^k"] is (None if contaminated else False)
+    assert record["verdict"] == ("inconclusive" if contaminated else "skill-wins")
+
+
+@pytest.mark.parametrize(("response", "answer_format", "passed"), [
+    ('{"answer":42}', "bare", True),
+    ('[{"answer":42}]', "bare", False),
+    ('```json\n{"answer":0}\n```\n```json\n{"answer":42}\n```\n{"answer":0}', "fenced", True),
+    ('```json\n[{"answer":42}]\n```\n{"answer":42}', "fenced", False),
+    ('First {"answer":0}. Final {"answer":42,"nested":{"answer":0}}. Unfinished {"nested":{"answer":0}',
+     "extracted", True),
+    ('No JSON answer. [ {"answer":42} ]', "none", False),
+])
+def test_answer_format_preserves_content_and_artifact_scores(tmp_path, monkeypatch, response, answer_format, passed):
+    results, _ = setup_trial(tmp_path, monkeypatch, response=response)
+    assert runner.main() == 0
+    report, = results.glob("*.json")
+    run = json.loads(report.read_text(encoding="utf-8"))["runs"]["skill"][0]
+    assert run["checks"] == {"answer": passed, "artifact": True}
+    assert run["answer_format"] == answer_format
+
+
+@pytest.mark.parametrize(("runtime", "cap", "order", "tokens"), [
+    ("claude", 2, ["none"], 3),
+    ("codex", 30, ["none", "terse"], 30),
+    ("claude", 18, ["none", "terse", "skill", "skill", "terse", "none"], 18),
+])
+def test_token_budget_stops_between_trials(tmp_path, monkeypatch, runtime, cap, order, tokens):
+    results, seen = setup_trial(tmp_path, monkeypatch, runtime=runtime)
+    sys.argv.extend(("--max-total-tokens", str(cap)))
+    complete = len(order) == 6
+    assert runner.main() == int(not complete)
+    assert len(seen) == 1 + len(order)
+    report, = results.glob("*.json")
+    record = json.loads(report.read_text(encoding="utf-8"))
+    assert record["order"] == order
+    assert record["total_tokens"] == tokens
+    assert record["limits"]["total_tokens"] == cap
+    planned = ["none", "terse", "skill", "skill", "terse", "none"]
+    assert record["skipped_trials"] == [
+        {"arm": arm, "repeat": i // 3 + 1} for i, arm in enumerate(planned) if i >= len(order)
+    ]
+    assert record["verdict"] == ("skill-wins" if complete else "inconclusive")
+
+
+def test_nonpositive_token_cap_starts_no_process(tmp_path, monkeypatch):
+    results, seen = setup_trial(tmp_path, monkeypatch)
+    sys.argv.extend(("--max-total-tokens", "0"))
+    with pytest.raises(SystemExit) as exc:
+        runner.main()
+    assert exc.value.code == 2
+    assert not seen
+    assert not results.exists()
 
 
 @pytest.mark.parametrize(("runtime", "mode", "shell", "fake", "exit_code"), [

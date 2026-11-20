@@ -184,11 +184,41 @@ def load_task(path):
     return task, fixture
 
 
-def judge(rubric, output, workspace):
+JSON_FENCE = re.compile(r"^[ \t]*```json[ \t]*\r?\n(.*?)^[ \t]*```[ \t]*(?=\r?$)",
+                        re.IGNORECASE | re.MULTILINE | re.DOTALL)
+JSON_CONTAINER = re.compile(r"[\[{]")
+
+
+def extract_answer(output):
     try:
         answer = json.loads(output)
     except json.JSONDecodeError:
-        answer = None
+        pass
+    else:
+        return answer, "bare"
+    fences = JSON_FENCE.findall(output)
+    if fences:
+        try:
+            answer = json.loads(fences[-1])
+        except json.JSONDecodeError:
+            pass
+        else:
+            return answer, "fenced"
+    decoder = json.JSONDecoder()
+    answer, end = None, 0
+    while start := JSON_CONTAINER.search(output, end):
+        try:
+            value, end = decoder.raw_decode(output, start.start())
+        except json.JSONDecodeError as error:
+            # Resume at the error instead of reinterpreting already parsed nested values.
+            end = max(start.end(), error.pos)
+        else:
+            if isinstance(value, dict):
+                answer = value
+    return answer, "extracted" if answer is not None else "none"
+
+
+def judge(rubric, answer, workspace):
     artifacts = {}
     scores = {}
     for label, check in rubric.items():
@@ -299,11 +329,57 @@ def agent_command(args, task, installed, arm):
     return command + ["-"]
 
 
-SKILL_ACCESS = re.compile(r"skill\.md\b|(?:\.claude|\.codex|\.agents)\b|\bskills[/\\]",
-                          re.I)
+COMMAND_WORD = re.compile(r"""(["'])(.*?)\1|([^\s"'`;&|<>()=,]+)""", re.DOTALL)
 
 
-def claude_trace(events, skill_file):
+def command_paths(command):
+    # Shell syntax is only a trace hint. Inspect literal operands, not command output.
+    previous = ""
+    for word in COMMAND_WORD.finditer(command):
+        quoted, bare = word.group(2, 3)
+        value = quoted if bare is None else bare
+        if quoted and previous in {"-c", "-lc", "-cl", "-command", "/c"}:
+            yield from command_paths(quoted)
+        elif "/" in value or "\\" in value:
+            yield value
+        previous = value.casefold()
+
+
+def argument_strings(value):
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, (dict, list)):
+        for item in value.values() if isinstance(value, dict) else value:
+            yield from argument_strings(item)
+
+
+def trace_path(value, workspace):
+    value = value.replace("\\", "/")
+    if value.startswith("~/"):
+        value = str(workspace.parent / "home" / value[2:])
+    try:
+        # On Windows, realpath expands existing 8.3 aliases, including parent directories.
+        return Path(os.path.realpath(workspace / value))
+    except (OSError, ValueError):
+        return None
+
+
+def skill_access(paths, workspace, skill_file):
+    catalog = (SKILLS / skill_file.parent.name).resolve()
+    home = workspace.parent / "home"
+    for path in paths:
+        if path is None or path.is_relative_to(workspace):
+            continue
+        if path.is_relative_to(catalog) or path.is_relative_to(skill_file.parent):
+            return True
+        if path.is_relative_to(home):
+            parts = path.relative_to(home).parts
+            if "skills" in (part.casefold() if os.name == "nt" else part for part in parts):
+                return True
+    return False
+
+
+def claude_trace(events, skill_file, workspace):
     result, trace, reads = {}, [], {}
     for event in events:
         kind = event.get("type")
@@ -315,25 +391,31 @@ def claude_trace(events, skill_file):
         for block in content if isinstance(content, list) else ():
             if block.get("type") == "tool_use":
                 name, arguments = block["name"], block.get("input", {})
-                access = name == "Skill" or bool(SKILL_ACCESS.search(str(arguments)))
+                read_path, paths = None, ()
+                if name == "Read" and "file_path" in arguments:
+                    read_path = trace_path(arguments["file_path"], workspace)
+                    paths = (read_path,)
+                elif name == "Glob":
+                    base = arguments.get("path") or "."
+                    pattern = arguments.get("pattern", "")
+                    paths = (trace_path(base, workspace), trace_path(str(Path(base) / pattern), workspace))
+                elif name == "Bash":
+                    paths = (trace_path(value, workspace) for value in command_paths(arguments.get("command", "")))
+                access = name == "Skill" or skill_access(paths, workspace, skill_file)
                 entry = {"tool": name, "skill_access": access, "skill_loaded": False}
                 trace.append(entry)
-                path = arguments.get("file_path", "")
                 if ((name == "Skill" and arguments.get("skill") == skill_file.parent.name)
-                        or (name == "Read" and Path(path) == skill_file)):
+                        or read_path == skill_file):
                     reads[block["id"]] = entry
             if block.get("type") == "tool_result" and block.get("tool_use_id") in reads:
                 reads[block["tool_use_id"]]["skill_loaded"] = not block.get("is_error", False)
     return result, trace
 
 
-def codex_trace(events, skill_file, skill_text):
+def codex_trace(events, skill_file, workspace, skill_text):
     result, calls = {}, {}
     # Require returned document text, not just an exit-zero command that mentions SKILL.md.
     header = "\n".join(skill_text.splitlines()[:3])
-    target = skill_file.as_posix()
-    if os.name == "nt":
-        target = target.casefold()
     for event in events:
         kind = event.get("type")
         if kind in {"turn.completed", "turn.failed"}:
@@ -346,15 +428,17 @@ def codex_trace(events, skill_file, skill_text):
             result["result"] = item["text"]
         if tool not in {"command_execution", "mcp_tool_call", "file_change"}:
             continue
-        payload = item.get("command", "") if tool == "command_execution" else str(item)
         entry = calls.setdefault(item["id"], {"tool": tool, "skill_access": False, "skill_loaded": False})
-        entry["skill_access"] |= bool(SKILL_ACCESS.search(payload))
-        command = payload.replace("\\", "/")
-        if os.name == "nt":
-            command = command.casefold()
+        payload = (command_paths(item.get("command", "")) if tool == "command_execution"
+                   else argument_strings(item.get("arguments")) if tool == "mcp_tool_call" else ())
+        paths = {trace_path(value, workspace) for value in payload}
+        entry["skill_access"] |= (
+            (tool == "mcp_tool_call" and item.get("tool", "").casefold() == "skill")
+            or skill_access(paths, workspace, skill_file)
+        )
         if (kind == "item.completed" and tool == "command_execution"
                 and item.get("status") == "completed" and item.get("exit_code") == 0
-                and target in command and header in item.get("aggregated_output", "").replace("\r\n", "\n")):
+                and skill_file in paths and header in item.get("aggregated_output", "").replace("\r\n", "\n")):
             entry["skill_loaded"] = True
     return result, list(calls.values())
 
@@ -383,9 +467,9 @@ def trial(args, task, fixture, root, arm, skill_text):
                            env=env, capture_output=True, timeout=args.timeout)
         events = [json.loads(line) for line in proc.stdout.splitlines() if line.strip()]
         if runtime == "claude":
-            result, trace = claude_trace(events, skill_file)
+            result, trace = claude_trace(events, skill_file, workspace)
         else:
-            result, trace = codex_trace(events, skill_file, skill_text)
+            result, trace = codex_trace(events, skill_file, workspace, skill_text)
         if (proc.returncode or result.get("subtype") != ("success" if runtime == "claude" else "turn.completed")
                 or result.get("is_error") or not isinstance(result.get("result"), str)):
             error = f"agent failed (exit {proc.returncode})"
@@ -399,7 +483,8 @@ def trial(args, task, fixture, root, arm, skill_text):
     invalid = ([error] if error else []) + (["control skill access"] if contaminated else [])
     if arm == "skill" and args.mode == "forced" and not loaded:
         invalid.append("forced skill load not observed")
-    scores, artifacts = judge(task["rubric"], output, workspace)
+    answer, answer_format = extract_answer(output)
+    scores, artifacts = judge(task["rubric"], answer, workspace)
     usage = result.get("usage", {})
     token_keys = ("input_tokens", "output_tokens")
     if runtime == "claude":
@@ -407,7 +492,7 @@ def trial(args, task, fixture, root, arm, skill_text):
     tokens = sum(usage.get(key, 0) for key in token_keys) if usage else None
     record = {"valid": not invalid, "invalid_reasons": invalid, "error": error,
               "contaminated": contaminated, "skill_loaded": loaded, "trace": trace,
-              "output": output, "artifacts": artifacts,
+              "output": output, "answer_format": answer_format, "artifacts": artifacts,
               "checks": scores, "score": sum(scores.values()) / len(scores),
               "passed": not invalid and all(scores.values()),
               "seconds": round(time.monotonic() - started, 3), "usage": usage, "tokens": tokens,
@@ -449,7 +534,8 @@ def run_eval(args):
     if any(destination.with_suffix(ext).exists() for ext in (".json", ".md")):
         raise ValueError(f"result already exists: {destination}.*")
     runs = {arm: [] for arm in ARMS}
-    order = []
+    order, skipped_trials = [], []
+    total_tokens = 0
     args.provider = codex_provider() if args.runtime == "codex" else ("", (), ())
     args.host_skill_rules = codex_host_skill_rules() if args.runtime == "codex" else []
     with tempfile.TemporaryDirectory(prefix="hoa-eval-version-") as temp:
@@ -461,16 +547,22 @@ def run_eval(args):
         version, model = redact(root, [proc.stdout.strip(), args.model], secrets=args.provider[2])
     for repeat in range(args.repeats):
         for arm in (ARMS if repeat % 2 == 0 else ARMS[::-1]):
+            if args.max_total_tokens is not None and total_tokens >= args.max_total_tokens:
+                skipped_trials.append({"arm": arm, "repeat": repeat + 1})
+                continue
             with tempfile.TemporaryDirectory(prefix=f"hoa-eval-{arm}-") as temp:
-                runs[arm].append(trial(args, task, fixture, Path(temp).resolve(), arm, skill_text))
+                run = trial(args, task, fixture, Path(temp).resolve(), arm, skill_text)
+            runs[arm].append(run)
+            total_tokens += run["tokens"] or 0
             order.append(arm)
     summary = {}
     for arm, trials in runs.items():
-        valid = all(run["valid"] for run in trials)
+        valid = len(trials) == args.repeats and all(run["valid"] for run in trials)
         scores = [run["score"] for run in trials]
         passed = sum(run["passed"] for run in trials)
         loaded = sum(run["skill_loaded"] for run in trials)
-        summary[arm] = {"valid": valid, "passed": passed, "loaded": loaded, "load_rate": loaded / len(trials),
+        summary[arm] = {"valid": valid, "passed": passed, "loaded": loaded,
+                        "load_rate": loaded / len(trials) if trials else None,
                         "pass_rate": passed / len(trials) if valid else None,
                         "pass^k": all(run["passed"] for run in trials) if valid else None,
                         "mean_score": statistics.mean(scores) if valid else None,
@@ -486,7 +578,7 @@ def run_eval(args):
     deltas = {arm: summary["skill"]["mean_score"] - summary[arm]["mean_score"]
               for arm in ("none", "terse")
               if summary["skill"]["valid"] and summary[arm]["valid"]}
-    limits = {"seconds_per_run": args.timeout}
+    limits = {"seconds_per_run": args.timeout, "total_tokens": args.max_total_tokens}
     if args.runtime == "claude":
         limits.update(turns_per_run=args.max_turns, usd_per_run=args.max_budget_usd)
     record = {"schema_version": 2, "task": task["id"], "generated_at": stamp.isoformat(),
@@ -495,7 +587,7 @@ def run_eval(args):
               "runtime": args.runtime, "mode": args.mode, "shell": args.shell, "order": order,
               "rubric": task["rubric"], "rubric_flags": rubric_flags, "thresholds": thresholds,
               "summary": summary, "mean_deltas_vs_skill": deltas, "runs": runs, "verdict": outcome,
-              "limits": limits}
+              "limits": limits, "total_tokens": total_tokens, "skipped_trials": skipped_trials}
     args.results.mkdir(parents=True, exist_ok=True)
     with destination.with_suffix(".json").open("x", encoding="utf-8", newline="\n") as file:
         json.dump(record, file, indent=2, ensure_ascii=False)
@@ -507,11 +599,16 @@ def run_eval(args):
         markdown.append(f"- {arm}: {row['passed']}/{args.repeats} passed; "
                         f"loaded {row['loaded']}; pass^k: {row['pass^k']}; mean score: {row['mean_score']}; "
                         f"sample stddev: {row['sample_stddev']}.")
-    markdown += ["", "| Arm | Trial | Validity | Tokens | Seconds |", "|---|---:|---|---:|---:|"]
+    markdown += ["", f"CLI-reported tokens: {total_tokens}."]
+    if skipped_trials:
+        skipped = ", ".join(f"{row['arm']} (repeat {row['repeat']})" for row in skipped_trials)
+        markdown.append(f"Skipped at token cap {args.max_total_tokens}: {skipped}.")
+    markdown += ["", "| Arm | Trial | Validity | Answer format | Tokens | Seconds |",
+                 "|---|---:|---|---|---:|---:|"]
     for arm, trials in runs.items():
         for i, run in enumerate(trials, 1):
             validity = "valid" if run["valid"] else "; ".join(run["invalid_reasons"])
-            markdown.append(f"| {arm} | {i} | {validity} | {run['tokens']} | {run['seconds']} |")
+            markdown.append(f"| {arm} | {i} | {validity} | {run['answer_format']} | {run['tokens']} | {run['seconds']} |")
     with destination.with_suffix(".md").open("x", encoding="utf-8", newline="\n") as file:
         file.write("\n".join(markdown) + "\n")
     print(f"{destination.name}: {outcome}")
@@ -531,6 +628,7 @@ def main():
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument("--max-turns", type=int, default=12, help="Claude only")
     parser.add_argument("--max-budget-usd", type=float, default=1.0, help="Claude only")
+    parser.add_argument("--max-total-tokens", type=int, help="stop starting trials at this CLI-reported token total")
     parser.add_argument("--timeout", type=int, default=300)
     args = parser.parse_args()
     if not args.model:
@@ -540,6 +638,8 @@ def main():
     if (min(args.repeats, args.max_turns, args.max_budget_usd, args.timeout) <= 0
             or not math.isfinite(args.max_budget_usd)):
         parser.error("repeat, turn, budget and timeout limits must be positive")
+    if args.max_total_tokens is not None and args.max_total_tokens <= 0:
+        parser.error("--max-total-tokens must be positive")
     executable = shutil.which(getattr(args, args.runtime))
     if not executable or (os.name == "nt" and Path(executable).suffix.lower() != ".exe"):
         parser.error(f"--{args.runtime} must resolve to a native executable, not a batch shim")
