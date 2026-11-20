@@ -61,8 +61,8 @@ targets:  runtime-agnostic | repo-only |
 | hoa-practice-retro | skill | self-management,work-management | runtime-agnostic | `skills/hoa-practice-retro/` | 定期复盘负责人跨仓库、会话与记忆的工程实践：应停止的习惯、未执行的决定、未知的未知，每条都有两个独立来源 |
 | hoa-repo-reckoning | skill | software-development,work-management | runtime-agnostic | `skills/hoa-repo-reckoning/` | 仅显式调用的只读仓库审查提示词：哪些事该停止，哪些未知会改变工作 |
 | hoa-skill-create | skill | software-development,work-management,self-management | runtime-agnostic | `skills/hoa-skill-create/` | 直接创建、演进或组合已定义的 skill，并按风险聚焦验证 |
-| hoa-skill-curate | skill | software-development,self-management | runtime-agnostic | `skills/hoa-skill-curate/` | 追溯已安装技能的来源与上游新鲜度，执行上游退役规则，仅在所有者确认后变更技能库 |
-| hoa-skill-port | skill | software-development,work-management | runtime-agnostic | `skills/hoa-skill-port/` | 把私有 skill 解耦到可发布仓库：确定权威副本、五轴改造、配置解析、目录与 CI 校验、走分支与 PR 发布 |
+| hoa-skill-curate | skill | software-development,self-management | runtime-agnostic | `skills/hoa-skill-curate/` | 追溯安装来源，区分内容漂移与上游活动，仅执行所有者确认的技能库变更 |
+| hoa-skill-port | skill | software-development,work-management | runtime-agnostic | `skills/hoa-skill-port/` | 将私有技能移入共享仓库作为权威副本：外置环境参数、通过目标仓库门禁，并区分运行时切换与发布 |
 | hoa-skill-review | skill | software-development,work-management,self-management | runtime-agnostic | `skills/hoa-skill-review/` | 依据消费者证据审计 skill 行为与修改，不改动被审查对象 |
 | hoa-skill-set-audit | skill | software-development,self-management | runtime-agnostic | `skills/hoa-skill-set-audit/` | 审计会话实际提供的整套技能：单项质量、重叠、遮蔽、指令冲突、同名漂移、可见性、../ 闭包、清单预算；只出报告 |
 | measurement-campaign-evidence | skill | software-development,work-management | runtime-agnostic | `skills/measurement-campaign-evidence/` | 测量运动：先钉候选身份、串行跑、一致报告集，不让基线伪造延迟对比 |
@@ -75,7 +75,7 @@ targets:  runtime-agnostic | repo-only |
 | spec-convergence | skill | software-development | runtime-agnostic | `skills/spec-convergence/` | 把模糊需求收敛为已确认 spec：每轮一个根问题、每轮问题数有上限、每问附事实、写前显式确认共同理解 |
 | structural-validity-gates | skill | software-development | runtime-agnostic | `skills/structural-validity-gates/` | 两面完整性门禁：拒掉坏的，接受格式合法的一切；上线前两侧都要探针 |
 | tmux-agent-control | skill | software-development,work-management | runtime-agnostic | `skills/tmux-agent-control/` | 在 tmux 中驱动运行中的 TUI agent：定位 pane、证明空闲、一次发出完整指令 |
-| writing | skill | work-management,self-management | runtime-agnostic | `skills/writing/` | 一套内容优先的共同层加分渠道契约：博客、论文、X、Reddit、小红书、公众号、教程、changelog；附可量化的 AI 味自查 |
+| writing | skill | work-management,self-management | runtime-agnostic | `skills/writing/` | 按读者与渠道撰写和核验可发布文章；风格指标用于诊断，不作统一配额 |
 | skill-scout | agent | software-development,work-management | repo-only | `agents/skill-scout.md` | 按请求先搜索已有 skill，再决定是否编写；只报告，不代写 |
 | typed-verification-gates | orchestration | software-development | repo-only | `orchestration/typed-verification-gates.md` | 循环每次迭代止于一道事先定型的验证门：programmatic / judge / human |
 | ado-commit-push-pr | prompt | software-development | repo-only | `prompts/ado-commit-push-pr.md` | 一次性 commit → push → PR 请求模板（Azure DevOps 或 GitHub），附提交约定与 az/gh 易错点 |
@@ -100,6 +100,7 @@ targets:  runtime-agnostic | repo-only |
 
 | Skill | 依赖（`../` 传递闭包） | 安装命令 |
 |---|---|---|
+| evidence-backed-analytical-writing | evidence-boundary-discipline | `npx skills add wxxb789/hoa -g -s evidence-backed-analytical-writing -s evidence-boundary-discipline -y` |
 | gdd | delegated-work-acceptance | `npx skills add wxxb789/hoa -g -s gdd -s delegated-work-acceptance -y` |
 | gdd-route-cc | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-cc -s delegated-work-acceptance -s gdd -y` |
 | gdd-route-codex | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-codex -s delegated-work-acceptance -s gdd -y` |

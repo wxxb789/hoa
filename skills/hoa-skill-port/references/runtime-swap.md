@@ -1,11 +1,12 @@
-# Runtime swap and live drift
+# Runtime swap and live drift (2026-11-21)
 
 ## Swap the runtime over without a gap
 
 1. Back up the current skill dir and tools to one tarball first.
 2. Build and validate the new package before touching the live directory.
-3. Replace the live skill dir with a symlink to the canonical package; load it through the runtime's
-   skill loader and confirm the body, linked files and scripts all resolve.
+3. Use a whole-directory link only if the runtime and filesystem support it. Verify the complete
+   sibling closure resolves in the loader layout, then confirm the body and scripts load.
+   If there is no supported link, stop the swap and agree on a single-source install method.
 4. Make the old entry points thin wrappers (`exec` the canonical script, forward argv and exit code)
    so in-flight work keeps the old paths and the owner's layout.
 5. Re-run the repo's own reconciliation/drift scripts afterwards, then **prove** what they changed:
@@ -31,7 +32,7 @@ that state visible instead of relying on remembering to check it:
    when dirty it reports only if the oldest dirty path is older than a threshold
    (`PORTING_DIRTY_AGE_HOURS`, default 24) so an in-flight edit is not noise.
 3. Give it a stable finding id (check + scope + violation) so the runner's dedupe emits it once rather
-   than every morning, and an action line that names the fix: commit it on a branch and open the PR.
+   than every run, and an action line for the operator. Do not have the probe commit or publish.
 4. Prove both branches before trusting it: the probe runs clean on a clean tree, and a deliberately
    touched file shows up at the right level.
 

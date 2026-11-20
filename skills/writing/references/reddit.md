@@ -1,10 +1,10 @@
 # Reddit
 
-For posts/comments. Reddit detects promotion and AI instantly and punishes both.
+For posts and comments. Match the community's rules and give readers enough detail to respond.
 
 ## Structure
 - Lead with context + what you actually did/found/asked. No preamble.
-- **TL;DR at the very top** for anything longer than a few paragraphs.
+- For a long post, consider a TL;DR when it helps in that community.
 - Plain markdown: paragraphs, occasional bullets, code blocks for code. No emoji walls.
 
 ## Tone

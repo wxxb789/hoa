@@ -47,7 +47,7 @@
 - Use `> blockquote` for the running 一句话总结 / memory anchors.
 - 中文排版按《中文文案排版指北》：中英文间空格，半角标点配中文。
 
-## Pitfalls (from building the 检索 notes)
+## Pitfalls
 - ❌ **Treating it as Socratic grilling** — piling on relentless "那又如何？那又如何？" until the reader feels cornered. Wrong engine. The story pulls; questioning doesn't push.
 - ❌ Story that's just a label slapped on ("把它想象成一家店") then never used again. Carry it through — it must drive, not garnish.
 - ❌ **Over-simplifying into a single causal chain** — forcing the world into a tidy "A→B→C" so each beat stays clean, when the real thing is multi-causal. That's false clarity. Let the branches and complexity show.
@@ -56,8 +56,6 @@
 - ❌ Dumping all material into one giant A. Split aggressively into more Q&A.
 - ❌ Losing technical accuracy for the sake of the story. Story serves the concept, not vice versa — keep verified facts/formulas intact.
 
-## Inherit
-All cross-channel hard rules from SKILL.md apply: clarity > cleverness, no fabrication
-(mark gaps `[TODO]`), no flirty padding, long pieces → a file in the task workspace.
-Run the AI-smell checklist, but note the genre exception: **uniform Q&A rhythm is a genre
-requirement here, not an AI tell** — don't flag it.
+## Review
+Check whether each question helps a reader follow the story or the idea. Regular Q&A
+is part of this form; change the rhythm only when it obscures the explanation.

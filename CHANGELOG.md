@@ -23,6 +23,15 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 - Focus harness engineering on live obligations, I/O boundaries, and fail-closed acceptance.
 - Keep OMP's default route and recovery checks while deferring shared transport details to GDD.
 - Focus the .NET workflow on repository gates, locked NuGet restore, and Roslyn references.
+- Shorten `evidence-backed-analytical-writing` around an evidence map and share the dated-source
+  audit with `evidence-boundary-discipline`; move logistics and report recipes to references.
+- Keep publisher-specific guidance in `writing` channel references and treat style measurements
+  as diagnostics rather than universal quotas.
+- Make `review-revision-candidates` verify both the approved edit scope and the patch against its
+  pinned base without modifying the rejected candidate.
+- Separate provenance, drift, activity, and authorized retirement in `hoa-skill-curate`.
+- Keep `hoa-skill-port` focused on portability and destination validation; require separate
+  authority for a live runtime swap or publication.
 
 ## 2026-11-20
 
