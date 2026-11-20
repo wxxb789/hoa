@@ -1,4 +1,26 @@
-# Necessity and WS4 pilots: 2026-11-20
+# Necessity evaluation evidence
+
+## E0 plumbing smoke: 2026-11-20
+
+One forced comparison per runtime on the synthetic claim-audit task, one repeat
+per arm, on native Windows. Both runtimes observed the installed
+`report-claim-audit` revision 2 being read; neither saw skill access in the two
+controls. All six trials were valid and passed all five checks. Both verdicts
+were `no-difference`; this only verifies delivery and scoring at `k=1`, not
+necessity or natural activation.
+
+| Runtime | Model | None tokens | Terse tokens | Skill tokens | Total tokens | CLI cost |
+|---|---|---:|---:|---:|---:|---:|
+| Claude Code 2.1.329 | `claude-haiku-5.5` | 24,586 | 25,009 | 40,330 | 89,925 | $0.006207545 |
+| Codex CLI 0.171.0 | `gpt-6.2-sol` | 36,688 | 49,402 | 103,214 | 189,304 | Not reported |
+
+Total: **279,229 CLI-reported tokens**. Claude includes cache creation and
+reads; Codex includes cached input in its input total. Raw smoke reports are
+not committed. Reproduce the setup with the current README's forced commands,
+adding `--repeats 1 --timeout 150`, plus `--max-turns 10 --max-budget-usd 0.35`
+for Claude.
+
+## Prior necessity and WS4 pilots: 2026-11-20
 
 Inputs, pinned by git object id (content hashes survive rebase and squash merge; check with
 `git rev-parse HEAD:<path>`):

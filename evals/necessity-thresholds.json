@@ -1,0 +1,6 @@
+{
+  "min_mean_gain": 0.1,
+  "max_terse_gap": 0.05,
+  "min_pass_rate": 1.0,
+  "min_natural_load_rate": 1.0
+}
