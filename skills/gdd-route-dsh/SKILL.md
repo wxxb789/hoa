@@ -6,7 +6,7 @@ description: >-
   work, must be resumed, stopped or recovered, or its launcher needs configuring. Not for the
   delivery protocol (`gdd`) or OMP runs (`gdd-route-omp`).
 metadata:
-  revision: "3"
+  revision: "4"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "dispatch and supervise a GDD stage on dsh headless: session/worktree rules, completion judgement, recovery, harness traps (requires skill `gdd`)"
@@ -22,8 +22,7 @@ the permission policy, not by the working directory: with the default `workspace
 whose harness enforces a sandbox, writes inside the policy's boundary succeed and writes outside it are
 denied; `--cwd` only selects the run's working directory. Changing the profile or `DSH_PERMISSION_MODE`
 changes that boundary, so re-confirm it before dispatching (see "Harness facts that bite"). The protocol
-stays in `gdd`; see the Headless CLI row and DSH route specifics in
-[`../gdd/references/transport.md`](../gdd/references/transport.md).
+stays in `gdd`; see [DSH route specifics](../gdd/references/transport.md#dsh-route-specifics).
 
 ## When to Use
 

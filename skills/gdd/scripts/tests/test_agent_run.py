@@ -1,9 +1,4 @@
-#!/usr/bin/env python3
-"""Contract tests for agent_run.py: a stub agent stands in for each CLI (`<AGENT>_BIN`).
-
-Opt-in smoke against real CLIs (costs tokens): GDD_SMOKE_AGENTS=omp,pi,codex,claude,opencode python -B test_agent_run.py SmokeTests
-(GDD_SMOKE_<AGENT>_MODEL passes --model when an agent's default model does not work on the host.)
-"""
+"""Contract tests for agent_run.py with synthetic agent CLIs."""
 import contextlib
 import glob
 import io
@@ -34,8 +29,9 @@ IS_WINDOWS = os.name == "nt"
 sys.path.insert(0, os.path.dirname(RUNNER))
 import agent_run
 import gdd_process
-from gdd_test_support import (check_locks, check_processes, cleanup_child, exited, finalized, ready, remove_tree,
-                              stop_headless, wait_for_json)
+import stage_result
+from gdd_test_support import (check_locks, check_processes, cleanup_child, exited, finalized, own_identity,
+                              ready, remove_tree, stop_headless, wait_for_json)
 PROMPT = "Do the task.\nReply with the word done.\n"
 EXPECTED = {
     "omp": {"answer": "done", "session_id": "00000000-0000-7000-8000-000000000001", "turns": 2, "tool_calls": 1,
@@ -97,22 +93,6 @@ def write(path, text):
 
 
 SCHEMA = json.loads(read(os.path.join(HERE, "state.schema.json")))
-JSON_TYPES = {"string": str, "integer": int, "number": (int, float), "boolean": bool, "object": dict, "array": list,
-              "null": type(None)}
-
-
-def schema_errors(state):
-    errors = [f"missing {key}" for key in SCHEMA["required"] if key not in state]
-    for key, value in state.items():
-        rule = SCHEMA["properties"].get(key)
-        if rule is None:
-            errors.append(f"unexpected {key}")
-            continue
-        types = rule["type"] if isinstance(rule["type"], list) else [rule["type"]]
-        if not any(isinstance(value, JSON_TYPES[t]) and not (t in ("integer", "number") and isinstance(value, bool))
-                   for t in types) or ("enum" in rule and value not in rule["enum"]):
-            errors.append(f"{key}={value!r} breaks {rule}")
-    return errors
 
 
 def force_kill(pid, recorded):
@@ -210,16 +190,28 @@ sys.exit(agent_run.main())
         self.assertEqual(list(Path(self.root).glob("*/race.prev-*")), [])
 
     def test_t1_argv_golden_new_and_resume(self):
+        metrics = ("session_id", "turns", "tool_calls", "usage", "cost_usd")
         for agent, (new, resumed) in ARGV.items():
             for label, extra, golden in (("new", (), new), ("resume", ("--resume", "S1"), resumed)):
                 with self.subTest(agent=agent, session=label):
-                    self.start(f"{agent}-{label}", agent, "ok", "--max-time", "10m", *extra)
+                    name = f"{agent}-{label}"
+                    self.start(name, agent, "ok", "--max-time", "10m", *extra)
                     record = self.recorded()
                     prompt_in_argv = agent in ARGV_PROMPT
                     self.assertEqual(uuid_masked(record["argv"]), golden + ([PROMPT] if prompt_in_argv else []))
                     self.assertEqual(record["stdin"], "" if prompt_in_argv else PROMPT)
                     self.assertEqual(os.path.realpath(record["cwd"]), os.path.realpath(self.work))
-                    self.finished(f"{agent}-{label}")
+                    state = self.finished(name)
+                    want = EXPECTED[agent]
+                    self.assertEqual((state["state"], state["exit"]), ("done", 0), state)
+                    if label == "new":
+                        self.assertEqual(stage_result.error(state, SCHEMA), "")
+                        self.assertEqual({k: state[k] for k in metrics}, {k: want[k] for k in metrics})
+                        run_dir = Path(self.run_dir(name))
+                        self.assertEqual(read(run_dir / "answer.md"), want["answer"])
+                        self.assertEqual(read(run_dir / "exit.code").strip(), "0")
+                        answer = self.cli("answer", name)
+                        self.assertEqual((answer.returncode, answer.stdout), (0, want["answer"]))
 
     def test_legacy_start_flags(self):
         self.start("omp-old-flags", "omp", "ok", "--backend", "tmux", "--profile", "with spaces")
@@ -241,21 +233,6 @@ sys.exit(agent_run.main())
                 self.assertEqual(self.recorded()["argv"][-len(tail):], tail)
                 self.finished(f"flags-{agent}")
 
-    def test_t2_ok_fixture_is_done(self):
-        for agent, want in EXPECTED.items():
-            with self.subTest(agent=agent):
-                self.start(f"ok-{agent}", agent)
-                state = self.finished(f"ok-{agent}")
-                self.assertEqual(schema_errors(state), [])
-                self.assertEqual((state["state"], state["exit"]), ("done", 0), state)
-                for key in ("session_id", "turns", "tool_calls", "usage", "cost_usd"):
-                    self.assertEqual(state[key], want[key], key)
-                run_dir = self.run_dir(f"ok-{agent}")
-                self.assertEqual(read(os.path.join(run_dir, "answer.md")), want["answer"])
-                self.assertEqual(read(os.path.join(run_dir, "exit.code")).strip(), "0")
-                answer = self.cli("answer", f"ok-{agent}")
-                self.assertEqual((answer.returncode, answer.stdout), (0, want["answer"]))
-
     def test_t3_exit_zero_without_success_marker_fails(self):
         for agent, want in EXPECTED.items():
             with self.subTest(agent=agent):
@@ -264,7 +241,7 @@ sys.exit(agent_run.main())
                 self.assertEqual((state["state"], state["exit"]), ("failed", 0))
                 self.assertIn(want["fail_error"], state["error"])
                 self.assertEqual(state["errors"], [state["error"]])
-                self.assertEqual(schema_errors(state), [])
+                self.assertEqual(stage_result.error(state, SCHEMA), "")
         aborted = os.path.join(self.tmp, "pi-aborted.ndjson")  # pi documents exit 0 on an aborted run
         write(aborted, read(os.path.join(FIXTURES, "pi.ok.ndjson")).replace('"aborted": false', '"aborted": true'))
         self.start("aborted-pi", "pi", env={"STUB_FIXTURE": aborted})
@@ -348,7 +325,7 @@ sys.exit(agent_run.main())
         self.assertEqual(self.finished("stuck")["state"], "killed")
 
     @unittest.skipUnless(sys.platform == "linux", "requires a Linux user manager")
-    def test_systemd_runs_in_literal_paths(self):
+    def test_systemd_preserves_literal_paths_and_umask(self):
         try:
             agent_run.select_detach("systemd")
         except ValueError as exc:
@@ -356,22 +333,13 @@ sys.exit(agent_run.main())
         self.root = os.path.join(self.tmp, "runs %h $HOME")
         self.work = os.path.join(self.tmp, "work %n $USER")
         os.mkdir(self.work)
-        self.env.update(GDD_RUN_ROOT=self.root, GDD_RUN_DETACH="systemd")
-        self.start("literal")
-        self.assertEqual(self.finished("literal")["state"], "done")
+        self.env["GDD_RUN_ROOT"] = self.root
+        self.check_dispatcher_umask("systemd")
         self.assertEqual(self.recorded()["cwd"], self.work)
 
     @unittest.skipIf(IS_WINDOWS, "POSIX file creation mask")
     def test_setsid_keeps_the_dispatchers_umask(self):
         self.check_dispatcher_umask("setsid")
-
-    @unittest.skipUnless(sys.platform == "linux", "requires a Linux user manager")
-    def test_systemd_keeps_the_dispatchers_umask(self):
-        try:
-            agent_run.select_detach("systemd")
-        except ValueError as exc:
-            self.skipTest(str(exc))
-        self.check_dispatcher_umask("systemd")
 
     def check_dispatcher_umask(self, mode):
         started = gdd_process.run(
@@ -516,10 +484,12 @@ sys.exit(agent_run.main())
         self.assertEqual(state["state"], "killed")
 
     def test_t10_max_time(self):
-        self.start("slow", "omp", "ok", "--max-time", "1", env={"STUB_HANG": "1"})
-        state = self.finished("slow")
-        self.assertEqual((state["state"], state["exit"]), ("failed", 124))
-        self.assertIn("max_time exceeded", state["note"])
+        with self.stdout_holder("slow", flags=("--max-time", "5"), STUB_HANG="1") as (_, descendant):
+            state = self.finished("slow")
+            self.assertEqual((state["state"], state["exit"]), ("failed", 124))
+            self.assertIn("max_time exceeded", state["note"])
+            self.assertTrue(agent_run.wait_until(lambda: exited(*descendant), 5),
+                            f"Grandchild PID {descendant[0]} survived max-time")
 
     def test_t11_event_bound_rotates_and_counters_stay_exact(self):
         self.start("bound", env={"GDD_RUN_EVENTS_MAX_BYTES": "1500"})
@@ -535,9 +505,11 @@ sys.exit(agent_run.main())
         self.assertNotIn("tool_calls_partial", state)
 
     @contextmanager
-    def stdout_holder(self, name, **env):
+    def stdout_holder(self, name, *, flags=(), **env):
+        record = None
+
         def verify_child_exit():
-            path = Path(self.record + ".child")
+            path = Path(record or (self.record + ".child"))
             child = wait_for_json(path, lambda row: len(row) == 2 and row[1], time.monotonic() + 5)
             check_processes({tuple(child): (path, True)}, 5)
 
@@ -549,7 +521,8 @@ sys.exit(agent_run.main())
             listener.listen()
             listener.settimeout(10)
             self.addCleanup(verify_child_exit)
-            self.start(name, env={"STUB_DRAIN_ENDPOINT": endpoint, **env})
+            self.start(name, "omp", "ok", *flags, env={"STUB_DRAIN_ENDPOINT": endpoint, **env})
+            record = self.record + ".child"
             peer, _ = listener.accept()
             with peer, peer.makefile("rb") as stream:
                 peer.settimeout(5)
@@ -623,7 +596,7 @@ sys.exit(agent_run.main())
                 state = self.finished(name)
                 self.assertEqual((state["state"], state["result"], state.get("result_error")), ("done", verdict, error))
                 self.assertEqual(os.path.exists(os.path.join(self.run_dir(name), "result.json")), verdict == "valid")
-                self.assertEqual(schema_errors(state), [])
+                self.assertEqual(stage_result.error(state, SCHEMA), "")
         refused = self.cli("start", "--name", "noschema", "--prompt", self.prompt, "--schema", os.path.join(self.tmp, "nope"))
         self.assertEqual(refused.returncode, 1)
         self.assertIn("is not a readable JSON object", refused.stderr)
@@ -702,6 +675,11 @@ if sys.stdin.readline().strip() != "RELEASE":
 
 
 class RunnerMechanicsTests(unittest.TestCase):
+    def test_stub_identity_matches_runner(self):
+        stub_identity = own_identity()
+        self.assertTrue(stub_identity)
+        self.assertEqual(stub_identity, agent_run.identity(os.getpid()))
+
     def test_child_env_drops_the_uv_script_venv_only(self):
         with tempfile.TemporaryDirectory() as venv:
             bindir = os.path.join(venv, "Scripts" if IS_WINDOWS else "bin")
@@ -788,13 +766,11 @@ class RunnerMechanicsTests(unittest.TestCase):
     def test_systemd_argv_and_private_environment(self):
         with tempfile.TemporaryDirectory() as tmp:
             run = Path(tmp)
-            unit = agent_run.unit_name("demo.slug")
-            self.assertRegex(unit, r"^gdd-demo\.slug-[0-9a-f]{12}$")
-            self.assertNotEqual(unit, agent_run.unit_name("demo.slug"))
-
             state = {"name": "demo.slug"}
 
             def submit(argv, **kwargs):
+                self.assertRegex(state["unit"], r"^gdd-demo\.slug-[0-9a-f]{12}$")
+                self.assertNotEqual(state["unit"], agent_run.unit_name(state["name"]))
                 self.assertEqual(argv, [
                     "systemd-run", "--user", "--collect", "--unit", state["unit"], "--service-type=exec",
                     "--no-ask-password", "--working-directory=/work/with spaces", "--property=UMask=0027",

@@ -3,43 +3,7 @@
 # requires-python = ">=3.13"
 # dependencies = []
 # ///
-"""Native Paseo launcher: start|status|result|answer|kill|list (stdlib only).
-
-Explicitly opt in with GDD_LAUNCHER; daemon failure never selects another
-launcher. PASEO_BIN is an executable path or JSON argv array (default paseo on
-PATH). Windows batch shims refuse newlines/shell metacharacters; configure the
-native executable and CLI entrypoint argv for multiline stages, without a shell.
---model / GDD_MODEL selects
-Paseo's --provider, --thinking / GDD_THINKING selects --thinking. GDD_RUN_ROOT
-defaults to ${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs on every OS.
-
-start records the real `run --no-wait --json` agentId before returning. A
-detached local monitor keeps state.json current for gdd.py's file-only polling.
-The daemon, not that monitor, owns execution. Its disappearance is unknown,
-never proof of success or permission to launch a substitute. Lifecycle mapping
-(Paseo 0.15.4): initializing/running -> running, idle -> done, error -> failed,
-closed -> killed. kill hard-deletes exactly the recorded agent, not merely its
-current turn. A confirmed deletion finalizes an active stage as killed; deleting
-an already-finalized agent preserves its historical stage outcome.
-An unverified dispatch cwd stays unknown until inspect explicitly confirms the
-requested directory, regardless of the agent's lifecycle state.
-
-inspect --json exposes Id/Status, not an answer field. Verified CLI 0.15.4
-`logs ID --filter assistant_message --tail 1` returns the last assistant text;
-even logs --json renders text, so this adapter deliberately does not parse it
-as JSON. Empty/unavailable output is explicitly unavailable, with the logs
-argv recorded, never a fabricated assistant response.
-
-Run artifacts include prompt.md, run.json (exact argv), state.json (monitor pid
-and agent_id), events.ndjson (observed lifecycle transitions), stderr.log,
-cli.ndjson (raw command evidence), answer.md when addressable, result.json when
-the answer carries a stage result valid against --schema, answer.partial.md
-while a pre-delete capture awaits confirmation, exit.code and finalized. The run
-dir's os.mkdir claims the slug; a kernel lock on the persistent `refresh` file
-serializes readers and is released on process exit. A finalized marker is immutable. An
-existing slug is refused rather than silently reused or replaced. Unsupported
---max-time is refused: Paseo's --wait-timeout is not an execution deadline.
-"""
+"""Native Paseo launcher: start|status|result|answer|kill|list (stdlib only)."""
 from __future__ import annotations
 
 import argparse
@@ -64,9 +28,6 @@ import stage_result
 STATES = {"initializing": "running", "running": "running", "idle": "done",
           "error": "failed", "closed": "killed"}
 EXITS = {"done": 0, "failed": 1, "killed": 143}
-# Foreground claim attempts wait half of one CLI call's 60-second budget.
-# A holder may make several calls, so no finite claim wait resolves a run:
-# the detached monitor retries every timeout until terminal evidence exists.
 CLI_TIMEOUT_SECONDS = 60
 CLAIM_WAIT_SECONDS = CLI_TIMEOUT_SECONDS / 2
 
@@ -75,41 +36,35 @@ class ClaimTimeout(RuntimeError):
     """The claim is unavailable, not evidence that the native run ended."""
 
 
-def fail(message):
-    raise RuntimeError(message)
-
-
 def configured_command():
     value = os.environ.get("PASEO_BIN") or "paseo"
     if value.lstrip().startswith("["):
         try:
             prefix = json.loads(value)
         except ValueError:
-            fail("PASEO_BIN must be an executable path or a JSON argv array")
+            raise RuntimeError("PASEO_BIN must be an executable path or a JSON argv array")
         if not isinstance(prefix, list) or not prefix or any(
                 not isinstance(part, str) or not part for part in prefix):
-            fail("PASEO_BIN JSON argv must be a non-empty array of non-empty strings")
+            raise RuntimeError("PASEO_BIN JSON argv must be a non-empty array of non-empty strings")
     else:
         prefix = [value]
     binary = os.path.expanduser(prefix[0])
     binary = binary if os.path.dirname(binary) else shutil.which(binary)
     if not binary or not os.path.isfile(binary):
-        fail(f"PASEO_BIN is not an executable on PATH: {prefix[0]}")
+        raise RuntimeError(f"PASEO_BIN is not an executable on PATH: {prefix[0]}")
     return [os.path.abspath(binary), *prefix[1:]]
 
 
-def command_argv(state, argv):
-    prefix = state["paseo_argv"]
-    hazard = support.shim_hazard(prefix[0], [*prefix[1:], *argv])
-    if hazard:
-        fail(f"{hazard}; configure PASEO_BIN as a JSON argv array naming the real executable "
-             "and CLI entrypoint (no shell)")
-    return [*support.command_prefix(prefix[0]), *prefix[1:], *argv]
+def command_argv(prefix, argv):
+    args = [*prefix[1:], *argv]
+    if hazard := support.shim_hazard(prefix[0], args):
+        raise RuntimeError(f"{hazard}; configure PASEO_BIN as a JSON argv array naming the real executable "
+                           "and CLI entrypoint (no shell)")
+    return [*support.command_prefix(prefix[0]), *args]
 
 
 def text_file(run_dir, name, text):
-    with open(os.path.join(run_dir, name), "w", encoding="utf-8", newline="") as handle:
-        handle.write(text)
+    Path(run_dir, name).write_text(text, encoding="utf-8", newline="")
 
 
 @contextmanager
@@ -125,29 +80,18 @@ def claim(path):
 
 
 def cli(state, argv):
-    command = command_argv(state, argv)
-    environment = dict(os.environ)
-    if argv[0] == "run":
-        # CLI 0.15.4 utils/caller-agent.js reads PASEO_AGENT_ID; agent/run.js
-        # reads PASEO_WORKSPACE_ID. Both override --cwd. These are the complete
-        # caller/session readers found in that CLI; preserve unrelated config.
-        for key in ("PASEO_AGENT_ID", "PASEO_WORKSPACE_ID"):
-            environment.pop(key, None)
-    # Dispatch runs in the requested worktree: provenance verification compares the
-    # CLI's reported cwd with it, so a removed worktree must fail loudly there.
-    # Lifecycle and readback commands only need a live working directory and must
-    # still reach the CLI after normal worktree cleanup.
-    cwd = state["cwd"]
-    if argv[0] != "run" and not os.path.isdir(cwd):
-        cwd = state["run_dir"]
+    command = command_argv(state["paseo_argv"], argv)
+    dispatch = argv[0] == "run"
+    # These caller identities override --cwd in Paseo 0.15.4.
+    scrub = ("PASEO_AGENT_ID", "PASEO_WORKSPACE_ID") if dispatch else ()
+    environment = {key: value for key, value in os.environ.items() if key not in scrub}
+    cwd, run_dir = state["cwd"], state["run_dir"]
     try:
-        result = gdd_process.run(command, cwd=cwd, capture_output=True,
-                                text=True, encoding="utf-8", errors="replace", timeout=CLI_TIMEOUT_SECONDS,
-                                env=environment)
+        result = gdd_process.run(command, cwd=cwd if dispatch or os.path.isdir(cwd) else run_dir,
+                                 capture_output=True, text=True, timeout=CLI_TIMEOUT_SECONDS, env=environment)
         code, stdout, stderr = result.returncode, result.stdout, result.stderr
     except (OSError, subprocess.TimeoutExpired) as exc:
         code, stdout, stderr = -1, "", str(exc)
-    run_dir = state["run_dir"]
     with open(os.path.join(run_dir, "cli.ndjson"), "a", encoding="utf-8") as handle:
         handle.write(json.dumps({"at": support.now_iso(), "argv": command, "exit": code,
                                  "stdout": stdout, "stderr": stderr}, ensure_ascii=False) + "\n")
@@ -160,31 +104,25 @@ def cli(state, argv):
 def json_cli(state, argv):
     code, stdout, stderr = cli(state, argv)
     if code:
-        fail(f"paseo {' '.join(argv[:2])}: exit {code}: {stderr.strip() or stdout.strip()}")
+        raise RuntimeError(f"paseo {' '.join(argv[:2])}: exit {code}: {stderr.strip() or stdout.strip()}")
     try:
         return json.loads(stdout)
     except ValueError:
-        fail(f"paseo {argv[0]} returned invalid JSON (see cli.ndjson)")
+        raise RuntimeError(f"paseo {argv[0]} returned invalid JSON (see cli.ndjson)")
 
 
-def answer_argv(state):
-    return ["logs", state["agent_id"], "--filter", "assistant_message", "--tail", "1"]
+def answer_argv(agent_id):
+    return ["logs", agent_id, "--filter", "assistant_message", "--tail", "1"]
 
 
 def fetch_answer(state, provisional=False):
-    code, stdout, _ = cli(state, answer_argv(state))
-    available = code == 0 and bool(stdout.strip()) and stdout.strip() != "No activity to display."
+    argv = answer_argv(state["agent_id"])
+    code, stdout, _ = cli(state, argv)
+    available = code == 0 and stdout.strip() not in ("", "No activity to display.")
     state["answer_available"] = available
-    state["answer_argv"] = [*state["paseo_argv"], *answer_argv(state)]
+    state["answer_argv"] = [*state["paseo_argv"], *argv]
     if available:
-        # A capture taken before the deletion is confirmed stays provisional: a
-        # draft at answer.md would let the answer command report it as final.
         text_file(state["run_dir"], "answer.partial.md" if provisional else "answer.md", stdout)
-
-
-def remove_quietly(path):
-    with suppress(OSError):
-        os.remove(path)
 
 
 def publish(state):
@@ -198,21 +136,21 @@ def cwd_matches(actual, requested):
 
 def finalize(state):
     run_dir = state["run_dir"]
-    if state.get("result_schema"):
+    if schema := state.get("result_schema"):
         text = ""
-        with suppress(OSError), open(os.path.join(run_dir, "answer.md"), encoding="utf-8") as handle:
-            text = handle.read()
-        state.update(stage_result.record(run_dir, text, None, state["result_schema"]))
-    state["ended"] = support.now_iso()
-    state["duration_s"] = round(support.state_age_seconds(state), 1)
-    text_file(run_dir, "exit.code", str(state["exit"]) + "\n")
+        with suppress(OSError):
+            text = Path(run_dir, "answer.md").read_text(encoding="utf-8")
+        state.update(stage_result.record(run_dir, text, None, schema))
+    state.update(ended=support.now_iso(), duration_s=round(support.state_age_seconds(state), 1))
+    exit_text = f"{state['exit']}\n"
+    text_file(run_dir, "exit.code", exit_text)
     publish(state)
-    text_file(run_dir, "finalized", str(state["exit"]) + "\n")
+    text_file(run_dir, "finalized", exit_text)
 
 
 def refresh_locked(run_dir):
     state = support.read_state(run_dir)
-    if not state or state.get("backend") != "paseo":
+    if state.get("backend") != "paseo":
         return {"name": os.path.basename(run_dir), "state": "unknown", "exit": None,
                 "error": "missing or non-Paseo state.json"}
     if os.path.exists(os.path.join(run_dir, "finalized")):
@@ -221,11 +159,11 @@ def refresh_locked(run_dir):
     try:
         agent = json_cli(state, ["inspect", state["agent_id"], "--json"])
         if not isinstance(agent, dict) or agent.get("Id") != state["agent_id"]:
-            fail("missing or mismatched agent in inspect response")
+            raise RuntimeError("missing or mismatched agent in inspect response")
         if not state.get("cwd_verified"):
             state["reported_cwd"] = agent.get("Cwd")
             if not cwd_matches(state["reported_cwd"], state["cwd"]):
-                fail(state.get("cwd_error") or "inspect did not verify the requested cwd; dispatch provenance is unknown")
+                raise RuntimeError(state.get("cwd_error") or "inspect did not verify the requested cwd; dispatch provenance is unknown")
             state["cwd_verified"] = True
             state.pop("cwd_error", None)
         native = agent.get("Status")
@@ -264,44 +202,35 @@ def find_run(name):
         return os.path.abspath(name)
     slug = support.sanitize(name)
     if not slug:
-        fail("empty run name")
+        raise RuntimeError("empty run name")
     paths = sorted(glob.glob(os.path.join(support.run_root(), "*", glob.escape(slug))), reverse=True)
-    for path in paths:
-        if os.path.isdir(path):
-            return path
-    fail(f"no recorded run: {name}")
+    if path := next(filter(os.path.isdir, paths), None):
+        return path
+    raise RuntimeError(f"no recorded run: {name}")
 
 
 def start(args):
     if args.max_time:
-        fail("--max-time is unsupported by paseo; --wait-timeout does not stop execution")
+        raise RuntimeError("--max-time is unsupported by paseo; --wait-timeout does not stop execution")
     slug = support.sanitize(args.name)
     if not slug:
-        fail("empty run name after sanitizing")
+        raise RuntimeError("empty run name after sanitizing")
     prefix = configured_command()
-    binary = prefix[0]
     cwd = os.path.abspath(os.path.expanduser(args.cwd))
     if not os.path.isdir(cwd):
-        fail(f"not a working directory: {cwd}")
+        raise RuntimeError(f"not a working directory: {cwd}")
     with open(args.prompt, encoding="utf-8") as handle:
         prompt = handle.read()
     if not prompt.strip():
-        fail("empty prompt")
+        raise RuntimeError("empty prompt")
     schema = args.schema and os.path.abspath(os.path.expanduser(args.schema))
-    if schema:
-        try:
-            with open(schema, encoding="utf-8") as handle:
-                readable = isinstance(json.load(handle), dict)
-        except (OSError, ValueError):
-            readable = False
-        if not readable:
-            fail(f"--schema {schema} is not a readable JSON object")
-    # Validate before creating a run directory or dispatching anything. Batch
-    # shims cannot carry arbitrary prompts; never send a silently shortened one.
-    command_argv({"paseo_argv": prefix}, ["run", "--cwd", cwd, "--", prompt])
+    if schema and not isinstance(support.read_json(schema), dict):
+        raise RuntimeError(f"--schema {schema} is not a readable JSON object")
+    # Refuse unsafe shim input before making a claim or dispatching.
+    command_argv(prefix, ["run", "--cwd", cwd, "--", prompt])
     root = support.run_root()
     run_dir = str(Path(root) / datetime.now().strftime("%Y-%m-%d") / slug)
-    support.warn_wsl(binary, run_dir)
+    support.warn_wsl(prefix[0], run_dir)
     for arg in prefix[1:]:
         if Path(arg).suffix.lower() == ".exe":
             support.warn_wsl(arg, run_dir=None)
@@ -311,46 +240,38 @@ def start(args):
 
 
 def start_locked(args, slug, prefix, cwd, prompt, schema, run_dir, mode, launcher):
-    binary = prefix[0]
     os.makedirs(os.path.dirname(run_dir), exist_ok=True)
     try:
         os.mkdir(run_dir)  # the slug claim
     except FileExistsError:
-        fail(f"run already recorded: {slug}; choose a fresh stage name")
+        raise RuntimeError(f"run already recorded: {slug}; choose a fresh stage name")
     with claim(os.path.join(run_dir, "refresh")):
-        state = {"name": slug, "state": "unknown", "exit": None, "cwd": cwd,
-                 "cwd_verified": False,
+        state = {"name": slug, "state": "unknown", "exit": None, "cwd": cwd, "cwd_verified": False,
                  "started": support.now_iso(), "ended": None, "duration_s": None,
-                 "backend": "paseo", "launcher": ADAPTER, "agent": binary,
-                 "paseo_argv": prefix,
-                 "run_dir": run_dir, "pid": None, "agent_id": None,
+                 "backend": "paseo", "launcher": ADAPTER, "agent": prefix[0],
+                 "paseo_argv": prefix, "run_dir": run_dir, "pid": None, "agent_id": None,
                  "session_id": "", "model": args.model, "thinking": args.thinking,
                  "result_schema": schema}
-        text_file(run_dir, "prompt.md", prompt)
-        text_file(run_dir, "stderr.log", "")
-        text_file(run_dir, "events.ndjson", "")
+        for file, text in (("prompt.md", prompt), ("stderr.log", ""), ("events.ndjson", "")):
+            text_file(run_dir, file, text)
         publish(state)
-        argv = ["run", "--no-wait", "--title", slug, "--cwd", cwd]
-        if args.model:
-            argv.extend(["--provider", args.model])
-        if args.thinking:
-            argv.extend(["--thinking", args.thinking])
-        argv.extend(["--json", "--", prompt])
+        argv = ["run", "--no-wait", "--title", slug, "--cwd", cwd,
+                *support.flags(("--provider", args.model), ("--thinking", args.thinking)), "--json", "--", prompt]
         support.write_json(os.path.join(run_dir, "run.json"),
-                           {"argv": command_argv(state, argv), "cwd": cwd,
+                           {"argv": command_argv(prefix, argv), "cwd": cwd,
                             "backend": "paseo", "launcher": ADAPTER})
         try:
             result = json_cli(state, argv)
             agent_id = result.get("agentId") if isinstance(result, dict) else None
             if not isinstance(agent_id, str) or not agent_id.strip():
-                fail("run returned no agentId; dispatch is unknown (see cli.ndjson); do not retry blindly")
+                raise RuntimeError("run returned no agentId; dispatch is unknown (see cli.ndjson); do not retry blindly")
             state.update(agent_id=agent_id, session_id=agent_id, state="running")
             publish(state)
             state["reported_cwd"] = result.get("cwd")
             if not cwd_matches(state["reported_cwd"], cwd):
                 state["cwd_error"] = ("run returned a different cwd; dispatch provenance is unknown "
                                       "(agent identity preserved; inspect before retrying)")
-                fail(state["cwd_error"])
+                raise RuntimeError(state["cwd_error"])
             state["cwd_verified"] = True
             runner = [support.interpreter(), "-B", ADAPTER, "_watch", "--run-dir", run_dir]
             pid, flags = support.spawn_detached(runner, run_dir, run_dir, dict(os.environ),
@@ -369,22 +290,21 @@ def start_locked(args, slug, prefix, cwd, prompt, schema, run_dir, mode, launche
 def watch(args):
     if not support.enter_detached(args):
         return 1
-    recorded = False
+    run_dir, pid, recorded = args.run_dir, os.getpid(), False
     while True:
         try:
             if not recorded:
-                with claim(os.path.join(args.run_dir, "refresh")):
-                    state = support.read_state(args.run_dir)
-                    if state.get("pid") != os.getpid():
-                        state.update(pid=os.getpid(), pid_identity=support.identity(os.getpid()))
+                with claim(os.path.join(run_dir, "refresh")):
+                    state = support.read_state(run_dir)
+                    if state.get("pid") != pid:
+                        state.update(pid=pid, pid_identity=support.identity(pid))
                         publish(state)
                 recorded = True
-            state = refresh(args.run_dir)
+            state = refresh(run_dir)
         except ClaimTimeout:
-            # Another reader may still be inside a permitted CLI call. Preserve
-            # its published observation; contention is not a lifecycle update.
-            state = support.read_state(args.run_dir)
-        if state.get("state") in EXITS or os.path.exists(os.path.join(args.run_dir, "finalized")):
+            # Contention is not a lifecycle update.
+            state = support.read_state(run_dir)
+        if state.get("state") in EXITS or os.path.exists(os.path.join(run_dir, "finalized")):
             return 0
         time.sleep(1)
 
@@ -395,7 +315,7 @@ def kill(run_dir):
         if state.get("agent_deleted"):
             return state
         if not state.get("agent_id"):
-            fail("kill: no recorded agent identity")
+            raise RuntimeError("kill: no recorded agent identity")
         settled = os.path.exists(os.path.join(run_dir, "finalized"))
         partial = os.path.join(run_dir, "answer.partial.md")
         if not state.get("answer_available"):
@@ -408,13 +328,15 @@ def kill(run_dir):
             # delete can exit zero even when the underlying deletion failed.
             if (not isinstance(result, dict) or type(result.get("deletedCount")) is not int
                     or result["deletedCount"] != 1 or result.get("agentIds") != [state["agent_id"]]):
-                fail("delete did not confirm termination; agent state is not killed")
+                raise RuntimeError("delete did not confirm termination; agent state is not killed")
         except BaseException:
-            remove_quietly(partial)
+            with suppress(OSError):
+                os.remove(partial)
             raise
         state.update(agent_deleted=True, termination_verb="delete", terminated_at=support.now_iso())
         if settled:
-            remove_quietly(partial)
+            with suppress(OSError):
+                os.remove(partial)
             publish(state)
         else:
             if os.path.exists(partial):
@@ -429,22 +351,21 @@ def main(argv=None):
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     commands = parser.add_subparsers(dest="command", required=True)
     launch = commands.add_parser("start")
-    launch.add_argument("--name", required=True)
-    launch.add_argument("--prompt", required=True)
+    for flag in ("--name", "--prompt"):
+        launch.add_argument(flag, required=True)
     launch.add_argument("--cwd", default=os.getcwd())
-    launch.add_argument("--model", default=os.environ.get("GDD_MODEL") or None)
-    launch.add_argument("--thinking", default=os.environ.get("GDD_THINKING") or None)
+    for key in ("model", "thinking"):
+        launch.add_argument(f"--{key}", default=os.environ.get(f"GDD_{key.upper()}") or None)
     launch.add_argument("--max-time")
     launch.add_argument("--schema", help="stage-result schema; the answer's ```json block is checked against it")
     monitor = commands.add_parser("_watch", help=argparse.SUPPRESS)
     monitor.add_argument("--run-dir", required=True)
     support.add_detach_arguments(monitor)
-    for name in ("status", "result", "answer", "kill"):
+    for name in ("status", "result", "answer", "kill", "tail"):
         sub = commands.add_parser(name)
         sub.add_argument("name")
-    tail = commands.add_parser("tail")
-    tail.add_argument("name")
-    tail.add_argument("lines", nargs="?", type=int, default=20)
+        if name == "tail":
+            sub.add_argument("lines", nargs="?", type=int, default=20)
     commands.add_parser("list")
     args = parser.parse_args(support.normalize_argv(sys.argv[1:] if argv is None else argv))
     if args.command == "start":
@@ -464,25 +385,24 @@ def main(argv=None):
     run_dir = find_run(args.name)
     state = kill(run_dir) if args.command == "kill" else refresh(run_dir)
     if args.command == "kill" and (problem := support.cleanup_supervisor(run_dir, state)):
-        fail(problem)
+        raise RuntimeError(problem)
     if args.command == "tail":
         with open(os.path.join(run_dir, "events.ndjson"), encoding="utf-8") as handle:
             sys.stdout.write("".join(handle.readlines()[-max(1, args.lines):]))
         return 0
     if args.command == "answer":
-        cached = os.path.isfile(os.path.join(run_dir, "answer.md"))
+        answer = Path(run_dir, "answer.md")
+        cached = os.path.isfile(answer)
         if state.get("state") in EXITS and not cached:
             with claim(os.path.join(run_dir, "refresh")):
                 state = support.read_state(run_dir)
                 fetch_answer(state)
                 publish(state)
-            cached = os.path.isfile(os.path.join(run_dir, "answer.md"))
+            cached = os.path.isfile(answer)
         if state.get("state") not in EXITS or not cached:
-            fallback = [*(state.get("paseo_argv") or ["paseo"]), "logs", state.get("agent_id") or "<agent-id>",
-                        "--filter", "assistant_message", "--tail", "1"]
-            fail(f"final assistant text unavailable ({state['state']}); logs argv: {json.dumps(fallback)}")
-        with open(os.path.join(run_dir, "answer.md"), encoding="utf-8") as handle:
-            sys.stdout.write(handle.read())
+            fallback = [*(state.get("paseo_argv") or ["paseo"]), *answer_argv(state.get("agent_id") or "<agent-id>")]
+            raise RuntimeError(f"final assistant text unavailable ({state['state']}); logs argv: {json.dumps(fallback)}")
+        sys.stdout.write(answer.read_text(encoding="utf-8"))
     else:
         print(json.dumps(state, indent=2, ensure_ascii=False))
     return 0
