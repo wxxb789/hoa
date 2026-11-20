@@ -6,6 +6,10 @@
 它协调每阶段独立的 authoring run、由操作者运行的 gate、脚本化的合并检查和可恢复的
 ledger。[目标契约目录](goals/README.md)是本仓库存放活跃契约的地方。
 
+将范围明确的书面任务交给一个外部编码 CLI 时，使用
+[轻量委派](../skills/gdd/SKILL.md#lightweight-delegation)。
+在隔离的 worktree 中运行，再独立验收结果；无需阶段 ledger、PR、合并门禁或合并。
+
 ## Headless route
 
 默认 launcher 是随附的 `agent_run.py` headless runner；`GDD_AGENT`

@@ -258,7 +258,7 @@
       ]
     },
     "model-escalation": {
-      "description": "Recommend a review-routing tier for a bounded task or candidate, subject to mandatory policy floors and human decisions (gdd, ai-coding-agent-delegation).",
+      "description": "Recommend a review-routing tier for a bounded task or candidate, subject to mandatory policy floors and human decisions (gdd).",
       "questions": [
         {
           "name": "route",

@@ -8,6 +8,11 @@ stage, operator-run gates, a scripted merge check, and a resumable ledger.
 The [goal contracts directory](goals/README.md) shows where this repo keeps its
 active contracts.
 
+For a written, bounded task handed to one external coding CLI, use
+[lightweight delegation](../skills/gdd/SKILL.md#lightweight-delegation).
+Run it in an isolated worktree and verify the result independently; it needs
+no stage ledger, PR, merge gate, or merge.
+
 ## Headless routes
 
 The default launcher is the bundled `agent_run.py` headless runner;

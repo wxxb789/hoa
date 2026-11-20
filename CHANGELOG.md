@@ -32,6 +32,11 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 - Separate provenance, drift, activity, and authorized retirement in `hoa-skill-curate`.
 - Keep `hoa-skill-port` focused on portability and destination validation; require separate
   authority for a live runtime swap or publication.
+- Retire `discord-rich-message` and `structural-validity-gates` without replacements.
+- Fold `cross-agent-repair-routing` into `delegated-work-acceptance` and
+  `project-phase-closeout` into `report-claim-audit`.
+- Replace `ai-coding-agent-delegation` with lightweight delegation in `gdd`:
+  isolated CLI handoffs stop at independent acceptance, without a stage ledger or merge.
 
 ## 2026-11-20
 

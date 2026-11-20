@@ -1,15 +1,16 @@
 ---
 name: delegated-work-acceptance
 description: >-
-  Accept or send back a teammate's or subagent's completed handoff. When contributors return patches
-  or claim repairs are done, inspect artifacts, recompute counts, rerun checks and compare changed
-  paths with assigned folders to detect out-of-scope writes. Not for ai-coding-agent-delegation.
+  Accept or send back a subagent handoff: inspect artifacts and diff, recount repairs and check
+  patches against assigned folders. For a bug in another worker's directory, reproduce the failing
+  command under the reporter's PATH and cwd, route it to the maintainer who owns the fix, and
+  escalate one scoped landing decision. Not for dispatch.
 metadata:
-  revision: "8"
+  revision: "10"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
-  summary: "verify a delegated \"done\" against the artifact, the re-derived numbers and the write boundary"
-  summary_zh: "验收被委派的交付：核对 artifact、重算关键数字、检查写入边界"
+  summary: "verify delegated work against artifacts and write scope; route rejected or out-of-scope fixes to their owner"
+  summary_zh: "按 artifact 和写入边界验收委派成果，将退回或越界的修复交还给负责人"
   kind: "entry"
   consumes: "work-report"
   produces: "acceptance-verdict, scope-seal"
@@ -161,6 +162,27 @@ earlier correction request. Designate one final decision artifact and explicitly
 draft options, counts and approval manifests; an old draft must not become an execution payload. Label
 static coverage, design acceptance, implementation, payload effects, scheduled-worker proof and
 delivery proof separately — a passing static gate proves neither deployment nor real behavior.
+
+## Send a rejected delivery or out-of-scope defect to its owner
+
+Use this playbook when you cannot repair the affected surface yourself. Check the claim as above
+before routing it; do not expand either agent's authority.
+
+1. Map the affected paths to their write owner and identify who can authorize landing. Check for
+   scheduled publication before touching a shared tree: a sweep can pick up unrelated in-flight
+   work. Re-read the live paths before any authorized apply.
+2. Reproduce with the reporter's exact command, tool binary, PATH order, cwd and relevant
+   environment. Use the project's own tool and capture the command's exit code before piping
+   output. Resolve paths from the tree, not masked logs. Use an isolated copy with equivalent
+   dependency resolution if a probe writes; in-place probes and CI reruns need explicit authority.
+   Read the failed step's log to distinguish infrastructure from code; if authorized, rerun only
+   the failed job and retain both results.
+3. Give the write owner the exact paths, exclusions, reproduction and runnable acceptance check.
+   Check sibling call sites; on a second same-class defect, require an invariant, a corpus with
+   controls, and before/after evidence. Route generated output fixes to the generator.
+4. Ask the landing owner for one scoped decision, with your recommendation, rollback unit and
+   cost of waiting. Stop when only authorization remains. Re-verify a revised delivery and any
+   automated review on the exact candidate before accepting; approval of a prior head is stale.
 
 ## Output shape
 

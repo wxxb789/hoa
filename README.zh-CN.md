@@ -46,6 +46,7 @@ npx skills add wxxb789/hoa -g -s official-document-verification
 
 面向需要交接一项书面、可机器检查的增量工作的仓库负责人，[`gdd`](skills/gdd/SKILL.md)
 定义交付协议：目标、分阶段 agent run、由操作者运行的 gate，以及脚本化的合并检查。
+单次外部 CLI 交接可用轻量委派，在独立验收后停止，无需阶段 ledger 或合并。
 Agent route 单独安装。只有 OMP（`gdd-route-omp`）对模型可见；DeepSeek Harness、
 Codex、Claude Code、Pi、OpenCode、Omo 和 GitHub Copilot route 均隐藏。
 可选的 [Paseo GDD Observer](paseo-plugins/gdd-observer/README.md) 是只读插件，

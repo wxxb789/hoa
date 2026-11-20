@@ -1,15 +1,15 @@
 ---
 name: gdd
 description: >-
-  Take an agreed, machine-checkable repo increment through implementation, PR review and authorized
-  merge, then branch the next goal. When asked to start the next goal or resume delivery, use fresh
-  authoring sessions, operator-run gates and a saved stage ledger. Not for define-goal.
+  Take a written repo goal through fresh authoring stages, PR review, operator-run gates and authorized merge, or
+  resume from a saved stage ledger. Hand a bounded patch or review to a CLI agent with a written brief and isolated
+  checkout; compare independent coding assistants in separate worktrees and check changes before integration.
 metadata:
-  revision: "18"
+  revision: "19"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
-  summary: "goal contract → agent-authored stages → operator-run gates → scripted merge gate → resumable ledger; ships `gdd.py`, `delivery-state.py`, `pr-merge-check.py`"
-  summary_zh: "目标契约 → agent 分阶段产出 → operator 验收 → 脚本化合并门禁 → 可续跑账本；随附 `gdd.py`、`delivery-state.py`、`pr-merge-check.py`"
+  summary: "deliver a goal through staged authoring, gates and authorized merge, or verify one isolated CLI handoff without shipping"
+  summary_zh: "用分阶段产出、门禁和授权合并交付目标，或单次委派给隔离的 CLI 并独立验收，不发布"
   kind: "controller"
   consumes: "goal-contract"
   produces: "chain-plan"
@@ -17,9 +17,8 @@ metadata:
 
 # Goal-driven delivery
 
-One written increment (a goal), authored by a coding agent, verified and landed by the operator, with
-the loop running end to end and no per-step approval. **Done** is merged *and* the next goal branched
-off the merged head — an open PR is not done.
+In full delivery, an agent authors one written increment and the operator verifies and lands it.
+**Done** is merged and the next goal branched from the merged head, not merely an open PR.
 
 ## When to Use
 
@@ -31,6 +30,13 @@ off the merged head — an open PR is not done.
 
 Not for: one-line fixes, exploratory poking with no acceptance criteria, or work whose result no
 machine can check.
+
+## Lightweight delegation
+
+For a bounded coding CLI handoff, read [lightweight delegation](references/lightweight-delegation.md).
+Require a written brief, isolated Git worktree, explicit CLI and stop authority, and independent
+acceptance. Stop on unsafe or out-of-scope work. No ledger, commit, push, PR, merge gate or merge.
+The stages below apply only to full delivery.
 
 ## Stage order — fixed, no skipping
 
@@ -74,11 +80,6 @@ verification plan for a repo that ships on more than one OS — a green local ru
 Read [`references/run-failure-modes.md`](references/run-failure-modes.md) before adding a selftest case or
 believing a run's report of itself: a test can kill the process under test, a stubbed test can pass for
 the wrong reason, and an exit code can disagree with the artifact it produced.
-
-## Playbooks
-
-Stage detail lives in `references/phases/*.md` (mapped in the Phase table above). Read the phase file
-matching the current stage directly — do not create per-phase skills.
 
 ## Stop conditions — when to stop and ask
 

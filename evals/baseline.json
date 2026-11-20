@@ -1,11 +1,11 @@
 {
-  "case_count": 32,
+  "case_count": 35,
   "model": "gemini-4-carbon",
   "effort": "low",
-  "passed": 32,
-  "total": 32,
+  "passed": 35,
+  "total": 35,
   "judge_endpoint_host": "127.0.0.1:4141",
-  "generated_at": "2026-11-19T15:55:19Z",
+  "generated_at": "2026-11-20T16:44:06Z",
   "per_case": [
     {
       "id": "route-to-search",
@@ -95,6 +95,21 @@
     {
       "id": "route-explicit-gdd",
       "pick": "gdd",
+      "passed": true
+    },
+    {
+      "id": "route-lightweight-delegation-to-gdd",
+      "pick": "gdd",
+      "passed": true
+    },
+    {
+      "id": "route-out-of-scope-defect-to-delegated-work-acceptance",
+      "pick": "delegated-work-acceptance",
+      "passed": true
+    },
+    {
+      "id": "route-milestone-closeout-to-report-claim-audit",
+      "pick": "report-claim-audit",
       "passed": true
     },
     {

@@ -108,13 +108,31 @@
       "id": "route-contract-increment-to-gdd",
       "request": "这个增量我已经写好验收契约（可观测的通过条件、判定工件、失败对照都齐了），帮我从分支开始一路跑到合并，不用逐步问我。",
       "must_pick": ["gdd"],
-      "distractors": ["hermes-kanban", "ai-coding-agent-delegation"]
+      "distractors": ["hermes-kanban", "delegated-work-acceptance"]
     },
     {
       "id": "route-explicit-gdd",
       "request": "跑 GDD：下一个 goal 端到端交付并合并，合并后直接起下一个分支。",
       "must_pick": ["gdd"],
-      "distractors": ["hermes-kanban", "project-phase-closeout", "gdd-route-dsh"]
+      "distractors": ["hermes-kanban", "report-claim-audit", "gdd-route-dsh"]
+    },
+    {
+      "id": "route-lightweight-delegation-to-gdd",
+      "request": "Give this written bugfix brief to an external coding CLI in its own Git worktree. Check its diff and rerun the acceptance commands yourself, but leave integration to me; no stage ledger or PR.",
+      "must_pick": ["gdd"],
+      "distractors": ["delegated-work-acceptance", "parallel-agent-worktrees", "hermes-kanban"]
+    },
+    {
+      "id": "route-out-of-scope-defect-to-delegated-work-acceptance",
+      "request": "The shared checkout's failing file belongs to another agent. Reproduce the failure under the reporter's PATH and working directory, route it to the path owner, and give me one scoped landing decision. Do not patch it yourself.",
+      "must_pick": ["delegated-work-acceptance"],
+      "distractors": ["report-claim-audit", "gdd", "hermes-ops-claim-verification"]
+    },
+    {
+      "id": "route-milestone-closeout-to-report-claim-audit",
+      "request": "Before we start the next project phase, inventory what is still open, reconcile the goal files and index with the release and the version production actually loads, and give me the one remaining closeout decision. Leave everything unchanged.",
+      "must_pick": ["report-claim-audit"],
+      "distractors": ["define-goal", "gdd", "delegated-work-acceptance"]
     },
     {
       "id": "route-boundaryless-goal-to-spec-first",
