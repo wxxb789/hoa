@@ -18,7 +18,7 @@
       "id": "route-to-goal-definition",
       "request": "Help me turn 'make our product enterprise-ready' into goal prompts I can run one at a time, getting an inspectable result roughly every half day without dictating implementation.",
       "must_pick": ["define-goal"],
-      "distractors": ["ghc-search", "parallel-agent-worktrees"]
+      "distractors": ["spec-convergence", "ghc-search", "parallel-agent-worktrees"]
     },
     {
       "id": "route-to-goal-refinement",
@@ -121,6 +121,66 @@
       "request": "我想把团队的发布流程改成全自动，目标定大一点，顺便把这季度的计划排出来。但现在连这件事该包含什么、什么算做完了都还没想清楚。",
       "must_pick": ["spec-convergence"],
       "distractors": ["define-goal", "gdd"]
+    },
+    {
+      "id": "route-to-report-claim-audit",
+      "request": "Before I approve the next sprint, audit this weekly dispatch digest: recompute its completion counts from the per-ticket records, reconcile missing deliverables against the manifest, and list the decisions still open. Leave the digest and deliverables unchanged.",
+      "must_pick": ["report-claim-audit"],
+      "distractors": ["delegated-work-acceptance", "hermes-ops-claim-verification"]
+    },
+    {
+      "id": "route-to-evidence-boundary-discipline",
+      "request": "Revise this regulator profile using only the two dated press releases I supplied. The page treats a planned launch as current and calls an unmentioned pilot canceled. Fix the tense, citations, and provenance labels without looking for new sources.",
+      "must_pick": ["evidence-boundary-discipline"],
+      "distractors": ["official-document-verification", "evidence-backed-analytical-writing"]
+    },
+    {
+      "id": "route-to-official-document-verification",
+      "request": "Our policy note says section 904 extends the subsidy. Compare the engrossed House and Senate bill prints, locate the provision by number and subject, and tell me exactly which print supports the claim. Do not rewrite the note.",
+      "must_pick": ["official-document-verification"],
+      "distractors": ["evidence-boundary-discipline", "report-claim-audit"]
+    },
+    {
+      "id": "route-to-delegated-work-acceptance",
+      "request": "The worker says the migration batch is done. Inspect its actual patch against the assigned file list, recount which migrations were delivered, and decide whether I should accept the handoff or send it back. Do not fix it yourself.",
+      "must_pick": ["delegated-work-acceptance"],
+      "distractors": ["report-claim-audit", "review-revision-candidates"]
+    },
+    {
+      "id": "route-to-measurement-campaign-evidence",
+      "request": "Our release is acceptable only if the packaged candidate's p95 import latency stays under 250 ms at three dataset sizes. Pin that exact package, run the candidate and comparator serially, and leave one reproducible measurement report as acceptance evidence.",
+      "must_pick": ["measurement-campaign-evidence"],
+      "distractors": ["report-claim-audit", "delegated-work-acceptance"]
+    },
+    {
+      "id": "route-to-research-stream-consolidation",
+      "request": "Two researchers collected overlapping material in separate project folders. Move the newer collection into the canonical project, deduplicate identical files, and repair the manifests and citations that point to the old paths. Preserve both researchers' provenance.",
+      "must_pick": ["research-stream-consolidation"],
+      "distractors": ["evidence-backed-analytical-writing", "delegated-work-acceptance"]
+    },
+    {
+      "id": "route-to-review-revision-candidates",
+      "request": "The reviewer rejected v2 of the policy page patch with four numbered fixes. Use only those fixes to build a v3 patch in scratch and map its hunks to the review items. Leave v2 and the working tree unchanged.",
+      "must_pick": ["review-revision-candidates"],
+      "distractors": ["evidence-boundary-discipline", "delegated-work-acceptance"]
+    },
+    {
+      "id": "route-to-evidence-backed-analytical-writing",
+      "request": "Write a new Chinese policy brief on why regional grid batteries are being deployed unevenly. Start from my hypotheses, look up recent sources, and explain what mechanism each key figure supports and where the evidence falls short.",
+      "must_pick": ["evidence-backed-analytical-writing"],
+      "distractors": ["evidence-boundary-discipline", "official-document-verification"]
+    },
+    {
+      "id": "route-to-hermes-ops-claim-verification",
+      "request": "Hermes says the nightly backup schedule is fixed, but all I saw was a successful manual retry. Check scheduler history and backup receipts to establish whether the next scheduled run actually fired and completed.",
+      "must_pick": ["hermes-ops-claim-verification"],
+      "distractors": ["report-claim-audit", "delegated-work-acceptance"]
+    },
+    {
+      "id": "no-trigger-evidence-terminology",
+      "request": "In a footnote, what does 'ibid.' mean?",
+      "must_pick": ["none"],
+      "distractors": ["evidence-boundary-discipline", "official-document-verification"]
     },
     {
       "id": "no-trigger-python-expression",

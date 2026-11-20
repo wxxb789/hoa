@@ -1,7 +1,11 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.13"
+# dependencies = ["pyyaml>=6"]
+# ///
 """Offline tests for check_contract_graph.
 
-Run: python scripts/test_check_contract_graph.py
+Run: uv run --script scripts/test_check_contract_graph.py
 Builds synthetic skills/, registry and trigger-case trees under
 .tmp-artifacts/ and exercises every contract rule CI depends on.
 """
@@ -144,7 +148,7 @@ class ContractGraphTests(unittest.TestCase):
         self.assertEqual(self.violations(), [])
 
     def test_r4_mechanism_must_not_be_a_must_pick_but_may_be_a_distractor(self):
-        make_skill(self.tmp, "runner", kind="mechanism", produces="gate-result")
+        make_skill(self.tmp, "runner", kind="mechanism", produces="gate-result", hidden=True)
         write_trigger_cases(self.tmp, [
             {"id": "route-to-runner", "must_pick": ["runner"], "distractors": []},
             {"id": "other-route", "must_pick": ["other"], "distractors": ["runner"]},
@@ -181,6 +185,18 @@ class ContractGraphTests(unittest.TestCase):
         lines = [item for item in self.violations() if ": R5: " in item]
         self.assertEqual(len(lines), 3, self.violations())
         self.assertTrue(any("must produce 'chain-plan'" in item for item in lines))
+
+    def test_r11_visible_mechanism_needs_another_skill_to_name_it(self):
+        make_skill(self.tmp, "gate-runner", kind="mechanism")
+        make_skill(self.tmp, "hidden-runner", kind="mechanism", hidden=True)
+        parent = make_skill(self.tmp, "gate-runner-extra", kind="entry")
+        line = self.assert_rule("R11")
+        self.assertIn("skills/gate-runner/SKILL.md", line)
+
+        reference = parent / "references" / "runner.md"
+        reference.parent.mkdir()
+        reference.write_text("Read `../../gate-runner/SKILL.md`.\n", encoding="utf-8")
+        self.assertEqual(self.violations(), [])
 
     def test_r5_valid_controller(self):
         make_skill(self.tmp, "router", kind="controller", produces="chain-plan")
@@ -269,7 +285,7 @@ class ContractGraphTests(unittest.TestCase):
 
     def test_main_summary_and_list(self):
         make_skill(self.tmp, "runner", kind="mechanism",
-                   consumes="gate-spec", produces="gate-result")
+                   consumes="gate-spec", produces="gate-result", hidden=True)
         make_skill(self.tmp, "plain", kind="entry")
         write_registry(self.tmp, external=["gate-spec"],
                        terminal={"gate-result": "the operator reads it"})

@@ -6,12 +6,12 @@ description: >-
   handoff comes back "complete" and must become a ruling on what to authorize or send back.
   Not for grading your own work, or when no artifact exists.
 metadata:
-  revision: "6"
+  revision: "7"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
   summary: "verify a delegated \"done\" against the artifact, the re-derived numbers and the write boundary"
   summary_zh: "验收被委派的交付：核对 artifact、重算关键数字、检查写入边界"
-  kind: "mechanism"
+  kind: "entry"
   consumes: "work-report"
   produces: "acceptance-verdict, scope-seal"
 ---

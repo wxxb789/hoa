@@ -11,16 +11,18 @@ names. The graph is valid only when every consumed artifact has exactly one
 producer (or is registered external), every producer is unambiguous, and every
 produced artifact is consumed by some skill or listed under `terminal:` in the
 registry with a one-line reason. A hidden skill (`disable-model-invocation:
-true`) is never a routing target, so it must not be a `must_pick`.
+true`) is never a routing target, so it must not be a `must_pick`. A visible
+mechanism must be named in another skill's SKILL.md or Markdown references.
 
 Usage:
-    python scripts/check_contract_graph.py          # exit 1 on violations
-    python scripts/check_contract_graph.py --list   # print the graph
+    uv run --script scripts/check_contract_graph.py          # exit 1 on violations
+    uv run --script scripts/check_contract_graph.py --list   # print the graph
 """
 from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -37,6 +39,7 @@ KINDS = ("controller", "stage", "mechanism", "entry")
 REGISTRY = Path("scripts") / "contract_graph_registry.yaml"
 TRIGGER_CASES = Path("evals") / "trigger-cases.json"
 MAX_CONTROLLER_LINES = 120
+SKILL_NAME = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 
 
 @dataclass(frozen=True)
@@ -165,6 +168,18 @@ def analyze(root: Path | None = None) -> Result:
     by_name = {skill.name: skill for skill in skills}
     violations: list[str] = []
 
+    visible_mechanisms = {skill.name for skill in skills
+                          if skill.kind == "mechanism" and not skill.hidden}
+    referenced = set()
+    for skill in skills:
+        skill_md = root / skill.path
+        candidates = visible_mechanisms - {skill.name} - referenced
+        if not candidates:
+            continue
+        for document in (skill_md, *(skill_md.parent / "references").rglob("*.md")):
+            referenced.update(candidates.intersection(
+                SKILL_NAME.findall(document.read_text(encoding="utf-8"))))
+
     produced: dict[str, list[str]] = {}
     for skill in skills:
         for artifact in skill.produces:
@@ -186,6 +201,9 @@ def analyze(root: Path | None = None) -> Result:
                                   f"produced by a skill nor registered external")
 
         if skill.kind == "mechanism":
+            if skill.name in visible_mechanisms and skill.name not in referenced:
+                violations.append(f"{skill.path}: R11: visible mechanism {skill.name!r} "
+                                  "is not named or linked by another skill")
             for case_id, must_pick in cases:
                 if skill.name in must_pick:
                     violations.append(f"{skill.path}: R4: mechanism is a must_pick in "

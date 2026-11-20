@@ -109,7 +109,7 @@ skill 用 `metadata.summary` / `metadata.summary_zh`，库 artifact 用索引注
 | `entry` | 可由用户请求直接路由。它可以消费/生产 artifact，但不需要 controller 来调用。 | 例如 `ghc-search`、`hoa-skill-create`、`spec-convergence` |
 | `controller` | 路由一条链：决定哪个 stage 运行，且只生产 `chain-plan`。 | `gdd` |
 | `stage` | 链中的一个阶段，由它的 controller 调用。声明它消费和生产什么。 | 目前没有 |
-| `mechanism` | 只由另一个 skill 调用，永远不是路由目标。CI 拒绝把它列为 trigger case 的 `must_pick`。 | `delegated-work-acceptance` |
+| `mechanism` | 只由另一个 skill 调用，永远不是路由目标。CI 拒绝把它列为 trigger case 的 `must_pick`。 | `gdd-route-dsh` |
 
 ### 面（Surfaces）
 

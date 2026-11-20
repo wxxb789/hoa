@@ -86,6 +86,7 @@ CI (`.github/workflows/ci.yml`) fails on:
 | `disable-model-invocation` not a kebab-case YAML boolean, or `true` without `agents/openai.yaml` `policy.allow_implicit_invocation: false`, or the reverse | `scripts/check_frontmatter.py` | Visibility 1–2 |
 | A `../<sibling>/` reference in `SKILL.md` or `references/**/*.md` that names no sibling skill or no existing path; one that leaves `skills/` only warns | `scripts/check_skill_links.py` | Chaining 1–2 |
 | A hidden skill in `must_pick` (`R10`) | `scripts/check_contract_graph.py` | Visibility 5 |
+| A visible mechanism that no other skill names or links in its `SKILL.md` or `references/**/*.md` (`R11`) | `scripts/check_contract_graph.py` | visible mechanisms have a caller |
 | A generated `npx skills add` row that does not name a skill's whole `../` closure, or an `npx skills remove` line that does not match `scripts/retired_skills.toml` (a registry entry that is a current skill or lacks `replacement`/`reason` fails too) | `scripts/generate_index.py --check` | install-closure invariant ([cross-platform-skills.md](cross-platform-skills.md)); stale names after a rename or split |
 
 On a machine, the user-run hoa-skill-set-audit diagnoses an installed set: a parent's `../` closure

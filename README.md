@@ -119,7 +119,7 @@ the layer is a fact about the tree, not a label someone remembers to add.
 | `entry` | Directly routable from a user request. It may consume/produce artifacts, but it needs no controller to be invoked. | e.g. `ghc-search`, `hoa-skill-create`, `spec-convergence` |
 | `controller` | Routes a chain: decides which stage runs, and produces only `chain-plan`. | `gdd` |
 | `stage` | One phase of a chain, invoked by its controller. Declares what it consumes and produces. | none at present |
-| `mechanism` | Invoked only by another skill; never a routing target. CI rejects it as a trigger-case `must_pick`. | `delegated-work-acceptance` |
+| `mechanism` | Invoked only by another skill; never a routing target. CI rejects it as a trigger-case `must_pick`. | `gdd-route-dsh` |
 
 ### Surfaces
 

@@ -1,24 +1,24 @@
 ---
 name: official-document-verification
 description: >-
-  Verify a load-bearing claim against the exact document print: pin the version, scan by number and
-  content, and fetch what a plain client cannot. Use when a conclusion rests on a bill, statute, audit
-  report, regulator's page or other artifact whose wording and version decide it. Not for ordinary
-  web reading where the page is the source of record.
+  Verify a claim whose answer turns on the exact version or wording of an official document,
+  such as a bill, statute, audit report, or regulator's notice. Pin the print, scan by section and
+  subject, and handle blocked fetches when needed. Not for auditing a whole status report or
+  rewriting prose from sources already verified.
 metadata:
-  revision: "4"
+  revision: "5"
   areas: "work-management"
   targets: "runtime-agnostic"
   summary: "verify a claim against the exact print of the document, including artifacts a plain client cannot fetch"
   summary_zh: "用文档的确切版本核验结论，含只能用真浏览器取到的被封来源"
-  kind: "mechanism"
+  kind: "entry"
 ---
 
 # Official document verification
 
 Use when a load-bearing claim rests on a bill, a statute, an audit report, a regulator's page, or any
-artifact whose exact version and exact wording decide the conclusion — and when that artifact is behind
-bot protection, a jurisdictional gate, or a page a plain HTTP client cannot reach.
+artifact whose exact version and exact wording decide the conclusion. If a plain HTTP client cannot
+reach it, use the access checks in section 3.
 
 Companion skills: `evidence-backed-analytical-writing`
 (claim hygiene and report structure), `hermes-ops-claim-verification` (cron results and "fixed" claims). This

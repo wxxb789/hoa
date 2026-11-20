@@ -1,17 +1,16 @@
 ---
 name: review-revision-candidates
 description: >-
-  Run a revision round on a reviewer-rejected candidate: re-read governing files, treat the
-  numbered list as the whole change set, build vN+1 without editing the rejected patch, and deliver
-  bytes plus anchors, not prose. Use when a patch, draft or page edit comes back REJECTED with items
-  to fix. Not for open-ended rewrites or reviewing others' work.
+  Build a new version of a rejected patch, draft, or page edit from the reviewer's numbered fixes.
+  Preserve the rejected candidate and the working tree; deliver the new files, patch, and anchors.
+  Not for auditing the review, applying fixes directly, or doing an open-ended rewrite.
 metadata:
-  revision: "2"
+  revision: "3"
   areas: "work-management"
   targets: "runtime-agnostic"
   summary: "run a rejected candidate's revision round: the numbered list is the whole change set"
   summary_zh: "被驳回候选的返修轮：编号清单就是全部变更集，交的是字节不是辩解"
-  kind: "mechanism"
+  kind: "entry"
 ---
 
 # Revision rounds on a rejected candidate
