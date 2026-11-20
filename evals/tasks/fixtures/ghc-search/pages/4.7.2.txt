@@ -1,0 +1,5 @@
+URL: https://sdk.morrow.invalid/releases/4.7.2
+Version: 4.7.2
+Published: 2026-11-17
+Channel: stable
+Page last edited: 2026-11-19

@@ -1,0 +1,4 @@
+URL: https://sdk.morrow.invalid/releases/4.8.0-rc.2
+Version: 4.8.0-rc.2
+Published: 2026-11-20
+Channel: preview

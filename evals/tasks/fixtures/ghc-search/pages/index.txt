@@ -1,0 +1,6 @@
+URL: https://sdk.morrow.invalid/releases
+
+Current build: Canary 4.9.0-dev.6
+Featured release: Preview 4.8.0-rc.2 (https://sdk.morrow.invalid/releases/4.8.0-rc.2)
+Generally available: Patch train (https://sdk.morrow.invalid/releases/4.7.2)
+LTS maintenance: 3.12.9 (https://sdk.morrow.invalid/releases/3.12.9)

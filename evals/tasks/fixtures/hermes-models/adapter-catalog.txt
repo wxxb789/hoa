@@ -1,0 +1,4 @@
+provider | picker-label | advertised-model
+edge-main | swift | swift-v4
+relay-b | swift-compat | finch-2.0
+relay-c | swift-compat | finch-1.8

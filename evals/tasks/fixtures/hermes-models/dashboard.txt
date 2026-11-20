@@ -1,0 +1,5 @@
+Profile: Inbox
+Picker label: swift
+Provider: edge-main
+Requested effort: high
+Status: mapped

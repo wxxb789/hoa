@@ -1,0 +1,16 @@
+{
+  "id": "ghc-search",
+  "skill": "ghc-search",
+  "fixture": "fixtures/ghc-search",
+  "prompt": "Find the latest stable Morrow SDK as of 2026-11-20, and say whether the vendor's social team called that exact version stable. Work entirely from the local replay in replay.md and pages/. Use file reads only. Never invoke a search script, proxy health check, browser, network client or real endpoint, even if a workflow normally calls for one. Return a bare JSON object with next_step (one replay action ID for each of the SDK and social tickets, keyed sdk and social), version (no leading v), release_date (ISO date), channel (lowercase), source_url, and social_confirmation (confirmed, contradicted or unverified). Pick actions you would use after reading the two initial responses; don't execute them.",
+  "terse": "Search when you have no URL. Use X search for X posts, and prefer library documentation tools for API questions. Once you have a promising result, fetch the source and verify the specific claim there instead of relying on the snippet.",
+  "shell": ["codex"],
+  "rubric": {
+    "follow-known-vendor-index": {"field": "next_step", "equals": {"sdk": "A2", "social": "A5"}},
+    "stable-version": {"field": "version", "equals": "4.7.2"},
+    "official-release-date": {"field": "release_date", "equals": "2026-11-17"},
+    "declared-release-channel": {"field": "channel", "equals": "stable"},
+    "cite-release-not-index-or-preview": {"field": "source_url", "equals": "https://sdk.morrow.invalid/releases/4.7.2"},
+    "no-evidence-from-sourceless-answer": {"field": "social_confirmation", "equals": "unverified"}
+  }
+}

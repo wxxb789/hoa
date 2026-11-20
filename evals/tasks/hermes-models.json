@@ -1,0 +1,19 @@
+{
+  "id": "hermes-models",
+  "skill": "hermes-models",
+  "fixture": "fixtures/hermes-models",
+  "prompt": "A dashboard says the Inbox Hermes profile is on swift at high effort. Is that the route a fresh ordinary Inbox session actually uses? Diagnose only the supplied offline fixture. Read operations.md; the only allowed shell actions are file reads and its synthetic Bash-builtin probe. Do not query or change real Hermes, configs, endpoints or adapters, and do not write probe receipts yourself. Return bare JSON with requested_alias, configured_provider, session_model, provider, effort, fallback_active, and mismatch (one sentence). Only assert what you have proved.",
+  "terse": "Inspect model and provider settings at the layer that actually resolves them. Separate a profile's requested model, provider aliases and observed active route. Verify with a minimal runtime check before declaring a model available or changed.",
+  "shell": true,
+  "rubric": {
+    "configured-alias": {"field": "requested_alias", "equals": "swift"},
+    "configured-provider": {"field": "configured_provider", "equals": "edge-main"},
+    "session-model": {"field": "session_model", "equals": "finch-2.1"},
+    "effective-provider": {"field": "provider", "equals": "relay-b"},
+    "effective-effort": {"field": "effort", "equals": "low"},
+    "fallback-was-active": {"field": "fallback_active", "equals": true},
+    "inert-profile-probe": {"file": "inbox-chat.txt", "contains": "PROBE_OK session=inbox-probe fallback_active=true provider=relay-b"},
+    "correlated-session-row": {"file": "inbox-session.txt", "contains": "session=inbox-probe model=finch-2.1"},
+    "resolve-effort-for-served-model": {"file": "inbox-reasoning.txt", "contains": "session=inbox-probe model=finch-2.1 effort=low"}
+  }
+}
