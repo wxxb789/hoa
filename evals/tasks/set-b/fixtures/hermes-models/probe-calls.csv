@@ -1,0 +1,4 @@
+home,session_id,invocation,reply
+root,R102,fresh default session,PROBE_OK
+desk,D205,fresh default session,PROBE_OK
+filing,F306,fresh default session,PROBE_OK

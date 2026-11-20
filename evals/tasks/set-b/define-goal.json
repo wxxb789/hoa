@@ -1,0 +1,25 @@
+{
+  "id": "set-b-define-goal",
+  "skill": "define-goal",
+  "fixture": "fixtures/define-goal",
+  "shell": ["codex"],
+  "prompt": "Please turn the Bracken archive brief into the next numbered goal prompts I can hand off. Use the records in this folder to reconcile the old roadmap with the current commitments. Don't execute the goals or edit the records. Reply as a bare JSON object with a files object (proposed numbered Markdown filename to complete file contents) and an index I can import. For the index, use an object per track in a separate top-level field named permit, lookup, or expansion. In each track map the relevant checkpoint IDs from milestones.csv to {number, after, mode}, where number is the integer goal number, after is the immediate prerequisite checkpoint ID or null, and mode is run, record, or provisional. Include only checkpoints that have their own numbered file. Follow the owner's recommended track order.",
+  "terse": "Define numbered, verifiable outcomes that preserve the larger ambition. Size the next commitment for useful feedback, ground success in credible evidence, and leave the implementation to the receiving agent.",
+  "rubric": {
+    "permit-boundary": {"field": "permit", "equals": {
+      "PKT": {"number": 2, "after": "INV", "mode": "run"},
+      "LIC": {"number": 3, "after": "PKT", "mode": "record"}
+    }},
+    "owner-review-is-not-a-goal": {"field": "lookup", "equals": {
+      "FND": {"number": 4, "after": "INV", "mode": "run"}
+    }},
+    "unresolved-acceptance": {"field": "expansion", "equals": {
+      "PUB": {"number": 5, "after": "LIC", "mode": "provisional"}
+    }}
+  },
+  "notes": {
+    "permit-boundary": "SKILL.md#make-success-credible: preserve the desired license but separate verifiable registry handoff from the outside decision; do not make a run wait for the panel.",
+    "owner-review-is-not-a-goal": "SKILL.md#make-success-credible and #let-detail-follow-evidence: the owner's review is part of the same lookup goal after the run. The independent track is not blocked by the earlier permit track.",
+    "unresolved-acceptance": "SKILL.md#let-detail-follow-evidence: unresolved disclosure scope changes acceptance and cannot be a reversible default, but it does not block a ready first goal. Keep the final outcome in the series as provisional."
+  }
+}

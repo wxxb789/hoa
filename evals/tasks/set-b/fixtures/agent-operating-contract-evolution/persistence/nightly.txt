@@ -1,0 +1,9 @@
+Export of the currently scheduled command bundle (documentation, not executable):
+
+  cedarctl store shape --root archive
+  cedarctl store status --root archive --check frontmatter
+  cedarctl store sync --root archive
+
+Stop on a nonzero exit from any of the three commands.
+The separate maintainer cheat sheet shows: cedarctl store status --check links.
+That invocation is not in the nightly schedule.

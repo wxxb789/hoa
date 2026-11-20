@@ -1,0 +1,26 @@
+{
+  "id": "set-b-hermes-models",
+  "skill": "hermes-models",
+  "fixture": "fixtures/hermes-models",
+  "shell": ["codex"],
+  "prompt": "The North Spit operator wants to close the route-verification ticket. Reconcile the exported Hermes homes and telemetry with the draft closeout. This is a read-only review of recorded data: do not run Hermes, OMP, or a live probe, and do not write settings. Return bare JSON with background (map each active home ID to {agent_jobs, on_pool}, both counts), omp_models (map the model IDs in the closeout's OMP claims to booleans for currently selectable in that harness), and verified (map active home IDs to booleans for whether the intended fresh-session default switch is proven by this ticket). Include brief evidence and recommended missing checks in additional fields.",
+  "terse": "Audit routing at the layer that actually resolves each request. Preserve intentional differences between homes, and use runtime evidence rather than treating a saved setting as proof.",
+  "rubric": {
+    "agent-cron-counts": {"field": "background", "equals": {
+      "root": {"agent_jobs": 2, "on_pool": 1},
+      "desk": {"agent_jobs": 2, "on_pool": 2},
+      "filing": {"agent_jobs": 1, "on_pool": 0}
+    }},
+    "managed-harness-catalog": {"field": "omp_models", "equals": {
+      "shoal-3": true, "spray-2": false, "dune-1": true
+    }},
+    "correlated-proof-per-home": {"field": "verified", "equals": {
+      "root": true, "desk": false, "filing": false
+    }}
+  },
+  "notes": {
+    "agent-cron-counts": "SKILL.md#gates and rule 16, references/delegation-routing.md#pinning-a-whole-class-of-background-jobs: inventory each active home's cron store, ignore script jobs' inert stamps, and resolve enabled unpinned agent jobs against their own home's default.",
+    "managed-harness-catalog": "SKILL.md#gates and rule 19, references/config-drift-audit.md#pitfalls-seen-in-practice: an OMP invocation can get IDs from a managed store even when not in models.yml; stale YAML can also list an ID the live catalog does not offer.",
+    "correlated-proof-per-home": "SKILL.md#proof and rule 4: a same-home before/after session model pair, a real fresh-session reply, and the intended resolved effort must agree; verify provider separately from the sessions table. Two rows already on the target do not prove a switch; an older row outside the before/after pair does not fix that."
+  }
+}

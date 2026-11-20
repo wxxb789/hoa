@@ -1,0 +1,7 @@
+{
+  "jobs": [
+    {"id": "d-digest", "enabled": true, "script": null, "model": "dune-1", "provider": "eddy", "labels": ["background"]},
+    {"id": "d-reconcile", "enabled": true, "script": null, "model": null, "provider": null, "labels": ["accounting"]},
+    {"id": "d-check", "enabled": true, "script": "check.py", "model": "dune-1", "provider": "eddy", "labels": ["background"]}
+  ]
+}

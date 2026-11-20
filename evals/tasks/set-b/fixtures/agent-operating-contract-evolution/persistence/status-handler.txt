@@ -1,0 +1,12 @@
+Export of the relevant dispatcher branches (pseudocode):
+
+  checks = set(args.check)
+  if "frontmatter" in checks:
+      require_clean(check_frontmatter(root))
+  if "links" in checks:
+      require_clean(find_orphan_entries(root))
+  else:
+      print("link audit skipped")
+
+The shape command validates layer names. The sync command stages the
+allowlisted roots and scans for secrets; neither calls find_orphan_entries.

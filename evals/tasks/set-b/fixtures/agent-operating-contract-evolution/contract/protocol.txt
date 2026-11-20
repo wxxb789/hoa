@@ -1,0 +1,6 @@
+Cedar workspace operating protocol export: CEDAR-OPS
+
+In the accession repository, register dates in UTC and use shelf IDs.
+Public desk notes cite the accession receipt when a receipt is handy.
+The persistence job owns commits to the store. A cataloger never commits.
+The protocol is installed at the Cedar checkout root, not in every intake lane.

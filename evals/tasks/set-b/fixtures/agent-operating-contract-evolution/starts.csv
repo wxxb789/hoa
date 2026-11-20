@@ -1,0 +1,4 @@
+id,cwd,git_root,local_candidates
+desk,cedar,cedar,OVERLAY;CEDAR-OPS
+intake,cedar/intake/night,cedar,
+scratch,scratch,none,SCRATCH-OPS

@@ -1,0 +1,7 @@
+id,track,checkpoint,source
+INV,inventory,Accepted inventory,001-inventory.md
+PKT,permit,Validated packet lodged,registry-bulletin.md
+LIC,permit,Redistribution license granted,registry-bulletin.md
+FND,lookup,Desk lookup usable,desk-pilot.md
+RVW,lookup,Owner sees demo,owner-brief.md
+PUB,expansion,Public edition available,owner-brief.md

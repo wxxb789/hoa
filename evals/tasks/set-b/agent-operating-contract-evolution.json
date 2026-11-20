@@ -1,0 +1,18 @@
+{
+  "id": "set-b-agent-operating-contract-evolution",
+  "skill": "agent-operating-contract-evolution",
+  "fixture": "fixtures/agent-operating-contract-evolution",
+  "shell": ["codex"],
+  "prompt": "The Cedar archive owner wants a draft-only change that makes attribution mandatory on every archive delivery, including work produced by delegated catalogers. Read the exported contract, startup captures, and persistence material. Do not edit or execute anything in the packet, change a runtime, or attempt a delivery. Return bare JSON with placement (the packet-relative path of the canonical contract document to amend), loaded (map the three startup IDs in starts.csv to the ID of the contract text currently in the project slot, or null), child_handoff (map each rule ID in handoff.md to a boolean for whether to put that rule explicitly in the cataloger's request), and link_audit_blocks_sync (boolean under the shipped job, not after your proposal). Include a draft text patch and a short rationale with the records you relied on.",
+  "terse": "Treat the operating contract as a layered system. Put each behavior in its owning layer, keep changes narrow and consistent, and verify what the runtime actually does.",
+  "rubric": {
+    "global-invariant": {"field": "placement", "equals": "contract/identity.txt"},
+    "delegation-context-loss": {"field": "child_handoff", "equals": {"ATTR": true, "TONE": false, "SYNC": false}},
+    "gate-call-site": {"field": "link_audit_blocks_sync", "equals": false}
+  },
+  "notes": {
+    "global-invariant": "SKILL.md#route-by-task and references/context-file-loading-probes.md#mutual-exclusion-rule-the-slot: use the stable identity slot for the global delivery invariant. The protocol is cwd-bound and can be preempted by an overlay. The ungraded loaded field provides the evidence for the placement, not a second score for transcribing it.",
+    "delegation-context-loss": "SKILL.md#gates and references/context-file-loading-probes.md#subagent--delegation-blind-spot: the child with skipped context files needs the relevant invariant passed explicitly, not the parent's unrelated rules.",
+    "gate-call-site": "SKILL.md#gates and references/asset-store-vs-workspace-routing.md#4-verify-every-gate-at-the-call-site: a callable check is not a blocking preflight when its scheduled caller omits the option that enables it."
+  }
+}

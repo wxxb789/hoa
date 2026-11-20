@@ -1,0 +1,23 @@
+{
+  "R10": {
+    "exit": 0,
+    "stdout": {"mode": "web_search", "answer": "Notice FQ-73: 07:00 to 18:00; exception: level access only after 16:00.", "sources": []},
+    "stderr": ""
+  },
+  "R11": {
+    "exit": 0,
+    "stdout": {"mode": "web_search", "answer": "Notice FQ-73: 07:00 to 18:00. The operating exception is\n\n[truncated: hit --max-tokens]", "sources": [{"n": 1, "url": "https://notices.fallowquay.example/orders/FQ-73", "title": "Signed order FQ-73"}]},
+    "stderr": ""
+  },
+  "R12": {
+    "exit": 1,
+    "stdout": null,
+    "stderr": "ghc-search: response status='incomplete', expected 'completed'. {'reason': 'content_filter'}",
+    "operator_note": "A diagnostic trace had a candidate URL, but no successful command output."
+  },
+  "R13": {
+    "exit": 0,
+    "stdout": {"mode": "web_search", "answer": "Signed notice FQ-73 sets 07:00 to 18:00, with level access only after 16:00.", "sources": [{"n": 1, "url": "https://register.fallowquay.example/orders/FQ-73", "title": "Signed order FQ-73"}]},
+    "stderr": ""
+  }
+}

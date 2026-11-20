@@ -1,0 +1,7 @@
+{
+  "capture_method": "Startup prompt marker extraction, before any reads or progressive context hints",
+  "desk": {"identity": ["IDENTITY"], "project": ["OVERLAY"]},
+  "intake": {"identity": ["IDENTITY"], "project": []},
+  "scratch": {"identity": ["IDENTITY"], "project": ["SCRATCH-OPS"]},
+  "cataloger": {"parent": "desk", "skip_context_files": true, "identity": ["BUILTIN"], "project": []}
+}

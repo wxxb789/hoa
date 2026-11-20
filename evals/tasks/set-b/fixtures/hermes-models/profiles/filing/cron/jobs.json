@@ -1,0 +1,7 @@
+{
+  "jobs": [
+    {"id": "f-sweep", "enabled": true, "script": null, "model": null, "provider": null, "labels": ["filing"]},
+    {"id": "f-mtime", "enabled": true, "script": "mtime.py", "model": "dune-1", "provider": "eddy", "labels": ["background"]},
+    {"id": "f-reminder", "enabled": false, "script": null, "model": "dune-1", "provider": "eddy", "labels": ["retired"]}
+  ]
+}
