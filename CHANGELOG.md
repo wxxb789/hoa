@@ -6,6 +6,8 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 ## 2026-11-20
 
+- Record the B8 orchestration case study (native Paseo against gdd on one real goal) in
+  `evals/results/2026-11-20-b8-orchestration.md`.
 - Give Pi necessity trials a 3000-second default timeout, ten times the other runtimes, for DeepSeek's long thinking.
 - Default necessity screening to Pi with Tencent LiteLLM DeepSeek V4.1 Flash Fast and max thinking.
   Reuse the gdd Pi route with isolated provider config, tool-trace load checks, and cache usage reporting.
