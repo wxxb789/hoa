@@ -8,6 +8,72 @@ when `--api decisions` (`EVALS_API=decisions` or `api: decisions` in
 `run_necessity_eval.py` compares outcomes on the same task with no skill (`none`),
 frozen short instructions (`terse`), and the installed skill (`skill`).
 
+## Measure description distinctiveness
+
+Run this manual check after editing skill descriptions. Use the same requests
+for the current listing and the draft; omit `--llm` for an offline comparison.
+The output prefix produces a Markdown summary (`.md`) and detailed JSON (`.json`).
+
+```sh
+uv run --script evals/run_skill_distinctiveness.py --output .tmp-artifacts/distinctiveness/current
+uv run --script evals/run_skill_distinctiveness.py --descriptions draft.json --output .tmp-artifacts/distinctiveness/draft
+```
+
+`--descriptions` takes a partial JSON object of skill names to replacement
+descriptions, such as `{"define-goal": "Draft description"}`. Unlisted skills
+and visibility flags are unchanged. `--skills-dir` overrides the checkout's
+`skills/` directory.
+
+The default [holdout](distinctiveness/holdout.jsonl) is frozen and now public:
+it is a regression set, not an independent test for new drafts. Judge drafts
+on a freshly written set with `--queries PATH`. Use JSONL rows with unique
+`id`, `text`, `lang` (`en` or `zh-CN`), and `skill` (an expected name or
+`none`). For exploratory replay, pass `--queries evals/distinctiveness/dev.jsonl`.
+The development set preserves its original `request`/`language`/`expected`
+schema and six historical targets outside the skill catalog; these are
+reported separately, not relabeled as `none`.
+
+For model selection, configure `DISTINCTIVENESS_BASE_URL` (API root such as
+`https://example.invalid/v1`), `DISTINCTIVENESS_MODEL`, and
+`DISTINCTIVENESS_API_KEY`; the tool uses the OpenAI-compatible
+`/chat/completions` API. Alternatively, pass `--pi-models PATH --pi-provider NAME`
+to read a named provider's `baseUrl`, `apiKey` (literal, environment name,
+`$VAR` or `${VAR}`), and sole model ID. Environment variables override the
+provider fields; set `DISTINCTIVENESS_MODEL` if the provider lists multiple
+models. No credential commands are executed. Pass only a trusted endpoint:
+each request and the visible listing are sent to it.
+
+```sh
+uv run --script evals/run_skill_distinctiveness.py --llm --orders 2 --output .tmp-artifacts/distinctiveness/llm
+```
+
+- **BM25:** Indexes names plus descriptions of all skills (including hidden
+  skills), with `k1=1.2`, `b=0.75`, and unique lowercase Unicode query terms.
+  Language denominators exclude `none` and out-of-catalog targets. Top-1 is
+  the exact first-choice rate; MRR averages inverse expected rank. Margin is
+  expected score minus best alternative score. Equal scores sort by name,
+  even on all-zero queries; the positive-score columns keep the same
+  denominator but count zero expected scores as misses. Chinese is not
+  segmented or translated, so look at the all-zero count before drawing
+  conclusions.
+- **TF-IDF:** A higher nearest-neighbor cosine means more lexical overlap, not
+  proof of misrouting. Every skill can be a neighbor; the visible mean/max
+  summarize only visible targets.
+- **LLM:** Only visible skills are listed; hidden and outside-catalog targets
+  are skipped. The tool records top-1, top-3, and `none` precision/recall per
+  order and averages across orders. Invalid or failed calls count as misses,
+  not abstentions; check coverage. Distinct shuffles start at seed 52026;
+  expect at least one request per eligible row per order. Use the same
+  model and orders for a comparison.
+
+The [published measurement](results/2026-11-20-description-distinctiveness.md)
+used the default holdout, two shuffles, and `--reasoning-effort max` on its
+provider. The offline metrics are deterministic. For LLM requests the default
+`--max-tokens` is 8192; the tool retries malformed rankings once with a
+two-backup prompt. To use a larger output budget, set `--max-tokens` explicitly;
+the historical run used extended-budget retries for unresolved requests.
+Model results can vary even at temperature zero.
+
 ## Run a necessity comparison
 
 Use uv with Python 3.13 or newer and a native executable, not a batch shim.

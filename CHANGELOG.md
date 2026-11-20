@@ -4,6 +4,11 @@ Entries are dated and optional; no CI gate requires one. There is no project ver
 counts its own iterations in `metadata.revision`. Earlier entries retain the retired project
 `VERSION` numbers and historical per-skill versions.
 
+## 2026-11-21
+
+- Add a [manual skill description distinctiveness measurement](evals/README.md#measure-description-distinctiveness)
+  with offline BM25 and TF-IDF, optional LLM routing, and the development and public regression sets.
+
 ## 2026-11-20
 
 - Rewrite all 37 model-visible skill descriptions for clearer routing; see the
