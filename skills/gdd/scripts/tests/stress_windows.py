@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.13"
-# dependencies = ["pytest==9.2.0", "pytest-timeout==2.5.0"]
+# dependencies = []  # pytest pins come from scripts/requirements.txt: pass --with-requirements
 # ///
 """Repeat a focused lifecycle suite in fresh guarded Windows interpreters."""
 

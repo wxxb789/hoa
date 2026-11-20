@@ -19,7 +19,7 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.3
       - name: Run ten serial lifecycle passes
         timeout-minutes: 20
-        run: uv run --python 3.13 --script skills/gdd/scripts/tests/stress_windows.py "${{ runner.temp }}/gdd-stress"
+        run: uv run --python 3.13 --with-requirements scripts/requirements.txt --script skills/gdd/scripts/tests/stress_windows.py "${{ runner.temp }}/gdd-stress"
       - name: Upload pytest and teardown diagnostics
         if: always()
         uses: actions/upload-artifact@v4
