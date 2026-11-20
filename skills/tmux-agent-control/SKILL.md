@@ -1,11 +1,11 @@
 ---
 name: tmux-agent-control
 description: >-
-  Drive a live TUI coding agent in a tmux pane: locate it by process, read its real state, wait for
-  idle, then hand it one complete instruction without corrupting the session. Use when taking over
-  or monitoring an interactive agent turn. Not for one-shot generation — run that headless.
+  Take over or monitor an interactive coding agent in a tmux pane. When asked to send the next
+  prompt after the current turn, find the process and pane, read its terminal state and wait until
+  the TUI is idle before sending the whole instruction. Not for ai-coding-agent-delegation.
 metadata:
-  revision: "2"
+  revision: "3"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "drive a live TUI agent in tmux: find the pane, prove idle, send one complete instruction"

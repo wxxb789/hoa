@@ -1,11 +1,12 @@
 ---
 name: cross-agent-repair-routing
 description: >-
-  Get a defect repaired when it sits in another agent's write surface: establish the authority map,
-  rule on the claim, reproduce under the reporter's environment, and escalate one scoped landing
-  decision. Use when you found a bug you may not fix in a shared tree. Not for fixing your own files.
+  Send a bug back to the maintainer who owns the affected files instead of patching outside your
+  write scope. When a shared checkout or automated publisher is involved, rerun the failing command
+  under the reporter's PATH and working directory, then escalate one scoped landing decision. Not
+  for delegated-work-acceptance.
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "route a defect found in another agent's write surface: authority map, reproduction, one scoped landing decision"

@@ -1,12 +1,11 @@
 ---
 name: dotnet-repo-workflow
 description: >-
-  Build, gate and ship a .NET (C#/F#) change: the repo's own gate harness instead of a hand-rolled
-  `dotnet test`, lock-file mechanics, Roslyn in-memory compilation traps, and the PR merge-ready
-  checklist. Use when a .NET build/test fails, a NuGet package is added, or a .NET change is ready
-  for a PR. Not for the repo's code style (its own AGENTS.md).
+  Build, test and prepare a C# or F# patch for merge through the repository's .NET build script.
+  When the SDK is missing from PATH, a NuGet change touches packages.lock.json, or Roslyn in-memory
+  tests hit CS1061, check those specific failure modes. Not for package-release-verification.
 metadata:
-  revision: "2"
+  revision: "3"
   areas: "software-development"
   targets: "runtime-agnostic"
   summary: "run the repo's own .NET gate harness instead of a hand-rolled `dotnet test`; lock files, Roslyn harness traps, merge-ready checklist"

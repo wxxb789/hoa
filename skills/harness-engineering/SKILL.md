@@ -1,12 +1,11 @@
 ---
 name: harness-engineering
 description: >-
-  Restructure and design harnesses — scheduled operational scripts, drift checkers, watchdogs,
-  gated data pipelines around a repo or agent system. Use when helper scripts outgrow one screen,
-  checkers multiply, or a harness subsystem needs a home. Not for one-off scripts or application
-  code. Repo-wide review: hoa-repo-reckoning (explicit shortcut).
+  Refactor a repo's watchdogs, drift checkers or cron scripts into self-contained modules and a thin
+  runner. When maintenance scripts sprawl or checks multiply, consolidate duplicate machinery and
+  tie each check to an owner decision. Not for agent-harness-settings-parity.
 metadata:
-  revision: "4"
+  revision: "5"
   areas: "software-development"
   targets: "runtime-agnostic"
   summary: "restructure and design harness scripts: self-containment, obligations bound to owner decisions, pure checks plus one thin runner, net-negative line budget"

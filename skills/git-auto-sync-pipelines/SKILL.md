@@ -1,12 +1,12 @@
 ---
 name: git-auto-sync-pipelines
 description: >-
-  Design a scheduled commit/push pipeline for a hand-edited repo: ordered preflight gates, scope
-  allowlist, size cap, staged secret scan, rebase-then-push, heartbeat and deduped alerts. Use when
-  a notes or research repo must sync on a schedule or an existing auto-sync needs a safety review.
-  Not for repos with a review/PR workflow or one-off commits.
+  Automate unattended Git commits and pushes for a hand-edited notes vault or research repo. When an
+  auto-sync job faces upstream edits or oversized binaries, enforce branch guard, path allowlist,
+  size cap and staged secret scan before rebase and push; add a heartbeat and deduplicated alerts.
+  Not for gdd.
 metadata:
-  revision: "4"
+  revision: "5"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "scheduled commit/push for hand-edited repos: ordered gates, allowlist and size caps, staged secret scan, heartbeat and deduped alerts"

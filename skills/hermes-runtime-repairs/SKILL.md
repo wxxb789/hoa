@@ -1,12 +1,12 @@
 ---
 name: hermes-runtime-repairs
 description: >-
-  Repair repository-owned wrappers and scheduled routines without confusing source correctness with
-  deployment. Use when a generated file misbehaves and the fix belongs in its template or generator,
-  or when a reviewed patch must be landed and then materialized into a live runtime. Not for editing
-  generated output by hand.
+  Fix a generated Hermes wrapper, cron routine or profile at its repository-owned template or
+  generator. When a patch is in Git but the running job is stale, check the staged output,
+  materialize it through the owning repo and read back the authorized deployment. Not for
+  hermes-updates.
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "software-development,work-management"
   targets: "hermes"
   summary: "repair the template/generator, prove the staged artifact, then deploy and read back the live runtime"

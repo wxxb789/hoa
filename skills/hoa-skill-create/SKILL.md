@@ -1,12 +1,11 @@
 ---
 name: hoa-skill-create
 description: >-
-  Create a skill for a defined capability, or evolve or compose (split, hide, chain) an existing
-  skill from a concrete failure or improvement target. Use when asked to create or change a skill.
-  Not for read-only reviews (hoa-skill-review), porting to a shared repo (hoa-skill-port), or
-  qualifying recurring work from history (hoa-practice-retro).
+  Create a new installable skill or evolve or compose an existing one for a defined capability. When
+  packaging a checklist as SKILL.md, correcting a behavior failure or deciding to split, hide or
+  chain entrypoints, validate the package with realistic tasks. Not for hoa-skill-review.
 metadata:
-  revision: "4"
+  revision: "5"
   areas: "software-development,work-management,self-management"
   targets: "runtime-agnostic"
   summary: "directly create, evolve or compose a defined skill with focused, risk-scaled validation"

@@ -6,6 +6,8 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 ## 2026-11-20
 
+- Rewrite all 37 model-visible skill descriptions for clearer routing; see the
+  [held-out measurement](evals/results/2026-11-20-description-distinctiveness.md).
 - Keep recommendations based on recent work in `hoa-skill-curate` only; keep `hoa-skill-set-audit` report-only.
 - Hide `gdd-route-dsh` from model routing, leaving OMP as the only model-visible GDD route.
 - Remove the `ghc-search` proxy health-check example; the script reports unreachable endpoints.

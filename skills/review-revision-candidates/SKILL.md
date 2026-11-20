@@ -1,11 +1,11 @@
 ---
 name: review-revision-candidates
 description: >-
-  Build a new version of a rejected patch, draft, or page edit from the reviewer's numbered fixes.
-  Preserve the rejected candidate and the working tree; deliver the new files, patch, and anchors.
-  Not for auditing the review, applying fixes directly, or doing an open-ended rewrite.
+  Build vN+1 of a rejected patch, draft or page edit from the reviewer's numbered corrections. When
+  resubmitting without touching the working tree, keep the rejected version immutable and deliver
+  revised files, a new patch and exact anchors. Not for hoa-skill-review.
 metadata:
-  revision: "3"
+  revision: "4"
   areas: "work-management"
   targets: "runtime-agnostic"
   summary: "run a rejected candidate's revision round: the numbered list is the whole change set"

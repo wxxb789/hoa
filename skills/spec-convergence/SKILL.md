@@ -1,12 +1,11 @@
 ---
 name: spec-convergence
 description: >-
-  Resolve undecided scope, acceptance criteria, or testing boundaries into a confirmed spec.
-  Ask fact-backed questions one concern at a time; confirm before writing. Use define-goal to
-  sequence or refine numbered outcome goals once the next outcome's boundaries are settled.
-  Not for an already specified change or a one-line fix.
+  Turn an ambiguous request into an agreed spec before implementation. When scope, exclusions, edge
+  cases or acceptance behavior are undecided, ask fact-backed questions one concern at a time, name
+  the test boundary and confirm the answers before writing. Not for define-goal.
 metadata:
-  revision: "5"
+  revision: "6"
   areas: "software-development"
   targets: "runtime-agnostic"
   summary: "converge an unclear request into a confirmed spec: one root concern per round, a capped number of questions per round, every question backed by the fact that makes it real, explicit shared-understanding confirmation before writing"

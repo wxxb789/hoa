@@ -1,12 +1,12 @@
 ---
 name: evidence-boundary-discipline
 description: >-
-  State only what dated sources support: tense per dateline, one provenance label everywhere, cited
-  paragraphs, absence never means "does not exist". Use when writing or revising a knowledge page,
-  monitor delta, entity section or delivery table from reports, press releases or partial legal
-  text. Not for collecting or grading sources (claim auditing).
+  Revise a knowledge page, company profile, monitoring delta or delivery table without overstating
+  cited sources. When a source describes a plan, is silent or conflicts with another entry, align
+  tense to the dateline, match provenance labels and cite factual paragraphs without inferring
+  absence. Not for official-document-verification.
 metadata:
-  revision: "4"
+  revision: "5"
   areas: "work-management"
   targets: "runtime-agnostic"
   summary: "state only what a dated source supports: tense to dateline, provenance-label parity, absence never escalates"

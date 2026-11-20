@@ -1,11 +1,11 @@
 ---
 name: discord-rich-message
 description: >-
-  Send structured tables and reports into Discord within its real limits: Components V2 payloads,
-  monospace aligned tables, and the attachment fallback. Use when a plain Discord message would show
-  raw pipes or truncate. Discord only — other platforms have their own rich-message systems.
+  Send aligned tables or structured messages to a Discord channel with Components V2, monospace code
+  blocks or a file attachment. When Markdown pipes render literally or text exceeds Discord's
+  message limit, choose the payload that fits. Not for writing.
 metadata:
-  revision: "2"
+  revision: "3"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "structured Discord messages within platform limits: Components V2, aligned code-block tables, attachment fallback"

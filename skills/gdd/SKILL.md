@@ -1,12 +1,11 @@
 ---
 name: gdd
 description: >-
-  Land a written, machine-checkable repo increment end to end: a goal contract, a fresh authoring-agent
-  run per stage, operator-run gates, a scripted merge gate, and a resumable ledger. Use when an
-  increment is delegated end to end, including the merge. Not for one-line fixes, exploration without
-  acceptance criteria, or work no machine can check.
+  Take an agreed, machine-checkable repo increment through implementation, PR review and authorized
+  merge, then branch the next goal. When asked to start the next goal or resume delivery, use fresh
+  authoring sessions, operator-run gates and a saved stage ledger. Not for define-goal.
 metadata:
-  revision: "16"
+  revision: "17"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "goal contract → agent-authored stages → operator-run gates → scripted merge gate → resumable ledger; ships `gdd.py`, `delivery-state.py`, `pr-merge-check.py`"

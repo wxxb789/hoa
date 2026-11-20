@@ -1,12 +1,12 @@
 ---
 name: measurement-campaign-evidence
 description: >-
-  Run a measurement campaign as the evidence phase of a goal whose pass condition is a size, duration,
-  count or ratio: pin the shipped candidate, measure serially, keep one report set, and never let a
-  comparator fake a latency. Use when the numbers are the acceptance criterion, or when accepting
-  someone else's campaign. Not for a plain gate run.
+  Benchmark the shipped candidate across sizes or topologies against a numeric acceptance threshold.
+  When cold start, p95 latency, footprint or a ratio decides pass/fail, pin the payload, measure
+  serially and reject mixed report sets or shortcuts in the comparator. Not for
+  package-release-verification.
 metadata:
-  revision: "2"
+  revision: "3"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "bind the candidate, measure serially, keep one report set, never let a comparator fake a latency"
