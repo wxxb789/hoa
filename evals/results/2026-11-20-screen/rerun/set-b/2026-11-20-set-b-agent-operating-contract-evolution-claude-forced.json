@@ -1,0 +1,1121 @@
+{
+  "schema_version": 3,
+  "task": "set-b-agent-operating-contract-evolution",
+  "generated_at": "2026-11-20T17:45:08.838637+08:00",
+  "skill": "agent-operating-contract-evolution",
+  "skill_revision": "6",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "forced",
+  "shell": false,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "global-invariant": {
+      "field": "placement",
+      "equals": "contract/identity.txt"
+    },
+    "delegation-context-loss": {
+      "field": "child_handoff",
+      "equals": {
+        "ATTR": true,
+        "TONE": false,
+        "SYNC": false
+      }
+    },
+    "gate-call-site": {
+      "field": "link_audit_blocks_sync",
+      "equals": false
+    }
+  },
+  "rubric_flags": {
+    "global-invariant": "flaky",
+    "delegation-context-loss": "non-discriminating",
+    "gate-call-site": "non-discriminating"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": false,
+      "passed": 1,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": null,
+      "pass^k": null,
+      "mean_score": null,
+      "sample_stddev": null
+    },
+    "terse": {
+      "valid": true,
+      "passed": 2,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.6666666666666666,
+      "pass^k": false,
+      "mean_score": 0.8888888888888888,
+      "sample_stddev": 0.1924500897298753
+    },
+    "skill": {
+      "valid": true,
+      "passed": 2,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 0.6666666666666666,
+      "pass^k": false,
+      "mean_score": 0.8888888888888888,
+      "sample_stddev": 0.1924500897298753
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "terse": 0.0
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "```json\n{\"placement\":\"contract/identity.txt\",\"loaded\":{\"desk\":\"OVERLAY\",\"intake\":null,\"scratch\":\"SCRATCH-OPS\"},\"child_handoff\":{\"ATTR\":true,\"TONE\":false,\"SYNC\":false},\"link_audit_blocks_sync\":false,\"patch\":\"--- a/contract/identity.txt\\n+++ b/contract/identity.txt\\n@@ -3,3 +3,5 @@\\n The archive steward keeps source material separate from interpretations.\\n+Every claim in a delivery-bound entry carries its accession source. A claim\\n+without a source is marked unsourced and withheld from delivery, whoever drafted it,\\n+including delegated cataloger work.\\n Never pass private accession details to a delivery recipient.\\n\",\"rationale\":\"Placement: contract/identity.txt is labeled the canonical identity input, and the other contract files are an overlay, a base protocol, and a scratch protocol that are not the identity text. Loaded: starts.csv lists desk (OVERLAY), intake (no project candidate), and scratch (SCRATCH-OPS). prompt-captures.json shows the project slots as desk [OVERLAY], intake [] (so null), and scratch [SCRATCH-OPS]. Child handoff: the cataloger's identity is BUILTIN with no project context and skip_context_files is true, so identity.txt will not reach it. ATTR must be restated in the cataloger brief. TONE applies only to direct owner messages, which a cataloger does not send. SYNC is false because a cataloger only drafts and never persists; the persistence job owns commits. Link audit: the scheduled nightly bundle runs shape, status --check frontmatter, and sync. The links check appears only in the maintainer cheat sheet and is not scheduled. Sync does not call find_orphan_entries, so the orphan-link audit does not block sync. The onboarding sheet claim that it does is stale. Records relied on: contract/identity.txt, contract/overlay.txt, contract/protocol.txt, contract/scratch-protocol.txt, handoff.md, persistence/nightly.txt, persistence/status-handler.txt, prompt-captures.json, starts.csv. No packet files were edited or executed and no delivery was attempted.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "global-invariant": true,
+          "delegation-context-loss": true,
+          "gate-call-site": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 14.873,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 9883,
+          "cache_read_input_tokens": 14712,
+          "output_tokens": 2610,
+          "output_tokens_details": {
+            "thinking_tokens": 994
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 9883
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27211,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0026880949999999997,
+        "turns": 11
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "```json\n{\"placement\":\"contract/protocol.txt\",\"loaded\":{\"desk\":\"OVERLAY\",\"intake\":null,\"scratch\":\"SCRATCH-OPS\"},\"child_handoff\":{\"ATTR\":true,\"TONE\":false,\"SYNC\":false},\"link_audit_blocks_sync\":false,\"draft_patch\":\"--- a/contract/protocol.txt\\n+++ b/contract/protocol.txt\\n@@ -3,3 +3,5 @@\\n In the accession repository, register dates in UTC and use shelf IDs.\\n Public desk notes cite the accession receipt when a receipt is handy.\\n The persistence job owns commits to the store. A cataloger never commits.\\n+Every claim in a delivery-bound entry carries its accession source, or is explicitly marked unsourced and withheld from delivery. This applies to work produced by delegated catalogers as well as to direct desk work.\\n+Delegated cataloger briefs must restate this attribution rule, because catalogers do not inherit the project overlay or context files.\\n The protocol is installed at the Cedar checkout root, not in every intake lane.\",\"rationale\":\"Placement: contract/protocol.txt is the workspace operating protocol installed at the checkout root and is the base protocol. The overlay (OVERLAY) states it is not the base protocol and supplements it, so the attribution rule belongs in the base. identity.txt is the identity input and scratch-protocol.txt applies only to scratch lanes. Loaded: starts.csv IDs map to the project slot in prompt-captures.json, which was captured before any reads: desk holds OVERLAY, scratch holds SCRATCH-OPS, and intake has an empty project slot, so null. Child handoff: the cataloger capture shows skip_context_files true, a BUILTIN identity, and an empty project slot, so it inherits neither the overlay nor the protocol. ATTR therefore goes in its brief explicitly. TONE is for reporting to the owner, which a cataloger never does, so false. SYNC concerns the persistence job's commits, which a cataloger never performs, so false, keeping its brief limited to drafting. Link audit: persistence/nightly.txt schedules shape, status --check frontmatter, and sync only. The links check appears only in the maintainer cheat sheet, not the schedule. The dispatcher in persistence/status-handler.txt runs the links audit only when 'links' is requested, and sync does not call find_orphan_entries, so the shipped job does not block sync on orphan links. Records relied on: contract/identity.txt, contract/overlay.txt, contract/protocol.txt, contract/scratch-protocol.txt, handoff.md, starts.csv, prompt-captures.json, persistence/nightly.txt, persistence/status-handler.txt. No files were edited, nothing was executed, and no delivery was attempted.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "global-invariant": false,
+          "delegation-context-loss": true,
+          "gate-call-site": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 16.626,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 7781,
+          "cache_read_input_tokens": 26769,
+          "output_tokens": 2855,
+          "output_tokens_details": {
+            "thinking_tokens": 1045
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 7781
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 37413,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002668615,
+        "turns": 12
+      },
+      {
+        "valid": false,
+        "invalid_reasons": [
+          "agent failed (exit 1)"
+        ],
+        "error": "agent failed (exit 1)",
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "",
+        "answer_format": "none",
+        "artifacts": {},
+        "checks": {
+          "global-invariant": false,
+          "delegation-context-loss": false,
+          "gate-call-site": false
+        },
+        "score": 0.0,
+        "passed": false,
+        "seconds": 17.818,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 7797,
+          "cache_read_input_tokens": 26751,
+          "output_tokens": 2730,
+          "output_tokens_details": {
+            "thinking_tokens": 1411
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 7797
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 37286,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002607935,
+        "turns": 12
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\"placement\": \"contract/identity.txt\", \"loaded\": {\"desk\": \"OVERLAY\", \"intake\": null, \"scratch\": \"SCRATCH-OPS\"}, \"child_handoff\": {\"ATTR\": true, \"TONE\": false, \"SYNC\": false}, \"link_audit_blocks_sync\": false, \"draft_patch\": \"--- a/contract/identity.txt\\n+++ b/contract/identity.txt\\n@@ -3,3 +3,4 @@\\n The archive steward keeps source material separate from interpretations.\\n Never pass private accession details to a delivery recipient.\\n+Every claim in a delivery-bound archive entry carries its accession source, or is explicitly marked unsourced and withheld from delivery. This applies to entries drafted by delegated catalogers.\\n Tone: short and decisive in messages to the owner.\\n\", \"rationale\": \"Placement: identity.txt is the file the packet calls the canonical identity input, and the ATTR rule belongs to the identity layer, not the overlay or protocol. Loaded: starts.csv maps desk to the OVERLAY project slot, scratch to SCRATCH-OPS, and intake has an empty project slot (prompt-captures.json lists [] for intake), so null. child_handoff: the cataloger's identity is BUILTIN with skip_context_files true, so the identity amendment will not reach it; it drafts delivery-bound entries, so ATTR goes in its request. It never talks to the owner or commits, so TONE and SYNC are excluded (handoff.md: keep its brief limited to work it does). link_audit_blocks_sync: nightly.txt schedules store shape, store status --check frontmatter, and store sync, with no links check. status-handler.txt shows the links branch runs only when --check links is passed, and sync does not call find_orphan_entries, so the shipped job does not block on orphan links. The maintainer cheat sheet's --check links is not scheduled. Records relied on: starts.csv, prompt-captures.json, handoff.md, contract/identity.txt, contract/overlay.txt, contract/protocol.txt, contract/scratch-protocol.txt, persistence/nightly.txt, persistence/status-handler.txt. Nothing in the packet was edited or executed, and no runtime was changed or delivery attempted. The patch is a draft only.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "global-invariant": true,
+          "delegation-context-loss": true,
+          "gate-call-site": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 15.33,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 9963,
+          "cache_read_input_tokens": 14843,
+          "output_tokens": 2837,
+          "output_tokens_details": {
+            "thinking_tokens": 1195
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 9963
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27649,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0028129049999999997,
+        "turns": 11
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\"placement\":\"contract/protocol.txt\",\"loaded\":{\"desk\":\"OVERLAY\",\"intake\":null,\"scratch\":\"SCRATCH-OPS\"},\"child_handoff\":{\"ATTR\":true,\"TONE\":false,\"SYNC\":false},\"link_audit_blocks_sync\":false,\"draft_patch\":\"--- a/contract/protocol.txt\\n+++ b/contract/protocol.txt\\n@@ Cedar workspace operating protocol (CEDAR-OPS)\\n+Attribution (mandatory on every archive delivery):\\n+- Every claim in a delivery-bound entry must carry its accession source. An entry with any claim lacking a source must be marked unsourced and withheld from delivery.\\n+- This applies to every delivery, including entries drafted by delegated catalogers. A parent who delivers a cataloger's draft is responsible for checking that its claims are sourced before delivery.\\n+- Catalogers draft only. They do not message the owner, deliver, or commit to the store.\\n\",\"rationale\":\"placement: protocol.txt is the base protocol (CEDAR-OPS, installed at checkout root). overlay.txt states it is not the base protocol, so the amendment belongs in the base document. identity.txt covers steward and privacy rules, not delivery attribution. loaded: starts.csv lists desk, intake, scratch. prompt-captures.json shows the desk project slot holds OVERLAY, intake's project slot is empty (null), and scratch's project slot holds SCRATCH-OPS. child_handoff: handoff.md says a cataloger only drafts, never talks to the owner or persists, and its brief should cover only work it does. So ATTR is true (it drafts delivery-bound entries). TONE is false (it does not report to the owner). SYNC is false (it never publishes or commits; protocol.txt says the persistence job owns commits). Catalogers also skip context files per prompt-captures.json, so ATTR must be stated explicitly in the request. link_audit_blocks_sync: nightly.txt lists the scheduled bundle as shape, status --check frontmatter, and sync. The links check is not in that schedule. status-handler.txt shows the links branch runs only when 'links' is requested, and that the else branch just prints 'link audit skipped'. Sync calls neither find_orphan_entries nor the links audit, so orphan links do not block the nightly sync. The overlay's and onboarding sheet's claim otherwise is not supported by these records. Records relied on: handoff.md, starts.csv, prompt-captures.json, contract/identity.txt, contract/overlay.txt, contract/protocol.txt, contract/scratch-protocol.txt, persistence/nightly.txt, persistence/status-handler.txt. Nothing in the packet was edited or executed, no runtime was changed, and no delivery was attempted.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "global-invariant": false,
+          "delegation-context-loss": true,
+          "gate-call-site": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 16.182,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 5306,
+          "cache_read_input_tokens": 19455,
+          "output_tokens": 2806,
+          "output_tokens_details": {
+            "thinking_tokens": 1013
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5306
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27573,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0022613999999999998,
+        "turns": 11
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "```json\n{\n  \"placement\": \"contract/identity.txt\",\n  \"loaded\": {\n    \"desk\": \"OVERLAY\",\n    \"intake\": null,\n    \"scratch\": \"SCRATCH-OPS\"\n  },\n  \"child_handoff\": {\n    \"ATTR\": true,\n    \"TONE\": false,\n    \"SYNC\": false\n  },\n  \"link_audit_blocks_sync\": false,\n  \"draft_patch\": \"--- a/contract/identity.txt\\n+++ b/contract/identity.txt\\n@@\\n The archive steward keeps source material separate from interpretations.\\n Never pass private accession details to a delivery recipient.\\n+Attribution is mandatory on every archive delivery, including work drafted by\\n+delegated catalogers. Every claim in a delivery-bound entry must carry its\\n+accession source, or be explicitly marked unsourced and withheld from delivery.\\n Tone: short and decisive in messages to the owner.\\n\",\n  \"rationale\": {\n    \"placement\": \"identity.txt is the file the packet calls the canonical identity input, and the owner's ATTR rule is an identity-level policy that applies in every lane. overlay.txt is a November desk supplement and protocol.txt is the base operating protocol for the checkout root, so neither is the canonical home.\",\n    \"loaded\": \"starts.csv maps desk to OVERLAY, intake to no project context, and scratch to SCRATCH-OPS. prompt-captures.json confirms the same project slots at startup: desk loads OVERLAY, intake loads nothing, and scratch loads SCRATCH-OPS. Intake has no local candidates, so it maps to null.\",\n    \"child_handoff\": \"handoff.md says a cataloger only drafts entries and neither talks to the owner nor persists a delivery, and that its brief should cover only work it actually does. So ATTR goes in the request because the cataloger produces the sourced draft. TONE applies only to direct owner reporting, which a cataloger never does, so it stays out. SYNC applies to the persistence job, and a cataloger never commits, so it stays out.\",\n    \"link_audit_blocks_sync\": \"The nightly bundle in the scheduled export runs shape, frontmatter status, and sync. The dispatcher runs the links audit only when 'links' is passed, and the maintainer's links check is not in the nightly schedule. The sync command does not call find_orphan_entries, so the shipped job does not block sync on orphan links. The old onboarding sheet's claim that it does is stale.\",\n    \"records_relied_on\": [\n      \"starts.csv\",\n      \"handoff.md\",\n      \"prompt-captures.json\",\n      \"contract/identity.txt\",\n      \"contract/overlay.txt\",\n      \"contract/protocol.txt\",\n      \"contract/scratch-protocol.txt\",\n      \"persistence/nightly.txt\",\n      \"persistence/status-handler.txt\"\n    ],\n    \"not_done\": \"No files were edited or executed, no runtime was changed, and no delivery was attempted. The patch is a draft only.\"\n  }\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "global-invariant": true,
+          "delegation-context-loss": true,
+          "gate-call-site": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 18.356,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 7789,
+          "cache_read_input_tokens": 26995,
+          "output_tokens": 3020,
+          "output_tokens_details": {
+            "thinking_tokens": 1160
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 7789
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 37812,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002754375,
+        "turns": 12
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": true,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": true,
+            "contamination_reasons": [
+              "installed-copy-read"
+            ]
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\"placement\":\"contract/identity.txt\",\"loaded\":{\"desk\":\"OVERLAY\",\"intake\":null,\"scratch\":\"SCRATCH-OPS\"},\"child_handoff\":{\"ATTR\":true,\"TONE\":false,\"SYNC\":false},\"link_audit_blocks_sync\":false,\"draft_patch\":\"--- contract/identity.txt (draft, not applied)\\n+++ contract/identity.txt (draft, not applied)\\n@@ Tone: short and decisive in messages to the owner.\\n+Attribution is mandatory on every archive delivery. Every claim in a delivery-bound entry carries its accession source. A claim without a source is marked unsourced and withheld from delivery. This applies to entries drafted by delegated catalogers and delivered by a parent.\\n\",\"rationale\":\"placement: identity.txt is the file the packet labels as the canonical identity input, and the skill says rules that must hold regardless of cwd belong there. The overlay preempts rather than adds, and the protocol is installed only at the checkout root. loaded: starts.csv maps desk to OVERLAY, which is its first local candidate, and intake to no project slot, which the captures show as an empty project list. Scratch maps to SCRATCH-OPS. child_handoff: prompt-captures.json shows the cataloger has skip_context_files true and only a BUILTIN identity, so identity.txt never reaches it. ATTR must therefore be stated explicitly in its request. handoff.md says the cataloger neither talks to the owner nor persists, so TONE (owner messaging) and SYNC (only the persistence job commits; protocol.txt says a cataloger never commits) stay out of its brief. link_audit_blocks_sync: persistence/nightly.txt schedules store shape, store status with --check frontmatter only, and store sync. The links check appears only in the maintainer cheat sheet and is not scheduled. status-handler.txt runs find_orphan_entries only when the links check is requested, and sync neither calls it nor blocks on it, so the shipped job is not blocked by a link audit. Records relied on: starts.csv, prompt-captures.json, handoff.md, contract/identity.txt, contract/overlay.txt, contract/protocol.txt, contract/scratch-protocol.txt, persistence/nightly.txt, persistence/status-handler.txt. Nothing was edited, executed, or delivered. The patch is a draft only, so no backup was needed.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "global-invariant": true,
+          "delegation-context-loss": true,
+          "gate-call-site": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 17.212,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 10073,
+          "cache_read_input_tokens": 35105,
+          "output_tokens": 2734,
+          "output_tokens_details": {
+            "thinking_tokens": 986
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 10073
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 47920,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002977975,
+        "turns": 12
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": true,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": true,
+            "contamination_reasons": [
+              "installed-copy-read"
+            ]
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "```json\n{\n  \"placement\": \"work/contract/identity.txt\",\n  \"loaded\": {\n    \"desk\": \"OVERLAY\",\n    \"intake\": null,\n    \"scratch\": \"SCRATCH-OPS\"\n  },\n  \"child_handoff\": {\n    \"ATTR\": true,\n    \"TONE\": false,\n    \"SYNC\": false\n  },\n  \"link_audit_blocks_sync\": false,\n  \"draft_patch\": {\n    \"status\": \"draft only, not applied\",\n    \"file\": \"work/contract/identity.txt\",\n    \"operation\": \"insert after line 4 (\\\"Never pass private accession details to a delivery recipient.\\\")\",\n    \"text\": \"Every claim in a delivery-bound entry carries its accession source, or is explicitly marked unsourced and withheld from delivery. This applies to work produced by delegated catalogers as well as direct work. Only the persistence job publishes or commits the store.\"\n  },\n  \"rationale\": {\n    \"placement\": \"The identity export is the only document that every startup lane loads (starts.csv; prompt-captures.json: desk, intake and scratch all list IDENTITY). The owner wants attribution to hold wherever work starts, and the skill says cwd-independent rules belong in the identity file. An overlay preempts rather than adds, so OVERLAY (desk only) or SCRATCH-OPS (scratch only) cannot carry it. CEDAR-OPS is the checkout-root protocol and is not loaded by any startup capture, so it cannot be the canonical place for a rule that must hold everywhere.\",\n    \"loaded\": \"starts.csv lists desk, intake and scratch. prompt-captures.json gives the project slot as OVERLAY for desk, empty for intake, and SCRATCH-OPS for scratch. The intake project slot is empty, so it maps to null. The cataloger row is BUILTIN identity with no project slot and skip_context_files true. It is not one of the three starts.csv IDs, so it is excluded from the map.\",\n    \"child_handoff\": \"prompt-captures.json says the cataloger skips context files and loads only BUILTIN identity, so no contract rule reaches it unless the parent passes it explicitly. handoff.md says a cataloger only drafts entries, so ATTR is needed in its brief. TONE is for reporting to the owner, and the cataloger never talks to the owner, so it is false. SYNC covers publishing and committing, which the cataloger never does (CEDAR-OPS: 'A cataloger never commits'; the persistence job owns commits), so it is false.\",\n    \"link_audit_blocks_sync\": \"persistence/nightly.txt schedules shape, status --check frontmatter, and sync. The maintainer's links check (status --check links) is explicitly 'not in the nightly schedule'. persistence/status-handler.txt runs find_orphan_entries only when 'links' is in the checks, and otherwise prints 'link audit skipped'. Its comment says sync calls neither the link check nor find_orphan_entries. Under the shipped job, orphan links do not block sync. Old onboarding that says otherwise is contradicted by these records.\",\n    \"unchanged_limits\": \"No force-push, no history rewrite, and no secrets in Git. The draft does not touch any of these. Nothing was edited or executed, and no delivery was attempted. No backup was made because nothing was written.\"\n  }\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "global-invariant": false,
+          "delegation-context-loss": true,
+          "gate-call-site": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 19.313,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 10059,
+          "cache_read_input_tokens": 35093,
+          "output_tokens": 3388,
+          "output_tokens_details": {
+            "thinking_tokens": 1351
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 10059
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 48548,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0033031049999999998,
+        "turns": 12
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": true,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": true,
+            "contamination_reasons": [
+              "installed-copy-read"
+            ]
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "```json\n{\"placement\":\"contract/identity.txt\",\"loaded\":{\"desk\":\"OVERLAY\",\"intake\":null,\"scratch\":\"SCRATCH-OPS\"},\"child_handoff\":{\"ATTR\":true,\"TONE\":false,\"SYNC\":false},\"link_audit_blocks_sync\":false,\"patch\":\"--- a/contract/identity.txt\\n+++ b/contract/identity.txt\\n@@ -3,3 +3,4 @@\\n The archive steward keeps source material separate from interpretations.\\n Never pass private accession details to a delivery recipient.\\n Tone: short and decisive in messages to the owner.\\n+Every claim in a delivery-bound entry carries its accession source, or is marked unsourced and withheld from delivery. This applies to delegated cataloger drafts too; the parent verifies it before delivering.\\n\",\"rationale\":\"Placement: identity.txt is the only file loaded in every startup lane that writes archive output (desk, intake, scratch). The overlay is loaded only at desk and is not the base protocol, and CEDAR-OPS is absent from intake and scratch. The cataloger's identity is BUILTIN with skip_context_files true, so no context file reaches it. ATTR must therefore also be passed explicitly in the cataloger's request. Loaded: starts.csv maps desk to the project slot OVERLAY, intake has an empty project slot (null), and scratch maps to SCRATCH-OPS (prompt-captures.json confirms each lane). child_handoff: ATTR is true because the cataloger drafts delivery-bound entries and loads no context. TONE is false because the cataloger never reports to the owner. SYNC is false because the cataloger never persists, and handoff.md asks that the brief cover only work it does. link_audit_blocks_sync is false: the shipped nightly job runs shape, status --check frontmatter, and sync (nightly.txt). The links branch runs only when --check links is passed, which the nightly job does not do. sync does not call find_orphan_entries (status-handler.txt). The onboarding sheet's claims that the overlay supplements the protocol and that nightly sync blocks orphan links are contradicted by overlay.txt and status-handler.txt. Records relied on: contract/identity.txt, contract/overlay.txt, contract/protocol.txt, contract/scratch-protocol.txt, handoff.md, starts.csv, prompt-captures.json, persistence/nightly.txt, persistence/status-handler.txt. No files were edited, executed, or delivered. The patch is a draft only.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "global-invariant": true,
+          "delegation-context-loss": true,
+          "gate-call-site": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 20.115,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 10063,
+          "cache_read_input_tokens": 35101,
+          "output_tokens": 3538,
+          "output_tokens_details": {
+            "thinking_tokens": 1759
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 10063
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 48710,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0033786849999999998,
+        "turns": 12
+      }
+    ]
+  },
+  "verdict": "inconclusive",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 340122,
+  "skipped_trials": []
+}

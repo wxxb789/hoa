@@ -1,0 +1,979 @@
+{
+  "schema_version": 3,
+  "task": "hoa-skill-review",
+  "generated_at": "2026-11-20T17:47:57.924294+08:00",
+  "skill": "hoa-skill-review",
+  "skill_revision": "4",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "forced",
+  "shell": false,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "evidence-ranked-intake": {
+      "field": "ticket_ids",
+      "equals": {
+        "change": [
+          "T-22"
+        ],
+        "verify": [
+          "T-15"
+        ],
+        "consider": [
+          "T-31"
+        ]
+      }
+    },
+    "promise-and-executable-rule": {
+      "field": "conflicting_rules",
+      "equals": [
+        "B-01",
+        "B-14"
+      ]
+    },
+    "reaches-real-consumer-contract": {
+      "field": "affected_consumer",
+      "equals": "C-05"
+    },
+    "output-write-is-a-write": {
+      "field": "observed_effect",
+      "equals": "output-create"
+    },
+    "static-not-runtime-verified": {
+      "field": "conflict_evidence",
+      "equals": "static"
+    }
+  },
+  "rubric_flags": {
+    "evidence-ranked-intake": "non-discriminating",
+    "promise-and-executable-rule": "non-discriminating",
+    "reaches-real-consumer-contract": "non-discriminating",
+    "output-write-is-a-write": "non-discriminating",
+    "static-not-runtime-verified": "non-discriminating"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    },
+    "terse": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    },
+    "skill": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": 0.0,
+    "terse": 0.0
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 1,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": true,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\"ticket_ids\":{\"change\":[\"T-22\"],\"verify\":[\"T-15\"],\"consider\":[\"T-31\"]},\"conflicting_rules\":[\"B-01\",\"B-14\"],\"affected_consumer\":\"C-05\",\"observed_effect\":\"output-create\",\"conflict_evidence\":\"static\",\"rationale\":\"T-22 is a Change. B-01 promises inspect creates no file in the binder or the caller's workspace. B-14 says that when a destination is supplied, the summary is delivered through the named Output Sink and the sink's handle is returned. The consumer contract says the sink creates a new file at the destination. C-05 is inspect mode with destination out/binder-x.json, so that call creates a file in the caller's workspace, which breaks B-01. The ticket's 'handle instead of summary' framing is not the defect: returning a handle is what B-14 specifies. The defect is the write that comes with it. C-02 (inspect, no destination) returns inline and creates nothing, so it does satisfy the no-write promise. The harness did not attempt C-05 and does not mount a workspace Output Sink, so the file creation is established by the static contract text, not by a live run; observed_effect is therefore the effect the contract specifies, and conflict_evidence is static. A live C-05 run against a mounted sink would confirm it. T-15 is a Verify. L-03 aborted during fixture setup because binder-no-header was missing from the archive, and no skill or language selection code ran. Nothing shows the fallback uses the wrong locale, so the blocker priority is not supported by evidence. The gap is decision-changing: a passing run of L-03 with binder-no-header present, checking that B-08 falls back to the caller's locale only when the header declares no language, would settle it. T-31 is a Consider. Moving title first in the summary is a presentation preference. B-21 fixes the order as count, language, title, but the summary decoder addresses keys by name rather than position, and no parse failure has been reported. Reordering would not break consumers, so the blocker priority is not supported. Any change would be a deliberate edit to B-21 and should be weighed against the rule's stated order.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "evidence-ranked-intake": true,
+          "promise-and-executable-rule": true,
+          "reaches-real-consumer-contract": true,
+          "output-write-is-a-write": true,
+          "static-not-runtime-verified": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 16.268,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4718,
+          "cache_read_input_tokens": 19036,
+          "output_tokens": 2633,
+          "output_tokens_details": {
+            "thinking_tokens": 1422
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4718
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 26393,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0020972099999999995,
+        "turns": 7
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 1,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": true,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "```json\n{\"ticket_ids\":{\"change\":[\"T-22\"],\"verify\":[\"T-15\"],\"consider\":[\"T-31\"]},\"conflicting_rules\":[\"B-01\",\"B-14\"],\"affected_consumer\":\"C-05\",\"observed_effect\":\"output-create\",\"conflict_evidence\":\"static\",\"rationale\":\"T-22 is a Change because the sources conflict on their face. B-01 promises that inspect creates no file in the caller's workspace. B-14 routes inspect output with a caller destination through the Output Sink. consumers.md says C-05 (inspect, destination out/binder-x.json) gets a newly created file from the sink, and that the sink never writes under the binder directory. So C-05 creates a workspace file in inspect mode, which breaks B-01. The binder-immutability point in the ticket does not answer this, because B-01 also covers the caller's workspace. The gap is that trace.md shows the replayer never ran C-05 (no workspace Output Sink was mounted), so the defect is shown by the contract text, not by a replay. The 'sometimes returns a handle' symptom is unreproduced. To settle the exact behaviour, mount a workspace Output Sink, run C-05 in inspect mode, and check whether out/binder-x.json is created and whether the returned handle matches that file. Then decide whether B-14 needs a no-write carve-out or B-01 needs to exempt the sink. T-15 is a Verify, not a Change or a regression. The reporter called it a blocker, but trace.md shows L-03 aborted during fixture setup (binder-no-header was missing from the archive) and no language selection code ran, so there is no evidence of a wrong locale fallback. This is a decision-changing gap, so the status is Verify. To resolve it, restore binder-no-header to the fixture archive, rerun L-03, and check that B-08 uses the caller's locale only when the binder header declares no language. T-31 is a Consider. Moving title first is a presentation preference. B-21 fixes the key order, but consumers.md says the summary decoder addresses keys by name, so the order does not break any consumer. No parse failure is reported. Changing B-21 would be a preference call for the owner, not a release blocker. The affected_consumer is C-05 because it is the only consumer whose listed behaviour conflicts with a promise. observed_effect is output-create, meaning the contract expects a workspace file to be created. conflict_evidence is static, since the conflict comes from reading the sources and not from a replay.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "evidence-ranked-intake": true,
+          "promise-and-executable-rule": true,
+          "reaches-real-consumer-contract": true,
+          "output-write-is-a-write": true,
+          "static-not-runtime-verified": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 20.569,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 4632,
+          "cache_read_input_tokens": 27147,
+          "output_tokens": 3459,
+          "output_tokens_details": {
+            "thinking_tokens": 2029
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4632
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 35246,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00258077,
+        "turns": 8
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 1,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": true,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\"ticket_ids\":{\"change\":[\"T-22\"],\"verify\":[\"T-15\"],\"consider\":[\"T-31\"]},\"conflicting_rules\":[\"B-01\",\"B-14\"],\"affected_consumer\":\"C-05\",\"observed_effect\":\"output-create\",\"conflict_evidence\":\"static\",\"rationale\":{\"T-22\":\"Change. B-01 says inspect creates no file in the binder or the caller's workspace. The consumer contract says C-05 is inspect with destination out/binder-x.json, and Output Sink creates a new file there before returning a handle. B-14 routes that delivery through the sink, so the inspect no-write promise is broken by the rule text itself. The binder stays immutable, but the workspace write still violates B-01, so the answer to the ticket's question is no. The reporter's cosmetic priority does not change this. The replay harness did not run C-05, so the handle-versus-summary symptom is not live-confirmed. The Change rests on the static contradiction, not on a replayed run. Resolving evidence: a live C-05 run that records the created file, plus a check that the handle matches a file.\",\"T-15\":\"Verify. The harness aborted L-03 during fixture setup because binder-no-header was missing from the archive, so no language selection code ran. There is no proven regression and no proven wrong locale. This is a decision-changing gap: if B-08 fallback behaves wrongly, the release decision changes. Resolving evidence: restore binder-no-header in the archive and rerun L-03, confirming the header is absent and that the locale fallback is used only for that binder.\",\"T-31\":\"Consider. Reordering the summary keys only changes presentation. B-21 fixes the order as count, language, title, but the consumer decoder addresses keys by name, not position, and no parse failure has been reported. The blocker priority is not supported by the sources. Resolving evidence: none is needed for the decision. A reorder can be weighed as a preference, and it should keep B-21 consistent if changed.\"}}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "evidence-ranked-intake": true,
+          "promise-and-executable-rule": true,
+          "reaches-real-consumer-contract": true,
+          "output-write-is-a-write": true,
+          "static-not-runtime-verified": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 19.294,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 4630,
+          "cache_read_input_tokens": 27143,
+          "output_tokens": 3191,
+          "output_tokens_details": {
+            "thinking_tokens": 1942
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4630
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 34972,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00244648,
+        "turns": 8
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 1,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": true,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "```json\n{\n  \"ticket_ids\": {\n    \"change\": [\"T-22\"],\n    \"verify\": [\"T-15\"],\n    \"consider\": [\"T-31\"]\n  },\n  \"conflicting_rules\": [\"B-01\", \"B-14\"],\n  \"affected_consumer\": \"C-05\",\n  \"observed_effect\": \"output-create\",\n  \"conflict_evidence\": \"static\",\n  \"rationale\": \"Ranked by consequence, not reporter priority. (1) T-22 is a Change. B-01 says inspect creates no file in the binder or the caller's workspace. B-14 delivers a destination summary through the Output Sink and returns its handle. consumers.md defines C-05 as inspect with destination out/binder-x.json, and says the sink creates a new file in the caller's workspace and that a handle without that file is an error. So C-05 creates a workspace file under inspect, which contradicts B-01. The contradiction is visible in the text alone, so it is static. The live replay did not attempt C-05 (trace.md), so no live run confirms it. The handle itself is correct per B-14. The defect is the no-write promise. The answer to the ticket is: C-02 satisfies no-write (inline, no destination), C-05 does not. Resolving it means either amending B-01 to permit inspect output to a caller-named destination, or removing the destination path from inspect and making it a refresh-only or caller-side operation. Replaying C-05 against a mounted workspace Output Sink would confirm the file creation live. (2) T-15 is a Verify, not a Change. The reporter's claim is that the fallback uses the wrong locale. trace.md says L-03 aborted in fixture setup because binder-no-header was missing from the archive, and that no skill or language selection code ran. The red probe therefore reflects a missing fixture, not a fallback result, and B-08 has no executed evidence either way. This is a decision-changing gap. Resolving it means restoring binder-no-header to the archive and rerunning L-03, then comparing the resolved language with the caller locale. Until then, B-08 is unproven in either direction. (3) T-31 is a Consider. Reordering the summary keys to title first would change B-21's documented order (count, language, title). consumers.md says the summary decoder addresses keys by name, not position, so the reorder does not break any consumer, and the ticket reports no parse failure. This is a presentation preference. If the owner wants it, the change is a one-line B-21 edit plus a note that order is not contractual. The affected_consumer and observed_effect fields above describe the Change finding (T-22). For T-15 the consumer is none in consumers.md, since no listed consumer uses a headerless binder, and no effect was observed. For T-31 the affected consumer is C-02, the only inline-summary consumer, with no observed effect and only static evidence. No files were edited or executed.\"\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "evidence-ranked-intake": true,
+          "promise-and-executable-rule": true,
+          "reaches-real-consumer-contract": true,
+          "output-write-is-a-write": true,
+          "static-not-runtime-verified": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 22.426,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 7322,
+          "cache_read_input_tokens": 24749,
+          "output_tokens": 3710,
+          "output_tokens_details": {
+            "thinking_tokens": 2170
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 7322
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 35789,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00301854,
+        "turns": 8
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 1,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": true,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "```json\n{\n  \"ticket_ids\": {\n    \"change\": [\"T-22\"],\n    \"verify\": [\"T-15\"],\n    \"consider\": [\"T-31\"]\n  },\n  \"conflicting_rules\": [\"B-01\", \"B-14\"],\n  \"affected_consumer\": \"C-05\",\n  \"observed_effect\": \"output-create\",\n  \"conflict_evidence\": \"static\",\n  \"rationale\": \"T-22 (Change): B-01 promises that inspect 'creates no file and changes no file in either the binder or the caller's workspace'. B-14 requires delivery through the named Output Sink when a destination is supplied, and consumers.md defines C-05 (inspect, destination out/binder-x.json) as a sink call that 'creates a new file at the destination' in the caller's workspace. The promise and the executable rule therefore conflict by the documents alone; this is a demonstrated defect in B-01's scope, not a runtime observation. The 'handle instead of summary' symptom is the designed B-14 path, so it is not itself the defect. The 'handle without file is an error' rule in consumers.md is not tested by any trace, so it is an open gap, not a finding. Resolution: amend B-01 to exclude sink delivery, or otherwise state the write exception. A live C-05 run with a mounted Output Sink would confirm the file creation and check whether a handle is ever returned without a file. The trace did not run C-05, so the observed effect is predicted, not measured. T-15 (Verify): the reporter's 'wrong locale' claim has no evidence. trace.md says L-03 aborted during fixture setup because binder-no-header was missing from the archive, and that no skill or language selection code ran. B-08 is therefore untested, and the red probe does not show a regression. The decision would change if a valid L-03 run with a headerless binder shows the fallback selecting a locale other than the caller's. Resolution: restore binder-no-header to the archive and rerun L-03 live. T-31 (Consider): B-21 fixes key order as count, language, title. consumers.md says the decoder addresses keys by name, not position, and no parse failure is reported. Moving title first is therefore a no-effect preference change for the known consumers, not a blocker. It only matters if some undocumented consumer parses by position, which would need its source to rule out. No files were edited or executed.\"\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "evidence-ranked-intake": true,
+          "promise-and-executable-rule": true,
+          "reaches-real-consumer-contract": true,
+          "output-write-is-a-write": true,
+          "static-not-runtime-verified": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 20.584,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 4633,
+          "cache_read_input_tokens": 27461,
+          "output_tokens": 3351,
+          "output_tokens_details": {
+            "thinking_tokens": 1974
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4633
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 35453,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002530035,
+        "turns": 8
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 1,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": true,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\"ticket_ids\":{\"change\":[\"T-22\"],\"verify\":[\"T-15\"],\"consider\":[\"T-31\"]},\"conflicting_rules\":[\"B-01\",\"B-14\"],\"affected_consumer\":\"C-05\",\"observed_effect\":\"output-create\",\"conflict_evidence\":\"static\",\"rationale\":{\"T-22\":\"Change. B-01 promises inspect creates no file in the caller's workspace. B-14 delivers the summary through the named Output Sink when a destination is supplied and returns the handle. consumers.md says that sink creates a new file at the destination in the caller's workspace, and C-05 supplies out/binder-x.json. So C-05 creates a workspace file while the skill text promises none. This follows from the text alone. The ticket's 'sometimes returns a handle' framing is not the defect: a handle is the designed result when a destination is given. C-02 (no destination, inline) does not write and satisfies B-01. The binder itself is never written by inspect. The replay harness did not run C-05, so the file creation is static, not observed live. Resolving it: either amend B-01 to exclude sink-delivered output, or change B-14 so the inspect destination path does not create a workspace file. Either choice should be checked against a live C-05 run that confirms the file and handle.\",\"T-15\":\"Verify. The language probe red is not a proven regression. L-03 aborted during fixture setup because binder-no-header was missing from the archive, and no skill or language selection code ran. The reporter's claim that the fallback uses the wrong locale has no execution evidence. The B-08 promise is therefore untested, not contradicted. Resolving it: restore binder-no-header to the archive, rerun L-03, and confirm the fallback to caller locale applies only to binders with no declared language, while binders with a header use the header language.\",\"T-31\":\"Consider. Reordering summary keys to put title first is a presentation preference. B-21 fixes the order as count, language, title, and that is a stated rule, so the change would conflict with it. However, consumers.md says the summary decoder addresses keys by name, not position, and no parse failure is reported. No consumer is broken by the current order, so this is a preference, not a defect or a decision-changing gap. If the owner wants it, update B-21 and note that positional consumers, if any exist, are not covered by consumers.md.\"}}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "evidence-ranked-intake": true,
+          "promise-and-executable-rule": true,
+          "reaches-real-consumer-contract": true,
+          "output-write-is-a-write": true,
+          "static-not-runtime-verified": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 18.829,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 4648,
+          "cache_read_input_tokens": 27475,
+          "output_tokens": 3218,
+          "output_tokens_details": {
+            "thinking_tokens": 1844
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4648
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 35349,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0024655499999999995,
+        "turns": 8
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": true,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": true,
+            "contamination_reasons": [
+              "installed-copy-read"
+            ]
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\"ticket_ids\":{\"change\":[\"T-22\"],\"verify\":[\"T-15\"],\"consider\":[\"T-31\"]},\"conflicting_rules\":[\"B-01\",\"B-14\"],\"affected_consumer\":\"C-05\",\"observed_effect\":\"output-create\",\"conflict_evidence\":\"static\",\"rationale\":{\"T-22\":\"Change. B-01 promises that inspect creates no file in the binder or the caller's workspace. B-14 says that when the caller supplies a destination, the summary is delivered through the named Output Sink and the sink's handle is returned. consumers.md says Output Sink creates a new file at the destination and that a returned handle without that file is an error. C-05 (inspect, destination out/binder-x.json) therefore necessarily creates a file in the caller's workspace, which breaks B-01. This is statically established from the inspected path, not runtime-exercised: trace.md shows the replayer never attempted C-05 because no workspace Output Sink is mounted. The answer to T-22 is no for C-05. The binder itself is never written, since the sink never writes under the binder directory. C-02 (no destination, inline summary) does satisfy the no-write promise. The owner is binder-inspect's B-01/B-14 pair. The smallest condition-based fix is to pick one contract and state it: either B-01 exempts a caller-requested sink write in inspect mode, or inspect with a destination stops routing through the sink. The reporter's 'cosmetic' priority does not change the classification, because the defect is a promise violation. Gap to close: a live C-05 run with a mounted sink, to confirm the file appears in the workspace.\",\"T-15\":\"Verify. The fallback code path (B-08) reads correctly, but it has not been exercised. The L-03 fixture aborted during setup because binder-no-header was missing from the archive, and trace.md states that no skill or language selection code ran. The red probe therefore does not show a wrong locale, and no regression is proven. The priority is decision-changing, so the gap must be closed. Resolution: rebuild the archive so binder-no-header is present, rerun L-03, and confirm the summary language equals the caller's locale for a binder with no declared language. Do not change B-08 until that run is done.\",\"T-31\":\"Consider. The reorder would move title ahead of count in the summary. consumers.md states that the summary decoder addresses keys by name, not position, and no parse failure has been reported. The change is a presentation preference with no demonstrated consumer impact. B-21 fixes the order as count, language, title, so any change to it is a preference-level edit. The reporter's 'blocker' priority is not supported by the evidence. Resolution, if the owner wants it: confirm the decoder behavior in a live consumer run before editing B-21.\"}}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "evidence-ranked-intake": true,
+          "promise-and-executable-rule": true,
+          "reaches-real-consumer-contract": true,
+          "output-write-is-a-write": true,
+          "static-not-runtime-verified": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 27.111,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 7988,
+          "cache_read_input_tokens": 33555,
+          "output_tokens": 4738,
+          "output_tokens_details": {
+            "thinking_tokens": 3260
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 7988
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 46289,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00370385,
+        "turns": 8
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": true,
+        "skill_probe_count": 1,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": true,
+            "contamination_reasons": [
+              "installed-copy-read"
+            ]
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": true,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": [
+              "installed-copy-read"
+            ]
+          }
+        ],
+        "output": "```json\n{\n  \"ticket_ids\": {\n    \"change\": [\"T-22\"],\n    \"verify\": [\"T-15\"],\n    \"consider\": [\"T-31\"]\n  },\n  \"conflicting_rules\": [\"B-01\", \"B-14\"],\n  \"affected_consumer\": \"C-05\",\n  \"observed_effect\": \"output-create\",\n  \"conflict_evidence\": \"static\",\n  \"rationale\": \"T-22 is a Change, and its reporter's 'cosmetic' priority does not change that. B-01 promises that inspect creates and changes no file in the binder or the caller's workspace. B-14 requires that, when the caller supplies a destination, the summary be delivered through the named Output Sink and its handle returned. The consumer contract in consumers.md defines C-05 as inspect with destination out/binder-x.json, and says Output Sink creates a new file at that workspace path and returns a handle. Returning a handle without the file is an error. So the inspected path necessarily creates a workspace file in inspect mode, which contradicts B-01. This is statically established from the rules and the sink contract, not runtime-exercised: the replay harness did not attempt C-05 because it does not mount a workspace Output Sink. The binder being immutable does not answer the question, because B-01 covers the workspace too. Owner: the binder-inspect skill's B-01/B-14 pairing. Smallest condition-based fix: either narrow B-01 to exempt the caller-named sink destination when one is supplied, or make B-14 deliver inline when the caller requests read-only inspect. The owner has to choose which contract is intended. C-02 (inspect, no destination) returned inline and C-09 (refresh) wrote the index, and both are consistent with the rules. T-15 is a Verify. The L-03 language-fallback case aborted during fixture setup because binder-no-header was missing from the archive, so no skill or language selection code ran. The blocker priority and the locale-regression theory are unproven. The check that would settle it is restoring binder-no-header to the fixture archive and running L-03 to observe which language B-08 resolves, using the fallback only when the header declares no language. T-31 is a Consider. B-21 fixes the summary key order as count, language, title, and the consumer decoder addresses keys by name rather than position, as consumers.md states. The ticket reports no parse failure. Moving title first is a presentation preference with no demonstrated consumer effect, so it does not justify a change. Verified paths (static trace only): B-01 vs B-14 against C-05 and the Output Sink contract. Replay-observed: C-02 returned inline, and C-09 recorded a binder index write, which refresh permits. Unverified paths: a live C-05 run against a workspace Output Sink, the L-03 language-fallback run, and any real host's behavior when the skill is auto-activated.\"\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "evidence-ranked-intake": true,
+          "promise-and-executable-rule": true,
+          "reaches-real-consumer-contract": true,
+          "output-write-is-a-write": true,
+          "static-not-runtime-verified": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 20.257,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 10092,
+          "cache_read_input_tokens": 43228,
+          "output_tokens": 3186,
+          "output_tokens_details": {
+            "thinking_tokens": 1453
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 10092
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 56516,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00328778,
+        "turns": 10
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": true,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": true,
+            "contamination_reasons": [
+              "installed-copy-read"
+            ]
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\"ticket_ids\":{\"change\":[\"T-22\"],\"verify\":[\"T-15\"],\"consider\":[\"T-31\"]},\"conflicting_rules\":[\"B-01\",\"B-14\"],\"affected_consumer\":\"C-05\",\"observed_effect\":\"output-create\",\"conflict_evidence\":\"static\",\"rationale\":\"T-22 (Change): B-01 promises that inspect creates no file and changes nothing in the caller's workspace. B-14 says that when a destination is supplied, the summary is delivered through the named Output Sink and the sink's handle is returned. consumers.md row C-05 is an inspect call with destination out/binder-x.json, and it states that the sink creates a new file at that destination and never writes under the binder directory. The conflict follows from the inspected text alone: C-05 necessarily creates a workspace file, which B-01 forbids. The handle is the designed return value, so the ticket's 'handle instead of summary' framing is not the defect. The binder itself stays immutable, which is why the ticket's framing misses the point. C-02 omits the destination and creates no file, so it is not affected. The owner of the defect is the B-01/B-14 pair in binder.md. The smallest correction is to make B-01's no-write promise explicit about the destination case, or to stop routing inspect through the sink. The owner must choose which of these is intended. trace.md did not exercise C-05 because the harness does not mount a workspace Output Sink, so this stays static and is not runtime-verified. T-15 (Verify): L-03 aborted during fixture setup because binder-no-header was missing from the archive. No skill or language selection code ran, so there is no evidence of a locale regression. The reporter's blocker priority is not supported by the evidence. To resolve it, restore binder-no-header to the archive and rerun L-03. The check passes if the binder header is absent, B-08 falls back to the caller's locale, and the summary language matches that locale. T-31 (Consider): Reordering the summary keys to put title first is a presentation preference. B-21 currently orders count, language, title, and consumers.md states that the summary decoder addresses keys by name rather than position, so no parse failure is reported and reordering has no demonstrated consumer effect. The reporter's blocker priority is not supported. Scope: binder.md, consumers.md, trace.md and tickets.md were inspected. Verified paths (statically established): the B-01/B-14 conflict for C-05 and the name-based key decoding. Unverified paths: runtime execution of C-05, any real Output Sink write, and the L-03 language fallback. Nothing was edited or executed.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "evidence-ranked-intake": true,
+          "promise-and-executable-rule": true,
+          "reaches-real-consumer-contract": true,
+          "output-write-is-a-write": true,
+          "static-not-runtime-verified": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 19.287,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 7571,
+          "cache_read_input_tokens": 32217,
+          "output_tokens": 3183,
+          "output_tokens_details": {
+            "thinking_tokens": 1824
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 7571
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 42979,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002860845,
+        "turns": 7
+      }
+    ]
+  },
+  "verdict": "no-difference",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 348986,
+  "skipped_trials": []
+}
