@@ -1,0 +1,9 @@
+{
+  "snapshot_utc": "2027-09-06T02:10:00Z",
+  "rows": [
+    {"id": "R-61", "profile": "ledger", "job": "bk-14", "event": "L-850", "trigger": "manual", "finished_utc": "2027-09-06T01:55:48Z", "result": "sealed", "bucket": "ledger"},
+    {"id": "R-62", "profile": "training", "job": "bk-14", "event": "T-851", "trigger": "schedule", "finished_utc": "2027-09-06T02:01:14Z", "result": "sealed", "bucket": "ledger"},
+    {"id": "R-63", "profile": "ledger", "job": "bk-14", "event": "L-851", "trigger": "schedule", "finished_utc": null, "result": "queued", "bucket": "ledger"}
+  ],
+  "notes": "Bucket labels are display aliases, not execution identities. The queue writes informational rows to the same export as the archive worker."
+}

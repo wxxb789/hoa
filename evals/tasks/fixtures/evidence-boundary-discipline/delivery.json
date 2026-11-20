@@ -1,0 +1,13 @@
+{
+  "profile_cutoff": "2027-06-07",
+  "label_vocabulary": {
+    "current-source": "A full source inspected this round supports the row.",
+    "attributed": "Carried from a previous round's capture; original was not re-read this round.",
+    "unknown": "The packet cannot establish the requested state."
+  },
+  "receipt": [
+    {"source": "A", "access": "previous round's capture only"},
+    {"source": "B", "access": "full release inspected in this round"}
+  ],
+  "editor": "Keep the dashboard's historically sourced milestone, and retain a distinct current-status row for each initiative."
+}
