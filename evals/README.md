@@ -33,6 +33,19 @@ The development set preserves its original `request`/`language`/`expected`
 schema and six historical targets outside the skill catalog; these are
 reported separately, not relabeled as `none`.
 
+The H1 retirement migrated labels only. `ai-coding-agent-delegation`,
+`cross-agent-repair-routing`, and `project-phase-closeout` now target
+`gdd`, `delegated-work-acceptance`, and `report-claim-audit`, respectively.
+`discord-rich-message` and `structural-validity-gates` have no replacement,
+so those requests now target `none`. Request text, IDs, and row order are
+unchanged. This changed 20 DEV labels and 25 holdout labels. The holdout
+SHA-256 changed from
+`0f2da25961bb61afbdddbfbd2851ce28f0c3af860c6c943c29ec4d0bdbf770c3` to
+`f8c909fa6914d7db64e1c8ec88332f06cd0d2db01f09ab1177bfde29d0976ec4`.
+The original published scores use the original labels and denominators.
+See the [H1 routing follow-up](results/2026-11-21-h1-routing-followup.md) for
+the single post-tuning holdout comparison and matched-denominator results.
+
 For model selection, configure `DISTINCTIVENESS_BASE_URL` (API root such as
 `https://example.invalid/v1`), `DISTINCTIVENESS_MODEL`, and
 `DISTINCTIVENESS_API_KEY`; the tool uses the OpenAI-compatible

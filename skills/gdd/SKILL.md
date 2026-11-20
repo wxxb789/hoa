@@ -1,11 +1,11 @@
 ---
 name: gdd
 description: >-
-  Deliver a written, machine-checkable repo increment through staged authoring, operator-run gates
-  and authorized merge, or hand one bounded coding or review task to an external coding CLI in an
-  isolated Git worktree and verify its result without shipping. Not for defining goals or managing a board.
+  Take a written repo goal through fresh authoring stages, PR review, operator-run gates and authorized merge, or
+  resume from a saved stage ledger. Hand a bounded patch or review to a CLI agent with a written brief and isolated
+  checkout; compare independent coding assistants in separate worktrees and check changes before integration.
 metadata:
-  revision: "18"
+  revision: "19"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "deliver a goal through staged authoring, gates and authorized merge, or verify one isolated CLI handoff without shipping"

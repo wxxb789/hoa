@@ -1,11 +1,12 @@
 ---
 name: report-claim-audit
 description: >-
-  Audit a decision-driving report, digest or project phase closeout without repairing files.
-  Recompute claims, diff deliverables for omissions, or inventory milestone leftovers and reconcile
-  task records with the release and actual deployment pin. Not for accepting one worker's handoff.
+  Audit a status report or memo, dispatch summary or closeout digest against per-item records,
+  manifests and validator logs. Recompute counts, find omitted files and price pending choices.
+  At a phase wrap-up, reconcile the milestone index, release and production pins; list live runs,
+  PRs and deferred loose ends. Read-only.
 metadata:
-  revision: "4"
+  revision: "5"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
   summary: "audit report claims and omissions or close out a milestone against its task inventory, release, and actual deployment pin"

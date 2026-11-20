@@ -1,11 +1,12 @@
 ---
 name: delegated-work-acceptance
 description: >-
-  Accept or reject a worker handoff: inspect artifacts, recompute claims, rerun checks and compare
-  paths with assigned scope. Route a defect outside your write scope to its owner with reproduction
-  in the reporter's environment and one landing decision. Not for launching an external agent.
+  Accept or send back a subagent handoff: inspect artifacts and diff, recount repairs and check
+  patches against assigned folders. For a bug in another worker's directory, reproduce the failing
+  command under the reporter's PATH and cwd, route it to the maintainer who owns the fix, and
+  escalate one scoped landing decision. Not for dispatch.
 metadata:
-  revision: "9"
+  revision: "10"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
   summary: "verify delegated work against artifacts and write scope; route rejected or out-of-scope fixes to their owner"
