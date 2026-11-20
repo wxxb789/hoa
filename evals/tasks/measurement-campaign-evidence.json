@@ -1,0 +1,20 @@
+{
+  "id": "measurement-campaign-evidence",
+  "skill": "measurement-campaign-evidence",
+  "fixture": "fixtures/measurement-campaign-evidence",
+  "prompt": "The release owner wants a go/no-go for the import-latency gate. Audit the finished fake-clock rehearsal; do not generate timing evidence. Start with goal.md and summary.md, and use the registry and raw run ledger as needed. Return only a raw JSON object (no Markdown, code fence, or commentary) with decision (accept or reject), campaign (campaign ID), candidate_digest (the recorded shipped SHA-256 without a prefix), dataset_ids (ordered by size), candidate_p95_ms and comparator_p95_ms (maps from decimal size strings to integer millisecond values), failed_dataset (ID or null), serial (boolean for the selected campaign), invalid_comparator_run (the run ID behind the summary's comparator result at size 1000, or null if admissible), and conflicting_slots (the sorted IDs of any pair of replay-06 runs sharing a host and overlapping, or an empty array).",
+  "terse": "Pin the shipped candidate and freeze workload and percentile rules. Use serial runs under equivalent real work. Keep one reproducible evidence set, recompute the numeric gate, and never let a proxy or bypass stand in for the measured path.",
+  "shell": ["codex"],
+  "rubric": {
+    "release-decision": {"field": "decision", "equals": "reject"},
+    "one-campaign": {"field": "campaign", "equals": "replay-07"},
+    "shipped-identity": {"field": "candidate_digest", "equals": "a61dad1f70653432101ec2dd3ffaad4c93186e318a7f87170335b2b3bddc9a86"},
+    "same-workloads": {"field": "dataset_ids", "equals": ["reed-100-b", "reed-500-b", "reed-1000-b"]},
+    "candidate-percentiles": {"field": "candidate_p95_ms", "equals": {"100": 48, "500": 119, "1000": 260}},
+    "comparator-percentiles": {"field": "comparator_p95_ms", "equals": {"100": 61, "500": 138, "1000": 281}},
+    "failing-workload": {"field": "failed_dataset", "equals": "reed-1000-b"},
+    "serial-intervals": {"field": "serial", "equals": true},
+    "short-circuit": {"field": "invalid_comparator_run", "equals": "r09"},
+    "cross-lane-overlap": {"field": "conflicting_slots", "equals": ["r13", "r14"]}
+  }
+}

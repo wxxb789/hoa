@@ -1,0 +1,24 @@
+{
+  "id": "research-stream-consolidation",
+  "skill": "research-stream-consolidation",
+  "fixture": "fixtures/research-stream-consolidation",
+  "prompt": "Make the two synthetic fieldwork streams in this disposable workspace into one canonical collection. Start with fieldwork/atlas/README.md. Perform the merge here, keeping the incoming stream's internal layout and repairing where readers and study tooling find the evidence. No commit, remote, or writes outside this workspace. The workspace is a snapshot without Git metadata; local file operations are enough. Keep machine-readable records in their existing formats and file the study relocation record described in study/README.md.",
+  "terse": "Inventory both trees and their path-bound records first. Move the incoming stream as a unit, deduplicate once by content identity subject to retention rules, preserve distinct sources and both origins, then repair and verify every manifest, control binding, and citation affected by the move.",
+  "shell": true,
+  "rubric": {
+    "retire-incoming": {"file": "study/relocations.tsv", "contains": "fieldwork/oriole\tfieldwork/atlas/oriole\tmoved"},
+    "dedup-record": {"file": "study/relocations.tsv", "contains": "fieldwork/oriole/evidence/weather-copy.txt\tfieldwork/atlas/evidence/weather.txt\tdeduplicated"},
+    "retain-atlas-receipt": {"file": "fieldwork/atlas/run/empty.receipt", "contains": "records=0\n"},
+    "retain-oriole-receipt": {"file": "fieldwork/atlas/oriole/run/empty.receipt", "contains": "records=0\n"},
+    "canonical-duplicate": {"file": "fieldwork/atlas/evidence/weather.txt", "contains": "West transect: rain began at 09:20."},
+    "preserve-first-same-name": {"file": "fieldwork/atlas/evidence/counts.txt", "contains": "West transect: 12 tagged reeds."},
+    "preserve-second-same-name": {"file": "fieldwork/atlas/oriole/evidence/counts.txt", "contains": "East transect: 17 tagged reeds."},
+    "union-origins": {"file": "fieldwork/atlas/provenance.tsv", "contains": "atlas-wx\tfieldwork/atlas/evidence/weather.txt\tWX-3\noriole-wx\tfieldwork/atlas/evidence/weather.txt\tWX-9"},
+    "incoming-citation": {"file": "fieldwork/atlas/oriole/MATERIALS.md", "contains": "[Weather sheet](../evidence/weather.txt)"},
+    "outside-navigation": {"file": "fieldwork/README.md", "contains": "[East materials](atlas/oriole/MATERIALS.md)"},
+    "control-canonical-duplicate": {"file": "study/artifacts.tsv", "contains": "oriole-wx\tfieldwork/atlas/evidence/weather.txt\twx-shared-0920"},
+    "control-distinct-bytes": {"file": "study/artifacts.tsv", "contains": "oriole-count\tfieldwork/atlas/oriole/evidence/counts.txt\tcount-east-17"},
+    "control-keep-sentinel": {"file": "study/artifacts.tsv", "contains": "oriole-empty\tfieldwork/atlas/oriole/run/empty.receipt\tempty"},
+    "unrelated-fixture": {"file": "study/schedule.txt", "contains": "Next observation window: 14:30."}
+  }
+}

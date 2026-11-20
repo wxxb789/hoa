@@ -1,0 +1,43 @@
+{
+  "id": "review-revision-candidates",
+  "skill": "review-revision-candidates",
+  "fixture": "fixtures/review-revision-candidates",
+  "prompt": "Please turn the rejected v2 into the v3 submission. Read review/current.md and request.md. Work in scratch/ only: this is a frozen checkout snapshot without Git metadata. Supply scratch/bulletin.md and a unified scratch/v3-bulletin.patch with a/bulletin.md and b/bulletin.md headers and full context. Use git apply --check on the v3 patch from the snapshot root, without applying it there. Return only a raw JSON object (no Markdown or commentary) with baseline (snapshot ID from request.md), apply_check (pass or fail for your actual check), and anchors (object mapping each numbered item as a string to its evidence locator from review/evidence.tsv).",
+  "terse": "Re-read the governing material and take the current review's numbered items as the entire revision scope. Preserve the rejected candidate and working tree; emit a new candidate from pristine bytes in scratch, verify the patch, and map each changed hunk to its review item and evidence anchor.",
+  "shell": true,
+  "rubric": {
+    "frozen-baseline": {
+      "field": "baseline",
+      "equals": "bulletin-base-6"
+    },
+    "apply-check": {
+      "field": "apply_check",
+      "equals": "pass"
+    },
+    "evidence-anchors": {
+      "field": "anchors",
+      "equals": {
+        "1": "JUN-06:T2",
+        "2": "MAR-11:N4",
+        "3": "CAT-02:S7",
+        "4": "FETCH-13:E2"
+      }
+    },
+    "candidate-content": {
+      "file": "scratch/bulletin.md",
+      "contains": "# Weekly Bulletin\nupdated: 2026-04-04\nStatus: 48 verified sessions in the June sample.\nPrior: 52 actions were attributed to the March log; definitions are not aligned.\nCoverage: The inspected February catalog lists an annex in section 7.\nAccess: The June 13 client attempt returned HTTP 403.\nFooter: Send questions to the desk.\n"
+    },
+    "root-applicable-patch": {
+      "file": "scratch/v3-bulletin.patch",
+      "contains": "--- a/bulletin.md\n+++ b/bulletin.md\n@@ -1,7 +1,7 @@\n # Weekly Bulletin\n updated: 2026-04-04\n-Status: The archive is closed.\n-Prior: The March log counted 52 verified sessions.\n-Coverage: No catalog lists an annex.\n-Access: The archive is unavailable.\n+Status: 48 verified sessions in the June sample.\n+Prior: 52 actions were attributed to the March log; definitions are not aligned.\n+Coverage: The inspected February catalog lists an annex in section 7.\n+Access: The June 13 client attempt returned HTTP 403.\n Footer: Send questions to the desk.\n"
+    },
+    "original-target-proxy": {
+      "file": "bulletin.md",
+      "contains": "# Weekly Bulletin\nupdated: 2026-04-04\nStatus: The archive is closed.\nPrior: The March log counted 52 verified sessions.\nCoverage: No catalog lists an annex.\nAccess: The archive is unavailable.\nFooter: Send questions to the desk.\n"
+    },
+    "rejected-v2-proxy": {
+      "file": "candidates/v2-bulletin.patch",
+      "contains": "--- a/bulletin.md\n+++ b/bulletin.md\n@@ -1,7 +1,7 @@\n # Weekly Bulletin\n-updated: 2026-04-04\n-Status: The archive is closed.\n-Prior: The March log counted 52 verified sessions.\n-Coverage: No catalog lists an annex.\n-Access: The archive is unavailable.\n-Footer: Send questions to the desk.\n+updated: 2026-06-14\n+Status: The archive is effectively closed.\n+Prior: The March baseline of 52 sessions was superseded.\n+Coverage: Catalogs do not list the annex.\n+Access: The endpoint is unavailable to readers.\n+Footer: Contact the editorial desk.\n"
+    }
+  }
+}

@@ -1,0 +1,28 @@
+diff --git a/migrations/041_queue.sql b/migrations/041_queue.sql
+--- a/migrations/041_queue.sql
++++ b/migrations/041_queue.sql
+@@ -1 +1 @@
+-UPDATE global_slots SET queue = 'ready';
++UPDATE local_slots SET queue = 'ready';
+diff --git a/migrations/042_owner.sql b/migrations/042_owner.sql
+--- a/migrations/042_owner.sql
++++ b/migrations/042_owner.sql
+@@ -1 +1 @@
+-UPDATE global_slots SET owner = 'importer';
++UPDATE local_slots SET owner = 'importer';
+diff --git a/archive/043_receipt.sql b/migrations/043_receipt.sql
+similarity index 100%
+rename from archive/043_receipt.sql
+rename to migrations/043_receipt.sql
+diff --git a/config/import.toml b/config/import.toml
+--- a/config/import.toml
++++ b/config/import.toml
+@@ -1 +1 @@
+-apply_mode = "execute"
++apply_mode = "dry-run"
+diff --git a/notes/release.md b/notes/release.md
+--- a/notes/release.md
++++ b/notes/release.md
+@@ -1 +1 @@
+- Window: Saturday
++ Window: Sunday

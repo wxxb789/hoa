@@ -1,0 +1,6 @@
+record_id	path	content_id
+atlas-count	fieldwork/atlas/evidence/counts.txt	count-west-12
+atlas-wx	fieldwork/atlas/evidence/weather.txt	wx-shared-0920
+oriole-count	fieldwork/oriole/evidence/counts.txt	count-east-17
+oriole-wx	fieldwork/oriole/evidence/weather-copy.txt	wx-shared-0920
+oriole-empty	fieldwork/oriole/run/empty.receipt	empty

@@ -1,0 +1,17 @@
+{
+  "id": "delegated-work-acceptance",
+  "skill": "delegated-work-acceptance",
+  "fixture": "fixtures/delegated-work-acceptance",
+  "prompt": "The migration worker says the batch is ready to land. Decide whether to clear it. Start with request.md and receipt.md; worker.diff, operator.log, and the request's referenced policy are the frozen evidence. This is a read-only acceptance round; do not fix or publish anything. Return only a raw JSON object (no Markdown, code fence, or commentary) with decision (accept or return-for-repair), delivered and assigned (integers), missing (single repo-relative path or null), forbidden (sorted repo-relative paths outside the write surface, excluding the operator baseline), excluded_preexisting (single repo-relative path or null), and unsupported_gate (gate name or null).",
+  "terse": "Treat the worker report as a claim. Inspect the artifact, recompute decisive counts and pass conditions, check the write boundary against the pre-dispatch baseline, and return a scoped accept-or-repair ruling without fixing the work yourself.",
+  "shell": ["codex"],
+  "rubric": {
+    "return-for-repair": {"field": "decision", "equals": "return-for-repair"},
+    "delivered-count": {"field": "delivered", "equals": 2},
+    "assigned-count": {"field": "assigned", "equals": 3},
+    "missing-migration": {"field": "missing", "equals": "migrations/043_receipt.sql"},
+    "out-of-scope-paths": {"field": "forbidden", "equals": ["archive/043_receipt.sql", "config/import.toml"]},
+    "operator-baseline": {"field": "excluded_preexisting", "equals": "notes/release.md"},
+    "unverified-apply": {"field": "unsupported_gate", "equals": "migration-apply"}
+  }
+}

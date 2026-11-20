@@ -1,0 +1,12 @@
+{
+  "package_digests": {
+    "release-archive": "a61dad1f70653432101ec2dd3ffaad4c93186e318a7f87170335b2b3bddc9a86",
+    "source-rebuild": "bf1808275558d24368214f3ea9279282f9be5d55a754e491a345379f333d855b",
+    "prior-archive": "e9c409cb17204f27fa069159dfb73b453e066479bb69d2b11f9a43c01a7030f7"
+  },
+  "required_datasets": ["reed-100-b", "reed-500-b", "reed-1000-b"],
+  "receipt_classes": {
+    "A": {"clock": "dispatch-to-verified-receipt", "committed": "all dataset rows"},
+    "B": {"clock": "route-entry-to-plan", "committed": 0}
+  }
+}

@@ -1,0 +1,16 @@
+run,campaign,role,package,dataset,host,start,end,receipt_class,sample_counts
+r01,replay-07,candidate,release-archive,reed-100-b,h1,0,10,A,41:18 48:1 90:1
+r02,replay-07,comparator,prior-archive,reed-100-b,h1,10,20,A,51:18 61:1 97:1
+r03,replay-07,candidate,release-archive,reed-500-b,h1,21,31,A,103:18 119:1 150:1
+r04,replay-07,comparator,prior-archive,reed-500-b,h1,31,42,A,119:18 138:1 171:1
+r05,replay-07,candidate,release-archive,reed-1000-b,h1,42,55,A,219:18 260:1 286:1
+r06,replay-07,comparator,prior-archive,reed-1000-b,h1,55,72,A,251:18 281:1 310:1
+r07,replay-08,candidate,release-archive,reed-1000-a,h1,73,90,A,203:18 227:1 258:1
+r08,replay-08,candidate,source-rebuild,reed-1000-b,h1,75,92,A,198:18 218:1 242:1
+r09,replay-08,comparator,prior-archive,reed-1000-b,h1,92,96,B,8:18 9:1 10:1
+r10,replay-06,candidate,release-archive,reed-100-b,h1,100,106,A,43:18 49:1 92:1
+r11,replay-06,comparator,prior-archive,reed-100-b,h1,106,113,A,50:18 62:1 98:1
+r12,replay-06,candidate,release-archive,reed-500-b,h1,114,124,A,101:18 115:1 144:1
+r13,replay-06,comparator,prior-archive,reed-500-b,h1,124,138,A,111:18 133:1 166:1
+r14,replay-06,candidate,release-archive,reed-1000-b,h1,137,150,A,200:18 236:1 270:1
+r15,replay-06,comparator,prior-archive,reed-1000-b,h1,150,166,A,232:18 261:1 309:1
