@@ -200,7 +200,10 @@ def fetch_checks(pr, repo):
         ["gh", "pr", "checks", str(pr), "--json", "name,state,bucket"], cwd=repo
     )
     if returncode == 0:
-        data = json.loads(stdout)
+        try:
+            data = json.loads(stdout)
+        except ValueError as exc:
+            raise GateError(f"gh pr checks --json: malformed output: {exc}") from exc
         if not isinstance(data, list):
             raise GateError("gh pr checks --json: expected a list of checks")
         for entry in data:

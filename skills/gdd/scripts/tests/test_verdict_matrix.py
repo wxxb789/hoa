@@ -485,7 +485,7 @@ def dimension_problems(cells):
 
 # --- stream fidelity (invariant 7) ------------------------------------------
 # A verdict cell cannot express this: sh_raw's padding is invisible to every verdict because
-# parse_text_checks strips each data field and json.loads tolerates surrounding whitespace. These
+# json.loads tolerates surrounding whitespace. These
 # cells compare the exact bytes sh_raw hands back instead of dropping the invariant silently.
 STREAM_CELLS = [
     StreamCell("stream-padded-stdout", "  leading\nbody\n\n", "err", 7,
