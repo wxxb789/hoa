@@ -20,7 +20,7 @@ does not install a route.
 | Agent | `GDD_AGENT` | Route skill | Visibility |
 |---|---|---|---|
 | OMP | `omp` | `gdd-route-omp` | Visible |
-| DeepSeek Harness | `dsh` | `gdd-route-dsh` | Visible |
+| DeepSeek Harness | `dsh` | `gdd-route-dsh` | Hidden |
 | Codex | `codex` | `gdd-route-codex` | Hidden |
 | Claude Code | `claude` | `gdd-route-cc` | Hidden |
 | Pi | `pi` | `gdd-route-pi` | Hidden |

@@ -16,7 +16,7 @@ ledger。[目标契约目录](goals/README.md)是本仓库存放活跃契约的�
 | Agent | `GDD_AGENT` | Route skill | 可见性 |
 |---|---|---|---|
 | OMP | `omp` | `gdd-route-omp` | 可见 |
-| DeepSeek Harness | `dsh` | `gdd-route-dsh` | 可见 |
+| DeepSeek Harness | `dsh` | `gdd-route-dsh` | 隐藏 |
 | Codex | `codex` | `gdd-route-codex` | 隐藏 |
 | Claude Code | `claude` | `gdd-route-cc` | 隐藏 |
 | Pi | `pi` | `gdd-route-pi` | 隐藏 |

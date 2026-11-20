@@ -58,7 +58,8 @@ Hermes 不识别 `disable-model-invocation`，仍会列出子 skill。
 | 创建、演进或组合一项已定义的能力 | [hoa-skill-create](../skills/hoa-skill-create/SKILL.md) | 改动、验证结果及未验证路径 |
 | 复盘跨仓库和 agent 会话的实践 | [hoa-practice-retro](../skills/hoa-practice-retro/SKILL.md)（仅显式调用） | 带证据的发现和重复工作候选，不自动创建 |
 | 审查单个仓库的实践与运作机制 | [hoa-repo-reckoning](../skills/hoa-repo-reckoning/SKILL.md)（仅显式调用的提示词） | 自由格式报告，按严重程度排列发现并附证据 |
-| 审计会话实际可用的 skill 集合 | [hoa-skill-set-audit](../skills/hoa-skill-set-audit/SKILL.md)（仅显式调用） | 集合级发现、必要性结论或每周建议，不做改动 |
+| 审计会话实际可用的 skill 集合 | [hoa-skill-set-audit](../skills/hoa-skill-set-audit/SKILL.md)（仅显式调用） | 集合级发现和必要性结论，不做改动 |
+| 根据近期工作推荐 skill | [hoa-skill-curate](../skills/hoa-skill-curate/SKILL.md) | 带证据的建议，不做改动 |
 
 先做聚焦的行为检查；覆盖范围、风险或证据冲突有需要时，再扩展到多个变体、model
 或 runtime。复盘候选须经负责人逐项批准后才能创建；直接请求明确定义的 skill 不用走
