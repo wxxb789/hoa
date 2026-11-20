@@ -113,7 +113,7 @@ def test_mixed_layout_starts_from_lexical_and_configured_root(tmp_path, mode):
     env = {key: value for key, value in os.environ.items() if not key.startswith(("GDD_", "STUB_"))}
     env.update(GDD_RUN_ROOT=str(root), XDG_CONFIG_HOME=str(tmp_path / "config"),
                GDD_RUN_DETACH="windows" if os.name == "nt" else "setsid",
-               OMP_BIN=str(stub), STUB_FIXTURE=str(fixture))
+               OMP_BIN=str(stub), STUB_FIXTURE=str(fixture), PYTHONIOENCODING="utf-8")
     host = runner.parents[2]
     canonical = runner.resolve()
     config = tmp_path / "config" / "gdd" / "config.yaml"
