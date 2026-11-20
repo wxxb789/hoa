@@ -1,0 +1,950 @@
+{
+  "schema_version": 3,
+  "task": "set-b-ghc-search",
+  "generated_at": "2026-11-20T02:10:40.832777-08:00",
+  "skill": "ghc-search",
+  "skill_revision": "3",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "natural",
+  "shell": false,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "source-specific-routes": {
+      "field": "routes",
+      "equals": {
+        "Q17": "x",
+        "Q21": "gpt",
+        "Q25": "direct-fetch",
+        "Q28": "docs"
+      }
+    },
+    "enforced-corpus-filters": {
+      "field": "search_options",
+      "equals": {
+        "Q17": {
+          "--handle": [
+            "FallowQuayOps",
+            "FallowQuayAccess"
+          ],
+          "--exclude-handle": [
+            "FallowQuayFans"
+          ],
+          "--from-date": "2026-10-24",
+          "--to-date": "2026-10-31"
+        },
+        "Q21": {
+          "--domain": [
+            "notices.fallowquay.example",
+            "register.fallowquay.example"
+          ],
+          "--block-domain": [
+            "mirrors.notices.fallowquay.example"
+          ]
+        }
+      }
+    },
+    "replay-evidence": {
+      "field": "replay",
+      "equals": {
+        "R10": "needs-sources",
+        "R11": "retry-with-higher-cap",
+        "R12": "failed",
+        "R13": "publishable"
+      }
+    }
+  },
+  "rubric_flags": {
+    "source-specific-routes": "flaky",
+    "replay-evidence": "non-discriminating"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 0,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.0,
+      "pass^k": false,
+      "mean_score": 0.6666666666666666,
+      "sample_stddev": 0.0
+    },
+    "terse": {
+      "valid": true,
+      "passed": 0,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.0,
+      "pass^k": false,
+      "mean_score": 0.5555555555555556,
+      "sample_stddev": 0.19245008972987523
+    },
+    "skill": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": 0.33333333333333337,
+    "terse": 0.4444444444444444
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 1,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": true,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "```json\n{\n  \"routes\": {\n    \"Q17\": \"x\",\n    \"Q21\": \"gpt\",\n    \"Q25\": \"direct-fetch\",\n    \"Q28\": \"docs\"\n  },\n  \"search_options\": {\n    \"Q17\": {\n      \"--account\": [\"FallowQuayOps\", \"FallowQuayAccess\"],\n      \"--exclude-account\": \"FallowQuayFans\",\n      \"--since\": \"2026-10-24\",\n      \"--until\": \"2026-10-31\"\n    },\n    \"Q21\": {\n      \"--domain\": [\"notices.fallowquay.example\", \"register.fallowquay.example\"],\n      \"--exclude-domain\": \"mirrors.notices.fallowquay.example\"\n    }\n  },\n  \"replay\": {\n    \"R10\": \"needs-sources\",\n    \"R11\": \"retry-with-higher-cap\",\n    \"R12\": \"failed\",\n    \"R13\": \"publishable\"\n  },\n  \"queries\": {\n    \"Q17\": \"east-lift trial opening announcement, closing week of October\",\n    \"Q21\": \"signed operating notice east-lift trial hours and final operating exception\"\n  }\n}\n```\n\nNotes on the decisions and the uncertain parts:\n\n- **Flag names are my guesses.** The packet never names the `ghc-search` corpus-restriction flags, and the skills directory is empty, so I could not check them. The keys `--account`, `--exclude-account`, `--since`, `--until`, `--domain`, and `--exclude-domain` are placeholders. Please confirm them against the tool's help before anyone runs these.\n- **Q17 search:** the register limits this to X originals from the two allowed accounts, excludes the fan account, and sets the archive window to 2026-10-24 through 2026-10-31. The query text leaves out account names and dates, which the flags carry.\n- **Q21 search:** the signed notice's page address was lost, so a domain-restricted search is the route. The fan-style mirror host is excluded explicitly.\n- **Q25:** the register gives a direct URL (`#signage` anchor on the 2026-09-17 minutes), so direct fetch applies. The handover's warning about the minutes link does not change this, since the register is the source of truth.\n- **Q28:** the catalog entry `berthplan@2.4` is the documentation route. I did not check the return type, since that would need the docs, which I did not open.\n- **Replay decisions:**\n  - R10 has the full answer including the exception, but no sources, so it is `needs-sources`.\n  - R11 cites a source but is truncated mid-exception, so it needs a retry with a higher cap.\n  - R12 returned an error with no output, so it is `failed`. Its diagnostic candidate URL is not usable evidence.\n  - R13 has the complete answer with the 16:00 exception and a cited source on the allowed `register.fallowquay.example` host, so it is `publishable` on its own.\n- No searches, fetches, or network calls were made. Everything comes from the four local files.",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "source-specific-routes": true,
+          "enforced-corpus-filters": false,
+          "replay-evidence": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 24.118,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 5340,
+          "cache_read_input_tokens": 28221,
+          "output_tokens": 3606,
+          "output_tokens_details": {
+            "thinking_tokens": 2044
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5340
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 37175,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00275351,
+        "turns": 7
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 1,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": true,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "I've read the packet, but the skills folder is empty, so I couldn't confirm any corpus-restriction CLI flag names. I'll leave `search_options` empty rather than guess them.\n\n```json\n{\n  \"routes\": {\n    \"Q17\": \"x\",\n    \"Q21\": \"gpt\",\n    \"Q25\": \"direct-fetch\",\n    \"Q28\": \"docs\"\n  },\n  \"search_options\": {},\n  \"replay\": {\n    \"R10\": \"needs-sources\",\n    \"R11\": \"retry-with-higher-cap\",\n    \"R12\": \"failed\",\n    \"R13\": \"publishable\"\n  },\n  \"queries\": {\n    \"Q17\": \"east-lift trial short posts announcing the trial, October 24-31 2026\",\n    \"Q21\": \"east-lift trial signed operating notice hours and accessibility exception\"\n  }\n}\n```\n\nBasis for the decisions:\n- **Routes:** Q17 is X-only, so it goes to `x`. Q21 has a lost address and needs a search restricted to the allowed notice hosts, so `gpt`. Q25 gives a direct URL, so `direct-fetch`. Q28 is a catalog lookup for berthplan@2.4, so `docs`.\n- **Replay:** R10 has no sources, so it needs them. R11 has a source, but its answer was cut off before the exception, so it needs a higher token cap. R12 returned no output (content filter), so it failed. R13 gives the full hours plus the level-access exception from the allowed host `register.fallowquay.example`, so it is publishable.\n- **Caveat:** The queries are proposals for the editor to review. The `search_options` flags still need to be confirmed against the search tool's documentation before any search is run.",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "source-specific-routes": true,
+          "enforced-corpus-filters": false,
+          "replay-evidence": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 16.391,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 4995,
+          "cache_read_input_tokens": 28539,
+          "output_tokens": 2554,
+          "output_tokens_details": {
+            "thinking_tokens": 1419
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4995
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 36096,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002187565,
+        "turns": 7
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 1,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": true,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "```json\n{\n  \"routes\": {\"Q17\": \"x\", \"Q21\": \"gpt\", \"Q25\": \"direct-fetch\", \"Q28\": \"docs\"},\n  \"search_options\": {\"Q17\": {}, \"Q21\": {}},\n  \"replay\": {\"R10\": \"needs-sources\", \"R11\": \"retry-with-higher-cap\", \"R12\": \"failed\", \"R13\": \"publishable\"},\n  \"queries\": {\n    \"Q17\": \"east-lift trial announcement closing week October\",\n    \"Q21\": \"signed operating notice east-lift trial hours and level access exception\"\n  }\n}\n```\n\nNote: the local files do not document the search CLI's corpus-restriction flags, so I could not fill `search_options`. The register gives the values (Q17: X accounts FallowQuayOps and FallowQuayAccess, excluding FallowQuayFans, dated 2026-10-24 to 2026-10-31; Q21: notices.fallowquay.example and register.fallowquay.example, excluding mirrors.notices.fallowquay.example). The flag names need to come from the tool's own help output, which I can't run here.",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "source-specific-routes": true,
+          "enforced-corpus-filters": false,
+          "replay-evidence": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 18.142,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 4933,
+          "cache_read_input_tokens": 28505,
+          "output_tokens": 2743,
+          "output_tokens_details": {
+            "thinking_tokens": 1868
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4933
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 36189,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002273975,
+        "turns": 7
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 1,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": true,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "I couldn't find the corpus-restriction CLI flag names. The packet doesn't define them, and the skills directory is empty. I haven't guessed them, so `search_options` is left empty for the two search requests. The register's allowed and excluded accounts and domains are listed in the notes below.\n\n```json\n{\n  \"routes\": {\n    \"Q17\": \"x\",\n    \"Q21\": \"gpt\",\n    \"Q25\": \"direct-fetch\",\n    \"Q28\": \"docs\"\n  },\n  \"search_options\": {\n    \"Q17\": {},\n    \"Q21\": {}\n  },\n  \"replay\": {\n    \"R10\": \"needs-sources\",\n    \"R11\": \"retry-with-higher-cap\",\n    \"R12\": \"failed\",\n    \"R13\": \"publishable\"\n  },\n  \"queries\": {\n    \"Q17\": \"east-lift trial announcement, closing week of October\",\n    \"Q21\": \"signed operating notice east-lift trial hours and level-access exception\"\n  }\n}\n```\n\nNotes for the editor:\n\n- **Blocker:** The flag names are missing. For Q17 the register requires X originals only, allowing FallowQuayOps then FallowQuayAccess, and excluding FallowQuayFans. The date range is 2026-10-24 through 2026-10-31. For Q21 it requires allowing notices.fallowquay.example then register.fallowquay.example, and excluding mirrors.notices.fallowquay.example. Once the flag names are supplied, these values can be filled in.\n- **Q17 query:** I left out the account names and dates that the handover suggested. The register scopes those through restrictions, not query text.\n- **Q21 route:** The notice address is lost, so this is a search, not a direct fetch.\n- **Replay:** R13 is the only capture that gives the complete answer, including the level-access exception after 16:00, and cites an allowed host (register.fallowquay.example). R10 has the exception but no sources. R11 is cut off before the exception. R12 has no output.\n- **Q25 and Q28:** The minutes URL and the berthplan@2.4 catalog entry are already given, so no search is needed.\n- **Offline:** I read only the four local files and made no searches, network calls, or service starts.",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "source-specific-routes": true,
+          "enforced-corpus-filters": false,
+          "replay-evidence": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 30.641,
+        "usage": {
+          "input_tokens": 12,
+          "cache_creation_input_tokens": 8611,
+          "cache_read_input_tokens": 45961,
+          "output_tokens": 4534,
+          "output_tokens_details": {
+            "thinking_tokens": 3029
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 8611
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 59118,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.003804185,
+        "turns": 9
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 1,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": true,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "```json\n{\"routes\":{\"Q17\":\"x\",\"Q21\":\"gpt\",\"Q25\":\"direct-fetch\",\"Q28\":\"docs\"},\"search_options\":{\"Q17\":{\"--x-account\":[\"FallowQuayOps\",\"FallowQuayAccess\"],\"--exclude-x-account\":\"FallowQuayFans\",\"--date-from\":\"2026-10-24\",\"--date-to\":\"2026-10-31\"},\"Q21\":{\"--allow-domain\":[\"notices.fallowquay.example\",\"register.fallowquay.example\"],\"--exclude-domain\":\"mirrors.notices.fallowquay.example\"}},\"replay\":{\"R10\":\"needs-sources\",\"R11\":\"retry-with-higher-cap\",\"R12\":\"failed\",\"R13\":\"publishable\"},\"queries\":{\"Q17\":\"east-lift trial original short posts closing week October 2026 operations access announcement\",\"Q21\":\"signed operating notice east-lift trial current operating hours final exception\"}}\n```\n\nNotes:\n- The CLI flag names are my assumption. No search CLI documentation exists in the local packet (the skills directory is empty), so the `--x-account`, `--exclude-x-account`, `--date-from`, `--date-to`, `--allow-domain`, and `--exclude-domain` keys need checking against the real tool before anyone runs them.\n- R10 has the right answer but no sources. R11 is cut off before the exception. R12 returned no output. R13 is the only capture with a cited register-domain source and the full exception.\n- Q25 and Q28 are not search requests, so they have no `search_options` or `queries` entries.",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "source-specific-routes": true,
+          "enforced-corpus-filters": false,
+          "replay-evidence": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 19.823,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 5013,
+          "cache_read_input_tokens": 28767,
+          "output_tokens": 3043,
+          "output_tokens_details": {
+            "thinking_tokens": 1931
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5013
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 36831,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002436595,
+        "turns": 7
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 1,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": true,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "```json\n{\n  \"routes\": {\n    \"Q17\": \"x\",\n    \"Q21\": \"direct-fetch\",\n    \"Q25\": \"direct-fetch\",\n    \"Q28\": \"docs\"\n  },\n  \"search_options\": {},\n  \"replay\": {\n    \"R10\": \"needs-sources\",\n    \"R11\": \"retry-with-higher-cap\",\n    \"R12\": \"failed\",\n    \"R13\": \"publishable\"\n  },\n  \"queries\": {\n    \"Q17\": \"east-lift trial announcement, from:FallowQuayOps OR from:FallowQuayAccess, 2026-10-24 to 2026-10-31 local\"\n  }\n}\n```\n\nNotes on the gaps:\n\n- **`search_options` is empty.** The packet never defines the search CLI or its corpus-restriction flags, and the replay log doesn't record the flags used. I didn't invent flag names. The register gives the Q17 allow-list (FallowQuayOps, then FallowQuayAccess; FallowQuayFans excluded) and the date window (2026-10-24 to 2026-10-31), so those values are ready to map once the flag names are supplied.\n- **`queries` covers only Q17.** Q21, Q25, and Q28 are routed to direct-fetch or docs, so they have no search query. The Q17 text is a proposal for the editor to review.\n- **Replay decisions:**\n  - R13 is the only capture that is publishable on its own: it gives the table hours and the level-access exception after 16:00, and cites the allowed register host.\n  - R10 has the full answer but no sources.\n  - R11 cites a source but is truncated before the exception, so it needs a higher token cap.\n  - R12 returned no output (content-filter stop), so it failed.\n- **Q21 route:** the register allows only the notices and register hosts, and the mirror host is excluded. R13's citation is on the register host.",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "source-specific-routes": false,
+          "enforced-corpus-filters": false,
+          "replay-evidence": true
+        },
+        "score": 0.3333333333333333,
+        "passed": false,
+        "seconds": 17.747,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 5009,
+          "cache_read_input_tokens": 28767,
+          "output_tokens": 2639,
+          "output_tokens_details": {
+            "thinking_tokens": 1449
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5009
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 36423,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002234095,
+        "turns": 7
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": true,
+        "skill_probe_count": 1,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": true,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": true,
+            "contamination_reasons": [
+              "installed-copy-read"
+            ]
+          }
+        ],
+        "output": "```json\n{\n  \"routes\": {\n    \"Q17\": \"x\",\n    \"Q21\": \"gpt\",\n    \"Q25\": \"direct-fetch\",\n    \"Q28\": \"docs\"\n  },\n  \"search_options\": {\n    \"Q17\": {\n      \"--handle\": [\"FallowQuayOps\", \"FallowQuayAccess\"],\n      \"--exclude-handle\": [\"FallowQuayFans\"],\n      \"--from-date\": \"2026-10-24\",\n      \"--to-date\": \"2026-10-31\"\n    },\n    \"Q21\": {\n      \"--domain\": [\"notices.fallowquay.example\", \"register.fallowquay.example\"],\n      \"--block-domain\": [\"mirrors.notices.fallowquay.example\"]\n    }\n  },\n  \"replay\": {\n    \"R10\": \"needs-sources\",\n    \"R11\": \"retry-with-higher-cap\",\n    \"R12\": \"failed\",\n    \"R13\": \"publishable\"\n  },\n  \"queries\": {\n    \"Q17\": \"east-lift trial announcement short post\",\n    \"Q21\": \"signed operating notice east-lift trial operating hours and level access exception\"\n  }\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "source-specific-routes": true,
+          "enforced-corpus-filters": true,
+          "replay-evidence": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 15.036,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 7508,
+          "cache_read_input_tokens": 19624,
+          "output_tokens": 2580,
+          "output_tokens_details": {
+            "thinking_tokens": 1585
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 7508
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 29718,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00242534,
+        "turns": 8
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": true,
+        "skill_probe_count": 1,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": true,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": true,
+            "contamination_reasons": [
+              "installed-copy-read"
+            ]
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": [
+              "installed-copy-read"
+            ]
+          }
+        ],
+        "output": "{\"routes\":{\"Q17\":\"x\",\"Q21\":\"gpt\",\"Q25\":\"direct-fetch\",\"Q28\":\"docs\"},\"search_options\":{\"Q17\":{\"--handle\":[\"FallowQuayOps\",\"FallowQuayAccess\"],\"--exclude-handle\":[\"FallowQuayFans\"],\"--from-date\":\"2026-10-24\",\"--to-date\":\"2026-10-31\"},\"Q21\":{\"--domain\":[\"notices.fallowquay.example\",\"register.fallowquay.example\"],\"--block-domain\":[\"mirrors.notices.fallowquay.example\"]}},\"replay\":{\"R10\":\"needs-sources\",\"R11\":\"retry-with-higher-cap\",\"R12\":\"failed\",\"R13\":\"publishable\"},\"queries\":{\"Q17\":\"east-lift trial announcement short post\",\"Q21\":\"east-lift trial signed operating notice hours and access exception\"}}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "source-specific-routes": true,
+          "enforced-corpus-filters": true,
+          "replay-evidence": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 19.429,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 8438,
+          "cache_read_input_tokens": 29437,
+          "output_tokens": 3260,
+          "output_tokens_details": {
+            "thinking_tokens": 2190
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 8438
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 41143,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00297992,
+        "turns": 9
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": true,
+        "skill_probe_count": 1,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": true,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": true,
+            "contamination_reasons": [
+              "installed-copy-read"
+            ]
+          }
+        ],
+        "output": "```json\n{\n  \"routes\": {\"Q17\": \"x\", \"Q21\": \"gpt\", \"Q25\": \"direct-fetch\", \"Q28\": \"docs\"},\n  \"search_options\": {\n    \"Q17\": {\n      \"--handle\": [\"FallowQuayOps\", \"FallowQuayAccess\"],\n      \"--exclude-handle\": [\"FallowQuayFans\"],\n      \"--from-date\": \"2026-10-24\",\n      \"--to-date\": \"2026-10-31\"\n    },\n    \"Q21\": {\n      \"--domain\": [\"notices.fallowquay.example\", \"register.fallowquay.example\"],\n      \"--block-domain\": [\"mirrors.notices.fallowquay.example\"]\n    }\n  },\n  \"replay\": {\"R10\": \"needs-sources\", \"R11\": \"retry-with-higher-cap\", \"R12\": \"failed\", \"R13\": \"publishable\"},\n  \"queries\": {\n    \"Q17\": \"east-lift trial short announcement posts, closing week of October\",\n    \"Q21\": \"signed operating notice east-lift trial current opening hours and final operating exception\"\n  }\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "source-specific-routes": true,
+          "enforced-corpus-filters": true,
+          "replay-evidence": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 13.6,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 7494,
+          "cache_read_input_tokens": 19613,
+          "output_tokens": 2448,
+          "output_tokens_details": {
+            "thinking_tokens": 1471
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 7494
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 29561,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0023574800000000003,
+        "turns": 8
+      }
+    ]
+  },
+  "verdict": "skill-wins",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 342254,
+  "skipped_trials": []
+}

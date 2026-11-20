@@ -1,0 +1,661 @@
+{
+  "schema_version": 3,
+  "task": "evidence-backed-analytical-writing",
+  "generated_at": "2026-11-20T02:02:29.401472-08:00",
+  "skill": "evidence-backed-analytical-writing",
+  "skill_revision": "3",
+  "cli_version": "codex-cli 0.171.0",
+  "model": "gpt-6.2-sol",
+  "repeats": 3,
+  "runtime": "codex",
+  "mode": "forced",
+  "shell": true,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "bay-cohort": {
+      "field": "bay",
+      "equals": {
+        "source": "BW-06",
+        "date": "2027-06-30",
+        "commissioned": 12,
+        "eligible": 20,
+        "rate_pct": 60
+      }
+    },
+    "ridge-corrected-cohort": {
+      "field": "ridge",
+      "equals": {
+        "source": "RG-06",
+        "date": "2027-06-30",
+        "commissioned": 8,
+        "eligible": 20,
+        "rate_pct": 40
+      }
+    },
+    "comparable-gap": {
+      "field": "gap_pp",
+      "equals": 20
+    },
+    "disputed-statistic-replaced": {
+      "field": "sponsor_comparison",
+      "equals": "replace"
+    },
+    "service-targets-not-measurements": {
+      "field": "review_times",
+      "equals": {
+        "source": "IX-06",
+        "date": "2027-06-28",
+        "bay_days": 10,
+        "ridge_days": 20,
+        "status": "target"
+      }
+    },
+    "causal-status": {
+      "field": "cause",
+      "equals": "hypothesis"
+    }
+  },
+  "rubric_flags": {
+    "bay-cohort": "non-discriminating",
+    "ridge-corrected-cohort": "non-discriminating",
+    "comparable-gap": "non-discriminating",
+    "disputed-statistic-replaced": "non-discriminating",
+    "service-targets-not-measurements": "non-discriminating",
+    "causal-status": "non-discriminating"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    },
+    "terse": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    },
+    "skill": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": 0.0,
+    "terse": 0.0
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"brief_zh\": \"2027年6月，按监测队列截止时具备并网资格的许可项目计算，Bay有12个项目投运、20个项目符合资格，投运率为60%［BW-06］。Ridge有8个项目投运、20个项目符合资格，投运率为40%。其分母包括申诉后追溯恢复资格的4个项目，这4个项目截至6月30日均未投运。Ridge仪表板的20%以全部40个许可项目为分母，应以60%对40%的同口径比较替换原提法，差距为20个百分点［RG-06］。\\n\\nBay和Ridge公布的并网审查时限目标分别为10个和20个工作日。较快的审查可能有助于项目投运，但现有记录只提供目标时限，缺少实际审查用时，也未将单个项目的审查用时与投运结果关联，因此无法判断审查速度是否造成了这20个百分点的差距［IX-06］。\",\n  \"bay\": {\n    \"source\": \"BW-06\",\n    \"date\": \"2027-06-30\",\n    \"commissioned\": 12,\n    \"eligible\": 20,\n    \"rate_pct\": 60\n  },\n  \"ridge\": {\n    \"source\": \"RG-06\",\n    \"date\": \"2027-06-30\",\n    \"commissioned\": 8,\n    \"eligible\": 20,\n    \"rate_pct\": 40\n  },\n  \"gap_pp\": 20,\n  \"sponsor_comparison\": \"replace\",\n  \"review_times\": {\n    \"source\": \"IX-06\",\n    \"date\": \"2027-06-28\",\n    \"bay_days\": 10,\n    \"ridge_days\": 20,\n    \"status\": \"target\"\n  },\n  \"cause\": \"hypothesis\"\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "bay-cohort": true,
+          "ridge-corrected-cohort": true,
+          "comparable-gap": true,
+          "disputed-statistic-replaced": true,
+          "service-targets-not-measurements": true,
+          "causal-status": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 17.844,
+        "usage": {
+          "input_tokens": 36305,
+          "cached_input_tokens": 23733,
+          "cache_write_input_tokens": 12563,
+          "output_tokens": 609,
+          "reasoning_output_tokens": 44
+        },
+        "tokens": 36914,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"brief_zh\": \"2027年6月监测期内，按截至6月30日符合并网资格的获许可项目计算，Bay有12个项目投运，占20个合格项目的60%（BW-06）；Ridge有8个项目投运，占20个合格项目的40%，其中4个项目经申诉追溯恢复资格，月底均未投运（RG-06）。Bay高出20个百分点，建议用这一同口径比较替换原提法。\\n\\n6月公布的并网审查时限目标为Bay 10个工作日、Ridge 20个工作日（IX-06）。较短的审查时间可能有助于项目更早投运，但现有资料只提供目标时限，缺少实际审查用时，也无法将逐项目的审查用时与投运结果对应，因此尚不能认定审查速度造成了这20个百分点的差距。\",\n  \"bay\": {\n    \"source\": \"BW-06\",\n    \"date\": \"2027-06-30\",\n    \"commissioned\": 12,\n    \"eligible\": 20,\n    \"rate_pct\": 60\n  },\n  \"ridge\": {\n    \"source\": \"RG-06\",\n    \"date\": \"2027-06-30\",\n    \"commissioned\": 8,\n    \"eligible\": 20,\n    \"rate_pct\": 40\n  },\n  \"gap_pp\": 20,\n  \"sponsor_comparison\": \"replace\",\n  \"review_times\": {\n    \"source\": \"IX-06\",\n    \"date\": \"2027-06-28\",\n    \"bay_days\": 10,\n    \"ridge_days\": 20,\n    \"status\": \"target\"\n  },\n  \"cause\": \"hypothesis\"\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "bay-cohort": true,
+          "ridge-corrected-cohort": true,
+          "comparable-gap": true,
+          "disputed-statistic-replaced": true,
+          "service-targets-not-measurements": true,
+          "causal-status": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 14.938,
+        "usage": {
+          "input_tokens": 36269,
+          "cached_input_tokens": 35213,
+          "cache_write_input_tokens": 1047,
+          "output_tokens": 534,
+          "reasoning_output_tokens": 0
+        },
+        "tokens": 36803,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"brief_zh\": \"2027年6月，按监测批次截止时具备并网资格的许可项目计算，截至6月30日，Bay有12个项目投运，占20个合格项目的60%（BW-06）；Ridge有8个项目投运，占20个合格项目的40%，其中4个项目经申诉追溯恢复资格，截至月底均未投运（RG-06）。Bay领先20个百分点，投运率为Ridge的1.5倍。原提案引用的Ridge 20%以全部40个许可项目为分母，应改用同口径的40%（RG-06）。\\n\\nBay和Ridge公布的并网审查时限目标分别为10和20个工作日（IX-06）。较短的审查时间可能有助于项目更早投运，但现有记录只提供目标时限，缺少实际审查用时，也未将逐项目的审查用时与投运结果关联，因此无法确定审查速度是否解释了投运率差距（IX-06）。\",\n  \"bay\": {\n    \"source\": \"BW-06\",\n    \"date\": \"2027-06-30\",\n    \"commissioned\": 12,\n    \"eligible\": 20,\n    \"rate_pct\": 60\n  },\n  \"ridge\": {\n    \"source\": \"RG-06\",\n    \"date\": \"2027-06-30\",\n    \"commissioned\": 8,\n    \"eligible\": 20,\n    \"rate_pct\": 40\n  },\n  \"gap_pp\": 20,\n  \"sponsor_comparison\": \"replace\",\n  \"review_times\": {\n    \"source\": \"IX-06\",\n    \"date\": \"2027-06-28\",\n    \"bay_days\": 10,\n    \"ridge_days\": 20,\n    \"status\": \"target\"\n  },\n  \"cause\": \"hypothesis\"\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "bay-cohort": true,
+          "ridge-corrected-cohort": true,
+          "comparable-gap": true,
+          "disputed-statistic-replaced": true,
+          "service-targets-not-measurements": true,
+          "causal-status": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 16.936,
+        "usage": {
+          "input_tokens": 36411,
+          "cached_input_tokens": 35287,
+          "cache_write_input_tokens": 1115,
+          "output_tokens": 572,
+          "reasoning_output_tokens": 0
+        },
+        "tokens": 36983,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"brief_zh\": \"2027年6月，按截至6月30日具备并网资格的许可项目计算，Bay有12个项目投运，占20个合格项目的60% [BW-06]。Ridge在计入4个经申诉追溯恢复资格、月底仍未投运的项目后，有8个项目投运，占20个合格项目的40% [RG-06]。Bay领先20个百分点。赞助方引用的Ridge 20%以全部40个许可项目为分母，应以同口径的40%替换 [RG-06]。\\n\\n区域并网秘书处6月28日公布的审查时限目标为Bay 10个工作日、Ridge 20个工作日 [IX-06]。如果实际审查更快，项目可能更早完成并网手续，从而更有机会在月底前投运。现有记录只提供目标时限，缺少实测时长及其与逐项目投运结果的对应数据，因此审查速度能否解释这20个百分点的差距仍是假设 [IX-06]。\",\n  \"bay\": {\n    \"source\": \"BW-06\",\n    \"date\": \"2027-06-30\",\n    \"commissioned\": 12,\n    \"eligible\": 20,\n    \"rate_pct\": 60\n  },\n  \"ridge\": {\n    \"source\": \"RG-06\",\n    \"date\": \"2027-06-30\",\n    \"commissioned\": 8,\n    \"eligible\": 20,\n    \"rate_pct\": 40\n  },\n  \"gap_pp\": 20,\n  \"sponsor_comparison\": \"replace\",\n  \"review_times\": {\n    \"source\": \"IX-06\",\n    \"date\": \"2027-06-28\",\n    \"bay_days\": 10,\n    \"ridge_days\": 20,\n    \"status\": \"target\"\n  },\n  \"cause\": \"hypothesis\"\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "bay-cohort": true,
+          "ridge-corrected-cohort": true,
+          "comparable-gap": true,
+          "disputed-statistic-replaced": true,
+          "service-targets-not-measurements": true,
+          "causal-status": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 16.561,
+        "usage": {
+          "input_tokens": 49706,
+          "cached_input_tokens": 36627,
+          "cache_write_input_tokens": 13067,
+          "output_tokens": 614,
+          "reasoning_output_tokens": 0
+        },
+        "tokens": 50320,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"brief_zh\": \"2027年6月监测以截至6月30日具备并网资格的已获许可项目为分母，两地纳入监测的项目均有至少30天可办理并网。Bay有12个项目投运，占20个合格项目的60%（BW-06）。Ridge在申诉复核后追溯恢复了4个项目在资格截止时点的并网资格，这4个项目均未投运，因此投运率为8/20，即40%。仪表板的20%以全部40个获许可项目为分母。按统一口径，Bay高出20个百分点（RG-06）。\\n\\n6月28日公布的并网审查时限目标为Bay 10个工作日、Ridge 20个工作日。若实际审查更快，项目或能更早完成并网手续，并在监测截止前投运。现有记录仅提供服务目标，缺少实测审查用时及其与逐项目投运结果的对应数据，因此审查速度对投运率差距的影响仍是假设（IX-06）。\",\n  \"bay\": {\n    \"source\": \"BW-06\",\n    \"date\": \"2027-06-30\",\n    \"commissioned\": 12,\n    \"eligible\": 20,\n    \"rate_pct\": 60\n  },\n  \"ridge\": {\n    \"source\": \"RG-06\",\n    \"date\": \"2027-06-30\",\n    \"commissioned\": 8,\n    \"eligible\": 20,\n    \"rate_pct\": 40\n  },\n  \"gap_pp\": 20,\n  \"sponsor_comparison\": \"replace\",\n  \"review_times\": {\n    \"source\": \"IX-06\",\n    \"date\": \"2027-06-28\",\n    \"bay_days\": 10,\n    \"ridge_days\": 20,\n    \"status\": \"target\"\n  },\n  \"cause\": \"hypothesis\"\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "bay-cohort": true,
+          "ridge-corrected-cohort": true,
+          "comparable-gap": true,
+          "disputed-statistic-replaced": true,
+          "service-targets-not-measurements": true,
+          "causal-status": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 16.816,
+        "usage": {
+          "input_tokens": 36638,
+          "cached_input_tokens": 35529,
+          "cache_write_input_tokens": 1100,
+          "output_tokens": 656,
+          "reasoning_output_tokens": 67
+        },
+        "tokens": 37294,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"brief_zh\": \"2027年6月，按截至监测期末已有至少30天可并网、且在队列截止时具备并网资格的许可项目计算，Bay有12个项目投运（12/20，60%），Ridge有8个项目投运（8/20，40%），相差20个百分点。Ridge的20%来自以全部40个许可项目为分母的仪表板口径。按资格口径，Ridge原有16个合格项目，另有4个项目经申诉追溯恢复资格，且均未在月底前投运。应以60%对40%替换原比较。[BW-06][RG-06]\\n\\n6月公布的并网审查时限目标为Bay 10个工作日、Ridge 20个工作日。如果较短的目标落实为较短的实际审查用时，项目就可能更早完成审查，并有更多时间在月底前并网投运。现有记录仅提供目标值，缺少实际审查用时及其与逐项目投运结果的对应数据，因此审查速度对投运率差距的影响仍是假设。[IX-06]\",\n  \"bay\": {\n    \"source\": \"BW-06\",\n    \"date\": \"2027-06-30\",\n    \"commissioned\": 12,\n    \"eligible\": 20,\n    \"rate_pct\": 60\n  },\n  \"ridge\": {\n    \"source\": \"RG-06\",\n    \"date\": \"2027-06-30\",\n    \"commissioned\": 8,\n    \"eligible\": 20,\n    \"rate_pct\": 40\n  },\n  \"gap_pp\": 20,\n  \"sponsor_comparison\": \"replace\",\n  \"review_times\": {\n    \"source\": \"IX-06\",\n    \"date\": \"2027-06-28\",\n    \"bay_days\": 10,\n    \"ridge_days\": 20,\n    \"status\": \"target\"\n  },\n  \"cause\": \"hypothesis\"\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "bay-cohort": true,
+          "ridge-corrected-cohort": true,
+          "comparable-gap": true,
+          "disputed-statistic-replaced": true,
+          "service-targets-not-measurements": true,
+          "causal-status": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 16.418,
+        "usage": {
+          "input_tokens": 48329,
+          "cached_input_tokens": 47260,
+          "cache_write_input_tokens": 1057,
+          "output_tokens": 596,
+          "reasoning_output_tokens": 22
+        },
+        "tokens": 48925,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": true,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": true,
+            "contamination_reasons": [
+              "installed-copy-read"
+            ]
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": [
+              "installed-copy-read"
+            ]
+          }
+        ],
+        "output": "{\n  \"brief_zh\": \"按2027年6月监测口径，截至6月30日，Bay具备并网资格的20个获批项目中有12个投运，转化率为60%【BW-06】。Ridge有8个投运项目，仪表板以全部40个获批项目为分母，显示20%。将申诉后追溯恢复资格的4个未投运项目计入后，Ridge共有20个符合资格的项目，按同一口径计算的转化率为40%【RG-06】。Bay高出20个百分点。\\n\\n6月公布的并网审查时限目标为Bay 10个工作日、Ridge 20个工作日【IX-06】。如果较短的目标能缩短实际等待时间，项目就可能更早完成并网并投运。现有记录只给出服务目标，也缺少逐项目关联的实际审查用时与投运结果，因此审查速度是否解释转化率差距仍是假设【IX-06】。\",\n  \"bay\": {\n    \"source\": \"BW-06\",\n    \"date\": \"2027-06-30\",\n    \"commissioned\": 12,\n    \"eligible\": 20,\n    \"rate_pct\": 60\n  },\n  \"ridge\": {\n    \"source\": \"RG-06\",\n    \"date\": \"2027-06-30\",\n    \"commissioned\": 8,\n    \"eligible\": 20,\n    \"rate_pct\": 40\n  },\n  \"gap_pp\": 20,\n  \"sponsor_comparison\": \"replace\",\n  \"review_times\": {\n    \"source\": \"IX-06\",\n    \"date\": \"2027-06-28\",\n    \"bay_days\": 10,\n    \"ridge_days\": 20,\n    \"status\": \"target\"\n  },\n  \"cause\": \"hypothesis\"\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "bay-cohort": true,
+          "ridge-corrected-cohort": true,
+          "comparable-gap": true,
+          "disputed-statistic-replaced": true,
+          "service-targets-not-measurements": true,
+          "causal-status": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 22.19,
+        "usage": {
+          "input_tokens": 58140,
+          "cached_input_tokens": 41835,
+          "cache_write_input_tokens": 16293,
+          "output_tokens": 731,
+          "reasoning_output_tokens": 48
+        },
+        "tokens": 58871,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": true,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": true,
+            "contamination_reasons": [
+              "installed-copy-read"
+            ]
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": [
+              "installed-copy-read"
+            ]
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"brief_zh\": \"2027年6月，按截至6月30日具备并网资格的许可项目计算，Bay有12个项目投运，占20个合资格项目的60%（BW-06）。Ridge有8个项目投运，占20个合资格项目的40%，其中4个经申诉追溯恢复资格的项目均未投运（RG-06）。Bay高出20个百分点。Ridge仪表盘的20%以全部40个许可项目为分母，应改用同口径的40%（RG-06）。\\n\\n区域并网秘书处6月公布的审查时限目标为Bay 10个工作日、Ridge 20个工作日（IX-06）。如果实际审查更快，项目可能更早进入并网和投运环节。现有记录只给出目标时限，且缺少逐项目关联的实际审查耗时和投运结果，因此审查速度对投运率差距的影响仍是待验证的假设（IX-06）。\",\n  \"bay\": {\n    \"source\": \"BW-06\",\n    \"date\": \"2027-06-30\",\n    \"commissioned\": 12,\n    \"eligible\": 20,\n    \"rate_pct\": 60\n  },\n  \"ridge\": {\n    \"source\": \"RG-06\",\n    \"date\": \"2027-06-30\",\n    \"commissioned\": 8,\n    \"eligible\": 20,\n    \"rate_pct\": 40\n  },\n  \"gap_pp\": 20,\n  \"sponsor_comparison\": \"replace\",\n  \"review_times\": {\n    \"source\": \"IX-06\",\n    \"date\": \"2027-06-28\",\n    \"bay_days\": 10,\n    \"ridge_days\": 20,\n    \"status\": \"target\"\n  },\n  \"cause\": \"hypothesis\"\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "bay-cohort": true,
+          "ridge-corrected-cohort": true,
+          "comparable-gap": true,
+          "disputed-statistic-replaced": true,
+          "service-targets-not-measurements": true,
+          "causal-status": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 19.873,
+        "usage": {
+          "input_tokens": 59328,
+          "cached_input_tokens": 42925,
+          "cache_write_input_tokens": 16391,
+          "output_tokens": 724,
+          "reasoning_output_tokens": 38
+        },
+        "tokens": 60052,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": true,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": true,
+            "contamination_reasons": [
+              "installed-copy-read"
+            ]
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": [
+              "installed-copy-read"
+            ]
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"brief_zh\": \"2027年6月监测以获许可、至少有30天可办理并网且在队列截止时具备并网资格的项目为分母。截至6月30日，Bay有12个项目投运，占20个合资格项目的60%。Ridge有8个项目投运，占20个合资格项目的40%。Ridge的分母包括申诉后追溯恢复资格的4个未投运项目，其看板上的20%则以全部40个获许可项目为分母。按统一口径，Bay的投运率高出20个百分点。[BW-06][RG-06]\\n\\n并网审查若能更早完成，项目就可能更早进入后续并网环节，并在月底前投运。6月公布的审查时限目标为Bay 10个工作日、Ridge 20个工作日。现有记录只提供目标值，缺少实际审查用时，也未将单个项目的审查用时与投运结果关联，因此审查速度对投运率差距的影响仍是待验证的假设。[IX-06]\",\n  \"bay\": {\n    \"source\": \"BW-06\",\n    \"date\": \"2027-06-30\",\n    \"commissioned\": 12,\n    \"eligible\": 20,\n    \"rate_pct\": 60\n  },\n  \"ridge\": {\n    \"source\": \"RG-06\",\n    \"date\": \"2027-06-30\",\n    \"commissioned\": 8,\n    \"eligible\": 20,\n    \"rate_pct\": 40\n  },\n  \"gap_pp\": 20,\n  \"sponsor_comparison\": \"replace\",\n  \"review_times\": {\n    \"source\": \"IX-06\",\n    \"date\": \"2027-06-28\",\n    \"bay_days\": 10,\n    \"ridge_days\": 20,\n    \"status\": \"target\"\n  },\n  \"cause\": \"hypothesis\"\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "bay-cohort": true,
+          "ridge-corrected-cohort": true,
+          "comparable-gap": true,
+          "disputed-statistic-replaced": true,
+          "service-targets-not-measurements": true,
+          "causal-status": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 20.986,
+        "usage": {
+          "input_tokens": 58829,
+          "cached_input_tokens": 42538,
+          "cache_write_input_tokens": 16279,
+          "output_tokens": 748,
+          "reasoning_output_tokens": 42
+        },
+        "tokens": 59577,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      }
+    ]
+  },
+  "verdict": "no-difference",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000
+  },
+  "total_tokens": 425739,
+  "skipped_trials": []
+}

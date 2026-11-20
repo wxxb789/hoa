@@ -9,6 +9,8 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 - Point gdd installs at a `gdd-route-*` row in the generated install guide: the `gdd` row alone has no route.
 - Record the first necessity screening of 17 subjects (haiku, forced, N=3) with schema 3 reruns of the eight
   task sets the old contamination rule invalidated; summary in `evals/results/2026-11-20-screen/README.md`.
+- Record the necessity follow-up: a Codex `gpt-6.2-sol` re-check (all arms at ceiling) and a natural-trigger run in
+  which three of four forced-mode winners were never selected; summary in `evals/results/2026-11-20-followup.md`.
 - Keep necessity eval controls valid when they only search for skills or fail to load one.
   Record probe counts and classify successful loads or external skill reads without storing paths.
 - Make both READMEs installation-first hubs for the repository's independent parts. Move architecture,

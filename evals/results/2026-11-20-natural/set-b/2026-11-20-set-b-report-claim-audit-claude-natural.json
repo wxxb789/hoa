@@ -1,0 +1,1342 @@
+{
+  "schema_version": 3,
+  "task": "set-b-report-claim-audit",
+  "generated_at": "2026-11-20T02:02:09.601463-08:00",
+  "skill": "report-claim-audit",
+  "skill_revision": "2",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "natural",
+  "shell": false,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "ready-from-receipts": {
+      "field": "release_ready",
+      "equals": {
+        "ready": 5,
+        "total": 12,
+        "ready_ids": [
+          "QA-01",
+          "QA-04",
+          "QA-06",
+          "QA-07",
+          "QA-10"
+        ]
+      }
+    },
+    "reconciled-inventory": {
+      "field": "inventory",
+      "equals": {
+        "disk": 6,
+        "manifest": 5,
+        "accepted": 3,
+        "mentioned": 4,
+        "disk_only": [
+          "AL-05",
+          "AL-06"
+        ],
+        "manifest_only": [
+          "AL-07"
+        ],
+        "accepted_missing": [
+          "AL-07"
+        ]
+      }
+    },
+    "rulings-and-cost": {
+      "field": "decisions",
+      "equals": {
+        "pending": [
+          "D-12",
+          "D-13"
+        ],
+        "covered": [
+          "D-11"
+        ],
+        "replacement_review_pages": 27
+      }
+    }
+  },
+  "rubric_flags": {
+    "ready-from-receipts": "non-discriminating",
+    "reconciled-inventory": "non-discriminating",
+    "rulings-and-cost": "flaky"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 2,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.6666666666666666,
+      "pass^k": false,
+      "mean_score": 0.8888888888888888,
+      "sample_stddev": 0.1924500897298753
+    },
+    "terse": {
+      "valid": true,
+      "passed": 0,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.0,
+      "pass^k": false,
+      "mean_score": 0.6666666666666666,
+      "sample_stddev": 0.0
+    },
+    "skill": {
+      "valid": true,
+      "passed": 1,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.3333333333333333,
+      "pass^k": false,
+      "mean_score": 0.7777777777777778,
+      "sample_stddev": 0.1924500897298753
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": -0.11111111111111105,
+    "terse": 0.11111111111111116
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "```json\n{\"release_ready\":{\"ready\":5,\"total\":12,\"ready_ids\":[\"QA-01\",\"QA-04\",\"QA-06\",\"QA-07\",\"QA-10\"]},\"inventory\":{\"disk\":6,\"manifest\":5,\"accepted\":3,\"mentioned\":4,\"disk_only\":[\"AL-05\",\"AL-06\"],\"manifest_only\":[\"AL-07\"],\"accepted_missing\":[\"AL-07\"]},\"decisions\":{\"pending\":[\"D-12\",\"D-13\"],\"covered\":[\"D-11\"],\"replacement_review_pages\":27},\"brief\":\"Recommend holding the Alder closeout; do not sign. The dispatch's 'nine of twelve ready' is wrong: under the release matrix's pinned revisions only 5 cases have a final exit-0 receipt (QA-02, QA-05, QA-09, QA-11 and QA-03/QA-08/QA-12 fail their pinned revision). AL-07 is a reserved, signed substitution that is not in the exhibit directory, so it cannot be retrieved and its acceptance is unsupported; D-13 (substitution index points to a missing exhibit) is the direct cause and is not waived. W-18 covers only the observer-portal outlet link (D-11); the signatory-portal link (D-12) is outside it. The replacement lane would require full re-review of both seal schedules (pages 1-13 and 8-21 = 27 page reviews, not the 21 distinct pages the dispatch cites), and the morning preview covers only pages 1-5 and is display-only. AL-05 and AL-06 are on disk but not registered in the manifest; AL-06 is a migration preview and AL-05 is a late scan with an outdated overlay.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "ready-from-receipts": true,
+          "reconciled-inventory": true,
+          "rulings-and-cost": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 17.841,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 10984,
+          "cache_read_input_tokens": 24166,
+          "output_tokens": 3188,
+          "output_tokens_details": {
+            "thinking_tokens": 1376
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 10984
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 38346,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00320946,
+        "turns": 16
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "```json\n{\"release_ready\":{\"ready\":5,\"total\":12,\"ready_ids\":[\"QA-01\",\"QA-04\",\"QA-06\",\"QA-07\",\"QA-10\"]},\"inventory\":{\"disk\":6,\"manifest\":5,\"accepted\":3,\"mentioned\":4,\"disk_only\":[\"AL-05\",\"AL-06\"],\"manifest_only\":[\"AL-07\"],\"accepted_missing\":[\"AL-07\"]},\"decisions\":{\"pending\":3,\"covered\":1,\"replacement_review_pages\":27},\"brief\":\"Recommend holding the Alder closeout; do not sign. Only 5 of 12 QA cases are ready, not the 9 the dispatch claims. QA-02, QA-03, QA-05, QA-08, QA-09, QA-11 and QA-12 lack a final exit-0 receipt for their pinned revision; neighbor-revision and preflight receipts do not count. AL-07 is accepted in the signed register but is missing from disk, so the dispatch's retrieval claim is wrong. AL-05 and AL-06 exist on disk but are not registered in the manifest, contrary to the dispatch. Of the open items, only D-11 is covered by waiver W-18, which applies to the observer portal only. D-12 (signatory portal) and D-13 (substitution index to missing exhibit) remain open. If the replacement lane is opened, it must review both seal packets in full (station 1-13 and owner 8-21 = 27 pages), not the deduplicated 21, and the 1-5 preview does not count toward it.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "ready-from-receipts": true,
+          "reconciled-inventory": true,
+          "rulings-and-cost": false
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 16.441,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 6479,
+          "cache_read_input_tokens": 28671,
+          "output_tokens": 3004,
+          "output_tokens_details": {
+            "thinking_tokens": 1245
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6479
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 38162,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002599385,
+        "turns": 16
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\"release_ready\":{\"ready\":5,\"total\":12,\"ready_ids\":[\"QA-01\",\"QA-04\",\"QA-06\",\"QA-07\",\"QA-10\"]},\"inventory\":{\"disk\":6,\"manifest\":5,\"accepted\":3,\"mentioned\":4,\"disk_only\":[\"AL-05\",\"AL-06\"],\"manifest_only\":[\"AL-07\"],\"accepted_missing\":[\"AL-07\"]},\"decisions\":{\"pending\":[\"D-12\",\"D-13\"],\"covered\":[\"D-11\"],\"replacement_review_pages\":27},\"brief\":\"Recommend holding the Alder closeout; do not sign. The dispatch's 'nine of twelve ready' claim is wrong: only 5 cases have a final exit-0 receipt for their pinned revision. QA-02, QA-03, QA-05, QA-08, QA-09, QA-11 and QA-12 fail or lack a final receipt for the pinned revision. AL-07 is accepted and reserved in the manifest but is not in the exhibit directory, so the dispatch's retrieval claim is unsupported. AL-02 is rejected, not 'still marked rejected'. AL-04 is held, not retained. D-13 remains open. W-18 covers only D-11 (observer portal), not D-12 (signatory portal). Replacement lane: the dispatch's 21 pages undercounts review, because the contract requires each signing packet to be re-reviewed in full (stations 1-13 plus owner 8-21 = 27 pages), so overlap does not reduce the work. Opening the replacement lane is not cheaper than holding on these facts. The morning preview covers pages 1-5 and is display-only, not a signing packet.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "ready-from-receipts": true,
+          "reconciled-inventory": true,
+          "rulings-and-cost": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 16.961,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 6453,
+          "cache_read_input_tokens": 28647,
+          "output_tokens": 3143,
+          "output_tokens_details": {
+            "thinking_tokens": 1370
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6453
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 38251,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0026653949999999997,
+        "turns": 16
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\"release_ready\":{\"ready\":5,\"total\":12,\"ready_ids\":[\"QA-01\",\"QA-04\",\"QA-06\",\"QA-07\",\"QA-10\"]},\"inventory\":{\"disk\":6,\"manifest\":5,\"accepted\":3,\"mentioned\":4,\"disk_only\":[\"AL-05\",\"AL-06\"],\"manifest_only\":[\"AL-07\"],\"accepted_missing\":[\"AL-07\"]},\"decisions\":{\"pending\":3,\"covered\":1,\"replacement_review_pages\":27},\"brief\":\"Recommendation: hold the Alder closeout; do not sign on this dispatch. It overstates readiness: 5 of 12 QA cases are ready under the release matrix, not 9. QA-02, QA-03, QA-05, QA-08, QA-09, QA-11 and QA-12 lack a final exit-0 receipt at the pinned revision (QA-05 rev 7 and QA-11 rev 2 have only preflight receipts; QA-09 rev 6 failed, and rev 7 is a neighbor that cannot certify). The claim that AL-07 can be retrieved is wrong: AL-07 is reserved in the manifest, absent from exhibits, and is an accepted signed ruling, so it is an accepted-but-missing exhibit. Exhibits AL-05 and AL-06 exist on disk but are not registered in the manifest. AL-06 is only a migration preview, and AL-05 is a late scan with an old overlay. Pending items are D-11, D-12, D-13. Only D-11 falls under waiver W-18 (observer portal); D-12 is a signatory link and is outside the waiver; D-13 (substitution index points to the missing exhibit) is not covered. D-10 was closed for a different packet and does not apply. Replacement review is 27 page-reviews: the contract requires each signing packet to be re-reviewed in full (pages 1-13 and 8-21), so the 21-page dedupe in the dispatch is wrong. The morning preview (pages 1-5) is display-only and does not count. The 'dry run finished on time' claim is unverified and not evidence of readiness. Accepted-register rulings were checked against the signed record: AL-01, AL-03 and AL-07 accepted, AL-02 rejected, AL-04 held; the dispatch states AL-02 is still rejected, which matches.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "ready-from-receipts": true,
+          "reconciled-inventory": true,
+          "rulings-and-cost": false
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 18.986,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 11030,
+          "cache_read_input_tokens": 24341,
+          "output_tokens": 3618,
+          "output_tokens_details": {
+            "thinking_tokens": 1607
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 11030
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 38997,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00343196,
+        "turns": 16
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\"release_ready\":{\"ready\":5,\"total\":12,\"ready_ids\":[\"QA-01\",\"QA-04\",\"QA-06\",\"QA-07\",\"QA-10\"]},\"inventory\":{\"disk\":6,\"manifest\":5,\"accepted\":3,\"mentioned\":4,\"disk_only\":[\"AL-05\",\"AL-06\"],\"manifest_only\":[\"AL-07\"],\"accepted_missing\":[\"AL-07\"]},\"decisions\":{\"pending\":[\"D-11\",\"D-12\",\"D-13\"],\"covered\":[\"D-11\"],\"replacement_review_pages\":27},\"brief\":\"Recommend holding the Alder closeout; do not sign as dispatched. The dispatch's nine-of-twelve QA claim fails: only 5 cases have a final exit-0 receipt for the pinned revision (QA-02, QA-05, QA-09 and QA-11 fail on revision mismatch or a non-zero or preflight-only receipt, and QA-03, QA-08 and QA-12 are non-zero). AL-07 is signed as accepted but is not in the exhibit directory, so the claim that it can be retrieved there is false. AL-05 and AL-06 are on disk but not in the manifest, contrary to 'everything is in the manifest'. D-11 is covered only for observer-portal outlet links under W-18; D-12 is explicitly outside that waiver and D-13 (missing exhibit) is open. The 21-page figure double-counts overlapping seal pages; the contract requires each scheduled signing packet to be re-reviewed in full (13 + 14 = 27 pages). The morning preview (pages 1-5) is display-only and does not count. No files were changed.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "ready-from-receipts": true,
+          "reconciled-inventory": true,
+          "rulings-and-cost": false
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 18.171,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 6483,
+          "cache_read_input_tokens": 28931,
+          "output_tokens": 3484,
+          "output_tokens_details": {
+            "thinking_tokens": 1691
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6483
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 38906,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002842485,
+        "turns": 16
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "```json\n{\"release_ready\":{\"ready\":5,\"total\":12,\"ready_ids\":[\"QA-01\",\"QA-04\",\"QA-06\",\"QA-07\",\"QA-10\"]},\"inventory\":{\"disk\":6,\"manifest\":5,\"accepted\":3,\"mentioned\":4,\"disk_only\":[\"AL-05\",\"AL-06\"],\"manifest_only\":[\"AL-07\"],\"accepted_missing\":[\"AL-07\"]},\"decisions\":{\"pending\":3,\"covered\":1,\"replacement_review_pages\":27},\"brief\":\"Recommend holding the Alder closeout; do not sign. Only 5 of 12 QA cases have a final exit-0 receipt on their pinned revision, not the 9 the dispatch claims. QA-02, QA-03, QA-05, QA-08, QA-09, QA-11 and QA-12 fail on their pinned revision, and the newer or preflight receipts cannot certify them. AL-07 is reserved in the manifest and missing from disk, yet the signed register accepts it, so the dispatch's retrieval claim is unsupported. AL-05 and AL-06 are on disk but not registered in the manifest groups, contrary to the dispatch. D-13 (missing substitution exhibit) remains open. D-11 is covered only for the observer portal by waiver W-18; D-12 (signatory portal) is not covered. Replacement lane: the schedule (station pages 1-13, owner pages 8-21) requires 27 full page reviews, since overlapping pages 8-13 are reviewed in both packets. The dispatch's 21 deduplicated pages is wrong for this purpose. The morning preview (pages 1-5) is display-only and does not count.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "ready-from-receipts": true,
+          "reconciled-inventory": true,
+          "rulings-and-cost": false
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 14.688,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 5818,
+          "cache_read_input_tokens": 28941,
+          "output_tokens": 2488,
+          "output_tokens_details": {
+            "thinking_tokens": 1071
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5818
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 37255,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00226146,
+        "turns": 11
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "```json\n{\n  \"release_ready\": {\n    \"ready\": 5,\n    \"total\": 12,\n    \"ready_ids\": [\"QA-01\", \"QA-04\", \"QA-06\", \"QA-07\", \"QA-10\"]\n  },\n  \"inventory\": {\n    \"disk\": 6,\n    \"manifest\": 5,\n    \"accepted\": 3,\n    \"mentioned\": 4,\n    \"disk_only\": [\"AL-05\", \"AL-06\"],\n    \"manifest_only\": [\"AL-07\"],\n    \"accepted_missing\": [\"AL-07\"]\n  },\n  \"decisions\": {\n    \"pending\": [\"D-11\", \"D-12\", \"D-13\"],\n    \"covered\": [\"D-11\"],\n    \"replacement_review_pages\": 27\n  },\n  \"brief\": \"Recommend holding the Alder signoff; do not sign on this dispatch. The dispatch overstates readiness: only 5 of 12 QA cases have a final exit-0 receipt at the pinned revision (QA-02, QA-03, QA-05, QA-08, QA-09, QA-11, QA-12 fail, and the passing receipts for neighboring revisions do not count). AL-07 is accepted in the register but is reserved and absent from the exhibit directory, so the claim that it can be retrieved is unverified. D-12 (signatory portal redirect) falls outside waiver W-18 and D-13 is open, so only D-11 is covered. The replacement lane is not 21 pages: station seal pages 1-13 and owner seal pages 8-21 are each signing packets that must be re-reviewed in full, giving 27 review pages. The morning dry run is a display-only preview and does not satisfy either packet. Holding until AL-07 is retrieved, the failing QA cases are resolved, and D-12 and D-13 are closed is the lower-risk path.\"\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "ready-from-receipts": true,
+          "reconciled-inventory": true,
+          "rulings-and-cost": false
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 15.768,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 5902,
+          "cache_read_input_tokens": 28671,
+          "output_tokens": 2985,
+          "output_tokens_details": {
+            "thinking_tokens": 1465
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5902
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 37566,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00251776,
+        "turns": 12
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "```json\n{\"release_ready\":{\"ready\":5,\"total\":12,\"ready_ids\":[\"QA-01\",\"QA-04\",\"QA-06\",\"QA-07\",\"QA-10\"]},\"inventory\":{\"disk\":6,\"manifest\":5,\"accepted\":3,\"mentioned\":4,\"disk_only\":[\"AL-05\",\"AL-06\"],\"manifest_only\":[\"AL-07\"],\"accepted_missing\":[\"AL-07\"]},\"decisions\":{\"pending\":[\"D-11\",\"D-12\",\"D-13\"],\"covered\":[\"D-11\"],\"replacement_review_pages\":27},\"brief\":\"Recommend holding the Alder closeout; do not sign. Only 5 of 12 QA cases have a final exit-0 receipt for their pinned revision, not the 9 the dispatch claims. QA-02, QA-03, QA-05, QA-08, QA-09, QA-11 and QA-12 fail on the pinned revision. AL-07 is accepted but its exhibit file is missing from disk, so it cannot be retrieved as the dispatch says. AL-05 and AL-06 are on disk but not in the manifest, contrary to the dispatch. D-11 is covered by waiver W-18 (observer portal only). D-12 is outside that waiver, and D-13 is blocked by the missing AL-07 exhibit. The replacement lane would need 27 pages reviewed in full (station 1-13, owner 8-21, overlap not deduplicated), not the 21 the dispatch cites. Opening that lane does not fix the QA or exhibit gaps, so holding is the cheaper option.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "ready-from-receipts": true,
+          "reconciled-inventory": true,
+          "rulings-and-cost": false
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 17.545,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 6483,
+          "cache_read_input_tokens": 28671,
+          "output_tokens": 3412,
+          "output_tokens_details": {
+            "thinking_tokens": 1641
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6483
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 38574,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002803885,
+        "turns": 16
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "```json\n{\"release_ready\":{\"ready\":5,\"total\":12,\"ready_ids\":[\"QA-01\",\"QA-04\",\"QA-06\",\"QA-07\",\"QA-10\"]},\"inventory\":{\"disk\":6,\"manifest\":5,\"accepted\":3,\"mentioned\":4,\"disk_only\":[\"AL-05\",\"AL-06\"],\"manifest_only\":[\"AL-07\"],\"accepted_missing\":[\"AL-07\"]},\"decisions\":{\"pending\":[\"D-12\",\"D-13\"],\"covered\":[\"D-11\"],\"replacement_review_pages\":27},\"brief\":\"Recommend holding the Alder closeout. The dispatch's '9 of 12 ready' is wrong: only 5 cases have a final exit-0 receipt for the exact pinned revision. QA-02, QA-03, QA-05, QA-08, QA-09, QA-11 and QA-12 fail the pin (wrong revision, non-zero exit, or preflight only). The dispatch also says everything on disk is in the manifest, but AL-05 and AL-06 are not registered, and AL-07 is registered as reserved but missing from disk. AL-07 is accepted in the signed register, so the accepted substitution cannot be verified in the exhibit directory. D-12 (signatory portal) is outside the W-18 waiver and D-13 (substitution index) is still open, so they block release. D-11 is covered by W-18. If the lane is opened, the replacement review is 27 pages (station 1-13 plus owner 8-21, each re-reviewed in full), not the 21 the dispatch deduplicated. Preview pages 1-5 do not count as signing packets.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "ready-from-receipts": true,
+          "reconciled-inventory": true,
+          "rulings-and-cost": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 18.005,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 6479,
+          "cache_read_input_tokens": 28671,
+          "output_tokens": 3481,
+          "output_tokens_details": {
+            "thinking_tokens": 1694
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6479
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 38639,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002837885,
+        "turns": 16
+      }
+    ]
+  },
+  "verdict": "inconclusive",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 344696,
+  "skipped_trials": []
+}

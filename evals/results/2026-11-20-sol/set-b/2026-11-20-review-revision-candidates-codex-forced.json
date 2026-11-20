@@ -1,0 +1,710 @@
+{
+  "schema_version": 3,
+  "task": "review-revision-candidates",
+  "generated_at": "2026-11-20T02:09:02.727851-08:00",
+  "skill": "review-revision-candidates",
+  "skill_revision": "3",
+  "cli_version": "codex-cli 0.171.0",
+  "model": "gpt-6.2-sol",
+  "repeats": 3,
+  "runtime": "codex",
+  "mode": "forced",
+  "shell": true,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "schedule-candidate": {
+      "field": "schedule",
+      "equals": {
+        "service": "Rainline",
+        "start": "2026-10-19",
+        "updated": "2026-10-02",
+        "route_label": "Quay Circut",
+        "friday_extra": false
+      }
+    },
+    "counts-candidate": {
+      "field": "counts",
+      "equals": {
+        "prior": {
+          "period": "2024-Q4",
+          "value": 812,
+          "source": "BR-14/p3",
+          "measure": "unverified"
+        },
+        "current": {
+          "period": "2026-Q3",
+          "value": 529,
+          "source": "OPS-62/t2",
+          "measure": "completed duty blocks"
+        },
+        "relationship": "not_comparable"
+      }
+    },
+    "access-candidate": {
+      "field": "access",
+      "equals": {
+        "index": "listed",
+        "attempt": {
+          "client": "desk-preview/4",
+          "date": "2026-10-18",
+          "path": "/documents/appendix-g.pdf",
+          "http_status": 403
+        },
+        "alternative": "CL-9/a2",
+        "filed": "unverified",
+        "filing_requirement": "unverified"
+      }
+    }
+  },
+  "rubric_flags": {
+    "schedule-candidate": "non-discriminating",
+    "counts-candidate": "non-discriminating",
+    "access-candidate": "non-discriminating"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    },
+    "terse": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    },
+    "skill": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": 0.0,
+    "terse": 0.0
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"baseline_id\": \"2d6c3e1\",\n  \"schedule\": {\n    \"service\": \"Rainline\",\n    \"start\": \"2026-10-19\",\n    \"updated\": \"2026-10-02\",\n    \"route_label\": \"Quay Circut\",\n    \"friday_extra\": false\n  },\n  \"counts\": {\n    \"prior\": {\n      \"period\": \"2024-Q4\",\n      \"value\": 812,\n      \"source\": \"BR-14/p3\",\n      \"measure\": \"unverified\"\n    },\n    \"current\": {\n      \"period\": \"2026-Q3\",\n      \"value\": 529,\n      \"source\": \"OPS-62/t2\",\n      \"measure\": \"completed duty blocks\"\n    },\n    \"relationship\": \"not_comparable\"\n  },\n  \"access\": {\n    \"index\": \"listed\",\n    \"attempt\": {\n      \"client\": \"desk-preview/4\",\n      \"date\": \"2026-10-18\",\n      \"path\": \"<path>\",\n      \"http_status\": 403\n    },\n    \"alternative\": \"CL-9/a2\",\n    \"filed\": \"unverified\",\n    \"filing_requirement\": \"unverified\"\n  },\n  \"anchors\": {\n    \"schedule\": [\"review.md item 1\", \"evidence/operations.md — RN-22 §3, final revision 5\"],\n    \"counts\": [\"review.md item 2\", \"evidence/operations.md — BR-14/p3 and OPS-62/t2\"],\n    \"access\": [\"review.md item 3\", \"evidence/register.md — R-6\", \"evidence/access-log.csv — <path>, <path>, and <path>\"]\n  }\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "schedule-candidate": true,
+          "counts-candidate": true,
+          "access-candidate": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 15.493,
+        "usage": {
+          "input_tokens": 36913,
+          "cached_input_tokens": 35090,
+          "cache_write_input_tokens": 1814,
+          "output_tokens": 632,
+          "reasoning_output_tokens": 86
+        },
+        "tokens": 37545,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"baseline_id\": \"2d6c3e1\",\n  \"schedule\": {\n    \"service\": \"Rainline\",\n    \"start\": \"2026-10-19\",\n    \"updated\": \"2026-10-02\",\n    \"route_label\": \"Quay Circut\",\n    \"friday_extra\": false\n  },\n  \"counts\": {\n    \"prior\": {\n      \"period\": \"2024-Q4\",\n      \"value\": 812,\n      \"source\": \"BR-14/p3\",\n      \"measure\": \"unverified\"\n    },\n    \"current\": {\n      \"period\": \"2026-Q3\",\n      \"value\": 529,\n      \"source\": \"OPS-62/t2\",\n      \"measure\": \"completed duty blocks\"\n    },\n    \"relationship\": \"not_comparable\"\n  },\n  \"access\": {\n    \"index\": \"listed\",\n    \"attempt\": {\n      \"client\": \"desk-preview/4\",\n      \"date\": \"2026-10-18\",\n      \"path\": \"<path>\",\n      \"http_status\": 403\n    },\n    \"alternative\": \"CL-9/a2\",\n    \"filed\": \"unverified\",\n    \"filing_requirement\": \"unverified\"\n  }\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "schedule-candidate": true,
+          "counts-candidate": true,
+          "access-candidate": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 15.221,
+        "usage": {
+          "input_tokens": 37007,
+          "cached_input_tokens": 35099,
+          "cache_write_input_tokens": 1899,
+          "output_tokens": 585,
+          "reasoning_output_tokens": 104
+        },
+        "tokens": 37592,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"baseline_id\": \"2d6c3e1\",\n  \"schedule\": {\n    \"service\": \"Rainline\",\n    \"start\": \"2026-10-19\",\n    \"updated\": \"2026-10-02\",\n    \"route_label\": \"Quay Circut\",\n    \"friday_extra\": false\n  },\n  \"counts\": {\n    \"prior\": {\n      \"period\": \"2024-Q4\",\n      \"value\": 812,\n      \"source\": \"BR-14/p3\",\n      \"measure\": \"unverified\"\n    },\n    \"current\": {\n      \"period\": \"2026-Q3\",\n      \"value\": 529,\n      \"source\": \"OPS-62/t2\",\n      \"measure\": \"completed duty blocks\"\n    },\n    \"relationship\": \"not_comparable\"\n  },\n  \"access\": {\n    \"index\": \"listed\",\n    \"attempt\": {\n      \"client\": \"desk-preview/4\",\n      \"date\": \"2026-10-18\",\n      \"path\": \"<path>\",\n      \"http_status\": 403\n    },\n    \"alternative\": \"CL-9/a2\",\n    \"filed\": \"unverified\",\n    \"filing_requirement\": \"unverified\"\n  }\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "schedule-candidate": true,
+          "counts-candidate": true,
+          "access-candidate": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 15.146,
+        "usage": {
+          "input_tokens": 37001,
+          "cached_input_tokens": 35104,
+          "cache_write_input_tokens": 1888,
+          "output_tokens": 557,
+          "reasoning_output_tokens": 71
+        },
+        "tokens": 37558,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"baseline_id\": \"2d6c3e1\",\n  \"schedule\": {\n    \"service\": \"Rainline\",\n    \"start\": \"2026-10-19\",\n    \"updated\": \"2026-10-02\",\n    \"route_label\": \"Quay Circut\",\n    \"friday_extra\": false\n  },\n  \"counts\": {\n    \"prior\": {\n      \"period\": \"2024-Q4\",\n      \"value\": 812,\n      \"source\": \"BR-14/p3\",\n      \"measure\": \"unverified\"\n    },\n    \"current\": {\n      \"period\": \"2026-Q3\",\n      \"value\": 529,\n      \"source\": \"OPS-62/t2\",\n      \"measure\": \"completed duty blocks\"\n    },\n    \"relationship\": \"not_comparable\"\n  },\n  \"access\": {\n    \"index\": \"listed\",\n    \"attempt\": {\n      \"client\": \"desk-preview/4\",\n      \"date\": \"2026-10-18\",\n      \"path\": \"<path>\",\n      \"http_status\": 403\n    },\n    \"alternative\": \"CL-9/a2\",\n    \"filed\": \"unverified\",\n    \"filing_requirement\": \"unverified\"\n  },\n  \"anchors\": {\n    \"schedule\": {\n      \"review_item\": 1,\n      \"evidence\": [\"evidence/operations.md:3-5 (RN-22 §3, final revision 5)\"]\n    },\n    \"counts\": {\n      \"review_item\": 2,\n      \"evidence\": [\n        \"evidence/operations.md:7-10 (BR-14/p3)\",\n        \"evidence/operations.md:12-14 (OPS-62/t2)\"\n      ]\n    },\n    \"access\": {\n      \"review_item\": 3,\n      \"evidence\": [\n        \"evidence/register.md:1-7 (R-6)\",\n        \"evidence/access-log.csv:2 (index entry)\",\n        \"evidence/access-log.csv:3 (Appendix G access attempt)\",\n        \"evidence/access-log.csv:5 (public copy verification)\"\n      ]\n    }\n  }\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "schedule-candidate": true,
+          "counts-candidate": true,
+          "access-candidate": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 21.03,
+        "usage": {
+          "input_tokens": 51649,
+          "cached_input_tokens": 37191,
+          "cache_write_input_tokens": 14446,
+          "output_tokens": 787,
+          "reasoning_output_tokens": 62
+        },
+        "tokens": 52436,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"baseline_id\": \"2d6c3e1\",\n  \"schedule\": {\n    \"service\": \"Rainline\",\n    \"start\": \"2026-10-19\",\n    \"updated\": \"2026-10-02\",\n    \"route_label\": \"Quay Circut\",\n    \"friday_extra\": false\n  },\n  \"counts\": {\n    \"prior\": {\n      \"period\": \"2024-Q4\",\n      \"value\": 812,\n      \"source\": \"BR-14/p3\",\n      \"measure\": \"unverified\"\n    },\n    \"current\": {\n      \"period\": \"2026-Q3\",\n      \"value\": 529,\n      \"source\": \"OPS-62/t2\",\n      \"measure\": \"completed duty blocks\"\n    },\n    \"relationship\": \"not_comparable\"\n  },\n  \"access\": {\n    \"index\": \"listed\",\n    \"attempt\": {\n      \"client\": \"desk-preview/4\",\n      \"date\": \"2026-10-18\",\n      \"path\": \"<path>\",\n      \"http_status\": 403\n    },\n    \"alternative\": \"CL-9/a2\",\n    \"filed\": \"unverified\",\n    \"filing_requirement\": \"unverified\"\n  },\n  \"anchors\": {\n    \"schedule\": {\n      \"review_item\": 1,\n      \"evidence\": [\"evidence/operations.md:3-5 (RN-22 §3, final revision 5)\"]\n    },\n    \"counts\": {\n      \"review_item\": 2,\n      \"evidence\": [\"evidence/operations.md:7-10 (BR-14/p3)\", \"evidence/operations.md:12-14 (OPS-62/t2)\"]\n    },\n    \"access\": {\n      \"review_item\": 3,\n      \"evidence\": [\"evidence/register.md:3-7 (R-6)\", \"evidence/access-log.csv:2\", \"evidence/access-log.csv:3\", \"evidence/access-log.csv:5\"]\n    }\n  }\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "schedule-candidate": true,
+          "counts-candidate": true,
+          "access-candidate": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 18.605,
+        "usage": {
+          "input_tokens": 51230,
+          "cached_input_tokens": 48482,
+          "cache_write_input_tokens": 2736,
+          "output_tokens": 688,
+          "reasoning_output_tokens": 22
+        },
+        "tokens": 51918,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"baseline_id\": \"2d6c3e1\",\n  \"schedule\": {\n    \"service\": \"Rainline\",\n    \"start\": \"2026-10-19\",\n    \"updated\": \"2026-10-02\",\n    \"route_label\": \"Quay Circut\",\n    \"friday_extra\": false\n  },\n  \"counts\": {\n    \"prior\": {\n      \"period\": \"2024-Q4\",\n      \"value\": 812,\n      \"source\": \"BR-14/p3\",\n      \"measure\": \"unverified\"\n    },\n    \"current\": {\n      \"period\": \"2026-Q3\",\n      \"value\": 529,\n      \"source\": \"OPS-62/t2\",\n      \"measure\": \"completed duty blocks\"\n    },\n    \"relationship\": \"not_comparable\"\n  },\n  \"access\": {\n    \"index\": \"listed\",\n    \"attempt\": {\n      \"client\": \"desk-preview/4\",\n      \"date\": \"2026-10-18\",\n      \"path\": \"<path>\",\n      \"http_status\": 403\n    },\n    \"alternative\": \"CL-9/a2\",\n    \"filed\": \"unverified\",\n    \"filing_requirement\": \"unverified\"\n  },\n  \"anchors\": {\n    \"schedule\": {\n      \"review\": \"review.md item 1, amended 18 October at 17:20\",\n      \"evidence\": [\"evidence/operations.md, RN-22 §3, final revision 5\"]\n    },\n    \"counts\": {\n      \"review\": \"review.md item 2\",\n      \"evidence\": [\"evidence/operations.md, BR-14/p3\", \"evidence/operations.md, OPS-62/t2\"]\n    },\n    \"access\": {\n      \"review\": \"review.md item 3\",\n      \"evidence\": [\n        \"evidence/register.md, register snapshot R-6\",\n        \"evidence/access-log.csv, 2026-10-18 <path>\",\n        \"evidence/access-log.csv, 2026-10-18 <path>\",\n        \"evidence/access-log.csv, 2026-10-18 <path>\"\n      ]\n    }\n  }\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "schedule-candidate": true,
+          "counts-candidate": true,
+          "access-candidate": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 15.033,
+        "usage": {
+          "input_tokens": 36890,
+          "cached_input_tokens": 35190,
+          "cache_write_input_tokens": 1691,
+          "output_tokens": 692,
+          "reasoning_output_tokens": 24
+        },
+        "tokens": 37582,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": true,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": true,
+            "contamination_reasons": [
+              "installed-copy-read"
+            ]
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"baseline_id\": \"2d6c3e1\",\n  \"schedule\": {\n    \"service\": \"Rainline\",\n    \"start\": \"2026-10-19\",\n    \"updated\": \"2026-10-02\",\n    \"route_label\": \"Quay Circut\",\n    \"friday_extra\": false\n  },\n  \"counts\": {\n    \"prior\": {\n      \"period\": \"2024-Q4\",\n      \"value\": 812,\n      \"source\": \"BR-14/p3\",\n      \"measure\": \"unverified\"\n    },\n    \"current\": {\n      \"period\": \"2026-Q3\",\n      \"value\": 529,\n      \"source\": \"OPS-62/t2\",\n      \"measure\": \"completed duty blocks\"\n    },\n    \"relationship\": \"not_comparable\"\n  },\n  \"access\": {\n    \"index\": \"listed\",\n    \"attempt\": {\n      \"client\": \"desk-preview/4\",\n      \"date\": \"2026-10-18\",\n      \"path\": \"<path>\",\n      \"http_status\": 403\n    },\n    \"alternative\": \"CL-9/a2\",\n    \"filed\": \"unverified\",\n    \"filing_requirement\": \"unverified\"\n  },\n  \"anchors\": {\n    \"1\": [\n      \"Notice RN-22 §3, final revision 5, 2026-10-15\"\n    ],\n    \"2\": [\n      \"BR-14/p3, January 2025\",\n      \"OPS-62/t2, 2026-10-12 export\"\n    ],\n    \"3\": [\n      \"Register snapshot R-6\",\n      \"evidence/access-log.csv:2\",\n      \"evidence/access-log.csv:3\",\n      \"evidence/access-log.csv:5\"\n    ]\n  }\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "schedule-candidate": true,
+          "counts-candidate": true,
+          "access-candidate": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 30.038,
+        "usage": {
+          "input_tokens": 72542,
+          "cached_input_tokens": 55466,
+          "cache_write_input_tokens": 17061,
+          "output_tokens": 1421,
+          "reasoning_output_tokens": 143
+        },
+        "tokens": 73963,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": true,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": true,
+            "contamination_reasons": [
+              "installed-copy-read"
+            ]
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"baseline_id\": \"2d6c3e1\",\n  \"schedule\": {\n    \"service\": \"Rainline\",\n    \"start\": \"2026-10-19\",\n    \"updated\": \"2026-10-02\",\n    \"route_label\": \"Quay Circut\",\n    \"friday_extra\": false\n  },\n  \"counts\": {\n    \"prior\": {\n      \"period\": \"2024-Q4\",\n      \"value\": 812,\n      \"source\": \"BR-14/p3\",\n      \"measure\": \"unverified\"\n    },\n    \"current\": {\n      \"period\": \"2026-Q3\",\n      \"value\": 529,\n      \"source\": \"OPS-62/t2\",\n      \"measure\": \"completed duty blocks\"\n    },\n    \"relationship\": \"not_comparable\"\n  },\n  \"access\": {\n    \"index\": \"listed\",\n    \"attempt\": {\n      \"client\": \"desk-preview/4\",\n      \"date\": \"2026-10-18\",\n      \"path\": \"<path>\",\n      \"http_status\": 403\n    },\n    \"alternative\": \"CL-9/a2\",\n    \"filed\": \"unverified\",\n    \"filing_requirement\": \"unverified\"\n  },\n  \"anchors\": [\n    {\n      \"review_item\": 1,\n      \"evidence\": [\n        \"evidence/operations.md:3-5 (RN-22 §3, final revision 5, 2026-10-15)\"\n      ]\n    },\n    {\n      \"review_item\": 2,\n      \"evidence\": [\n        \"evidence/operations.md:7-10 (BR-14/p3, January 2025 briefing)\",\n        \"evidence/operations.md:12-14 (OPS-62/t2, 2026-10-12 export)\"\n      ]\n    },\n    {\n      \"review_item\": 3,\n      \"evidence\": [\n        \"evidence/access-log.csv:2 (index entry)\",\n        \"evidence/access-log.csv:3 (Appendix G access attempt)\",\n        \"evidence/access-log.csv:5 (public copy)\",\n        \"evidence/register.md:1-8 (R-6 snapshot, filing status and filing requirement unverified)\"\n      ]\n    }\n  ]\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "schedule-candidate": true,
+          "counts-candidate": true,
+          "access-candidate": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 37.302,
+        "usage": {
+          "input_tokens": 77855,
+          "cached_input_tokens": 59267,
+          "cache_write_input_tokens": 18573,
+          "output_tokens": 1472,
+          "reasoning_output_tokens": 198
+        },
+        "tokens": 79327,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": true,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": true,
+            "contamination_reasons": [
+              "installed-copy-read"
+            ]
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"baseline_id\": \"2d6c3e1\",\n  \"schedule\": {\n    \"service\": \"Rainline\",\n    \"start\": \"2026-10-19\",\n    \"updated\": \"2026-10-02\",\n    \"route_label\": \"Quay Circut\",\n    \"friday_extra\": false\n  },\n  \"counts\": {\n    \"prior\": {\n      \"period\": \"2024-Q4\",\n      \"value\": 812,\n      \"source\": \"BR-14/p3\",\n      \"measure\": \"unverified\"\n    },\n    \"current\": {\n      \"period\": \"2026-Q3\",\n      \"value\": 529,\n      \"source\": \"OPS-62/t2\",\n      \"measure\": \"completed duty blocks\"\n    },\n    \"relationship\": \"not_comparable\"\n  },\n  \"access\": {\n    \"index\": \"listed\",\n    \"attempt\": {\n      \"client\": \"desk-preview/4\",\n      \"date\": \"2026-10-18\",\n      \"path\": \"<path>\",\n      \"http_status\": 403\n    },\n    \"alternative\": \"CL-9/a2\",\n    \"filed\": \"unverified\",\n    \"filing_requirement\": \"unverified\"\n  },\n  \"anchors\": [\n    {\n      \"review_item\": 1,\n      \"evidence\": [\"evidence/operations.md:3-5\"],\n      \"finding\": \"RN-22 §3, final revision 5, sets the start to 19 October 2026. The Friday worksheet is marked TRAINING ONLY.\"\n    },\n    {\n      \"review_item\": 2,\n      \"evidence\": [\"evidence/operations.md:7-14\"],\n      \"finding\": \"BR-14/p3 records 812 for 2024-Q4 without a verified measure. The 2026-10-12 export of OPS-62/t2 records 529 completed duty blocks for 2026-Q3. The records do not establish a trend.\"\n    },\n    {\n      \"review_item\": 3,\n      \"evidence\": [\"evidence/access-log.csv:2-3\", \"evidence/access-log.csv:5\", \"evidence/register.md:3-7\"],\n      \"finding\": \"Register R-6 lists Appendix G. The desk preview request returned 403, and the library request confirmed the public copy at CL-9/a2. The register lacks appendix filing status, and the available counsel notes address only the main bulletin’s filing duty.\"\n    }\n  ]\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "schedule-candidate": true,
+          "counts-candidate": true,
+          "access-candidate": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 28.533,
+        "usage": {
+          "input_tokens": 76938,
+          "cached_input_tokens": 58935,
+          "cache_write_input_tokens": 17988,
+          "output_tokens": 1252,
+          "reasoning_output_tokens": 106
+        },
+        "tokens": 78190,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      }
+    ]
+  },
+  "verdict": "no-difference",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000
+  },
+  "total_tokens": 486111,
+  "skipped_trials": []
+}
