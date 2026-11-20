@@ -1,0 +1,977 @@
+{
+  "schema_version": 2,
+  "task": "set-b-evidence-boundary-discipline",
+  "generated_at": "2026-11-20T00:49:11.179654-08:00",
+  "skill": "evidence-boundary-discipline",
+  "skill_revision": "4",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "forced",
+  "shell": false,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "dated-charter-state": {
+      "field": "charter",
+      "equals": {
+        "announcement_date": "2028-05-29",
+        "announcement_status": "planned",
+        "current_status": "unknown",
+        "search_date": "2028-06-18",
+        "search_result": "not located",
+        "monitor_through": "2028-07-12"
+      }
+    },
+    "carried-fact-parity": {
+      "field": "pilot",
+      "equals": {
+        "page_labels": [
+          "carried citation",
+          "fact",
+          "not rechecked"
+        ],
+        "delivery_labels": [
+          "carried citation",
+          "fact",
+          "not rechecked"
+        ]
+      }
+    },
+    "standalone-inspection-source": {
+      "field": "inspection_citation",
+      "equals": {
+        "url": "https://rill.example/inspector/notices/IR-64",
+        "date": "2028-06-14",
+        "locator": "paragraph 4",
+        "quote": "The inspector witnessed a single 40-minute handover at East Pier."
+      }
+    }
+  },
+  "rubric_flags": {
+    "dated-charter-state": "flaky",
+    "carried-fact-parity": "non-discriminating",
+    "standalone-inspection-source": "flaky"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 0,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.0,
+      "pass^k": false,
+      "mean_score": 0.2222222222222222,
+      "sample_stddev": 0.19245008972987523
+    },
+    "terse": {
+      "valid": true,
+      "passed": 0,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.0,
+      "pass^k": false,
+      "mean_score": 0.1111111111111111,
+      "sample_stddev": 0.19245008972987523
+    },
+    "skill": {
+      "valid": true,
+      "passed": 0,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 0.0,
+      "pass^k": false,
+      "mean_score": 0.4444444444444444,
+      "sample_stddev": 0.19245008972987523
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": 0.2222222222222222,
+    "terse": 0.3333333333333333
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"charter\":{\"announcement_date\":\"2028-05-29\",\"announcement_status\":\"planned\",\"current_status\":\"unpublished\",\"search_date\":\"2028-06-18\",\"search_result\":\"not located\",\"monitor_through\":\"2028-07-12\"},\"pilot\":{\"page_labels\":[\"carried citation\",\"fact\",\"not rechecked\"],\"delivery_labels\":[\"carried citation\",\"not rechecked\"]},\"inspection_citation\":{\"url\":\"https://rill.example/inspector/notices/IR-64\",\"date\":\"2028-06-14\",\"locator\":\"paragraph 4\",\"quote\":\"The inspector witnessed a single 40-minute handover at East Pier.\"}}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "dated-charter-state": false,
+          "carried-fact-parity": false,
+          "standalone-inspection-source": true
+        },
+        "score": 0.3333333333333333,
+        "passed": false,
+        "seconds": 14.616,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 5405,
+          "cache_read_input_tokens": 18766,
+          "output_tokens": 2296,
+          "output_tokens_details": {
+            "thinking_tokens": 1367
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5405
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 26473,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002011885,
+        "turns": 10
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"charter\":{\"announcement_date\":\"2028-05-29\",\"announcement_status\":\"planned\",\"current_status\":\"unpublished\",\"search_date\":\"2028-06-18\",\"search_result\":\"not located\",\"monitor_through\":\"2028-07-12\"},\"pilot\":{\"page_labels\":[\"carried citation\",\"fact\",\"not rechecked\"],\"delivery_labels\":[\"carried citation\",\"not rechecked\"]},\"inspection_citation\":{\"url\":\"https://rill.example/inspector/notices/IR-64\",\"date\":\"2028-06-14\",\"locator\":\"paragraph 4\",\"quote\":\"The inspector witnessed a single 40-minute handover at East Pier.\",\"rendered_as\":\"The inspector witnessed a single 40-minute handover at East Pier.\"}}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "dated-charter-state": false,
+          "carried-fact-parity": false,
+          "standalone-inspection-source": false
+        },
+        "score": 0.0,
+        "passed": false,
+        "seconds": 21.442,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 5151,
+          "cache_read_input_tokens": 19048,
+          "output_tokens": 2249,
+          "output_tokens_details": {
+            "thinking_tokens": 1271
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5151
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 26454,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0019594549999999997,
+        "turns": 10
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"charter\": {\n    \"announcement_date\": \"2028-05-29\",\n    \"announcement_status\": \"planned\",\n    \"current_status\": \"unpublished\",\n    \"search_date\": \"2028-06-18\",\n    \"search_result\": \"not located\",\n    \"monitor_through\": \"2028-07-12\"\n  },\n  \"pilot\": {\n    \"page_labels\": [\"carried citation\", \"fact\", \"not rechecked\"],\n    \"delivery_labels\": [\"carried citation\", \"not rechecked\"]\n  },\n  \"inspection_citation\": {\n    \"url\": \"https://rill.example/inspector/notices/IR-64\",\n    \"date\": \"2028-06-14\",\n    \"locator\": \"paragraph 4\",\n    \"quote\": \"The inspector witnessed a single 40-minute handover at East Pier.\"\n  }\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "dated-charter-state": false,
+          "carried-fact-parity": false,
+          "standalone-inspection-source": true
+        },
+        "score": 0.3333333333333333,
+        "passed": false,
+        "seconds": 17.62,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 5159,
+          "cache_read_input_tokens": 19052,
+          "output_tokens": 2917,
+          "output_tokens_details": {
+            "thinking_tokens": 1920
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5159
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27134,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0022944949999999997,
+        "turns": 10
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"charter\":{\"announcement_date\":null,\"announcement_status\":\"planned\",\"current_status\":\"unpublished\",\"search_date\":\"2028-06-18\",\"search_result\":\"not located\",\"monitor_through\":\"2028-07-12\"},\"pilot\":{\"page_labels\":[\"fact\"],\"delivery_labels\":[\"carried citation\",\"not rechecked\"]},\"inspection_citation\":{\"url\":\"https://rill.example/inspector/notices/IR-64\",\"date\":\"2028-06-14\",\"locator\":\"paragraph 4\",\"quote\":\"The inspector witnessed a single 40-minute handover at East Pier.\",\"rendered_as\":\"The inspector witnessed a single 40-minute handover at East Pier. Paragraph 5 of the same notice states: \\\"This was an observation visit, not an acceptance test.\\\"\"}}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "dated-charter-state": false,
+          "carried-fact-parity": false,
+          "standalone-inspection-source": false
+        },
+        "score": 0.0,
+        "passed": false,
+        "seconds": 15.781,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 7765,
+          "cache_read_input_tokens": 16604,
+          "output_tokens": 2942,
+          "output_tokens_details": {
+            "thinking_tokens": 1932
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 7765
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27317,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002608265,
+        "turns": 10
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"charter\": {\n    \"announcement_date\": \"2028-05-29\",\n    \"announcement_status\": \"planned\",\n    \"current_status\": \"unpublished\",\n    \"search_date\": \"2028-06-18\",\n    \"search_result\": \"not located\",\n    \"monitor_through\": \"2028-07-12\"\n  },\n  \"pilot\": {\n    \"page_labels\": [\"fact\", \"not rechecked\"],\n    \"delivery_labels\": [\"carried citation\", \"not rechecked\"]\n  },\n  \"inspection_citation\": {\n    \"url\": \"https://rill.example/inspector/notices/IR-64\",\n    \"date\": \"2028-06-14\",\n    \"locator\": \"paragraph 4\",\n    \"quote\": \"The inspector witnessed a single 40-minute handover at East Pier.\",\n    \"rendered\": \"The inspector witnessed a single 40-minute handover at East Pier. This was an observation visit, not an acceptance test.\"\n  }\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "dated-charter-state": false,
+          "carried-fact-parity": false,
+          "standalone-inspection-source": false
+        },
+        "score": 0.0,
+        "passed": false,
+        "seconds": 18.282,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 5199,
+          "cache_read_input_tokens": 19218,
+          "output_tokens": 2624,
+          "output_tokens_details": {
+            "thinking_tokens": 1550
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5199
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27047,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002154655,
+        "turns": 10
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"charter\": {\n    \"announcement_date\": \"2028-05-29\",\n    \"announcement_status\": \"planned\",\n    \"current_status\": \"unpublished\",\n    \"search_date\": \"2028-06-18\",\n    \"search_result\": \"not located\",\n    \"monitor_through\": \"2028-07-12\"\n  },\n  \"pilot\": {\n    \"page_labels\": [\"fact\"],\n    \"delivery_labels\": [\"carried citation\", \"not rechecked\"]\n  },\n  \"inspection_citation\": {\n    \"url\": \"https://rill.example/inspector/notices/IR-64\",\n    \"date\": \"2028-06-14\",\n    \"locator\": \"paragraph 4\",\n    \"quote\": \"The inspector witnessed a single 40-minute handover at East Pier.\"\n  }\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "dated-charter-state": false,
+          "carried-fact-parity": false,
+          "standalone-inspection-source": true
+        },
+        "score": 0.3333333333333333,
+        "passed": false,
+        "seconds": 16.098,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 5155,
+          "cache_read_input_tokens": 19186,
+          "output_tokens": 2730,
+          "output_tokens_details": {
+            "thinking_tokens": 1746
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5155
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27077,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002201835,
+        "turns": 10
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"charter\": {\n    \"announcement_date\": \"2028-05-29\",\n    \"announcement_status\": \"planned\",\n    \"current_status\": \"unknown\",\n    \"search_date\": \"2028-06-18\",\n    \"search_result\": \"not located\",\n    \"monitor_through\": \"2028-07-12\"\n  },\n  \"pilot\": {\n    \"page_labels\": [\"carried citation\", \"fact\", \"not rechecked\"],\n    \"delivery_labels\": [\"carried citation\", \"not rechecked\"]\n  },\n  \"inspection_citation\": {\n    \"url\": \"https://rill.example/inspector/notices/IR-64\",\n    \"date\": \"2028-06-14\",\n    \"locator\": \"paragraph 4\",\n    \"quote\": \"The inspector witnessed a single 40-minute handover at East Pier.\",\n    \"rendered\": \"The inspector witnessed a single 40-minute handover at East Pier. This was an observation visit, not an acceptance test. (IR-64, paragraph 4–5)\"\n  }\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "dated-charter-state": true,
+          "carried-fact-parity": false,
+          "standalone-inspection-source": false
+        },
+        "score": 0.3333333333333333,
+        "passed": false,
+        "seconds": 16.316,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 8451,
+          "cache_read_input_tokens": 21873,
+          "output_tokens": 2443,
+          "output_tokens_details": {
+            "thinking_tokens": 1268
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 8451
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 32773,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0024972049999999997,
+        "turns": 11
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"charter\": {\n    \"announcement_date\": null,\n    \"announcement_status\": \"planned\",\n    \"current_status\": \"unknown\",\n    \"search_date\": \"2028-06-18\",\n    \"search_result\": \"not located\",\n    \"monitor_through\": \"2028-07-12\"\n  },\n  \"pilot\": {\n    \"page_labels\": [\"carried citation\", \"fact\", \"not rechecked\"],\n    \"delivery_labels\": [\"carried citation\", \"not rechecked\"]\n  },\n  \"inspection_citation\": {\n    \"url\": \"https://rill.example/inspector/notices/IR-64\",\n    \"date\": \"2028-06-14\",\n    \"locator\": \"paragraph 4\",\n    \"quote\": \"The inspector witnessed a single 40-minute handover at East Pier.\"\n  }\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "dated-charter-state": false,
+          "carried-fact-parity": false,
+          "standalone-inspection-source": true
+        },
+        "score": 0.3333333333333333,
+        "passed": false,
+        "seconds": 16.918,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 8450,
+          "cache_read_input_tokens": 32044,
+          "output_tokens": 2372,
+          "output_tokens_details": {
+            "thinking_tokens": 1273
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 8450
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 42874,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00256349,
+        "turns": 11
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"charter\":{\"announcement_date\":\"2028-05-29\",\"announcement_status\":\"planned\",\"current_status\":\"unknown\",\"search_date\":\"2028-06-18\",\"search_result\":\"not located\",\"monitor_through\":\"2028-07-12\"},\"pilot\":{\"page_labels\":[\"carried citation\",\"fact\",\"not rechecked\"],\"delivery_labels\":[\"carried citation\",\"not rechecked\"]},\"inspection_citation\":{\"url\":\"https://rill.example/inspector/notices/IR-64\",\"date\":\"2028-06-14\",\"locator\":\"paragraph 4\",\"quote\":\"The inspector witnessed a single 40-minute handover at East Pier.\"}}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "dated-charter-state": true,
+          "carried-fact-parity": false,
+          "standalone-inspection-source": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 16.096,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 8446,
+          "cache_read_input_tokens": 32048,
+          "output_tokens": 2244,
+          "output_tokens_details": {
+            "thinking_tokens": 1189
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 8446
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 42746,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00249903,
+        "turns": 11
+      }
+    ]
+  },
+  "verdict": "no-difference",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 279895,
+  "skipped_trials": []
+}

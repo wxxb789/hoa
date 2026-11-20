@@ -1,0 +1,960 @@
+{
+  "schema_version": 2,
+  "task": "claim-audit",
+  "generated_at": "2026-11-20T00:41:59.699218-08:00",
+  "skill": "report-claim-audit",
+  "skill_revision": "2",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "forced",
+  "shell": false,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "signoff": {
+      "field": "signoff",
+      "equals": "hold"
+    },
+    "final-ticket-dispositions": {
+      "field": "accepted_tickets",
+      "equals": 3
+    },
+    "distinct-card-calibers": {
+      "field": "card_counts",
+      "equals": {
+        "disk": 3,
+        "manifest": 4,
+        "admitted": 2,
+        "mentioned": 4
+      }
+    },
+    "missing-cards": {
+      "field": "missing",
+      "equals": [
+        "cards/C.md",
+        "cards/D.md"
+      ]
+    },
+    "unregistered-preview": {
+      "field": "unexpected",
+      "equals": [
+        "cards/E.md"
+      ]
+    },
+    "same-seal-validation": {
+      "field": "validator_exit",
+      "equals": 2
+    },
+    "pending-owner": {
+      "field": "pending",
+      "equals": {
+        "Q-9": "Inez"
+      }
+    },
+    "within-budget": {
+      "field": "recommendation",
+      "equals": "carry-forward"
+    },
+    "reseal-cost": {
+      "field": "rejected_option_minutes",
+      "equals": 72
+    }
+  },
+  "rubric_flags": {
+    "signoff": "non-discriminating",
+    "final-ticket-dispositions": "non-discriminating",
+    "distinct-card-calibers": "non-discriminating",
+    "missing-cards": "non-discriminating",
+    "unregistered-preview": "non-discriminating",
+    "same-seal-validation": "non-discriminating",
+    "pending-owner": "non-discriminating",
+    "within-budget": "non-discriminating",
+    "reseal-cost": "non-discriminating"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 0,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.0,
+      "pass^k": false,
+      "mean_score": 0.8888888888888888,
+      "sample_stddev": 0.0
+    },
+    "terse": {
+      "valid": true,
+      "passed": 0,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.0,
+      "pass^k": false,
+      "mean_score": 0.8888888888888888,
+      "sample_stddev": 0.0
+    },
+    "skill": {
+      "valid": true,
+      "passed": 0,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 0.0,
+      "pass^k": false,
+      "mean_score": 0.8888888888888888,
+      "sample_stddev": 0.0
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": 0.0,
+    "terse": 0.0
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"signoff\":\"hold\",\"accepted_tickets\":3,\"card_counts\":{\"disk\":3,\"manifest\":4,\"admitted\":3,\"mentioned\":4},\"missing\":[\"cards/C.md\",\"cards/D.md\"],\"unexpected\":[\"cards/E.md\"],\"validator_exit\":2,\"pending\":{\"Q-9\":\"Inez\"},\"recommendation\":\"carry-forward\",\"rejected_option_minutes\":72}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "signoff": true,
+          "final-ticket-dispositions": true,
+          "distinct-card-calibers": false,
+          "missing-cards": true,
+          "unregistered-preview": true,
+          "same-seal-validation": true,
+          "pending-owner": true,
+          "within-budget": true,
+          "reseal-cost": true
+        },
+        "score": 0.8888888888888888,
+        "passed": false,
+        "seconds": 11.732,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4925,
+          "cache_read_input_tokens": 18851,
+          "output_tokens": 1768,
+          "output_tokens_details": {
+            "thinking_tokens": 1049
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4925
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 25550,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0016887350000000002,
+        "turns": 8
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"signoff\":\"hold\",\"accepted_tickets\":3,\"card_counts\":{\"disk\":3,\"manifest\":4,\"admitted\":3,\"mentioned\":4},\"missing\":[\"cards/C.md\",\"cards/D.md\"],\"unexpected\":[\"cards/E.md\"],\"validator_exit\":2,\"pending\":{\"Q-9\":\"Inez\"},\"recommendation\":\"carry-forward\",\"rejected_option_minutes\":72}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "signoff": true,
+          "final-ticket-dispositions": true,
+          "distinct-card-calibers": false,
+          "missing-cards": true,
+          "unregistered-preview": true,
+          "same-seal-validation": true,
+          "pending-owner": true,
+          "within-budget": true,
+          "reseal-cost": true
+        },
+        "score": 0.8888888888888888,
+        "passed": false,
+        "seconds": 10.857,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4613,
+          "cache_read_input_tokens": 19173,
+          "output_tokens": 1647,
+          "output_tokens_details": {
+            "thinking_tokens": 916
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4613
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 25439,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.001592455,
+        "turns": 8
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"signoff\":\"hold\",\"accepted_tickets\":3,\"card_counts\":{\"disk\":3,\"manifest\":4,\"admitted\":3,\"mentioned\":4},\"missing\":[\"cards/C.md\",\"cards/D.md\"],\"unexpected\":[\"cards/E.md\"],\"validator_exit\":2,\"pending\":{\"Q-9\":\"Inez\"},\"recommendation\":\"carry-forward\",\"rejected_option_minutes\":72}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "signoff": true,
+          "final-ticket-dispositions": true,
+          "distinct-card-calibers": false,
+          "missing-cards": true,
+          "unregistered-preview": true,
+          "same-seal-validation": true,
+          "pending-owner": true,
+          "within-budget": true,
+          "reseal-cost": true
+        },
+        "score": 0.8888888888888888,
+        "passed": false,
+        "seconds": 12.763,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4619,
+          "cache_read_input_tokens": 19179,
+          "output_tokens": 1616,
+          "output_tokens_details": {
+            "thinking_tokens": 888
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4619
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 25420,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.001577765,
+        "turns": 8
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"signoff\":\"hold\",\"accepted_tickets\":3,\"card_counts\":{\"disk\":3,\"manifest\":4,\"admitted\":3,\"mentioned\":4},\"missing\":[\"cards/C.md\",\"cards/D.md\"],\"unexpected\":[\"cards/E.md\"],\"validator_exit\":2,\"pending\":{\"Q-9\":\"Inez\"},\"recommendation\":\"carry-forward\",\"rejected_option_minutes\":72}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "signoff": true,
+          "final-ticket-dispositions": true,
+          "distinct-card-calibers": false,
+          "missing-cards": true,
+          "unregistered-preview": true,
+          "same-seal-validation": true,
+          "pending-owner": true,
+          "within-budget": true,
+          "reseal-cost": true
+        },
+        "score": 0.8888888888888888,
+        "passed": false,
+        "seconds": 10.102,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 7303,
+          "cache_read_input_tokens": 16772,
+          "output_tokens": 1422,
+          "output_tokens_details": {
+            "thinking_tokens": 694
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 7303
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 25503,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.001792195,
+        "turns": 8
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"signoff\":\"hold\",\"accepted_tickets\":3,\"card_counts\":{\"disk\":3,\"manifest\":4,\"admitted\":3,\"mentioned\":4},\"missing\":[\"cards/C.md\",\"cards/D.md\"],\"unexpected\":[\"cards/E.md\"],\"validator_exit\":2,\"pending\":{\"Q-9\":\"Inez\"},\"recommendation\":\"carry-forward\",\"rejected_option_minutes\":72}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "signoff": true,
+          "final-ticket-dispositions": true,
+          "distinct-card-calibers": false,
+          "missing-cards": true,
+          "unregistered-preview": true,
+          "same-seal-validation": true,
+          "pending-owner": true,
+          "within-budget": true,
+          "reseal-cost": true
+        },
+        "score": 0.8888888888888888,
+        "passed": false,
+        "seconds": 11.349,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4614,
+          "cache_read_input_tokens": 19447,
+          "output_tokens": 1574,
+          "output_tokens_details": {
+            "thinking_tokens": 853
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4614
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 25641,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00155882,
+        "turns": 8
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"signoff\":\"hold\",\"accepted_tickets\":3,\"card_counts\":{\"disk\":3,\"manifest\":4,\"admitted\":3,\"mentioned\":4},\"missing\":[\"cards/C.md\",\"cards/D.md\"],\"unexpected\":[\"cards/E.md\"],\"validator_exit\":2,\"pending\":{\"Q-9\":\"Inez\"},\"recommendation\":\"carry-forward\",\"rejected_option_minutes\":72}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "signoff": true,
+          "final-ticket-dispositions": true,
+          "distinct-card-calibers": false,
+          "missing-cards": true,
+          "unregistered-preview": true,
+          "same-seal-validation": true,
+          "pending-owner": true,
+          "within-budget": true,
+          "reseal-cost": true
+        },
+        "score": 0.8888888888888888,
+        "passed": false,
+        "seconds": 11.357,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4622,
+          "cache_read_input_tokens": 19451,
+          "output_tokens": 1682,
+          "output_tokens_details": {
+            "thinking_tokens": 944
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4622
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 25761,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00161386,
+        "turns": 8
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"signoff\":\"hold\",\"accepted_tickets\":3,\"card_counts\":{\"disk\":3,\"manifest\":4,\"admitted\":3,\"mentioned\":4},\"missing\":[\"cards/C.md\",\"cards/D.md\"],\"unexpected\":[\"cards/E.md\"],\"validator_exit\":2,\"pending\":{\"Q-9\":\"Inez\"},\"recommendation\":\"carry-forward\",\"rejected_option_minutes\":72}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "signoff": true,
+          "final-ticket-dispositions": true,
+          "distinct-card-calibers": false,
+          "missing-cards": true,
+          "unregistered-preview": true,
+          "same-seal-validation": true,
+          "pending-owner": true,
+          "within-budget": true,
+          "reseal-cost": true
+        },
+        "score": 0.8888888888888888,
+        "passed": false,
+        "seconds": 14.038,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 7647,
+          "cache_read_input_tokens": 31578,
+          "output_tokens": 1748,
+          "output_tokens_details": {
+            "thinking_tokens": 934
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 7647
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 40981,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002146455,
+        "turns": 9
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"signoff\":\"hold\",\"accepted_tickets\":3,\"card_counts\":{\"disk\":3,\"manifest\":4,\"admitted\":3,\"mentioned\":4},\"missing\":[\"cards/C.md\",\"cards/D.md\"],\"unexpected\":[\"cards/E.md\"],\"validator_exit\":2,\"pending\":{\"Q-9\":\"Inez\"},\"recommendation\":\"carry-forward\",\"rejected_option_minutes\":72}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "signoff": true,
+          "final-ticket-dispositions": true,
+          "distinct-card-calibers": false,
+          "missing-cards": true,
+          "unregistered-preview": true,
+          "same-seal-validation": true,
+          "pending-owner": true,
+          "within-budget": true,
+          "reseal-cost": true
+        },
+        "score": 0.8888888888888888,
+        "passed": false,
+        "seconds": 14.054,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 7643,
+          "cache_read_input_tokens": 31574,
+          "output_tokens": 1984,
+          "output_tokens_details": {
+            "thinking_tokens": 1170
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 7643
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 41209,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002263915,
+        "turns": 9
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"signoff\":\"hold\",\"accepted_tickets\":3,\"card_counts\":{\"disk\":3,\"manifest\":4,\"admitted\":3,\"mentioned\":4},\"missing\":[\"cards/C.md\",\"cards/D.md\"],\"unexpected\":[\"cards/E.md\"],\"validator_exit\":2,\"pending\":{\"Q-9\":\"Inez\"},\"recommendation\":\"carry-forward\",\"rejected_option_minutes\":72}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "signoff": true,
+          "final-ticket-dispositions": true,
+          "distinct-card-calibers": false,
+          "missing-cards": true,
+          "unregistered-preview": true,
+          "same-seal-validation": true,
+          "pending-owner": true,
+          "within-budget": true,
+          "reseal-cost": true
+        },
+        "score": 0.8888888888888888,
+        "passed": false,
+        "seconds": 12.266,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 7621,
+          "cache_read_input_tokens": 31550,
+          "output_tokens": 1685,
+          "output_tokens_details": {
+            "thinking_tokens": 891
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 7621
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 40864,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002111425,
+        "turns": 9
+      }
+    ]
+  },
+  "verdict": "no-difference",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 276368,
+  "skipped_trials": []
+}
