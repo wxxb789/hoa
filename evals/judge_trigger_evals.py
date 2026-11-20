@@ -3,7 +3,7 @@
 # requires-python = ">=3.13"
 # dependencies = ["pyyaml>=6"]
 # ///
-"""Judge the trigger (routing) eval suite against a configured chat endpoint.
+"""Judge the trigger (routing) eval suite against a configured endpoint.
 
 Offline structure validation lives in run_trigger_evals.py. This script does the
 judge pass: build the artifact catalog, ask a fresh-context judge which artifact
@@ -12,8 +12,8 @@ baseline.
 
 Configuration
 -------------
-No endpoint, model, effort or credential is compiled in. Every value is
-resolved through scripts/skill_config.py in the documented order:
+No endpoint, model, effort, API mode or credential is compiled in. Every value
+is resolved through scripts/skill_config.py in the documented order:
 
     CLI flag -> environment variable -> $XDG_CONFIG_HOME/evals/config.yaml
              (fallback ~/.config/evals/config.yaml) -> documented default
@@ -22,15 +22,20 @@ resolved through scripts/skill_config.py in the documented order:
     base_url  --base-url   EVALS_BASE_URL    none (required)
     model     --model      EVALS_MODEL       none (required)
     effort    --effort     EVALS_EFFORT      low
+    api       --api        EVALS_API         chat-completions
     api_key   (none)       EVALS_API_KEY     none (unauthenticated request)
 
-`base_url` is the OpenAI-compatible base URL; `/chat/completions` is appended
-unless the value already ends with it. `effort` is sent as the request's
-`reasoning_effort` and recorded in the baseline.
+`base_url` is the OpenAI-compatible base URL. By default (`api: chat-completions`),
+`/chat/completions` is appended unless the value already ends with it, and
+`effort` is sent as the request's `reasoning_effort` and recorded in the
+baseline. When `api` is set to `decisions` (opt-in for OpenAI Decisions API
+models such as `gpt-6-luna-decisions`), `/decisions` is appended unless the
+value already ends with it, and the judge sends a single `choice` question over
+the visible catalog artifact names plus `none`.
 
 Without `base_url` and `model` the script exits 2, printing the keys it needs
-and the config-file path. A malformed config file exits 2 naming `path:line`.
-
+and the config-file path. A malformed config file or unsupported `api` value
+exits 2.
 Usage
 -----
     python evals/judge_trigger_evals.py [--limit N] [--json]
@@ -82,8 +87,13 @@ SKILL = "evals"
 KEY_BASE_URL = "base_url"
 KEY_MODEL = "model"
 KEY_EFFORT = "effort"
+KEY_API = "api"
 KEY_API_KEY = "api_key"
 DEFAULT_EFFORT = "low"
+API_CHAT_COMPLETIONS = "chat-completions"
+API_DECISIONS = "decisions"
+DEFAULT_API = API_CHAT_COMPLETIONS
+SUPPORTED_APIS = (API_CHAT_COMPLETIONS, API_DECISIONS)
 MAX_WORKERS = 5
 MAX_TOKENS = 2048
 TIMEOUT = 120.0
@@ -94,9 +104,9 @@ class RecordError(ValueError):
     """A baseline record that cannot be written without losing an earlier one."""
 
 
-def catalog_text() -> str:
-    """Use frontmatter descriptions for visible skills and index notes otherwise."""
-    lines = []
+def visible_catalog_rows() -> list[tuple[str, str, str]]:
+    """Return (name, type, description) for every visible catalog artifact."""
+    rows: list[tuple[str, str, str]] = []
     for row in gi.collect():
         if row["type"] == "skill":
             skill_md = ROOT / row["path"] / "SKILL.md"
@@ -107,9 +117,26 @@ def catalog_text() -> str:
             description = fields["description"]
         else:
             description = row["note_en"]
-        lines.append(f"- {row['name']} ({row['type']}): {description}")
-    return "\n".join(lines)
+        rows.append((row["name"], row["type"], description))
+    return rows
 
+
+def catalog_text() -> str:
+    """Use frontmatter descriptions for visible skills and index notes otherwise."""
+    return "\n".join(
+        f"- {name} ({kind}): {description}"
+        for name, kind, description in visible_catalog_rows()
+    )
+
+
+def catalog_choices(catalog: str) -> list[str]:
+    """Extract artifact names from a rendered catalog_text() block, plus NO_MATCH."""
+    names: list[str] = []
+    for line in catalog.splitlines():
+        if line.startswith("- ") and " (" in line:
+            names.append(line[2:].split(" (", 1)[0])
+    names.append(gate.NO_MATCH)
+    return names
 
 def build_prompt(catalog: str, request: str) -> str:
     return (
@@ -128,6 +155,12 @@ def chat_completions_url(base_url: str) -> str:
     return f"{base}/chat/completions"
 
 
+def decisions_url(base_url: str) -> str:
+    """The decisions URL for an OpenAI-compatible Decisions API base URL."""
+    base = base_url.rstrip("/")
+    if base.endswith("/decisions"):
+        return base
+    return f"{base}/decisions"
 def endpoint_host(base_url: str) -> str:
     """The recordable endpoint identity: host plus port, no path, query or key."""
     return urlsplit(base_url).netloc
@@ -149,6 +182,26 @@ def build_body(model: str, effort: str, prompt: str) -> dict:
     }
 
 
+def build_decisions_body(model: str, catalog: str, request: str,
+                         choices: list[str] | None = None) -> dict:
+    names = catalog_choices(catalog) if choices is None else choices
+    return {
+        "model": model,
+        "input": f"Catalog:\n{catalog}\n\nUser request: {request}\n",
+        "questions": [
+            {
+                "name": "route",
+                "type": "choice",
+                "instructions": (
+                    "Route the user request to the best-fitting artifact, if any, "
+                    f"or {gate.NO_MATCH} if no artifact applies."
+                ),
+                "choices": [{"value": name} for name in names],
+            }
+        ],
+    }
+
+
 def parse_answer(payload) -> str:
     """Pull the artifact name out of one chat-completions reply."""
     if not isinstance(payload, dict):
@@ -165,14 +218,41 @@ def parse_answer(payload) -> str:
     return content.strip()
 
 
+def parse_decisions_answer(payload) -> str:
+    """Pull the chosen artifact name out of one /decisions reply."""
+    if not isinstance(payload, dict):
+        raise ValueError("response is not a JSON object")
+    if payload.get("error"):
+        raise ValueError(f"endpoint error: {payload['error']}")
+    answers = payload.get("answers")
+    if not isinstance(answers, list) or not answers or not isinstance(answers[0], dict):
+        raise ValueError("response has no answers")
+    answer = answers[0]
+    if answer.get("type") == "refusal":
+        raise ValueError("decision model refused to answer")
+    choice = answer.get("choice")
+    if not isinstance(choice, str) or not choice.strip():
+        raise ValueError("response answer has no string choice")
+    return choice.strip()
+
+
 def judge_one(base_url: str, model: str, effort: str, api_key: str | None,
-              catalog: str, request: str) -> str:
-    body = build_body(model, effort, build_prompt(catalog, request))
+              catalog: str, request: str, *, api: str = DEFAULT_API) -> str:
+    if api == API_DECISIONS:
+        url = decisions_url(base_url)
+        body = build_decisions_body(model, catalog, request)
+        parser = parse_decisions_answer
+    elif api == API_CHAT_COMPLETIONS:
+        url = chat_completions_url(base_url)
+        body = build_body(model, effort, build_prompt(catalog, request))
+        parser = parse_answer
+    else:
+        raise ValueError(f"unsupported api {api!r}")
     headers = {"content-type": "application/json"}
     if api_key:
         headers["authorization"] = f"Bearer {api_key}"
     req = urllib.request.Request(
-        chat_completions_url(base_url),
+        url,
         data=json.dumps(body).encode(),
         headers=headers,
         method="POST",
@@ -189,18 +269,19 @@ def judge_one(base_url: str, model: str, effort: str, api_key: str | None,
         payload = json.loads(raw.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
         raise RuntimeError(f"response is not JSON: {error}") from error
-    return parse_answer(payload)
-
+    return parser(payload)
 
 def resolve_settings(args, env=None):
-    """Resolve (base_url, model, effort, api_key) through the shared resolver."""
+    """Resolve (base_url, model, effort, api_key, api) through the shared resolver."""
     environ = os.environ if env is None else env
     base_url = sc.resolve(SKILL, KEY_BASE_URL, flag=args.base_url, env=environ)
     model = sc.resolve(SKILL, KEY_MODEL, flag=args.model, env=environ)
     effort = sc.resolve(SKILL, KEY_EFFORT, flag=args.effort, env=environ,
                         default=DEFAULT_EFFORT)
     api_key = sc.resolve(SKILL, KEY_API_KEY, env=environ)
-    return base_url, model, effort, api_key
+    api = sc.resolve(SKILL, KEY_API, flag=getattr(args, "api", None), env=environ,
+                     default=DEFAULT_API)
+    return base_url, model, effort, api_key, api
 
 
 def unconfigured_message(base_url, model, effort, env=None) -> str:
@@ -211,6 +292,7 @@ def unconfigured_message(base_url, model, effort, env=None) -> str:
         ("base_url", "--base-url", sc.env_name(SKILL, KEY_BASE_URL), None),
         ("model", "--model", sc.env_name(SKILL, KEY_MODEL), None),
         ("effort", "--effort", sc.env_name(SKILL, KEY_EFFORT), DEFAULT_EFFORT),
+        ("api", "--api", sc.env_name(SKILL, KEY_API), DEFAULT_API),
     ]
     lines = [
         "judge_trigger_evals: judge endpoint and model are not configured.",
@@ -224,7 +306,6 @@ def unconfigured_message(base_url, model, effort, env=None) -> str:
         "Set them in that file, in the environment, or with the flags.",
     ]
     return "\n".join(lines)
-
 
 def baseline_record(cases, model, effort, base_url, results) -> dict:
     return {
@@ -288,6 +369,8 @@ def main(argv=None) -> int:
                         help="judge model name (flag beats env and config)")
     parser.add_argument("--effort", default=None,
                         help=f"judge effort, sent as reasoning_effort (default: {DEFAULT_EFFORT})")
+    parser.add_argument("--api", default=None,
+                        help=f"judge wire API: {', '.join(SUPPORTED_APIS)} (default: {DEFAULT_API})")
     args = parser.parse_args(argv)
     if args.limit < 0:
         parser.error("--limit must be >= 0")
@@ -297,12 +380,16 @@ def main(argv=None) -> int:
         parser.error("--record needs the full case set; drop --limit")
 
     try:
-        base_url, model, effort, api_key = resolve_settings(args)
+        base_url, model, effort, api_key, api = resolve_settings(args)
     except sc.ConfigError as error:
         print(f"judge_trigger_evals: {error}", file=sys.stderr)
         return 2
     if not base_url or not model:
         print(unconfigured_message(base_url, model, effort), file=sys.stderr)
+        return 2
+    if api not in SUPPORTED_APIS:
+        print(f"judge_trigger_evals: api must be one of {SUPPORTED_APIS}, got {api!r}",
+              file=sys.stderr)
         return 2
     problem = _validate_base_url(base_url)
     if problem:
@@ -329,13 +416,13 @@ def main(argv=None) -> int:
 
     def run_case(case: dict) -> dict:
         try:
-            pick = judge_one(base_url, model, effort, api_key, catalog, case["request"])
+            pick = judge_one(base_url, model, effort, api_key, catalog,
+                             case["request"], api=api)
             passed = pick in case["must_pick"]
         except Exception as error:  # per-case failure, never aborts the batch
             pick, passed = f"error: {error}", False
         return {"id": case["id"], "pick": pick,
                 "must_pick": case["must_pick"], "passed": passed}
-
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         results = list(executor.map(run_case, cases))
 
