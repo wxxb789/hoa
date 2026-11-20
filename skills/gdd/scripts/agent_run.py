@@ -12,11 +12,11 @@ sys.dont_write_bytecode = True
 
 import argparse
 import glob
+import hashlib
 import json
 import os
 import plistlib
 import re
-import runpy
 import shlex
 import shutil
 import signal
@@ -33,6 +33,7 @@ from typing import Any, Callable, Literal
 # Keep the lexical install path: a linked skill's canonical directory may have different siblings.
 SCRIPT_DIR = Path(os.path.abspath(__file__)).parent
 SKILLS_ROOT = SCRIPT_DIR.parents[1]
+ROUTE_SNAPSHOT = "route.py"
 sys.path.insert(0, str(SCRIPT_DIR))
 # Route modules import this runner, including when it was launched as __main__.
 sys.modules.setdefault("agent_run", sys.modules[__name__])
@@ -828,20 +829,49 @@ class RouteError(ValueError):
     pass
 
 
+def skills_root() -> Path:
+    value = skill_config.resolve("gdd", "GDD_SKILLS_ROOT", default=str(SKILLS_ROOT))
+    return Path(os.path.abspath(os.path.expanduser(value)))
+
+
+def route_package(name: str) -> str:
+    return "gdd-route-cc" if name == "claude" else f"gdd-route-{name}"
+
+
 def discover_routes(root: Path | None = None) -> dict[str, Path]:
-    root = SKILLS_ROOT if root is None else root
-    return {path.parents[1].name.removeprefix("gdd-route-"): path
-            for path in sorted(root.glob("gdd-route-*/scripts/route.py")) if path.is_file()}
+    root = skills_root() if root is None else root
+    installed = {}
+    for path in sorted(root.glob("gdd-route-*/scripts/route.py")):
+        package = path.parents[1].name
+        name = "claude" if package == "gdd-route-cc" else package.removeprefix("gdd-route-")
+        if route_package(name) == package and path.is_file():
+            installed[name] = path
+    return installed
 
 
-def load_route(name: str, root: Path | None = None) -> Route:
+def installed_route(name: str, root: Path) -> Path:
     installed = discover_routes(root)
     if name not in installed:
-        raise RouteError(f"agent {name!r} has no installed route (installed: {', '.join(installed) or 'none'}); "
-                         f"install with: npx skills add wxxb789/hoa -s gdd-route-{name}")
-    path = installed[name]
+        package = route_package(name)
+        raise RouteError(f"agent {name!r} has no installed route (scanned: {root}; "
+                         f"installed: {', '.join(installed) or 'none'}); install for the same host (-a) and scope as gdd: "
+                         f"npx skills add wxxb789/hoa -s {package} (project) or "
+                         f"npx skills add wxxb789/hoa -g -s {package} (global). "
+                         "For a resolved runner path, set GDD_SKILLS_ROOT to the host skills root")
+    return installed[name]
+
+
+def route_source(path: Path) -> bytes:
     try:
-        exports = runpy.run_path(str(path))
+        return path.read_bytes()
+    except OSError as exc:
+        raise RouteError(f"{path}: could not read ROUTE: {exc}") from exc
+
+
+def parse_route(name: str, path: Path, source: bytes) -> Route:
+    exports = {"__name__": "gdd_route", "__file__": str(path)}
+    try:
+        exec(compile(source, str(path), "exec"), exports)
     except Exception as exc:
         raise RouteError(f"{path}: could not load ROUTE: {exc}") from exc
     if "ROUTE" not in exports:
@@ -867,6 +897,21 @@ def load_route(name: str, root: Path | None = None) -> Route:
         if not valid:
             raise RouteError(f"{path}: invalid ROUTE.{field}: {detail}")
     return route
+
+
+def load_route(name: str, root: Path | None = None) -> Route:
+    path = installed_route(name, skills_root() if root is None else root)
+    return parse_route(name, path, route_source(path))
+
+
+def run_route(run_dir, name: str, plan: dict) -> Route:
+    if "route_sha256" not in plan:
+        return load_route(name)  # legacy run
+    path = Path(run_dir, ROUTE_SNAPSHOT)
+    source = route_source(path)
+    if hashlib.sha256(source).hexdigest() != plan["route_sha256"]:
+        raise RouteError(f"{path}: route snapshot differs from the one recorded at start")
+    return parse_route(name, path, source)
 
 
 def fold_line(spec, acc, raw):
@@ -980,14 +1025,20 @@ def finalize(run_dir, exit_code, acc=None, note=None, recovered=False, extra=Non
     if os.path.exists(os.path.join(run_dir, "finalized")):
         return read_state(run_dir)
     state = read_state(run_dir)
+    plan = read_json(os.path.join(run_dir, "run.json"), {})
     refolded = acc is None
     if refolded:  # the runner died: re-fold whatever events were retained
         if spec is None and (agent := state.get("agent")):
             try:
-                spec = load_route(agent)
-            except RouteError:
-                # A removed or broken route must not prevent stopping or settling an old run.
-                pass
+                spec = run_route(run_dir, agent, plan)
+            except (RouteError, skill_config.ConfigError) as exc:
+                # Show the dead process outcome, but let a later read retry the refold.
+                unavailable = f"events could not be refolded: {exc}"
+                pending = ": ".join(filter(None, (note, unavailable)))
+                if state.get("note") != pending:
+                    state["note"] = pending
+                    write_json(os.path.join(run_dir, "state.json"), state)
+                return {**state, "state": "killed" if exit_code in KILLED_EXITS else "failed", "exit": exit_code}
         acc = new_acc()
         for path in event_files(run_dir) if spec else []:
             with open(path, "rb") as handle:
@@ -1013,7 +1064,7 @@ def finalize(run_dir, exit_code, acc=None, note=None, recovered=False, extra=Non
         state["stale_recovered"] = True
         note = f"runner/agent pids {state.get('pid')}/{state.get('agent_pid')} died without finalizing"
     state.update({"note": note} if note else {}, **(extra or {}))
-    if schema := read_json(os.path.join(run_dir, "run.json"), {}).get("schema"):
+    if schema := plan.get("schema"):
         state.update(stage_result.record(run_dir, acc["answer"], acc["structured"], schema))
     # a native structured result is the JSON alone: keep the report written before it in answer.md
     report = acc["report"] if schema and acc["report"].strip() not in ("", acc["answer"].strip()) else ""
@@ -1052,7 +1103,7 @@ def effective_state(run_dir):
         state = finalize(run_dir, KILL_EXIT, note="stop requested and the runner is gone; recorded by a reader")
     else:
         state = finalize(run_dir, -1, recovered=True)
-        recovered = True
+        recovered = bool(state.get("stale_recovered"))
     cleanup_supervisor(run_dir, state)
     return state, recovered
 
@@ -1078,7 +1129,7 @@ def find_run(name, command=None):
 
 
 def stop_run(run_dir):
-    """Return an empty string after finalization, or why the stop is unproven."""
+    """Return an empty string after confirming the stop, or why it is unproven."""
     marker = os.path.join(run_dir, "finalized")
 
     def settled():
@@ -1120,11 +1171,11 @@ def cmd_start(args):
             print(f"agent_run: warning: {key} is retired; use {replacement}", file=sys.stderr)
     try:
         agent = skill_config.resolve("gdd", "GDD_AGENT", flag=args.agent, default="omp")
-    except skill_config.ConfigError as exc:
-        die(f"start: {exc}")
-    try:
-        spec = load_route(agent)
-    except RouteError as exc:
+        route_root = skills_root()
+        module = installed_route(agent, route_root)
+        source = route_source(module)
+        spec = parse_route(agent, module, source)
+    except (RouteError, skill_config.ConfigError) as exc:
         die(f"start: {exc}")
     if args.session_id is not None:
         if "session_id" not in spec.legacy or args.resume is not None:
@@ -1164,12 +1215,13 @@ def cmd_start(args):
     try:
         mode, launcher = select_detach(detach_config())
         with slug_start_lock(root, slug):
-            return start_locked(args, spec, slug, cwd, run_dir, command, prompt, max_time, mode, launcher)
+            return start_locked(args, spec, slug, cwd, run_dir, command, prompt, max_time, mode, launcher,
+                                route_root, source)
     except (OSError, ValueError) as exc:
         die(f"start: {exc}")
 
 
-def start_locked(args, spec, slug, cwd, run_dir, command, prompt, max_time, mode, launcher):
+def start_locked(args, spec, slug, cwd, run_dir, command, prompt, max_time, mode, launcher, route_root, source):
     previous = find_run(slug)
     if previous:
         state, _ = effective_state(previous)
@@ -1202,10 +1254,13 @@ def start_locked(args, spec, slug, cwd, run_dir, command, prompt, max_time, mode
         die(f"start: cannot claim {run_dir}: {exc}")
     with open(os.path.join(run_dir, "prompt.md"), "wb") as handle:
         handle.write(prompt)
+    with os.fdopen(private_file(Path(run_dir, ROUTE_SNAPSHOT)), "wb") as handle:
+        handle.write(source)
     agent = spec.name
     write_json(os.path.join(run_dir, "run.json"), {"agent": agent, "argv": command, "prompt": spec.prompt,
                                                    "cwd": cwd, "scrub_env": spec.scrub_env, "max_time_s": max_time,
-                                                   "schema": args.schema})
+                                                   "schema": args.schema, "skills_root": str(route_root),
+                                                   "route_sha256": hashlib.sha256(source).hexdigest()})
     state = {
         "name": slug, "agent": agent, "state": "running", "exit": None, "cwd": cwd, "started": now_iso(),
         "ended": None, "duration_s": None, "run_dir": run_dir, "pid": None, "agent_pid": None,
@@ -1267,8 +1322,8 @@ def run_agent(args):
         finalize(run_dir, KILL_EXIT, note="stop requested before agent startup")
         return 1
     try:
-        spec = load_route(plan["agent"])
-    except RouteError as exc:
+        spec = run_route(run_dir, plan["agent"], plan)
+    except (RouteError, skill_config.ConfigError) as exc:
         finalize(run_dir, 127, new_acc(), note=str(exc))
         return 1
     with open(os.path.join(run_dir, "prompt.md"), "rb") as handle:
@@ -1421,21 +1476,28 @@ def cmd_answer(args):
 
 def cmd_kill(args):
     run_dir = find_run(args.name, "kill")
+    marker = Path(run_dir, "finalized")
     state, _ = effective_state(run_dir)
-    if os.path.exists(os.path.join(run_dir, "finalized")):
+    if marker.exists():
         die(f"kill: run '{args.name}' is already finished (state {state.get('state')})")
     if not (run_alive(run_dir, state) or is_starting(state)):
         die(f"kill: no live process recorded for '{args.name}' (state {reported_state(state)['state']})")
     if problem := stop_run(run_dir):
         die(f"kill: cannot confirm the stop of '{args.name}': {problem}")
-    final = read_state(run_dir)
+    final = read_state(run_dir) if marker.exists() else effective_state(run_dir)[0]
     print(f"killed: {args.name} state={final.get('state')} exit={final.get('exit')}")
     return 0
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__,
-                                     epilog=f"Installed routes: {', '.join(discover_routes()) or 'none'}.")
+    argv = normalize_argv(sys.argv[1:] if argv is None else argv)
+    epilog = None
+    if argv[:1] in (["--help"], ["-h"]):
+        try:
+            epilog = f"Installed routes: {', '.join(discover_routes()) or 'none'}."
+        except skill_config.ConfigError as exc:
+            epilog = f"Could not list installed routes: {exc}"
+    parser = argparse.ArgumentParser(description=__doc__, epilog=epilog)
     sub = parser.add_subparsers(dest="command", required=True)
     start = sub.add_parser("start", help="start one detached run")
     for flag in ("--cwd", "--agent", "--model", "--thinking", "--max-time", "--resume", "--schema", "--extra"):
@@ -1458,7 +1520,7 @@ def main(argv=None):
         if name == "tail":
             command.add_argument("lines", nargs="?", type=int)
         command.set_defaults(func=func)
-    args = parser.parse_args(normalize_argv(sys.argv[1:] if argv is None else argv))
+    args = parser.parse_args(argv)
     return args.func(args)
 
 

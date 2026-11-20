@@ -123,7 +123,7 @@ jobs:
           skills/gdd/scripts/tests/test_paseo_run_python.py
           skills/gdd/scripts/tests/test_watch_pr_checks.py
           skills/gdd/scripts/tests/test_route_loading.py
-          skills/gdd-route-claude/scripts/tests
+          skills/gdd-route-cc/scripts/tests
           skills/gdd-route-codex/scripts/tests
           skills/gdd-route-dsh/scripts/tests
           skills/gdd-route-omp/scripts/tests

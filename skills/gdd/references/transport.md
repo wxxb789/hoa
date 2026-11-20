@@ -93,18 +93,25 @@ live run. Real agent CLI smoke is opt-in via `GDD_SMOKE_AGENTS`.
 current interpreter; a Windows batch shim uses `%COMSPEC%` and is refused for
 metacharacters (`" & | < > ^ ( ) % !` or newlines).
 
-The runner discovers `gdd-route-*/scripts/route.py` next to the installed
-`gdd` skill. Routes are optional, not part of gdd's install closure. Install
-the route you select in the same skills root; for example:
-`npx skills add wxxb789/hoa -s gdd-route-omp`. If it is missing, `start` reports
-which routes are installed and exits before creating a run directory.
+The runner discovers `gdd-route-*/scripts/route.py` beside the lexical path of
+the installed `gdd` skill. If the harness supplies the resolved path but a route
+is copied into the host's skills root, set `GDD_SKILLS_ROOT` to that host skills
+root. The environment overrides the gdd config file. Only that one root is
+scanned; `start` names it and lists its routes before refusing a missing route.
+
+Routes are optional, not part of gdd's install closure. New and upgrading
+users must add the selected route. Use the same host (`-a <agent>`) and scope
+as gdd. For the default route, use `npx skills add wxxb789/hoa -s gdd-route-omp`
+for a project install or `npx skills add wxxb789/hoa -g -s gdd-route-omp` for a
+global install. The generated index has the complete command for each route.
+`GDD_AGENT=claude` selects the `gdd-route-cc` package.
 
 Route documentation (configuration, input, and exit-0 success marker):
 
 - [gdd-route-omp](https://github.com/wxxb789/hoa/blob/main/skills/gdd-route-omp/SKILL.md)
 - [gdd-route-dsh](https://github.com/wxxb789/hoa/blob/main/skills/gdd-route-dsh/SKILL.md)
 - [gdd-route-codex](https://github.com/wxxb789/hoa/blob/main/skills/gdd-route-codex/SKILL.md)
-- [gdd-route-claude](https://github.com/wxxb789/hoa/blob/main/skills/gdd-route-claude/SKILL.md)
+- [gdd-route-cc](https://github.com/wxxb789/hoa/blob/main/skills/gdd-route-cc/SKILL.md)
 - [gdd-route-pi](https://github.com/wxxb789/hoa/blob/main/skills/gdd-route-pi/SKILL.md)
 - [gdd-route-opencode](https://github.com/wxxb789/hoa/blob/main/skills/gdd-route-opencode/SKILL.md)
 
@@ -118,6 +125,12 @@ Route documentation (configuration, input, and exit-0 success marker):
 - **Recovery:** once startup grace expires, a reader finalizes abandoned
   running state as failed/-1 with `stale_recovered`, or killed if stop was
   requested. Dispatcher and ledger liveness reads report stale without writing.
+  New runs keep a private snapshot of the validated route for detached startup
+  and event refolding even after uninstall. Keep `GDD_RUN_ROOT` in a trusted
+  location: these artifacts include executable route code. For old runs
+  without a snapshot, if the installed route is unavailable, the reader notes
+  that events could not be refolded and preserves answer and progress. Restore
+  the route to allow a later read to finish recovery.
 - **Events:** rotate to `events.1.ndjson` at half the limit. The current log's
   truncation marker appears after bytes have been dropped. An observer
   reading only the active segment treats counts as partial once any
@@ -130,6 +143,7 @@ Route documentation (configuration, input, and exit-0 success marker):
 
 | Setting | Default / scope |
 |---|---|
+| `GDD_SKILLS_ROOT` | lexical sibling skills root; environment then gdd config |
 | `GDD_RUN_DETACH` | `auto`; env then gdd config; also applies to the Paseo monitor |
 | `GDD_RUN_EVENTS_MAX_BYTES` | 8388608 |
 | `GDD_RUN_START_GRACE_SECONDS` | 60 |

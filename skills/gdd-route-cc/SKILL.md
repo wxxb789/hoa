@@ -1,5 +1,5 @@
 ---
-name: gdd-route-claude
+name: gdd-route-cc
 description: >-
   Configure the Claude Code headless route for gdd's shared runner. Use for
   route configuration and troubleshooting, not for interactive sessions or
@@ -14,7 +14,7 @@ metadata:
   kind: "mechanism"
 ---
 
-# gdd-route-claude
+# gdd-route-cc
 
 Requires [gdd](../gdd/SKILL.md) and the Claude Code CLI in PATH, or an executable
 path in `CLAUDE_BIN`. Install both skills in the same skills root. Select
