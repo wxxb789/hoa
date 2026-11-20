@@ -231,9 +231,8 @@ export const runLineageSchema = z.object({
  * Bounded live tail: the run's summary, its last `tailLines` events, and its answer tail. The
  * client polls this while a run is selected; the counters behind the summary reuse a per-run byte
  * offset, so the counting reads only what the launcher appended since the previous call. Revision
- * caches reuse unchanged bounded event/answer windows and extend them on append. Paseo 0.15 has no
- * plugin subscription transport, so polling is the available live channel and it stops the moment
- * the surface unmounts.
+ * caches reuse unchanged bounded event/answer windows and extend them on append. Polling also
+ * supports Paseo 0.15 hosts and stops when the surface unmounts.
  * No `scannedAt`: an unchanged poll must be able to compare equal, and nothing renders it here.
  */
 export const followRun = defineRpc({

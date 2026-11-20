@@ -12,6 +12,13 @@ updates:
     directory: /paseo-plugins/gdd-observer
     schedule:
       interval: weekly
+    ignore:
+      # Match the Observer's minimum supported Node.js major.
+      - dependency-name: "@types/node"
+        versions: [">=21"]
+      # Vitest 5 drops support for Node.js 20.
+      - dependency-name: vitest
+        versions: [">=5 <6"]
     groups:
       gdd-observer:
         patterns:

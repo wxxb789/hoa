@@ -4,6 +4,11 @@ Entries are dated and optional; no CI gate requires one. There is no project ver
 counts its own iterations in `metadata.revision`. Earlier entries retain the retired project
 `VERSION` numbers and historical per-skill versions.
 
+## 2026-11-20
+
+- Update GDD Observer to the Paseo 0.16 SDK and matching React runtime dependencies while retaining
+  bounded RPC polling and Node.js 20.19.4 support.
+
 ## 2026-11-19
 
 - Restore Dependabot checkouts and group weekly Actions and GDD Observer dependency updates.

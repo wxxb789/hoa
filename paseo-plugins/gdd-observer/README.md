@@ -193,7 +193,8 @@ work, `client/` the surfaces (`runs-browser` the browser, `status-strip` the sta
 badges, `model-card` the model attribution, `labels` the state and liveness key/color maps),
 translations, and styles. Tests live in `server/tests/` and `client/tests/`.
 
-Client tests render the actual components with `react-test-renderer` matching React 19.1. The SDK's
+Client tests render the actual components with `react-test-renderer` matching Paseo 0.16's React
+19.2.3. The development React Native version also matches the host (0.86.3). The SDK's
 translation runtime, RPC validation, and React Query remain real. Only host-injected
 React Native/UI primitives, settings persistence, clipboard and toast services are test adapters;
 RPC responses are synthetic and never connect to a daemon. The client project fixes the timezone to
@@ -213,8 +214,8 @@ measurements) and its archived goal contracts are not part of this checkout; the
 
 ## Known limits
 
-- **Polling, not subscriptions.** Paseo 0.15 has no plugin subscription transport, so the live tail
-  is a bounded poll and polling stops as soon as the last observing surface unmounts. File revision
+- **Polling, not subscriptions.** The live tail uses bounded RPC polling, which also works on
+  Paseo 0.15 hosts. Polling stops as soon as the last observing surface unmounts. File revision
   checks reuse unchanged event counters and bounded event/answer tails; warmed unchanged polls
   read and parse zero retained-event bytes. Small appends extend cached tails; large appends rebuild
   only the bounded tail, while the independent counter fold still reads all new event lines.
