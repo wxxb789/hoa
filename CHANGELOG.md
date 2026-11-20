@@ -10,6 +10,12 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
   passing fix, review stage never ran (provider 403).
 - Add a [manual skill description distinctiveness measurement](evals/README.md#measure-description-distinctiveness)
   with offline BM25 and TF-IDF, optional LLM routing, and the development and public regression sets.
+- Shorten the Hermes operational verification, context loading, Kanban and
+  updater skills while keeping evidence checks and pinning upstream mechanics.
+- Make the tmux watcher verify pane identity, harness state, composer readback
+  and both send results; test it against an isolated stub.
+- Make scheduled Git sync fail visibly and verify branch, operation state and
+  publication scope before reporting success.
 
 ## 2026-11-20
 
