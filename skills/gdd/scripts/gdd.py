@@ -27,7 +27,7 @@ Environment or operator config file:
                     run dir (default ${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs)
     GDD_LAUNCHER    launcher command (default <script dir>/agent_run.py)
     GDD_AGENT       agent CLI exported to the launcher when set
-                    (agent_run.py: omp, dsh, codex, claude, pi, opencode; its default is omp)
+                    (agent_run.py: an installed route; default omp, claude uses gdd-route-cc)
     GDD_TEMPLATES   template root
                     (default <script dir>/../references/stage-templates)
     GDD_GOAL_GLOB   goal-contract glob (default docs/goals/*<goal>*.md)
@@ -858,7 +858,7 @@ Environment or operator config file:
                   (default ${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs)
   GDD_LAUNCHER    launcher command (default <script dir>/agent_run.py)
   GDD_AGENT       agent CLI exported to the launcher when set
-                  (agent_run.py: omp, dsh, codex, claude, pi, opencode; its default is omp)
+                  (agent_run.py: an installed route; default omp, claude uses gdd-route-cc)
   GDD_TEMPLATES   template root (default <script dir>/../references/stage-templates)
   GDD_GOAL_GLOB   goal-contract glob (default docs/goals/*<goal>*.md)
   GDD_MODEL, GDD_THINKING, GDD_MAX_TIME

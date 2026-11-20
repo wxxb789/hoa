@@ -41,8 +41,12 @@ targets:  runtime-agnostic | repo-only |
 | evidence-backed-analytical-writing | skill | work-management | runtime-agnostic | `skills/evidence-backed-analytical-writing/` | evidence map plus a claim → evidence → mechanism → limitation spine for Chinese analytical reports; recency window, status ladder, negative findings |
 | evidence-boundary-discipline | skill | work-management | runtime-agnostic | `skills/evidence-boundary-discipline/` | state only what a dated source supports: tense to dateline, provenance-label parity, absence never escalates |
 | gdd | skill | software-development,work-management | runtime-agnostic | `skills/gdd/` | goal contract → agent-authored stages → operator-run gates → scripted merge gate → resumable ledger; ships `gdd.py`, `delivery-state.py`, `pr-merge-check.py` |
+| gdd-route-cc | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-cc/` | Claude Code stream-JSON route with session resume and native JSON schema |
+| gdd-route-codex | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-codex/` | Codex exec and resume route with native JSON schema and integrations off by default |
 | gdd-route-dsh | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-dsh/` | dispatch and supervise a GDD stage on dsh headless: session/worktree rules, completion judgement, recovery, harness traps (requires skill `gdd`) |
 | gdd-route-omp | skill | software-development,work-management | pi | `skills/gdd-route-omp/` | detached runner for long `omp -p` runs; polled completion, session-id recovery (requires skill `gdd`) |
+| gdd-route-opencode | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-opencode/` | OpenCode standalone server route with session resume and model variant selection |
+| gdd-route-pi | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-pi/` | Pi stdin and JSON event route with session resume |
 | ghc-search | skill | software-development | runtime-agnostic | `skills/ghc-search/` | web and X/Twitter search via a local ghc-proxy Responses API; answer plus deduped sources |
 | git-auto-sync-pipelines | skill | software-development,work-management | runtime-agnostic | `skills/git-auto-sync-pipelines/` | scheduled commit/push for hand-edited repos: ordered gates, allowlist and size caps, staged secret scan, heartbeat and deduped alerts |
 | harness-engineering | skill | software-development | runtime-agnostic | `skills/harness-engineering/` | restructure and design harness scripts: self-containment, obligations bound to owner decisions, pure checks plus one thin runner, net-negative line budget |
@@ -93,9 +97,13 @@ below. A skill without a row has no dependencies: `npx skills add wxxb789/hoa -g
 
 | Skill | Needs (transitive `../` closure) | Install command |
 |---|---|---|
-| gdd | delegated-work-acceptance, gdd-route-dsh | `npx skills add wxxb789/hoa -g -s gdd -s delegated-work-acceptance -s gdd-route-dsh -y` |
+| gdd | delegated-work-acceptance | `npx skills add wxxb789/hoa -g -s gdd -s delegated-work-acceptance -y` |
+| gdd-route-cc | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-cc -s delegated-work-acceptance -s gdd -y` |
+| gdd-route-codex | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-codex -s delegated-work-acceptance -s gdd -y` |
 | gdd-route-dsh | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-dsh -s delegated-work-acceptance -s gdd -y` |
-| gdd-route-omp | delegated-work-acceptance, gdd, gdd-route-dsh | `npx skills add wxxb789/hoa -g -s gdd-route-omp -s delegated-work-acceptance -s gdd -s gdd-route-dsh -y` |
+| gdd-route-omp | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-omp -s delegated-work-acceptance -s gdd -y` |
+| gdd-route-opencode | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-opencode -s delegated-work-acceptance -s gdd -y` |
+| gdd-route-pi | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-pi -s delegated-work-acceptance -s gdd -y` |
 | hermes-models | hermes-models-cutover | `npx skills add wxxb789/hoa -g -s hermes-models -s hermes-models-cutover -y` |
 | hoa-skill-set-audit | hoa-skill-create | `npx skills add wxxb789/hoa -g -s hoa-skill-set-audit -s hoa-skill-create -y` |
 
@@ -103,7 +111,7 @@ Without Hermes, skip the `hermes-*` skills: they only operate a Hermes install, 
 links to them. Install everything else with:
 
 ```bash
-npx skills add wxxb789/hoa -g -s agent-harness-settings-parity -s agent-operating-contract-evolution -s ai-coding-agent-delegation -s contract-bound-deliverables -s cross-agent-repair-routing -s define-goal -s delegated-work-acceptance -s discord-rich-message -s dotnet-repo-workflow -s evidence-backed-analytical-writing -s evidence-boundary-discipline -s gdd -s gdd-route-dsh -s gdd-route-omp -s ghc-search -s git-auto-sync-pipelines -s harness-engineering -s hoa-practice-retro -s hoa-repo-reckoning -s hoa-skill-create -s hoa-skill-curate -s hoa-skill-port -s hoa-skill-review -s hoa-skill-set-audit -s measurement-campaign-evidence -s official-document-verification -s package-release-verification -s project-phase-closeout -s report-claim-audit -s research-stream-consolidation -s review-revision-candidates -s spec-convergence -s structural-validity-gates -s tmux-agent-control -s writing -y
+npx skills add wxxb789/hoa -g -s agent-harness-settings-parity -s agent-operating-contract-evolution -s ai-coding-agent-delegation -s contract-bound-deliverables -s cross-agent-repair-routing -s define-goal -s delegated-work-acceptance -s discord-rich-message -s dotnet-repo-workflow -s evidence-backed-analytical-writing -s evidence-boundary-discipline -s gdd -s gdd-route-cc -s gdd-route-codex -s gdd-route-dsh -s gdd-route-omp -s gdd-route-opencode -s gdd-route-pi -s ghc-search -s git-auto-sync-pipelines -s harness-engineering -s hoa-practice-retro -s hoa-repo-reckoning -s hoa-skill-create -s hoa-skill-curate -s hoa-skill-port -s hoa-skill-review -s hoa-skill-set-audit -s measurement-campaign-evidence -s official-document-verification -s package-release-verification -s project-phase-closeout -s report-claim-audit -s research-stream-consolidation -s review-revision-candidates -s spec-convergence -s structural-validity-gates -s tmux-agent-control -s writing -y
 ```
 
 After a release that renames or retires skills, remove the names this repo no longer ships

@@ -6,7 +6,7 @@ description: >-
   increment is delegated end to end, including the merge. Not for one-line fixes, exploration without
   acceptance criteria, or work no machine can check.
 metadata:
-  revision: "15"
+  revision: "16"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "goal contract → agent-authored stages → operator-run gates → scripted merge gate → resumable ledger; ships `gdd.py`, `delivery-state.py`, `pr-merge-check.py`"
@@ -101,7 +101,8 @@ matching the current stage directly — do not create per-phase skills.
 | `GDD_STATE_FILE` | ledger path | `${XDG_STATE_HOME:-$HOME/.local/state}/gdd/ledger.tsv` |
 | `GDD_TASK_ROOT` | task/state root | `${XDG_STATE_HOME:-$HOME/.local/state}/gdd/tasks` |
 | `GDD_RUN_ROOT` | launcher run root | `${XDG_STATE_HOME:-$HOME/.local/state}/gdd/runs` |
-| `GDD_LAUNCHER`, `GDD_AGENT` | explicit launcher selection (custom launchers must accept `--schema`); the headless agent CLI, exported to the launcher when set | bundled `scripts/agent_run.py`, agent `omp` (or `dsh`, `codex`, `claude`, `pi`, `opencode`); opt in to native Paseo with `scripts/adapters/paseo-run.py` |
+| `GDD_SKILLS_ROOT` | override the headless runner's route discovery root | lexical sibling skills root |
+| `GDD_LAUNCHER`, `GDD_AGENT` | explicit launcher selection (custom launchers must accept `--schema`); install the selected headless route skill next to `gdd` | bundled `scripts/agent_run.py`, agent `omp` (`gdd-route-omp`); opt in to native Paseo with `scripts/adapters/paseo-run.py` |
 | `GDD_RUN_DETACH` | detach mode: `auto`, `systemd`, `launchd`, `setsid`, `windows`, or environment-only `tmux` / `herdr` | `auto` (Linux user unit, macOS LaunchAgent, POSIX double fork, or native Windows) |
 | `GDD_TEMPLATES` | stage-template root | the bundled `references/stage-templates` |
 | `GDD_GOAL_GLOB` | goal-contract glob | `docs/goals/*<goal>*.md` |
@@ -114,6 +115,6 @@ Run bundled scripts with `uv run <path>`. Only if a script command fails (for ex
 found), read [references/troubleshooting.md](references/troubleshooting.md).
 
 Read [`references/transport.md`](references/transport.md) before selecting or dispatching a launcher:
-it defines both routes, model/thinking mapping, artifact polling, and platform-specific evidence.
+it covers installed headless routes, native Paseo, artifact polling, and platform-specific evidence.
 Native stages are Paseo agents and require a reachable daemon; never substitute routes by reachability.
 Missing state/agents and an unreachable daemon are unknown, never success; headless evidence is not native evidence.

@@ -16,12 +16,12 @@ from unittest import mock
 
 import agent_run
 import gdd_process
-from gdd_test_support import check_locks, finalized, remove_tree, stop_headless, wait_for_json
+from gdd_test_support import check_locks, finalized, remove_tree, route_fixture, stop_headless, wait_for_json
 
 HERE = Path(__file__).resolve().parent
 RUNNER = str(HERE.parent / "agent_run.py")
 STUB = str(HERE / "stub_agent.py")
-FIXTURE = str(HERE / "fixtures" / "events" / "omp.ok.ndjson")
+FIXTURE = route_fixture("omp")
 
 
 class RealTmuxTests(unittest.TestCase):

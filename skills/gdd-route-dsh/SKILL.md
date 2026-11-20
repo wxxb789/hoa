@@ -6,7 +6,7 @@ description: >-
   work, must be resumed, stopped or recovered, or its launcher needs configuring. Not for the
   delivery protocol (`gdd`) or OMP runs (`gdd-route-omp`).
 metadata:
-  revision: "4"
+  revision: "5"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "dispatch and supervise a GDD stage on dsh headless: session/worktree rules, completion judgement, recovery, harness traps (requires skill `gdd`)"
@@ -22,7 +22,8 @@ the permission policy, not by the working directory: with the default `workspace
 whose harness enforces a sandbox, writes inside the policy's boundary succeed and writes outside it are
 denied; `--cwd` only selects the run's working directory. Changing the profile or `DSH_PERMISSION_MODE`
 changes that boundary, so re-confirm it before dispatching (see "Harness facts that bite"). The protocol
-stays in `gdd`; see [DSH route specifics](../gdd/references/transport.md#dsh-route-specifics).
+stays in [gdd](../gdd/SKILL.md), which this skill requires. Install both in the
+same skills root.
 
 ## When to Use
 
@@ -185,8 +186,12 @@ and has no such flags: `start` exits 1 with `start: --model is not supported on 
 changed for this one rather than silently overridden. `--max-time` is the runner's own deadline (exit
 124, `failed`).
 
-The runner is `../gdd/scripts/agent_run.py`; its `--help` is authoritative for the exact flag set, and
-`../gdd/scripts/tests/test_agent_run.py` (stub CLI, no network; the dsh rows) is its acceptance gate.
+The runner is `../gdd/scripts/agent_run.py`; its `--help` lists the installed routes.
+The route runs `dsh --profile PROFILE [extra flags] --json [--session-id ID]
+--permission-mode MODE --approval-policy never -` and reads the prompt from stdin.
+A detached run has no approval channel, so a tool call needing approval is rejected.
+The stage prompts for JSON results; this route has no native schema flag.
+The stub CLI acceptance tests are in `scripts/tests/test_dsh_route.py`.
 
 ## Cost notes (measured, one host)
 

@@ -93,14 +93,27 @@ live run. Real agent CLI smoke is opt-in via `GDD_SMOKE_AGENTS`.
 current interpreter; a Windows batch shim uses `%COMSPEC%` and is refused for
 metacharacters (`" & | < > ^ ( ) % !` or newlines).
 
-| CLI (verified version) | Input and options | Exit 0 also requires |
-|---|---|---|
-| OMP 18.22.0 | argv; `-p --mode=json --approval-mode yolo`; resume `-r` | Last assistant `stopReason` present and not error/aborted/length |
-| DSH | stdin; `--json --approval-policy never -`; resume `--session-id` | Final reason `completed` |
-| Codex 0.169.0 | stdin; `exec --json`, approval never, workspace-write with network; thinking maps to `model_reasoning_effort` | Last turn `turn.completed` |
-| Claude Code 2.1.326 | stdin; `-p --output-format stream-json --verbose --permission-mode bypassPermissions`; fresh UUID; thinking maps to `--effort` | `result` subtype success with `is_error: false` |
-| Pi 1.5.2 | stdin; `--mode json --no-approve` skips unapproved project-local files (not a sandbox); resume `--session` | Same marker as OMP |
-| OpenCode 2.3.0 | argv; `run --standalone --format json --auto`, private server; resume `-s`; thinking requires model (`MODEL#VARIANT`) | Last step reason stop, no error event |
+The runner discovers `gdd-route-*/scripts/route.py` beside the lexical path of
+the installed `gdd` skill. If the harness supplies the resolved path but a route
+is copied into the host's skills root, set `GDD_SKILLS_ROOT` to that host skills
+root. The environment overrides the gdd config file. Only that one root is
+scanned; `start` names it and lists its routes before refusing a missing route.
+
+Routes are optional, not part of gdd's install closure. New and upgrading
+users must add the selected route. Use the same host (`-a <agent>`) and scope
+as gdd. For the default route, use `npx skills add wxxb789/hoa -s gdd-route-omp`
+for a project install or `npx skills add wxxb789/hoa -g -s gdd-route-omp` for a
+global install. The generated index has the complete command for each route.
+`GDD_AGENT=claude` selects the `gdd-route-cc` package.
+
+Route documentation (configuration, input, and exit-0 success marker):
+
+- [gdd-route-omp](https://github.com/wxxb789/hoa/blob/main/skills/gdd-route-omp/SKILL.md)
+- [gdd-route-dsh](https://github.com/wxxb789/hoa/blob/main/skills/gdd-route-dsh/SKILL.md)
+- [gdd-route-codex](https://github.com/wxxb789/hoa/blob/main/skills/gdd-route-codex/SKILL.md)
+- [gdd-route-cc](https://github.com/wxxb789/hoa/blob/main/skills/gdd-route-cc/SKILL.md)
+- [gdd-route-pi](https://github.com/wxxb789/hoa/blob/main/skills/gdd-route-pi/SKILL.md)
+- [gdd-route-opencode](https://github.com/wxxb789/hoa/blob/main/skills/gdd-route-opencode/SKILL.md)
 
 - **End states:** stop is killed/143; signal exit codes are kept
   (`130/137/143/-2/-9/-15`). Max time ends the run as failed/124 with a
@@ -112,45 +125,31 @@ metacharacters (`" & | < > ^ ( ) % !` or newlines).
 - **Recovery:** once startup grace expires, a reader finalizes abandoned
   running state as failed/-1 with `stale_recovered`, or killed if stop was
   requested. Dispatcher and ledger liveness reads report stale without writing.
+  New runs keep a private snapshot of the validated route for detached startup
+  and event refolding even after uninstall. Keep `GDD_RUN_ROOT` in a trusted
+  location: these artifacts include executable route code. For old runs
+  without a snapshot, if the installed route is unavailable, the reader notes
+  that events could not be refolded and preserves answer and progress. Restore
+  the route to allow a later read to finish recovery.
 - **Events:** rotate to `events.1.ndjson` at half the limit. The current log's
   truncation marker appears after bytes have been dropped. An observer
   reading only the active segment treats counts as partial once any
   rotated segment exists. `tail` shows type and up to 160 characters of text.
-- **Results:** Codex uses `--output-schema`; Claude takes inline
-  `--json-schema` (use a native executable on Windows). Claude running as
-  root needs `IS_SANDBOX=1` for the permission mode above. Other routes
-  are prompted for JSON. Prefer structured output, then the whole answer as
+- **Results:** when a route does not use a native schema flag, the stage
+  prompts for JSON. Prefer structured output, then the whole answer as
   JSON, then its last JSON fence. Validation does not change run state;
   native rejection can fail the underlying turn. Keep a preceding report
   above the JSON in `answer.md` on native schema routes.
 
 | Setting | Default / scope |
 |---|---|
+| `GDD_SKILLS_ROOT` | lexical sibling skills root; environment then gdd config |
 | `GDD_RUN_DETACH` | `auto`; env then gdd config; also applies to the Paseo monitor |
 | `GDD_RUN_EVENTS_MAX_BYTES` | 8388608 |
 | `GDD_RUN_START_GRACE_SECONDS` | 60 |
 | `GDD_RUN_STOP_WAIT_SECONDS` | 20 |
 | `GDD_RUN_DRAIN_TIMEOUT_SECONDS` | 30 (at most 5 on stop); expiry marks `stream_incomplete` |
-| `DSH_RUN_PROFILE`, `DSH_PERMISSION_MODE`, `DSH_APPROVAL_POLICY` | `headless`, `workspace-write`, `never` (other approval values refused) |
-
-Retired environment keys warn; OMP accepts legacy `--backend` (warns) and
-`--profile`.
-
-### DSH route specifics
-
-`dsh --profile PROFILE [extra flags] --json [--session-id ID] --permission-mode MODE --approval-policy never -`
-reads `prompt.md` on stdin. The runner maps `--resume ID` to `--session-id ID`
-and accepts `start --session-id ID` as a resume alias. The cwd must be the
-session's recorded worktree; DSH refuses to resume it from another directory.
-
-`--approval-policy never` is required because a detached run has no approval
-channel; a tool call needing approval is rejected. The sandbox, when enforced
-by the host, sets the write boundary, not the cwd. See
-[gdd-route-dsh](../../gdd-route-dsh/SKILL.md) for the permission boundary.
-
-DSH drops inherited `DSH_PROFILE`, `DSH_PROFILE_DIR`, and `DSH_SESSION_ID`.
-Leave `GDD_MODEL` and `GDD_THINKING` unset: both flags are refused before a
-run directory is created, for example `start: --model is not supported on the DSH route`.
+Retired runner environment keys warn.
 
 ## Native Paseo adapter
 
