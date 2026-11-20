@@ -13,8 +13,8 @@ root-level source listed in SOURCES), and this vendoring pass copies it
 commit all updated copies together.
 
 Usage:
-    python scripts/vendor_shared.py           # copy shared/ → each consumer
-    python scripts/vendor_shared.py --check   # exit 1 on drift (CI)
+    uv run scripts/vendor_shared.py           # copy shared/ → each consumer
+    uv run scripts/vendor_shared.py --check   # exit 1 on drift (CI)
 """
 from __future__ import annotations
 
@@ -97,13 +97,13 @@ def main(argv=None) -> int:
                 # but is not a self-contained copy: an installed skill package
                 # would carry a dangling link. Fail in both modes.
                 print(f"vendor_shared: {dest} is a symlink; remove it and run "
-                      f"python scripts/vendor_shared.py", file=sys.stderr)
+                      "uv run scripts/vendor_shared.py", file=sys.stderr)
                 status = 1
                 continue
             if args.check:
                 if not dest.is_file() or digest(dest) != src_hash:
                     print(f"vendor_shared: {dest} is stale; run "
-                          f"python scripts/vendor_shared.py", file=sys.stderr)
+                          "uv run scripts/vendor_shared.py", file=sys.stderr)
                     status = 1
             else:
                 if dest.is_file() and digest(dest) == src_hash:

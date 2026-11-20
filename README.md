@@ -166,11 +166,14 @@ spec, acceptance-verdict, scope-seal). Every rule is enforced by that command:
 
 ### What CI runs
 
-CI (`.github/workflows/ci.yml`) has two jobs: `test` on Ubuntu and `gdd-runner` on Ubuntu, macOS,
-and Windows. Both run on every push to `main`, every pull request, and
-`workflow_dispatch`. There is no release job: `npx skills` installs straight from GitHub, so nothing
-is tagged or published. Each check is its own named step, so a failure names itself in the Actions
-UI; a newer push to a pull request cancels the older run.
+CI ([`ci.yml`](.github/workflows/ci.yml)) runs `test` on Ubuntu, plus `gdd-runner` and
+`gdd-observer` on each of Ubuntu, macOS, and Windows. It runs on pushes to `main`, pull requests,
+and `workflow_dispatch`. The `main` ruleset requires all seven job checks. There is no release
+job: `npx skills` installs straight from GitHub. Each check is its own named step, so a failure
+names itself in the Actions UI; a newer push to a pull request cancels the older run.
+
+The separate [`gdd-windows-stress.yml`](.github/workflows/gdd-windows-stress.yml) workflow runs
+guarded Windows lifecycle tests nightly and on manual dispatch. It is not a required check.
 
 | Job / Step | Command | Protects |
 |---|---|---|
@@ -182,7 +185,7 @@ UI; a newer push to a pull request cancels the older run.
 | PR bumps changed skills' revision (pull requests) | `python scripts/version.py check-revisions` | Every skill directory changed since the merge base raises its `metadata.revision`. |
 | pytest | `python -m pytest` | Every `test_*.py` unittest/pytest file under `scripts/`, `evals/` and `skills/` (`pytest.ini`); 120 s per test. |
 | Script checks | `python evals/run_trigger_evals.py`, `skills/define-goal/evals/validate_fixtures.py`, `skills/hermes-models/scripts/tests/test-*.py`, `skills/gdd/scripts/tests/test_verdict_matrix.py`, `mutate_verdict_matrix.py` | Standalone checks whose exit code is the contract; one step each. |
-| Paseo gdd-observer | `npm ci && npm run typecheck && npm test` in `paseo-plugins/gdd-observer` | The plugin's typecheck and Vitest suite. |
+| `gdd-observer` (Ubuntu, macOS, Windows) | `npm ci && npm run typecheck && npm test` in `paseo-plugins/gdd-observer` | The plugin's typecheck and Vitest suite. |
 | `gdd-runner` (Ubuntu, macOS, Windows) | `python -m pytest -q` on `test_agent_run.py`, `test_detach_supervisors.py`, `test_gdd.py`, `test_no_window.py`, `test_paseo_run_python.py`, and `test_watch_pr_checks.py` under `skills/gdd/scripts/tests/` | Cross-platform runner, detach supervisors, stage dispatch, console suppression, Paseo adapter, and PR watcher contracts. |
 
 Run the Python tests locally with

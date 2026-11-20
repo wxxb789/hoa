@@ -44,8 +44,7 @@ A standing constraint for naming a new skill and for renaming one. Visibility an
    `AGENTS.md` requires. The owner-approved explicit-only audit entries `hoa-practice-retro`
    (own usage history) and `hoa-repo-reckoning` (one repository's practices and machinery) use
    noun phrases with the `hoa-` prefix. The latter is a specific exception to the prefix scope,
-   not a precedent for unrelated repository skills. The owner-approved `hermes-ops-claim-verification`
-   name reflects its Hermes origin; its verification method remains runtime-agnostic.
+   not a precedent for unrelated repository skills. `hermes-ops-claim-verification` targets Hermes.
 6. **Banned words.** `work`, `do`, `handle`, `helper`, `utils`, `tools`, `misc`; a single generic word
    as the whole name; a verb that misdescribes the behaviour; superlatives (`best`, `ultimate`);
    numeric suffixes; implementation details (`cdp`, `headless`) in a new name. `workflow`,

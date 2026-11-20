@@ -40,7 +40,7 @@ Script paths resolve against the skill directory, the file holding them,
 `<placeholder>/` or `~/`.
 
 Usage:
-    python scripts/check_skill_links.py
+    uv run scripts/check_skill_links.py
 
 Exit codes: 0 every sibling reference and script command is valid, 1 at least one error.
 """

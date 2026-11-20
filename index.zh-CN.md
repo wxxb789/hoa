@@ -6,7 +6,7 @@
 `areas` 和 `targets` 打标签——因为一个 artifact 常同时服务多个 area 或 runtime，
 而目录表达不了这一点。
 
-> 由 `python scripts/generate_index.py` 生成——目录表不要手改。skill 请修改 YAML
+> 由 `uv run scripts/generate_index.py` 生成——目录表不要手改。skill 请修改 YAML
 > frontmatter 中的 `metadata.areas`、`metadata.targets`；库文件仍修改
 > `<!-- index: ... -->` 注释。
 
@@ -48,7 +48,7 @@ targets:  runtime-agnostic | repo-only |
 | hermes-kanban | skill | work-management,software-development | hermes | `skills/hermes-kanban/` | 多卡片看板工作：拆解、并行派发、评审门禁、卡住任务恢复 |
 | hermes-models | skill | software-development | hermes | `skills/hermes-models/` | 配置 Hermes provider、传输与路由；用实时信号证明路由，而非 `config get` |
 | hermes-models-cutover | skill | software-development | hermes | `skills/hermes-models-cutover/` | 跨 Hermes home 与 harness 切换供应商路由，实时验证并保留回滚 |
-| hermes-ops-claim-verification | skill | software-development,work-management | runtime-agnostic | `skills/hermes-ops-claim-verification/` | 把定时任务、修复或部署的说法变成证据：找准记录面、区分手动与调度运行、审查审计者 |
+| hermes-ops-claim-verification | skill | software-development,work-management | hermes | `skills/hermes-ops-claim-verification/` | 验证 Hermes 定时任务、修复或部署的说法：找准记录面、区分手动与调度运行、审查审计者 |
 | hermes-runtime-repairs | skill | software-development,work-management | hermes | `skills/hermes-runtime-repairs/` | 修模板/生成器、验证暂存产物，再部署并回读线上运行时 |
 | hermes-updates | skill | software-development | hermes | `skills/hermes-updates/` | 升级运行中的 Hermes 并诊断漂移：快照、官方更新器、更新后检查、故障索引 |
 | hoa-practice-retro | skill | self-management,work-management | runtime-agnostic | `skills/hoa-practice-retro/` | 定期复盘负责人跨仓库、会话与记忆的工程实践：应停止的习惯、未执行的决定、未知的未知，每条都有两个独立来源 |

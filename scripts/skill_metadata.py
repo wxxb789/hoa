@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Read custom-skill catalog metadata from SKILL.md YAML frontmatter.
 
 PyYAML supplies the parsed nodes, so duplicate, merge and aliased keys are

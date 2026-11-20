@@ -1,3 +1,8 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.13"
+# dependencies = []  # pytest pins come from scripts/requirements.txt: pass --with-requirements
+# ///
 """Repeat a focused lifecycle suite in fresh guarded Windows interpreters."""
 
 import argparse
@@ -30,6 +35,7 @@ CASES = (
     "test_gdd.py::LaunchTests::test_live_run_blocks_and_stale_run_does_not",
     "test_paseo_run_python.py::PaseoLauncherTests::test_monitor_finalizes_without_status_and_answer_is_last_assistant",
     "test_paseo_run_python.py::PaseoLauncherTests::test_missing_state_file_is_unknown_even_with_an_agent_lock",
+    "test_paseo_run_python.py::PaseoLauncherTests::test_deleting_finalized_agent_preserves_historical_outcome",
 )
 
 
