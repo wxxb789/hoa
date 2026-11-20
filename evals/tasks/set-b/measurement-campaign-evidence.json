@@ -1,0 +1,19 @@
+{
+  "id": "measurement-campaign-evidence",
+  "skill": "measurement-campaign-evidence",
+  "fixture": "fixtures/measurement-campaign-evidence",
+  "prompt": "The release chair needs a decision on the Parcel Shelf report before it is circulated. Use the archived evidence only; do not launch anything. Return bare JSON with campaign_usable (boolean), off_candidate_reports (sorted report IDs), pilot_delta_ms (object mapping each workload in pilot-candidate.csv to the publishable candidate-minus-legacy p50 latency in ms, or null when no such comparison is warranted), and rerun_controls (sorted control IDs for the next lab slot). You may add decision_note for the chair.",
+  "terse": "Treat measurements as evidence for a specific artifact and claim. Check the underlying records and distinguish results that support the decision from results that need new evidence.",
+  "shell": ["codex"],
+  "rubric": {
+    "campaign-decision": {"field": "campaign_usable", "equals": false},
+    "off-candidate": {"field": "off_candidate_reports", "equals": ["run-214"]},
+    "publishable-deltas": {"field": "pilot_delta_ms", "equals": {"aisle-320": 4, "aisle-2400": null}},
+    "affected-control-set": {"field": "rerun_controls", "equals": ["backlog-128", "backlog-64", "backlog-96"]}
+  },
+  "notes": {
+    "identity": {"anchor": "§1 Bind the candidate before measuring", "checks": ["campaign-decision", "off-candidate"], "trap": "Identical version and tarball references mask one divergent installed payload; the claimed set cannot be aggregated.", "mutant": {"campaign_usable": true, "off_candidate_reports": []}},
+    "clock-and-shape": {"anchor": "§3 Comparators that cannot satisfy the oracle / Clock origin", "checks": ["publishable-deltas"], "trap": "Subtract legacy page-clock median from candidate driver median and publish a single sample as a comparable median.", "mutant": {"pilot_delta_ms": {"aisle-320": 110, "aisle-2400": 118}}},
+    "control-rerun": {"anchor": "§5 Accepting someone else's campaign", "checks": ["affected-control-set"], "trap": "Retry just the visibly broken control after repairing the result reader, rather than all controls using it.", "mutant": {"rerun_controls": ["backlog-128"]}}
+  }
+}

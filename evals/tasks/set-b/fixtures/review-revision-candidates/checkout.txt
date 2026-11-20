@@ -1,0 +1,4 @@
+desk export 2026-10-18T17:28:00Z
+baseline HEAD 2d6c3e1
+target diff --stat: empty
+ M desk/review.md (reviewer work, exported separately as review.md)

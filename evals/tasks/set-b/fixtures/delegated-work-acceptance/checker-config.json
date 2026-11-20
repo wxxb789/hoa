@@ -1,0 +1,9 @@
+{
+  "version": "intake-checker/3",
+  "group_by": ["branch", "leaf"],
+  "keep": {"state": "active", "channel": "intake"},
+  "prefer": "max revision",
+  "suppress": [{"branch": "west", "leaf": "beacon", "ticket": "Q-088"}],
+  "receipt_join": ["branch", "leaf"],
+  "receipt_status": "issued"
+}

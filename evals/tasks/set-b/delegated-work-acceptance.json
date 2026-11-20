@@ -1,0 +1,21 @@
+{
+  "id": "delegated-work-acceptance",
+  "skill": "delegated-work-acceptance",
+  "fixture": "fixtures/delegated-work-acceptance",
+  "prompt": "The North Quay intake worker says batch 18 is ready for sign-off. Review the saved handoff packet and give the release desk a read-only acceptance record; these exports are all you have. Return one bare JSON object: eligible_total and missing_total (integers); missing_keys (sorted list of branch/leaf strings); increment_paths and operator_paths (sorted path lists for the batch increment and dirty-path ownership decisions, respectively); unproven_cases (sorted IDs from request.md for gate cases you cannot sign off). You may also include a short reason under decision_note. Do not repair anything.",
+  "terse": "Treat the worker's completion report as a claim. Independently validate the delivery against the request and its evidence, then distinguish what you can accept from what must go back to the worker or operator.",
+  "shell": ["codex"],
+  "rubric": {
+    "eligible-population": {"field": "eligible_total", "equals": 13},
+    "missing-count": {"field": "missing_total", "equals": 4},
+    "missing-keys": {"field": "missing_keys", "equals": ["east/ferry", "north/sluice", "south/lock", "west/ferry"]},
+    "increment-paths": {"field": "increment_paths", "equals": ["audit/b18.json", "intake/aliases.csv", "intake/normalize.ts"]},
+    "ownership-stop": {"field": "operator_paths", "equals": ["intake/aliases.csv"]},
+    "operational-proof": {"field": "unproven_cases", "equals": ["apply-rollback", "apply-success"]}
+  },
+  "notes": {
+    "population": {"anchor": "§2 Re-derive every number that the deliverable depends on", "checks": ["eligible-population", "missing-count", "missing-keys"], "trap": "Count the worker's slug-collapsed view instead of the checker's composite inventory with its own exclusions.", "mutant": {"eligible_total": 7, "missing_total": 2, "missing_keys": ["north/sluice", "south/lock"]}},
+    "ownership": {"anchor": "§0.6 The working increment is a path set, not a document hash", "checks": ["increment-paths", "ownership-stop"], "trap": "Subtract all paths already dirty at intake, losing the overlapping write and its operator stop.", "mutant": {"increment_paths": ["audit/b18.json", "intake/normalize.ts"], "operator_paths": []}},
+    "coverage": {"anchor": "§1 Verify from the diff, not from the receipt, item 8", "checks": ["operational-proof"], "trap": "Accept the all-green suite without inspecting invocation modes and rollback's surviving revert run.", "mutant": {"unproven_cases": []}}
+  }
+}

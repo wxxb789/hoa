@@ -1,0 +1,28 @@
+{
+  "id": "review-revision-candidates",
+  "skill": "review-revision-candidates",
+  "fixture": "fixtures/review-revision-candidates",
+  "prompt": "The bulletin desk needs Rainline candidate v4 from the saved review packet. Its preview intake accepts a single bare JSON object, not a patch attachment. Supply schedule, counts and access as the complete replacement JSON objects for the corresponding files in baseline/; the desk will build the patch from those bytes. Include baseline_id and, if useful, anchors with the review item and evidence locators. Do not edit the packet or apply the candidate.",
+  "terse": "Build a new candidate from the pristine baseline using the current review as the change boundary. Keep the rejected version and baseline untouched; deliver reviewable bytes with evidence anchors.",
+  "shell": ["codex"],
+  "rubric": {
+    "schedule-candidate": {"field": "schedule", "equals": {"service": "Rainline", "start": "2026-10-19", "updated": "2026-10-02", "route_label": "Quay Circut", "friday_extra": false}},
+    "counts-candidate": {"field": "counts", "equals": {
+      "prior": {"period": "2024-Q4", "value": 812, "source": "BR-14/p3", "measure": "unverified"},
+      "current": {"period": "2026-Q3", "value": 529, "source": "OPS-62/t2", "measure": "completed duty blocks"},
+      "relationship": "not_comparable"
+    }},
+    "access-candidate": {"field": "access", "equals": {
+      "index": "listed",
+      "attempt": {"client": "desk-preview/4", "date": "2026-10-18", "path": "/documents/appendix-g.pdf", "http_status": 403},
+      "alternative": "CL-9/a2",
+      "filed": "unverified",
+      "filing_requirement": "unverified"
+    }}
+  },
+  "notes": {
+    "amendment-and-scope": {"anchor": "§1 Re-read the governing files at the start of every round; §2 Treat the numbered list as the sole change set; §3 Versioning", "checks": ["schedule-candidate"], "trap": "Carry forward an express but withdrawn instruction from forwarded review mail or inherit unrelated edits from v3.", "mutant": {"schedule": {"service": "Rainline", "start": "2026-10-19", "updated": "2026-10-18", "route_label": "Quay Circuit", "friday_extra": true}}},
+    "measurement-definition": {"anchor": "§4 Pre-resubmit self-review: Downgrade cross-caliber inferences; Do not relabel inherited numbers", "checks": ["counts-candidate"], "trap": "Remove the explicit decline but silently preserve the old count as headcount.", "mutant": {"counts": {"prior": {"period": "2024-Q4", "value": 812, "source": "BR-14/p3", "measure": "headcount"}, "current": {"period": "2026-Q3", "value": 529, "source": "OPS-62/t2", "measure": "completed duty blocks"}, "relationship": "not_comparable"}}},
+    "access-attribution": {"anchor": "§4 Pre-resubmit self-review: Attribute access failures to the run, not the resource", "checks": ["access-candidate"], "trap": "Conflate the direct URL denial with delisting, no public copy, and nonfiling.", "mutant": {"access": {"index": "delisted", "attempt": {"client": "desk-preview/4", "date": "2026-10-18", "path": "/documents/appendix-g.pdf", "http_status": 403}, "alternative": null, "filed": "no", "filing_requirement": "unverified"}}}
+  }
+}

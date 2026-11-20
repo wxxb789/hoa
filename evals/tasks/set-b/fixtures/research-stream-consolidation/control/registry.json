@@ -1,0 +1,7 @@
+{
+  "delta": {
+    "capture": "staging/delta/capture.json",
+    "sha256": "3e63861fedee8cc19a9e22cd294c5e5f592196c5fa4ec7f3cd703b2b83966ce0"
+  },
+  "encoding": "The digest is SHA-256 of the UTF-8 capture file with LF and one final newline. The capture is one compact JSON line with keys in the existing order; change only the artifact value. The validator opens capture by locator, verifies its digest, then opens capture.artifact relative to repo root."
+}

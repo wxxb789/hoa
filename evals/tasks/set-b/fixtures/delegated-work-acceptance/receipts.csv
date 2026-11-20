@@ -1,0 +1,13 @@
+branch,leaf,status,ticket
+east,bridge,issued,Q-102
+east,cut,issued,Q-103
+north,ferry,issued,Q-112
+north,stairs,issued,Q-114
+north,canal,issued,Q-115
+south,bridge,issued,Q-121
+south,lock,void,Q-122
+south,stairs,issued,Q-123
+south,cut,issued,Q-124
+west,stairs,issued,Q-131
+west,canal,issued,Q-132
+east,beacon,issued,Q-141
