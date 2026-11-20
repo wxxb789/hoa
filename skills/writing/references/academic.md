@@ -6,8 +6,8 @@ For papers, sections, abstracts, reviews, related-work, rebuttals.
 - **Full paper:** abstract → intro (gap + contribution, stated explicitly) → related work →
   method → experiments/results → limitations → conclusion → (refs).
 - **Single section:** claim → evidence → method/derivation → limitation/threat to validity.
-- **Abstract (≈150–250w):** context (1–2 sentences) → gap → what we do → key result with a
-  number → significance. No citations in the abstract.
+- **Abstract:** context, gap, method, main result, and significance. Follow the venue's
+  word budget and rules for citations.
 
 ## Tone
 - Precise, hedged, impersonal-ish. "We show that…", "results suggest…", "this indicates…".

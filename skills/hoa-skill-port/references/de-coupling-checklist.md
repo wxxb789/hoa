@@ -1,4 +1,4 @@
-# De-coupling checklist — five axes
+# De-coupling checklist (2026-11-21)
 
 Each row is a concrete transform. The left column is what a private runtime produces; the right is
 what survives publication. Anything you cannot move to the right column stays local and the public
@@ -31,7 +31,7 @@ Why it also improves the skill: a protocol written around roles states *what* mu
 |---|---|
 | `~/private-root/tools/x.py` | `<package>/scripts/x.py`, resolved from the script's own location |
 | `~/private-root/tasks/...` for state | `${XDG_STATE_HOME:-$HOME/.local/state}/<tool>/...`, overridable by env |
-| a hardcoded template dir inside another skill | script-relative sibling (`<script>/../references/<kind>/`) plus one override env var |
+| a hardcoded template dir inside another skill | package-relative asset plus an override only when the caller must supply another template |
 | an absolute checkout path in a command | `<repo>` placeholder plus a documented `*_REPO` env var |
 | tool silently defaults to the author's model | no default; pass a flag only when the caller supplies it |
 
@@ -53,9 +53,9 @@ and a lock or session id that makes a dead run detectable.
 
 | Private shape | Publishable shape |
 |---|---|
-| a review-bot marker string compiled in | `--marker TEXT`; a repo without a bot must pass an explicit opt-in flag |
+| a review-bot marker string compiled in | `--marker TEXT`; skipping a required check needs an explicit, authorized opt-out |
 | model id / effort pairing in code | documented pairing guidance, values passed by the caller |
-| internal bot handle in prose | "the repo's review bot", with the handle as a labelled example |
+| internal bot handle in prose | "the repo's review bot", with no internal handle in the package |
 | an absolute wrapper path as default | default resolved from the package, overridable by env |
 | a timeout or size cap as a literal | config key with a documented default (e.g. `24` hours, `20` MB) |
 | a private host or port in an endpoint | `<proxy-base-url>` resolved from config |
@@ -64,7 +64,7 @@ and a lock or session id that makes a dead run detectable.
 
 | Private shape | Publishable shape |
 |---|---|
-| one profile per real repo | `references/profiles/_template.md` public; instances in `private/profiles/<repo>.md` |
+| one profile per real repo | publish a template; keep instances outside the distributable package |
 | customer names, internal gate lists, API baselines | never published; profiles describe them locally only |
 | personal notes inside a reference file | drop, or rewrite as a generic decision rule |
 | a private repo named as "the example" | `<project>` placeholder, with the shape of the real thing kept |
@@ -72,21 +72,16 @@ and a lock or session id that makes a dead run detectable.
 Verify the ignore rule instead of assuming it:
 
 ```bash
-git check-ignore -v <package>/private/profiles/*.md   # must print the rule that matches
+git check-ignore -v <repo-relative-private-profile>   # must print the rule that matches
 ```
 
-A `**/private/` rule in the repo's `.gitignore` lets the private instances live *inside* the publishable
-package — one directory, no second copy, and package consumers simply never see them.
+Check the tracked or staged files and the actual distribution file list too: an ignore rule
+does not untrack a file and does not protect a private file copied by another packager.
 
 ## Release-blocking scan
 
-Keep the patterns in one config-readable list (`PORTING_SCAN_PATTERNS` or the package's own scan
-file) rather than retyping them per release. A workable default set:
-
-```bash
-grep -rniE '(/home/|~/(<private-root>|\.<runtime-dir>)|<username>|<private-repo>|sk-|ghp_|AKIA[0-9A-Z]{8}|@[a-z0-9.-]+\.(com|cn|io))' \
-  <package> --include=*.md --include=*.py --include=*.sh | grep -v '/private/'
-```
-
-Expected hits: fixture emails at `example.com`, public product names. Anything else is a fix, not a
-note. Run the scan before the port report, so the report's demotion table and the grep agree.
+Use one reviewed pattern list from the destination, or supply one for the port. Scan the
+distribution inputs for absolute user paths, private identifiers, hostnames, model IDs,
+mail addresses and credential prefixes. Review hits against a documented allowlist of
+public names and synthetic fixtures. An unexpected hit blocks release; do not exempt a
+directory merely because its name is `private`.

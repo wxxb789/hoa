@@ -63,8 +63,8 @@ targets:  runtime-agnostic | repo-only |
 | hoa-practice-retro | skill | self-management,work-management | runtime-agnostic | `skills/hoa-practice-retro/` | periodic retro on the owner's own engineering practice across repos, sessions and memory: habits to stop, decisions never executed, unknown unknowns, each with two independent origins |
 | hoa-repo-reckoning | skill | software-development,work-management | runtime-agnostic | `skills/hoa-repo-reckoning/` | explicit shortcut for a read-only repository review: what should stop and what the owner needs to know |
 | hoa-skill-create | skill | software-development,work-management,self-management | runtime-agnostic | `skills/hoa-skill-create/` | directly create, evolve or compose a defined skill with focused, risk-scaled validation |
-| hoa-skill-curate | skill | software-development,self-management | runtime-agnostic | `skills/hoa-skill-curate/` | trace installed skills' provenance and upstream freshness, apply the upstream-retirement rule, and execute only owner-confirmed library changes |
-| hoa-skill-port | skill | software-development,work-management | runtime-agnostic | `skills/hoa-skill-port/` | de-couple a private skill for publication: canonical side, five axes, config resolution, catalog/CI validation, branch-and-PR release |
+| hoa-skill-curate | skill | software-development,self-management | runtime-agnostic | `skills/hoa-skill-curate/` | trace installer provenance, separate content drift from upstream activity, and execute only owner-confirmed library changes |
+| hoa-skill-port | skill | software-development,work-management | runtime-agnostic | `skills/hoa-skill-port/` | make a shared repo canonical for a private skill: externalize environment values, verify destination gates, and separate live swap from publication |
 | hoa-skill-review | skill | software-development,work-management,self-management | runtime-agnostic | `skills/hoa-skill-review/` | review skill behavior and changes against consumer evidence without editing the target |
 | hoa-skill-set-audit | skill | software-development,self-management | runtime-agnostic | `skills/hoa-skill-set-audit/` | audit the whole offered skill set: per-skill quality, overlap, shadowing, contradictions, same-name drift, visibility, ../ closure, listing budget; report-only |
 | measurement-campaign-evidence | skill | software-development,work-management | runtime-agnostic | `skills/measurement-campaign-evidence/` | bind the candidate, measure serially, keep one report set, never let a comparator fake a latency |
@@ -77,7 +77,7 @@ targets:  runtime-agnostic | repo-only |
 | spec-convergence | skill | software-development | runtime-agnostic | `skills/spec-convergence/` | converge an unclear request into a confirmed spec: one root concern per round, a capped number of questions per round, every question backed by the fact that makes it real, explicit shared-understanding confirmation before writing |
 | structural-validity-gates | skill | software-development | runtime-agnostic | `skills/structural-validity-gates/` | a two-sided integrity gate: reject the broken, accept every legal construct; probe both sides before shipping |
 | tmux-agent-control | skill | software-development,work-management | runtime-agnostic | `skills/tmux-agent-control/` | drive a live TUI agent in tmux: find the pane, prove idle, send one complete instruction |
-| writing | skill | work-management,self-management | runtime-agnostic | `skills/writing/` | per-channel prose contracts behind one content-first layer: blog, academic, X, Reddit, 小红书, 公众号, tutorial, changelog; plus a measurable AI-smell audit |
+| writing | skill | work-management,self-management | runtime-agnostic | `skills/writing/` | draft and verify publishable prose for its audience and channel; use style measurements as diagnostics, not quotas |
 | skill-scout | agent | software-development,work-management | repo-only | `agents/skill-scout.md` | read-only search for an existing skill when asked to check before authoring; never create one |
 | typed-verification-gates | orchestration | software-development | repo-only | `orchestration/typed-verification-gates.md` | every loop iteration ends at a gate typed programmatic / judge / human, declared before the work |
 | ado-commit-push-pr | prompt | software-development | repo-only | `prompts/ado-commit-push-pr.md` | one-shot commit → push → PR request for Azure DevOps or GitHub, with house conventions and az/gh pitfalls |
@@ -102,6 +102,7 @@ below. A skill without a row has no dependencies: `npx skills add wxxb789/hoa -g
 
 | Skill | Needs (transitive `../` closure) | Install command |
 |---|---|---|
+| evidence-backed-analytical-writing | evidence-boundary-discipline | `npx skills add wxxb789/hoa -g -s evidence-backed-analytical-writing -s evidence-boundary-discipline -y` |
 | gdd | delegated-work-acceptance | `npx skills add wxxb789/hoa -g -s gdd -s delegated-work-acceptance -y` |
 | gdd-route-cc | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-cc -s delegated-work-acceptance -s gdd -y` |
 | gdd-route-codex | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-codex -s delegated-work-acceptance -s gdd -y` |
