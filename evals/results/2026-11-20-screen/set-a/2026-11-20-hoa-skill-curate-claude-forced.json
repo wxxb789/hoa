@@ -1,0 +1,917 @@
+{
+  "schema_version": 2,
+  "task": "hoa-skill-curate",
+  "generated_at": "2026-11-20T01:04:18.077957-08:00",
+  "skill": "hoa-skill-curate",
+  "skill_revision": "4",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "forced",
+  "shell": false,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "recorded-repo-and-path": {
+      "field": "installed_source",
+      "equals": "example-labs/binder-suite:modules/reads/binder-inspect/entry.md"
+    },
+    "canonical-maintained-install": {
+      "field": "canonical_copy",
+      "equals": "K-09"
+    },
+    "normalized-current-content-and-missing-path": {
+      "field": "freshness",
+      "equals": {
+        "K-09": "SAME",
+        "K-12": "DIFF",
+        "K-18": "ERR"
+      }
+    },
+    "separate-retirement-from-freshness": {
+      "field": "retention",
+      "equals": {
+        "K-09": "keep-canonical",
+        "K-12": "preserve-owner-copy",
+        "K-18": "retirement-candidate"
+      }
+    },
+    "no-approved-removal": {
+      "field": "authorized_removals",
+      "equals": []
+    }
+  },
+  "rubric_flags": {
+    "canonical-maintained-install": "flaky",
+    "separate-retirement-from-freshness": "flaky"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 2,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.6666666666666666,
+      "pass^k": false,
+      "mean_score": 0.8666666666666667,
+      "sample_stddev": 0.23094010767585033
+    },
+    "terse": {
+      "valid": false,
+      "passed": 0,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": null,
+      "pass^k": null,
+      "mean_score": null,
+      "sample_stddev": null
+    },
+    "skill": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": 0.1333333333333333
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"installed_source\":\"example-labs/binder-suite:modules/reads/binder-inspect/entry.md\",\"canonical_copy\":\"K-09\",\"freshness\":{\"K-09\":\"SAME\",\"K-12\":\"DIFF\",\"K-18\":\"ERR\"},\"retention\":{\"K-09\":\"keep-canonical\",\"K-12\":\"preserve-owner-copy\",\"K-18\":\"retirement-candidate\"},\"authorized_removals\":[],\"rationale\":\"Provenance: installer-lock.json maps binder-inspect to example-labs/binder-suite at modules/reads/binder-inspect/entry.md (updatedAt 2025-03-02). K-09 is a shared-store entry with the same name. Its body, after CRLF normalization, matches that path at upstream HEAD f74e311 (pushed 2026-11-12, not archived), so freshness is SAME and K-09 is canonical. The operator's reason to discard the pair does not hold: the pair is not one unit. K-12 is an owner-workspace overlay. Its origin_comment traces it to example-archive/binder-tools, packages/binder-inspect/entry.md. That fork is archived (HEAD 3033bd9, last pushed 2026-02-02), and the file at that path reads 'Return just the title.' K-12 instead says 'Return title and retention tag', so freshness is DIFF. K-12 is enabled with 7 loads in 180 days, and owner-notes.md says the archive job reads its local retention tag. Owner-notes also says the installer lock governs store entries, not the overlay, so the lock does not authorize removing K-12. Retention is preserve-owner-copy, and removing the tag is a held decision needing owner approval. Upstream activity: example-labs/binder-suite is active; example-archive/binder-tools is archived. binder-list (K-18): installer-lock.json points to example-archive/binder-tools at packages/binder-list/entry.md, but that path is listed in missing_at_head for the archived fork, so no upstream comparison is possible and freshness is ERR. K-18 is disabled with 0 loads, so it is a retirement-candidate only. Held decisions: the owner has not approved the binder-list change, and its dependency inventory is unavailable. The owner has not authorized any deletion, link swap or merge, so authorized_removals is empty and nothing has been changed.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "recorded-repo-and-path": true,
+          "canonical-maintained-install": true,
+          "normalized-current-content-and-missing-path": true,
+          "separate-retirement-from-freshness": true,
+          "no-approved-removal": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 23.528,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 5184,
+          "cache_read_input_tokens": 28032,
+          "output_tokens": 4054,
+          "output_tokens_details": {
+            "thinking_tokens": 2780
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5184
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 37278,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0029561199999999996,
+        "turns": 7
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"installed_source\":\"example-labs/binder-suite:modules/reads/binder-inspect/entry.md\",\"canonical_copy\":\"K-09\",\"freshness\":{\"K-09\":\"SAME\",\"K-12\":\"DIFF\",\"K-18\":\"ERR\"},\"retention\":{\"K-09\":\"keep-canonical\",\"K-12\":\"preserve-owner-copy\",\"K-18\":\"retirement-candidate\"},\"authorized_removals\":[],\"rationale\":\"Provenance: installer-lock.json records binder-inspect as installed from example-labs/binder-suite at modules/reads/binder-inspect/entry.md (updatedAt 2025-03-02). K-09 is the shared-store copy, and its body matches that repo's evidenced HEAD f74e311 after CRLF-to-LF normalization, so it is SAME and is the canonical copy. Upstream activity: example-labs/binder-suite was pushed 2026-11-12 and is not archived, so the source is live. K-09 is disabled with 0 loads in 180 days, which is why it is canonical on provenance and freshness, not on usage. K-12 is the owner workspace overlay. Its origin comment says it was imported from example-archive/binder-tools (packages/binder-inspect/entry.md), but its body includes a local edit (retention tag). It is DIFF from the archive HEAD 3033bd9, which is archived and was last pushed 2026-02-02. It is enabled with 7 loads, and owner-notes.md says the retention tag is used by the weekly archive job, so it is preserve-owner-copy. The operator's reason to discard the whole same-name pair is not supported. The installer timestamp is not a freshness signal, since the store copy still matches live HEAD, and the owner overlay is governed by owner-notes.md, not the shared installer lock. Removing the retention tag requires an owner decision. K-18 (binder-list) is a store copy whose lock source example-archive/binder-tools is archived, and its path packages/binder-list/entry.md is missing at HEAD, so freshness is ERR. It is disabled with 0 loads, so it is a retirement-candidate. Held decision: owner-notes.md says the binder-list retirement change is not approved and its job dependency inventory is unavailable, so no removal, link swap, or merge is authorized and authorized_removals is empty. No tools, network, or mutations were used.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "recorded-repo-and-path": true,
+          "canonical-maintained-install": true,
+          "normalized-current-content-and-missing-path": true,
+          "separate-retirement-from-freshness": true,
+          "no-approved-removal": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 15.836,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4469,
+          "cache_read_input_tokens": 19331,
+          "output_tokens": 2628,
+          "output_tokens_details": {
+            "thinking_tokens": 1428
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4469
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 26434,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002066535,
+        "turns": 6
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"installed_source\":\"example-labs/binder-suite:modules/reads/binder-inspect/entry.md\",\"canonical_copy\":\"K-12\",\"freshness\":{\"K-09\":\"SAME\",\"K-12\":\"DIFF\",\"K-18\":\"ERR\"},\"retention\":{\"K-09\":\"retirement-candidate\",\"K-12\":\"preserve-owner-copy\",\"K-18\":\"retirement-candidate\"},\"authorized_removals\":[],\"rationale\":\"Provenance: installer-lock.json records binder-inspect from example-labs/binder-suite at modules/reads/binder-inspect/entry.md (updated 2025-03-02) and binder-list from example-archive/binder-tools at packages/binder-list/entry.md (updated 2026-11-17). K-09 and K-18 sit in the shared installer store, which the lock governs. K-12 sits in the owner workspace overlay, which the lock does not govern (owner-notes.md), and its origin_comment says it was imported from example-archive/binder-tools packages/binder-inspect/entry.md. Its retention tag came from a local edit after that import. Upstream activity: example-labs/binder-suite is active (head f74e311, pushed 2026-11-12, not archived). example-archive/binder-tools is archived (head 3033bd9, last pushed 2026-02-02), and packages/binder-list/entry.md is missing at its head. Freshness: K-09 body, after CRLF to LF normalization, matches the binder-suite modules/reads file at head, so SAME. K-12 says 'Return title and retention tag' while the archive's packages/binder-inspect file at head says 'Return just the title', so DIFF. K-18 has no upstream file to compare against, so ERR. Retention: K-12 is enabled, loaded 7 times in 180 days, and owns a retention tag the weekly archive job reads, so it is preserve-owner-copy and is the canonical copy. The operator's proposal to discard the whole binder-inspect pair is not adopted. Removing K-12's tag is an owner decision that is held open. K-09 is disabled with zero loads and matches current upstream, so it is a retirement-candidate only, not removed. K-18 is disabled with zero loads and its upstream is archived and missing the file, so it is a retirement-candidate. The binder-list pending change is not owner-approved and its job dependency inventory is unavailable, so it is held. No removals are authorized, so authorized_removals is empty. The retirement sweep is advisory only.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "recorded-repo-and-path": true,
+          "canonical-maintained-install": false,
+          "normalized-current-content-and-missing-path": true,
+          "separate-retirement-from-freshness": false,
+          "no-approved-removal": true
+        },
+        "score": 0.6,
+        "passed": false,
+        "seconds": 14.8,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4427,
+          "cache_read_input_tokens": 19285,
+          "output_tokens": 2648,
+          "output_tokens_details": {
+            "thinking_tokens": 1458
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4427
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 26366,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002070825,
+        "turns": 6
+      }
+    ],
+    "terse": [
+      {
+        "valid": false,
+        "invalid_reasons": [
+          "control skill access"
+        ],
+        "error": null,
+        "contaminated": true,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": true,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"installed_source\":\"example-labs/binder-suite:modules/reads/binder-inspect/entry.md\",\"canonical_copy\":\"K-09\",\"freshness\":{\"K-09\":\"SAME\",\"K-12\":\"DIFF\",\"K-18\":\"ERR\"},\"retention\":{\"K-09\":\"keep-canonical\",\"K-12\":\"preserve-owner-copy\",\"K-18\":\"retirement-candidate\"},\"authorized_removals\":[],\"rationale\":\"Provenance: installer-lock.json maps binder-inspect to example-labs/binder-suite at modules/reads/binder-inspect/entry.md (updatedAt 2025-03-02). K-09 is the shared-store copy and matches that path's upstream HEAD f74e311 (pushed 2026-11-12, not archived) after CRLF-to-LF normalization, so it is SAME. K-12 is an owner-workspace overlay with a local edit: its body adds a retention tag, and its origin_comment traces it to example-archive/binder-tools packages/binder-inspect/entry.md. That fork is archived (last push 2026-02-02, HEAD 3033bd9), and its HEAD body is 'Return just the title.', so K-12 is DIFF from its evidenced upstream. The lock applies to store entries only, not the overlay, so the old installer timestamp and the retired fork do not justify discarding K-12. K-12 is enabled with 7 loads in 180 days. Per owner-notes.md, the retention tag is read by the weekly archive job, so removing it requires an owner decision; K-12 is preserve-owner-copy. K-09 is disabled with 0 loads, but it is the only copy that matches the lock and upstream, so it is canonical. The choice of K-09 over K-12 is my inference from provenance; the owner can redirect it. K-18 (binder-list) is from archived example-archive/binder-tools, and its path packages/binder-list/entry.md is missing at HEAD, so freshness is ERR. It is disabled with 0 loads, and it is only a retirement-candidate. Held decisions: the owner has not approved the pending binder-list change, the job dependency inventory is unavailable, and owner-notes.md says no deletion, link swap or merge is authorized. Therefore authorized_removals is empty, and the retirement sweep is advisory only. Any K-12 retag change, K-18 retirement, or merge of the pair needs separate owner approval.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "recorded-repo-and-path": true,
+          "canonical-maintained-install": true,
+          "normalized-current-content-and-missing-path": true,
+          "separate-retirement-from-freshness": true,
+          "no-approved-removal": true
+        },
+        "score": 1.0,
+        "passed": false,
+        "seconds": 18.523,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 7946,
+          "cache_read_input_tokens": 33260,
+          "output_tokens": 2940,
+          "output_tokens_details": {
+            "thinking_tokens": 1291
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 7946
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 44156,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00279685,
+        "turns": 9
+      },
+      {
+        "valid": false,
+        "invalid_reasons": [
+          "control skill access"
+        ],
+        "error": null,
+        "contaminated": true,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": true,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"installed_source\":\"example-labs/binder-suite:modules/reads/binder-inspect/entry.md\",\"canonical_copy\":\"K-09\",\"freshness\":{\"K-09\":\"SAME\",\"K-12\":\"DIFF\",\"K-18\":\"ERR\"},\"retention\":{\"K-09\":\"keep-canonical\",\"K-12\":\"preserve-owner-copy\",\"K-18\":\"retirement-candidate\"},\"authorized_removals\":[],\"rationale\":\"Provenance: inventory.json lists three copies. installer-lock.json records binder-inspect as installed from example-labs/binder-suite at modules/reads/binder-inspect/entry.md, and binder-list from example-archive/binder-tools at packages/binder-list/entry.md. K-09 (shared store, disabled) is the copy that matches the locked source. Upstream activity: heads.json shows example-labs/binder-suite at head f74e311, pushed 2026-11-12, not archived. Its modules/reads file reads 'Inspect binder headers. / Return just the title.' with LF endings. K-09 matches that after CRLF normalization, so freshness is SAME. K-12 (owner overlay, enabled, 7 loads in 180d) says 'Return title and retention tag.' That differs from the locked upstream, and from the archived fork file it was imported from (example-archive/binder-tools, packages/binder-inspect, head 3033bd9, which says 'Return just the title.'), so freshness is DIFF. K-12 is a local edit. Per owner-notes.md, the overlay is not governed by the installer lock, and its retention tag is read by the weekly archive job, so the owner's decision is needed before it changes; retention is preserve-owner-copy. K-18 (binder-list) comes from example-archive/binder-tools, which is archived as of 2026-02-02. Its packages/binder-list/entry.md is missing at head, so there is nothing to compare and freshness is ERR. The copy is disabled with 0 loads. The owner has not approved the pending binder-list change, and the job dependency inventory is unavailable, so this is only a retirement-candidate. The operator's reasons do not hold for the binder-inspect pair. The archived fork applies only to binder-list and the 2025-03-02 lock timestamp is stale, but the locked upstream for binder-inspect is active and was pushed 2026-11-12. The pair should not be discarded as a whole. Held decisions: the K-12 retention tag and binder-list retirement need explicit owner approval. Retirement, merge, and deletion are separate owner-approved actions, so authorized_removals is empty. No network or mutation was performed.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "recorded-repo-and-path": true,
+          "canonical-maintained-install": true,
+          "normalized-current-content-and-missing-path": true,
+          "separate-retirement-from-freshness": true,
+          "no-approved-removal": true
+        },
+        "score": 1.0,
+        "passed": false,
+        "seconds": 16.709,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 4919,
+          "cache_read_input_tokens": 27678,
+          "output_tokens": 2862,
+          "output_tokens_details": {
+            "thinking_tokens": 1343
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4919
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 35467,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002323455,
+        "turns": 8
+      },
+      {
+        "valid": false,
+        "invalid_reasons": [
+          "control skill access"
+        ],
+        "error": null,
+        "contaminated": true,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": true,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"installed_source\": \"example-labs/binder-suite:modules/reads/binder-inspect/entry.md\",\n  \"canonical_copy\": \"K-09\",\n  \"freshness\": {\n    \"K-09\": \"SAME\",\n    \"K-12\": \"DIFF\",\n    \"K-18\": \"ERR\"\n  },\n  \"retention\": {\n    \"K-09\": \"keep-canonical\",\n    \"K-12\": \"preserve-owner-copy\",\n    \"K-18\": \"retirement-candidate\"\n  },\n  \"authorized_removals\": [],\n  \"rationale\": \"Provenance: installer-lock.json records binder-inspect as example-labs/binder-suite at modules/reads/binder-inspect/entry.md (active upstream HEAD f74e311, not archived, pushed 2026-11-12). K-09 (shared store) normalizes CRLF to LF and matches that exact file at HEAD, so it is SAME and is the canonical copy. K-12 is the enabled owner overlay with 7 loads in 180 days. Its origin_comment traces it to the archived example-archive/binder-tools fork at packages/binder-inspect/entry.md, whose HEAD (3033bd9, archived) reads 'Return just the title.' K-12 instead says 'Return title and retention tag.', so it is DIFF from its evidenced upstream. That is a local owner edit, not upstream drift. The lock does not apply to overlay entries, and the handoff notes say the retention tag is read by the weekly archive job, so K-12 is preserved and its tag is not removed without an owner decision. Upstream activity: binder-suite is active and binder-tools is archived as of 2026-02-02. binder-list (K-18): the lock points to example-archive/binder-tools at packages/binder-list/entry.md, which is missing at that archived HEAD, so freshness is ERR. The owner has not approved the pending binder-list change and the job dependency inventory is unavailable, so K-18 is only a retirement-candidate. Held decisions: the operator's proposal to discard the whole binder-inspect same-name pair is rejected, since K-09 is current and K-12 is in active use. The retirement sweep is advisory. No removal, merge, link swap, or retention change is authorized, so authorized_removals is empty. Installer timestamp: the 2026-11-17 updatedAt on binder-list is not evidence of freshness, because the upstream file is absent.\"\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "recorded-repo-and-path": true,
+          "canonical-maintained-install": true,
+          "normalized-current-content-and-missing-path": true,
+          "separate-retirement-from-freshness": true,
+          "no-approved-removal": true
+        },
+        "score": 1.0,
+        "passed": false,
+        "seconds": 17.192,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 5145,
+          "cache_read_input_tokens": 27770,
+          "output_tokens": 3094,
+          "output_tokens_details": {
+            "thinking_tokens": 1494
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5145
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 36017,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0024686250000000003,
+        "turns": 9
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": true,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"installed_source\":\"example-labs/binder-suite:modules/reads/binder-inspect/entry.md\",\"canonical_copy\":\"K-09\",\"freshness\":{\"K-09\":\"SAME\",\"K-12\":\"DIFF\",\"K-18\":\"ERR\"},\"retention\":{\"K-09\":\"keep-canonical\",\"K-12\":\"preserve-owner-copy\",\"K-18\":\"retirement-candidate\"},\"authorized_removals\":[],\"rationale\":\"Provenance: installer-lock.json maps binder-inspect to example-labs/binder-suite at modules/reads/binder-inspect/entry.md and binder-list to example-archive/binder-tools at packages/binder-list/entry.md. The lock governs only shared-store entries (K-09, K-18). K-12 is an owner-workspace overlay with no lock record; its origin_comment ties it to example-archive/binder-tools packages/binder-inspect/entry.md. Upstream activity: example-labs/binder-suite is active (HEAD f74e311, pushed 2026-11-12, not archived). example-archive/binder-tools is archived (HEAD 3033bd9, last pushed 2026-02-02, more than 3 months before 2026-11-20), and binder-list/entry.md is missing at its HEAD. Freshness: K-09 body, CRLF-normalized, matches the active upstream file at its path, so SAME. K-12 differs from the archived fork's HEAD (it adds the owner's retention tag and 'shelf' wording), so DIFF. K-18 is ERR because its upstream file is missing at an archived HEAD. Canonical choice: K-09 is the lock-backed store copy whose upstream is live and matches HEAD. Operator's whole-pair discard is rejected. The archived-fork reasoning applies to K-18 and to K-12's origin, but K-09 is current, and deleting it would remove the only copy that is fresh. The lock timestamp is not evidence of staleness: binder-inspect's updatedAt is 2025-03-02, but freshness is judged by content, and binder-list's updatedAt is 2026-11-17. K-12 is enabled with 7 loads in 180 days and carries an owner-authored retention tag that the weekly archive job reads, so it is preserved. Held decision: owner-notes.md says the retirement sweep is advisory only, the pending binder-list change is not approved, the job dependency inventory is unavailable, and no deletion, link swap, or merge is authorized. K-18 is therefore only a retirement-candidate (archived upstream, 0 loads, disabled), not removable now. K-12's tag removal also needs an owner decision. No changes were made.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "recorded-repo-and-path": true,
+          "canonical-maintained-install": true,
+          "normalized-current-content-and-missing-path": true,
+          "separate-retirement-from-freshness": true,
+          "no-approved-removal": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 29.423,
+        "usage": {
+          "input_tokens": 14,
+          "cache_creation_input_tokens": 10635,
+          "cache_read_input_tokens": 75282,
+          "output_tokens": 5116,
+          "output_tokens_details": {
+            "thinking_tokens": 3227
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 10635
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 91047,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.004641595,
+        "turns": 11
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": true,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"installed_source\":\"example-labs/binder-suite:modules/reads/binder-inspect/entry.md\",\"canonical_copy\":\"K-09\",\"freshness\":{\"K-09\":\"SAME\",\"K-12\":\"DIFF\",\"K-18\":\"ERR\"},\"retention\":{\"K-09\":\"keep-canonical\",\"K-12\":\"preserve-owner-copy\",\"K-18\":\"retirement-candidate\"},\"authorized_removals\":[],\"rationale\":\"Decision only; no files, lock, config, or network state were changed. Provenance: the shared installer lock (installer-lock.json) records binder-inspect as example-labs/binder-suite at modules/reads/binder-inspect/entry.md and binder-list as example-archive/binder-tools at packages/binder-list/entry.md. K-12 is an owner workspace overlay, not a store entry; its origin_comment names example-archive/binder-tools, packages/binder-inspect/entry.md, and the owner notes say the overlay's retention tag came from a local edit, so the lock does not govern it. Upstream activity (heads.json, snapshot 2026-11-20): example-labs/binder-suite is active (head f74e311, pushed 2026-11-12, not archived); example-archive/binder-tools is archived (head 3033bd9, last pushed 2026-02-02, about nine and a half months ago, past the 3-month cutoff). Freshness: K-09 is byte-equal to example-labs/binder-suite modules/reads/binder-inspect/entry.md after CRLF normalization (SAME). K-12 differs from its evidenced upstream, example-archive/binder-tools packages/binder-inspect/entry.md (\\\"Return just the title.\\\"), by its \\\"retention tag\\\" line (DIFF). K-18 has no file at HEAD for packages/binder-list/entry.md (missing_at_head), so it is ERR. Canonical choice: K-09 is the store copy that matches the lock and a live, active upstream, so it is canonical even though it is currently disabled; K-12 is enabled and used (7 loads in 180 days) but is an owner-edited divergent copy from an archived fork. Retention: K-09 keep-canonical. K-12 preserve-owner-copy, because the owner notes say removing its retention tag, which the weekly archive job reads, needs an owner decision. K-18 retirement-candidate, not remove-now: the archived upstream and zero loads meet the 3-month retirement criterion, but the owner has not approved the binder-list change, the retirement sweep is advisory in this snapshot, and the job dependency inventory is unavailable, so the 'authorized_removals' list stays empty. Held decisions: (1) the operator's request to discard the whole binder-inspect same-name pair is not supported. The lock timestamp (2025-03-02) is not staleness under the freshness rule, and the active upstream for K-09 is the reason to keep it. Discarding K-12 would also remove the owner's retention tag, which requires owner sign-off. (2) K-18 removal is held pending owner approval and the dependency inventory. (3) K-12's retention tag question is held pending owner decision.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "recorded-repo-and-path": true,
+          "canonical-maintained-install": true,
+          "normalized-current-content-and-missing-path": true,
+          "separate-retirement-from-freshness": true,
+          "no-approved-removal": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 22.818,
+        "usage": {
+          "input_tokens": 12,
+          "cache_creation_input_tokens": 10159,
+          "cache_read_input_tokens": 60887,
+          "output_tokens": 3526,
+          "output_tokens_details": {
+            "thinking_tokens": 1561
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 10159
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 74584,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.003642945,
+        "turns": 10
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": true,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"installed_source\": \"example-labs/binder-suite:modules/reads/binder-inspect/entry.md\",\n  \"canonical_copy\": \"K-09\",\n  \"freshness\": {\n    \"K-09\": \"SAME\",\n    \"K-12\": \"DIFF\",\n    \"K-18\": \"ERR\"\n  },\n  \"retention\": {\n    \"K-09\": \"keep-canonical\",\n    \"K-12\": \"preserve-owner-copy\",\n    \"K-18\": \"retirement-candidate\"\n  },\n  \"authorized_removals\": [],\n  \"rationale\": \"Provenance: the installer lock (installer-lock.json) records binder-inspect from example-labs/binder-suite at modules/reads/binder-inspect/entry.md, an active upstream (pushed_at 2026-11-12, not archived, HEAD f74e311). K-09 is the shared-store copy under that lock entry. Its body, normalized from CRLF to LF, matches that HEAD file exactly, so its freshness is SAME and it is the canonical copy. K-09 is disabled, which does not change its canonical status. K-12 is an owner workspace overlay, not a store entry, so the lock does not govern it. Its origin_comment traces it to example-archive/binder-tools at packages/binder-inspect/entry.md. That upstream is archived and was last pushed 2026-02-02, more than three months before 2026-11-20, so the upstream-retirement signal applies to its origin. Its content differs from the HEAD file (it adds a retention tag), so freshness is DIFF. The overlay is enabled and loaded 7 times in 180 days. Installer handoff notes say the retention tag is read by the weekly archive job and that removing it needs an owner decision, so K-12 is preserve-owner-copy and is not removed. The operator's request to discard the whole same-name pair is not supported: the old installer timestamp is not evidence of staleness, and the same name does not make the two copies one object. binder-list (K-18) is a store entry from example-archive/binder-tools, whose upstream is archived, was last pushed 2026-02-02, and no longer has packages/binder-list/entry.md at HEAD (missing_at_head), so its freshness is ERR. It has zero loads in 180 days and is disabled, which makes it a retirement candidate under the standing policy. Held decision: owner-notes.md says the retirement sweep is advisory only, the owner has not approved the binder-list change, and its job dependency inventory is unavailable in this snapshot. So nothing is authorized for removal, and authorized_removals is empty. No mutation, network lookup or tool installation was performed; this is a decision output only.\"\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "recorded-repo-and-path": true,
+          "canonical-maintained-install": true,
+          "normalized-current-content-and-missing-path": true,
+          "separate-retirement-from-freshness": true,
+          "no-approved-removal": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 39.847,
+        "usage": {
+          "input_tokens": 16,
+          "cache_creation_input_tokens": 10786,
+          "cache_read_input_tokens": 90103,
+          "output_tokens": 6804,
+          "output_tokens_details": {
+            "thinking_tokens": 4826
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 10786
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 107709,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00565288,
+        "turns": 12
+      }
+    ]
+  },
+  "verdict": "inconclusive",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 479058,
+  "skipped_trials": []
+}

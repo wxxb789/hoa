@@ -1,0 +1,806 @@
+{
+  "schema_version": 2,
+  "task": "set-b-hoa-skill-create",
+  "generated_at": "2026-11-20T00:47:04.331093-08:00",
+  "skill": "hoa-skill-create",
+  "skill_revision": "4",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "forced",
+  "shell": false,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "split-by-lifecycle": {
+      "field": "layout",
+      "equals": {
+        "receipt-parser": "catalog/receipt-parser/SKILL.md",
+        "return-labels": "catalog/dispatch-return/references/return-labels.md",
+        "transfer-digest": "catalog/warehouse-transfer/references/transfer-digest.md"
+      }
+    },
+    "portable-hidden-chain": {
+      "field": "composition",
+      "equals": {
+        "parent_line": "Read ../receipt-parser/SKILL.md (relative to this skill's directory) and follow it. Do not call the Skill tool for it.",
+        "child_frontmatter": {
+          "disable-model-invocation": true
+        },
+        "codex_sidecar": {
+          "policy": {
+            "allow_implicit_invocation": false
+          }
+        }
+      }
+    },
+    "resolve-both-install-paths": {
+      "field": "evaluation",
+      "equals": {
+        "linux_target": "/srv/release/catalog/receipt-parser/SKILL.md",
+        "windows_target": "R:/host/cards/receipt-parser/SKILL.md",
+        "windows_repair": "R:/release/catalog/receipt-parser",
+        "selective_copy_dirs": [
+          "dispatch-return",
+          "receipt-parser"
+        ]
+      }
+    }
+  },
+  "rubric_flags": {
+    "split-by-lifecycle": "flaky",
+    "portable-hidden-chain": "flaky",
+    "resolve-both-install-paths": "flaky"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 0,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.0,
+      "pass^k": false,
+      "mean_score": 0.1111111111111111,
+      "sample_stddev": 0.19245008972987523
+    },
+    "terse": {
+      "valid": true,
+      "passed": 0,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.0,
+      "pass^k": false,
+      "mean_score": 0.2222222222222222,
+      "sample_stddev": 0.19245008972987523
+    },
+    "skill": {
+      "valid": true,
+      "passed": 0,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 0.0,
+      "pass^k": false,
+      "mean_score": 0.5555555555555556,
+      "sample_stddev": 0.19245008972987523
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": 0.4444444444444445,
+    "terse": 0.33333333333333337
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"layout\":{\"receipt-parser\":\"catalog/receipt-parser/SKILL.md\",\"return-labels\":\"catalog/return-labels/SKILL.md\",\"transfer-digest\":\"catalog/transfer-digest/SKILL.md\"},\"composition\":{\"parent_line\":\"Before the send-approval gate, run the receipt-parser pack's parse step on the receipt; it only reads and decodes and never sends. Do not invoke return-labels or transfer-digest as separate steps.\",\"child_frontmatter\":{\"disable-model-invocation\":true},\"codex_sidecar\":{\"policy\":{\"allow_implicit_invocation\":false}}},\"evaluation\":{\"linux_target\":\"<path>\",\"windows_target\":\"<path>\",\"windows_repair\":\"<path>\",\"selective_copy_dirs\":[\"dispatch-return\",\"parser-r7\",\"receipt-parser\"]}}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "split-by-lifecycle": false,
+          "portable-hidden-chain": false,
+          "resolve-both-install-paths": false
+        },
+        "score": 0.0,
+        "passed": false,
+        "seconds": 25.836,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 5128,
+          "cache_read_input_tokens": 18981,
+          "output_tokens": 4794,
+          "output_tokens_details": {
+            "thinking_tokens": 4014
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5128
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 28909,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00322841,
+        "turns": 6
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"layout\": {\n    \"receipt-parser\": \"catalog/receipt-parser/SKILL.md\",\n    \"return-labels\": \"catalog/dispatch-return/references/return-labels.md\",\n    \"transfer-digest\": \"catalog/warehouse-transfer/references/transfer-digest.md\"\n  },\n  \"composition\": {\n    \"parent_line\": \"Run the receipt-parser package on the receipt before the send-approval gate in both Dispatch Return and Warehouse Transfer. The parser only reads and decodes the receipt and never sends; keep the send-approval gate immediately before sending in each entry point.\",\n    \"child_frontmatter\": {\n      \"user-invocable\": true,\n      \"disable-model-invocation\": true\n    },\n    \"codex_sidecar\": {\n      \"policy\": {\n        \"allow_implicit_invocation\": false\n      }\n    }\n  },\n  \"evaluation\": {\n    \"linux_target\": \"<path>\",\n    \"windows_target\": \"<path>\",\n    \"windows_repair\": \"<path>\",\n    \"selective_copy_dirs\": [\"dispatch-return\", \"receipt-parser\"]\n  }\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "split-by-lifecycle": true,
+          "portable-hidden-chain": false,
+          "resolve-both-install-paths": false
+        },
+        "score": 0.3333333333333333,
+        "passed": false,
+        "seconds": 20.136,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4754,
+          "cache_read_input_tokens": 19373,
+          "output_tokens": 3840,
+          "output_tokens_details": {
+            "thinking_tokens": 2967
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4754
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27973,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00270858,
+        "turns": 6
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"layout\":{\"receipt-parser\":\"catalog/receipt-parser/SKILL.md\",\"return-labels\":\"catalog/return-labels/SKILL.md\",\"transfer-digest\":\"catalog/transfer-digest/SKILL.md\"},\"composition\":{\"parent_line\":\"Before the send-approval gate, run the receipt-parser package to read and decode the receipt. Do not invoke return-labels or transfer-digest as separate steps; they remain owned by their packet flows.\",\"child_frontmatter\":{\"disable-model-invocation\":true,\"user-invocable\":true},\"codex_sidecar\":{\"policy\":{\"allow_implicit_invocation\":false}}},\"evaluation\":{\"linux_target\":\"<path>\",\"windows_target\":\"<path>\",\"windows_repair\":\"<path>\",\"selective_copy_dirs\":[\"dispatch-return\",\"receipt-parser\",\"return-labels\"]}}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "split-by-lifecycle": false,
+          "portable-hidden-chain": false,
+          "resolve-both-install-paths": false
+        },
+        "score": 0.0,
+        "passed": false,
+        "seconds": 23.14,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4722,
+          "cache_read_input_tokens": 19343,
+          "output_tokens": 4224,
+          "output_tokens_details": {
+            "thinking_tokens": 3464
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4722
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 28295,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0028962799999999998,
+        "turns": 6
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"layout\":{\"receipt-parser\":\"catalog/receipt-parser/SKILL.md\",\"return-labels\":\"catalog/return-labels/SKILL.md\",\"transfer-digest\":\"catalog/transfer-digest/SKILL.md\"},\"composition\":{\"parent_line\":\"Before the send-approval gate, run ..<path> to read and decode the receipt; the parser only decodes and never sends, and the approval gate stays immediately before sending.\",\"child_frontmatter\":{\"user-invocable\":true,\"disable-model-invocation\":true},\"codex_sidecar\":{\"policy\":{\"allow_implicit_invocation\":false}}},\"evaluation\":{\"linux_target\":\"<path>\",\"windows_target\":\"<path>\",\"windows_repair\":\"<path>\",\"selective_copy_dirs\":[\"return-labels\"]}}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "split-by-lifecycle": false,
+          "portable-hidden-chain": false,
+          "resolve-both-install-paths": false
+        },
+        "score": 0.0,
+        "passed": false,
+        "seconds": 24.423,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 7456,
+          "cache_read_input_tokens": 16859,
+          "output_tokens": 4541,
+          "output_tokens_details": {
+            "thinking_tokens": 3823
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 7456
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 28862,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00337169,
+        "turns": 6
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"layout\":{\"receipt-parser\":\"catalog/receipt-parser/SKILL.md\",\"return-labels\":\"catalog/dispatch-return/references/return-labels.md\",\"transfer-digest\":\"catalog/warehouse-transfer/references/transfer-digest.md\"},\"composition\":{\"parent_line\":\"Before the send-approval gate, read and apply the receipt-parser skill to decode the receipt. The parser does not send; keep the send-approval gate immediately before sending.\",\"child_frontmatter\":{\"user-invocable\":true,\"disable-model-invocation\":true},\"codex_sidecar\":{\"policy\":{\"allow_implicit_invocation\":false}}},\"evaluation\":{\"linux_target\":\"<path>\",\"windows_target\":\"<path>\",\"windows_repair\":\"<path>\",\"selective_copy_dirs\":[\"dispatch-return\",\"receipt-parser\"]}}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "split-by-lifecycle": true,
+          "portable-hidden-chain": false,
+          "resolve-both-install-paths": false
+        },
+        "score": 0.3333333333333333,
+        "passed": false,
+        "seconds": 22.26,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4702,
+          "cache_read_input_tokens": 19617,
+          "output_tokens": 4318,
+          "output_tokens_details": {
+            "thinking_tokens": 3595
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4702
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 28643,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00294352,
+        "turns": 6
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"layout\": {\n    \"receipt-parser\": \"catalog/receipt-parser/SKILL.md\",\n    \"return-labels\": \"catalog/dispatch-return/references/return-labels.md\",\n    \"transfer-digest\": \"catalog/warehouse-transfer/references/transfer-digest.md\"\n  },\n  \"composition\": {\n    \"parent_line\": \"Dispatch Return and Warehouse Transfer each run the receipt-parser package as an explicit step to decode the receipt, keep the send-approval gate immediately before sending, and never surface receipt-parser as a model-catalog suggestion.\",\n    \"child_frontmatter\": {\n      \"disable-model-invocation\": true,\n      \"user-invocable\": true\n    },\n    \"codex_sidecar\": {\n      \"policy\": {\n        \"allow_implicit_invocation\": false\n      }\n    }\n  },\n  \"evaluation\": {\n    \"linux_target\": \"<path>\",\n    \"windows_target\": \"<path>\",\n    \"windows_repair\": \"<path>\",\n    \"selective_copy_dirs\": [\n      \"dispatch-return\",\n      \"receipt-parser\"\n    ]\n  }\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "split-by-lifecycle": true,
+          "portable-hidden-chain": false,
+          "resolve-both-install-paths": false
+        },
+        "score": 0.3333333333333333,
+        "passed": false,
+        "seconds": 29.981,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4712,
+          "cache_read_input_tokens": 19621,
+          "output_tokens": 5686,
+          "output_tokens_details": {
+            "thinking_tokens": 4857
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4712
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 30025,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0036288100000000005,
+        "turns": 6
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"layout\": {\n    \"receipt-parser\": \"catalog/receipt-parser/SKILL.md\",\n    \"return-labels\": \"catalog/dispatch-return/references/return-labels.md\",\n    \"transfer-digest\": \"catalog/warehouse-transfer/references/transfer-digest.md\"\n  },\n  \"composition\": {\n    \"parent_line\": \"Read ..<path> (relative to this skill's directory) and follow it. Do not call the Skill tool for it. The send-approval gate stays in this parent and must run immediately before sending; the parser only reads and decodes the receipt.\",\n    \"child_frontmatter\": {\n      \"disable-model-invocation\": true\n    },\n    \"codex_sidecar\": {\n      \"policy\": {\n        \"allow_implicit_invocation\": false\n      }\n    }\n  },\n  \"evaluation\": {\n    \"linux_target\": \"<path>\",\n    \"windows_target\": \"<path>\",\n    \"windows_repair\": \"<path>\",\n    \"selective_copy_dirs\": [\n      \"dispatch-return\",\n      \"receipt-parser\",\n      \"warehouse-transfer\"\n    ]\n  }\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "split-by-lifecycle": true,
+          "portable-hidden-chain": false,
+          "resolve-both-install-paths": false
+        },
+        "score": 0.3333333333333333,
+        "passed": false,
+        "seconds": 29.424,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 10763,
+          "cache_read_input_tokens": 42567,
+          "output_tokens": 5539,
+          "output_tokens_details": {
+            "thinking_tokens": 4490
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 10763
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 58879,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.004541545000000001,
+        "turns": 8
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"layout\": {\n    \"receipt-parser\": \"catalog/receipt-parser/SKILL.md\",\n    \"return-labels\": \"catalog/dispatch-return/references/return-labels.md\",\n    \"transfer-digest\": \"catalog/warehouse-transfer/references/transfer-digest.md\"\n  },\n  \"composition\": {\n    \"parent_line\": \"Read ..<path> (relative to this skill's directory) and follow it. Do not call the Skill tool for it.\",\n    \"child_frontmatter\": {\n      \"disable-model-invocation\": true\n    },\n    \"codex_sidecar\": {\n      \"policy\": {\n        \"allow_implicit_invocation\": false\n      }\n    }\n  },\n  \"evaluation\": {\n    \"linux_target\": \"<path>\",\n    \"windows_target\": \"<path>\",\n    \"windows_repair\": \"<path>\",\n    \"selective_copy_dirs\": [\n      \"dispatch-return\",\n      \"receipt-parser\"\n    ]\n  }\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "split-by-lifecycle": true,
+          "portable-hidden-chain": true,
+          "resolve-both-install-paths": false
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 38.684,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 10770,
+          "cache_read_input_tokens": 33005,
+          "output_tokens": 7593,
+          "output_tokens_details": {
+            "thinking_tokens": 6585
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 10770
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 51376,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0054736,
+        "turns": 8
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"layout\": {\n    \"receipt-parser\": \"catalog/receipt-parser/SKILL.md\",\n    \"return-labels\": \"catalog/dispatch-return/references/return-labels.md\",\n    \"transfer-digest\": \"catalog/warehouse-transfer/references/transfer-digest.md\"\n  },\n  \"composition\": {\n    \"parent_line\": \"Before composing the packet, decode the receipt by reading and following ..<path> Do not suggest or invoke receipt-parser as a standalone step. The send-approval gate remains immediately before sending. The parser reads and decodes only; it does not send.\",\n    \"child_frontmatter\": {\n      \"disable-model-invocation\": true,\n      \"user-invocable\": true\n    },\n    \"codex_sidecar\": {\n      \"policy\": {\n        \"allow_implicit_invocation\": false\n      }\n    }\n  },\n  \"evaluation\": {\n    \"linux_target\": \"<path>\",\n    \"windows_target\": \"<path>\",\n    \"windows_repair\": \"<path>\",\n    \"selective_copy_dirs\": [\"dispatch-return\", \"receipt-parser\"]\n  }\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "split-by-lifecycle": true,
+          "portable-hidden-chain": false,
+          "resolve-both-install-paths": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 32.109,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 7410,
+          "cache_read_input_tokens": 30913,
+          "output_tokens": 5406,
+          "output_tokens_details": {
+            "thinking_tokens": 4458
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 7410
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 43737,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0039391800000000005,
+        "turns": 7
+      }
+    ]
+  },
+  "verdict": "no-difference",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 326699,
+  "skipped_trials": []
+}
