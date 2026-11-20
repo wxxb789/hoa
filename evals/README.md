@@ -14,7 +14,10 @@ Use uv with Python 3.13 or newer and a native executable, not a batch shim.
 Screening defaults to Pi (tested with 1.5.2),
 `tencent-litellm/deepseek-v4.1-flash-fast`, and `--thinking max`.
 `--model` can select another model in `tencent-litellm`; only an explicit
-Pi `--thinking` changes the thinking level.
+Pi `--thinking` changes the thinking level. The provider is free to the owner, so
+time is the only cost: Pi trials default to `--timeout 3000` (ten times the other
+runtimes), and any `--max-total-tokens` cap for Pi should be about ten times the
+cap you would give Claude or Codex, because DeepSeek thinks at length.
 Claude Code needs `--restricted` (tested with 2.1.329) and
 `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN`, optionally
 `ANTHROPIC_BASE_URL`. Codex needs a configured model provider; the runner uses
