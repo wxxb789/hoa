@@ -554,6 +554,9 @@ def record_skill_reads(entry, values, workspace, skill_file):
         if reason := skill_read(path, literal, workspace, skill_file):
             reasons.add(reason)
             loaded |= path == skill_file
+            if reason != "installed-copy-read":
+                # Keep the offending path so a flagged trial can be audited after the workspace is gone.
+                entry.setdefault("contamination_paths", []).append(str(literal))
     entry["contamination_reasons"] = sorted(reasons)
     return loaded
 
