@@ -18,6 +18,11 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
   publication scope before reporting success.
 - Add hidden Omo and GitHub Copilot CLI routes (1) with JSON event folding
   and session resume; gdd (18) launches both without Windows batch shims.
+- Require explicit scope for durable agent-contract edits and verify coverage and behavior.
+- Verify harness settings per installed version and profile; keep mutable keys in a dated reference.
+- Focus harness engineering on live obligations, I/O boundaries, and fail-closed acceptance.
+- Keep OMP's default route and recovery checks while deferring shared transport details to GDD.
+- Focus the .NET workflow on repository gates, locked NuGet restore, and Roslyn references.
 
 ## 2026-11-20
 
