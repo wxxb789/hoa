@@ -1,0 +1,18 @@
+{
+  "skills": {
+    "binder-inspect": {
+      "source": "example-labs/binder-suite",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/example-labs/binder-suite",
+      "skillPath": "modules/reads/binder-inspect/entry.md",
+      "updatedAt": "2025-03-02T09:00:00Z"
+    },
+    "binder-list": {
+      "source": "example-archive/binder-tools",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/example-archive/binder-tools",
+      "skillPath": "packages/binder-list/entry.md",
+      "updatedAt": "2026-11-17T09:00:00Z"
+    }
+  }
+}

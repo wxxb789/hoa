@@ -1,0 +1,15 @@
+{
+  "id": "hoa-skill-review",
+  "skill": "hoa-skill-review",
+  "fixture": "fixtures/hoa-skill-review",
+  "prompt": "Give the owner a read-only release review of the binder-inspect skill exported as binder.md. Read consumers.md and trace.md and assess the three intake tickets in tickets.md against those sources, not just against the ticket summaries. Use Change for a demonstrated defect, Verify for a decision-changing evidence gap, and Consider for a preference. Return bare JSON with ticket_ids (an object mapping change, verify, and consider to arrays of ticket IDs in intake order); conflicting_rules (array with the promise then the executable rule ID); affected_consumer (consumer ID); observed_effect (one of source-edit, output-create, output-read, no-effect); and conflict_evidence (one of static, live, unknown). Explain why each decision follows and what would resolve any gap in an additional rationale field. Do not edit or execute anything.",
+  "terse": "Review the existing skill against its promised outcome and real consumers. Cite reproducible contradictions or failures, rank by consequence, identify gaps instead of inventing evidence, and leave the skill unchanged.",
+  "shell": ["codex"],
+  "rubric": {
+    "evidence-ranked-intake": {"field": "ticket_ids", "equals": {"change": ["T-22"], "verify": ["T-15"], "consider": ["T-31"]}},
+    "promise-and-executable-rule": {"field": "conflicting_rules", "equals": ["B-01", "B-14"]},
+    "reaches-real-consumer-contract": {"field": "affected_consumer", "equals": "C-05"},
+    "output-write-is-a-write": {"field": "observed_effect", "equals": "output-create"},
+    "static-not-runtime-verified": {"field": "conflict_evidence", "equals": "static"}
+  }
+}

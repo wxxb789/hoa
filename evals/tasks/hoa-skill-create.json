@@ -1,0 +1,19 @@
+{
+  "id": "hoa-skill-create",
+  "skill": "hoa-skill-create",
+  "fixture": "fixtures/hoa-skill-create",
+  "prompt": "The owner requests a local evolution of the shift-brief skill. Release-side report R-17 says a ready-to-stage handoff asks a redundant question instead of staging. Read package/brief.md (a frozen export of the installed skill, not a live installation), cases.json, and history.md. Fix the regression without weakening the neighboring paths or changing the package identity. The only writable source is package/brief.md. The fixture's repository check is `uv run --no-project --python 3.13 python check.py before` (before the edit) and the same command with `after` (after the edit); use these as the only shell commands, inheriting the guard environment. They exercise a fixed local test double, not a model or loader. Report in bare JSON with cause_anchor (the original rule ID), retained_mandate_source (the historical record ID), and activation_verified (boolean). Do not touch real installations or use the network.",
+  "terse": "Start from a defined capability or a concrete failure. State the smallest behavior change, keep the skill portable, and test the failing case plus nearby boundaries against the prior snapshot before keeping the change. Update only the scope the owner approved.",
+  "shell": true,
+  "rubric": {
+    "baseline-reproduces": {"file": "before.txt", "contains": "ready=ask"},
+    "ready-stages": {"file": "after.txt", "contains": "ready=stage"},
+    "missing-input-asks-once": {"file": "after.txt", "contains": "incomplete=ask"},
+    "publication-stays-gated": {"file": "after.txt", "contains": "publish=ask"},
+    "approved-publication-path-stays-available": {"file": "after.txt", "contains": "approved=publish"},
+    "package-gate": {"file": "after.txt", "contains": "package=valid"},
+    "owning-rule": {"field": "cause_anchor", "equals": "B-20"},
+    "retained-mandate-provenance": {"field": "retained_mandate_source", "equals": "H-08"},
+    "no-claim-of-activation": {"field": "activation_verified", "equals": false}
+  }
+}

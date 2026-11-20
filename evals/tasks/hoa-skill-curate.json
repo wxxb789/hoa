@@ -1,0 +1,15 @@
+{
+  "id": "hoa-skill-curate",
+  "skill": "hoa-skill-curate",
+  "fixture": "fixtures/hoa-skill-curate",
+  "prompt": "Decide what to keep canonical in this offline library snapshot as of 2026-11-20. The operator points at the retired upstream fork and the old installer timestamp as reasons to discard the whole same-name pair. Use inventory.json, installer-lock.json, heads.json and owner-notes.md; these are all the available sources. Return bare JSON with installed_source (repo plus repo-relative path separated by a colon), canonical_copy (copy ID), freshness (an object keyed by copy ID, using SAME, DIFF or ERR for normalized comparison to that copy's evidenced upstream HEAD), retention (an object keyed by copy ID, using keep-canonical, preserve-owner-copy, retirement-candidate or remove-now), and authorized_removals (array of copy IDs). In a rationale field, explain provenance, upstream activity, and any held decision. This is a decision request only, with no tool installation, network lookup, or mutation.",
+  "terse": "Trace the installed skill to its canonical upstream and distinguish local edits from upstream drift. Re-derive provenance and freshness before making a recommendation. Treat retirement, merge and deletion as separate owner-approved actions.",
+  "shell": ["codex"],
+  "rubric": {
+    "recorded-repo-and-path": {"field": "installed_source", "equals": "example-labs/binder-suite:modules/reads/binder-inspect/entry.md"},
+    "canonical-maintained-install": {"field": "canonical_copy", "equals": "K-09"},
+    "normalized-current-content-and-missing-path": {"field": "freshness", "equals": {"K-09": "SAME", "K-12": "DIFF", "K-18": "ERR"}},
+    "separate-retirement-from-freshness": {"field": "retention", "equals": {"K-09": "keep-canonical", "K-12": "preserve-owner-copy", "K-18": "retirement-candidate"}},
+    "no-approved-removal": {"field": "authorized_removals", "equals": []}
+  }
+}
