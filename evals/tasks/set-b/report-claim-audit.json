@@ -1,0 +1,18 @@
+{
+  "id": "set-b-report-claim-audit",
+  "skill": "report-claim-audit",
+  "fixture": "fixtures/report-claim-audit",
+  "prompt": "The release owner is about to sign the Alder closeout. Audit the attached dispatch and give the owner a decision brief. Do not repair anything. Return bare JSON with release_ready (object: ready, total, ready_ids), inventory (object: disk, manifest, accepted, mentioned, disk_only, manifest_only, accepted_missing; mentioned counts distinct exhibit IDs explicitly named anywhere in the dispatch), and decisions (object: pending, covered, replacement_review_pages). Use integers for counts and sorted arrays for IDs. You may add a brief field with your recommendation and why.",
+  "terse": "Treat the dispatch as a claim, not evidence. Verify it against the artifacts that own the facts and give the owner an independently supported decision brief without changing the release.",
+  "shell": ["codex"],
+  "rubric": {
+    "ready-from-receipts": {"field": "release_ready", "equals": {"ready": 5, "total": 12, "ready_ids": ["QA-01", "QA-04", "QA-06", "QA-07", "QA-10"]}},
+    "reconciled-inventory": {"field": "inventory", "equals": {"disk": 6, "manifest": 5, "accepted": 3, "mentioned": 4, "disk_only": ["AL-05", "AL-06"], "manifest_only": ["AL-07"], "accepted_missing": ["AL-07"]}},
+    "rulings-and-cost": {"field": "decisions", "equals": {"pending": ["D-12", "D-13"], "covered": ["D-11"], "replacement_review_pages": 27}}
+  },
+  "notes": {
+    "ready-from-receipts": "SKILL.md §1, Recount every claim from the artifact that owns it. Join the released revision register to same-revision QA receipts; drafts, later revisions and preflight greens cannot stand in. Trap answer uses the dispatch's nine-ready claim.",
+    "reconciled-inventory": "SKILL.md §2, Look for what the report did not say. Enumerate typed manifest entries, separately read acceptance, then diff against disk. The migration note mentions a real stray path but does not register it. Trap answer counts it as registered and suppresses AL-06 from disk_only.",
+    "rulings-and-cost": "SKILL.md §§2–3, Look for what the report did not say / Price the decisions. Recognize the scoped standing waiver, then price the replacement lane including duplicated review of pages in two separately signed packets. Trap answer reopens D-11 or counts distinct pages rather than review passes."
+  }
+}

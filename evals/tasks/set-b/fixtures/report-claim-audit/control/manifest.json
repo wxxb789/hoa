@@ -1,0 +1,8 @@
+{
+  "release": "Alder",
+  "groups": [
+    {"name": "station exhibits", "entries": [{"path": "exhibits/AL-01.md"}, {"path": "exhibits/AL-02.md"}, {"path": "exhibits/AL-03.md"}]},
+    {"name": "substitutions", "entries": [{"path": "exhibits/AL-04.md"}, {"path": "exhibits/AL-07.md", "state": "reserved"}]}
+  ],
+  "migration": {"last_preview": "exhibits/AL-06.md", "ticket": "migration AL-03 checksum re-index"}
+}

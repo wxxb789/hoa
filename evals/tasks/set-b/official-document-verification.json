@@ -1,0 +1,18 @@
+{
+  "id": "set-b-official-document-verification",
+  "skill": "official-document-verification",
+  "fixture": "fixtures/official-document-verification",
+  "prompt": "The island freight board is about to circulate board-note.md. Verify its three takeaways against the publisher packet as of October 2, 2028. Use the supplied packet only. Return bare JSON with extension (object: print, section, prior_law, sunset; section as an integer, sunset as an ISO date), deck_relay (object keyed by publisher print IDs, with booleans for whether each latest chamber print would permit the Deck Relay waiver), and staffing (object keyed by source IDs, each with count and unit). Use the two staffing records named in the board note; unit vocabulary is in index.md. You may include a brief field with the corrected wording.",
+  "terse": "Verify official-document claims against the actual authoritative text for the question, and report findings only at the scope and level supported by the evidence.",
+  "shell": ["codex"],
+  "rubric": {
+    "extension-by-subject": {"field": "extension", "equals": {"print": "H52-EH", "section": 126, "prior_law": "Island Docks Act 8(b)", "sunset": "2032-03-31"}},
+    "relay-by-current-print": {"field": "deck_relay", "equals": {"H52-EH": true, "S14-RS": false}},
+    "staffing-calibers": {"field": "staffing", "equals": {"F-28": {"count": 48, "unit": "authorized positions"}, "C-09": {"count": 31, "unit": "people on duty"}}}
+  },
+  "notes": {
+    "extension-by-subject": "SKILL.md §2, Scan by number and by content. The amendment is in §126, not either numbered §904 hit. The general contracts sunset has the earlier FY date but applies to a different law. Trap answer reports the first §904 hit as the extension.",
+    "relay-by-current-print": "SKILL.md §§1–2, Pin the version / Scan by number and by content. Senate introduced text and the action feed mention the waiver; the latest Senate print replaces it with an incident-count provision and retains the heading. House policy is not the common text. Trap answer marks both current prints true.",
+    "staffing-calibers": "SKILL.md §4, Caliber ladder for counts. Keep the two enumerators and units side by side rather than collapse them into staffed headcount. Trap answer labels F-28's 48 as people on duty."
+  }
+}
