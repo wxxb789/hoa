@@ -42,17 +42,17 @@ class _StubHandler(BaseHTTPRequestHandler):
         length = int(self.headers.get("content-length") or 0)
         body = json.loads(self.rfile.read(length).decode("utf-8"))
         self.server.stub.requests.append({
+            "path": self.path,
             "body": body,
             "authorization": self.headers.get("authorization"),
         })
-        status, payload = self.server.stub.reply(body)
+        status, payload = self.server.stub.reply(self.path, body)
         raw = json.dumps(payload).encode()
         self.send_response(status)
         self.send_header("content-type", "application/json")
         self.send_header("content-length", str(len(raw)))
         self.end_headers()
         self.wfile.write(raw)
-
     def log_message(self, format, *args) -> None:  # noqa: A002 - stdlib signature
         pass
 
@@ -84,7 +84,32 @@ class Stub:
         self.server.server_close()
         self.thread.join(timeout=5)
 
-    def reply(self, body: dict) -> tuple[int, dict]:
+    def reply(self, path: str, body: dict) -> tuple[int, dict]:
+        if path.endswith("/decisions"):
+            prompt = body["input"]
+            case = next(case for case in self.cases
+                        if f"User request: {case['request']}\n" in prompt)
+            if self.mode == "garbage" and case["id"] == self.fail_case:
+                choice = "no-such-artifact"
+            elif self.mode == "other_artifact" and case["id"] == self.fail_case:
+                choice = next(candidate["must_pick"][0] for candidate in self.cases
+                              if candidate["must_pick"][0] not in case["must_pick"])
+            elif self.mode == "http500" and case["id"] == self.fail_case:
+                return 500, {"error": "stub failure"}
+            elif self.mode == "refusal" and case["id"] == self.fail_case:
+                return 200, {"answers": [{"type": "refusal", "name": "route"}]}
+            else:
+                choice = case["must_pick"][0]
+            return 200, {
+                "model": body["model"],
+                "answers": [{
+                    "type": "choice",
+                    "name": "route",
+                    "choice": choice,
+                    "confidence": 1.0,
+                    "probabilities": [{"value": choice, "probability": 1.0}],
+                }],
+            }
         prompt = body["messages"][0]["content"]
         case = next(case for case in self.cases
                     if f"User request: {case['request']}\n" in prompt)
@@ -97,7 +122,6 @@ class Stub:
         if self.mode == "http500" and case["id"] == self.fail_case:
             return 500, {"error": "stub failure"}
         return 200, {"choices": [{"message": {"content": case["must_pick"][0]}}]}
-
 
 class JudgeCliTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -292,6 +316,29 @@ class JudgeCliTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertIn("--force only applies with --record", result.stderr)
 
+    def test_decisions_api_is_opt_in_via_flag_env_or_config(self) -> None:
+        stub = self.stub()
+        result = self.run_judge(
+            "--limit", "2", "--json", "--base-url", stub.base_url,
+            "--model", "decision-model", "--api", "decisions")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        data = json.loads(result.stdout)
+        self.assertEqual(data["passed"], 2)
+        self.assertEqual(stub.requests[0]["path"], "/v1/decisions")
+        self.assertEqual(stub.requests[0]["body"]["model"], "decision-model")
+        q = stub.requests[0]["body"]["questions"][0]
+        self.assertEqual(q["type"], "choice")
+        self.assertEqual(q["name"], "route")
+        choice_vals = [c["value"] for c in q["choices"]]
+        self.assertIn("ghc-search", choice_vals)
+        self.assertIn("none", choice_vals)
+
+        result_bad = self.run_judge(
+            "--limit", "1", "--base-url", stub.base_url,
+            "--model", "decision-model", "--api", "unknown-api")
+        self.assertEqual(result_bad.returncode, 2)
+        self.assertIn("api must be one of", result_bad.stderr)
+
 
 class RecordTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -434,6 +481,23 @@ class JudgeUnitTests(unittest.TestCase):
         self.assertEqual(body["model"], "model-name")
         self.assertEqual(body["reasoning_effort"], "high")
         self.assertEqual(body["messages"], [{"role": "user", "content": "prompt"}])
+
+    def test_decisions_url_and_parser(self) -> None:
+        self.assertEqual(judge.decisions_url("http://host:1/v1"),
+                         "http://host:1/v1/decisions")
+        self.assertEqual(judge.decisions_url("http://host:1/v1/decisions"),
+                         "http://host:1/v1/decisions")
+        self.assertEqual(
+            judge.parse_decisions_answer(
+                {"answers": [{"type": "choice", "choice": " ghc-search "}]}
+            ),
+            "ghc-search",
+        )
+        for bad in ({}, {"answers": []}, {"answers": [{"type": "refusal"}]},
+                    {"answers": [{"type": "choice", "choice": ""}]}, {"error": "bad"}):
+            with self.subTest(bad=bad):
+                with self.assertRaises(ValueError):
+                    judge.parse_decisions_answer(bad)
 
 
 class BaselineGateTests(unittest.TestCase):

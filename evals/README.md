@@ -1,6 +1,10 @@
 # Evaluations
 
 `run_trigger_evals.py` validates the routing cases and recorded baseline offline.
+`judge_trigger_evals.py` runs the trigger suite against a configured OpenAI-compatible
+`/chat/completions` endpoint by default, or against an opt-in `/decisions` endpoint
+when `--api decisions` (`EVALS_API=decisions` or `api: decisions` in
+`$XDG_CONFIG_HOME/evals/config.yaml`) is set.
 `run_necessity_eval.py` compares outcomes on the same task with no skill (`none`),
 frozen short instructions (`terse`), and the installed skill (`skill`).
 
