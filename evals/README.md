@@ -48,16 +48,24 @@ legacy user root intentionally used here. On Windows it also enumerates the real
 Known Folder profile's `.agents/skills`; the runner excludes those documents
 via path-based skill disable rules instead of modifying the profile. For Claude,
 a successful `Skill` result for the named skill or `Read` of the installed
-`SKILL.md` is load evidence. For Codex, look for `item.completed` with
-`item.type: command_execution`, successful exit, the installed path in the
-command, and the skill header in `aggregated_output`. Catalog listings, plain
-mentions and untraced automatic injection do not establish a load. A control
-trial is contaminated by a `Skill` call or a read attempt targeting the installed
-skill copy, the task skill's catalog directory, or a `skills` location under the
-isolated home or config directories. Paths inside the fixture workspace do not
-count. Relative paths are interpreted from the workspace. This tool-trace check
-is necessary for a valid comparison, but is not a full file-access audit; it
-does not reconstruct all shell behavior or observe untraced reads.
+`SKILL.md` is load evidence; success comes from the matching `tool_result`.
+For Codex, a successful named `Skill` tool result or a completed shell read
+of the installed document with the skill header in `aggregated_output` is load
+evidence. Plain mentions and untraced automatic injection do not establish a load.
+
+Searches or listings for skills (for example `Glob`, `Grep`, `ls`, or
+`rg --files`) and failed `Skill` calls are probes, not contamination. Control
+contamination requires a successful `Skill` call or an observed successful content
+read of an external `SKILL.md` or a file in a skill directory. This includes catalog
+sources, installed copies, and host skill directories. Paths inside the fixture
+workspace do not count. Relative paths are interpreted from the workspace.
+The JSON report (schema 3) records `skill_probe_count` once per trial and lists
+distinct `contamination_reasons` for invalidated controls: `skill-load`,
+`catalog-read`, `host-skill-read`, or `installed-copy-read`. The trace summary
+does not store command arguments or paths.
+
+This tool-trace check is necessary for a valid comparison, but is not an OS-level
+file-access audit; it does not reconstruct all shell behavior or observe untraced reads.
 
 Run only trusted tasks, skills, executables and providers in an unmanaged
 environment. Profile and tool isolation do not constrain an arbitrary native
