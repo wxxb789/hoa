@@ -905,13 +905,24 @@ class SmokeTests(RunnerCase):
 
 
 class InterpreterTests(unittest.TestCase):
-    def test_spawned_pid_is_the_running_interpreter(self):
-        # Supervisors record Popen pids. Under `uv run` on Windows, a venv python.exe is a launcher
-        # that re-spawns the base interpreter, so its pid would not name the process that runs.
-        child = gdd_process.popen([agent_run.interpreter(), "-c", "import os; print(os.getpid())"],
-                                  stdout=subprocess.PIPE, text=True)
-        out, _ = child.communicate(timeout=60)
-        self.assertEqual(int(out), child.pid)
+    def test_runner_pid_is_the_running_interpreter_inside_a_venv(self):
+        # Supervisors record the runner's Popen pid. A Windows venv python.exe is a launcher that
+        # re-spawns the base interpreter, so its pid would not name the process that runs. Build a
+        # venv here: CI may run pytest from a base interpreter, which would hide the launcher.
+        with tempfile.TemporaryDirectory() as tmp:
+            venv = Path(tmp) / "v"
+            made = gdd_process.run([sys.executable, "-m", "venv", "--without-pip", str(venv)],
+                                   capture_output=True, text=True, timeout=120)
+            self.assertEqual(made.returncode, 0, made.stderr)
+            python = venv / ("Scripts/python.exe" if IS_WINDOWS else "bin/python")
+            probe = ("import sys, subprocess; sys.path.insert(0, sys.argv[1]); import agent_run, gdd_process;"
+                     "c = gdd_process.popen([agent_run.runner_interpreter(), '-c', 'import os; print(os.getpid())'],"
+                     " stdout=subprocess.PIPE, text=True); out, _ = c.communicate(timeout=60);"
+                     "print(int(out) == c.pid, int(out), c.pid)")
+            result = gdd_process.run([str(python), "-c", probe, os.path.dirname(RUNNER)], capture_output=True,
+                                     text=True, timeout=120)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(result.stdout.startswith("True"), result.stdout)
 
 
 if __name__ == "__main__":

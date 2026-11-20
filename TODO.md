@@ -17,9 +17,3 @@
   and [gdd-route-dsh](skills/gdd-route-dsh/SKILL.md#configuration). Update the default version
   in `SUPERVISOR` and the cases in `test_tmux_version_floor` in
   [test_detach_supervisors.py](skills/gdd/scripts/tests/test_detach_supervisors.py).
-- **Windows flake:** Investigate why the monitor PID changed between two status reads in
-  `test_deleting_finalized_agent_preserves_historical_outcome` in
-  [test_paseo_run_python.py](skills/gdd/scripts/tests/test_paseo_run_python.py). Observed once on
-  Windows; not reproduced in three reruns on `d181c40`. Reproduced in round 1 of the local
-  guarded Windows stress run after adding the test to the stress set; its teardown audit
-  found no leftover processes or test paths.
