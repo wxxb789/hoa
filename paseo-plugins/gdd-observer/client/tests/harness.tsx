@@ -5,7 +5,12 @@ import {
   QueryClientProvider,
   type QueryClientConfig,
 } from "@tanstack/react-query";
-import { PluginRpcProvider, PluginTranslationProvider, PluginTranslationRuntime } from "@getpaseo/plugin/client/host";
+import {
+  PluginRpcProvider,
+  PluginTranslationProvider,
+  PluginTranslationRuntime,
+  type PluginSubscribe,
+} from "@getpaseo/plugin/client/host";
 import type { PluginHostProps } from "@getpaseo/plugin/client";
 import type {
   FollowRunOutput,
@@ -14,7 +19,7 @@ import type {
   RunPathsOutput,
   RunSummary,
 } from "../../shared/runs";
-import { afterEach, vi, type Mock } from "vitest";
+import { afterEach, expect, vi, type Mock } from "vitest";
 import { StateBadge } from "../status-strip";
 
 export { TestFlatList, mountedRowRange, testListViewport } from "./setup";
@@ -156,10 +161,13 @@ export async function renderClient(element: ReactElement, options: Options = {})
     if (method === "runs.paths") return paths;
     throw new Error(`Unexpected RPC: ${method}`);
   }));
+  const subscribe = vi.fn<PluginSubscribe>((method) => {
+    throw new Error(`Unexpected RPC subscription: ${method}`);
+  });
   function wrap(children: ReactNode) {
     return (
       <PluginTranslationProvider runtime={translations}>
-        <PluginRpcProvider invoke={invoke}>
+        <PluginRpcProvider invoke={invoke} subscribe={subscribe}>
           <QueryClientProvider client={query}>{children}</QueryClientProvider>
         </PluginRpcProvider>
       </PluginTranslationProvider>
@@ -174,6 +182,8 @@ export async function renderClient(element: ReactElement, options: Options = {})
     // Unmount while a test's fake clock is still installed so pending polling timers are cleared
     // against the timers that created them, then hand the real clock back to the runner.
     if (vi.isFakeTimers()) vi.useRealTimers();
+    // The SDK can turn a subscription failure into hook state instead of throwing to the test.
+    expect(subscribe).not.toHaveBeenCalled();
   });
   return {
     tree, query, invoke, translations,
