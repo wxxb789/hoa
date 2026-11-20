@@ -13,6 +13,8 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 ## 2026-11-20
 
+- Keep Pi necessity trial homes, agent profiles, and session paths inside each trial,
+  with natural skill discovery limited to the isolated installation.
 - Rewrite all 37 model-visible skill descriptions for clearer routing; see the
   [held-out measurement](evals/results/2026-11-20-description-distinctiveness.md).
 - Keep recommendations based on recent work in `hoa-skill-curate` only; keep `hoa-skill-set-audit` report-only.

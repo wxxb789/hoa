@@ -113,7 +113,8 @@ uv run --script evals/run_necessity_eval.py evals/tasks/claim-audit.json --runti
   the cap. The report lists each skipped arm and repeat.
 
 Each trial gets a fresh workspace, HOME/USERPROFILE, runtime profiles, XDG
-homes, APPDATA/LOCALAPPDATA and temp directories. Claude uses strict empty MCP
+homes, APPDATA/LOCALAPPDATA and temp directories. On Windows, HOMEDRIVE and
+HOMEPATH together point to the trial's USERPROFILE. Claude uses strict empty MCP
 configuration. Codex `exec --json` uses an isolated `CODEX_HOME` and copies only
 `model_provider` and its matching `model_providers` table from the operator's
 `$CODEX_HOME/config.toml` (default `~/.codex/config.toml`). Environment credentials
@@ -123,7 +124,9 @@ state or an executable auth command. Codex bypasses approvals and sandboxing,
 and disables the dispatch integrations, web search, subagents and bundled skills.
 
 Pi uses the checkout's gdd Pi route for JSON mode and the success marker.
-Each trial sets `PI_CODING_AGENT_DIR` to a new directory and copies only the
+Every Pi arm in both modes uses `<trial>/home/.pi/agent` as
+`PI_CODING_AGENT_DIR` and redirects `PI_CODING_AGENT_SESSION_DIR` to a separate
+directory under the same isolated home. The runner copies only the
 `tencent-litellm` entry from `~/.pi/agent/models.json` and the matching entry
 from `auth.json`, when present. Only environment variables referenced by that
 provider's credentials or headers are forwarded as provider credentials.
@@ -132,7 +135,9 @@ are copied. Pi disables session persistence, MCP, extensions, project trust and
 context-file loading. The real Pi agent directory is read-only to the runner.
 Controls always use `--no-skills`. The forced skill arm uses `--no-skills` with
 an explicit `--skill` pointing at the installed copy. Only the natural skill arm
-allows discovery, with the copy in `<agent-dir>/skills/<name>/SKILL.md`.
+allows discovery, with the copy in `<trial>/home/.pi/agent/skills/<name>/SKILL.md`.
+Neither control has an installed copy. These settings isolate default home
+lookups, not explicit file access outside the trial.
 
 Codex CLI 0.171.0 still discovers `$CODEX_HOME/skills/<name>/SKILL.md`, the
 legacy user root intentionally used here. On Windows it also enumerates the real

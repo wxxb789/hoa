@@ -22,6 +22,8 @@ for key in ("HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "XDG_CONFIG_HOME",
     path = Path(os.environ[key])
     assert path.is_relative_to(root), (key, path)
     (path / (key + ".sentinel")).write_text("within trial", encoding="utf-8")
+if os.name == "nt":
+    assert Path(os.environ["HOMEDRIVE"] + os.environ["HOMEPATH"]) == Path(os.environ["USERPROFILE"])
 assert "ARBITRARY_PARENT_SECRET" not in os.environ
 assert "AUDIT_STATE_DIR" not in os.environ
 assert "GIT_DIR" not in os.environ
@@ -30,9 +32,16 @@ assert prompt.startswith("same prompt for every arm: report-claim-audit")
 assert ("First read" in prompt) == (MODE == "forced" and HAS_SKILL)
 assert ("frozen terse text" in str(sys.argv)) == IS_TERSE
 if RUNTIME == "pi":
+    home = Path.home()
+    assert home == Path(os.environ["HOME"])
+    assert not (home / ".agents" / "skills").exists()
+    assert Path(os.environ["PI_CODING_AGENT_SESSION_DIR"]) == home / ".pi" / "sessions"
     agent = Path(os.environ["PI_CODING_AGENT_DIR"])
-    assert agent == Path(os.environ["HOME"]) / ".pi" / "agent"
+    assert agent == home / ".pi" / "agent"
     assert {p.name for p in agent.iterdir()} == {"skills", "models.json", "auth.json"}
+    assert {p.name for p in (agent / "skills").iterdir()} == (
+        {"report-claim-audit"} if HAS_SKILL else set()
+    )
     assert json.loads((agent / "models.json").read_text(encoding="utf-8")) == {
         "providers": {"tencent-litellm": PI_CONFIG}}
     assert json.loads((agent / "auth.json").read_text(encoding="utf-8")) == {
@@ -236,9 +245,15 @@ command = "do-not-run"
     (outside / "auth.json").write_text("do not copy", encoding="utf-8")
     for key in (*runner.PROFILE, "AUDIT_STATE_DIR", "GIT_DIR", "ARBITRARY_PARENT_SECRET"):
         monkeypatch.setenv(key, str(outside))
+    if sys.platform == "win32":
+        monkeypatch.setenv("HOMEDRIVE", outside.drive)
+        monkeypatch.setenv("HOMEPATH", str(outside)[len(outside.drive):])
     monkeypatch.setenv("EVAL_STUB_TOKEN", "private-token")
     monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "not-for-codex")
     if runtime == "pi":
+        host_skill = outside / ".agents" / "skills" / "host-only" / "SKILL.md"
+        host_skill.parent.mkdir(parents=True)
+        host_skill.write_text("do not discover", encoding="utf-8")
         agent = outside / ".pi" / "agent"
         agent.mkdir(parents=True)
         (agent / "models.json").write_text(json.dumps({"providers": {
@@ -252,6 +267,7 @@ command = "do-not-run"
         monkeypatch.setenv("OTHER_PI_KEY", "unrelated-pi-env")
         monkeypatch.setenv("PI_STUB_HEADER", "private-pi-header")
         monkeypatch.setenv("PI_CODING_AGENT_DIR", str(agent))
+        monkeypatch.setenv("PI_CODING_AGENT_SESSION_DIR", str(agent / "sessions"))
     # tempfile chooses its base independently of the untrusted agent profile.
     monkeypatch.setattr(runner.tempfile, "tempdir", str(tmp_path))
     monkeypatch.setattr(runner, "codex_host_skill_rules", lambda: [])
