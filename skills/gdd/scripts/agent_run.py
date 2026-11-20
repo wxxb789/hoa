@@ -766,7 +766,7 @@ def text_parts(content):
 
 
 def fold_message_events(acc, event):
-    """Fold the message-event protocol shared by OMP and Pi."""
+    """Fold the message-event protocol shared by OMP, Pi, and Omo."""
     kind = event.get("type")
     if kind == "session" and not acc["session_id"]:
         acc["session_id"] = event.get("id") or ""
@@ -823,6 +823,7 @@ class Route:
     scrub_env: tuple[str, ...] = ()
     prepare: Callable[[argparse.Namespace], None] | None = None  # pre-start validation
     legacy: tuple[Literal["backend", "profile", "session_id"], ...] = ()
+    windows_native: bool = False  # never cross cmd.exe's batch shim boundary
 
 
 class RouteError(ValueError):
@@ -892,6 +893,7 @@ def parse_route(name: str, path: Path, source: bytes) -> Route:
         ("legacy", isinstance(route.legacy, tuple) and all(key in ("backend", "profile", "session_id")
                                                          for key in route.legacy),
          "expected a tuple of legacy start option names"),
+        ("windows_native", isinstance(route.windows_native, bool), "expected a bool"),
     )
     for field, valid, detail in checks:
         if not valid:
@@ -926,7 +928,11 @@ def fold_line(spec, acc, raw):
 def resolve_binary(spec):
     key = f"{spec.name.upper()}_BIN"
     name = os.path.expanduser(os.environ.get(key) or spec.name)
-    path = name if os.path.dirname(name) else shutil.which(name)
+    native = IS_WINDOWS and spec.windows_native
+    lookup = f"{name}.exe" if native and not os.path.splitext(name)[1] else name
+    path = name if os.path.dirname(name) else shutil.which(lookup)
+    if native and (not path or os.path.splitext(path)[1].lower() not in (".exe", ".py")):
+        die(f"start: {name!r} requires a native executable; point {key} at the real executable")
     if not path or not os.path.isfile(path):
         die(f"start: agent binary not found: {key}={name}")
     return command_prefix(path)

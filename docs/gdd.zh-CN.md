@@ -21,6 +21,8 @@ ledger。[目标契约目录](goals/README.md)是本仓库存放活跃契约的�
 | Claude Code | `claude` | `gdd-route-cc` | 隐藏 |
 | Pi | `pi` | `gdd-route-pi` | 隐藏 |
 | OpenCode | `opencode` | `gdd-route-opencode` | 隐藏 |
+| Omo | `omo` | `gdd-route-omo` | 隐藏 |
+| GitHub Copilot | `copilot` | `gdd-route-copilot` | 隐藏 |
 
 上表描述独立 route 的设计。请从[生成的安装指南](../index.zh-CN.md#安装)
 查看当前 checkout 可用的包。隐藏 route 不向模型公布以供路由；隐藏不授予权限。

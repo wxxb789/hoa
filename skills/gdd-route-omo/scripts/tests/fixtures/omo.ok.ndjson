@@ -1,0 +1,9 @@
+{"type":"session","version":3,"id":"00000000-0000-7000-8000-000000000001"}
+{"type":"agent_start"}
+{"type":"turn_start"}
+{"type":"message_end","message":{"role":"user","content":[{"type":"text","text":"Reply with exactly PROBE_OK. Do not use tools."}]}}
+{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"PROBE_OK"}],"stopReason":"stop","usage":{"input":6715,"output":5,"cacheRead":0,"cacheWrite":0,"totalTokens":6720,"cost":{"total":0},"costUnknown":true}}}
+{"type":"turn_end"}
+{"type":"agent_end","willRetry":false}
+{"type":"agent_settled"}
+{"type":"agent_idle"}
