@@ -1,0 +1,1015 @@
+{
+  "schema_version": 2,
+  "task": "delegated-work-acceptance",
+  "generated_at": "2026-11-20T00:44:02.552676-08:00",
+  "skill": "delegated-work-acceptance",
+  "skill_revision": "7",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "forced",
+  "shell": false,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "eligible-population": {
+      "field": "eligible_total",
+      "equals": 13
+    },
+    "missing-count": {
+      "field": "missing_total",
+      "equals": 4
+    },
+    "missing-keys": {
+      "field": "missing_keys",
+      "equals": [
+        "east/ferry",
+        "north/sluice",
+        "south/lock",
+        "west/ferry"
+      ]
+    },
+    "increment-paths": {
+      "field": "increment_paths",
+      "equals": [
+        "audit/b18.json",
+        "intake/aliases.csv",
+        "intake/normalize.ts"
+      ]
+    },
+    "ownership-stop": {
+      "field": "operator_paths",
+      "equals": [
+        "intake/aliases.csv"
+      ]
+    },
+    "operational-proof": {
+      "field": "unproven_cases",
+      "equals": [
+        "apply-rollback",
+        "apply-success"
+      ]
+    }
+  },
+  "rubric_flags": {
+    "eligible-population": "non-discriminating",
+    "missing-count": "non-discriminating",
+    "missing-keys": "non-discriminating",
+    "increment-paths": "flaky",
+    "ownership-stop": "flaky",
+    "operational-proof": "non-discriminating"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 0,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.0,
+      "pass^k": false,
+      "mean_score": 0.7222222222222222,
+      "sample_stddev": 0.09622504486493767
+    },
+    "terse": {
+      "valid": true,
+      "passed": 0,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.0,
+      "pass^k": false,
+      "mean_score": 0.6666666666666666,
+      "sample_stddev": 0.0
+    },
+    "skill": {
+      "valid": true,
+      "passed": 1,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 0.3333333333333333,
+      "pass^k": false,
+      "mean_score": 0.7777777777777778,
+      "sample_stddev": 0.1924500897298753
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": 0.05555555555555558,
+    "terse": 0.11111111111111116
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"eligible_total\":13,\"missing_total\":4,\"missing_keys\":[\"east/ferry\",\"north/sluice\",\"south/lock\",\"west/ferry\"],\"increment_paths\":[\"audit/b18.json\",\"intake/normalize.ts\"],\"operator_paths\":[\"desk/calendar.md\",\"intake/aliases.csv\"],\"unproven_cases\":[\"apply-rollback\",\"apply-success\"],\"decision_note\":\"13 eligible groups after active+intake filter, max revision, and west/beacon suppression (east/beacon is preview-channel, so excluded). Receipts cover 9. Missing: east/ferry, west/ferry, north/sluice (no receipt), south/lock (void receipt Q-122). The handoff's leaf-keyed join hid the ferry gaps. preview-list has a passing b18 run and a failing revert run, so it can be signed off. apply-rollback is unproven: its b18 and revert runs both pass, and the runner discarded its temp store before the byte comparison, so the assertion is vacuous. apply-success has no lab evidence. Aliases is pre-existing dirty, so it goes to the operator, not the increment. No tests or CI TAP output are in the packet, so the 13-test claim is unverified.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "eligible-population": true,
+          "missing-count": true,
+          "missing-keys": true,
+          "increment-paths": false,
+          "ownership-stop": false,
+          "operational-proof": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 17.031,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 5721,
+          "cache_read_input_tokens": 18750,
+          "output_tokens": 3007,
+          "output_tokens_details": {
+            "thinking_tokens": 1888
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5721
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27484,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002406725,
+        "turns": 10
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"eligible_total\": 13, \"missing_total\": 4, \"missing_keys\": [\"east/ferry\", \"north/sluice\", \"south/lock\", \"west/ferry\"], \"increment_paths\": [\"audit/b18.json\", \"intake/normalize.ts\"], \"operator_paths\": [\"desk/calendar.md\", \"intake/aliases.csv\"], \"unproven_cases\": [\"apply-rollback\", \"apply-success\"], \"decision_note\": \"Eligible rows come from inventory.csv after checker-config rules: keep active/intake, max revision per branch/leaf, west/beacon suppressed (Q-088). Missing receipts are eligible keys without an issued receipt; south/lock is void (Q-122). The worker's handoff keyed by leaf and ignored the branch, so it is not used. intake/aliases.csv was dirty before the worker started and is a pre-existing local edit, so it goes to the operator. The worker's exclusion of it from accounting is unresolved. apply-success has no lab case. apply-rollback passed only because the runner discarded its temp store before comparing bytes, and the revert control (305) still passed. preview-list is supported by lab run 301, with revert control 302 failing. The shipped command is --apply, but the preview case used --dry-run. This is a read-only record; nothing was repaired.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "eligible-population": true,
+          "missing-count": true,
+          "missing-keys": true,
+          "increment-paths": false,
+          "ownership-stop": false,
+          "operational-proof": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 18.018,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 5462,
+          "cache_read_input_tokens": 19021,
+          "output_tokens": 3458,
+          "output_tokens_details": {
+            "thinking_tokens": 2306
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5462
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27947,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00260256,
+        "turns": 10
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"eligible_total\": 13, \"missing_total\": 4, \"missing_keys\": [\"east/ferry\", \"north/sluice\", \"south/lock\", \"west/ferry\"], \"increment_paths\": [\"audit/b18.json\", \"intake/aliases.csv\", \"intake/normalize.ts\"], \"operator_paths\": [\"desk/calendar.md\", \"intake/aliases.csv\"], \"unproven_cases\": [\"apply-rollback\", \"apply-success\"], \"decision_note\": \"Eligible = active, intake, not suppressed (west/beacon, Q-088), deduplicated by branch/leaf at max revision: 13 groups. Receipt coverage uses issued receipts joined on branch/leaf: 9 covered. Missing are east/ferry and west/ferry (only north/ferry has a receipt, so the leaf-keyed dashboard overstated coverage), north/sluice (no receipt), and south/lock (receipt void). The handoff's 'two exceptions' is wrong. Increment: intake/aliases.csv is included because the request assigns this batch's alias changes to the worker; it was also dirty before the worker started, so it is listed under operator_paths as a pre-existing edit the operator must decide on. desk/calendar.md is operator-owned. Gate: preview-list is supported (run 301 passes, and the reverted build fails in 302). apply-success has no write-case evidence in the exports. apply-rollback is non-discriminating: run 304 passes with the runner discarding its store before the byte comparison, and run 305 passes with the rollback code removed. The handoff's 'ready to sign off' is not supported by these exports. Nothing was repaired.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "eligible-population": true,
+          "missing-count": true,
+          "missing-keys": true,
+          "increment-paths": true,
+          "ownership-stop": false,
+          "operational-proof": true
+        },
+        "score": 0.8333333333333334,
+        "passed": false,
+        "seconds": 18.035,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 5469,
+          "cache_read_input_tokens": 19026,
+          "output_tokens": 3586,
+          "output_tokens_details": {
+            "thinking_tokens": 2310
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5469
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 28087,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002667485,
+        "turns": 10
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"eligible_total\": 13, \"missing_total\": 4, \"missing_keys\": [\"east/ferry\", \"north/sluice\", \"south/lock\", \"west/ferry\"], \"increment_paths\": [\"audit/b18.json\", \"intake/normalize.ts\"], \"operator_paths\": [\"desk/calendar.md\", \"intake/aliases.csv\"], \"unproven_cases\": [\"apply-rollback\", \"apply-success\"], \"decision_note\": \"Not accepted. Four eligible branch/leaf groups lack an issued receipt: east/ferry and west/ferry (the north/ferry receipt does not cover them, since the dashboard keyed by leaf), north/sluice, and south/lock (receipt void). apply-success has no lab evidence. apply-rollback's PASS is vacuous (the store is discarded before the byte comparison, and the rollback-reverted build also passes). preview-list is supported by lab run 301, and its reverted build (302) fails. Dirty paths: desk/calendar.md is operator-owned and pre-existing; intake/aliases.csv was already dirty and its intake blob differs from the dispatch blob, so the operator decides it. The worker's claim that all 13 tests passed is not verified by these exports.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "eligible-population": true,
+          "missing-count": true,
+          "missing-keys": true,
+          "increment-paths": false,
+          "ownership-stop": false,
+          "operational-proof": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 17.331,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 8103,
+          "cache_read_input_tokens": 16638,
+          "output_tokens": 3149,
+          "output_tokens_details": {
+            "thinking_tokens": 1996
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 8103
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27896,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002754355,
+        "turns": 10
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"eligible_total\": 13, \"missing_total\": 4, \"missing_keys\": [\"east/ferry\", \"north/sluice\", \"south/lock\", \"west/ferry\"], \"increment_paths\": [\"audit/b18.json\", \"intake/normalize.ts\"], \"operator_paths\": [\"desk/calendar.md\", \"intake/aliases.csv\"], \"unproven_cases\": [\"apply-rollback\", \"apply-success\"], \"decision_note\": \"Not accepted. Receipts join on branch+leaf, not leaf alone, so the worker's leaf-keyed export hides four uncovered eligible groups: east/ferry (no receipt), north/sluice (no receipt), south/lock (receipt void), west/ferry (no receipt). Eligible set is 13 after keep/active/intake, max-revision per group, and the west/beacon suppression. preview-list is supported by lab run 301, which fails when the duplicate-op revert is applied. apply-rollback is not proven: run 304 passes only because the temp store was discarded before the byte comparison, and run 305 passes with the rollback code removed. apply-success has no evidence in the packet. The increment is the worker's two files. The aliases.csv edit predates the batch and desk/calendar.md is operator-owned, so both go to the operator.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "eligible-population": true,
+          "missing-count": true,
+          "missing-keys": true,
+          "increment-paths": false,
+          "ownership-stop": false,
+          "operational-proof": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 16.442,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 5480,
+          "cache_read_input_tokens": 19225,
+          "output_tokens": 3026,
+          "output_tokens_details": {
+            "thinking_tokens": 1871
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5480
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27737,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00239085,
+        "turns": 10
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"eligible_total\": 13, \"missing_total\": 4, \"missing_keys\": [\"east/ferry\", \"north/sluice\", \"south/lock\", \"west/ferry\"], \"increment_paths\": [\"audit/b18.json\", \"intake/normalize.ts\"], \"operator_paths\": [\"desk/calendar.md\", \"intake/aliases.csv\"], \"unproven_cases\": [\"apply-rollback\", \"apply-success\"], \"decision_note\": \"Eligibility applies the checker rules (active, intake, max revision per branch/leaf, west/beacon suppressed) to inventory.csv, giving 13 groups. Receipts join on branch+leaf with status issued. south/lock is void and east/ferry, north/sluice and west/ferry have no receipt, so 4 are missing. The worker's leaf-keyed claim that ferry is covered does not hold for east or west. Increment is the two worker-owned dirty intake paths; aliases.csv was dirty before the batch and desk/calendar.md is operator-owned, so both go to the operator. preview-list is supported by run 301, and the reverted build (302) fails, so the check discriminates. apply-success has no lab evidence. apply-rollback is not proven: run 304 discards its temp store before the byte comparison, and run 305 passes with the rollback code removed. No repairs or commits were made.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "eligible-population": true,
+          "missing-count": true,
+          "missing-keys": true,
+          "increment-paths": false,
+          "ownership-stop": false,
+          "operational-proof": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 17.67,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 5465,
+          "cache_read_input_tokens": 19220,
+          "output_tokens": 3227,
+          "output_tokens_details": {
+            "thinking_tokens": 2057
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5465
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27918,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002489425,
+        "turns": 10
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"eligible_total\": 13, \"missing_total\": 4, \"missing_keys\": [\"east/ferry\", \"north/sluice\", \"south/lock\", \"west/ferry\"], \"increment_paths\": [\"audit/b18.json\", \"intake/aliases.csv\", \"intake/normalize.ts\"], \"operator_paths\": [\"intake/aliases.csv\"], \"unproven_cases\": [\"apply-rollback\", \"apply-success\"], \"decision_note\": \"Not acceptable for sign-off. Eligible set is 13 after the active/intake filter, the west/beacon Q-088 suppression, and max-revision dedup (south/cut). Only 9 have an issued receipt; south/lock is void and east/ferry, north/sluice and west/ferry have none. The worker's leaf-keyed join hid three of these. intake/aliases.csv changed content from blob-12 to blob-23 during the run, so it is in the increment and has two writers, which needs an operator ownership ruling. apply-success has no gate case. apply-rollback passes only vacuously: the store is discarded before the byte comparison, and the mutation run with rollback removed still passes (305). preview-list is proven: 301 passes and the reverted preview fails (302).\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "eligible-population": true,
+          "missing-count": true,
+          "missing-keys": true,
+          "increment-paths": true,
+          "ownership-stop": true,
+          "operational-proof": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 20.796,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 10648,
+          "cache_read_input_tokens": 35794,
+          "output_tokens": 3638,
+          "output_tokens_details": {
+            "thinking_tokens": 2401
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 10648
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 50088,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00350874,
+        "turns": 11
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"eligible_total\": 13, \"missing_total\": 4, \"missing_keys\": [\"east/ferry\", \"north/sluice\", \"south/lock\", \"west/ferry\"], \"increment_paths\": [\"audit/b18.json\", \"intake/normalize.ts\"], \"operator_paths\": [\"desk/calendar.md\", \"intake/aliases.csv\"], \"unproven_cases\": [\"apply-rollback\", \"apply-success\"], \"decision_note\": \"Eligible set is 13 branch/leaf groups after keep (active, intake), the west/beacon suppression (Q-088) and max-revision grouping; north/canal is retired and east/beacon is preview. Receipts join on branch+leaf with status issued; south/lock is void and east/ferry, north/sluice and west/ferry have no receipt. The worker's leaf-keyed check and its 'ferry covered' claim do not hold. intake/aliases.csv changed from blob-12 at dispatch to blob-23 now, so it is an overlap with the operator's pre-existing edit and is not accepted into the increment. desk/calendar.md is unchanged from baseline. Gates: preview-list has lab run 301 PASS with mutation run 302 FAIL. apply-rollback is unproven: run 304 compares bytes after the store is discarded, and run 305 passes with rollback code removed. apply-success has no lab case in gate-cases.csv or the exports. Nothing was repaired and nothing was committed.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "eligible-population": true,
+          "missing-count": true,
+          "missing-keys": true,
+          "increment-paths": false,
+          "ownership-stop": false,
+          "operational-proof": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 21.582,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 10648,
+          "cache_read_input_tokens": 35794,
+          "output_tokens": 3903,
+          "output_tokens_details": {
+            "thinking_tokens": 2592
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 10648
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 50353,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0036412400000000004,
+        "turns": 11
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"eligible_total\": 13, \"missing_total\": 4, \"missing_keys\": [\"east/ferry\", \"north/sluice\", \"south/lock\", \"west/ferry\"], \"increment_paths\": [\"audit/b18.json\", \"intake/normalize.ts\"], \"operator_paths\": [\"desk/calendar.md\", \"intake/aliases.csv\"], \"unproven_cases\": [\"apply-rollback\", \"apply-success\"], \"decision_note\": \"Not accepted. Eligible set is 13 after excluding east/beacon (preview), north/canal (retired) and suppressing west/beacon (Q-088), with south/cut collapsed to revision 2. Receipts cover 9; south/lock is void, so 4 are missing. intake/aliases.csv changed from blob-12 to blob-23 since dispatch, so it is a contested overlap, not pre-existing and untouched. The worker's leaf-keyed export and rerun evidence do not prove apply-success (no write-to-store case) or apply-rollback (run 304 discards the store before comparing; run 305 passes with rollback removed). preview-list is supported by run 301, and run 302 fails when the fix is reverted. Nothing was repaired or written.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "eligible-population": true,
+          "missing-count": true,
+          "missing-keys": true,
+          "increment-paths": false,
+          "ownership-stop": false,
+          "operational-proof": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 30.506,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 11033,
+          "cache_read_input_tokens": 50699,
+          "output_tokens": 5583,
+          "output_tokens_details": {
+            "thinking_tokens": 4257
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 11033
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 67325,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.004678615,
+        "turns": 12
+      }
+    ]
+  },
+  "verdict": "no-difference",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 334835,
+  "skipped_trials": []
+}

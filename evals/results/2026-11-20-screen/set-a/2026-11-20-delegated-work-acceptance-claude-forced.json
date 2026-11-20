@@ -1,0 +1,883 @@
+{
+  "schema_version": 2,
+  "task": "delegated-work-acceptance",
+  "generated_at": "2026-11-20T00:41:53.604220-08:00",
+  "skill": "delegated-work-acceptance",
+  "skill_revision": "7",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "forced",
+  "shell": false,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "return-for-repair": {
+      "field": "decision",
+      "equals": "return-for-repair"
+    },
+    "delivered-count": {
+      "field": "delivered",
+      "equals": 2
+    },
+    "assigned-count": {
+      "field": "assigned",
+      "equals": 3
+    },
+    "missing-migration": {
+      "field": "missing",
+      "equals": "migrations/043_receipt.sql"
+    },
+    "out-of-scope-paths": {
+      "field": "forbidden",
+      "equals": [
+        "archive/043_receipt.sql",
+        "config/import.toml"
+      ]
+    },
+    "operator-baseline": {
+      "field": "excluded_preexisting",
+      "equals": "notes/release.md"
+    },
+    "unverified-apply": {
+      "field": "unsupported_gate",
+      "equals": "migration-apply"
+    }
+  },
+  "rubric_flags": {
+    "return-for-repair": "non-discriminating",
+    "delivered-count": "non-discriminating",
+    "assigned-count": "non-discriminating",
+    "missing-migration": "non-discriminating",
+    "out-of-scope-paths": "flaky",
+    "operator-baseline": "non-discriminating",
+    "unverified-apply": "non-discriminating"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    },
+    "terse": {
+      "valid": true,
+      "passed": 2,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.6666666666666666,
+      "pass^k": false,
+      "mean_score": 0.9523809523809523,
+      "sample_stddev": 0.08247860988423228
+    },
+    "skill": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": 0.0,
+    "terse": 0.04761904761904767
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"decision\":\"return-for-repair\",\"delivered\":2,\"assigned\":3,\"missing\":\"migrations/043_receipt.sql\",\"forbidden\":[\"archive/043_receipt.sql\",\"config/import.toml\"],\"excluded_preexisting\":\"notes/release.md\",\"unsupported_gate\":\"migration-apply\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "return-for-repair": true,
+          "delivered-count": true,
+          "assigned-count": true,
+          "missing-migration": true,
+          "out-of-scope-paths": true,
+          "operator-baseline": true,
+          "unverified-apply": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 10.104,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 9036,
+          "cache_read_input_tokens": 14544,
+          "output_tokens": 1424,
+          "output_tokens_details": {
+            "thinking_tokens": 833
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 9036
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 25010,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00198754,
+        "turns": 7
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"decision\":\"return-for-repair\",\"delivered\":2,\"assigned\":3,\"missing\":\"migrations/043_receipt.sql\",\"forbidden\":[\"archive/043_receipt.sql\",\"config/import.toml\"],\"excluded_preexisting\":\"notes/release.md\",\"unsupported_gate\":\"migration-apply\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "return-for-repair": true,
+          "delivered-count": true,
+          "assigned-count": true,
+          "missing-migration": true,
+          "out-of-scope-paths": true,
+          "operator-baseline": true,
+          "unverified-apply": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 10.059,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4531,
+          "cache_read_input_tokens": 19562,
+          "output_tokens": 1345,
+          "output_tokens_details": {
+            "thinking_tokens": 760
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4531
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 25444,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.001435095,
+        "turns": 7
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"decision\":\"return-for-repair\",\"delivered\":2,\"assigned\":3,\"missing\":\"migrations/043_receipt.sql\",\"forbidden\":[\"archive/043_receipt.sql\",\"config/import.toml\"],\"excluded_preexisting\":\"notes/release.md\",\"unsupported_gate\":\"migration-apply\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "return-for-repair": true,
+          "delivered-count": true,
+          "assigned-count": true,
+          "missing-migration": true,
+          "out-of-scope-paths": true,
+          "operator-baseline": true,
+          "unverified-apply": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 16.552,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 4777,
+          "cache_read_input_tokens": 28631,
+          "output_tokens": 2252,
+          "output_tokens_details": {
+            "thinking_tokens": 1581
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4777
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 35668,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002010235,
+        "turns": 8
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"decision\":\"return-for-repair\",\"delivered\":2,\"assigned\":3,\"missing\":\"migrations/043_receipt.sql\",\"forbidden\":[\"archive/043_receipt.sql\",\"config/import.toml\"],\"excluded_preexisting\":\"notes/release.md\",\"unsupported_gate\":\"migration-apply\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "return-for-repair": true,
+          "delivered-count": true,
+          "assigned-count": true,
+          "missing-migration": true,
+          "out-of-scope-paths": true,
+          "operator-baseline": true,
+          "unverified-apply": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 12.413,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 9149,
+          "cache_read_input_tokens": 15221,
+          "output_tokens": 1261,
+          "output_tokens_details": {
+            "thinking_tokens": 676
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 9149
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 25637,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.001926935,
+        "turns": 7
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"decision\":\"return-for-repair\",\"delivered\":2,\"assigned\":3,\"missing\":\"migrations/043_receipt.sql\",\"forbidden\":[\"archive/043_receipt.sql\",\"config/import.toml\"],\"excluded_preexisting\":\"notes/release.md\",\"unsupported_gate\":\"migration-apply\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "return-for-repair": true,
+          "delivered-count": true,
+          "assigned-count": true,
+          "missing-migration": true,
+          "out-of-scope-paths": true,
+          "operator-baseline": true,
+          "unverified-apply": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 9.364,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4547,
+          "cache_read_input_tokens": 19849,
+          "output_tokens": 1298,
+          "output_tokens_details": {
+            "thinking_tokens": 701
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4547
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 25700,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.001416465,
+        "turns": 7
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"decision\":\"return-for-repair\",\"delivered\":2,\"assigned\":3,\"missing\":\"migrations/043_receipt.sql\",\"forbidden\":[\"config/import.toml\"],\"excluded_preexisting\":\"notes/release.md\",\"unsupported_gate\":\"migration-apply\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "return-for-repair": true,
+          "delivered-count": true,
+          "assigned-count": true,
+          "missing-migration": true,
+          "out-of-scope-paths": false,
+          "operator-baseline": true,
+          "unverified-apply": true
+        },
+        "score": 0.8571428571428571,
+        "passed": false,
+        "seconds": 11.047,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4539,
+          "cache_read_input_tokens": 19842,
+          "output_tokens": 1362,
+          "output_tokens_details": {
+            "thinking_tokens": 783
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4539
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 25749,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.001447395,
+        "turns": 7
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"decision\":\"return-for-repair\",\"delivered\":2,\"assigned\":3,\"missing\":\"migrations/043_receipt.sql\",\"forbidden\":[\"archive/043_receipt.sql\",\"config/import.toml\"],\"excluded_preexisting\":\"notes/release.md\",\"unsupported_gate\":\"migration-apply\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "return-for-repair": true,
+          "delivered-count": true,
+          "assigned-count": true,
+          "missing-migration": true,
+          "out-of-scope-paths": true,
+          "operator-baseline": true,
+          "unverified-apply": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 13.606,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 9745,
+          "cache_read_input_tokens": 36350,
+          "output_tokens": 1524,
+          "output_tokens_details": {
+            "thinking_tokens": 828
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 9745
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 47627,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002344425,
+        "turns": 8
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"decision\":\"return-for-repair\",\"delivered\":2,\"assigned\":3,\"missing\":\"migrations/043_receipt.sql\",\"forbidden\":[\"archive/043_receipt.sql\",\"config/import.toml\"],\"excluded_preexisting\":\"notes/release.md\",\"unsupported_gate\":\"migration-apply\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "return-for-repair": true,
+          "delivered-count": true,
+          "assigned-count": true,
+          "missing-migration": true,
+          "out-of-scope-paths": true,
+          "operator-baseline": true,
+          "unverified-apply": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 12.611,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 9721,
+          "cache_read_input_tokens": 36318,
+          "output_tokens": 1411,
+          "output_tokens_details": {
+            "thinking_tokens": 729
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 9721
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 47458,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002284605,
+        "turns": 8
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"decision\":\"return-for-repair\",\"delivered\":2,\"assigned\":3,\"missing\":\"migrations/043_receipt.sql\",\"forbidden\":[\"archive/043_receipt.sql\",\"config/import.toml\"],\"excluded_preexisting\":\"notes/release.md\",\"unsupported_gate\":\"migration-apply\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "return-for-repair": true,
+          "delivered-count": true,
+          "assigned-count": true,
+          "missing-migration": true,
+          "out-of-scope-paths": true,
+          "operator-baseline": true,
+          "unverified-apply": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 13.556,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 9721,
+          "cache_read_input_tokens": 36318,
+          "output_tokens": 1434,
+          "output_tokens_details": {
+            "thinking_tokens": 752
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 9721
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 47481,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0022961049999999997,
+        "turns": 8
+      }
+    ]
+  },
+  "verdict": "no-difference",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 305774,
+  "skipped_trials": []
+}

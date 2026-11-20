@@ -1,0 +1,977 @@
+{
+  "schema_version": 2,
+  "task": "measurement-campaign-evidence",
+  "generated_at": "2026-11-20T00:49:06.150206-08:00",
+  "skill": "measurement-campaign-evidence",
+  "skill_revision": "2",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "forced",
+  "shell": false,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "campaign-decision": {
+      "field": "campaign_usable",
+      "equals": false
+    },
+    "off-candidate": {
+      "field": "off_candidate_reports",
+      "equals": [
+        "run-214"
+      ]
+    },
+    "publishable-deltas": {
+      "field": "pilot_delta_ms",
+      "equals": {
+        "aisle-320": 4,
+        "aisle-2400": null
+      }
+    },
+    "affected-control-set": {
+      "field": "rerun_controls",
+      "equals": [
+        "backlog-128",
+        "backlog-64",
+        "backlog-96"
+      ]
+    }
+  },
+  "rubric_flags": {
+    "campaign-decision": "non-discriminating",
+    "off-candidate": "non-discriminating",
+    "publishable-deltas": "non-discriminating",
+    "affected-control-set": "flaky"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    },
+    "terse": {
+      "valid": true,
+      "passed": 2,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.6666666666666666,
+      "pass^k": false,
+      "mean_score": 0.9166666666666666,
+      "sample_stddev": 0.14433756729740643
+    },
+    "skill": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": 0.0,
+    "terse": 0.08333333333333337
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"campaign_usable\":false,\"off_candidate_reports\":[\"run-214\"],\"pilot_delta_ms\":{\"aisle-320\":4,\"aisle-2400\":null},\"rerun_controls\":[\"backlog-128\",\"backlog-64\",\"backlog-96\"],\"decision_note\":\"Do not circulate the report as a pass. run-214 (2,400 parcels) reports installed_payload_fingerprint tree:a37d03e1, but release-lock.json pins tree:1b28ae70, so it is not the released build. Its tarball_ref points to the same lock file, so the fingerprint is the only discriminator. The 2,400 gate therefore has no valid evidence. The 320 (run-210, p95 result 13 ms) and 9,600 (run-217, p95 result 51 ms) runs match the lock and pass the 60 ms gate, with draw p95 reported alongside. The chair draft's instruction to use all three rows is wrong. The 2,400 size needs a fresh campaign run on the released build. The pilot delta uses the page_pointerover_to_visible_ms column, which both files record. The controller_around_action_ms column exists only in the candidate file, so the draft's +110 ms and +118 ms figures compare different metrics and should be withdrawn. aisle-320 p50 is 151 ms candidate versus 147 ms legacy, a +4 ms delta. aisle-2400 has one candidate sample against five legacy samples, so no comparison is warranted. The control rerun covers backlog-64 and backlog-96, which used fallback or rehearsal cache files, and backlog-128, which had no output. backlog-48 (Feb 19, fresh latest.json, same filename scheme) and oversize-10m (readStdout, unaffected) are kept as-is. Historical IDs are excluded from this slot.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "campaign-decision": true,
+          "off-candidate": true,
+          "publishable-deltas": true,
+          "affected-control-set": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 15.114,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 5740,
+          "cache_read_input_tokens": 18730,
+          "output_tokens": 2737,
+          "output_tokens_details": {
+            "thinking_tokens": 1408
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5740
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27213,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0022739,
+        "turns": 10
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"campaign_usable\":false,\"off_candidate_reports\":[\"run-214\"],\"pilot_delta_ms\":{\"aisle-320\":4,\"aisle-2400\":null},\"rerun_controls\":[\"backlog-128\",\"backlog-64\",\"backlog-96\"],\"decision_note\":\"Do not circulate the Parcel Shelf report as drafted. run-214 (2,400 parcels) ran installed payload tree:a37d03e1, but the released 2.8.0 lock is tree:1b28ae70, so it is off-candidate. The chair draft's 'use all three' is wrong. Without run-214 there is no valid 2,400 gate result, so campaign_usable is false. The remaining runs are on the lock payload: run-210 (320) result p95 13 ms and run-217 (9,600) result p95 51 ms, both under 60 ms, with draw p95 18 and 142 ms kept alongside. Rerun the 2,400 campaign point on the released payload. The pilot delta uses page_pointerover_to_visible_ms, the only metric both builds recorded. Candidate-minus-legacy medians are 151 vs 147 ms at 320 parcels, a +4 ms delta. The +110 and +118 ms figures in the draft come from the controller stopwatch, which the legacy build did not record, so they are not comparable. At 2,400 parcels the candidate has a single sample, so no median comparison is warranted (null). Controls: backlog-64 and backlog-96 were read through the fallback path, which scanned rehearsal cache files, so their results are untrustworthy. backlog-128 has no latest.json because of the reader's old filename, so it is an error, not a red overshoot. Rerun all three after the result-reader repair. oversize-10m used readStdout, which the log says is unaffected, so it does not need a rerun. backlog-48 is a historical Feb 19 control and is out of scope for this slot.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "campaign-decision": true,
+          "off-candidate": true,
+          "publishable-deltas": true,
+          "affected-control-set": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 21.487,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 5496,
+          "cache_read_input_tokens": 18986,
+          "output_tokens": 2332,
+          "output_tokens_details": {
+            "thinking_tokens": 972
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5496
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 26820,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00204346,
+        "turns": 10
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"campaign_usable\":false,\"off_candidate_reports\":[\"run-214\"],\"pilot_delta_ms\":{\"aisle-320\":4,\"aisle-2400\":null},\"rerun_controls\":[\"backlog-128\",\"backlog-64\",\"backlog-96\"],\"decision_note\":\"Do not circulate the Parcel Shelf 2.8 package gate as passing. run-214 (2,400 parcels) reports installed_payload_fingerprint tree:a37d03e1, but release-lock.json pins tree:1b28ae70 for 2.8.0, so it is not the released build. The chair draft's claim that all three rows match the release is wrong. That leaves no valid 2,400-parcel result, so the gate cannot be shown at every size. The 13/28/51 ms figures include the off-build 28 ms value. The pilot: the +110/+118 ms hover penalties come from controller_around_action_ms, which the legacy file does not record, so they are not comparable. The shared page_pointerover_to_visible_ms metric gives a 320-parcel candidate-minus-legacy p50 of +4 ms (151 vs 147 ms, five samples each). No 2,400-parcel comparison is warranted because the candidate has only one sample. The middle-size pilot is therefore not publishable. Controls: backlog-64 and backlog-96 were read from stale rehearsal cache files through the broken readLatest fallback, so they are not valid evidence despite not being marked red. backlog-128 has no output. Rerun those three after the result-reader repair. oversize-10m uses readStdout, which is unaffected, so it does not need a rerun. backlog-48 is a Feb 19 historical ID and is out of scope for this slot.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "campaign-decision": true,
+          "off-candidate": true,
+          "publishable-deltas": true,
+          "affected-control-set": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 16.074,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 5488,
+          "cache_read_input_tokens": 18982,
+          "output_tokens": 2583,
+          "output_tokens_details": {
+            "thinking_tokens": 1283
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5488
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27059,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0021679200000000003,
+        "turns": 10
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"campaign_usable\": false, \"off_candidate_reports\": [\"run-214\"], \"pilot_delta_ms\": {\"aisle-320\": 4, \"aisle-2400\": null}, \"rerun_controls\": [\"backlog-128\", \"backlog-64\", \"backlog-96\"], \"decision_note\": \"Not usable for circulation as-is. run-214 (2,400 parcels) has installed_payload_fingerprint tree:a37d03e1, but release-lock.json pins tree:1b28ae70, so it is not the released 2.8.0 payload and the 2,400 gate has no valid evidence. The 320 (run-210, p95 result 13 ms) and 9,600 (run-217, p95 result 51 ms) rows match the lock and are under 60 ms, but they cannot carry the release alone. Redo the 2,400 run on the locked payload. The draft's 28 ms figure comes from run-214 and should be removed. Pilot: the +110/+118 ms hover penalty in the draft is not supported. Those figures mix the controller_around_action_ms stopwatch, which only the candidate recorded, with the page pointerover-to-visible metric. On the one metric both pilot files share, the aisle-320 median is 151 ms candidate vs 147 ms legacy, a +4 ms delta. The aisle-2400 candidate has one sample against five legacy samples, so no comparison is warranted (null). Controls: backlog-64 and backlog-96 were read through the readLatest fallback to rehearsal cache files, and backlog-128 has no output because the reader checks the old latest.json name. Those three need fresh evidence after the reader repair. oversize-10m uses readStdout, which the lab log says is unaffected, and backlog-48 is a historical Feb 19 ID, so neither is in this slot. The backlog-128 red row should not be treated as a clean failure until it is rerun.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "campaign-decision": true,
+          "off-candidate": true,
+          "publishable-deltas": true,
+          "affected-control-set": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 17.136,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 8065,
+          "cache_read_input_tokens": 16567,
+          "output_tokens": 2952,
+          "output_tokens_details": {
+            "thinking_tokens": 1608
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 8065
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27590,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002650395,
+        "turns": 10
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"campaign_usable\":false,\"off_candidate_reports\":[\"run-214\"],\"pilot_delta_ms\":{\"aisle-320\":4,\"aisle-2400\":null},\"rerun_controls\":[\"backlog-128\",\"backlog-64\",\"backlog-96\"],\"decision_note\":\"Not usable as-is. run-214 (2,400 parcels) has installed_payload_fingerprint tree:a37d03e1, while release-lock.json pins tree:1b28ae70, so it is not the released build. Without it there is no valid 2,400-parcel gate result, so the campaign cannot pass. run-210 (320) and run-217 (9,600) match the lock. Their result p95 values of 13 ms and 51 ms are under the 60 ms gate, and their draw p95 values (18 and 142 ms) are kept alongside as rendering context. Rerun the 2,400 size on the released build. The chair draft's 'use all three' is wrong for that reason. Its +110/+118 ms hover figures are also not supported. They compare the candidate's controller_around_action_ms with the legacy page-only metric, which is not like-for-like. The publishable like-for-like comparison is page_pointerover_to_visible_ms: the aisle-320 p50 is 151 ms candidate versus 147 ms legacy, a delta of +4 ms (n=5 each). aisle-2400 is null because the candidate has only one sample, so no p50 is warranted. Controls: backlog-64 and backlog-96 were read through the readLatest fallback to stale rehearsal cache files, and backlog-128 has no output, so all three need fresh evidence after the reader repair. oversize-10m used readStdout, which the lab log says is unaffected, so it stands. backlog-48 is from the Feb 19 slot and is outside this slot.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "campaign-decision": true,
+          "off-candidate": true,
+          "publishable-deltas": true,
+          "affected-control-set": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 17.914,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 5488,
+          "cache_read_input_tokens": 19156,
+          "output_tokens": 2601,
+          "output_tokens_details": {
+            "thinking_tokens": 1276
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5488
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27251,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00217866,
+        "turns": 10
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"campaign_usable\": false, \"off_candidate_reports\": [\"run-214\"], \"pilot_delta_ms\": {\"aisle-320\": 4, \"aisle-2400\": null}, \"rerun_controls\": [\"backlog-064\", \"backlog-096\", \"backlog-128\"], \"decision_note\": \"Campaign: run-214 (2,400 parcels) ran on installed payload tree:a37d03e1, not the locked tree:1b28ae70, so it is off-candidate. Without it there is no valid 2,400-parcel result, so the gate cannot be shown for that size and the campaign is not usable. The draft's 'Pass: 13 / 28 / 51 ms' should not circulate; only 13 and 51 ms are on the candidate build. Pilot: the +110 ms and +118 ms hover penalties compare the candidate's controller_around_action_ms with the legacy page-observer metric, which are different measurements. I used page_pointerover_to_visible_ms for both builds. aisle-320 medians: candidate 151, legacy 147, delta +4 ms (exploratory). aisle-2400 has only one candidate sample, so no p50 comparison is warranted. Controls: the readLatest adapter was reading an outdated top-level filename for the feb26 slot. backlog-064 and backlog-096 were served from rehearsal cache files, and backlog-128 had no output. These three need fresh evidence after the reader repair. oversize-10m uses readStdout and is unaffected. backlog-048 (feb19) was fresh and is not in the rerun set. The 'backlog-128 red, budget one retry' note reflects the reader error, not a measured control failure.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "campaign-decision": true,
+          "off-candidate": true,
+          "publishable-deltas": true,
+          "affected-control-set": false
+        },
+        "score": 0.75,
+        "passed": false,
+        "seconds": 18.484,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 5530,
+          "cache_read_input_tokens": 19186,
+          "output_tokens": 3270,
+          "output_tokens_details": {
+            "thinking_tokens": 1954
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5530
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27992,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00251871,
+        "turns": 10
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"campaign_usable\":false,\"off_candidate_reports\":[\"run-214\"],\"pilot_delta_ms\":{\"aisle-320\":4,\"aisle-2400\":null},\"rerun_controls\":[\"backlog-128\",\"backlog-64\",\"backlog-96\"],\"decision_note\":\"Do not circulate the Parcel Shelf 2.8 report yet. run-214 (2,400 parcels) carries installed_payload_fingerprint tree:a37d03e1, while release-lock.json and run-210/run-217 record tree:1b28ae70. Two artifacts were measured, so no aggregate from this set is valid, and the 13/28/51 ms pass line in chair-draft.md cannot be cited. The 2,400 workload needs a clean re-run against the locked tarball (sha256 0dd4f1d0...) and a fingerprint check on all three reports. Pilot: the chair-draft +110/+118 ms hover penalties mix the driver-side controller stopwatch with the page-side pointerover-to-visible probe, so they are not publishable. Same-clock page numbers give aisle-320 candidate p50 151 ms vs legacy p50 147 ms (n=5 each), a +4 ms delta. aisle-2400 is null because the candidate has only n=1 (158 ms), so no p50 comparison is warranted. Controls: the reader bug affects readLatest only. backlog-64, backlog-96 and backlog-128 (Feb 26) need fresh evidence after the reader repair. oversize-10m uses readStdout and is unaffected. backlog-48 (Feb 19) is historical and out of this slot. The chair-draft statement that all three reports share the candidate is wrong, and its 'one retry' budget does not cover the candidate-identity failure.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "campaign-decision": true,
+          "off-candidate": true,
+          "publishable-deltas": true,
+          "affected-control-set": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 18.465,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 9176,
+          "cache_read_input_tokens": 32796,
+          "output_tokens": 2948,
+          "output_tokens_details": {
+            "thinking_tokens": 1524
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 9176
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 44928,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00294976,
+        "turns": 11
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"campaign_usable\": false, \"off_candidate_reports\": [\"run-214\"], \"pilot_delta_ms\": {\"aisle-320\": 4, \"aisle-2400\": null}, \"rerun_controls\": [\"backlog-128\", \"backlog-64\", \"backlog-96\"], \"decision_note\": \"Do not circulate the Parcel Shelf 2.8 pass (13/28/51 ms). run-214 (2,400 parcels) carries installed_payload_fingerprint tree:a37d03e1, while the release lock and run-210/run-217 are tree:1b28ae70. Two artifacts were measured, so no aggregate from this set is valid. The 2,400-parcel gate needs a re-run on the locked tree. The campaign-level pass is withdrawn until that run exists. Pilot: both files share the page-side clock (pointerover to visible). The candidate's controller_around_action_ms column and the chair draft's +110/+118 ms figures compare a driver timer with a page timer, so they are not a publishable delta. aisle-320 page-clock p50 is 151 ms candidate (n=5) vs 147 ms legacy (n=5), so +4 ms. aisle-2400 has only one candidate sample, so no p50 is warranted and the value is null. Controls: the readLatest rows (backlog-64, backlog-96, backlog-128) use the old top-level latest.json path. The 64 and 96 results came from rehearsal cache files, and 128 has no output, so all three need fresh evidence after the reader repair. oversize-10m uses readStdout, which is unaffected, so it stands. backlog-48 is a historical Feb 19 ID and is out of scope for this slot. Limits: the pilot is an exploratory emulated-Chromium comparison on loopback. The package campaign also lacks a 2,400-parcel result on the locked tree.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "campaign-decision": true,
+          "off-candidate": true,
+          "publishable-deltas": true,
+          "affected-control-set": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 20.841,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 9176,
+          "cache_read_input_tokens": 32796,
+          "output_tokens": 2983,
+          "output_tokens_details": {
+            "thinking_tokens": 1530
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 9176
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 44963,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00296726,
+        "turns": 11
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"campaign_usable\":false,\"off_candidate_reports\":[\"run-214\"],\"pilot_delta_ms\":{\"aisle-320\":4,\"aisle-2400\":null},\"rerun_controls\":[\"backlog-128\",\"backlog-64\",\"backlog-96\"],\"decision_note\":\"Do not circulate the Parcel Shelf 2.8 report as a passing package campaign. run-214 (2,400 parcels) reports installed_payload_fingerprint tree:a37d03e1, while run-210 and run-217 report tree:1b28ae70, and all three are supposed to share the release-lock.json candidate. The 2,400-parcel result (p95 28 ms, draw 63 ms) therefore comes from a different artifact and cannot support the gate, so the 320/2,400/9,600 set is incomplete as evidence. Re-run the 2,400 workload on the locked candidate. The 'Pass: 13 / 28 / 51 ms' headline and the 'use all three' note in chair-draft.md are wrong for that reason. Pilot: the pilot files use the same page-side clock (pointerover to visible) on both trees. aisle-320 has n=5 on each side (candidate p50 151 ms, legacy p50 147 ms), so the publishable candidate-minus-legacy delta is +4 ms. aisle-2400 has only one candidate sample (158 ms) against five legacy samples, so no p50 comparison is warranted (null). The chair-draft figures of +110 and +118 ms mix the candidate controller-side timer (about 255-271 ms) with the legacy page-side timer and must be withdrawn. Controls: backlog-64 and backlog-96 were read through the stale readLatest path and may have picked up rehearsal cache files, and backlog-128 has no output, so all three need fresh runs. oversize-10m (readStdout, bounded-size) is not affected by the reader defect. backlog-48 is a Feb 19 historical control, outside this slot.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "campaign-decision": true,
+          "off-candidate": true,
+          "publishable-deltas": true,
+          "affected-control-set": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 17.529,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 9181,
+          "cache_read_input_tokens": 32804,
+          "output_tokens": 2738,
+          "output_tokens_details": {
+            "thinking_tokens": 1231
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 9181
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 44731,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002845465,
+        "turns": 11
+      }
+    ]
+  },
+  "verdict": "no-difference",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 298547,
+  "skipped_trials": []
+}
