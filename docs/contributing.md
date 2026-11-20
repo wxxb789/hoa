@@ -65,7 +65,7 @@ For manual invocation on other runtimes, follow the
 | Review behavior or a proposed change | [hoa-skill-review](../skills/hoa-skill-review/SKILL.md) | Evidence-backed findings, no edits to the reviewed skill |
 | Create, evolve, or compose a defined capability | [hoa-skill-create](../skills/hoa-skill-create/SKILL.md) | A change, validation results, and any unverified paths |
 | Review practice across repos and agent sessions | [hoa-practice-retro](../skills/hoa-practice-retro/SKILL.md) (explicit only) | Evidence-backed findings and recurring-work candidates, no automatic creation |
-| Deep-audit one repo's machinery | [hoa-repo-reckoning](../skills/hoa-repo-reckoning/SKILL.md) (explicit only) | Verified findings, a ranked stop-doing list, and follow-through |
+| Review one repo's practices and machinery | [hoa-repo-reckoning](../skills/hoa-repo-reckoning/SKILL.md) (explicit prompt shortcut) | Free-form report with ranked, evidence-backed findings |
 | Audit the set of skills offered to a session | [hoa-skill-set-audit](../skills/hoa-skill-set-audit/SKILL.md) (explicit only) | Set-level findings, necessity verdicts, or weekly recommendations, no changes |
 
 Start with focused behavior checks and expand to variants, models, or runtimes
@@ -120,9 +120,8 @@ repository maintenance, not automatic deployment.
   included ECC's skill scout and looper's typed verification gates. See
   [reflections](../reflections/), [goal contracts](goals/README.md), and
   [plans](plans/) for working and historical records, not a feature roadmap.
-- Run `hoa-practice-retro` monthly after the repo reckonings so it can reuse
-  their ledgers. Keep its artifacts in the configured private audit state
-  directory, not in Git.
+- Run `hoa-practice-retro` monthly; it reads only its own prior runs. Keep its
+  artifacts in the configured private audit state directory, not in Git.
 
 ## Request a skill
 

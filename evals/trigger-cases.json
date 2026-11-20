@@ -84,7 +84,7 @@
       "id": "route-to-harness-restructure",
       "request": "The repo's scheduled drift checkers and watchdog scripts have multiplied and repeat the same logic. Help me restructure that harness, not audit the rest of the repository.",
       "must_pick": ["harness-engineering"],
-      "distractors": ["hoa-repo-reckoning", "hoa-skill-set-audit"]
+      "distractors": ["hoa-skill-set-audit"]
     },
     {
       "id": "route-to-typed-gates",

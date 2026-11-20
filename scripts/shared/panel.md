@@ -1,18 +1,14 @@
 # Audit panel protocol
 
 Finders, then adversarial verifiers, then a completeness critic, then a parent spot-check.
-The audit is read-only on its subject. Each SKILL.md supplies the dimensions, inputs and verdicts.
+The retro is read-only on its subject. Its SKILL.md supplies the dimensions, inputs and verdicts.
 
 ## Run directory (outside the subject; never committed)
 
 `--state-dir` flag → `AUDIT_STATE_DIR` → `state_dir` in `${XDG_CONFIG_HOME:-~/.config}/audits/config.yaml`
-→ `${XDG_STATE_HOME:-~/.local/state}/audits`. A run is `<root>/<subject-slug>/<YYYY-MM-DD>/` (slug: the repo
-name or `practice`; pick a distinct slug if a name is shared, and use the session date). The prior run is the
-newest sibling directory. The same config file may set `lens_file` (replaces the lens below).
-
-`AUDIT_STATE_DIR` and `~/.config/audits/config.yaml` (or its XDG equivalent) deliberately share a
-namespace between `hoa-practice-retro` and `hoa-repo-reckoning` so they can read each other's ledgers.
-This is an exception to the per-skill config convention.
+→ `${XDG_STATE_HOME:-~/.local/state}/audits`. A practice retro run is
+`<root>/practice/<YYYY-MM-DD>/` (use the session date). For follow-through, use the newest prior
+practice-retro run in that directory. The same config file may set `lens_file` (replaces the lens below).
 
 For `hoa-practice-retro`, `HOA_PRACTICE_RETRO_ROOTS` (JSON array of workspace paths) overrides
 `roots`, and `HOA_PRACTICE_RETRO_REPORT_LANGUAGE` overrides `report_language` in

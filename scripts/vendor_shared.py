@@ -34,14 +34,8 @@ SOURCES: dict[str, Path] = {
 # shared file name → destination skill dirs
 CONSUMERS: dict[str, list[str]] = {
     "skill_config.py": ["skills/gdd/scripts"],
-    "findings.py": [
-        "skills/hoa-practice-retro/scripts",
-        "skills/hoa-repo-reckoning/scripts",
-    ],
-    "panel.md": [
-        "skills/hoa-practice-retro/references",
-        "skills/hoa-repo-reckoning/references",
-    ],
+    "findings.py": ["skills/hoa-practice-retro/scripts"],
+    "panel.md": ["skills/hoa-practice-retro/references"],
     "usage-based-recommendations.md": [
         "skills/hoa-skill-curate/references",
         "skills/hoa-skill-set-audit/references",
@@ -64,7 +58,6 @@ CONSUMERS: dict[str, list[str]] = {
         "skills/ghc-search/references",
         "skills/hermes-models/references",
         "skills/hoa-practice-retro/references",
-        "skills/hoa-repo-reckoning/references",
         "skills/hoa-skill-curate/references",
         "skills/hoa-skill-set-audit/references",
         "skills/writing/references",
