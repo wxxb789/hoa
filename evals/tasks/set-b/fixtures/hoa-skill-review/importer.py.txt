@@ -1,0 +1,14 @@
+# Excerpt from dock_import 2.4 (the consumer being shipped)
+import json
+
+
+def parse_only(raw):
+    row = json.loads(raw)
+    if not isinstance(row, dict):
+        raise ValueError("expected object")
+    return row
+
+
+def enqueue(raw, db):
+    row = parse_only(raw)
+    return db.commit_dock_release(row["release_code"], row.get("note", ""))

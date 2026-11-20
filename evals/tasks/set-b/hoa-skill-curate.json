@@ -1,0 +1,18 @@
+{
+  "id": "set-b-hoa-skill-curate",
+  "skill": "hoa-skill-curate",
+  "fixture": "fixtures/hoa-skill-curate",
+  "prompt": "The library owner attached an offline evidence packet for the November 20 inventory review. Triage the two install warnings, tell me which installed entries match their current upstream documents, and give me the proposed retirement decisions as of 2026-11-20T12:00:00Z. Use only these exported records; do not make changes, fetch from the network, or carry out any retirement. Return bare JSON with warnings (object keyed by warned name, each value an object with phase: scan or install, disposition: cosmetic or upstream-defect, installed: boolean, and source: owner/repo); freshness (object keyed by installed name with SAME, DIFF, or ERR); retirement (object keyed by installed name with keep, candidate, or blocked-live-reference). Include citations separately if useful.",
+  "terse": "Establish provenance from the recorded installation state. Check the upstream evidence relevant to the owner's question, account for current uses and protection boundaries, and separate advice from authorized execution. Explain what the available records can prove.",
+  "shell": ["codex"],
+  "rubric": {
+    "warning-phase-and-impact": {"field": "warnings", "equals": {"empty-label": {"phase": "scan", "disposition": "cosmetic", "installed": false, "source": "paperworks/dock-tools"}, "shift-bundle": {"phase": "scan", "disposition": "upstream-defect", "installed": false, "source": "paperworks/dock-tools"}}},
+    "content-not-recency": {"field": "freshness", "equals": {"carton-map": "SAME", "route-proof": "DIFF", "queue-digest": "SAME", "bin-audit": "SAME", "seal-register": "ERR"}},
+    "activity-and-live-dependencies": {"field": "retirement", "equals": {"carton-map": "keep", "route-proof": "keep", "queue-digest": "candidate", "bin-audit": "blocked-live-reference", "seal-register": "keep"}}
+  },
+  "notes": {
+    "warning-phase-and-impact": "SKILL.md#installer-provenance-and-warning-triage. Same diagnostic and both absent from the lock do not make both warnings harmless; distinguish the clone fixture from the real malformed package.",
+    "content-not-recency": "SKILL.md#upstream-freshness--verify-by-head-diff-not-the-lock-timestamp. Resolve by the lock's full source path, normalize CRLF, include disabled entries and distinguish fetch errors from differences.",
+    "activity-and-live-dependencies": "SKILL.md#upstream-maintenance-retirement-rule. Zero-use active entries stay; recent but archived is a candidate with only a historical mention; the unarchived stale repo's scheduled invocation blocks deletion."
+  }
+}

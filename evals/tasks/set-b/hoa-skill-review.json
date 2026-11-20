@@ -1,0 +1,20 @@
+{
+  "id": "set-b-hoa-skill-review",
+  "skill": "hoa-skill-review",
+  "fixture": "fixtures/hoa-skill-review",
+  "prompt": "The release lead needs a read-only assessment of two submitted replies for the dock handoff workflow. Use the frozen grading card, the importer excerpt, and the recorded trials. Do not repair or regenerate the replies, contact a host, or change any files. Return bare JSON with fields north and south (each an object keyed by the grading card's criterion IDs, with a 0, 1, 2, or string U per criterion); path_evidence (an object keyed by actual_importer and unattended_activation, each with a sorted array of run IDs that verify that path, or [] if none); comparison (controlled, uncontrolled, or unknown). Put any supporting citations in a separate evidence field.",
+  "terse": "Review read-only against the intended result and its next consumer. Read the relevant contract, follow the evidence, and grade only what the record can establish. Separate demonstrated failures from risks and name the limits of the assessment.",
+  "shell": ["codex"],
+  "rubric": {
+    "grade-consumed-bytes": {"field": "north", "equals": {"format": 0, "dispatch": 0, "origin": 2, "persistence": "U"}},
+    "distinguish-omission-from-unavailable": {"field": "south", "equals": {"format": 2, "dispatch": 0, "origin": 2, "persistence": "U"}},
+    "verify-at-the-claimed-boundary": {"field": "path_evidence", "equals": {"actual_importer": ["P-14"], "unattended_activation": []}},
+    "do-not-infer-controlled-effect": {"field": "comparison", "equals": "uncontrolled"}
+  },
+  "notes": {
+    "grade-consumed-bytes": "SKILL.md#boundary-and-review-path; evaluate.md#score-and-preserve-evidence. North is fenced; a mock normalized it but the actual parser does not. Its human-visible source note is still gradable.",
+    "distinguish-omission-from-unavailable": "SKILL.md safe failure; evaluate.md#score-and-preserve-evidence. South's missing required code is a failure, whereas neither reply can establish persistence with the database evidence unavailable.",
+    "verify-at-the-claimed-boundary": "SKILL.md#report; evaluate.md#separate-simulation-from-consumer-proof. The negative real importer run still exercised the importer; neither a mock success nor a forced load proves unattended activation.",
+    "do-not-infer-controlled-effect": "Same evidence-boundary trap as verify-at-the-claimed-boundary, applied to comparison: evaluate.md#set-up-an-honest-comparison. Known different tooling and invocation invalidate a causal comparison, not separate grades."
+  }
+}

@@ -1,0 +1,15 @@
+From cached CLI bundle (same version as install transcript), scanRepository:
+  cloneRoot = mkdtemp(TMPDIR + "/skills-")
+  for path in walk(cloneRoot, "SKILL.md"):
+      if missingRequiredFrontmatter(path):
+          warnSkip(path)
+      else:
+          found.append(path)
+  install(filterRequested(found))
+
+Catalog source notes at the scanned revision:
+  tests/fixtures/empty-label/SKILL.md: frontmatter {"name":"empty-label"};
+    tests/read-metadata checks the missing-description path using this file.
+  cards/shift-bundle/SKILL.md: frontmatter {"name":"shift-bundle"};
+    listed in user catalog under Dispatch as a real installable package.
+  cards/carton-map/SKILL.md: frontmatter includes name and description.

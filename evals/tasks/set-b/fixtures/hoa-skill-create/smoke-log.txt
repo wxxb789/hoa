@@ -1,0 +1,6 @@
+release-candidate=RC-17
+linux parent=dispatch-return receipt=fixture-102 parser=parser-r7 now=ok
+windows parent=dispatch-return receipt=fixture-102 parser=parser-r3 now=ok
+catalog_snapshot: dispatch-return, warehouse-transfer, inventory-count
+receipt fixture-102 uses the original schema; parser-r7 also reads the new batch schema.
+No Windows batch-schema or manual-entry run was recorded.

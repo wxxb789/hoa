@@ -1,0 +1,7 @@
+Trial swap snapshot (sandbox profile, exported by the operator)
+proof-packet alias resolves into shared-kit/catalog/proof-packet
+body parse=OK; linked contract read=OK; adapter receipt=job-54 exit=0
+weekday profile scan: export-notes, pdf-preview, proof-packet
+weekend profile scan: export-notes, pdf-preview
+Release ticket comment: "The settings file is unchanged, so the weekend
+drop must be a broken symlink. Patch it before release."

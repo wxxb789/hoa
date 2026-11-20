@@ -1,0 +1,9 @@
+{
+  "argv": ["--repo", "review-checkout"],
+  "environment": {
+    "PROOF_PACKET_REPO": "canary-checkout",
+    "PROOF_PACKET_ADAPTER": "bridge-canary",
+    "PROOF_PACKET_CACHE_DIR": "run-cache"
+  },
+  "config": {"repo": "stable-checkout", "adapter": "bridge-stable", "timeout_s": 55}
+}

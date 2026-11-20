@@ -1,0 +1,10 @@
+{
+  "encoding": "The document values contain the complete decoded text, including line endings.",
+  "documents": {
+    "carton-map": "---\r\nname: carton-map\r\ndescription: map items to cartons\r\n---\r\nMatch by carton ID.\r\n",
+    "route-proof": "---\nname: route-proof\ndescription: verify route against dock slip\n---\nRequire the route field.\n",
+    "queue-digest": "---\nname: queue-digest\ndescription: summarize queue receipts\n---\nGroup by arrival hour.\n",
+    "bin-audit": "---\nname: bin-audit\ndescription: verify designated bins\n---\nKeep empty bins.\n",
+    "seal-register": "---\nname: seal-register\ndescription: record seal assignments\n---\nSort by seal ID.\n"
+  }
+}

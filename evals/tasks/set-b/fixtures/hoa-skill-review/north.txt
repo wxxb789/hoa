@@ -1,0 +1,3 @@
+```json
+{"release_code":"D17","note":"Register DR-52, C14"}
+```
