@@ -92,6 +92,8 @@ targets:  runtime-agnostic | repo-only |
 `npx skills` 只安装你点名的 skill，不跟随它们之间的 `../` 链接。
 整库安装用 `npx skills add wxxb789/hoa -g -s '*' -y`；单装某个 skill 用下表该行的命令。
 表中没有的 skill 没有依赖：`npx skills add wxxb789/hoa -g -s <skill> -y`。
+`gdd` 通过单独安装的 route 运行 agent：请用某个 `gdd-route-*` 行安装（默认 agent 是
+`gdd-route-omp`），不要只用 `gdd` 那一行。
 
 | Skill | 依赖（`../` 传递闭包） | 安装命令 |
 |---|---|---|
