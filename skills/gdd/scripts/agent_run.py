@@ -544,9 +544,13 @@ def sanitize(value):
 
 
 def interpreter():
-    """python.exe, not pythonw.exe: a pythonw parent loses the std handles children need."""
-    console = os.path.join(os.path.dirname(sys.executable), "python.exe")
-    return console if IS_WINDOWS and os.path.exists(console) else sys.executable
+    """python.exe, not pythonw.exe: a pythonw parent loses the std handles children need. On Windows a
+    venv's python.exe (`uv run`) is a launcher that re-spawns the base interpreter, so a recorded Popen
+    pid would name the launcher; gdd's scripts are stdlib-only, so run the base interpreter directly."""
+    if not IS_WINDOWS:
+        return sys.executable
+    console = os.path.join(os.path.dirname(getattr(sys, "_base_executable", sys.executable)), "python.exe")
+    return console if os.path.exists(console) else sys.executable
 
 
 def state_age_seconds(state):

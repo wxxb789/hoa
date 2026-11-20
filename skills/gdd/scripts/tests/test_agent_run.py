@@ -904,5 +904,15 @@ class SmokeTests(RunnerCase):
                     resume = ("--resume", state["session_id"])
 
 
+class InterpreterTests(unittest.TestCase):
+    def test_spawned_pid_is_the_running_interpreter(self):
+        # Supervisors record Popen pids. Under `uv run` on Windows, a venv python.exe is a launcher
+        # that re-spawns the base interpreter, so its pid would not name the process that runs.
+        child = gdd_process.popen([agent_run.interpreter(), "-c", "import os; print(os.getpid())"],
+                                  stdout=subprocess.PIPE, text=True)
+        out, _ = child.communicate(timeout=60)
+        self.assertEqual(int(out), child.pid)
+
+
 if __name__ == "__main__":
     unittest.main()
