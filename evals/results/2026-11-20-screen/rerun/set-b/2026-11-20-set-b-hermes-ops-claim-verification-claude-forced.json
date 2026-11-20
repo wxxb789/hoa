@@ -1,0 +1,1203 @@
+{
+  "schema_version": 3,
+  "task": "set-b-hermes-ops-claim-verification",
+  "generated_at": "2026-11-20T17:45:09.938420+08:00",
+  "skill": "hermes-ops-claim-verification",
+  "skill_revision": "3",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "forced",
+  "shell": false,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "scheduler-owns-payload": {
+      "field": "first_run",
+      "equals": {
+        "scheduled_payload_rc": 78,
+        "agent_woken": true,
+        "manual_payload_rc": 0
+      }
+    },
+    "transient-green": {
+      "field": "recovery",
+      "equals": {
+        "disposition": "transient",
+        "release_paths": [
+          "/srv/tools/releases/r17/bin/python3",
+          "/srv/tools/releases/r18/bin/python3"
+        ],
+        "latest_scheduled_payload_rc": 0
+      }
+    },
+    "head-bound-review": {
+      "field": "merge_review",
+      "equals": {
+        "head": "916cb240c61cebf048ff022a3da26e9233846999",
+        "last_clear_head": "a28f930608e9c2aedd92350d538cfa17df941111",
+        "state": "unreviewed"
+      }
+    }
+  },
+  "rubric_flags": {
+    "scheduler-owns-payload": "flaky",
+    "transient-green": "non-discriminating",
+    "head-bound-review": "non-discriminating"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 0,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.0,
+      "pass^k": false,
+      "mean_score": 0.4444444444444444,
+      "sample_stddev": 0.19245008972987523
+    },
+    "terse": {
+      "valid": true,
+      "passed": 0,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.0,
+      "pass^k": false,
+      "mean_score": 0.4444444444444444,
+      "sample_stddev": 0.19245008972987523
+    },
+    "skill": {
+      "valid": true,
+      "passed": 0,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 0.0,
+      "pass^k": false,
+      "mean_score": 0.6666666666666666,
+      "sample_stddev": 0.0
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": 0.2222222222222222,
+    "terse": 0.2222222222222222
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 1,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": true,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "```json\n{\"first_run\": {\"scheduled_payload_rc\": 78, \"agent_woken\": true, \"manual_payload_rc\": 0}, \"recovery\": {\"disposition\": \"unresolved\", \"release_paths\": [\"<path>\", \"<path>\"], \"latest_scheduled_payload_rc\": 0}, \"merge_review\": {\"head\": \"916cb240c61cebf048ff022a3da26e9233846999\", \"last_clear_head\": \"a28f930608e9c2aedd92350d538cfa17df941111\", \"state\": \"unreviewed\"}, \"operator_decision\": \"Do not close the incident or land PR #62 yet. The handoff's 'restored' claim rests on one green 08:00 run after <path> moved from r17 to r18 at 07:42, and the 06:00 and 07:00 scheduled runs failed with rc 78 under r17. The 08:00 run also resolved to r18, so it does not show the r17 fault is fixed. The only clear verdict covers a28f930, but head 916cb240 was pushed at 07:55 after that review and has no verdict marker, so it is unreviewed. The dashboard's clear badge and the 08:11 build check do not cover the current head.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "scheduler-owns-payload": true,
+          "transient-green": false,
+          "head-bound-review": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 15.516,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 6990,
+          "cache_read_input_tokens": 29393,
+          "output_tokens": 2699,
+          "output_tokens_details": {
+            "thinking_tokens": 1082
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6990
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 39090,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00251798,
+        "turns": 14
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\"first_run\":{\"scheduled_payload_rc\":0,\"agent_woken\":true,\"manual_payload_rc\":0},\"recovery\":{\"disposition\":\"unresolved\",\"release_paths\":[\"<path>\",\"<path>\"],\"latest_scheduled_payload_rc\":0},\"merge_review\":{\"head\":\"916cb240c61cebf048ff022a3da26e9233846999\",\"last_clear_head\":\"a28f930608e9c2aedd92350d538cfa17df941111\",\"state\":\"unreviewed\"},\"operator_decision\":\"Do not close the incident or land the patch yet. The handoff's 'restored' claim rests on the 08:00 run, which did not wake the agent, and <path> was switched from r17 to r18 at 07:42 with no agent-dispatched collector run after that change. The only clear verdict is for a28f930, not the current head 916cb240, and the head was pushed at 07:55 after that verdict. The dashboard clear badge is stale. Scheduled runs do not log their interpreter path, so the scheduled interpreter list is not recorded here; the only interpreter in the logs is <path>, from the manual replay.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "scheduler-owns-payload": false,
+          "transient-green": false,
+          "head-bound-review": true
+        },
+        "score": 0.3333333333333333,
+        "passed": false,
+        "seconds": 13.61,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 5637,
+          "cache_read_input_tokens": 19158,
+          "output_tokens": 2496,
+          "output_tokens_details": {
+            "thinking_tokens": 1352
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5637
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27297,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0021448049999999996,
+        "turns": 10
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 1,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": true,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "```json\n{\n  \"first_run\": {\n    \"scheduled_payload_rc\": 0,\n    \"agent_woken\": true,\n    \"manual_payload_rc\": 0\n  },\n  \"recovery\": {\n    \"disposition\": \"restored; transient; unresolved\",\n    \"release_paths\": [],\n    \"latest_scheduled_payload_rc\": 0\n  },\n  \"merge_review\": {\n    \"head\": \"916cb240c61cebf048ff022a3da26e9233846999\",\n    \"last_clear_head\": \"a28f930608e9c2aedd92350d538cfa17df941111\",\n    \"state\": \"unreviewed\"\n  },\n  \"operator_decision\": \"Do not close the incident or land the patch yet. The handoff's 'restored' call is only partly supported: the scheduled runs succeeded, but the cause is unresolved, and the scheduled runs' interpreter paths are not recorded. Toolchain events show <path> was repointed from r17 to r18 at 07:42Z, after the 06:01 manual replay that used <path> The PR head 916cb240 was pushed at 07:55Z and has no native clear verdict; the only clear verdict (comment 314) is for a28f9306, and the 08:01 'clear badge' is a dashboard sync, not a verdict on the head. Merge review needs a clear verdict on 916cb240 before landing.\"\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "scheduler-owns-payload": false,
+          "transient-green": false,
+          "head-bound-review": true
+        },
+        "score": 0.3333333333333333,
+        "passed": false,
+        "seconds": 13.481,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 5803,
+          "cache_read_input_tokens": 19336,
+          "output_tokens": 2479,
+          "output_tokens_details": {
+            "thinking_tokens": 1164
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5803
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27624,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002158835,
+        "turns": 11
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "```json\n{\n  \"first_run\": {\n    \"scheduled_payload_rc\": 0,\n    \"agent_woken\": true,\n    \"manual_payload_rc\": 0\n  },\n  \"recovery\": {\n    \"disposition\": \"restored; transient; unresolved\",\n    \"release_paths\": [\n      \"<path>\",\n      \"<path>\"\n    ],\n    \"latest_scheduled_payload_rc\": 0\n  },\n  \"merge_review\": {\n    \"head\": \"916cb240c61cebf048ff022a3da26e9233846999\",\n    \"last_clear_head\": \"a28f930608e9c2aedd92350d538cfa17df941111\",\n    \"state\": \"unreviewed\"\n  },\n  \"operator_decision\": \"Do not close the incident or land the patch yet. The handoff's 06:01 reproduction was a manual shell run, not the scheduled path, and the logs show <path> was repointed from r17 to r18 at 07:42, after the 06:00 run. The 'clear' review covers a28f9306, not the current head 916cb240, and the 08:11 build pass does not count as a review. Scheduled-run interpreter paths are not recorded in the logs, so the interpreter list is not reported. A fresh clear verdict on 916cb240 is required before landing.\"\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "scheduler-owns-payload": false,
+          "transient-green": false,
+          "head-bound-review": true
+        },
+        "score": 0.3333333333333333,
+        "passed": false,
+        "seconds": 14.419,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 8230,
+          "cache_read_input_tokens": 16693,
+          "output_tokens": 2355,
+          "output_tokens_details": {
+            "thinking_tokens": 1191
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 8230
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27284,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00237378,
+        "turns": 10
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 1,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": true,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "```json\n{\n  \"first_run\": {\n    \"scheduled_payload_rc\": 0,\n    \"agent_woken\": true,\n    \"manual_payload_rc\": 0\n  },\n  \"recovery\": {\n    \"disposition\": \"unresolved\",\n    \"release_paths\": [\n      \"<path>\",\n      \"<path>\"\n    ],\n    \"latest_scheduled_payload_rc\": 0,\n    \"collector_interpreter_paths_scheduled\": []\n  },\n  \"merge_review\": {\n    \"head\": \"916cb240c61cebf048ff022a3da26e9233846999\",\n    \"last_clear_head\": \"a28f930608e9c2aedd92350d538cfa17df941111\",\n    \"state\": \"unreviewed\"\n  },\n  \"operator_decision\": \"Do not close the incident or land the PR yet. The handoff's 'restored' is not supported: exit codes were 0, but <path> was re-pointed at 05:10 (r17) and 07:42 (r18), and the root cause is not established. The 'clear' badge and the 07:52 clear verdict cover a28f930, not head 916cb24 pushed at 07:55, so the head has no verdict and the change needs a clear review first. The scheduler log does not record the interpreter for scheduled runs; the only captured interpreter is <path> from the manual shell at M-0601, so that list is empty pending evidence.\"\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "scheduler-owns-payload": false,
+          "transient-green": false,
+          "head-bound-review": true
+        },
+        "score": 0.3333333333333333,
+        "passed": false,
+        "seconds": 16.915,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 5817,
+          "cache_read_input_tokens": 19484,
+          "output_tokens": 2978,
+          "output_tokens_details": {
+            "thinking_tokens": 1635
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5817
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 28285,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002411565,
+        "turns": 11
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 1,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": true,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\"first_run\":{\"scheduled_payload_rc\":78,\"agent_woken\":true,\"manual_payload_rc\":0},\"recovery\":{\"disposition\":\"unresolved\",\"release_paths\":[\"<path>\",\"<path>\"],\"latest_scheduled_payload_rc\":0},\"merge_review\":{\"head\":\"916cb240c61cebf048ff022a3da26e9233846999\",\"last_clear_head\":\"a28f930608e9c2aedd92350d538cfa17df941111\",\"state\":\"unreviewed\"},\"operator_decision\":\"Do not close the incident or land the patch. The handoff's 'restored' claim conflicts with the scheduled payload exits (78 at 06:00 and 07:00), and the 08:00 success followed a <path> switch from r17 to r18 that the host does not guarantee is stable. The only clear verdict is on a28f930, which predates the 07:55 push to head 916cb240; the 06:01 manual replay used a different PATH and interpreter, so it does not show the scheduled path is fixed.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "scheduler-owns-payload": true,
+          "transient-green": false,
+          "head-bound-review": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 20.153,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 6658,
+          "cache_read_input_tokens": 29829,
+          "output_tokens": 3688,
+          "output_tokens_details": {
+            "thinking_tokens": 2174
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6658
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 40183,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00297534,
+        "turns": 14
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": true,
+        "skill_probe_count": 1,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": true,
+            "contamination_reasons": [
+              "installed-copy-read"
+            ]
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": true,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\"first_run\": {\"scheduled_payload_rc\": 78, \"agent_woken\": true, \"manual_payload_rc\": 0}, \"recovery\": {\"disposition\": \"unresolved\", \"release_paths\": [\"<path>\", \"<path>\"], \"latest_scheduled_payload_rc\": 0}, \"merge_review\": {\"head\": \"916cb240c61cebf048ff022a3da26e9233846999\", \"last_clear_head\": \"a28f930608e9c2aedd92350d538cfa17df941111\", \"state\": \"unreviewed\"}, \"operator_decision\": \"Do not close the incident or land the patch. The 06:00 and 07:00 scheduled runs exited 78 with the agent woken, and the 06:01 rc=0 was a manual run under a different PATH. The 08:00 green run came after the <path> symlink moved from r17 to r18 at 07:42, so it is one success across a re-provisioning, not a restoration. The current head 916cb24 was pushed at 07:55 and has no clear verdict marker. Its only clear marker names a28f930, and the changes-requested marker names 64e4376. The dashboard's green CI and clear badge do not establish review of the current head. Re-request review on 916cb24, and pin the collector interpreter before closing.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "scheduler-owns-payload": true,
+          "transient-green": false,
+          "head-bound-review": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 17.456,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 11366,
+          "cache_read_input_tokens": 35066,
+          "output_tokens": 3050,
+          "output_tokens_details": {
+            "thinking_tokens": 1346
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 11366
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 49490,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00329721,
+        "turns": 15
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": true,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": true,
+            "contamination_reasons": [
+              "installed-copy-read"
+            ]
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\"first_run\":{\"scheduled_payload_rc\":78,\"agent_woken\":true,\"manual_payload_rc\":0},\"recovery\":{\"disposition\":\"unresolved\",\"release_paths\":[\"<path>\",\"<path>\"],\"latest_scheduled_payload_rc\":0},\"merge_review\":{\"head\":\"916cb240c61cebf048ff022a3da26e9233846999\",\"last_clear_head\":\"a28f930608e9c2aedd92350d538cfa17df941111\",\"state\":\"unreviewed\"},\"operator_decision\":\"Do not close the incident or land the patch yet. The 06:00 and 07:00 scheduled runs exited 78 (r17 missing rollup_reader), and the 08:00 success came after the tools symlink moved to r18, so this is a nondeterministic dependency, not a restoration. The 06:01 rc 0 was a manual run under the venv PATH, not the scheduled run. The clear verdict covers a28f930, not head 916cb24, so the patch needs re-review and the interpreter should be pinned.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "scheduler-owns-payload": true,
+          "transient-green": false,
+          "head-bound-review": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 14.854,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 11010,
+          "cache_read_input_tokens": 34714,
+          "output_tokens": 2578,
+          "output_tokens_details": {
+            "thinking_tokens": 1081
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 11010
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 48310,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0030131900000000002,
+        "turns": 14
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": true,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": true,
+            "contamination_reasons": [
+              "installed-copy-read"
+            ]
+          },
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\"first_run\": {\"scheduled_payload_rc\": 78, \"agent_woken\": true, \"manual_payload_rc\": 0}, \"recovery\": {\"disposition\": \"unresolved\", \"release_paths\": [\"<path>\", \"<path>\"], \"latest_scheduled_payload_rc\": 0}, \"merge_review\": {\"head\": \"916cb240c61cebf048ff022a3da26e9233846999\", \"last_clear_head\": \"a28f930608e9c2aedd92350d538cfa17df941111\", \"state\": \"unreviewed\"}, \"operator_decision\": \"Do not close the incident or land the patch. The 06:00 and 07:00 scheduled runs exited 78 under r17. The 08:00 green run used r18 after the 07:42 reprovision, so it is one success in a changed environment, not restoration. The manual 06:01 replay ran under the venv-first PATH and does not represent the scheduled outcome. The current head 916cb24 has no PierBot verdict marker; its last clear verdict is on a28f930, which predates the 07:55 push. Re-request review on the current head and pin the collector interpreter before reconsidering.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "scheduler-owns-payload": true,
+          "transient-green": false,
+          "head-bound-review": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 22.103,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 11467,
+          "cache_read_input_tokens": 49912,
+          "output_tokens": 3793,
+          "output_tokens_details": {
+            "thinking_tokens": 2193
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 11467
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 65182,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.003829995,
+        "turns": 15
+      }
+    ]
+  },
+  "verdict": "no-difference",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 352745,
+  "skipped_trials": []
+}
