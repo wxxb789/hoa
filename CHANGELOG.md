@@ -8,6 +8,7 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 - Update GDD Observer to the Paseo 0.16 SDK and matching React runtime dependencies while retaining
   bounded RPC polling and Node.js 20.19.4 support.
+- Group daily reference submodule updates in Dependabot and auto-merge them after required CI checks pass.
 
 ## 2026-11-19
 

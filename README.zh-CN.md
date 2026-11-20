@@ -248,7 +248,8 @@ git clone https://github.com/wxxb789/hoa   # 用 skill / 跑测试都不需要�
 `ref/` 下的参考仓库是子模块，只在研究上游时才需要。普通克隆
 （不加 `--recursive`）即可使用和测试其余内容。新克隆的子模块默认使用浅克隆。
 需要时刷新参考：
-`git submodule update --init --remote --merge`。
+`git submodule update --init --remote --depth 1`。
+Dependabot 每天检查各上游的默认分支，并在必需的 CI 检查通过后自动合并记录的提交更新。
 
 ## 该放哪儿？（分类）
 

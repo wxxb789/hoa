@@ -270,7 +270,9 @@ git clone https://github.com/wxxb789/hoa   # submodules NOT needed for skills/te
 `ref/` holds reference repos as submodules, needed only when studying an
 upstream. A plain clone (no `--recursive`) is enough to use and test everything
 else. New submodule clones are shallow by default. Refresh the references when needed:
-`git submodule update --init --remote --merge`.
+`git submodule update --init --remote --depth 1`.
+Dependabot checks each upstream's default branch daily and automatically merges
+updates to the recorded commits once required CI checks pass.
 
 ## Where does it go? (classification)
 
