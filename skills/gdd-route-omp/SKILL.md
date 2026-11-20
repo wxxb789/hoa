@@ -5,7 +5,7 @@ description: >-
   headless tasks or a turn killed midway, set a timeout, poll runner status, inspect the NDJSON
   event log and resume from the saved session ID. Not for tmux-agent-control.
 metadata:
-  revision: "6"
+  revision: "7"
   areas: "software-development,work-management"
   targets: "pi"
   summary: "detached runner for long `omp -p` runs; polled completion, session-id recovery (requires skill `gdd`)"
@@ -15,154 +15,50 @@ metadata:
 
 # gdd-route-omp
 
-Delegate bounded work to OMP (`omp -p`) without tying the run to the dispatching session.
+Run long OMP print-mode jobs through GDD's shared detached runner. Install both skills.
+For detachment, timeouts, cleanup, state and artifact formats, see
+[GDD transport](../gdd/references/transport.md). Use its runner, not a bare background job.
 
-## When to Use
+## Dispatch
 
-- Delegating a repo task to OMP that will run longer than a couple of minutes.
-- You are working from chat (Discord/Slack) and cannot watch a terminal, but the run must not die when
-  the session ends.
-- Recovering an OMP run that was killed mid-turn (needs its session id).
-- Deciding between headless `-p` and an attachable tmux TUI.
-
-## Rule: never launch OMP as a bare background job of the session
-
-A background child of the orchestrating session receives SIGTERM when that session ends, and `omp -p`
-prints only at exit — a run killed at minute 37 leaves a 0-byte output file. Always launch through the
-shared runner:
+- GDD selects OMP by default when no route is configured; pass `--agent omp` for standalone
+  dispatch. `OMP_BIN` overrides the executable on PATH. Use a native executable on Windows
+  for multiline prompts. Set an explicit model and compatible thinking effort when they must
+  be reproducible. The route forwards `--profile`, model, thinking, and the explicit resume ID;
+  the prompt is last. Results use prompted JSON, not a native schema flag.
+- The adapter selects print mode, JSON events and non-interactive approval (`yolo`).
+  Launch only with operator authority, an isolated worktree, bounded permissions and
+  independent gates. Agent output is not authorization to publish or alter shared state.
+- The optional POSIX `scripts/omp-run.sh` sets `GDD_AGENT=omp` and forwards to the shared
+  runner; `OMP_RUN_SH` can override it. The legacy runner `--backend` is ignored with a
+  warning; it does not select a supervisor.
 
 ```text
-uv run ../gdd/scripts/agent_run.py start --agent omp --name example --prompt task.md --cwd .
-uv run ../gdd/scripts/agent_run.py status example
+uv run ../gdd/scripts/agent_run.py start --agent omp --name SLUG --prompt FILE --cwd DIR --max-time DURATION
+uv run ../gdd/scripts/agent_run.py status SLUG
 ```
 
-`--max-time` takes seconds or one unit (`90m`, `2h`); the runner enforces it (exit `124`, `failed`).
-
-The runner records its effective `detach` mode in `state.json`.
-
-| Mode | Dispatch session | Gateway/service restart | Logout/reboot |
-|---|---|---|---|
-| `systemd` | Yes | Yes, separate user unit; not a user-manager restart | No |
-| `launchd` | Yes | Yes, separate job; not a GUI-domain restart | No |
-| `setsid` | Yes | No guarantee against cgroup or job teardown | No |
-| `windows` | Yes | Only if the runner is outside the terminating job | No |
-| `tmux` (optional, 3.2a or newer) | Yes | Only if the tmux server is outside the gateway's cgroup/job | No |
-| `herdr` (optional) | Yes | Only if the Herdr server survives the restart | No |
-
-Launchd is verified with stubs only; double-fork session and process-group survival is exercised on
-WSL2, not on macOS/BSD. See [transport](../gdd/references/transport.md#headless-platform-rules)
-for selection and cleanup.
-
-This skill requires skill `gdd`: the runner is maintained once, as gdd's `../gdd/scripts/agent_run.py`
-(cross-platform, stdlib Python), because that skill's `gdd.py` launches through it too. Existing
-POSIX callers can still use the optional `scripts/omp-run.sh` forwarder; it sets `GDD_AGENT=omp`
-and resolves the sibling runner (no PATH fallback). `--profile P` still reaches OMP;
-`--backend` is accepted with a warning and has no effect, including for `tmux`.
-The route was verified on OMP 18.22.0. `OMP_BIN` overrides `omp` on PATH. The
-prompt is the last argv element; `--model` and `--thinking` pass through when
-set. On Windows, point `OMP_BIN` at a native executable for multiline prompts.
-The runner prompts for JSON results; this route has no native schema flag.
 Only if a script command fails (for example `uv` is not found), read
 [the runner troubleshooting reference](../gdd/references/troubleshooting.md).
 
-## Why headless (not TUI)
+## Observe and accept
 
-- Headless output is a machine-checkable artifact; you can work from chat and attach to a TUI only for
-  rare manual intervention.
-- A TUI in tmux loses information when the pane scrolls or the client detaches; the NDJSON event log
-  does not.
-- `--mode=json` gives live progress (`session`, `turn_start`, `message_start`,
-  `tool_execution_start`, `message_update`, `message_end`, `turn_end`) — observability does not
-  require a TUI.
+1. Poll runner `status` at turn boundaries; use bounded `tail` for event progress, not raw
+   NDJSON or process-name matching. Budget time for all child work; serialize heavy gates on
+   constrained hosts.
+2. Require the last assistant `message_end.stopReason` to be present and not `error`,
+   `aborted`, or `length`. Read `answer.md` and the result; exit zero alone cannot prove
+   completion, especially for empty, truncated or still-waiting answers. Require actual gate
+   exit codes; a background verifier may die at runner cleanup. Re-run the repo gate yourself.
+3. On `ECONNREFUSED`, check whether operator configuration or logs confirm an endpoint
+   restart. If confirmed, retry once after recovery; if it fails again, report or select an
+   authorized fallback rather than retrying indefinitely. Do not infer a model defect.
 
-## Pitfalls (each one observed in production)
+## Recover
 
-1. `--restore` ("continue the interrupted turn") requires a TTY: it fails with
-   `open terminal failed: not a terminal` under `-p`. Headless recovery is
-   `omp -r <session-id> -p "<hand-written continuation prompt>"`.
-2. `-p` emits nothing until exit. Without `--mode=json` a long run is a black box and a kill costs
-   everything: always tee the event stream.
-3. Never run a measurement/benchmark project concurrently with the full test suite on a host sized for
-   one heavy job: the run dies as exit `-9` and looks like an OOM. Serialize heavy steps and say so in
-   the prompt.
-4. Approval must be resolved before launch: headless with the default approval mode blocks silently
-   forever and no human sees the prompt. Use an explicit non-interactive approval mode (the wrapper
-   passes `--approval-mode yolo`) **only** in repos with machine gates.
-5. `-c` / "continue last session" is ambiguous when lanes run in parallel — always pass an explicit
-   session id (`-r <id>`).
-6. Budget by stage: a single implementation run costs 45–55 min, a review 15–30, a fix 10–25. Anything
-   above ~30 min is a kill risk; resuming needs the session id, so the runner records it in
-   `state.json` (`session_id`) the moment it appears. **A review/simplify stage that fans out sub-reviewers costs
-   the sum, not one pass** (~5 parallel reviewers, 20–100k tokens each, 35–40 min, tens of MB of
-   events) — budget that, and do not read its timeout as a hang.
-7. Model and thinking effort are coupled per provider: the fast reasoning model needs its high effort
-   setting, a fallback model usually needs a lower one. A wrong pairing degrades quality silently.
-   Record the pairing your CLI needs and pass it explicitly — never inherit a default.
-8. Headless only works when the result is falsifiable. Treat the agent's report as a claim; re-run the
-   repo gates yourself (build, test, format, docs snippets, api baseline, examples) and read exit codes
-   before committing.
-9. **Judge liveness from `state.json` or the runner's `status`, never from `ps | grep <shim path>`.**
-   Package-manager shims (`mise`, `asdf`, `volta`) point at a different binary than the one running, so
-   grepping the shim path reports a healthy run as dead — use the pid in `state.json`.
-10. **A detached run has no completion notification.** Nothing pings you when it ends: poll
-    the runner's `status <slug>` at turn boundaries, and treat `state` leaving `running` as the done
-    signal. A run whose runner and agent died is finalized as failed (`stale_recovered: true`, exit
-    `-1`) the next time `status`/`list`/`result`/`answer` reads it; a state file stuck at `running` is
-    not evidence that the work is alive — read `finalized` or the `stale_recovered` flag.
-11. **`exit=0` means the process ended, not that the task finished.** The last assistant
-    `message_end.stopReason` must be present and not `error`, `aborted`, or `length`. A run can end its turn while a
-    long command is still in flight and report "waiting for the test gate" as its last text. Read
-    `answer.md` for trailing wait language before treating the phase as done; the fix is a continuation
-    run (`-r <session-id>` plus a prompt that names the remaining steps), not a fresh restart.
-12. **Never print the raw `events.ndjson` of a JSON-mode run.** Each event carries the full prompt of
-    every sub-agent the run spawned, so one raw read returns hundreds of KB and floods the context for
-    no signal. The runner's `tail <slug> [N]` prints one line per event (type plus at most 160 characters
-    of text), which is safe; poll `status <slug>` for liveness and read `answer.md` (or `result <slug>`)
-    for the outcome.
-13. **`state.json` grows over the run lifecycle.** Counters and the final fields (`ended`,
-    `duration_s`, `error`) appear as the run progresses. Read `state`, `exit`, `duration_s`, `cwd` and
-    `run_dir` defensively; treat everything else as optional.
-
-14. **A run that says it "launched" its verification is not evidence.** Whether teardown takes
-    backgrounded children with it is the launcher's cleanup contract, not a universal law: a launcher
-    that terminates its cleanup group at finalize (`systemd-run`, `KillMode=control-group`) kills a gate
-    left under `&` / `nohup` with no exit code anywhere, while one that merely returns may leave it
-    running. Require the exit code before treating the verification as done — a gate awaited to
-    completion is fine, a gate left behind is not. The stage-side rule lives in skill `gdd` →
-    `references/run-failure-modes.md` §8.
-
-15. **A model-endpoint restart window is a transport fault, not a model defect — and a report-only
-    stage can hide it behind `exit 0`.** The endpoint that fronts the models restarts on a schedule
-    the operator's runtime configuration declares — read that schedule from the configuration, never
-    assume it. A lane dispatched inside the window fails with `ECONNREFUSED`: classify that as
-    suspected transport, not as a model failure. Confirm the window, retry **once** against the same
-    route, and on a second failure switch to another model in the pool or fall back to the primary
-    route — a third attempt on the same assumption is wasted budget. The window is doubly easy to miss
-    because a report-only stage (simplify / review) can still exit 0 with an empty or truncated
-    `answer.md`; that is a suspected failure to re-verify, not a completed stage — read the artifact,
-    not just the exit code (pitfalls 8 and 11 are the same rule at the run level).
-
-## Recovery after a session restart
-
-```text
-uv run ../gdd/scripts/agent_run.py list  # failed(stale) = runner and agent died; sess= is the resume id
-```
-
-Then start a new run with `--agent omp --name <slug>-r2 --prompt <continuation> --resume <id>`.
-
-Artifacts per run (`<run_root>/<YYYY-MM-DD>/<slug>/`): `prompt.md`, `run.json` (the exact argv),
-`events.ndjson` (and `events.1.ndjson` after rotation), `stderr.log`, `runner.log`, `state.json`
-(the single record, including `session_id`),
-`answer.md`, `exit.code`, `finalized`. There is no runner ledger; `list` shows every run.
-
-## When a TUI is still right
-
-Ambiguous scope, work needing mid-run steering, or the operator explicitly asking to watch:
-run `omp --resume SESSION_ID` in an interactive terminal. Never run a TUI and a headless process on
-the same session id.
-
-## Related
-
-Delivery-specific transport rules (one run per stage, no cross-increment resume, one run per worktree):
-skill `gdd` → `references/transport.md`. That skill's `scripts/gdd.py` calls the same runner
-through the same contract.
+Use runner `list` or `status` to distinguish a live run from a stale one and recover its
+recorded `session_id`. Start a new named runner invocation with `--agent omp` and
+`--resume <id>`; the prompt should state what remains in the same interrupted stage.
+Do not use implicit last-session selection or TTY-only restoration for headless recovery.
+For interactive steering, use the installed CLI's interactive resume on that ID only after
+the headless process has stopped. Never attach two writers to one session.

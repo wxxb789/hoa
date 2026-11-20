@@ -2,7 +2,7 @@
 
 Coverage proves no rule was lost. It does not prove the file still produces the right behavior — a rewrite can keep every sentence and still shift hedging, gate behavior, or tone.
 
-- Keep 10–15 one-shot cases (`<runtime> -z "<prompt>"`), each asserting a behavior the contract explicitly governs: decisive take, red gate, destructive confirm, ADHD support shape, fact verification, channel style, ask-before-side-effect, retry stop.
+- Default to 10-15 one-shot cases; add or remove cases to cover the changed behaviors and their nearest restraint paths. Use the installed runtime's one-shot command and the owner's actual approval policy.
 - Per case declare `expect` (regex alternatives, at least one must hit) and `forbid` (failure signatures, none may hit). Forbidden patterns are what catch the regressions the rules exist to prevent.
 - Run before and after every contract edit; compare pass counts and diff raw outputs (`runs/<ts>/raw/*.txt`). Report a measured baseline instead of asserting the new version "feels better".
 - **Contamination pitfall**: if the case file lives where the agent can scan (inside the project workspace it is asked to investigate), it finds the assertions and answers the test — observed as a case's `forbid` regex quoted back verbatim in the reply. Keep cases and runner outside the agent's workspace (e.g. a runtime-level `evals/` directory).

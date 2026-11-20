@@ -1,8 +1,8 @@
 # Context-compaction thresholds per harness
 
-Reference policy: auto-compact at **50% of the model window** on every harness. Each harness names and
-scales the knob differently; these are the resolved answers. Config roots are written as environment
-overrides with the harness's own default; substitute the root the host actually uses.
+Snapshot carried forward on 2026-11-21. The source notes did not pin CLI versions; paths, keys,
+defaults and commands below are lookup candidates, not current guarantees. Check installed-version
+help, schema and runtime behavior. The example policy is a trigger at 50% of the model window.
 
 | Harness | Config file | Key | Default | 50% of a 1M window | Verify with |
 |---|---|---|---|---|---|
@@ -43,6 +43,6 @@ headroom, so very small windows can be dominated by the headroom term.
 
 ## Verification depth actually applied
 
-dump-config and `config get` prove the composed configuration; only a running session proves the
-runtime behaviour. Do not claim "applies at 50%" for a profile you could not boot — say the config
-is composed and will take effect at next start.
+A parser or schema check alone proves neither composition nor runtime activation. In OMP, look for
+a resolved `thinking_level_change` event when verifying model effort; verify that this session loaded
+the intended config. If runtime readback is unavailable, report only the layer actually verified.

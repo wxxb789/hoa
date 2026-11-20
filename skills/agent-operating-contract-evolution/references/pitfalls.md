@@ -47,7 +47,7 @@
   judgement you paid for.
 - **Unmeasured savings claims in a contract proposal**: `wc -l -c` a copy of the file before promising how many lines/bytes a merge or prune removes. Estimating from the visible block over-states it (a section merge read as "-20 lines / -800 chars" measured -13 / -135), and an owner who checks data notices. Measure first, or phrase the benefit as direction and report real numbers after applying.
 - **Contract polish as displacement**: repeated rounds of identity/prompt refinement are high-feedback, low-risk, and unfailable — exactly the profile of an avoidance task. Before accepting another round, check whether a decaying deliverable exists (evidence log mtime, unpushed work, empty inbox, stalled plan) and say it once with the measured fact, then proceed with what was asked. Name the tradeoff; do not moralize and do not refuse the work.
-- **Blocking questions answered mid-audit**: ask the pruning/risk question *before* the heavy edits, with 2-4 concrete levels (light/moderate/aggressive) expressed in measured savings — the owner picks a level, you execute the whole plan without re-asking.
+- **Resolve risk before editing**: offer a few pruning scopes with measured savings. A scope choice is not durable-write approval unless the owner explicitly authorizes the edits it entails.
 
 ## Migrate and retire paths
 
