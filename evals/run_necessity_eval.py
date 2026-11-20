@@ -46,6 +46,10 @@ PROFILE = {
     "XDG_CONFIG_DIRS": "home/xdg/system-config", "XDG_DATA_DIRS": "home/xdg/system-data",
     "TEMP": "tmp", "TMP": "tmp", "TMPDIR": "tmp",
 }
+PI_PROFILE = {
+    "PI_CODING_AGENT_DIR": "home/.pi/agent",
+    "PI_CODING_AGENT_SESSION_DIR": "home/.pi/sessions",
+}
 PASSTHROUGH = {
     "PATH", "PATHEXT", "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "COMSPEC", "LANG", "LC_ALL",
     "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "NODE_EXTRA_CA_CERTS", "SSL_CERT_FILE",
@@ -117,18 +121,21 @@ def run_process(command, **kwargs):
     return subprocess.run(command, encoding="utf-8", errors="replace", **kwargs)
 
 
-def isolated_env(root, passthrough=()):
+def isolated_env(root, runtime, passthrough=()):
     allow = PASSTHROUGH.union(passthrough)
     env = {key: value for key, value in os.environ.items() if key.upper() in allow or key in allow}
     if os.name == "nt" and os.getenv("NOWINDOW_GUARD_LOG"):
         for key in ("NOWINDOW_GUARD_LOG", "PYTHONPATH"):
             env[key] = os.environ[key]
-    for key, relative in PROFILE.items():
+    profile = PROFILE | PI_PROFILE if runtime == "pi" else PROFILE
+    for key, relative in profile.items():
         path = root / relative
         path.mkdir(mode=0o700, parents=True, exist_ok=True)
         env[key] = str(path)
     if os.name == "nt":
         env["HOMEDRIVE"], env["HOMEPATH"] = os.path.splitdrive(env["USERPROFILE"])
+    if runtime == "pi":
+        env["PI_TELEMETRY"] = "0"
     env.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull,
                CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1", CLAUDE_CODE_DISABLE_AUTO_MEMORY="1",
                CLAUDE_CODE_DISABLE_BACKGROUND_TASKS="1", CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN="1",
@@ -312,13 +319,6 @@ def pi_provider():
             else:
                 secrets.add(PI_ENV_REFERENCE.sub(credential, value))
     return files, credentials, (*secrets, *map(os.getenv, credentials))
-
-
-def pi_env(env):
-    home = Path(env["HOME"]) / ".pi" / "agent"
-    home.mkdir(mode=0o700, parents=True)
-    env.update(PI_CODING_AGENT_DIR=str(home), PI_TELEMETRY="0")
-    return home
 
 
 def codex_host_skill_rules():
@@ -682,11 +682,11 @@ def pi_trace(route, acc, events, skill_file, workspace, skill_text):
 def trial(args, task, fixture, root, arm, skill_text):
     runtime = args.runtime
     config, extra_env, secrets = args.provider
-    env = isolated_env(root, CLAUDE_AUTH if runtime == "claude" else extra_env)
+    env = isolated_env(root, runtime, CLAUDE_AUTH if runtime == "claude" else extra_env)
     workspace = root / "work"
     snapshot(fixture, workspace, fixture=True)
     if runtime == "pi":
-        home = pi_env(env)
+        home = Path(env["PI_CODING_AGENT_DIR"])
         for name, data in config.items():
             path = home / name
             path.touch(mode=0o600)
@@ -799,9 +799,7 @@ def run_eval(args):
     args.host_skill_rules = codex_host_skill_rules() if args.runtime == "codex" else []
     with tempfile.TemporaryDirectory(prefix="hoa-eval-version-") as temp:
         root = Path(temp)
-        env = isolated_env(root)
-        if args.runtime == "pi":
-            pi_env(env)
+        env = isolated_env(root, args.runtime)
         proc = run_process([str(args.executable), "--version"], cwd=root, env=env,
                            capture_output=True, timeout=args.timeout)
         if proc.returncode:
