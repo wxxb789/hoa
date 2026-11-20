@@ -1,0 +1,810 @@
+{
+  "schema_version": 3,
+  "task": "set-b-hoa-skill-review",
+  "generated_at": "2026-11-20T02:05:23.472564-08:00",
+  "skill": "hoa-skill-review",
+  "skill_revision": "4",
+  "cli_version": "codex-cli 0.171.0",
+  "model": "gpt-6.2-sol",
+  "repeats": 3,
+  "runtime": "codex",
+  "mode": "forced",
+  "shell": true,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "grade-consumed-bytes": {
+      "field": "north",
+      "equals": {
+        "format": 0,
+        "dispatch": 0,
+        "origin": 2,
+        "persistence": "U"
+      }
+    },
+    "distinguish-omission-from-unavailable": {
+      "field": "south",
+      "equals": {
+        "format": 2,
+        "dispatch": 0,
+        "origin": 2,
+        "persistence": "U"
+      }
+    },
+    "verify-at-the-claimed-boundary": {
+      "field": "path_evidence",
+      "equals": {
+        "actual_importer": [
+          "P-14"
+        ],
+        "unattended_activation": []
+      }
+    },
+    "do-not-infer-controlled-effect": {
+      "field": "comparison",
+      "equals": "uncontrolled"
+    }
+  },
+  "rubric_flags": {
+    "grade-consumed-bytes": "non-discriminating",
+    "distinguish-omission-from-unavailable": "non-discriminating",
+    "verify-at-the-claimed-boundary": "non-discriminating",
+    "do-not-infer-controlled-effect": "non-discriminating"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    },
+    "terse": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    },
+    "skill": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": 0.0,
+    "terse": 0.0
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"north\": {\n    \"format\": 0,\n    \"dispatch\": 0,\n    \"origin\": 2,\n    \"persistence\": \"U\"\n  },\n  \"south\": {\n    \"format\": 2,\n    \"dispatch\": 0,\n    \"origin\": 2,\n    \"persistence\": \"U\"\n  },\n  \"path_evidence\": {\n    \"actual_importer\": [\"P-14\"],\n    \"unattended_activation\": []\n  },\n  \"comparison\": \"uncontrolled\",\n  \"evidence\": {\n    \"north\": \"trials.md P-14 records a JSONDecodeError at byte 0 when the shipped parser received the exact north.txt bytes. The parse failure prevents release_code extraction. north.txt names register DR-52.\",\n    \"south\": \"south.txt contains one JSON object and names register DR-52. It uses code for D17, while importer.py.txt requires release_code.\",\n    \"paths\": \"trials.md P-14 exercised the shipped parser. P-11 used a mock importer, P-12 used explicit operator activation and an importer stub, and P-13 simulated selection.\",\n    \"persistence\": \"trials.md records no staging transaction receipt for either submission.\",\n    \"comparison\": \"trials.md records that North used a desktop host with an operator-injected workflow body and workspace reads, while South used an isolated simulator with no file tool. Both saw the same release record as text.\"\n  }\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "grade-consumed-bytes": true,
+          "distinguish-omission-from-unavailable": true,
+          "verify-at-the-claimed-boundary": true,
+          "do-not-infer-controlled-effect": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 14.224,
+        "usage": {
+          "input_tokens": 36458,
+          "cached_input_tokens": 35160,
+          "cache_write_input_tokens": 1289,
+          "output_tokens": 482,
+          "reasoning_output_tokens": 39
+        },
+        "tokens": 36940,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"north\": {\n    \"format\": 0,\n    \"dispatch\": 0,\n    \"origin\": 2,\n    \"persistence\": \"U\"\n  },\n  \"south\": {\n    \"format\": 2,\n    \"dispatch\": 0,\n    \"origin\": 2,\n    \"persistence\": \"U\"\n  },\n  \"path_evidence\": {\n    \"actual_importer\": [\"P-14\"],\n    \"unattended_activation\": []\n  },\n  \"comparison\": \"uncontrolled\",\n  \"evidence\": {\n    \"north\": \"trials.md P-14 records JSONDecodeError at byte 0 when the shipped parser received the exact north.txt bytes. The parsing failure prevents release_code extraction. north.txt names register DR-52.\",\n    \"south\": \"south.txt contains one JSON object and names register DR-52. It uses code as the key for D17, while importer.py.txt requires release_code.\",\n    \"persistence\": \"grading-card.md requires a staging transaction receipt. trials.md records that neither reply has a retained receipt.\",\n    \"paths\": \"trials.md identifies P-14 as a shipped-parser run. P-11 used a mock importer, P-12 used explicit loading on a desktop host, and P-13 simulated automatic selection.\",\n    \"comparison\": \"trials.md describes North as a desktop submission with operator-injected workflow content and workspace reads, and South as an isolated simulator submission without a file tool.\"\n  }\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "grade-consumed-bytes": true,
+          "distinguish-omission-from-unavailable": true,
+          "verify-at-the-claimed-boundary": true,
+          "do-not-infer-controlled-effect": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 14.284,
+        "usage": {
+          "input_tokens": 36463,
+          "cached_input_tokens": 35160,
+          "cache_write_input_tokens": 1294,
+          "output_tokens": 464,
+          "reasoning_output_tokens": 16
+        },
+        "tokens": 36927,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"north\": {\n    \"format\": 0,\n    \"dispatch\": 0,\n    \"origin\": 2,\n    \"persistence\": \"U\"\n  },\n  \"south\": {\n    \"format\": 2,\n    \"dispatch\": 0,\n    \"origin\": 2,\n    \"persistence\": \"U\"\n  },\n  \"path_evidence\": {\n    \"actual_importer\": [\"P-14\"],\n    \"unattended_activation\": []\n  },\n  \"comparison\": \"uncontrolled\",\n  \"evidence\": {\n    \"north\": \"P-14 records a JSONDecodeError from the shipped parser on the exact north.txt bytes, so the importer could not extract release_code. north.txt names register DR-52.\",\n    \"south\": \"south.txt is one JSON object and names register DR-52. It uses code for D17, while enqueue requires release_code (importer.py.txt).\",\n    \"persistence\": \"No staging transaction receipt was retained for either reply (trials.md).\",\n    \"paths\": \"P-11 used a mock importer. P-12 used explicit workflow loading on a desktop host and an importer stub. P-13 simulated workflow selection. P-14 exercised the shipped parser and observed rejection (trials.md).\",\n    \"comparison\": \"North used a desktop host with operator-injected workflow instructions and workspace reads. South used an isolated simulator with no file tool (trials.md).\"\n  }\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "grade-consumed-bytes": true,
+          "distinguish-omission-from-unavailable": true,
+          "verify-at-the-claimed-boundary": true,
+          "do-not-infer-controlled-effect": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 13.577,
+        "usage": {
+          "input_tokens": 36478,
+          "cached_input_tokens": 35158,
+          "cache_write_input_tokens": 1311,
+          "output_tokens": 484,
+          "reasoning_output_tokens": 38
+        },
+        "tokens": 36962,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"north\": {\n    \"format\": 0,\n    \"dispatch\": 0,\n    \"origin\": 2,\n    \"persistence\": \"U\"\n  },\n  \"south\": {\n    \"format\": 2,\n    \"dispatch\": 0,\n    \"origin\": 2,\n    \"persistence\": \"U\"\n  },\n  \"path_evidence\": {\n    \"actual_importer\": [\"P-14\"],\n    \"unattended_activation\": []\n  },\n  \"comparison\": \"uncontrolled\",\n  \"evidence\": {\n    \"north\": \"The shipped parser raised JSONDecodeError on the exact fenced reply in P-14, so it could not extract release_code. The reply identifies DR-52. (north.txt:1–3, trials.md:8)\",\n    \"south\": \"The reply is a JSON object and identifies DR-52. It supplies code, while enqueue requires release_code. These scores follow from the reply and the importer excerpt. (south.txt:1, importer.py.txt:5–14)\",\n    \"persistence\": \"The grading card requires a staging transaction receipt. Neither reply has one in the record. (grading-card.md:12, trials.md:12–14)\",\n    \"paths\": \"P-14 exercised the shipped parser. P-11 used a mock, P-12 used explicit operator loading on a desktop host, and P-13 simulated automatic selection. (trials.md:5–8)\",\n    \"comparison\": \"North used a desktop with an operator-injected workflow body and workspace reads. South used an isolated simulator with no file tool. Both received the same release record as text. (trials.md:10–12)\"\n  }\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "grade-consumed-bytes": true,
+          "distinguish-omission-from-unavailable": true,
+          "verify-at-the-claimed-boundary": true,
+          "do-not-infer-controlled-effect": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 14.186,
+        "usage": {
+          "input_tokens": 36656,
+          "cached_input_tokens": 23743,
+          "cache_write_input_tokens": 12904,
+          "output_tokens": 537,
+          "reasoning_output_tokens": 43
+        },
+        "tokens": 37193,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"north\": {\n    \"format\": 0,\n    \"dispatch\": 0,\n    \"origin\": 2,\n    \"persistence\": \"U\"\n  },\n  \"south\": {\n    \"format\": 2,\n    \"dispatch\": 0,\n    \"origin\": 2,\n    \"persistence\": \"U\"\n  },\n  \"path_evidence\": {\n    \"actual_importer\": [\"P-14\"],\n    \"unattended_activation\": []\n  },\n  \"comparison\": \"uncontrolled\",\n  \"evidence\": {\n    \"north\": \"The shipped parser rejected the exact submitted bytes at byte 0, preventing release_code extraction. The reply identifies DR-52. (trials.md, P-14; north.txt)\",\n    \"south\": \"The submitted text decodes to one JSON object. It identifies DR-52 and contains code, while enqueue requires release_code. This assessment follows from the submitted text and importer excerpt. (south.txt; importer.py.txt)\",\n    \"persistence\": \"The grading card requires a staging transaction receipt. The record contains none for either reply. (grading-card.md; trials.md)\",\n    \"paths\": \"P-14 exercised the shipped parser. P-11 used a mock, P-12 used explicit operator loading on a desktop host, and P-13 simulated automatic selection. (trials.md)\",\n    \"comparison\": \"North used operator loading and workspace reads on a desktop host. South used an isolated simulator without a file tool. Both saw the same release record as text. (trials.md)\"\n  }\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "grade-consumed-bytes": true,
+          "distinguish-omission-from-unavailable": true,
+          "verify-at-the-claimed-boundary": true,
+          "do-not-infer-controlled-effect": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 14.858,
+        "usage": {
+          "input_tokens": 36612,
+          "cached_input_tokens": 35287,
+          "cache_write_input_tokens": 1316,
+          "output_tokens": 547,
+          "reasoning_output_tokens": 77
+        },
+        "tokens": 37159,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"north\": {\n    \"format\": 0,\n    \"dispatch\": 0,\n    \"origin\": 2,\n    \"persistence\": \"U\"\n  },\n  \"south\": {\n    \"format\": 2,\n    \"dispatch\": 0,\n    \"origin\": 2,\n    \"persistence\": \"U\"\n  },\n  \"path_evidence\": {\n    \"actual_importer\": [\"P-14\"],\n    \"unattended_activation\": []\n  },\n  \"comparison\": \"uncontrolled\",\n  \"evidence\": {\n    \"north\": \"P-14 exercised the shipped parser on the exact bytes of north.txt and failed at byte 0, preventing extraction of release_code. P-11 succeeded after the mock stripped the fences. north.txt names register DR-52.\",\n    \"south\": \"south.txt contains one JSON object and names register DR-52. Its D17 value is under code, while enqueue in importer.py.txt requires release_code. These scores follow from the submitted text and importer excerpt.\",\n    \"persistence\": \"grading-card.md requires a staging transaction receipt. trials.md records no retained receipt for either reply.\",\n    \"unattended_activation\": \"P-12 used an explicit operator command on a desktop host. P-13 reported automatic selection in a simulator. trials.md records no unforced live invocation.\",\n    \"comparison\": \"trials.md records that North used a desktop with an operator-injected workflow body and workspace reads, while South used an isolated simulator with no file tool. Both saw the same release record as text.\"\n  }\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "grade-consumed-bytes": true,
+          "distinguish-omission-from-unavailable": true,
+          "verify-at-the-claimed-boundary": true,
+          "do-not-infer-controlled-effect": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 15.965,
+        "usage": {
+          "input_tokens": 36587,
+          "cached_input_tokens": 35287,
+          "cache_write_input_tokens": 1291,
+          "output_tokens": 519,
+          "reasoning_output_tokens": 57
+        },
+        "tokens": 37106,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": true,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": true,
+            "contamination_reasons": [
+              "installed-copy-read"
+            ]
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": [
+              "installed-copy-read"
+            ]
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"north\": {\n    \"format\": 0,\n    \"dispatch\": 0,\n    \"origin\": 2,\n    \"persistence\": \"U\"\n  },\n  \"south\": {\n    \"format\": 2,\n    \"dispatch\": 0,\n    \"origin\": 2,\n    \"persistence\": \"U\"\n  },\n  \"path_evidence\": {\n    \"actual_importer\": [\"P-14\"],\n    \"unattended_activation\": []\n  },\n  \"comparison\": \"uncontrolled\",\n  \"evidence\": {\n    \"north\": {\n      \"format\": \"The shipped parser raised JSONDecodeError at byte 0 on the exact fenced reply. north.txt:1, trials.md P-14.\",\n      \"dispatch\": \"The parse error prevented extraction of release_code. The mock extracted D17 after stripping the fences. north.txt:2, importer.py.txt:5–14, trials.md P-11 and P-14.\",\n      \"origin\": \"The note identifies Register DR-52, C14. north.txt:2.\",\n      \"persistence\": \"The packet contains no staging transaction receipt. P-14 ran parse_only without a database connection. trials.md P-14 and closing notes.\"\n    },\n    \"south\": {\n      \"format\": \"Static inspection establishes that the reply is one JSON object accepted by parse_only. The ledger records no production parser run for South. south.txt:1, importer.py.txt:5–9, trials.md P-13.\",\n      \"dispatch\": \"The reply supplies code with value D17 and omits the required release_code key that enqueue reads. south.txt:1, importer.py.txt:12–14.\",\n      \"origin\": \"The note identifies Register DR-52, C14. south.txt:1.\",\n      \"persistence\": \"The packet contains no staging transaction receipt, and staging access was unavailable. trials.md closing notes.\"\n    },\n    \"actual_importer\": \"P-14 exercised the shipped dock_import 2.4 parser on North and observed a parse failure. P-11 used a mock, P-12 used a stub, and P-13 had no importer. trials.md P-11 through P-14.\",\n    \"unattended_activation\": \"P-12 explicitly loaded the workflow on a desktop host. P-13 prepended the workflow body in a simulator and reported a heuristic selection. trials.md P-12 and P-13.\",\n    \"comparison\": \"Both replies saw the same release record as text. North ran on desktop with an operator-injected body and workspace reads. South ran in an isolated simulator without a file tool. trials.md closing notes.\",\n    \"judge\": \"A fresh independent judge received the frozen criteria before reading the submitted replies and reached the same grades and path findings.\"\n  }\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "grade-consumed-bytes": true,
+          "distinguish-omission-from-unavailable": true,
+          "verify-at-the-claimed-boundary": true,
+          "do-not-infer-controlled-effect": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 49.819,
+        "usage": {
+          "input_tokens": 123321,
+          "cached_input_tokens": 106136,
+          "cache_write_input_tokens": 16825,
+          "output_tokens": 1509,
+          "reasoning_output_tokens": 343
+        },
+        "tokens": 124830,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": true,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": true,
+            "contamination_reasons": [
+              "installed-copy-read"
+            ]
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": [
+              "installed-copy-read"
+            ]
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"north\": {\n    \"format\": 0,\n    \"dispatch\": 0,\n    \"origin\": 2,\n    \"persistence\": \"U\"\n  },\n  \"south\": {\n    \"format\": 2,\n    \"dispatch\": 0,\n    \"origin\": 2,\n    \"persistence\": \"U\"\n  },\n  \"path_evidence\": {\n    \"actual_importer\": [\"P-14\"],\n    \"unattended_activation\": []\n  },\n  \"comparison\": \"uncontrolled\",\n  \"evidence\": {\n    \"north\": {\n      \"format\": \"The shipped parser raised JSONDecodeError at byte 0 on the exact north.txt bytes in P-14. [trials.md:8]\",\n      \"dispatch\": \"The parse error prevented extraction. P-11 captured D17 after the mock stripped the fences. [importer.py.txt:5–14; trials.md:5–8]\",\n      \"origin\": \"The reply visibly names Register DR-52. [north.txt:2]\",\n      \"persistence\": \"No staging transaction receipt was retained, and P-14 had no database connection. [trials.md:8–14]\"\n    },\n    \"south\": {\n      \"format\": \"A local check using the supplied parse_only excerpt decoded the exact south.txt bytes into one object. [south.txt:1; importer.py.txt:5–9]\",\n      \"dispatch\": \"The object contains code with value D17. The importer's required release_code lookup would raise KeyError. [south.txt:1; importer.py.txt:12–14]\",\n      \"origin\": \"The reply visibly names Register DR-52. [south.txt:1]\",\n      \"persistence\": \"No staging transaction receipt was retained. [trials.md:10–14]\"\n    },\n    \"paths\": \"P-14 exercised the shipped parser through parse_only. P-11 used a mock. P-12 explicitly loaded the workflow on a desktop host and used an importer stub. P-13 prepended the workflow in a simulator. [grading-card.md:14–17; trials.md:5–14]\",\n    \"comparison\": \"Both replies saw the same release record as text. North ran on a desktop with operator injection and workspace reads. South ran in an isolated simulator without a file tool. [trials.md:10–12]\",\n    \"review\": \"A fresh independent judge received the frozen rubric followed by the replies under neutral labels. Its grades agreed with the primary review. The local parser check used the supplied excerpt and has no recorded trial ID.\"\n  }\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "grade-consumed-bytes": true,
+          "distinguish-omission-from-unavailable": true,
+          "verify-at-the-claimed-boundary": true,
+          "do-not-infer-controlled-effect": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 45.554,
+        "usage": {
+          "input_tokens": 145286,
+          "cached_input_tokens": 126606,
+          "cache_write_input_tokens": 18092,
+          "output_tokens": 1785,
+          "reasoning_output_tokens": 163
+        },
+        "tokens": 147071,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": true,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": true,
+            "contamination_reasons": [
+              "installed-copy-read"
+            ]
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": [
+              "installed-copy-read"
+            ]
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"north\": {\n    \"format\": 0,\n    \"dispatch\": 0,\n    \"origin\": 2,\n    \"persistence\": \"U\"\n  },\n  \"south\": {\n    \"format\": 2,\n    \"dispatch\": 0,\n    \"origin\": 2,\n    \"persistence\": \"U\"\n  },\n  \"path_evidence\": {\n    \"actual_importer\": [\"P-14\"],\n    \"unattended_activation\": []\n  },\n  \"comparison\": \"uncontrolled\",\n  \"evidence\": {\n    \"north\": {\n      \"format\": \"P-14 records JSONDecodeError at byte 0 when dock_import 2.4 parsed the exact north.txt bytes, which begin with a Markdown fence.\",\n      \"dispatch\": \"P-14 shows that parsing failed before the importer could extract release_code.\",\n      \"origin\": \"north.txt contains \\\"Register DR-52, C14\\\".\",\n      \"persistence\": \"trials.md records no staging transaction receipt for North. P-14 had no database connection.\"\n    },\n    \"south\": {\n      \"format\": \"Static inspection of south.txt and importer.py.txt establishes that json.loads would decode the reply as one object. No South importer run was recorded.\",\n      \"dispatch\": \"south.txt supplies \\\"code\\\":\\\"D17\\\". The direct lookup row[\\\"release_code\\\"] in importer.py.txt would fail because that key is absent.\",\n      \"origin\": \"south.txt contains \\\"Register DR-52, C14\\\".\",\n      \"persistence\": \"trials.md records no staging transaction receipt for South.\"\n    },\n    \"paths\": \"P-14 exercised the shipped parser and observed rejection. P-11 used a mock that stripped fences. P-12 explicitly loaded the workflow and used an importer stub. P-13 prepended the workflow body in a simulator.\",\n    \"comparison\": \"trials.md records different conditions. North ran on a desktop with operator injection and workspace reads. South ran in an isolated simulator without a file tool.\",\n    \"judge\": \"The grades are based on the submitted artifacts and recorded trials. No independent judge participated.\"\n  }\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "grade-consumed-bytes": true,
+          "distinguish-omission-from-unavailable": true,
+          "verify-at-the-claimed-boundary": true,
+          "do-not-infer-controlled-effect": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 26.819,
+        "usage": {
+          "input_tokens": 72931,
+          "cached_input_tokens": 56821,
+          "cache_write_input_tokens": 16095,
+          "output_tokens": 924,
+          "reasoning_output_tokens": 180
+        },
+        "tokens": 73855,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      }
+    ]
+  },
+  "verdict": "no-difference",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000
+  },
+  "total_tokens": 568043,
+  "skipped_trials": []
+}

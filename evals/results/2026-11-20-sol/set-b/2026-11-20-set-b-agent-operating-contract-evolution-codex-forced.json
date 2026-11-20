@@ -1,0 +1,763 @@
+{
+  "schema_version": 3,
+  "task": "set-b-agent-operating-contract-evolution",
+  "generated_at": "2026-11-20T02:12:27.403897-08:00",
+  "skill": "agent-operating-contract-evolution",
+  "skill_revision": "6",
+  "cli_version": "codex-cli 0.171.0",
+  "model": "gpt-6.2-sol",
+  "repeats": 3,
+  "runtime": "codex",
+  "mode": "forced",
+  "shell": true,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "global-invariant": {
+      "field": "placement",
+      "equals": "contract/identity.txt"
+    },
+    "delegation-context-loss": {
+      "field": "child_handoff",
+      "equals": {
+        "ATTR": true,
+        "TONE": false,
+        "SYNC": false
+      }
+    },
+    "gate-call-site": {
+      "field": "link_audit_blocks_sync",
+      "equals": false
+    }
+  },
+  "rubric_flags": {
+    "global-invariant": "non-discriminating",
+    "delegation-context-loss": "non-discriminating",
+    "gate-call-site": "non-discriminating"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    },
+    "terse": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    },
+    "skill": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": 0.0,
+    "terse": 0.0
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"placement\": \"contract/identity.txt\",\n  \"loaded\": {\n    \"desk\": \"OVERLAY\",\n    \"intake\": null,\n    \"scratch\": \"SCRATCH-OPS\"\n  },\n  \"child_handoff\": {\n    \"ATTR\": true,\n    \"TONE\": false,\n    \"SYNC\": false\n  },\n  \"link_audit_blocks_sync\": false,\n  \"draft_patch\": \"--- a/contract/identity.txt\\n+++ b/contract/identity.txt\\n@@ -3,4 +3,8 @@\\n The archive steward keeps source material separate from interpretations.\\n Never pass private accession details to a delivery recipient.\\n+Every claim in an entry prepared for any archive delivery must carry its accession source. Explicitly mark any claim without an accession source as unsourced in the draft and withhold it from delivery.\\n+Use accession references that are safe to share with the recipient. Withhold any claim whose source cannot be cited without exposing private accession details.\\n+Include the attribution and withholding requirements explicitly in every request to a delegated cataloger preparing delivery-bound entries.\\n+Before each delivery, verify that every included claim meets these requirements, including claims drafted by delegated catalogers.\\n Tone: short and decisive in messages to the owner.\\n \\n\",\n  \"rationale\": \"contract/identity.txt identifies itself as the canonical identity input, and prompt-captures.json shows IDENTITY in all three starts listed in starts.csv. The captured project slots contain OVERLAY, no text, and SCRATCH-OPS respectively. CEDAR-OPS appears among the desk candidates but is absent from its captured project slot. The cataloger capture shows BUILTIN identity, an empty project slot, and skip_context_files enabled. handoff.md limits catalogers to drafting, so the request explicitly includes ATTR. TONE applies to direct owner reports, and SYNC applies to publishing or committing the store. persistence/nightly.txt schedules shape, status with --check frontmatter, and sync. persistence/status-handler.txt shows that only status with --check links runs the orphan audit, so that audit cannot block the shipped sync.\"\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "global-invariant": true,
+          "delegation-context-loss": true,
+          "gate-call-site": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 18.481,
+        "usage": {
+          "input_tokens": 36834,
+          "cached_input_tokens": 35232,
+          "cache_write_input_tokens": 1593,
+          "output_tokens": 696,
+          "reasoning_output_tokens": 71
+        },
+        "tokens": 37530,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"placement\": \"contract/identity.txt\",\n  \"loaded\": {\n    \"desk\": \"OVERLAY\",\n    \"intake\": null,\n    \"scratch\": \"SCRATCH-OPS\"\n  },\n  \"child_handoff\": {\n    \"ATTR\": true,\n    \"TONE\": false,\n    \"SYNC\": false\n  },\n  \"link_audit_blocks_sync\": false,\n  \"draft_patch\": \"--- a/contract/identity.txt\\n+++ b/contract/identity.txt\\n@@ -5,4 +5,9 @@\\n Tone: short and decisive in messages to the owner.\\n \\n+For every archive delivery, each claim in a delivery-bound entry must cite its accession source in a form the recipient may see. Mark any claim without such a citation as unsourced and withhold it from delivery.\\n+\\n+Include this attribution rule explicitly in every delegated cataloger's drafting request. Before delivering, the parent must verify attribution and withhold unsourced claims, including those in delegated drafts.\\n+\\n This is the canonical identity input. Runtime-export filenames in this packet\\n are neutralized; do not install them or infer paths on the host from them.\",\n  \"rationale\": \"contract/identity.txt identifies the canonical identity input, and prompt-captures.json shows it loaded at all three starts in starts.csv, whose project slots differ as listed above. The cataloger starts with BUILTIN and an empty project slot. handoff.md limits its work to drafting, so its request needs ATTR. TONE applies to owner reporting and SYNC applies to persistence. persistence/nightly.txt schedules status with only --check frontmatter. persistence/status-handler.txt gates the orphan-link audit on --check links and confirms that neither shape nor sync runs it.\"\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "global-invariant": true,
+          "delegation-context-loss": true,
+          "gate-call-site": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 17.841,
+        "usage": {
+          "input_tokens": 37029,
+          "cached_input_tokens": 35235,
+          "cache_write_input_tokens": 1785,
+          "output_tokens": 580,
+          "reasoning_output_tokens": 46
+        },
+        "tokens": 37609,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"placement\": \"contract/identity.txt\",\n  \"loaded\": {\n    \"desk\": \"OVERLAY\",\n    \"intake\": null,\n    \"scratch\": \"SCRATCH-OPS\"\n  },\n  \"child_handoff\": {\n    \"ATTR\": true,\n    \"TONE\": false,\n    \"SYNC\": false\n  },\n  \"link_audit_blocks_sync\": false,\n  \"draft_patch\": \"--- a/contract/identity.txt\\n+++ b/contract/identity.txt\\n@@ -5,4 +5,12 @@\\n Tone: short and decisive in messages to the owner.\\n \\n+Every claim in an archive delivery must cite its accession source in a form\\n+that keeps private accession details from the recipient. Mark any claim that\\n+cannot be attributed as unsourced in the draft and withhold it from delivery.\\n+\\n+When delegating entry drafting, explicitly require the cataloger to record\\n+the accession source for each claim and flag unsourced claims for exclusion.\\n+The parent must verify attribution and exclude unsourced claims before delivery.\\n+\\n This is the canonical identity input. Runtime-export filenames in this packet\\n are neutralized; do not install them or infer paths on the host from them.\",\n  \"rationale\": \"contract/identity.txt identifies IDENTITY as canonical. The startup captures show IDENTITY at all three starts, with project slots containing OVERLAY at desk, no text at intake, and SCRATCH-OPS at scratch. starts.csv lists local candidates, while prompt-captures.json records what loaded. The cataloger capture shows BUILTIN identity and an empty project slot with context files skipped, so its request must carry ATTR explicitly. handoff.md limits catalogers to drafting, which makes owner-facing TONE and persistence SYNC outside their brief. persistence/nightly.txt schedules status with only the frontmatter check, and persistence/status-handler.txt gates the orphan-link audit on the links check. Neither shape nor sync runs that audit.\"\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "global-invariant": true,
+          "delegation-context-loss": true,
+          "gate-call-site": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 18.362,
+        "usage": {
+          "input_tokens": 36790,
+          "cached_input_tokens": 35218,
+          "cache_write_input_tokens": 1563,
+          "output_tokens": 706,
+          "reasoning_output_tokens": 137
+        },
+        "tokens": 37496,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"placement\": \"contract/identity.txt\",\n  \"loaded\": {\n    \"desk\": \"OVERLAY\",\n    \"intake\": null,\n    \"scratch\": \"SCRATCH-OPS\"\n  },\n  \"child_handoff\": {\n    \"ATTR\": true,\n    \"TONE\": false,\n    \"SYNC\": false\n  },\n  \"link_audit_blocks_sync\": false,\n  \"draft_patch\": \"--- a/contract/identity.txt\\n+++ b/contract/identity.txt\\n@@ -3,6 +3,14 @@\\n The archive steward keeps source material separate from interpretations.\\n Never pass private accession details to a delivery recipient.\\n Tone: short and decisive in messages to the owner.\\n \\n+Every claim in an entry drafted for archive delivery must carry its\\n+accession source. Explicitly mark any claim without an accession source as\\n+unsourced in the draft and withhold it from delivery.\\n+\\n+Include this attribution rule explicitly in every cataloger request for\\n+delivery-bound drafts. Before every archive delivery, verify attribution\\n+for all claims being delivered, including claims drafted by catalogers.\\n+\\n This is the canonical identity input. Runtime-export filenames in this packet\\n are neutralized; do not install them or infer paths on the host from them.\",\n  \"rationale\": \"contract/identity.txt identifies the canonical identity input, and prompt-captures.json shows that all three startups listed in starts.csv load IDENTITY even though their project slots differ. The same capture shows that the cataloger skips context files and receives BUILTIN with an empty project slot. handoff.md limits catalogers to drafting, so their requests explicitly carry ATTR. Owner-facing tone and store publication fall outside their role. persistence/nightly.txt schedules status with only the frontmatter check. persistence/status-handler.txt gates orphan detection on the links check, and neither shape nor sync runs it.\"\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "global-invariant": true,
+          "delegation-context-loss": true,
+          "gate-call-site": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 19.341,
+        "usage": {
+          "input_tokens": 37098,
+          "cached_input_tokens": 23813,
+          "cache_write_input_tokens": 13276,
+          "output_tokens": 863,
+          "reasoning_output_tokens": 234
+        },
+        "tokens": 37961,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"placement\": \"contract/identity.txt\",\n  \"loaded\": {\n    \"desk\": \"OVERLAY\",\n    \"intake\": null,\n    \"scratch\": \"SCRATCH-OPS\"\n  },\n  \"child_handoff\": {\n    \"ATTR\": true,\n    \"TONE\": false,\n    \"SYNC\": false\n  },\n  \"link_audit_blocks_sync\": false,\n  \"draft_patch\": \"--- a/contract/identity.txt\\n+++ b/contract/identity.txt\\n@@ -3,6 +3,15 @@\\n The archive steward keeps source material separate from interpretations.\\n Never pass private accession details to a delivery recipient.\\n Tone: short and decisive in messages to the owner.\\n \\n+Before every archive delivery, verify that each claim in every entry carries\\n+its accession source in a form safe to share with the recipient. Explicitly\\n+mark any claim without such a source as unsourced and withhold its entry\\n+from delivery until every claim in the entry has an accession source.\\n+\\n+When asking a cataloger to draft delivery-bound entries, explicitly require\\n+an accession source for each claim and require the cataloger to mark unsourced\\n+claims and flag their entries for withholding. Verify delegated drafts before delivery.\\n+\\n This is the canonical identity input. Runtime-export filenames in this packet\\n are neutralized; do not install them or infer paths on the host from them.\",\n  \"rationale\": \"contract/identity.txt identifies itself as canonical. starts.csv and prompt-captures.json show that all three startups load IDENTITY and that their project slots contain OVERLAY, nothing, and SCRATCH-OPS, respectively. Desk lists CEDAR-OPS as a candidate, but its captured project slot contains only OVERLAY. The cataloger starts with BUILTIN identity and an empty project slot. handoff.md limits its work to drafting, so its request needs ATTR explicitly. TONE applies to direct owner reports and SYNC applies to persistence. persistence/nightly.txt schedules a frontmatter check, and persistence/status-handler.txt shows that only the links check runs the orphan audit. Neither shape nor sync runs that audit.\"\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "global-invariant": true,
+          "delegation-context-loss": true,
+          "gate-call-site": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 21.4,
+        "usage": {
+          "input_tokens": 37109,
+          "cached_input_tokens": 35331,
+          "cache_write_input_tokens": 1769,
+          "output_tokens": 948,
+          "reasoning_output_tokens": 333
+        },
+        "tokens": 38057,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"placement\": \"contract/identity.txt\",\n  \"loaded\": {\n    \"desk\": \"OVERLAY\",\n    \"intake\": null,\n    \"scratch\": \"SCRATCH-OPS\"\n  },\n  \"child_handoff\": {\n    \"ATTR\": true,\n    \"TONE\": false,\n    \"SYNC\": false\n  },\n  \"link_audit_blocks_sync\": false,\n  \"draft_patch\": \"--- a/contract/identity.txt\\n+++ b/contract/identity.txt\\n@@\\n The archive steward keeps source material separate from interpretations.\\n Never pass private accession details to a delivery recipient.\\n+For every archive delivery, cite the accession source for each claim. Explicitly mark any claim without an accession source as unsourced in the draft and withhold that claim from delivery.\\n+When requesting a delivery-bound draft from a cataloger, explicitly require the cataloger to attach an accession source to each claim or mark it unsourced for withholding. Before delivery, verify attribution and exclude unsourced claims, including claims from delegated drafts.\\n Tone: short and decisive in messages to the owner.\",\n  \"rationale\": \"contract/identity.txt identifies itself as the canonical identity input. starts.csv lists startup candidates, while prompt-captures.json records the actual slots before any reads. IDENTITY is shared across desk, intake, and scratch, whose project slots contain OVERLAY, nothing, and SCRATCH-OPS respectively. contract/protocol.txt describes CEDAR-OPS as the checkout-root protocol, and contract/overlay.txt describes OVERLAY as the desk-shift overlay. The cataloger capture shows skip_context_files enabled, BUILTIN identity, and an empty project slot. handoff.md limits catalogers to drafting, so their request explicitly carries ATTR. TONE governs direct reports to the owner, and SYNC governs persistence. persistence/nightly.txt schedules status with only the frontmatter check. persistence/status-handler.txt shows that orphan detection requires the links check and that neither shape nor sync invokes it.\"\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "global-invariant": true,
+          "delegation-context-loss": true,
+          "gate-call-site": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 18.157,
+        "usage": {
+          "input_tokens": 37114,
+          "cached_input_tokens": 35317,
+          "cache_write_input_tokens": 1788,
+          "output_tokens": 729,
+          "reasoning_output_tokens": 149
+        },
+        "tokens": 37843,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": true,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": true,
+            "contamination_reasons": [
+              "installed-copy-read"
+            ]
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": [
+              "installed-copy-read"
+            ]
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"placement\": \"contract/identity.txt\",\n  \"loaded\": {\n    \"desk\": \"OVERLAY\",\n    \"intake\": null,\n    \"scratch\": \"SCRATCH-OPS\"\n  },\n  \"child_handoff\": {\n    \"ATTR\": true,\n    \"TONE\": false,\n    \"SYNC\": false\n  },\n  \"link_audit_blocks_sync\": false,\n  \"draft_patch\": \"--- a/contract/identity.txt\\n+++ b/contract/identity.txt\\n@@ -3,6 +3,10 @@\\n The archive steward keeps source material separate from interpretations.\\n Never pass private accession details to a delivery recipient.\\n Tone: short and decisive in messages to the owner.\\n \\n+For every archive delivery, including work drafted by catalogers, every claim in an entry must carry its accession source in a form safe to share with the recipient. Mark any claim without such a source as unsourced and withhold the entry from delivery.\\n+In each cataloger request, explicitly require the cataloger to record the accession source for every claim and flag any unsourced claim so the parent can withhold the entry.\\n+Before delivery, the parent verifies attribution on every claim and withholds any entry that fails this check.\\n+\\n This is the canonical identity input. Runtime-export filenames in this packet\\n are neutralized; do not install them or infer paths on the host from them.\",\n  \"rationale\": \"contract/identity.txt identifies itself as canonical. The startup IDs in starts.csv match prompt-captures.json, which shows IDENTITY in all three parent starts and a project slot containing OVERLAY at desk, no text at intake, and SCRATCH-OPS at scratch. CEDAR-OPS is a candidate at desk but does not occupy the captured slot. The cataloger starts with context files skipped and gets BUILTIN. Under handoff.md, it only drafts entries, so its request needs ATTR. TONE applies to owner messages and SYNC applies to persistence. The draft uses recipient-safe attribution to preserve the identity's privacy rule and assigns the final check to the delivering parent. persistence/nightly.txt requests only the frontmatter status check. persistence/status-handler.txt runs the orphan-link audit only when links is requested, and neither shape nor sync invokes it.\"\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "global-invariant": true,
+          "delegation-context-loss": true,
+          "gate-call-site": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 25.725,
+        "usage": {
+          "input_tokens": 65387,
+          "cached_input_tokens": 45471,
+          "cache_write_input_tokens": 19904,
+          "output_tokens": 1008,
+          "reasoning_output_tokens": 161
+        },
+        "tokens": 66395,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": true,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": true,
+            "contamination_reasons": [
+              "installed-copy-read"
+            ]
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"placement\": \"contract/identity.txt\",\n  \"loaded\": {\n    \"desk\": \"OVERLAY\",\n    \"intake\": null,\n    \"scratch\": \"SCRATCH-OPS\"\n  },\n  \"child_handoff\": {\n    \"ATTR\": true,\n    \"TONE\": false,\n    \"SYNC\": false\n  },\n  \"link_audit_blocks_sync\": false,\n  \"draft_patch\": \"--- a/contract/identity.txt\\n+++ b/contract/identity.txt\\n@@ -3,5 +3,9 @@\\n The archive steward keeps source material separate from interpretations.\\n Never pass private accession details to a delivery recipient.\\n+Require every claim in every delivery-bound archive entry to carry a traceable accession source that is safe to share with the recipient.\\n+Explicitly mark claims without such a source as unsourced and withhold them from delivery.\\n+Include these attribution and withholding requirements explicitly in every delegated cataloger's drafting request.\\n+Before each archive delivery, verify attribution for every claim being delivered, including claims drafted by delegated catalogers.\\n Tone: short and decisive in messages to the owner.\\n \\n This is the canonical identity input. Runtime-export filenames in this packet\\n\",\n  \"rationale\": [\n    \"starts.csv and prompt-captures.json show that IDENTITY loads at all three starts. The desk project slot contains only OVERLAY, intake's is empty, and scratch's contains SCRATCH-OPS. contract/identity.txt identifies itself as the canonical identity input.\",\n    \"prompt-captures.json shows that the delegated cataloger starts with context files skipped. handoff.md limits catalogers to drafting, so the request explicitly carries ATTR. TONE applies to direct owner reports and SYNC applies to publishing or committing the store.\",\n    \"persistence/nightly.txt invokes status with --check frontmatter. persistence/status-handler.txt runs the orphan-link audit only when links is requested, and neither shape nor sync invokes it.\"\n  ]\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "global-invariant": true,
+          "delegation-context-loss": true,
+          "gate-call-site": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 25.229,
+        "usage": {
+          "input_tokens": 65173,
+          "cached_input_tokens": 45415,
+          "cache_write_input_tokens": 19746,
+          "output_tokens": 1025,
+          "reasoning_output_tokens": 286
+        },
+        "tokens": 66198,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": true,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": true,
+            "contamination_reasons": [
+              "installed-copy-read"
+            ]
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "command_execution",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\n  \"placement\": \"contract/identity.txt\",\n  \"loaded\": {\n    \"desk\": \"OVERLAY\",\n    \"intake\": null,\n    \"scratch\": \"SCRATCH-OPS\"\n  },\n  \"child_handoff\": {\n    \"ATTR\": true,\n    \"TONE\": false,\n    \"SYNC\": false\n  },\n  \"link_audit_blocks_sync\": false,\n  \"draft_text_patch\": \"--- a/contract/identity.txt\\n+++ b/contract/identity.txt\\n@@ -3,5 +3,9 @@\\n The archive steward keeps source material separate from interpretations.\\n Never pass private accession details to a delivery recipient.\\n Tone: short and decisive in messages to the owner.\\n \\n+For every archive delivery, including entries drafted by catalogers, verify that each claim carries a traceable accession source that is safe to share with the recipient. Mark any claim without such a source as unsourced in the draft and withhold the entry until every claim qualifies.\\n+\\n+In each cataloger request for delivery-bound entries, explicitly require an accession source for every claim. Tell the cataloger to mark any claim without a source as unsourced and flag the entry for withholding. The parent verifies attribution before delivery.\\n+\\n This is the canonical identity input. Runtime-export filenames in this packet\\n\",\n  \"rationale\": \"contract/identity.txt identifies the canonical identity input. starts.csv lists the local candidates, and prompt-captures.json records the actual startup slots. IDENTITY loads at all three starts. At desk, OVERLAY occupies the project slot by itself even though CEDAR-OPS is a candidate. The cataloger capture shows skip_context_files=true and only the built-in identity, so its request must carry ATTR explicitly. handoff.md limits catalogers to drafting and assigns owner reporting and persistence outside that role. The draft withholds an entire entry while any claim lacks a recipient-safe accession source, preserving the existing privacy rule. Shipped sync stops on a nonzero exit, but persistence/nightly.txt invokes status with only --check frontmatter. persistence/status-handler.txt runs orphan detection only with the links check, and neither shape nor sync invokes it. This assessment uses the exported records and startup captures.\"\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "global-invariant": true,
+          "delegation-context-loss": true,
+          "gate-call-site": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 20.194,
+        "usage": {
+          "input_tokens": 65566,
+          "cached_input_tokens": 45422,
+          "cache_write_input_tokens": 20132,
+          "output_tokens": 883,
+          "reasoning_output_tokens": 112
+        },
+        "tokens": 66449,
+        "models": [],
+        "cost_usd": null,
+        "turns": null
+      }
+    ]
+  },
+  "verdict": "no-difference",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000
+  },
+  "total_tokens": 425538,
+  "skipped_trials": []
+}
