@@ -193,8 +193,10 @@ work, `client/` the surfaces (`runs-browser` the browser, `status-strip` the sta
 badges, `model-card` the model attribution, `labels` the state and liveness key/color maps),
 translations, and styles. Tests live in `server/tests/` and `client/tests/`.
 
-Client tests render the actual components with `react-test-renderer` matching Paseo 0.16's React
-19.2.3. The development React Native version also matches the host (0.86.3). The SDK's
+Client tests render the actual components with `react-test-renderer` matching Paseo 0.16.1's React
+19.2.3. The development React Native version also matches the host (0.86.3).
+Dependabot ignores React, React Native, the test renderer, and their type packages; update them
+together with `@getpaseo/plugin` to match the Paseo host. The SDK's
 translation runtime, RPC validation, and React Query remain real. Only host-injected
 React Native/UI primitives, settings persistence, clipboard and toast services are test adapters;
 RPC responses are synthetic and never connect to a daemon. The client project fixes the timezone to
