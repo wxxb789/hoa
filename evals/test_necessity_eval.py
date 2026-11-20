@@ -26,8 +26,8 @@ assert "ARBITRARY_PARENT_SECRET" not in os.environ
 assert "AUDIT_STATE_DIR" not in os.environ
 assert "GIT_DIR" not in os.environ
 prompt = sys.stdin.read()
-assert prompt.startswith("same prompt for every arm")
-assert ("report-claim-audit" in prompt) == (MODE == "forced" and HAS_SKILL)
+assert prompt.startswith("same prompt for every arm: report-claim-audit")
+assert ("First read" in prompt) == (MODE == "forced" and HAS_SKILL)
 assert ("frozen terse text" in str(sys.argv)) == IS_TERSE
 if RUNTIME == "claude":
     tools = sys.argv[sys.argv.index("--tools") + 1].split(",")
@@ -67,8 +67,17 @@ if not HAS_SKILL and CONTROL_PATH:
         "relative-fixture": "skills/report-claim-audit/input.txt",
         "catalog": catalog / "report-claim-audit" / "SKILL.md",
         "other-catalog": catalog / "not-the-task-skill" / "SKILL.md",
+        "catalog-probe": catalog / "report-claim-audit",
+        "workspace-probe": Path.cwd() / "skills" / "report-claim-audit",
+        "catalog-failed": catalog / "report-claim-audit" / "SKILL.md",
+        "catalog-pending": catalog / "report-claim-audit" / "SKILL.md",
+        "host-reference": root.parent / "host/.agents/skills/another/references/guide.md",
+        "host-root-file": root.parent / "host/.agents/skills/catalog.txt",
+        "standalone": root.parent / "host/SKILL.md",
         "config": config_read,
         "skill-tool": "skills/report-claim-audit/input.txt",
+        "skill-failed": "skills/report-claim-audit/input.txt",
+        "skill-not-found": "skills/report-claim-audit/input.txt",
         "mcp-fixture": "skills/report-claim-audit/input.txt",
         "mcp-catalog": catalog / "report-claim-audit" / "SKILL.md",
     }
@@ -77,7 +86,13 @@ if not HAS_SKILL and CONTROL_PATH:
 else:
     read_path = str(skill)
 if RUNTIME == "codex":
-    if not HAS_SKILL and CONTROL_PATH and CONTROL_PATH.startswith("mcp-"):
+    if not HAS_SKILL and CONTROL_PATH in {"skill-tool", "skill-failed"}:
+        print(json.dumps({"type": "item.completed", "item": {
+            "type": "mcp_tool_call", "id": "skill1", "tool": "skill",
+            "arguments": {"skill": "report-claim-audit"},
+            "result": {"isError": CONTROL_PATH == "skill-failed", "content": [{"text": "stub output"}]},
+        }}))
+    elif not HAS_SKILL and CONTROL_PATH and CONTROL_PATH.startswith("mcp-"):
         print(json.dumps({"type": "item.completed", "item": {
             "type": "mcp_tool_call", "id": "read1", "tool": "read_file",
             "arguments": {"paths": [read_path]},
@@ -85,9 +100,13 @@ if RUNTIME == "codex":
         }}))
     elif access:
         command = f"powershell -Command 'Get-Content -LiteralPath \"{read_path}\"'"
+        if not HAS_SKILL and CONTROL_PATH == "catalog-probe":
+            command = f"/bin/bash -lc 'rg --files \"{read_path}\"; ls \"{read_path}\"'"
+        if not HAS_SKILL and CONTROL_PATH == "host-reference":
+            command = f"/bin/bash -lc 'rg instruction \"{read_path}\"'"
         item = {"type": "command_execution", "id": "read1", "command": command}
         print(json.dumps({"type": "item.started", "item": item}))
-        item.update(status="completed", exit_code=0 if has_skill else 1,
+        item.update(status="completed", exit_code=int(not has_skill and CONTROL_PATH == "catalog-failed"),
                     aggregated_output=skill.read_text(encoding="utf-8") if has_skill and LOAD else str(skill))
         print(json.dumps({"type": "item.completed", "item": item}))
     print(json.dumps({"type": "item.completed", "item": {"type": "agent_message", "text": answer}}))
@@ -95,13 +114,29 @@ if RUNTIME == "codex":
                                                         "output_tokens": 3, "reasoning_output_tokens": 1}}))
     sys.exit(0)
 if access:
-    name = "Skill" if not HAS_SKILL and CONTROL_PATH == "skill-tool" else "Read"
+    name, arguments = "Read", {"file_path": read_path}
+    if not HAS_SKILL and CONTROL_PATH and CONTROL_PATH.startswith("skill-"):
+        name, arguments = "Skill", {"skill": "report-claim-audit"}
+    if not HAS_SKILL and CONTROL_PATH in {"catalog-probe", "workspace-probe"}:
+        name, arguments = "Glob", {"path": read_path, "pattern": "**/SKILL.md"}
+    if not HAS_SKILL and CONTROL_PATH == "catalog-probe":
+        print(json.dumps({"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "id": "local-glob", "name": "Glob", "input": {"pattern": "*.txt"}}
+        ]}}))
+        for i in range(4):
+            print(json.dumps({"type": "assistant", "message": {"content": [
+                {"type": "tool_use", "id": f"local{i}", "name": "Read", "input": {"file_path": "input.txt"}}
+            ]}}))
     print(json.dumps({"type": "assistant", "message": {"content": [
-        {"type": "tool_use", "id": "read1", "name": name, "input": {"file_path": read_path}}
+        {"type": "tool_use", "id": "read1", "name": name, "input": arguments}
     ]}}))
-    print(json.dumps({"type": "user", "message": {"content": [
-        {"type": "tool_result", "tool_use_id": "read1", "is_error": not has_skill}
-    ]}}))
+    if HAS_SKILL or CONTROL_PATH != "catalog-pending":
+        print(json.dumps({"type": "user", "message": {"content": [
+            {"type": "tool_result", "tool_use_id": "read1",
+             "is_error": not HAS_SKILL and CONTROL_PATH in {"skill-failed", "catalog-failed"},
+             "content": "Skill report-claim-audit not found" if not HAS_SKILL and
+             CONTROL_PATH == "skill-not-found" else "stub output"}
+        ]}}))
 print(json.dumps({"type": "result", "subtype": "success", "num_turns": 2,
                   "usage": {"output_tokens": 3},
                   "result": answer}))
@@ -110,7 +145,7 @@ print(json.dumps({"type": "result", "subtype": "success", "num_turns": 2,
 
 def setup_trial(tmp_path, monkeypatch, *, runtime="claude", mode="forced", leak=False,
                 load=True, shell=False, fake_load=False, scores=None, thresholds=None,
-                control_path=None, response=None):
+                control_path=None, response=None, repeats=2):
     outside = tmp_path / "outside"
     outside.mkdir()
     (outside / "sentinel").write_bytes(b"untouched")
@@ -150,7 +185,7 @@ command = "do-not-run"
     task = tmp_path / "task.json"
     task.write_text(json.dumps({
         "id": "test-eval", "skill": "report-claim-audit", "fixture": "fixture",
-        "prompt": "same prompt for every arm", "terse": "frozen terse text", "shell": shell,
+        "prompt": "same prompt for every arm: report-claim-audit", "terse": "frozen terse text", "shell": shell,
         "rubric": rubric,
     }), encoding="utf-8")
     process = runner.run_process
@@ -172,7 +207,7 @@ command = "do-not-run"
     monkeypatch.setattr(runner, "run_process", launch)
     results = tmp_path / "results"
     argv = ["runner", str(task), "--runtime", runtime, "--mode", mode, f"--{runtime}", sys.executable,
-            "--model", "stub-model", "--results", str(results), "--repeats", "2"]
+            "--model", "stub-model", "--results", str(results), "--repeats", str(repeats)]
     if thresholds is not None:
         policy = tmp_path / "thresholds.json"
         policy.write_text(json.dumps(thresholds), encoding="utf-8")
@@ -195,7 +230,7 @@ def test_three_arm_results_and_process_isolation(tmp_path, monkeypatch, runtime,
     assert report.with_suffix(".md").is_file()
     record = json.loads(report.read_text(encoding="utf-8"))
     assert report.stem.endswith(f"-test-eval-{runtime}-forced")
-    assert record["schema_version"] == 2
+    assert record["schema_version"] == 3
     assert record["cli_version"] == "stub 1.0"
     assert record["order"] == ["none", "terse", "skill", "skill", "terse", "none"]
     assert record["summary"]["skill"]["pass^k"] is True
@@ -234,26 +269,52 @@ def test_redact_windows_paths_and_credentials(monkeypatch):
     assert clean[6:] == ["<redacted>: <redacted>", "subject/README.md"]
 
 
-@pytest.mark.parametrize(("runtime", "path", "contaminated"), [
-    ("claude", "fixture", False),
-    ("codex", "relative-fixture", False),
-    ("claude", "other-catalog", False),
-    ("codex", "mcp-fixture", False),
-    ("claude", "catalog", True),
-    ("codex", "mcp-catalog", True),
-    ("claude", "config", True),
-    ("codex", "config", True),
-    ("claude", "skill-tool", True),
-    ("claude", None, True),
-    ("codex", None, True),
+@pytest.mark.parametrize(("runtime", "path", "reason", "probes"), [
+    ("claude", "fixture", None, 0),
+    ("codex", "relative-fixture", None, 0),
+    ("codex", "mcp-fixture", None, 0),
+    ("claude", "catalog-probe", None, 1),
+    ("codex", "catalog-probe", None, 1),
+    ("claude", "workspace-probe", None, 0),
+    ("claude", "skill-failed", None, 1),
+    ("codex", "skill-failed", None, 1),
+    ("claude", "skill-not-found", None, 1),
+    ("claude", "catalog-failed", None, 0),
+    ("claude", "catalog-pending", None, 0),
+    ("codex", "catalog-failed", None, 0),
+    ("claude", "catalog", "catalog-read", 0),
+    ("codex", "catalog", "catalog-read", 0),
+    ("claude", "other-catalog", "catalog-read", 0),
+    ("codex", "mcp-catalog", "catalog-read", 0),
+    ("claude", "host-reference", "host-skill-read", 0),
+    ("claude", "host-root-file", "host-skill-read", 0),
+    ("codex", "host-reference", "host-skill-read", 0),
+    ("claude", "standalone", "host-skill-read", 0),
+    ("claude", "config", "host-skill-read", 0),
+    ("codex", "config", "host-skill-read", 0),
+    ("claude", "skill-tool", "skill-load", 0),
+    ("codex", "skill-tool", "skill-load", 0),
+    ("claude", None, "installed-copy-read", 0),
+    ("codex", None, "installed-copy-read", 0),
 ])
-def test_control_skill_access_uses_trial_paths(tmp_path, monkeypatch, runtime, path, contaminated):
-    results, _ = setup_trial(tmp_path, monkeypatch, runtime=runtime, leak=path is None, control_path=path)
+def test_control_skill_probes_and_contamination(tmp_path, monkeypatch, runtime, path, reason, probes):
+    results, _ = setup_trial(tmp_path, monkeypatch, runtime=runtime, leak=path is None,
+                             control_path=path, repeats=1)
+    contaminated = reason is not None
     assert runner.main() == int(contaminated)
     report, = results.glob("*.json")
     record = json.loads(report.read_text(encoding="utf-8"))
     for arm in ("none", "terse"):
-        assert record["runs"][arm][0]["contaminated"] is contaminated
+        run = record["runs"][arm][0]
+        assert run["valid"] is not contaminated
+        assert run["contaminated"] is contaminated
+        assert run["skill_loaded"] is (reason == "skill-load"
+                                       or (reason == "installed-copy-read" and runtime == "claude"))
+        assert run["skill_probe_count"] == probes
+        assert sum(event["skill_probe"] for event in run["trace"]) == probes
+        assert run["contamination_reasons"] == ([reason] if reason else [])
+        assert all(set(event) == {"tool", "skill_probe", "skill_loaded", "contamination_reasons"}
+                   for event in run["trace"])
         assert record["summary"][arm]["pass^k"] is (None if contaminated else False)
     assert record["verdict"] == ("inconclusive" if contaminated else "skill-wins")
 

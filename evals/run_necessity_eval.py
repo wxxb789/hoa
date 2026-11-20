@@ -329,20 +329,40 @@ def agent_command(args, task, installed, arm):
     return command + ["-"]
 
 
-COMMAND_WORD = re.compile(r"""(["'])(.*?)\1|([^\s"'`;&|<>()=,]+)""", re.DOTALL)
+COMMAND_WORD = re.compile(r"""(["'])(.*?)\1|([;&|<>\r\n]+)|([^\s"'`;&|<>()]+)""", re.DOTALL)
+SEARCH_TOOLS = {"glob", "grep", "ls", "dir", "find", "get-childitem"}
+READ_COMMANDS = {"cat", "type", "get-content", "sed", "head"}
+RG_LIST_OPTIONS = {"--files", "--files-with-matches", "--files-without-match", "-l", "--count", "-c",
+                   "--count-matches"}
+READ_VALUE_OPTIONS = {
+    "rg": {"-g", "--glob", "--iglob", "--encoding", "--max-count", "-m", "-A", "-B", "-C"},
+    "head": {"-n", "--lines", "-c", "--bytes"},
+    "get-content": {"-totalcount", "-tail", "-readcount", "-encoding"},
+}
 
 
-def command_paths(command):
-    # Shell syntax is only a trace hint. Inspect literal operands, not command output.
-    previous = ""
-    for word in COMMAND_WORD.finditer(command):
-        quoted, bare = word.group(2, 3)
-        value = quoted if bare is None else bare
-        if quoted and previous in {"-c", "-lc", "-cl", "-command", "/c"}:
-            yield from command_paths(quoted)
-        elif "/" in value or "\\" in value:
-            yield value
-        previous = value.casefold()
+def shell_commands(command):
+    # Inspect literal commands, including quoted shell wrappers, not arbitrary shell behavior.
+    words = []
+    redirected = False
+    for _, quoted, separator, bare in COMMAND_WORD.findall(command + "\n"):
+        if separator and not set(separator) <= {"<", ">"}:
+            if words:
+                verb = words[0].replace("\\", "/").rsplit("/", 1)[-1].casefold().removesuffix(".exe")
+                args = words[1:]
+                if verb in {"bash", "sh", "zsh", "powershell", "pwsh", "cmd"}:
+                    for flag, script in zip(args, args[1:]):
+                        if flag.casefold() in {"-c", "-lc", "-cl", "-command", "/c"}:
+                            yield from shell_commands(script)
+                            break
+                else:
+                    yield verb, args
+            words = []
+            redirected = False
+        elif separator:
+            redirected = True
+        elif not redirected:
+            words.append(bare or quoted)
 
 
 def argument_strings(value):
@@ -359,28 +379,105 @@ def trace_path(value, workspace):
         value = str(workspace.parent / "home" / value[2:])
     try:
         # On Windows, realpath expands existing 8.3 aliases, including parent directories.
-        return Path(os.path.realpath(workspace / value))
+        target = workspace / value
+        return Path(os.path.realpath(target)), Path(os.path.abspath(target))
     except (OSError, ValueError):
+        return None, None
+
+
+def skill_read(path, literal, workspace, skill_file):
+    if path is None or path.is_relative_to(workspace):
         return None
+    if any(p.is_relative_to(skill_file.parents[1]) for p in (path, literal)):
+        return "installed-copy-read"
+    if any(p.is_relative_to(catalog) and len(p.relative_to(catalog).parts) >= 2
+           for p, catalog in ((path, SKILLS.resolve()), (literal, SKILLS))):
+        return "catalog-read"
+    for candidate in (path, literal):
+        parts = tuple(part.casefold() for part in candidate.parts)
+        if (parts[-1:] == ("skill.md",) or "skills" in parts[:-2]
+                or (parts[-2:-1] == ("skills",) and (
+                    parts[-3:-2] in {(".agents",), (".claude",), (".codex",)}
+                    or candidate.is_relative_to(workspace.parent / "home")))):
+            return "host-skill-read"
+    return None
 
 
-def skill_access(paths, workspace, skill_file):
-    catalog = (SKILLS / skill_file.parent.name).resolve()
-    home = workspace.parent / "home"
-    for path in paths:
-        if path is None or path.is_relative_to(workspace):
+def skill_probe(values, workspace, skill_file, base=None):
+    marker = re.compile(rf"(?<![\w-])(?:skills|skill\.md|{re.escape(skill_file.parent.name)})(?![\w-])", re.I)
+    for value in values:
+        if not marker.search(value):
             continue
-        if path.is_relative_to(catalog) or path.is_relative_to(skill_file.parent):
-            return True
-        if path.is_relative_to(home):
-            parts = path.relative_to(home).parts
-            if "skills" in (part.casefold() if os.name == "nt" else part for part in parts):
-                return True
+        path, _ = trace_path(value, workspace)
+        if path is not None and path.is_relative_to(workspace):
+            if base is not None:
+                # Structured search tools scope relative patterns to their explicit base.
+                base_path, _ = trace_path(base, workspace)
+                if base_path is not None and base_path.is_relative_to(workspace):
+                    continue
+            elif (("/" in value or "\\" in value) and not value.startswith(("*", "?"))) or path.exists():
+                continue
+        return True
     return False
 
 
+def shell_skill_operations(command, workspace):
+    for verb, args in shell_commands(command):
+        if verb in SEARCH_TOOLS or (verb == "rg" and RG_LIST_OPTIONS.intersection(args)):
+            yield True, args
+        elif verb in READ_COMMANDS or verb == "rg":
+            # rg and sed take a pattern/script before files, unless supplied by option.
+            files = []
+            pattern_given = verb not in {"rg", "sed"}
+            skip_value = False
+            options = True
+            for arg in args:
+                if skip_value:
+                    skip_value = False
+                elif options and arg == "--":
+                    options = False
+                elif options and arg.startswith("-"):
+                    option, equals, value = arg.partition("=")
+                    if verb in {"rg", "sed"} and option in {"-e", "--regexp", "--expression"}:
+                        pattern_given = True
+                        skip_value = not equals
+                    elif verb in {"rg", "sed"} and option in {"-f", "--file"}:
+                        pattern_given = True
+                        if equals:
+                            files.append(value)
+                    elif (option.casefold() if verb == "get-content" else option) in READ_VALUE_OPTIONS.get(verb, ()):
+                        skip_value = not equals
+                elif pattern_given:
+                    files.append(arg)
+                else:
+                    pattern_given = True
+            if verb == "rg":
+                targets = [file for file in files if (path := trace_path(file, workspace)[0]) and not path.is_dir()]
+                if not files or len(files) != len(targets):
+                    yield True, args
+                files = targets
+            yield False, files
+
+
+def skill_failed(content):
+    return any(re.match(r"\s*(?:unknown skill\b|skill\b[^\r\n]*\bnot found\b)", value, re.I)
+               for value in argument_strings(content))
+
+
+def record_skill_reads(entry, values, workspace, skill_file):
+    reasons = set(entry["contamination_reasons"])
+    loaded = False
+    for value in values:
+        path, literal = trace_path(value, workspace)
+        if reason := skill_read(path, literal, workspace, skill_file):
+            reasons.add(reason)
+            loaded |= path == skill_file
+    entry["contamination_reasons"] = sorted(reasons)
+    return loaded
+
+
 def claude_trace(events, skill_file, workspace):
-    result, trace, reads = {}, [], {}
+    result, trace, pending = {}, [], {}
     for event in events:
         kind = event.get("type")
         if kind == "result":
@@ -391,24 +488,33 @@ def claude_trace(events, skill_file, workspace):
         for block in content if isinstance(content, list) else ():
             if block.get("type") == "tool_use":
                 name, arguments = block["name"], block.get("input", {})
-                read_path, paths = None, ()
-                if name == "Read" and "file_path" in arguments:
-                    read_path = trace_path(arguments["file_path"], workspace)
-                    paths = (read_path,)
-                elif name == "Glob":
-                    base = arguments.get("path") or "."
-                    pattern = arguments.get("pattern", "")
-                    paths = (trace_path(base, workspace), trace_path(str(Path(base) / pattern), workspace))
-                elif name == "Bash":
-                    paths = (trace_path(value, workspace) for value in command_paths(arguments.get("command", "")))
-                access = name == "Skill" or skill_access(paths, workspace, skill_file)
-                entry = {"tool": name, "skill_access": access, "skill_loaded": False}
+                entry = {"tool": name, "skill_probe": False, "skill_loaded": False, "contamination_reasons": []}
                 trace.append(entry)
-                if ((name == "Skill" and arguments.get("skill") == skill_file.parent.name)
-                        or read_path == skill_file):
-                    reads[block["id"]] = entry
-            if block.get("type") == "tool_result" and block.get("tool_use_id") in reads:
-                reads[block["tool_use_id"]]["skill_loaded"] = not block.get("is_error", False)
+                reads = []
+                if name.casefold() in SEARCH_TOOLS:
+                    entry["skill_probe"] = skill_probe(argument_strings(arguments), workspace, skill_file,
+                                                       arguments.get("path"))
+                elif name == "Read":
+                    reads = list(argument_strings(arguments.get("file_path")))
+                elif name == "Bash":
+                    for search, values in shell_skill_operations(arguments.get("command", ""), workspace):
+                        if search:
+                            entry["skill_probe"] |= skill_probe(values, workspace, skill_file)
+                        else:
+                            reads.extend(values)
+                if name == "Skill" or reads:
+                    pending[block["id"]] = entry, arguments.get("skill"), reads
+            elif block.get("type") == "tool_result" and block.get("tool_use_id") in pending:
+                entry, skill, reads = pending.pop(block["tool_use_id"])
+                success = not block.get("is_error", False)
+                if entry["tool"] == "Skill":
+                    success = success and not skill_failed(block.get("content"))
+                    entry["skill_probe"] = not success
+                    if success:
+                        entry["contamination_reasons"] = ["skill-load"]
+                        entry["skill_loaded"] = skill == skill_file.parent.name
+                elif success:
+                    entry["skill_loaded"] = record_skill_reads(entry, reads, workspace, skill_file)
     return result, trace
 
 
@@ -428,18 +534,37 @@ def codex_trace(events, skill_file, workspace, skill_text):
             result["result"] = item["text"]
         if tool not in {"command_execution", "mcp_tool_call", "file_change"}:
             continue
-        entry = calls.setdefault(item["id"], {"tool": tool, "skill_access": False, "skill_loaded": False})
-        payload = (command_paths(item.get("command", "")) if tool == "command_execution"
-                   else argument_strings(item.get("arguments")) if tool == "mcp_tool_call" else ())
-        paths = {trace_path(value, workspace) for value in payload}
-        entry["skill_access"] |= (
-            (tool == "mcp_tool_call" and item.get("tool", "").casefold() == "skill")
-            or skill_access(paths, workspace, skill_file)
-        )
-        if (kind == "item.completed" and tool == "command_execution"
-                and item.get("status") == "completed" and item.get("exit_code") == 0
-                and skill_file in paths and header in item.get("aggregated_output", "").replace("\r\n", "\n")):
-            entry["skill_loaded"] = True
+        entry = calls.setdefault(item["id"], {
+            "tool": tool, "skill_probe": False, "skill_loaded": False, "contamination_reasons": [],
+        })
+        if tool == "command_execution":
+            for search, values in shell_skill_operations(item.get("command", ""), workspace):
+                if search:
+                    entry["skill_probe"] |= skill_probe(values, workspace, skill_file)
+                elif (kind == "item.completed" and item.get("status") == "completed"
+                      and item.get("exit_code") == 0):
+                    installed_read = record_skill_reads(entry, values, workspace, skill_file)
+                    entry["skill_loaded"] |= (
+                        installed_read and header in item.get("aggregated_output", "").replace("\r\n", "\n")
+                    )
+        elif tool == "mcp_tool_call":
+            name, arguments = item.get("tool", "").casefold(), item.get("arguments")
+            if name in SEARCH_TOOLS:
+                entry["skill_probe"] |= skill_probe(argument_strings(arguments), workspace, skill_file)
+            if kind == "item.completed":
+                response = item.get("result")
+                success = response is not None and not (
+                    item.get("error") or item.get("status") == "failed"
+                    or (isinstance(response, dict) and (response.get("isError") or response.get("is_error")))
+                )
+                if name == "skill":
+                    entry["skill_probe"] = not success or skill_failed(response)
+                    if not entry["skill_probe"]:
+                        entry["contamination_reasons"] = ["skill-load"]
+                        entry["skill_loaded"] = (isinstance(arguments, dict)
+                                                 and arguments.get("skill") == skill_file.parent.name)
+                elif name in {"read", "read_file"} and success:
+                    record_skill_reads(entry, argument_strings(arguments), workspace, skill_file)
     return result, list(calls.values())
 
 
@@ -479,8 +604,8 @@ def trial(args, task, fixture, root, arm, skill_text):
         error = "invalid agent event stream"
     output = result.get("result", "") if error is None else ""
     loaded = any(event["skill_loaded"] for event in trace)
-    contaminated = arm != "skill" and any(event["skill_access"] for event in trace)
-    invalid = ([error] if error else []) + (["control skill access"] if contaminated else [])
+    reasons = sorted({reason for event in trace for reason in event["contamination_reasons"]}) if arm != "skill" else []
+    invalid = ([error] if error else []) + (["control skill contamination"] if reasons else [])
     if arm == "skill" and args.mode == "forced" and not loaded:
         invalid.append("forced skill load not observed")
     answer, answer_format = extract_answer(output)
@@ -491,7 +616,8 @@ def trial(args, task, fixture, root, arm, skill_text):
         token_keys += ("cache_creation_input_tokens", "cache_read_input_tokens")
     tokens = sum(usage.get(key, 0) for key in token_keys) if usage else None
     record = {"valid": not invalid, "invalid_reasons": invalid, "error": error,
-              "contaminated": contaminated, "skill_loaded": loaded, "trace": trace,
+              "contaminated": bool(reasons), "contamination_reasons": reasons, "skill_loaded": loaded,
+              "skill_probe_count": sum(event["skill_probe"] for event in trace), "trace": trace,
               "output": output, "answer_format": answer_format, "artifacts": artifacts,
               "checks": scores, "score": sum(scores.values()) / len(scores),
               "passed": not invalid and all(scores.values()),
@@ -581,7 +707,7 @@ def run_eval(args):
     limits = {"seconds_per_run": args.timeout, "total_tokens": args.max_total_tokens}
     if args.runtime == "claude":
         limits.update(turns_per_run=args.max_turns, usd_per_run=args.max_budget_usd)
-    record = {"schema_version": 2, "task": task["id"], "generated_at": stamp.isoformat(),
+    record = {"schema_version": 3, "task": task["id"], "generated_at": stamp.isoformat(),
               "skill": task["skill"], "skill_revision": revision[1] if revision else None,
               "cli_version": version, "model": model, "repeats": args.repeats,
               "runtime": args.runtime, "mode": args.mode, "shell": args.shell, "order": order,
