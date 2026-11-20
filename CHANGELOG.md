@@ -6,6 +6,7 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 ## 2026-11-20
 
+- Point gdd installs at a `gdd-route-*` row in the generated install guide: the `gdd` row alone has no route.
 - Record the first necessity screening of 17 subjects (haiku, forced, N=3) with schema 3 reruns of the eight
   task sets the old contamination rule invalidated; summary in `evals/results/2026-11-20-screen/README.md`.
 - Keep necessity eval controls valid when they only search for skills or fail to load one.

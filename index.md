@@ -94,6 +94,8 @@ targets:  runtime-agnostic | repo-only |
 `npx skills` installs only the skills you name and does not follow the `../` links between them.
 Install everything with `npx skills add wxxb789/hoa -g -s '*' -y`, or one skill with its row's command
 below. A skill without a row has no dependencies: `npx skills add wxxb789/hoa -g -s <skill> -y`.
+`gdd` runs agents through a separately installed route: install it with a `gdd-route-*` row
+(`gdd-route-omp` is the default agent), not with the `gdd` row alone.
 
 | Skill | Needs (transitive `../` closure) | Install command |
 |---|---|---|
