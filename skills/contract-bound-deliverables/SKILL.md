@@ -1,12 +1,12 @@
 ---
 name: contract-bound-deliverables
 description: >-
-  Produce a deliverable against a measurable contract — length budget, citation discipline,
-  required section numbering: freeze the evidence packet, draft in parallel, assemble to the number,
-  verify with the contract's own measuring rule. Use when acceptance is countable. Not for prose
-  judged on quality alone, or for auditing a delivered report.
+  Assemble a draft to an exact word or character count, required section numbering and citation
+  rules. When a submission requires numbered clauses or sources per table row, freeze the admissible
+  packet, combine drafts and verify the final document with the brief's counting rule. Not for
+  report-claim-audit.
 metadata:
-  revision: "5"
+  revision: "6"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
   summary: "meet a measurable brief: freeze the evidence packet, draft in parallel, assemble to the number, verify with the contract's own metric"

@@ -1,12 +1,12 @@
 ---
 name: research-stream-consolidation
 description: >-
-  Merge overlapping research runs on one topic into one project with provenance intact. Relocate
-  the stream as a unit, deduplicate identical artifacts, and repair manifests, receipts, and links
-  bound to old paths. Not for auditing a research closeout, synthesizing a report without moving
-  files, or reconciling code branches.
+  Merge overlapping research runs into one project without losing provenance. When two studies cover
+  the same topic and their files must move, relocate whole run directories, deduplicate identical
+  artifacts and repair manifests, receipts and links bound to old paths. Not for
+  contract-bound-deliverables.
 metadata:
-  revision: "3"
+  revision: "4"
   areas: "work-management"
   targets: "runtime-agnostic"
   summary: "merge overlapping research streams into one project and repair the records that bound the old paths"

@@ -1,12 +1,12 @@
 ---
 name: hoa-skill-curate
 description: >-
-  Use when asked where a skill came from, why an installer warns, whether skills match upstream,
-  which imported skills have abandoned upstreams, or which skills recent work suggests; or to
-  execute an owner-confirmed retirement, merge or deletion. Not for loaded-set overlap or pruning
-  (hoa-skill-set-audit), or creating, editing or porting a skill.
+  Trace installed skill provenance and upstream freshness using installer receipts and lock records.
+  When an install warns, an imported source goes stale or last week's tasks suggest a skill to
+  reuse, recommend library changes and execute only an owner-confirmed retirement, merge or
+  deletion. Not for hoa-skill-set-audit.
 metadata:
-  revision: "4"
+  revision: "5"
   areas: "software-development,self-management"
   targets: "runtime-agnostic"
   summary: "trace installed skills' provenance and upstream freshness, apply the upstream-retirement rule, and execute only owner-confirmed library changes"

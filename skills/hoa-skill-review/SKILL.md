@@ -1,12 +1,11 @@
 ---
 name: hoa-skill-review
 description: >-
-  Read-only, evidence-ranked review of one skill or a changed skill block against its intended
-  outcome and next consumer; also grades candidate skill replies against task requirements. Use
-  when reviewing a skill, its diff, or its outputs. Not for creating or evolving
-  skills (hoa-skill-create) or whole-set verdicts (user runs hoa-skill-set-audit).
+  Audit one SKILL.md, its diff or candidate replies without editing the subject. When scoring
+  answers against a rubric or reviewing behavior, inspect referenced files, trace actual downstream
+  consumers and separate proven findings from untested risks. Not for hoa-skill-set-audit.
 metadata:
-  revision: "4"
+  revision: "5"
   areas: "software-development,work-management,self-management"
   targets: "runtime-agnostic"
   summary: "review skill behavior and changes against consumer evidence without editing the target"

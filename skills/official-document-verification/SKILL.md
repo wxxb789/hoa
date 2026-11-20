@@ -1,12 +1,11 @@
 ---
 name: official-document-verification
 description: >-
-  Verify a claim whose answer turns on the exact version or wording of an official document,
-  such as a bill, statute, audit report, or regulator's notice. Pin the print, scan by section and
-  subject, and handle blocked fetches when needed. Not for auditing a whole status report or
-  rewriting prose from sources already verified.
+  Verify the exact wording of a bill, statute, audit report or regulator notice against the
+  authoritative edition. When a disputed clause was added, removed or renumbered, pin the print,
+  search section and subject, and separate publication status from text. Not for ghc-search.
 metadata:
-  revision: "5"
+  revision: "6"
   areas: "work-management"
   targets: "runtime-agnostic"
   summary: "verify a claim against the exact print of the document, including artifacts a plain client cannot fetch"

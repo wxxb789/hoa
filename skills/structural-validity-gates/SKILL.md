@@ -1,12 +1,12 @@
 ---
 name: structural-validity-gates
 description: >-
-  Write or audit a two-sided integrity gate for structured input (image container, archive, document,
-  protocol frame) before publish, upload, extraction or decode: reject the broken, accept every legal
-  construct. Use when adding a completeness check or a gate rejects a valid file. Not for schema
-  validation of a repo's own config or a test-suite gate.
+  Validate PNG, GIF, archives, documents or protocol frames before upload, storage, extraction or
+  decoding. When truncated bytes pass a tolerant decoder or a legal file fails import, check
+  lengths, CRCs and end markers where required and add fixtures for both cases. Not for
+  package-release-verification.
 metadata:
-  revision: "3"
+  revision: "4"
   areas: "software-development"
   targets: "runtime-agnostic"
   summary: "a two-sided integrity gate: reject the broken, accept every legal construct; probe both sides before shipping"

@@ -1,12 +1,11 @@
 ---
 name: hermes-ops-claim-verification
 description: >-
-  Verify a Hermes scheduled-job, repair or deployment claim: find the surface that records it,
-  separate a manual rerun from the scheduled run, re-verify auditor verdicts. Use when checking a
-  cron result, a "fixed" claim, a CI/review-bot gate or an environment status report. Not for
-  auditing a written report or accepting a teammate's delivery.
+  Check whether a Hermes cron job really ran, a fix actually landed or a CI or review-bot verdict
+  applies. When a maintenance check is green after manual reruns, find timestamped scheduler output
+  or deployment receipts and recheck the auditor's verdict. Not for report-claim-audit.
 metadata:
-  revision: "3"
+  revision: "4"
   areas: "software-development,work-management"
   targets: "hermes"
   summary: "verify Hermes scheduled-job, repair or deployment claims: find the recording surface, separate manual from scheduled runs, audit the auditor"

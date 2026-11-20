@@ -1,11 +1,12 @@
 ---
 name: agent-harness-settings-parity
 description: >-
-  Audit and apply one policy — model, thinking effort, compaction threshold, approval mode — across
-  every installed coding harness, each with its own config file, knob name, and unit. Use when a
-  setting must hold everywhere or before claiming it is already set. Not for a single-harness edit.
+  Enforce the same model, reasoning budget or thinking effort, auto-compaction threshold and
+  approval mode across installed coding CLIs like Codex, Pi and OpenCode. When knobs differ in units
+  (tokens, percent, fractions) or profiles override them, verify effective values with config
+  readback and session traces. Not for hermes-models.
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "software-development"
   targets: "runtime-agnostic"
   summary: "hold one policy across every coding harness despite different config files, knob names and units"

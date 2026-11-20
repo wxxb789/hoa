@@ -1,12 +1,11 @@
 ---
 name: hermes-kanban
 description: >-
-  Run multi-card work on a persistent board: decompose heterogeneous work, dispatch parallel
-  workers, enforce review gates, and recover stuck cards. Use when a task outlives one agent turn
-  or needs per-card ownership and routing. Not for a single edit, and not for uniform batch
-  fan-out — that wants one resumable runner script.
+  Run a persistent Hermes Kanban board with multiple cards, owners, dependencies and worker
+  profiles. When heterogeneous tasks span turns or a card stalls, dispatch independent lanes, review
+  their results and recover or reassign blocked work. Not for ai-coding-agent-delegation.
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "work-management,software-development"
   targets: "hermes"
   summary: "multi-card board work: decomposition, parallel dispatch, review gates, stuck-card recovery"

@@ -1,12 +1,11 @@
 ---
 name: project-phase-closeout
 description: >-
-  Close a phase: enumerate the task surface, reconcile record, index, published release and what users
-  actually load, then rank the tails so one decision clears the phase. Use when a goal series ends,
-  before writing the next phase's goals, or on "anything left undone?". Not mid-goal, not a merge
-  gate, not a report audit (report-claim-audit).
+  Find unfinished work and loose ends at the end of a project phase or goal series. When milestones
+  look done, reconcile the goal archive, task index, published version and production pins; list
+  live runs and PRs, rank leftovers and separate deliberate deferrals. Not for report-claim-audit.
 metadata:
-  revision: "2"
+  revision: "3"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "enumerate the task surface, reconcile record/index/release/production, output a ranked closeout list with one decision"

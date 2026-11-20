@@ -1,12 +1,11 @@
 ---
 name: hoa-skill-port
 description: >-
-  Port a skill from a private runtime into a shared, publishable repo and keep it canonical: de-couple
-  it, demote every literal to configuration, publish through a branch. Use when a skill names a
-  person, home path, model id, private repo or vendor CLI. Not for behaviour changes
-  (hoa-skill-create) or provenance and freshness (hoa-skill-curate).
+  Port a private runtime skill to a shared repository and make that package canonical. When home
+  paths, personal identifiers, model IDs or a vendor CLI prevent reuse, externalize them into
+  configuration or adapter contracts and validate before publication. Not for hoa-skill-curate.
 metadata:
-  revision: "5"
+  revision: "6"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "de-couple a private skill for publication: canonical side, five axes, config resolution, catalog/CI validation, branch-and-PR release"

@@ -1,12 +1,11 @@
 ---
 name: hermes-updates
 description: >-
-  Upgrade a live Hermes install and diagnose update drift: judge if an update merits a maintenance
-  window, snapshot first, run the official updater, verify the runtime. Use for failed updates, stale
-  unattended timers, dependency-sync gates, detached release checkouts, or post-update checks. Not
-  for model/provider config or editing Hermes source.
+  Upgrade the Hermes installation itself with a snapshot, the official updater and post-upgrade
+  checks. When an unattended timer goes stale, the release checkout lags, dependency sync fails or
+  the CLI will not start, diagnose the upgrade state. Not for hermes-models.
 metadata:
-  revision: "2"
+  revision: "3"
   areas: "software-development"
   targets: "hermes"
   summary: "upgrade a live Hermes install and diagnose drift: snapshot, official updater, post-check, failure index"

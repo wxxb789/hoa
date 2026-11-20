@@ -1,12 +1,12 @@
 ---
 name: define-goal
 description: >-
-  Turn an ambitious direction into numbered goal-prompt files, or refine the next goal from prior
-  results. Write verifiable near-term outcomes and provisional later ones, not implementation
-  tasks. Use spec-convergence first if the next outcome's scope, acceptance, or testing boundary
-  is still undecided.
+  Break an ambitious direction into numbered goal-prompt files or revise the next milestone after a
+  result ships. For a sequence of outcomes, make the first demonstrable within a feedback window,
+  leave later ones provisional and let the receiving agent choose implementation. Not for
+  spec-convergence.
 metadata:
-  revision: "4"
+  revision: "5"
   areas: "self-management,software-development,work-management"
   targets: "runtime-agnostic"
   summary: "preserve ambitious intent in numbered goal files, with clear near-term and provisional later outcomes, not implementation plans"

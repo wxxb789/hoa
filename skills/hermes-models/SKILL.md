@@ -1,12 +1,12 @@
 ---
 name: hermes-models
 description: >-
-  Configure Hermes providers, transports and routing: default-route switching, reasoning effort,
-  delegation pins, profile copies, proven with live signals. Use when a model 404s or rejects an
-  endpoint, a profile ignores its key, root and profiles drift, vision or image-gen errors, or a
-  relay's effort/cost is wrong. Not for another harness's models.
+  Configure Hermes model providers, relay endpoints and pins for interactive sessions, delegation or
+  profiles. When a profile uses the wrong API key, a model returns 404, or reasoning effort, vision
+  or image generation is wrong, verify the effective route with a real request and session record.
+  Not for hermes-updates.
 metadata:
-  revision: "6"
+  revision: "7"
   areas: "software-development"
   targets: "hermes"
   summary: "configure Hermes providers, transports and routing; prove every route with live signals, not `config get`"

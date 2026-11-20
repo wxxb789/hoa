@@ -1,12 +1,11 @@
 ---
 name: package-release-verification
 description: >-
-  Cut or verify a package release: changelog, gates on the same commit, workflow dispatch, a per-version
-  registry check, and cleanup as a separate approval. Use when publishing a version to a registry, or
-  checking that the installable release is the one the gates ran on. Not for landing the increment —
-  that is the merge phase of `gdd`.
+  Cut a versioned package release and verify the registry serves the intended version. When
+  publishing X.Y.Z or npm still shows an old version, check the changelog, tag or dispatch, passing
+  gates on the exact release commit, and package provenance if claimed. Not for gdd.
 metadata:
-  revision: "2"
+  revision: "3"
   areas: "software-development"
   targets: "runtime-agnostic"
   summary: "changelog → gate-on-the-same-commit → dispatch → per-version registry check → approved cleanup"
