@@ -7,7 +7,7 @@ description: >-
   repo's machinery (suggest the user run hoa-repo-reckoning).
 disable-model-invocation: true
 metadata:
-  revision: "2"
+  revision: "3"
   areas: "self-management,work-management"
   targets: "runtime-agnostic"
   summary: "periodic retro on the owner's own engineering practice across repos, sessions and memory: habits to stop, decisions never executed, unknown unknowns, each with two independent origins"
@@ -39,9 +39,10 @@ never evidence of absence.
 3. **Cross-repo activity** in the window: PRs authored (for example
    `gh search prs --author @me --created ">=SINCE"`) and `git log` across the workspace roots listed
    under `roots` in `${XDG_CONFIG_HOME:-~/.config}/hoa-practice-retro/config.yaml`. No default roots.
-4. **Prior audit ledgers** under the shared audit state dir (see [the panel](references/panel.md)):
-   `hoa-repo-reckoning` and prior `hoa-practice-retro` runs. A finding kind that recurs in two or more repos, or
-   in three or more runs, is promoted to a practice finding. This is the cheapest strong signal.
+4. **Prior practice-retro ledgers** (see [the panel](references/panel.md)): read only prior
+   `hoa-practice-retro` runs. Reckoning reports are now free-form and are not an input.
+   A finding kind that recurs in two or more repos, or in three or more runs, is promoted to a
+   practice finding. This is the cheapest strong signal.
 
 Config keys (same file): `roots` (list of workspace paths; no default), `report_language`
 (default `en-US`; narrative only, never numbers, ids or citations). See [the panel](references/panel.md)
@@ -113,8 +114,8 @@ count, top decided-not-done item, and one horizon item.
 
 ## Cadence
 
-Monthly, or at quarter end with a 90-day window. Run it after the month's `hoa-repo-reckoning` runs so
-their ledgers feed it. Unattended runs stop at the report and record no decisions.
+Monthly, or at quarter end with a 90-day window. Unattended runs stop at the report and record no
+decisions.
 
 ## Provenance
 

@@ -56,7 +56,7 @@ targets:  runtime-agnostic | repo-only |
 | hermes-runtime-repairs | skill | software-development,work-management | hermes | `skills/hermes-runtime-repairs/` | 修模板/生成器、验证暂存产物，再部署并回读线上运行时 |
 | hermes-updates | skill | software-development | hermes | `skills/hermes-updates/` | 升级运行中的 Hermes 并诊断漂移：快照、官方更新器、更新后检查、故障索引 |
 | hoa-practice-retro | skill | self-management,work-management | runtime-agnostic | `skills/hoa-practice-retro/` | 定期复盘负责人跨仓库、会话与记忆的工程实践：应停止的习惯、未执行的决定、未知的未知，每条都有两个独立来源 |
-| hoa-repo-reckoning | skill | software-development,work-management | runtime-agnostic | `skills/hoa-repo-reckoning/` | 定期深度审计单个仓库：分维度查找、对抗验证与补漏评审，产出排序的停止清单与未知的未知 |
+| hoa-repo-reckoning | skill | software-development,work-management | runtime-agnostic | `skills/hoa-repo-reckoning/` | 仅显式调用的只读仓库审查提示词：哪些事该停止，哪些未知会改变工作 |
 | hoa-skill-create | skill | software-development,work-management,self-management | runtime-agnostic | `skills/hoa-skill-create/` | 直接创建、演进或组合已定义的 skill，并按风险聚焦验证 |
 | hoa-skill-curate | skill | software-development,self-management | runtime-agnostic | `skills/hoa-skill-curate/` | 追溯已安装技能的来源与上游新鲜度，执行上游退役规则，仅在所有者确认后变更技能库 |
 | hoa-skill-port | skill | software-development,work-management | runtime-agnostic | `skills/hoa-skill-port/` | 把私有 skill 解耦到可发布仓库：确定权威副本、五轴改造、配置解析、目录与 CI 校验、走分支与 PR 发布 |

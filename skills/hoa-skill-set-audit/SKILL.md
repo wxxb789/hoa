@@ -6,10 +6,11 @@ description: >-
   shadowing, same-name drift, visibility mistakes, broken ../ closure and listing-budget
   truncation, ranks fixes and gives necessity verdicts. Also offers weekly recommendations from
   recent work. Not for reviewing one skill (hoa-skill-review), provenance or upstream freshness
-  (hoa-skill-curate), or editing skills.
+  (hoa-skill-curate), reviewing one repo's practices (the explicit hoa-repo-reckoning shortcut),
+  or editing skills.
 disable-model-invocation: true
 metadata:
-  revision: "3"
+  revision: "4"
   areas: "software-development,self-management"
   targets: "runtime-agnostic"
   summary: "audit the whole offered skill set: per-skill quality, overlap, shadowing, contradictions, same-name drift, visibility, ../ closure, listing budget; report-only"

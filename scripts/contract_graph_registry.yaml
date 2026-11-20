@@ -12,5 +12,6 @@ shared: []
 terminal:
   acceptance-verdict: the operator's ruling is the destination; no phase reads this artifact
   chain-plan: the controller's routing plan is consumed by the operator, not a skill
+  repository-reckoning-report: the operator receives a free-form review; no skill reads it
   spec: the operator or their planning tool takes the converged spec; no skill here consumes it
   scope-seal: worktree-scope.py verify checks the tree; no skill consumes the artifact

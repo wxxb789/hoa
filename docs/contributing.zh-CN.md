@@ -57,7 +57,7 @@ Hermes 不识别 `disable-model-invocation`，仍会列出子 skill。
 | 评审行为或拟议改动 | [hoa-skill-review](../skills/hoa-skill-review/SKILL.md) | 带证据的发现，不修改被评审的 skill |
 | 创建、演进或组合一项已定义的能力 | [hoa-skill-create](../skills/hoa-skill-create/SKILL.md) | 改动、验证结果及未验证路径 |
 | 复盘跨仓库和 agent 会话的实践 | [hoa-practice-retro](../skills/hoa-practice-retro/SKILL.md)（仅显式调用） | 带证据的发现和重复工作候选，不自动创建 |
-| 深度审计一个仓库的运作机制 | [hoa-repo-reckoning](../skills/hoa-repo-reckoning/SKILL.md)（仅显式调用） | 已验证的发现、排序的停止事项和跟进 |
+| 审查单个仓库的实践与运作机制 | [hoa-repo-reckoning](../skills/hoa-repo-reckoning/SKILL.md)（仅显式调用的提示词） | 自由格式报告，按严重程度排列发现并附证据 |
 | 审计会话实际可用的 skill 集合 | [hoa-skill-set-audit](../skills/hoa-skill-set-audit/SKILL.md)（仅显式调用） | 集合级发现、必要性结论或每周建议，不做改动 |
 
 先做聚焦的行为检查；覆盖范围、风险或证据冲突有需要时，再扩展到多个变体、model
@@ -98,7 +98,7 @@ Paseo 插件，这里的内容供参考或仓库维护，不自动部署。
 - [最早一批上游模式改编](../reflections/2026-09-23-first-steals.md)包括 ECC 的 skill scout
   和 looper 的 typed verification gates。[复盘](../reflections/)、
   [目标契约](goals/README.md)与[计划](plans/)是工作和历史记录，不是功能路线图。
-- 每月在 repo reckoning 之后运行一次 `hoa-practice-retro`，以复用其 ledger。
+- 每月运行一次 `hoa-practice-retro`，它只读取自身以往的运行记录。
   产物写入配置的私有审计状态目录，不提交到 Git。
 
 ## 请求一个 skill

@@ -4,9 +4,9 @@ description: >-
   Restructure and design harnesses — scheduled operational scripts, drift checkers, watchdogs,
   gated data pipelines around a repo or agent system. Use when helper scripts outgrow one screen,
   checkers multiply, or a harness subsystem needs a home. Not for one-off scripts or application
-  code; for a repo-wide audit, have the user run hoa-repo-reckoning.
+  code. Repo-wide review: hoa-repo-reckoning (explicit shortcut).
 metadata:
-  revision: "3"
+  revision: "4"
   areas: "software-development"
   targets: "runtime-agnostic"
   summary: "restructure and design harness scripts: self-containment, obligations bound to owner decisions, pure checks plus one thin runner, net-negative line budget"
