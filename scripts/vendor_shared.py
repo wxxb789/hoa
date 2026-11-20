@@ -41,7 +41,6 @@ CONSUMERS: dict[str, list[str]] = {
     "usage-based-recommendations.md": ["skills/hoa-skill-curate/references"],
     # The configuration resolution order; skills that document configuration keys.
     "configuration.md": [
-        "skills/ai-coding-agent-delegation/references",
         "skills/contract-bound-deliverables/references",
         "skills/evidence-boundary-discipline/references",
         "skills/gdd/references",

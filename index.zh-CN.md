@@ -29,16 +29,13 @@ targets:  runtime-agnostic | repo-only |
 |---|---|---|---|---|---|
 | agent-harness-settings-parity | skill | software-development | runtime-agnostic | `skills/agent-harness-settings-parity/` | 让同一条策略在每个 coding harness 上生效，尽管配置文件、键名与单位各不相同 |
 | agent-operating-contract-evolution | skill | software-development,work-management,self-management | runtime-agnostic | `skills/agent-operating-contract-evolution/` | 按分层演进 agent 身份文件与操作协议：覆盖标记、行为评测、加载范围探测 |
-| ai-coding-agent-delegation | skill | software-development,work-management | runtime-agnostic | `skills/ai-coding-agent-delegation/` | 把定界编码任务交给隔离 worktree 中的外部 agent CLI，再自行核验 diff、测试与全部验收声明 |
 | contract-bound-deliverables | skill | work-management,software-development | runtime-agnostic | `skills/contract-bound-deliverables/` | 满足可度量契约：冻结证据包、并行起草、按字数装配、用契约自身的度量脚本验收 |
-| cross-agent-repair-routing | skill | software-development,work-management | runtime-agnostic | `skills/cross-agent-repair-routing/` | 把他人写入面内的缺陷送修：权限地图、复现、一次定界的落地决策 |
 | define-goal | skill | self-management,software-development,work-management | runtime-agnostic | `skills/define-goal/` | 把雄心转化为编号 goal 文件，近期清晰、远期可细化，不制定实现步骤 |
-| delegated-work-acceptance | skill | work-management,software-development | runtime-agnostic | `skills/delegated-work-acceptance/` | 验收被委派的交付：核对 artifact、重算关键数字、检查写入边界 |
-| discord-rich-message | skill | software-development,work-management | runtime-agnostic | `skills/discord-rich-message/` | 在平台限制内发送结构化 Discord 消息：Components V2、等宽对齐表格、附件兜底 |
+| delegated-work-acceptance | skill | work-management,software-development | runtime-agnostic | `skills/delegated-work-acceptance/` | 按 artifact 和写入边界验收委派成果，将退回或越界的修复交还给负责人 |
 | dotnet-repo-workflow | skill | software-development | runtime-agnostic | `skills/dotnet-repo-workflow/` | 运行仓库自带的 .NET 门禁，验证 NuGet 锁定还原，诊断 Roslyn 编译引用缺失 |
 | evidence-backed-analytical-writing | skill | work-management | runtime-agnostic | `skills/evidence-backed-analytical-writing/` | 中文分析报告：证据地图与「主张 → 证据 → 机制 → 局限」骨架；时效边界、状态阶梯、否定性结论 |
 | evidence-boundary-discipline | skill | work-management | runtime-agnostic | `skills/evidence-boundary-discipline/` | 只陈述有日期的来源所能支持的事实：时态对齐日期、来源标签全链路一致、缺失不升级为不存在 |
-| gdd | skill | software-development,work-management | runtime-agnostic | `skills/gdd/` | 目标契约 → agent 分阶段产出 → operator 验收 → 脚本化合并门禁 → 可续跑账本；随附 `gdd.py`、`delivery-state.py`、`pr-merge-check.py` |
+| gdd | skill | software-development,work-management | runtime-agnostic | `skills/gdd/` | 用分阶段产出、门禁和授权合并交付目标，或单次委派给隔离的 CLI 并独立验收，不发布 |
 | gdd-route-cc | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-cc/` | Claude Code stream-JSON 路由，支持会话恢复和原生 JSON schema |
 | gdd-route-codex | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-codex/` | Codex exec 与 resume 路由，支持原生 JSON schema，默认关闭集成 |
 | gdd-route-copilot | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-copilot/` | GitHub Copilot CLI prompt 与 JSONL 结果路由，支持会话恢复 |
@@ -68,12 +65,10 @@ targets:  runtime-agnostic | repo-only |
 | measurement-campaign-evidence | skill | software-development,work-management | runtime-agnostic | `skills/measurement-campaign-evidence/` | 测量运动：先钉候选身份、串行跑、一致报告集，不让基线伪造延迟对比 |
 | official-document-verification | skill | work-management | runtime-agnostic | `skills/official-document-verification/` | 用文档的确切版本核验结论，含只能用真浏览器取到的被封来源 |
 | package-release-verification | skill | software-development | runtime-agnostic | `skills/package-release-verification/` | 发版：先补 changelog、同一 commit 的门禁、分派、按版本号核 registry、单独获批的清理 |
-| project-phase-closeout | skill | software-development,work-management | runtime-agnostic | `skills/project-phase-closeout/` | 清点任务面，对账记录/索引/发布/生产四层，输出带唯一决策点的收尾清单 |
-| report-claim-audit | skill | work-management,software-development | runtime-agnostic | `skills/report-claim-audit/` | 从各自的权威 artifact 重算每条报告声明、对账交付集合，并给待决事项定价 |
+| report-claim-audit | skill | work-management,software-development | runtime-agnostic | `skills/report-claim-audit/` | 审计报告声明和遗漏，或用任务清单、实际发布与部署锁定版本核查阶段收尾 |
 | research-stream-consolidation | skill | work-management | runtime-agnostic | `skills/research-stream-consolidation/` | 把重复的研究流并成一个项目，并修好绑定旧路径的记录 |
 | review-revision-candidates | skill | work-management | runtime-agnostic | `skills/review-revision-candidates/` | 被驳回候选的返修轮：编号清单就是全部变更集，交的是字节不是辩解 |
 | spec-convergence | skill | software-development | runtime-agnostic | `skills/spec-convergence/` | 把模糊需求收敛为已确认 spec：每轮一个根问题、每轮问题数有上限、每问附事实、写前显式确认共同理解 |
-| structural-validity-gates | skill | software-development | runtime-agnostic | `skills/structural-validity-gates/` | 两面完整性门禁：拒掉坏的，接受格式合法的一切；上线前两侧都要探针 |
 | tmux-agent-control | skill | software-development,work-management | runtime-agnostic | `skills/tmux-agent-control/` | 在 tmux 中驱动运行中的 TUI agent：定位 pane、证明空闲、一次发出完整指令 |
 | writing | skill | work-management,self-management | runtime-agnostic | `skills/writing/` | 按读者与渠道撰写和核验可发布文章；风格指标用于诊断，不作统一配额 |
 | skill-scout | agent | software-development,work-management | repo-only | `agents/skill-scout.md` | 按请求先搜索已有 skill，再决定是否编写；只报告，不代写 |
@@ -117,7 +112,7 @@ targets:  runtime-agnostic | repo-only |
 安装其余全部 skill：
 
 ```bash
-npx skills add wxxb789/hoa -g -s agent-harness-settings-parity -s agent-operating-contract-evolution -s ai-coding-agent-delegation -s contract-bound-deliverables -s cross-agent-repair-routing -s define-goal -s delegated-work-acceptance -s discord-rich-message -s dotnet-repo-workflow -s evidence-backed-analytical-writing -s evidence-boundary-discipline -s gdd -s gdd-route-cc -s gdd-route-codex -s gdd-route-copilot -s gdd-route-dsh -s gdd-route-omo -s gdd-route-omp -s gdd-route-opencode -s gdd-route-pi -s ghc-decisions -s ghc-search -s git-auto-sync-pipelines -s harness-engineering -s hoa-practice-retro -s hoa-repo-reckoning -s hoa-skill-create -s hoa-skill-curate -s hoa-skill-port -s hoa-skill-review -s hoa-skill-set-audit -s measurement-campaign-evidence -s official-document-verification -s package-release-verification -s project-phase-closeout -s report-claim-audit -s research-stream-consolidation -s review-revision-candidates -s spec-convergence -s structural-validity-gates -s tmux-agent-control -s writing -y
+npx skills add wxxb789/hoa -g -s agent-harness-settings-parity -s agent-operating-contract-evolution -s contract-bound-deliverables -s define-goal -s delegated-work-acceptance -s dotnet-repo-workflow -s evidence-backed-analytical-writing -s evidence-boundary-discipline -s gdd -s gdd-route-cc -s gdd-route-codex -s gdd-route-copilot -s gdd-route-dsh -s gdd-route-omo -s gdd-route-omp -s gdd-route-opencode -s gdd-route-pi -s ghc-decisions -s ghc-search -s git-auto-sync-pipelines -s harness-engineering -s hoa-practice-retro -s hoa-repo-reckoning -s hoa-skill-create -s hoa-skill-curate -s hoa-skill-port -s hoa-skill-review -s hoa-skill-set-audit -s measurement-campaign-evidence -s official-document-verification -s package-release-verification -s report-claim-audit -s research-stream-consolidation -s review-revision-candidates -s spec-convergence -s tmux-agent-control -s writing -y
 ```
 
 某次发布改名或退役了 skill 时：移除本仓库已不再提供的名称（由 `scripts/retired_skills.toml`
@@ -127,7 +122,7 @@ npx skills add wxxb789/hoa -g -s agent-harness-settings-parity -s agent-operatin
 把你从其它来源安装的同名 skill 从命令中去掉：
 
 ```bash
-npx skills remove -g arch-improvement-plan design-an-interface design-md dsh-headless-gdd find-nearby generated-runtime-repairs git-worktree-workflow github-code-review github-repo-management grounded-citations hoa-agent-retrieve hoa-introspect hoa-introspect-distill hoa-skill-work html-artifact jupyter-live-kernel kanban-workflows m365-copilot-cdp microsoft-office my-ado-cppr notes-to-prd ocr-and-documents omp-headless-orchestration ops-claim-verification plan-to-issues rss-feeds skill-library-curation skill-porting-and-publishing subagent-driven-development systematic-debugging teams-cdp to-issues to-prd whisper writing-plans
+npx skills remove -g ai-coding-agent-delegation arch-improvement-plan cross-agent-repair-routing design-an-interface design-md discord-rich-message dsh-headless-gdd find-nearby generated-runtime-repairs git-worktree-workflow github-code-review github-repo-management grounded-citations hoa-agent-retrieve hoa-introspect hoa-introspect-distill hoa-skill-work html-artifact jupyter-live-kernel kanban-workflows m365-copilot-cdp microsoft-office my-ado-cppr notes-to-prd ocr-and-documents omp-headless-orchestration ops-claim-verification plan-to-issues project-phase-closeout rss-feeds skill-library-curation skill-porting-and-publishing structural-validity-gates subagent-driven-development systematic-debugging teams-cdp to-issues to-prd whisper writing-plans
 ```
 
 > reflections 与 eval 结果属于文章 / 知识类，不在此索引。

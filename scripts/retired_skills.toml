@@ -151,3 +151,23 @@ reason = "Hermes-origin; tracked upstream by Hermes (#72)"
 [retired.writing-plans]
 replacement = "Hermes upstream built-in skill"
 reason = "Hermes-origin; tracked upstream by Hermes (#72)"
+
+[retired.discord-rich-message]
+replacement = "none"
+reason = "retired the Discord payload guide; no sender was shipped (2026-11-21)"
+
+[retired.structural-validity-gates]
+replacement = "none"
+reason = "retired the standalone structured-input gate guide by owner decision (2026-11-21)"
+
+[retired.cross-agent-repair-routing]
+replacement = "delegated-work-acceptance"
+reason = "merged the ownership-routing playbook for rejected deliveries (2026-11-21)"
+
+[retired.project-phase-closeout]
+replacement = "report-claim-audit"
+reason = "merged the read-only milestone closeout checklist (2026-11-21)"
+
+[retired.ai-coding-agent-delegation]
+replacement = "gdd"
+reason = "merged bounded CLI handoffs as lightweight delegation without shipping (2026-11-21)"

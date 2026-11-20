@@ -9,7 +9,7 @@ description: >-
   a substitute for deterministic gates, artifact inspection, or primary agent sign-off.
 disable-model-invocation: true
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "opt-in `/v1/decisions` and `/v1/chat/completions` rubric classifier with 9 bundled presets"
@@ -71,7 +71,7 @@ uv run "$S" --preset pr-feedback-triage \
 | `memory-curation` | `durability` (`choice`), `relationship` (`choice`) | `distill-memory` / `nmem` pre-write deduplication and noise filtering |
 | `pr-feedback-triage` | `resolution` (`choice`: `resolved_root_cause`/`symptom_patch`/`unaddressed`/`regression_introduced`) | `review-revision-candidates`, `ce-resolve-pr-feedback` |
 | `citation-entailment` | `entailment` (`choice`: `strictly_entailed`/`temporal_or_scope_drift`/`unsupported_extrapolation`/`insufficient_evidence`) | `evidence-boundary-discipline`, `official-document-verification` |
-| `model-escalation` | `route` (`choice`: `stay_fast_worker`/`escalate_single_reviewer`/`escalate_dual_audit`) | `gdd`, `ai-coding-agent-delegation` review tier routing |
+| `model-escalation` | `route` (`choice`: `stay_fast_worker`/`escalate_single_reviewer`/`escalate_dual_audit`) | `gdd` review tier routing |
 | `spec-readiness` | `readiness` (`choice`: `ready_to_dispatch`/`missing_acceptance_seam`/`unbounded_scope`) | `spec-convergence`, `define-goal` pre-dispatch gate |
 
 ## Configuration

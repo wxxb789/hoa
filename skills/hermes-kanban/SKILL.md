@@ -3,7 +3,7 @@ name: hermes-kanban
 description: >-
   Run a persistent Hermes Kanban board with multiple cards, owners, dependencies and worker
   profiles. When heterogeneous tasks span turns or a card stalls, dispatch independent lanes, review
-  their results and recover or reassign blocked work. Not for ai-coding-agent-delegation.
+  their results and recover or reassign blocked work. Not for one isolated coding CLI handoff.
 metadata:
   revision: "3"
   areas: "work-management,software-development"

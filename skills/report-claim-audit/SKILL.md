@@ -1,16 +1,15 @@
 ---
 name: report-claim-audit
 description: >-
-  Audit a status report, dispatch digest or closeout memo against per-item records, manifests and
-  validator logs. When a summary will drive a decision, independently recompute its totals, diff the
-  deliverable list for omissions and quantify pending choices without repairing the files. Not for
-  delegated-work-acceptance.
+  Audit a decision-driving report, digest or project phase closeout without repairing files.
+  Recompute claims, diff deliverables for omissions, or inventory milestone leftovers and reconcile
+  task records with the release and actual deployment pin. Not for accepting one worker's handoff.
 metadata:
-  revision: "3"
+  revision: "4"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
-  summary: "recount every report claim from the artifact that owns it, diff the deliverable set, and price the open decisions"
-  summary_zh: "从各自的权威 artifact 重算每条报告声明、对账交付集合，并给待决事项定价"
+  summary: "audit report claims and omissions or close out a milestone against its task inventory, release, and actual deployment pin"
+  summary_zh: "审计报告声明和遗漏，或用任务清单、实际发布与部署锁定版本核查阶段收尾"
   kind: "entry"
 ---
 
@@ -97,6 +96,26 @@ licenses *reading* and at most a `notes`/`STATUS` write, never a repair of what 
 
 Plain text in a terminal, one point per line, no markdown decoration: the operator may be reading this
 on a phone.
+
+## Milestone closeout checklist
+
+Use this read-only pass at a project phase boundary, even when there is no closeout memo.
+
+1. Inventory before reading summary prose: enumerate goal/task files and statuses, then reconcile
+   index and archive rows. Include open PRs/issues, live runs and inherited obligations. Separate
+   recorded completion, unrecorded completion, unfinished work, in-flight work and deliberate deferrals.
+2. Reconcile what was recorded with what was measured, the changelog with the published tag or
+   registry version, and that release with what users actually load. Resolve the deploy pipeline's
+   effective dependency, generator or tool pin to its version or commit, date and lag from release.
+   Inspect the materialized output when generation is involved.
+3. Look for post-deploy proof on the serving host: the shipped artifact is reachable, boots or
+   loads, and real usage exercises the changed capability. Check live host behavior (such as
+   response headers) when it matters. A green build, publish or deploy does not prove this;
+   mark unproven behavior and skipped checks explicitly.
+4. Rank remaining items by cost of leaving them, with evidence, execution order and blockers
+   such as active runs. Include cleanup candidates without acting on them. State the completion
+   verdict and recommend the one owner decision that clears the phase, if any. Do not repair
+   records, change pins, deploy or clean up during this audit.
 
 ## Pitfalls
 
