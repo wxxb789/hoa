@@ -27,6 +27,7 @@ ARMS = ("none", "terse", "skill")
 RUNTIMES = ("claude", "codex", "pi")
 PI_PROVIDER = "tencent-litellm"
 PI_DEFAULT_MODEL = f"{PI_PROVIDER}/deepseek-v4.1-flash-fast"
+PI_TIMEOUT = 3000
 PI_THINKING = ("off", "minimal", "low", "medium", "high", "xhigh", "max")
 PI_ENV_REFERENCE = re.compile(r"\$\{([A-Za-z_]\w*)\}|\$([A-Za-z_]\w*)")
 CODEX_DISABLED = (
@@ -897,7 +898,7 @@ def main():
     parser.add_argument("--max-turns", type=int, default=12, help="Claude only")
     parser.add_argument("--max-budget-usd", type=float, default=1.0, help="Claude only")
     parser.add_argument("--max-total-tokens", type=int, help="stop starting trials at this CLI-reported token total")
-    parser.add_argument("--timeout", type=int, default=300)
+    parser.add_argument("--timeout", type=int, help="seconds per trial; default 300, or 3000 for Pi")
     args = parser.parse_args()
     if not args.model:
         if args.runtime == "claude":
@@ -911,6 +912,9 @@ def main():
         args.thinking = args.thinking or "max"
     elif args.thinking is not None:
         parser.error("--thinking is only supported with --runtime pi")
+    # DeepSeek at max thinking spends about ten times the tokens and time of the other runtimes.
+    if args.timeout is None:
+        args.timeout = PI_TIMEOUT if args.runtime == "pi" else 300
     if (min(args.repeats, args.max_turns, args.max_budget_usd, args.timeout) <= 0
             or not math.isfinite(args.max_budget_usd)):
         parser.error("repeat, turn, budget and timeout limits must be positive")
