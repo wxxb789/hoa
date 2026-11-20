@@ -6,6 +6,8 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 ## 2026-11-20
 
+- Default necessity screening to Pi with Tencent LiteLLM DeepSeek V4.1 Flash Fast and max thinking.
+  Reuse the gdd Pi route with isolated provider config, tool-trace load checks, and cache usage reporting.
 - Reduce `hoa-repo-reckoning` to an explicit-only, read-only prompt shortcut after two behavioral
   acceptance losses. Remove its panel and fallback tasks; `hoa-practice-retro` reads only its own
   ledgers. See [the measurement](evals/results/2026-11-20-ws4-reckoning.md).

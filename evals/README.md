@@ -7,12 +7,18 @@ frozen short instructions (`terse`), and the installed skill (`skill`).
 ## Run a necessity comparison
 
 Use uv with Python 3.13 or newer and a native executable, not a batch shim.
+Screening defaults to Pi (tested with 1.5.2),
+`tencent-litellm/deepseek-v4.1-flash-fast`, and `--thinking max`.
+`--model` can select another model in `tencent-litellm`; only an explicit
+Pi `--thinking` changes the thinking level.
 Claude Code needs `--restricted` (tested with 2.1.329) and
 `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN`, optionally
 `ANTHROPIC_BASE_URL`. Codex needs a configured model provider; the runner uses
 `gpt-6.2-sol` by default.
 
 ```sh
+uv run --script evals/run_necessity_eval.py evals/tasks/claim-audit.json --runtime pi --mode forced
+uv run --script evals/run_necessity_eval.py evals/tasks/claim-audit.json --runtime pi --mode natural
 uv run --script evals/run_necessity_eval.py evals/tasks/claim-audit.json --runtime claude --model claude-haiku-5.5 --mode forced
 uv run --script evals/run_necessity_eval.py evals/tasks/claim-audit.json --runtime codex --model gpt-6.2-sol --mode forced
 uv run --script evals/run_necessity_eval.py evals/tasks/claim-audit.json --runtime claude --model claude-haiku-5.5 --mode natural
@@ -22,11 +28,11 @@ uv run --script evals/run_necessity_eval.py evals/tasks/claim-audit.json --runti
 - `forced` (default) explicitly asks the skill arm to read and follow the named
   skill. No observed load invalidates that trial.
 - `natural` gives every arm the identical user prompt. The terse text goes in
-  the Claude system or Codex developer instructions in either mode, never in the
-  common user prompt. Skill misses in natural mode are recorded as misses, not
+  the Claude or Pi system prompt or the Codex developer instructions in either
+  mode, never in the common user prompt. Skill misses in natural mode are recorded as misses, not
   individually invalidated.
 - Each repeat runs all three arms, reversing order on every other repeat.
-  `--repeats` defaults to 3. Use `--timeout` on either runtime; Claude also accepts
+  `--repeats` defaults to 3. Use `--timeout` on any runtime; Claude also accepts
   `--max-turns` and `--max-budget-usd`. Use matching limits within a comparison.
 - `--max-total-tokens N` stops starting trials once their cumulative CLI-reported
   tokens reach the positive limit. There is no cap by default. A running trial
@@ -43,6 +49,18 @@ MCP settings are not copied. Use a provider that does not require existing login
 state or an executable auth command. Codex bypasses approvals and sandboxing,
 and disables the dispatch integrations, web search, subagents and bundled skills.
 
+Pi uses the checkout's gdd Pi route for JSON mode and the success marker.
+Each trial sets `PI_CODING_AGENT_DIR` to a new directory and copies only the
+`tencent-litellm` entry from `~/.pi/agent/models.json` and the matching entry
+from `auth.json`, when present. Only environment variables referenced by that
+provider's credentials or headers are forwarded as provider credentials.
+Credential commands are rejected. No other providers, sessions or extensions
+are copied. Pi disables session persistence, MCP, extensions, project trust and
+context-file loading. The real Pi agent directory is read-only to the runner.
+Controls always use `--no-skills`. The forced skill arm uses `--no-skills` with
+an explicit `--skill` pointing at the installed copy. Only the natural skill arm
+allows discovery, with the copy in `<agent-dir>/skills/<name>/SKILL.md`.
+
 Codex CLI 0.171.0 still discovers `$CODEX_HOME/skills/<name>/SKILL.md`, the
 legacy user root intentionally used here. On Windows it also enumerates the real
 Known Folder profile's `.agents/skills`; the runner excludes those documents
@@ -51,7 +69,9 @@ a successful `Skill` result for the named skill or `Read` of the installed
 `SKILL.md` is load evidence; success comes from the matching `tool_result`.
 For Codex, a successful named `Skill` tool result or a completed shell read
 of the installed document with the skill header in `aggregated_output` is load
-evidence. Plain mentions and untraced automatic injection do not establish a load.
+evidence. Pi uses the matching successful `tool_execution_end` for a skill read
+or load, and requires returned skill text for shell-based load evidence.
+Plain mentions and untraced automatic injection do not establish a load.
 
 Searches or listings for skills (for example `Glob`, `Grep`, `ls`, or
 `rg --files`) and failed `Skill` calls are probes, not contamination. Control
@@ -104,7 +124,9 @@ Results: `evals/results/<local-date>-<task-id>-<runtime>-<mode>.{json,md}`.
 Use `--results DIR` to avoid overwriting a comparison. Review response and
 artifact excerpts for secrets before committing. Raw traces and stderr are
 not persisted. Token counts are CLI-reported; Codex cached input and reasoning
-output are subsets, not added a second time. Claude's CLI cost is not an invoice.
+output are subsets, not added a second time. Pi sums uncached input, output,
+cache reads and cache writes from completed assistant messages and records
+the process exit code. Claude's CLI cost is not an invoice.
 Exit 1 indicates skipped or invalid trials; exit 2 indicates setup failure. Otherwise
 inspect the verdict, including natural comparisons with unobserved treatment.
 
@@ -120,8 +142,9 @@ inspect the verdict, including natural comparisons with unobserved treatment.
 3. Set a nonempty `rubric` keyed by check ID. Checks are
    `{"field":"answer","equals":42}` against a top-level field of the JSON answer,
    or `{"file":"report.md","contains":"expected text"}` against a relative UTF-8
-   artifact no larger than 64 KiB. File checks enable Claude's Write tool.
-4. Shells are off by default. Set `"shell": true` to enable them for both
+   artifact no larger than 64 KiB. File checks enable Claude's Write and Pi's
+   write/edit tools.
+4. Shells are off by default. Set `"shell": true` to enable them for all
    runtimes, or `"shell": ["codex"]` for Codex only. Codex 0.171.0 has no
    general-purpose file reader without its shell tool, so opt in for Codex
    tasks that need fixture or skill reads.

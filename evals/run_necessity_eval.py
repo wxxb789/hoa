@@ -24,7 +24,11 @@ EVALS = Path(__file__).resolve().parent
 SKILLS = EVALS.parent / "skills"
 NAME = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 ARMS = ("none", "terse", "skill")
-RUNTIMES = ("claude", "codex")
+RUNTIMES = ("claude", "codex", "pi")
+PI_PROVIDER = "tencent-litellm"
+PI_DEFAULT_MODEL = f"{PI_PROVIDER}/deepseek-v4.1-flash-fast"
+PI_THINKING = ("off", "minimal", "low", "medium", "high", "xhigh", "max")
+PI_ENV_REFERENCE = re.compile(r"\$\{([A-Za-z_]\w*)\}|\$([A-Za-z_]\w*)")
 CODEX_DISABLED = (
     "computer_use", "browser_use", "browser_use_external", "in_app_browser", "remote_plugin",
     "image_generation", "skill_search", "plugins", "apps", "memories",
@@ -276,6 +280,46 @@ def codex_provider():
     return text, credentials, secrets
 
 
+def pi_provider():
+    home = Path.home() / ".pi" / "agent"
+    models = home / "models.json"
+    provider = json.loads(models.read_text(encoding="utf-8")).get("providers", {}).get(PI_PROVIDER)
+    if not provider:
+        raise ValueError(f"{models.name}: missing providers.{PI_PROVIDER}")
+    files = {"models.json": {"providers": {PI_PROVIDER: provider}}}
+    auth_file = home / "auth.json"
+    auth = json.loads(auth_file.read_text(encoding="utf-8")).get(PI_PROVIDER) if auth_file.is_file() else None
+    credentials, secrets = set(), set()
+    if auth is not None:
+        files["auth.json"] = {PI_PROVIDER: auth}
+        secrets.update(argument_strings({key: value for key, value in auth.items() if key != "type"}))
+
+    def credential(match):
+        key = match[1] or match[2]
+        credentials.add(key)
+        return os.getenv(key, match[0])
+
+    for config in (provider, *provider.get("models", ()), *provider.get("modelOverrides", {}).values(),
+                   {"apiKey": (auth or {}).get("key")}):
+        secrets.update(argument_strings(config.get("baseUrl")))
+        for value in argument_strings([config.get("apiKey"), config.get("headers")]):
+            if value.startswith("!"):
+                raise ValueError(f"{PI_PROVIDER}: Pi credential commands are not supported in isolated trials")
+            secrets.add(value)
+            if value.startswith(("$$", "$!")):
+                secrets.add(value[1:])
+            else:
+                secrets.add(PI_ENV_REFERENCE.sub(credential, value))
+    return files, credentials, (*secrets, *map(os.getenv, credentials))
+
+
+def pi_env(env):
+    home = Path(env["HOME"]) / ".pi" / "agent"
+    home.mkdir(mode=0o700, parents=True)
+    env.update(PI_CODING_AGENT_DIR=str(home), PI_TELEMETRY="0")
+    return home
+
+
 def codex_host_skill_rules():
     if os.name != "nt":
         return []
@@ -317,6 +361,21 @@ def agent_command(args, task, installed, arm):
         if arm == "terse":
             command += ["--append-system-prompt", task["terse"]]
         return command
+    if args.runtime == "pi":
+        tools = ["read", "grep", "find", "ls"]
+        if write:
+            tools += ["write", "edit"]
+        if shell:
+            tools += ["bash", "powershell"] if os.name == "nt" else ["bash"]
+        extra = ["--offline", "--no-session", "--no-extensions", "--no-mcp",
+                 "--no-context-files", "--no-prompt-templates", "--no-themes", "--tools", ",".join(tools)]
+        if arm != "skill" or args.mode == "forced":
+            extra.append("--no-skills")
+        if arm == "skill" and args.mode == "forced":
+            extra += ["--skill", str(installed / task["skill"])]
+        if arm == "terse":
+            extra += ["--append-system-prompt", task["terse"]]
+        return command + args.pi_route.argv(args, extra)
     command += ["exec", "--json", "--ephemeral", "--skip-git-repo-check",
                 "--dangerously-bypass-approvals-and-sandbox", "--model", args.model,
                 "-c", 'model_reasoning_effort="medium"', "-c", 'web_search="disabled"',
@@ -568,15 +627,73 @@ def codex_trace(events, skill_file, workspace, skill_text):
     return result, list(calls.values())
 
 
+def pi_trace(route, acc, events, skill_file, workspace, skill_text):
+    trace, pending = [], {}
+    cache_write, has_usage, models = 0, False, set()
+    header = "\n".join(skill_text.splitlines()[:3])
+    for event in events:
+        route.fold(acc, event)
+        kind = event.get("type")
+        if kind == "message_end" and event["message"].get("role") == "assistant":
+            message = event["message"]
+            if usage := message.get("usage"):
+                has_usage = True
+                cache_write += int(usage.get("cacheWrite") or 0)
+            if model := message.get("model"):
+                models.add(model)
+        if kind == "tool_execution_start":
+            tool, arguments = event["toolName"].casefold(), event.get("args", {})
+            entry = {"tool": tool, "skill_probe": False, "skill_loaded": False, "contamination_reasons": []}
+            trace.append(entry)
+            reads = []
+            if tool in SEARCH_TOOLS:
+                entry["skill_probe"] = skill_probe(argument_strings(arguments), workspace, skill_file,
+                                                   arguments.get("path"))
+            elif tool == "read":
+                reads = list(argument_strings(arguments.get("path")))
+            elif tool in {"bash", "powershell"}:
+                for search, values in shell_skill_operations(arguments.get("command", ""), workspace):
+                    if search:
+                        entry["skill_probe"] |= skill_probe(values, workspace, skill_file)
+                    else:
+                        reads.extend(values)
+            if reads or tool == "skill":
+                pending[event["toolCallId"]] = entry, arguments, reads
+        elif kind == "tool_execution_end" and event["toolCallId"] in pending:
+            entry, arguments, reads = pending.pop(event["toolCallId"])
+            response = event.get("result")
+            success = event.get("isError") is False and response is not None
+            if entry["tool"] == "skill":
+                entry["skill_probe"] = not success or skill_failed(response)
+                if not entry["skill_probe"]:
+                    entry["contamination_reasons"] = ["skill-load"]
+                    entry["skill_loaded"] = arguments.get("skill") == skill_file.parent.name
+            elif success:
+                loaded = record_skill_reads(entry, reads, workspace, skill_file)
+                entry["skill_loaded"] = loaded and (entry["tool"] == "read" or any(
+                    header in value.replace("\r\n", "\n") for value in argument_strings(response)))
+    usage = {**acc["usage"], "cache_write_tokens": cache_write} if has_usage else {}
+    result = {"result": acc["answer"], "is_error": not route.succeeded(acc["success_marker"]),
+              "usage": usage, "modelUsage": models, "num_turns": acc["turns"], "total_cost_usd": acc["cost_usd"]}
+    return result, trace
+
+
 def trial(args, task, fixture, root, arm, skill_text):
     runtime = args.runtime
     config, extra_env, secrets = args.provider
     env = isolated_env(root, CLAUDE_AUTH if runtime == "claude" else extra_env)
     workspace = root / "work"
     snapshot(fixture, workspace, fixture=True)
-    home = Path(env["CLAUDE_CONFIG_DIR" if runtime == "claude" else "CODEX_HOME"])
-    if config:
-        (home / "config.toml").write_text(config, encoding="utf-8")
+    if runtime == "pi":
+        home = pi_env(env)
+        for name, data in config.items():
+            path = home / name
+            path.touch(mode=0o600)
+            path.write_text(json.dumps(data), encoding="utf-8")
+    else:
+        home = Path(env["CLAUDE_CONFIG_DIR" if runtime == "claude" else "CODEX_HOME"])
+        if config:
+            (home / "config.toml").write_text(config, encoding="utf-8")
     installed = home / "skills"
     installed.mkdir()
     skill_file = installed / task["skill"] / "SKILL.md"
@@ -586,17 +703,21 @@ def trial(args, task, fixture, root, arm, skill_text):
         if args.mode == "forced":
             prompt += f'\n\nUse the {task["skill"]} skill. First read "{skill_file.as_posix()}", then follow it.'
     started = time.monotonic()
-    result, trace, error = {}, [], None
+    result, trace, error, exit_code = {}, [], None, None
     try:
         proc = run_process(agent_command(args, task, installed, arm), input=prompt, cwd=workspace,
                            env=env, capture_output=True, timeout=args.timeout)
-        events = [json.loads(line) for line in proc.stdout.splitlines() if line.strip()]
+        exit_code = proc.returncode
+        events = [json.loads(line) for line in proc.stdout.split("\n") if line.strip()]
         if runtime == "claude":
             result, trace = claude_trace(events, skill_file, workspace)
+            result["is_error"] = result.get("is_error") or result.get("subtype") != "success"
+        elif runtime == "pi":
+            result, trace = pi_trace(args.pi_route, args.pi_acc(), events, skill_file, workspace, skill_text)
         else:
             result, trace = codex_trace(events, skill_file, workspace, skill_text)
-        if (proc.returncode or result.get("subtype") != ("success" if runtime == "claude" else "turn.completed")
-                or result.get("is_error") or not isinstance(result.get("result"), str)):
+            result["is_error"] = result.get("subtype") != "turn.completed"
+        if proc.returncode or result.get("is_error") or not isinstance(result.get("result"), str):
             error = f"agent failed (exit {proc.returncode})"
     except subprocess.TimeoutExpired:
         error = "agent timed out"
@@ -614,6 +735,8 @@ def trial(args, task, fixture, root, arm, skill_text):
     token_keys = ("input_tokens", "output_tokens")
     if runtime == "claude":
         token_keys += ("cache_creation_input_tokens", "cache_read_input_tokens")
+    elif runtime == "pi":
+        token_keys += ("cache_write_tokens", "cache_read_tokens")
     tokens = sum(usage.get(key, 0) for key in token_keys) if usage else None
     record = {"valid": not invalid, "invalid_reasons": invalid, "error": error,
               "contaminated": bool(reasons), "contamination_reasons": reasons, "skill_loaded": loaded,
@@ -624,6 +747,8 @@ def trial(args, task, fixture, root, arm, skill_text):
               "seconds": round(time.monotonic() - started, 3), "usage": usage, "tokens": tokens,
               "models": sorted(result.get("modelUsage", {})), "cost_usd": result.get("total_cost_usd"),
               "turns": result.get("num_turns")}
+    if runtime == "pi":
+        record["exit_code"] = exit_code
     return redact(root, record, secrets=secrets)
 
 
@@ -662,11 +787,21 @@ def run_eval(args):
     runs = {arm: [] for arm in ARMS}
     order, skipped_trials = [], []
     total_tokens = 0
-    args.provider = codex_provider() if args.runtime == "codex" else ("", (), ())
+    if args.runtime == "pi":
+        args.provider = pi_provider()
+        sys.path.insert(0, str(SKILLS / "gdd" / "scripts"))
+        from agent_run import load_route, new_acc
+
+        args.pi_route, args.pi_acc, args.resume = load_route("pi", SKILLS), new_acc, None
+    else:
+        args.provider = codex_provider() if args.runtime == "codex" else ("", (), ())
     args.host_skill_rules = codex_host_skill_rules() if args.runtime == "codex" else []
     with tempfile.TemporaryDirectory(prefix="hoa-eval-version-") as temp:
         root = Path(temp)
-        proc = run_process([str(args.executable), "--version"], cwd=root, env=isolated_env(root),
+        env = isolated_env(root)
+        if args.runtime == "pi":
+            pi_env(env)
+        proc = run_process([str(args.executable), "--version"], cwd=root, env=env,
                            capture_output=True, timeout=args.timeout)
         if proc.returncode:
             raise ValueError(f"{args.runtime} --version failed (exit {proc.returncode})")
@@ -714,6 +849,8 @@ def run_eval(args):
               "rubric": task["rubric"], "rubric_flags": rubric_flags, "thresholds": thresholds,
               "summary": summary, "mean_deltas_vs_skill": deltas, "runs": runs, "verdict": outcome,
               "limits": limits, "total_tokens": total_tokens, "skipped_trials": skipped_trials}
+    if args.runtime == "pi":
+        record["thinking"] = args.thinking
     args.results.mkdir(parents=True, exist_ok=True)
     with destination.with_suffix(".json").open("x", encoding="utf-8", newline="\n") as file:
         json.dump(record, file, indent=2, ensure_ascii=False)
@@ -721,6 +858,8 @@ def run_eval(args):
     markdown = [f"# {task['id']}", "", f"Verdict: **{outcome}** ({args.runtime}, {args.mode}, k={args.repeats}).",
                 f"Model: `{model}`; CLI: `{version}`; skill: `{task['skill']}` rev {record['skill_revision']}.",
                 "", f"Thresholds: `{json.dumps(thresholds, sort_keys=True)}`.", ""]
+    if args.runtime == "pi":
+        markdown.insert(4, f"Thinking: `{args.thinking}`.")
     for arm, row in summary.items():
         markdown.append(f"- {arm}: {row['passed']}/{args.repeats} passed; "
                         f"loaded {row['loaded']}; pass^k: {row['pass^k']}; mean score: {row['mean_score']}; "
@@ -744,11 +883,14 @@ def run_eval(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("task", type=Path)
-    parser.add_argument("--runtime", choices=RUNTIMES, default="claude")
+    parser.add_argument("--runtime", choices=RUNTIMES, default="pi")
     parser.add_argument("--mode", choices=("forced", "natural"), default="forced")
     parser.add_argument("--claude", default="claude", help="native Claude Code executable")
     parser.add_argument("--codex", default="codex", help="native Codex executable")
-    parser.add_argument("--model", help="required for Claude; defaults to gpt-6.2-sol for Codex")
+    parser.add_argument("--pi", default="pi", help="native Pi executable")
+    parser.add_argument("--model", help="required for Claude; defaults to gpt-6.2-sol for Codex "
+                        f"or {PI_DEFAULT_MODEL} for Pi")
+    parser.add_argument("--thinking", choices=PI_THINKING, help="Pi only; defaults to max")
     parser.add_argument("--results", type=Path, default=EVALS / "results")
     parser.add_argument("--thresholds", type=Path, default=EVALS / "necessity-thresholds.json")
     parser.add_argument("--repeats", type=int, default=3)
@@ -760,7 +902,15 @@ def main():
     if not args.model:
         if args.runtime == "claude":
             parser.error("--model is required for Claude")
-        args.model = "gpt-6.2-sol"
+        args.model = PI_DEFAULT_MODEL if args.runtime == "pi" else "gpt-6.2-sol"
+    if args.runtime == "pi":
+        if "/" not in args.model:
+            args.model = f"{PI_PROVIDER}/{args.model}"
+        if args.model.partition("/")[0] != PI_PROVIDER or not args.model.partition("/")[2] or ":" in args.model:
+            parser.error(f"Pi --model must use {PI_PROVIDER} without a thinking suffix; use --thinking")
+        args.thinking = args.thinking or "max"
+    elif args.thinking is not None:
+        parser.error("--thinking is only supported with --runtime pi")
     if (min(args.repeats, args.max_turns, args.max_budget_usd, args.timeout) <= 0
             or not math.isfinite(args.max_budget_usd)):
         parser.error("repeat, turn, budget and timeout limits must be positive")

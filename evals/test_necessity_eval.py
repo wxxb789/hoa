@@ -29,7 +29,32 @@ prompt = sys.stdin.read()
 assert prompt.startswith("same prompt for every arm: report-claim-audit")
 assert ("First read" in prompt) == (MODE == "forced" and HAS_SKILL)
 assert ("frozen terse text" in str(sys.argv)) == IS_TERSE
-if RUNTIME == "claude":
+if RUNTIME == "pi":
+    agent = Path(os.environ["PI_CODING_AGENT_DIR"])
+    assert agent == Path(os.environ["HOME"]) / ".pi" / "agent"
+    assert {p.name for p in agent.iterdir()} == {"skills", "models.json", "auth.json"}
+    assert json.loads((agent / "models.json").read_text(encoding="utf-8")) == {
+        "providers": {"tencent-litellm": PI_CONFIG}}
+    assert json.loads((agent / "auth.json").read_text(encoding="utf-8")) == {
+        "tencent-litellm": PI_AUTH}
+    assert os.environ["PI_STUB_HEADER"] == "private-pi-header"
+    assert "OTHER_PI_KEY" not in os.environ
+    assert "ANTHROPIC_AUTH_TOKEN" not in os.environ
+    options = dict(zip(sys.argv, sys.argv[1:]))
+    assert options["--mode"] == "json"
+    assert options["--model"] == PI_MODEL
+    assert options["--thinking"] == PI_THINKING
+    assert {"--no-approve", "--no-session", "--no-extensions", "--no-mcp",
+            "--no-context-files"} <= set(sys.argv)
+    assert ("--no-skills" in sys.argv) == (not HAS_SKILL or MODE == "forced")
+    assert ("--skill" in sys.argv) == (HAS_SKILL and MODE == "forced")
+    if HAS_SKILL and MODE == "forced":
+        assert Path(options["--skill"]) == agent / "skills" / "report-claim-audit"
+    assert ("--append-system-prompt" in sys.argv) == IS_TERSE
+    tools = options["--tools"].split(",")
+    assert ("bash" in tools) == SHELL
+    assert ("write" in tools) == (RESPONSE is not None)
+elif RUNTIME == "claude":
     tools = sys.argv[sys.argv.index("--tools") + 1].split(",")
     assert ("Bash" in tools) == SHELL
 else:
@@ -46,13 +71,14 @@ else:
 source = Path("input.txt")
 assert source.read_text(encoding="utf-8") == "original"
 source.write_text("changed in this arm only", encoding="utf-8")
-home = "CLAUDE_CONFIG_DIR" if RUNTIME == "claude" else "CODEX_HOME"
+home = {"claude": "CLAUDE_CONFIG_DIR", "codex": "CODEX_HOME", "pi": "PI_CODING_AGENT_DIR"}[RUNTIME]
 skill = Path(os.environ[home]) / "skills" / "report-claim-audit" / "SKILL.md"
 has_skill = skill.is_file()
 assert HAS_SKILL == has_skill
 access = (has_skill and LOAD) or (not has_skill and LEAK_BASELINE) or FAKE_LOAD
-answer = json.dumps({"answer": SCORE, "cwd": str(Path.cwd()),
-                     "secret": "private-token private-header" if RUNTIME == "codex" else ""})
+secret = {"codex": "private-token private-header",
+          "pi": "private-pi-model-key private-pi-auth-key private-pi-header"}.get(RUNTIME, "")
+answer = json.dumps({"answer": SCORE, "cwd": str(Path.cwd()), "secret": secret})
 if RESPONSE is not None:
     answer = RESPONSE
     Path("artifact.txt").write_text("expected artifact", encoding="utf-8")
@@ -85,6 +111,43 @@ if not HAS_SKILL and CONTROL_PATH:
     assert CONTROL_PATH not in {"fixture", "relative-fixture"} or Path(read_path).is_file()
 else:
     read_path = str(skill)
+if RUNTIME == "pi":
+    def emit(**event):
+        print(json.dumps(event, ensure_ascii=False))
+
+    def message(stop, content):
+        emit(type="message_end", message={
+            "role": "assistant", "model": PI_MODEL, "stopReason": stop, "content": content,
+            "usage": {"input": 12, "output": 3, "cacheRead": 8, "cacheWrite": 2, "totalTokens": 25},
+        })
+
+    if access:
+        if FAILURE != "marker":
+            message("toolUse", [])
+        scenario = None if HAS_SKILL else CONTROL_PATH
+        tool, args = "read", {"path": read_path}
+        if scenario in {"catalog-probe", "workspace-probe"}:
+            tool, args = "find", {"path": read_path, "pattern": "**/SKILL.md"}
+        elif scenario and scenario.startswith("skill-"):
+            tool, args = "skill", {"skill": "report-claim-audit"}
+        elif scenario == "host-reference" or FAKE_LOAD:
+            tool, args = "bash", {"command": f'cat "{read_path}"'}
+        emit(type="tool_execution_start", toolCallId="skill1", toolName=tool, args=args)
+        if scenario != "catalog-pending":
+            content = "Unknown skill" if scenario == "skill-not-found" else "completed"
+            emit(type="tool_execution_end", toolCallId="skill1", toolName=tool,
+                 isError=scenario in {"catalog-failed", "skill-failed"},
+                 result={"content": [{"type": "text", "text": content}]})
+        emit(type="turn_end")
+    if FAILURE == "stream":
+        print("not JSON")
+    elif FAILURE != "marker":
+        # A Unicode line separator inside JSON is not a JSONL record boundary.
+        message("error" if FAILURE == "stop" else "stop",
+                [{"type": "thinking", "thinking": "\u2028"}, {"type": "text", "text": answer}])
+        emit(type="turn_end")
+    emit(type="agent_settled", aborted=FAILURE == "aborted")
+    sys.exit(7 if FAILURE == "exit" else 0)
 if RUNTIME == "codex":
     if not HAS_SKILL and CONTROL_PATH in {"skill-tool", "skill-failed"}:
         print(json.dumps({"type": "item.completed", "item": {
@@ -143,9 +206,15 @@ print(json.dumps({"type": "result", "subtype": "success", "num_turns": 2,
 """
 
 
+PI_CONFIG = {"baseUrl": "https://pi.invalid/v1", "apiKey": "private-pi-model-key",
+             "headers": {"X-Stub": "${PI_STUB_HEADER}"}, "api": "openai-completions",
+             "models": [{"id": "deepseek-v4.1-flash-fast"}, {"id": "stub-model"}]}
+PI_AUTH = {"type": "api_key", "key": "private-pi-auth-key"}
+
+
 def setup_trial(tmp_path, monkeypatch, *, runtime="claude", mode="forced", leak=False,
                 load=True, shell=False, fake_load=False, scores=None, thresholds=None,
-                control_path=None, response=None, repeats=2):
+                control_path=None, response=None, repeats=2, pi_override=False, failure=None):
     outside = tmp_path / "outside"
     outside.mkdir()
     (outside / "sentinel").write_bytes(b"untouched")
@@ -169,6 +238,20 @@ command = "do-not-run"
         monkeypatch.setenv(key, str(outside))
     monkeypatch.setenv("EVAL_STUB_TOKEN", "private-token")
     monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "not-for-codex")
+    if runtime == "pi":
+        agent = outside / ".pi" / "agent"
+        agent.mkdir(parents=True)
+        (agent / "models.json").write_text(json.dumps({"providers": {
+            "tencent-litellm": PI_CONFIG, "other": {"apiKey": "$OTHER_PI_KEY"},
+        }}), encoding="utf-8")
+        (agent / "auth.json").write_text(json.dumps({
+            "tencent-litellm": PI_AUTH, "other": {"type": "api_key", "key": "unrelated-pi-auth"},
+        }), encoding="utf-8")
+        for name in ("settings.json", "extensions", "sessions", "skills"):
+            (agent / name).write_text("do not copy", encoding="utf-8")
+        monkeypatch.setenv("OTHER_PI_KEY", "unrelated-pi-env")
+        monkeypatch.setenv("PI_STUB_HEADER", "private-pi-header")
+        monkeypatch.setenv("PI_CODING_AGENT_DIR", str(agent))
     # tempfile chooses its base independently of the untrusted agent profile.
     monkeypatch.setattr(runner.tempfile, "tempdir", str(tmp_path))
     monkeypatch.setattr(runner, "codex_host_skill_rules", lambda: [])
@@ -199,15 +282,23 @@ command = "do-not-run"
         has_skill, is_terse = arm == "skill", arm == "terse"
         score = next(scores) if scores is not None and arm else (42 if has_skill else 0)
         constants = (runtime, mode, has_skill, is_terse, shell, load, leak, fake_load and has_skill,
-                     score, control_path, str(runner.SKILLS), response)
+                     score, control_path, str(runner.SKILLS), response, PI_CONFIG, PI_AUTH,
+                     f"tencent-litellm/{'stub-model' if pi_override else 'deepseek-v4.1-flash-fast'}",
+                     "high" if pi_override == "thinking" else "max", failure)
         header = ("RUNTIME, MODE, HAS_SKILL, IS_TERSE, SHELL, LOAD, LEAK_BASELINE, FAKE_LOAD, SCORE, "
-                  "CONTROL_PATH, CATALOG, RESPONSE")
+                  "CONTROL_PATH, CATALOG, RESPONSE, PI_CONFIG, PI_AUTH, PI_MODEL, PI_THINKING, FAILURE")
+        if arm and failure == "timeout":
+            raise runner.subprocess.TimeoutExpired(argv, kwargs["timeout"])
         return process([sys.executable, "-c", f"{header} = {constants!r}\n" + STUB, *argv[1:]], **kwargs)
 
     monkeypatch.setattr(runner, "run_process", launch)
     results = tmp_path / "results"
     argv = ["runner", str(task), "--runtime", runtime, "--mode", mode, f"--{runtime}", sys.executable,
-            "--model", "stub-model", "--results", str(results), "--repeats", str(repeats)]
+            "--results", str(results), "--repeats", str(repeats)]
+    if runtime != "pi" or pi_override:
+        argv.extend(("--model", "stub-model"))
+    if pi_override == "thinking":
+        argv.extend(("--thinking", "high"))
     if thresholds is not None:
         policy = tmp_path / "thresholds.json"
         policy.write_text(json.dumps(thresholds), encoding="utf-8")
@@ -216,15 +307,16 @@ command = "do-not-run"
     return results, seen
 
 
-@pytest.mark.parametrize(("runtime", "shell"), [("claude", False), ("codex", True)])
+@pytest.mark.parametrize(("runtime", "shell"), [("claude", False), ("codex", True), ("pi", False)])
 def test_three_arm_results_and_process_isolation(tmp_path, monkeypatch, runtime, shell):
     results, seen = setup_trial(tmp_path, monkeypatch, runtime=runtime, shell=shell)
-    before = {path.name: path.read_bytes() for path in (tmp_path / "outside").iterdir()}
+    outside = tmp_path / "outside"
+    before = {path: path.read_bytes() for path in outside.rglob("*") if path.is_file()}
     assert runner.main() == 0
     assert len(set(seen)) == len(seen) == 7
     assert all(not path.parent.exists() for path in seen[1:])
     assert not seen[0].exists()
-    assert {path.name: path.read_bytes() for path in (tmp_path / "outside").iterdir()} == before
+    assert {path: path.read_bytes() for path in outside.rglob("*") if path.is_file()} == before
     assert (tmp_path / "fixture/input.txt").read_text(encoding="utf-8") == "original"
     report, = results.glob("*.json")
     assert report.with_suffix(".md").is_file()
@@ -235,13 +327,67 @@ def test_three_arm_results_and_process_isolation(tmp_path, monkeypatch, runtime,
     assert record["order"] == ["none", "terse", "skill", "skill", "terse", "none"]
     assert record["summary"]["skill"]["pass^k"] is True
     assert record["summary"]["none"]["pass^k"] is False
-    assert record["runs"]["skill"][0]["usage"]["output_tokens"] == 3
+    assert record["runs"]["skill"][0]["usage"]["output_tokens"] == (6 if runtime == "pi" else 3)
     assert json.loads(record["runs"]["skill"][0]["output"])["cwd"].startswith("<trial>")
     assert record["verdict"] == "skill-wins"
     if runtime == "codex":
         assert record["runs"]["skill"][0]["tokens"] == 15
         assert "private-token" not in report.read_text(encoding="utf-8")
         assert "private-header" not in report.read_text(encoding="utf-8")
+    elif runtime == "pi":
+        assert record["model"] == "tencent-litellm/deepseek-v4.1-flash-fast"
+        assert record["thinking"] == "max"
+        run = record["runs"]["skill"][0]
+        assert run["usage"] == {"input_tokens": 24, "output_tokens": 6, "cache_read_tokens": 16,
+                                "cache_write_tokens": 4, "total_tokens": 50}
+        assert run["tokens"] == 50
+        assert run["exit_code"] == 0
+        assert run["skill_loaded"]
+        for path in results.iterdir():
+            saved = path.read_text(encoding="utf-8")
+            assert "private-pi-" not in saved and "unrelated-pi-" not in saved
+
+
+@pytest.mark.parametrize("override", [True, "thinking"])
+def test_pi_natural_skill_discovery_and_overrides(tmp_path, monkeypatch, override):
+    results, _ = setup_trial(tmp_path, monkeypatch, runtime="pi", mode="natural",
+                             pi_override=override, repeats=1)
+    assert runner.main() == 0
+    report, = results.glob("*.json")
+    record = json.loads(report.read_text(encoding="utf-8"))
+    assert record["model"] == "tencent-litellm/stub-model"
+    assert record["thinking"] == ("high" if override == "thinking" else "max")
+    assert record["runs"]["skill"][0]["skill_loaded"]
+
+
+@pytest.mark.parametrize(("failure", "exit_code"), [
+    ("exit", 7), ("marker", 0), ("stop", 0), ("aborted", 0), ("stream", 0), ("timeout", None),
+])
+def test_pi_failure_does_not_score_answer(tmp_path, monkeypatch, failure, exit_code):
+    results, seen = setup_trial(tmp_path, monkeypatch, runtime="pi", failure=failure, repeats=1)
+    assert runner.main() == 1
+    report, = results.glob("*.json")
+    record = json.loads(report.read_text(encoding="utf-8"))
+    run = record["runs"]["skill"][0]
+    assert not run["valid"]
+    assert run["error"]
+    assert run["exit_code"] == exit_code
+    assert run["answer_format"] == "none"
+    assert run["score"] == 0
+    assert record["verdict"] == "inconclusive"
+    assert all(not path.parent.exists() for path in seen[1:])
+
+
+def test_pi_rejects_credential_commands_before_launch(tmp_path, monkeypatch, capsys):
+    results, seen = setup_trial(tmp_path, monkeypatch, runtime="pi", repeats=1)
+    auth_file = tmp_path / "outside/.pi/agent/auth.json"
+    auth_file.write_text(json.dumps({
+        "tencent-litellm": {"type": "api_key", "key": "!never-run-private-command"},
+    }), encoding="utf-8")
+    assert runner.main() == 2
+    assert not seen
+    assert not results.exists()
+    assert "never-run-private-command" not in capsys.readouterr().err
 
 
 def test_redact_windows_paths_and_credentials(monkeypatch):
@@ -296,6 +442,16 @@ def test_redact_windows_paths_and_credentials(monkeypatch):
     ("codex", "skill-tool", "skill-load", 0),
     ("claude", None, "installed-copy-read", 0),
     ("codex", None, "installed-copy-read", 0),
+    ("pi", "relative-fixture", None, 0),
+    ("pi", "catalog-probe", None, 1),
+    ("pi", "workspace-probe", None, 0),
+    ("pi", "catalog-failed", None, 0),
+    ("pi", "catalog-pending", None, 0),
+    ("pi", "skill-not-found", None, 1),
+    ("pi", "catalog", "catalog-read", 0),
+    ("pi", "host-reference", "host-skill-read", 0),
+    ("pi", "skill-tool", "skill-load", 0),
+    ("pi", None, "installed-copy-read", 0),
 ])
 def test_control_skill_probes_and_contamination(tmp_path, monkeypatch, runtime, path, reason, probes):
     results, _ = setup_trial(tmp_path, monkeypatch, runtime=runtime, leak=path is None,
@@ -309,7 +465,7 @@ def test_control_skill_probes_and_contamination(tmp_path, monkeypatch, runtime, 
         assert run["valid"] is not contaminated
         assert run["contaminated"] is contaminated
         assert run["skill_loaded"] is (reason == "skill-load"
-                                       or (reason == "installed-copy-read" and runtime == "claude"))
+                                       or (reason == "installed-copy-read" and runtime in {"claude", "pi"}))
         assert run["skill_probe_count"] == probes
         assert sum(event["skill_probe"] for event in run["trace"]) == probes
         assert run["contamination_reasons"] == ([reason] if reason else [])
@@ -374,6 +530,8 @@ def test_nonpositive_token_cap_starts_no_process(tmp_path, monkeypatch):
     ("claude", "forced", True, False, 1),
     ("codex", "forced", True, True, 1),
     ("codex", "natural", False, False, 0),
+    ("pi", "forced", True, True, 1),
+    ("pi", "natural", False, False, 0),
 ])
 def test_unobserved_treatment(tmp_path, monkeypatch, runtime, mode, shell, fake, exit_code):
     results, _ = setup_trial(tmp_path, monkeypatch, runtime=runtime, mode=mode,
