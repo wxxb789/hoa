@@ -5,7 +5,7 @@ description: >-
   prompt after the current turn, find the process and pane, read its terminal state and wait until
   the TUI is idle before sending the whole instruction. Not for launching a headless coding CLI.
 metadata:
-  revision: "4"
+  revision: "5"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "drive a live TUI agent in tmux: find the pane, prove idle, send one complete instruction"

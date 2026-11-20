@@ -5,7 +5,7 @@ description: >-
   profiles. When heterogeneous tasks span turns or a card stalls, dispatch independent lanes, review
   their results and recover or reassign blocked work. Not for one isolated coding CLI handoff.
 metadata:
-  revision: "3"
+  revision: "4"
   areas: "work-management,software-development"
   targets: "hermes"
   summary: "multi-card board work: decomposition, parallel dispatch, review gates, stuck-card recovery"
