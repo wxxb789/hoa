@@ -29,7 +29,7 @@
     "react-native": "0.81.5",
     "react-test-renderer": "19.1.0",
     "typescript": "^5.9.3",
-    "vitest": "^3.2.4",
+    "vitest": "^4.1.12",
     "zod": "^4.4.3"
   }
 }
