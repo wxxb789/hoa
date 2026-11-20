@@ -296,7 +296,7 @@ sys.exit(agent_run.main(args))
     def test_optional_modes_require_env_and_executable(self):
         for mode in ("tmux", "herdr"):
             with self.subTest(mode=mode), mock.patch.object(agent_run, "IS_WINDOWS", mode == "herdr" and os.name == "nt"), \
-                    mock.patch.object(agent_run, "interpreter", return_value=self.herdr_python):
+                    mock.patch.object(agent_run, "runner_interpreter", return_value=self.herdr_python):
                 with mock.patch.object(agent_run.skill_config, "resolve", return_value=mode), \
                         mock.patch.dict(os.environ, {"GDD_RUN_DETACH": "auto"}):
                     with self.assertRaisesRegex(ValueError, "must be set in the environment"):
@@ -428,7 +428,7 @@ sys.exit(agent_run.main(args))
                         mock.patch.object(agent_run, "supervisor_call") as call, \
                         mock.patch.object(agent_run.shutil, "which", return_value="herdr"):
                     self.argv[0] = template.format(char)
-                    with mock.patch.object(agent_run, "interpreter", return_value=self.argv[0]):
+                    with mock.patch.object(agent_run, "runner_interpreter", return_value=self.argv[0]):
                         with self.assertRaises(OSError):
                             agent_run.select_detach("herdr")
                     with self.assertRaises(OSError):
@@ -441,7 +441,7 @@ sys.exit(agent_run.main(args))
         prompt = self.root / "prompt.md"
         prompt.write_text("test", encoding="utf-8")
         executable = str(HERE / "python.exe")
-        with mock.patch.object(agent_run, "interpreter", return_value=executable), \
+        with mock.patch.object(agent_run, "runner_interpreter", return_value=executable), \
                 mock.patch.object(agent_run, "select_detach", return_value=("herdr", "herdr")), \
                 mock.patch.object(agent_run, "spawn_detached", side_effect=OSError) as spawn, \
                 mock.patch.dict(os.environ, {"GDD_AGENT": "omp", "OMP_BIN": STUB}):

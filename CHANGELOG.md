@@ -28,6 +28,9 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
   while retaining platform detachment, process ownership, and stage outcome rules.
 - Restore the DSH transport instructions and regression coverage for runner identity,
   lifecycle diagnostics, and Paseo start output.
+- gdd starts its own detached runner and the Paseo watcher on the base interpreter, so on Windows the
+  recorded pid names the running process rather than a venv launcher; this fixes the intermittent
+  Paseo historical-outcome failure. User-supplied `.py` agents and launchers keep the caller's venv.
 
 - The README and the generated index tell users who do not run Hermes to skip the `hermes-*` skills, and
   the index carries an install-everything-but-Hermes command; `generate_index.py` fails if any other

@@ -273,7 +273,7 @@ def start_locked(args, slug, prefix, cwd, prompt, schema, run_dir, mode, launche
                                       "(agent identity preserved; inspect before retrying)")
                 raise RuntimeError(state["cwd_error"])
             state["cwd_verified"] = True
-            runner = [support.interpreter(), "-B", ADAPTER, "_watch", "--run-dir", run_dir]
+            runner = [support.runner_interpreter(), "-B", ADAPTER, "_watch", "--run-dir", run_dir]
             pid, flags = support.spawn_detached(runner, run_dir, run_dir, dict(os.environ),
                                                state, mode, launcher)
             state["spawn"] = {"creationflags": flags, "platform": sys.platform}

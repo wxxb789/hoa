@@ -114,7 +114,7 @@ def select_detach(requested):
         if requested == "tmux":
             check_tmux_version(launcher)
         else:
-            herdr_executable(interpreter())
+            herdr_executable(runner_interpreter())
         return requested, launcher
     if requested in ("auto", "systemd") and sys.platform == "linux":
         if (launcher := shutil.which("systemd-run")) and (ctl := shutil.which("systemctl")):
@@ -547,6 +547,17 @@ def interpreter():
     """python.exe, not pythonw.exe: a pythonw parent loses the std handles children need."""
     console = os.path.join(os.path.dirname(sys.executable), "python.exe")
     return console if IS_WINDOWS and os.path.exists(console) else sys.executable
+
+
+def runner_interpreter():
+    """interpreter() for gdd's own stdlib-only detached runners, whose Popen pid is recorded as theirs.
+
+    On Windows a venv's python.exe (`uv run`, `python -m venv`) is a launcher that re-spawns the base
+    interpreter, so its pid names the launcher. User-supplied `.py` agents keep interpreter() and the venv.
+    """
+    base = getattr(sys, "_base_executable", sys.executable)
+    console = os.path.join(os.path.dirname(base), "python.exe")
+    return console if IS_WINDOWS and os.path.exists(console) else interpreter()
 
 
 def state_age_seconds(state):
@@ -1283,7 +1294,7 @@ def start_locked(args, spec, slug, cwd, run_dir, command, prompt, max_time, mode
         "model": args.model,
         "thinking": args.thinking, "max_time": args.max_time, "resumed_from": args.resume,
         "spawn": {"creationflags": 0, "platform": sys.platform}}
-    runner = [interpreter(), "-B", os.path.abspath(__file__), "_run", "--run-dir", run_dir]
+    runner = [runner_interpreter(), "-B", os.path.abspath(__file__), "_run", "--run-dir", run_dir]
     try:
         pid, _ = spawn_detached(runner, run_dir, cwd, child_env(spec.scrub_env), state, mode, launcher)
     except OSError as exc:
