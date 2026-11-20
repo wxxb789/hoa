@@ -9,6 +9,7 @@ import argparse
 import json
 import math
 import os
+import posixpath
 import re
 import shutil
 import statistics
@@ -18,7 +19,12 @@ import tempfile
 import time
 import tomllib
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+
+if __package__:
+    from . import wsl_pi
+else:
+    import wsl_pi
 
 EVALS = Path(__file__).resolve().parent
 SKILLS = EVALS.parent / "skills"
@@ -288,12 +294,21 @@ def codex_provider():
     return text, credentials, secrets
 
 
-def pi_provider():
+def pi_provider(model=None):
     home = Path.home() / ".pi" / "agent"
     models = home / "models.json"
     provider = json.loads(models.read_text(encoding="utf-8")).get("providers", {}).get(PI_PROVIDER)
     if not provider:
         raise ValueError(f"{models.name}: missing providers.{PI_PROVIDER}")
+    if model is not None:
+        model_id = model.split("/", 1)[1]
+        selected = [entry for entry in provider.get("models", ()) if entry["id"] == model_id]
+        if len(selected) != 1:
+            raise ValueError(f"{models.name}: expected one model entry for {model}")
+        provider["models"] = selected
+        if "modelOverrides" in provider:
+            provider["modelOverrides"] = {key: value for key, value in provider["modelOverrides"].items()
+                                          if key == model_id}
     files = {"models.json": {"providers": {PI_PROVIDER: provider}}}
     auth_file = home / "auth.json"
     auth = json.loads(auth_file.read_text(encoding="utf-8")).get(PI_PROVIDER) if auth_file.is_file() else None
@@ -367,7 +382,7 @@ def agent_command(args, task, installed, arm):
         if write:
             tools += ["write", "edit"]
         if shell:
-            tools += ["bash", "powershell"] if os.name == "nt" else ["bash"]
+            tools += ["bash", "powershell"] if os.name == "nt" and not getattr(args, "sandbox", None) else ["bash"]
         extra = ["--offline", "--no-session", "--no-extensions", "--no-mcp",
                  "--no-context-files", "--no-prompt-templates", "--no-themes", "--tools", ",".join(tools)]
         if arm != "skill" or args.mode == "forced":
@@ -437,6 +452,11 @@ def trace_path(value, workspace):
     value = value.replace("\\", "/")
     if value.startswith("~/"):
         value = str(workspace.parent / "home" / value[2:])
+    if not isinstance(workspace, Path):
+        if re.match(r"^[A-Za-z]:/", value):
+            value = "/" + value
+        target = PurePosixPath(posixpath.normpath(str(workspace / value)))
+        return target, target
     try:
         # On Windows, realpath expands existing 8.3 aliases, including parent directories.
         target = workspace / value
@@ -475,7 +495,8 @@ def skill_probe(values, workspace, skill_file, base=None):
                 base_path, _ = trace_path(base, workspace)
                 if base_path is not None and base_path.is_relative_to(workspace):
                     continue
-            elif (("/" in value or "\\" in value) and not value.startswith(("*", "?"))) or path.exists():
+            elif ((("/" in value or "\\" in value) and not value.startswith(("*", "?")))
+                  or isinstance(path, Path) and path.exists()):
                 continue
         return True
     return False
@@ -512,7 +533,8 @@ def shell_skill_operations(command, workspace):
                 else:
                     pattern_given = True
             if verb == "rg":
-                targets = [file for file in files if (path := trace_path(file, workspace)[0]) and not path.is_dir()]
+                targets = [file for file in files if (path := trace_path(file, workspace)[0])
+                           and not (isinstance(path, Path) and path.is_dir())]
                 if not files or len(files) != len(targets):
                     yield True, args
                 files = targets
@@ -685,6 +707,7 @@ def trial(args, task, fixture, root, arm, skill_text):
     env = isolated_env(root, runtime, CLAUDE_AUTH if runtime == "claude" else extra_env)
     workspace = root / "work"
     snapshot(fixture, workspace, fixture=True)
+    sandbox = getattr(args, "wsl_pi", None)
     if runtime == "pi":
         home = Path(env["PI_CODING_AGENT_DIR"])
         for name, data in config.items():
@@ -702,19 +725,28 @@ def trial(args, task, fixture, root, arm, skill_text):
     if arm == "skill":
         snapshot(SKILLS / task["skill"], skill_file.parent)
         if args.mode == "forced":
-            prompt += f'\n\nUse the {task["skill"]} skill. First read "{skill_file.as_posix()}", then follow it.'
+            read_path = wsl_pi.TRIAL / skill_file.relative_to(root).as_posix() if sandbox else skill_file
+            prompt += f'\n\nUse the {task["skill"]} skill. First read "{read_path.as_posix()}", then follow it.'
     started = time.monotonic()
     result, trace, error, exit_code = {}, [], None, None
     try:
-        proc = run_process(agent_command(args, task, installed, arm), input=prompt, cwd=workspace,
-                           env=env, capture_output=True, timeout=args.timeout)
+        if sandbox:
+            remote_skills = wsl_pi.TRIAL / installed.relative_to(root).as_posix()
+            remote_work = wsl_pi.TRIAL / "work"
+            outputs = {check["file"] for check in task["rubric"].values() if "file" in check}
+            proc = sandbox.run(root, agent_command(args, task, remote_skills, arm), prompt, outputs, args.timeout)
+            trace_skill = remote_skills / task["skill"] / "SKILL.md"
+        else:
+            proc = run_process(agent_command(args, task, installed, arm), input=prompt, cwd=workspace,
+                               env=env, capture_output=True, timeout=args.timeout)
+            remote_work, trace_skill = workspace, skill_file
         exit_code = proc.returncode
         events = [json.loads(line) for line in proc.stdout.split("\n") if line.strip()]
         if runtime == "claude":
             result, trace = claude_trace(events, skill_file, workspace)
             result["is_error"] = result.get("is_error") or result.get("subtype") != "success"
         elif runtime == "pi":
-            result, trace = pi_trace(args.pi_route, args.pi_acc(), events, skill_file, workspace, skill_text)
+            result, trace = pi_trace(args.pi_route, args.pi_acc(), events, trace_skill, remote_work, skill_text)
         else:
             result, trace = codex_trace(events, skill_file, workspace, skill_text)
             result["is_error"] = result.get("subtype") != "turn.completed"
@@ -788,8 +820,13 @@ def run_eval(args):
     runs = {arm: [] for arm in ARMS}
     order, skipped_trials = [], []
     total_tokens = 0
+    sandbox = getattr(args, "wsl_pi", None)
     if args.runtime == "pi":
-        args.provider = pi_provider()
+        if sandbox:
+            _, _, secrets = pi_provider(args.model)
+            args.provider = ({}, (), sorted({value for value in secrets if value}))
+        else:
+            args.provider = pi_provider()
         sys.path.insert(0, str(SKILLS / "gdd" / "scripts"))
         from agent_run import load_route, new_acc
 
@@ -797,14 +834,18 @@ def run_eval(args):
     else:
         args.provider = codex_provider() if args.runtime == "codex" else ("", (), ())
     args.host_skill_rules = codex_host_skill_rules() if args.runtime == "codex" else []
-    with tempfile.TemporaryDirectory(prefix="hoa-eval-version-") as temp:
-        root = Path(temp)
-        env = isolated_env(root, args.runtime)
-        proc = run_process([str(args.executable), "--version"], cwd=root, env=env,
-                           capture_output=True, timeout=args.timeout)
-        if proc.returncode:
-            raise ValueError(f"{args.runtime} --version failed (exit {proc.returncode})")
-        version, model = redact(root, [proc.stdout.strip(), args.model], secrets=args.provider[2])
+    if sandbox:
+        preflight = sandbox.call("--check", payload=args.provider[2])
+        version, model = redact(EVALS, [preflight["version"], args.model], secrets=args.provider[2])
+    else:
+        with tempfile.TemporaryDirectory(prefix="hoa-eval-version-") as temp:
+            root = Path(temp)
+            env = isolated_env(root, args.runtime)
+            proc = run_process([str(args.executable), "--version"], cwd=root, env=env,
+                               capture_output=True, timeout=args.timeout)
+            if proc.returncode:
+                raise ValueError(f"{args.runtime} --version failed (exit {proc.returncode})")
+            version, model = redact(root, [proc.stdout.strip(), args.model], secrets=args.provider[2])
     for repeat in range(args.repeats):
         for arm in (ARMS if repeat % 2 == 0 else ARMS[::-1]):
             if args.max_total_tokens is not None and total_tokens >= args.max_total_tokens:
@@ -850,6 +891,8 @@ def run_eval(args):
               "limits": limits, "total_tokens": total_tokens, "skipped_trials": skipped_trials}
     if args.runtime == "pi":
         record["thinking"] = args.thinking
+        if sandbox:
+            record["sandbox"] = "wsl"
     args.results.mkdir(parents=True, exist_ok=True)
     with destination.with_suffix(".json").open("x", encoding="utf-8", newline="\n") as file:
         json.dump(record, file, indent=2, ensure_ascii=False)
@@ -859,6 +902,8 @@ def run_eval(args):
                 "", f"Thresholds: `{json.dumps(thresholds, sort_keys=True)}`.", ""]
     if args.runtime == "pi":
         markdown.insert(4, f"Thinking: `{args.thinking}`.")
+        if sandbox:
+            markdown.insert(5, "Sandbox: `wsl`.")
     for arm, row in summary.items():
         markdown.append(f"- {arm}: {row['passed']}/{args.repeats} passed; "
                         f"loaded {row['loaded']}; pass^k: {row['pass^k']}; mean score: {row['mean_score']}; "
@@ -887,6 +932,8 @@ def main():
     parser.add_argument("--claude", default="claude", help="native Claude Code executable")
     parser.add_argument("--codex", default="codex", help="native Codex executable")
     parser.add_argument("--pi", default="pi", help="native Pi executable")
+    parser.add_argument("--sandbox", choices=("wsl",), help="Windows-only filesystem sandbox for Pi")
+    parser.add_argument("--wsl-distro", default=wsl_pi.DISTRO)
     parser.add_argument("--model", help="required for Claude; defaults to gpt-6.2-sol for Codex "
                         f"or {PI_DEFAULT_MODEL} for Pi")
     parser.add_argument("--thinking", choices=PI_THINKING, help="Pi only; defaults to max")
@@ -918,10 +965,22 @@ def main():
         parser.error("repeat, turn, budget and timeout limits must be positive")
     if args.max_total_tokens is not None and args.max_total_tokens <= 0:
         parser.error("--max-total-tokens must be positive")
-    executable = shutil.which(getattr(args, args.runtime))
-    if not executable or (os.name == "nt" and Path(executable).suffix.lower() != ".exe"):
-        parser.error(f"--{args.runtime} must resolve to a native executable, not a batch shim")
-    args.executable = Path(executable).absolute()
+    if args.sandbox:
+        if args.runtime != "pi" or args.model != PI_DEFAULT_MODEL or args.pi != "pi":
+            parser.error(f"--sandbox wsl requires Pi's installed executable and model {PI_DEFAULT_MODEL}")
+        if os.name != "nt":
+            print("necessity eval: skipped; --sandbox wsl is Windows-only", file=sys.stderr)
+            return 0
+        wsl = shutil.which("wsl.exe")
+        if not wsl:
+            parser.error("--sandbox wsl requires wsl.exe")
+        args.wsl_pi = wsl_pi.WslPi(run_process, Path(wsl).absolute(), args.wsl_distro, EVALS)
+        args.executable = wsl_pi.PI
+    else:
+        executable = shutil.which(getattr(args, args.runtime))
+        if not executable or (os.name == "nt" and Path(executable).suffix.lower() != ".exe"):
+            parser.error(f"--{args.runtime} must resolve to a native executable, not a batch shim")
+        args.executable = Path(executable).absolute()
     try:
         return run_eval(args)
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
