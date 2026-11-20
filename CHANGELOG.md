@@ -22,6 +22,8 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 - Refresh maintenance anchors and cover the intermittent Paseo historical-outcome test in the
   bounded Windows stress run.
 - Use `uv run` in Python script usage examples and regeneration diagnostics.
+- Remove gdd's human-table merge-check fallback; manual CI requires structured check evidence,
+  and both merge paths require the exact verified head.
 - The README and the generated index tell users who do not run Hermes to skip the `hermes-*` skills, and
   the index carries an install-everything-but-Hermes command; `generate_index.py` fails if any other
   skill starts linking to a `hermes-*` skill.

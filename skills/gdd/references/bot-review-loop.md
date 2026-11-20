@@ -112,7 +112,7 @@ Require exit 0 from both commands, then check the PR head against `REVIEW_HEAD` 
 Then run the project gates and follow [Phase 6](phases/06-merge.md), passing the full reviewed head
 and the same `--marker` if customized. A successful post alone is not merge permission. Both paths
 require valid completed clean evidence, zero unresolved threads, and verified local gates; only
-the manual path waits for all CI checks in gdd.
+the manual path reads all checks from gh's structured output and requires them to be green.
 
 ## Finding dispositions and threads
 
