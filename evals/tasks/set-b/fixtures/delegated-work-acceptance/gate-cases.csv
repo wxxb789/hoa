@@ -1,0 +1,6 @@
+case,reported,entrypoint,args,assertion
+preview renders clean,pass,normalize,--dry-run,plan matches and test store unchanged
+apply mode help,pass,normalize,--apply --help,usage mentions writes
+apply rolls back,pass,normalize,--apply --store fake-fails-second-write,exit=7 and prior bytes restored
+unknown option,pass,normalize,--impossible,exit=2
+remaining nine checks,pass,library cases,none,parsing and filename normalization

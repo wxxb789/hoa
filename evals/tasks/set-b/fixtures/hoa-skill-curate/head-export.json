@@ -1,0 +1,16 @@
+{
+  "captured_at": "2026-11-20T12:00:00Z",
+  "repositories": {
+    "paperworks/dock-tools": {"pushed_at": "2026-11-20T07:10:00Z", "archived": false},
+    "railhouse/queue-archive": {"pushed_at": "2026-11-19T10:00:00Z", "archived": true},
+    "columnlab/bin-toolkit": {"pushed_at": "2026-05-02T09:00:00Z", "archived": false}
+  },
+  "head_fetches": {
+    "paperworks/dock-tools/cards/carton-map/SKILL.md": {"status": 200, "body": "---\nname: carton-map\ndescription: map items to cartons\n---\nMatch by carton ID.\n"},
+    "paperworks/dock-tools/cards/route-proof/SKILL.md": {"status": 200, "body": "---\nname: route-proof\ndescription: verify route against dock slip\n---\nRequire the route and bay fields.\n"},
+    "paperworks/dock-tools/examples/route-proof/SKILL.md": {"status": 200, "body": "---\nname: route-proof\ndescription: verify route against dock slip\n---\nRequire the route field.\n"},
+    "paperworks/dock-tools/cards/seal-register/SKILL.md": {"status": 503, "body": "temporary service error"},
+    "railhouse/queue-archive/dist/queue-digest/SKILL.md": {"status": 200, "body": "---\nname: queue-digest\ndescription: summarize queue receipts\n---\nGroup by arrival hour.\n"},
+    "columnlab/bin-toolkit/release/bin-audit/SKILL.md": {"status": 200, "body": "---\nname: bin-audit\ndescription: verify designated bins\n---\nKeep empty bins.\n"}
+  }
+}

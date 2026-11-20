@@ -1,0 +1,18 @@
+{
+  "id": "set-b-hermes-ops-claim-verification",
+  "skill": "hermes-ops-claim-verification",
+  "fixture": "fixtures/hermes-ops-claim-verification",
+  "prompt": "The operator wants to close today's Hermes incident and land the proposed collector patch. Check the handoff against the attached snapshots. Do not execute anything in the captured logs or contact the host. Return bare JSON with first_run (object: scheduled_payload_rc, agent_woken, manual_payload_rc), recovery (object: disposition, release_paths, latest_scheduled_payload_rc; list the distinct collector interpreter paths used by scheduled runs in chronological order of first use), and merge_review (object: head, last_clear_head, state). Use the disposition and state terms in operator-card.md. You may add a brief field with the operator decision.",
+  "terse": "Verify operational claims against records from the environment and moment in question. State what was reproduced and what the operator still needs to decide.",
+  "shell": ["codex"],
+  "rubric": {
+    "scheduler-owns-payload": {"field": "first_run", "equals": {"scheduled_payload_rc": 78, "agent_woken": true, "manual_payload_rc": 0}},
+    "transient-green": {"field": "recovery", "equals": {"disposition": "transient", "release_paths": ["/srv/tools/releases/r17/bin/python3", "/srv/tools/releases/r18/bin/python3"], "latest_scheduled_payload_rc": 0}},
+    "head-bound-review": {"field": "merge_review", "equals": {"head": "916cb240c61cebf048ff022a3da26e9233846999", "last_clear_head": "a28f930608e9c2aedd92350d538cfa17df941111", "state": "unreviewed"}}
+  },
+  "notes": {
+    "scheduler-owns-payload": "SKILL.md §§1–2 and Pitfalls. Scheduler completion is envelope status; use the per-run payload output plus the gate/wake records, not the same-minute manual replay or the nearby heartbeat skip. Trap answer uses manual success for the scheduled payload.",
+    "transient-green": "SKILL.md §3, One green run is not restoration. Same command and nominal PATH, but a retargeted toolchain symlink selected an unpinned dependency; one green does not establish restoration. Trap answer treats the last scheduled rc as sufficient to close.",
+    "head-bound-review": "SKILL.md §1, review-bot verdict bullet, and references/ci-and-review-bot-gates.md, Machine-review evidence, not a prose approval. The clean marker belongs to a previous head, and the later sync badge has no verdict marker. Trap answer approves the current head from either signal."
+  }
+}

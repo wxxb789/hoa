@@ -1,0 +1,25 @@
+{
+  "id": "set-b-ghc-search",
+  "skill": "ghc-search",
+  "fixture": "fixtures/ghc-search",
+  "shell": ["codex"],
+  "prompt": "The Fallow Quay editor needs a dry-run query plan and a decision on which recorded search outputs can supply a complete, cited note. Reconcile the handover with the source register and replay log. This is strictly offline: read the local files only. Do not execute search commands, start a service, contact a proxy, or access the web. Return a bare JSON object: routes maps request IDs to gpt, x, direct-fetch, or docs; search_options maps search request IDs to just the corpus-restriction CLI flags (literal flag names as keys, repeatable values as arrays in register order, and other values as strings); replay maps replay IDs to publishable, needs-sources, retry-with-higher-cap, or failed. Also include queries, mapping search request IDs to your proposed query text; the editor will review that text separately.",
+  "terse": "Choose the retrieval method that matches the source you need. Keep source provenance attached to the answer and check the returned evidence before relying on it.",
+  "rubric": {
+    "source-specific-routes": {"field": "routes", "equals": {
+      "Q17": "x", "Q21": "gpt", "Q25": "direct-fetch", "Q28": "docs"
+    }},
+    "enforced-corpus-filters": {"field": "search_options", "equals": {
+      "Q17": {"--handle": ["FallowQuayOps", "FallowQuayAccess"], "--exclude-handle": ["FallowQuayFans"], "--from-date": "2026-10-24", "--to-date": "2026-10-31"},
+      "Q21": {"--domain": ["notices.fallowquay.example", "register.fallowquay.example"], "--block-domain": ["mirrors.notices.fallowquay.example"]}
+    }},
+    "replay-evidence": {"field": "replay", "equals": {
+      "R10": "needs-sources", "R11": "retry-with-higher-cap", "R12": "failed", "R13": "publishable"
+    }}
+  },
+  "notes": {
+    "source-specific-routes": "SKILL.md#use-it and #when-this-is-not-the-right-tool: X posts and open-web discovery are separate corpora; a known page or a named API does not require open-ended search.",
+    "enforced-corpus-filters": "SKILL.md#use-it and #what-you-need-to-know: encode the restrictions in the engine-specific flag family, not just query prose, site: hints, or an incompatible common filter set. The query prose is not pinned.",
+    "replay-evidence": "SKILL.md#what-you-need-to-know: distinguish a successful uncited answer, a usable but truncated answer whose missing tail matters, and an actual command failure. Neither exit zero nor an attached citation alone establishes completeness."
+  }
+}

@@ -1,0 +1,11 @@
+case,revision,stage,exit
+QA-01,3,final,0
+QA-02,2,preflight,0
+QA-02,2,final,1
+QA-02,3,final,0
+QA-03,4,final,2
+QA-04,1,final,0
+QA-05,6,final,0
+QA-05,7,preflight,0
+QA-06,5,final,0
+QA-06,6,preflight,0

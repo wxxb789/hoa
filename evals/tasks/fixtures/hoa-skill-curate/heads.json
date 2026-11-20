@@ -1,0 +1,20 @@
+{
+  "example-labs/binder-suite": {
+    "head": "f74e311",
+    "pushed_at": "2026-11-12T10:00:00Z",
+    "archived": false,
+    "files": {
+      "modules/reads/binder-inspect/entry.md": "Inspect binder headers.\nReturn just the title.\n",
+      "packages/binder-inspect/entry.md": "Inspect binder headers.\nReturn title and shelf.\n"
+    }
+  },
+  "example-archive/binder-tools": {
+    "head": "3033bd9",
+    "pushed_at": "2026-02-02T10:00:00Z",
+    "archived": true,
+    "files": {
+      "packages/binder-inspect/entry.md": "Inspect binder headers.\nReturn just the title.\n"
+    },
+    "missing_at_head": ["packages/binder-list/entry.md"]
+  }
+}

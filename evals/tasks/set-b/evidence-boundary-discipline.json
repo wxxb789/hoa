@@ -1,0 +1,18 @@
+{
+  "id": "set-b-evidence-boundary-discipline",
+  "skill": "evidence-boundary-discipline",
+  "fixture": "fixtures/evidence-boundary-discipline",
+  "prompt": "The Port Rill knowledge base is publishing its June 18 monitoring update. Supply the publication data to replace the three passages in candidate.md and populate the February pilot delivery row. Work from the supplied packet only. Return bare JSON: charter (object with announcement_date, announcement_status, current_status, search_date, search_result, monitor_through); pilot (object with page_labels and delivery_labels, both sorted arrays); inspection_citation (object with url, date, locator, quote, rendered as the East Pier paragraph by the publisher). Use ISO dates and the terms in desk-vocabulary.md.",
+  "terse": "Write only what the sources support, keeping the limits of the evidence visible wherever a reader might rely on the claim.",
+  "shell": ["codex"],
+  "rubric": {
+    "dated-charter-state": {"field": "charter", "equals": {"announcement_date": "2028-05-29", "announcement_status": "planned", "current_status": "unknown", "search_date": "2028-06-18", "search_result": "not located", "monitor_through": "2028-07-12"}},
+    "carried-fact-parity": {"field": "pilot", "equals": {"page_labels": ["carried citation", "fact", "not rechecked"], "delivery_labels": ["carried citation", "fact", "not rechecked"]}},
+    "standalone-inspection-source": {"field": "inspection_citation", "equals": {"url": "https://rill.example/inspector/notices/IR-64", "date": "2028-06-14", "locator": "paragraph 4", "quote": "The inspector witnessed a single 40-minute handover at East Pier."}}
+  },
+  "notes": {
+    "dated-charter-state": "SKILL.md §§1, 4, Fix the tense to the dateline / Absence never escalates. Reconstruct the May plan and the June catalog outcome separately; an unretrieved attachment and an administrative ticket are not evidence of publication status or a closed monitoring window. Trap answer reports the charter as unpublished and treats the ticket resolution as the monitoring end.",
+    "carried-fact-parity": "SKILL.md §2, Hold one provenance label across all surfaces. Preserve the previously verified fact but carry its attribution and recheck boundaries on both surfaces. Trap answer leaves an unqualified fact on the page even while qualifying the delivery row.",
+    "standalone-inspection-source": "SKILL.md §3, Every new factual paragraph carries its own citation. The standalone section needs the primary dated locator and exact claim quote, not the existing sister-page link or its later release recap. The citation object is the section's publication data. Trap answer points to the recap with the superficially matching topic."
+  }
+}

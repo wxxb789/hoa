@@ -1,0 +1,18 @@
+{
+  "id": "set-b-hoa-skill-port",
+  "skill": "hoa-skill-port",
+  "fixture": "fixtures/hoa-skill-port",
+  "prompt": "We are ready to move Proof Packet out of a private runtime into the shared kit without changing its procedure. Prepare the migration decision for the release owner. Reconcile all the attached records; the workspace is an offline export, not a live runtime. Do not edit, publish, or contact any host. Return bare JSON with ownership (object: canonical, runtime_target, nightly_sync; use paths in the records and a boolean for nightly_sync), effective_settings (object keyed by repo, adapter, marker and timeout_s; each value is an object with value and source, using source IDs flag, env, config, default or missing and null for a missing value), and loader_disposition (object: profile, missing_skill, reason, action; reason is policy, packaging, or unverified; action is request-owner-review, fix-package, or retry-loader).",
+  "terse": "Move the existing procedure into a portable shared package without changing its behavior. Remove assumptions about one machine and make the package usable by a stranger. Read the destination contracts and verify the actual consumer before recommending release.",
+  "shell": ["codex"],
+  "rubric": {
+    "canonical-not-mirrored": {"field": "ownership", "equals": {"canonical": "shared-kit/catalog/proof-packet", "runtime_target": "shared-kit/catalog/proof-packet", "nightly_sync": false}},
+    "per-key-portable-resolution": {"field": "effective_settings", "equals": {"repo": {"value": "review-checkout", "source": "flag"}, "adapter": {"value": "bridge-canary", "source": "env"}, "marker": {"value": null, "source": "missing"}, "timeout_s": {"value": 55, "source": "config"}}},
+    "consumer-policy-not-port-regression": {"field": "loader_disposition", "equals": {"profile": "weekend", "missing_skill": "proof-packet", "reason": "policy", "action": "request-owner-review"}}
+  },
+  "notes": {
+    "canonical-not-mirrored": "SKILL.md#1-decide-the-canonical-side-before-writing-a-file. Public is canonical; a named nightly sync and a runtime-owned mirror are plausible but recreates the double source.",
+    "per-key-portable-resolution": "SKILL.md#configuration-is-a-gate-not-advice; configuration.md. Resolve each key independently; the absence of a marker must not fall through to the private script constant.",
+    "consumer-policy-not-port-regression": "SKILL.md#5-swap-the-runtime-over-without-a-gap; runtime-swap.md#swap-the-runtime-over-without-a-gap. Same displayed setting and a repair claim are not proof; compare the effective allowlist and derived set before attributing the loader loss or changing policy."
+  }
+}

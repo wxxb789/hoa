@@ -6,6 +6,8 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 ## 2026-11-20
 
+- Add necessity tasks for 17 subjects in two sets: set A (first authoring pass) and a harder set B under
+  `evals/tasks/set-b/`, authored without access to any results and frozen before any model run (tree `34c1f567635a`).
 - Fix necessity eval contamination checks to exempt fixture paths, recover JSON answers from
   wrapped replies, and stop scheduling trials at an optional cumulative token cap.
 - Update GDD Observer to the Paseo 0.16.1 SDK and keep its React dependencies aligned with the host.

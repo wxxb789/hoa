@@ -1,0 +1,9 @@
+locator	state	topic	approved_wording
+JUN-06:T1	superseded	June	48 sessions prove closure.
+JUN-06:T2	current	June	48 verified sessions in the June sample.
+MAR-11:N3	superseded	March	52 verified sessions in the March log.
+MAR-11:N4	current	March	52 actions were attributed to the March log; definitions are not aligned.
+CAT-02:S2	superseded	February	No catalog lists an annex.
+CAT-02:S7	current	February	The inspected February catalog lists an annex in section 7.
+FETCH-13:E1	superseded	June 13	The archive is unavailable.
+FETCH-13:E2	current	June 13	The June 13 client attempt returned HTTP 403.

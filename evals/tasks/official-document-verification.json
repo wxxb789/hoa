@@ -1,0 +1,20 @@
+{
+  "id": "official-document-verification",
+  "skill": "official-document-verification",
+  "fixture": "fixtures/official-document-verification",
+  "prompt": "The release desk says 'H.R. 4382 section 904 extends eligibility for new shoreline subsidy claims through September 30, 2031.' For which print, if any, can I publish that statement as a description of the proposed text? Verify both offline captures. No edits, external commands, or network; read tools or shell builtins only. Return bare JSON with supporting_print (print code), supporting_date (YYYY-MM-DD), supporting_sha256 (archived capture fingerprint), supporting_section (integer), supporting_quote (verbatim operative sentence), other_print (print code), other_904_extends_eligibility (boolean), other_transition_section (integer for the closest substantive parallel in the other print), other_transition_quote (verbatim operative sentence), and summary_only (boolean indicating whether the unsigned press index alone establishes the claim for either print).",
+  "terse": "Pin the exact dated print and inspect its authoritative text, not a landing page or summary. Find the provision by number and subject, compare competing versions, and quote the specific text that does or does not carry the claim.",
+  "shell": ["codex"],
+  "rubric": {
+    "supporting-version": {"field": "supporting_print", "equals": "ES"},
+    "supporting-dateline": {"field": "supporting_date", "equals": "2027-08-12"},
+    "supporting-fingerprint": {"field": "supporting_sha256", "equals": "a530cb1015fd06e686694953db303f3590a3f0d1f5f4a843fd04fdb57cd30034"},
+    "supporting-section": {"field": "supporting_section", "equals": 904},
+    "operative-extension": {"field": "supporting_quote", "equals": "Section 18(b) of the Harbor Services Act is amended by striking \"September 30, 2029\" and inserting \"September 30, 2031\"."},
+    "compared-version": {"field": "other_print", "equals": "EH"},
+    "report-deadline-not-extension": {"field": "other_904_extends_eligibility", "equals": false},
+    "other-substantive-section": {"field": "other_transition_section", "equals": 911},
+    "payment-not-eligibility": {"field": "other_transition_quote", "equals": "Payments under section 18 of the Harbor Services Act may be made after September 30, 2029, solely for claims approved on or before that date."},
+    "versionless-index-insufficient": {"field": "summary_only", "equals": false}
+  }
+}

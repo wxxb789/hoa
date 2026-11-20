@@ -1,0 +1,7 @@
+{
+  "number": 62,
+  "head_sha": "916cb240c61cebf048ff022a3da26e9233846999",
+  "head_pushed_at": "2028-09-08T07:55:00Z",
+  "dashboard": {"ci": "success", "review_badge": "clear"},
+  "review_lane": "native PierBot verdict-marker comments"
+}

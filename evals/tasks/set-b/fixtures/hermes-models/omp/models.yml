@@ -1,0 +1,7 @@
+# Local declarations, copied before the managed registry was refreshed.
+# A declaration here may be disabled or shadowed by the managed registry.
+models:
+  - id: dune-1
+    provider: eddy
+  - id: spray-2
+    provider: tide

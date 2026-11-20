@@ -1,0 +1,18 @@
+{
+  "id": "set-b-hoa-skill-create",
+  "skill": "hoa-skill-create",
+  "fixture": "fixtures/hoa-skill-create",
+  "prompt": "The release team wants a packaging decision before implementing change RC-17. Use the ticket and the current package and install records in this workspace. Give the implementer a concrete plan for both entry points and the installed copies. This is a design review: do not make edits, access other directories, or contact any host. Return bare JSON with three fields: layout (an object mapping receipt-parser, return-labels, and transfer-digest to their proposed repository-relative file paths); composition (an object with parent_line, child_frontmatter and codex_sidecar, containing the proposed parent instruction and the two parsed YAML patch objects, including only visibility keys to be added or changed); evaluation (an object with linux_target and windows_target giving the current resolved parser document paths as shown by the loader model, windows_repair giving the intended absolute Windows sibling directory target, and selective_copy_dirs listing the exact directory basenames to ship when only the return-label entry point is requested, in alphabetical order).",
+  "terse": "Design the smallest complete skill package that serves the user's actual outcome. Inspect the current owner, packager, and target hosts before deciding how to organize it. Make entry points clear and verify the paths the user will actually exercise. Distinguish structural checks from observed behavior.",
+  "shell": ["codex"],
+  "rubric": {
+    "split-by-lifecycle": {"field": "layout", "equals": {"receipt-parser": "catalog/receipt-parser/SKILL.md", "return-labels": "catalog/dispatch-return/references/return-labels.md", "transfer-digest": "catalog/warehouse-transfer/references/transfer-digest.md"}},
+    "portable-hidden-chain": {"field": "composition", "equals": {"parent_line": "Read ../receipt-parser/SKILL.md (relative to this skill's directory) and follow it. Do not call the Skill tool for it.", "child_frontmatter": {"disable-model-invocation": true}, "codex_sidecar": {"policy": {"allow_implicit_invocation": false}}}},
+    "resolve-both-install-paths": {"field": "evaluation", "equals": {"linux_target": "/srv/release/catalog/receipt-parser/SKILL.md", "windows_target": "R:/host/cards/receipt-parser/SKILL.md", "windows_repair": "R:/release/catalog/receipt-parser", "selective_copy_dirs": ["dispatch-return", "receipt-parser"]}}
+  },
+  "notes": {
+    "split-by-lifecycle": "SKILL.md#outcome and #choose-the-work-path; compose.md#when-to-split. Split the genuinely shared parser with a manual entry, not each parent-specific output step.",
+    "portable-hidden-chain": "SKILL.md#choose-the-work-path; compose.md#the-parent-link and #hiding-a-child. Use the exact Read instruction and both host visibility switches, without disabling the operator entry.",
+    "resolve-both-install-paths": "SKILL.md#choose-the-work-path; compose.md#cross-platform--resolution. A passing physical read does not prove a lexical install; the stale Windows sibling and the selective copy closure are distinct repairs."
+  }
+}

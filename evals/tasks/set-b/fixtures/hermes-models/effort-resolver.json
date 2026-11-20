@@ -1,0 +1,6 @@
+{
+  "source": "resolve_reasoning_config called under each recorded home for the target model",
+  "root": {"model": "shoal-3", "enabled": true, "effort": "high"},
+  "desk": {"model": "dune-1", "enabled": true, "effort": "low"},
+  "filing": {"model": "shoal-3", "enabled": true, "effort": "high"}
+}

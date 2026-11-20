@@ -1,0 +1,4 @@
+Scratch desk operating protocol export: SCRATCH-OPS
+
+Use the temporary checkout's scratch accession prefix.
+Keep scratch receipts local until the owner relocates them.

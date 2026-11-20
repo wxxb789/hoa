@@ -1,0 +1,20 @@
+{
+  "id": "hermes-ops-claim-verification",
+  "skill": "hermes-ops-claim-verification",
+  "fixture": "fixtures/hermes-ops-claim-verification",
+  "prompt": "Can I close the backup repair in the handoff? Use only the frozen local packet; do not make changes, run external commands, contact any service, or retry a job. Read tools or shell builtins only. Return bare JSON with profile, event (ID), started_utc (RFC 3339), configured and fired (booleans), backup_outcome (sealed, failed, or unverified), matching_seal_receipt (receipt ID or null), manual_seal_receipt (receipt ID), other_profile_seal_receipt (receipt ID), and close_repair (boolean).",
+  "terse": "Bind the claim to its profile, mechanism, and time window. Match the actual scheduled event to its own durable completion receipt; configuration and a successful manual retry prove different things. Distinguish wrapper exit from payload outcome and report what remains unverified.",
+  "shell": ["codex"],
+  "rubric": {
+    "target-profile": {"field": "profile", "equals": "ledger"},
+    "target-dispatch": {"field": "event", "equals": "L-851"},
+    "scheduled-time": {"field": "started_utc", "equals": "2027-09-06T02:00:00Z"},
+    "schedule-configured": {"field": "configured", "equals": true},
+    "schedule-fired": {"field": "fired", "equals": true},
+    "archive-outcome-not-wrapper-exit": {"field": "backup_outcome", "equals": "unverified"},
+    "no-matching-seal": {"field": "matching_seal_receipt", "equals": null},
+    "manual-is-not-scheduled": {"field": "manual_seal_receipt", "equals": "R-61"},
+    "bucket-is-not-profile": {"field": "other_profile_seal_receipt", "equals": "R-62"},
+    "no-closure": {"field": "close_repair", "equals": false}
+  }
+}

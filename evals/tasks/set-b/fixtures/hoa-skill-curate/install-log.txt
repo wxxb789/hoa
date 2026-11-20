@@ -1,0 +1,8 @@
+2026-11-19: skills add paperworks/dock-tools --skill carton-map
+Cloning https://github.com/paperworks/dock-tools into TEMP/skills-164ac
+Skipped TEMP/skills-164ac/tests/fixtures/empty-label/SKILL.md: missing required frontmatter field(s): description
+Skipped TEMP/skills-164ac/cards/shift-bundle/SKILL.md: missing required frontmatter field(s): description
+Selected carton-map (unchanged); linked profile: dispatch
+
+The owner asked whether either warning represents a real problem upstream.
+The inventory includes all on-disk entries, even if a profile is unavailable.

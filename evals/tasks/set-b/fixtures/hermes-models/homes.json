@@ -1,0 +1,6 @@
+{
+  "root": {"active": true, "path": "root", "model": {"provider": "tide", "default": "shoal-3", "api_mode": "codex_responses"}, "agent": {"reasoning_effort": "high"}},
+  "desk": {"active": true, "path": "profiles/desk", "model": {"provider": "eddy", "default": "dune-1", "api_mode": "chat_completions"}, "agent": {"reasoning_effort": "medium"}},
+  "filing": {"active": true, "path": "profiles/filing", "model": {"provider": "tide", "default": "shoal-3", "api_mode": "codex_responses"}, "agent": {"reasoning_effort": "high"}},
+  "annex": {"active": false, "path": "profiles/.deleted/annex", "model": {"provider": "eddy", "default": "dune-1"}}
+}

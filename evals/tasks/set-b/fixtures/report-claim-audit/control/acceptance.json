@@ -1,0 +1,6 @@
+{
+  "record": "owner-signoff-184",
+  "signed": "2028-05-04T08:30:00Z",
+  "rulings": {"accepted": ["AL-01", "AL-03", "AL-07"], "rejected": ["AL-02"], "held": ["AL-04"]},
+  "prior_packet": {"accepted": ["AL-02", "AL-03", "AL-04"]}
+}

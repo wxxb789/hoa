@@ -1,0 +1,24 @@
+{
+  "K-09": {
+    "name": "binder-inspect",
+    "location": "shared installer store",
+    "enabled": false,
+    "loads_180d": 0,
+    "body": "Inspect binder headers.\r\nReturn just the title.\r\n"
+  },
+  "K-12": {
+    "name": "binder-inspect",
+    "location": "owner workspace overlay",
+    "enabled": true,
+    "loads_180d": 7,
+    "body": "Inspect binder headers.\nReturn title and retention tag.\n",
+    "origin_comment": "Initially imported from example-archive/binder-tools, path packages/binder-inspect/entry.md."
+  },
+  "K-18": {
+    "name": "binder-list",
+    "location": "shared installer store",
+    "enabled": false,
+    "loads_180d": 0,
+    "body": "List binder titles.\n"
+  }
+}

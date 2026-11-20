@@ -1,0 +1,14 @@
+{
+  "dispatch": "NW-19",
+  "seal": "s6",
+  "authority": "Read only. Ticket acceptance is the final reviewer disposition for this dispatch; artifact admission is a separate decision.",
+  "manifest": {
+    "release_cards": [{"path": "cards/A.md"}, {"path": "cards/B.md"}, {"path": "cards/C.md"}, {"path": "cards/D.md"}],
+    "prior_seal_note": "cards/E.md was circulated as a scratch preview in s5."
+  },
+  "artifact_admissions": [
+    {"path": "cards/A.md", "seal": "s6", "admitted": true},
+    {"path": "cards/B.md", "seal": "s6", "admitted": true},
+    {"path": "cards/D.md", "seal": "s5", "admitted": true}
+  ]
+}

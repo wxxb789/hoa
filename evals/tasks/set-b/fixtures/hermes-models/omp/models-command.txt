@@ -1,0 +1,5 @@
+Recorded stdout: omp models, ticket window, exit 0
+PROVIDER      MODEL     ORIGIN
+tide          shoal-3   managed
+eddy          dune-1    local
+offshore      kelp-8    managed

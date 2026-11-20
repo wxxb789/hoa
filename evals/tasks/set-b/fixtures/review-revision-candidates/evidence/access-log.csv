@@ -1,0 +1,5 @@
+client,date,path,http_status,note
+desk-preview/4,2026-10-18,/index/attachments,200,Appendix G still linked
+desk-preview/4,2026-10-18,/documents/appendix-g.pdf,403,access policy page
+desk-preview/4,2026-10-18,/documents/appendix-f.pdf,404,retired training sheet
+civic-library/2,2026-10-18,/copies/CL-9/a2,200,Appendix G public scan compared against docket title and revision

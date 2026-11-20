@@ -1,0 +1,5 @@
+time,path,event,target,reason
+2028-09-08T05:10:00Z,/srv/tools/current,symlink,/srv/tools/releases/r17,base image refresh
+2028-09-08T06:25:00Z,/srv/cache/current,symlink,/srv/cache/releases/c3,tide cache change
+2028-09-08T07:42:00Z,/srv/tools/current,symlink,/srv/tools/releases/r18,worker reprovision
+2028-09-08T08:02:00Z,/srv/tmp/collector.bak,removed,,age limit

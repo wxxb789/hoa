@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "skills": {
+    "carton-map": {"source": "paperworks/dock-tools", "sourceType": "github", "sourceUrl": "https://github.com/paperworks/dock-tools", "skillPath": "cards/carton-map/SKILL.md", "updatedAt": "2025-08-03"},
+    "route-proof": {"source": "paperworks/dock-tools", "sourceType": "github", "sourceUrl": "https://github.com/paperworks/dock-tools", "skillPath": "cards/route-proof/SKILL.md", "updatedAt": "2026-11-19"},
+    "queue-digest": {"source": "railhouse/queue-archive", "sourceType": "github", "sourceUrl": "https://github.com/railhouse/queue-archive", "skillPath": "dist/queue-digest/SKILL.md", "updatedAt": "2026-11-18"},
+    "bin-audit": {"source": "columnlab/bin-toolkit", "sourceType": "github", "sourceUrl": "https://github.com/columnlab/bin-toolkit", "skillPath": "release/bin-audit/SKILL.md", "updatedAt": "2026-04-04"},
+    "seal-register": {"source": "paperworks/dock-tools", "sourceType": "github", "sourceUrl": "https://github.com/paperworks/dock-tools", "skillPath": "cards/seal-register/SKILL.md", "updatedAt": "2026-10-28"}
+  },
+  "dismissed": ["empty-label"],
+  "lastSelectedAgents": ["dispatch"]
+}

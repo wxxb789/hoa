@@ -1,0 +1,20 @@
+{
+  "ticket_events": [
+    {"ticket": "NW-41", "rev": 1, "disposition": "accepted"},
+    {"ticket": "NW-42", "rev": 1, "disposition": "accepted"},
+    {"ticket": "NW-43", "rev": 1, "disposition": "accepted"},
+    {"ticket": "NW-44", "rev": 2, "disposition": "waiting-for-owner"},
+    {"ticket": "NW-44", "rev": 1, "disposition": "accepted"}
+  ],
+  "validator_runs": [
+    {"seal": "s5", "exit": 0, "checked": 4},
+    {"seal": "s6", "exit": 2, "checked": 3}
+  ],
+  "decisions": [
+    {"id": "Q-7", "status": "approved", "owner": "Mira", "scope": "s5 dangling backlink only"},
+    {"id": "Q-9", "status": "pending", "owner": "Inez", "scope": "slot C in s6", "options": [
+      {"id": "carry-forward", "effect": "leave slot C out of this dispatch and move its review to the next sprint", "review_minutes_now": 0},
+      {"id": "reopen", "effect": "the existing seal is invalidated and every planned card must be re-reviewed", "review_minutes_per_planned_card": 18}
+    ]}
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "id": "evidence-backed-analytical-writing",
+  "skill": "evidence-backed-analytical-writing",
+  "fixture": "fixtures/evidence-backed-analytical-writing",
+  "prompt": "Write the requested Simplified Chinese grid-battery policy brief from the local commission and frozen search packet. No edits, external commands, or network; read tools or shell builtins only. Return one JSON object with brief_zh (two short analytical paragraphs with inline source IDs), bay and ridge (evidence map objects each with source, date in YYYY-MM-DD, commissioned, eligible, rate_pct as numbers for the last three), gap_pp (Bay minus Ridge in percentage points), sponsor_comparison (retain or replace), review_times (object with source, date, bay_days, ridge_days, and status: target or observed), and cause (established or hypothesis). The first character of your response must be { and the last must be }; no Markdown fences or prose outside the object.",
+  "terse": "Classify the numbers that carry the argument, tie them to dated sources and compatible denominators, and build each claim through evidence, mechanism, and limitation. Write the brief in Chinese and separate what the sources establish from what remains a hypothesis.",
+  "shell": ["codex"],
+  "rubric": {
+    "bay-cohort": {"field": "bay", "equals": {"source": "BW-06", "date": "2027-06-30", "commissioned": 12, "eligible": 20, "rate_pct": 60}},
+    "ridge-corrected-cohort": {"field": "ridge", "equals": {"source": "RG-06", "date": "2027-06-30", "commissioned": 8, "eligible": 20, "rate_pct": 40}},
+    "comparable-gap": {"field": "gap_pp", "equals": 20},
+    "disputed-statistic-replaced": {"field": "sponsor_comparison", "equals": "replace"},
+    "service-targets-not-measurements": {"field": "review_times", "equals": {"source": "IX-06", "date": "2027-06-28", "bay_days": 10, "ridge_days": 20, "status": "target"}},
+    "causal-status": {"field": "cause", "equals": "hypothesis"}
+  }
+}

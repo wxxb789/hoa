@@ -1,0 +1,24 @@
+H52-EH | HOUSE | ENGROSSED | 2028-09-26
+DOCK RELIABILITY PACKAGE
+
+TITLE I. ISLAND INFRASTRUCTURE
+Sec. 110. Receipt of navigation records.
+The board shall archive the station's tide ledgers in electronic form.
+Sec. 126. Continuity of island pier service.
+In Island Docks Act 8(b), strike "March 31, 2029" and insert "March 31, 2032".
+Sec. 134. Dispatch exception for remote piers.
+An inspector may waive the fixed shore relay requirement for a Deck Relay at
+a pier served fewer than twelve days per quarter, subject to a written decision.
+
+TITLE IX. ADMINISTRATIVE CONTRACTS
+Sec. 903. Form of bid security.
+The registrar may accept a standing surety bond.
+Sec. 904. Sunset for bundled contracts.
+In Municipal Purchasing Act 4(d), replace the sunset with September 30, 2031.
+Sec. 905. Transition.
+Existing bids shall be evaluated under the rules in effect when received.
+
+TITLE XII. STATION FUND
+Sec. 1202. Training allowances.
+Allowances are available for the registration of new pilot instructors.
+END OF PRINT

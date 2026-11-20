@@ -1,0 +1,10 @@
+{
+  "jobs": [
+    {"profile": "ledger", "id": "bk-14", "enabled": true, "cron": "0 2 * * *", "timezone": "UTC", "payload": "snapshot"},
+    {"profile": "training", "id": "bk-14", "enabled": true, "cron": "0 2 * * *", "timezone": "UTC", "payload": "snapshot"}
+  ],
+  "events": [
+    {"id": "L-851", "profile": "ledger", "job": "bk-14", "trigger": "schedule", "started_utc": "2027-09-06T02:00:00Z", "wrapper_finished_utc": "2027-09-06T02:00:01Z", "wrapper_message": "completed successfully"},
+    {"id": "T-851", "profile": "training", "job": "bk-14", "trigger": "schedule", "started_utc": "2027-09-06T02:00:00Z", "wrapper_finished_utc": "2027-09-06T02:00:01Z", "wrapper_message": "completed successfully"}
+  ]
+}

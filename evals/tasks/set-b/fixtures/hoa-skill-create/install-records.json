@@ -1,0 +1,21 @@
+{
+  "linked_hosts": {
+    "linux": {
+      "loader_base": "/srv/host/cards/dispatch-return",
+      "parent_target": "/srv/release/catalog/dispatch-return",
+      "path_resolution": "physical open() walk",
+      "repo_siblings": {"receipt-parser": "parser-r7", "warehouse-transfer": "transfer-r4"},
+      "loader_siblings": {"warehouse-transfer": "/srv/release/catalog/warehouse-transfer"}
+    },
+    "windows": {
+      "loader_base": "R:/host/cards/dispatch-return",
+      "parent_target": "R:/release/catalog/dispatch-return",
+      "path_resolution": "lexical before open",
+      "repo_siblings": {"receipt-parser": "parser-r7", "warehouse-transfer": "transfer-r4"},
+      "loader_siblings": {"receipt-parser": "R:/compat/catalog/receipt-parser", "warehouse-transfer": "R:/release/catalog/warehouse-transfer"},
+      "compat_parser": "parser-r3"
+    }
+  },
+  "copy_host": {"release_unit": "one flat directory at a time", "auto_follow_dependencies": false},
+  "path_reporting": "Use forward slashes and report the path produced by the loader's lexical or physical resolution of ../, before following any final sibling alias."
+}

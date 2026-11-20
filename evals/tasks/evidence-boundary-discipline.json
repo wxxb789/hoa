@@ -1,0 +1,15 @@
+{
+  "id": "evidence-boundary-discipline",
+  "skill": "evidence-boundary-discipline",
+  "fixture": "fixtures/evidence-boundary-discipline",
+  "prompt": "Prepare the replacement rows for the Vale Water Office profile and the matching delivery export from the local packet only. No edits, external commands, or network; read tools or shell builtins only. Return bare JSON. milestone is an object with status, target_month (YYYY-MM), source, source_date, url, locator, and quote (source text without outer quotation marks). dashboard_now and sensor_now are single-word status values at the editorial cutoff. page_labels and delivery_labels are objects keyed milestone, dashboard_now, sensor_now, using the delivery vocabulary. Also include paragraphs, a two-string array with the replacement profile paragraphs (dashboard then sensor); do not retain unsupported assertions.",
+  "terse": "Keep each claim within its dated source. Preserve planned versus observed status, use one provenance label consistently across the page and receipt, cite facts locally, and treat silence as unknown rather than proof of absence.",
+  "shell": ["codex"],
+  "rubric": {
+    "dated-plan-with-citation": {"field": "milestone", "equals": {"status": "planned", "target_month": "2027-05", "source": "A", "source_date": "2027-03-19", "url": "https://vale-water.example/releases/0319", "locator": "paragraph 2", "quote": "We plan to open the river intake dashboard in May 2027."}},
+    "lapsed-target-not-observation": {"field": "dashboard_now", "equals": "unknown"},
+    "silence-not-cancellation": {"field": "sensor_now", "equals": "unknown"},
+    "page-provenance": {"field": "page_labels", "equals": {"milestone": "attributed", "dashboard_now": "unknown", "sensor_now": "unknown"}},
+    "delivery-parity": {"field": "delivery_labels", "equals": {"milestone": "attributed", "dashboard_now": "unknown", "sensor_now": "unknown"}}
+  }
+}

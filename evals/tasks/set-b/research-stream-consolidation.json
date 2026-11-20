@@ -1,0 +1,26 @@
+{
+  "id": "research-stream-consolidation",
+  "skill": "research-stream-consolidation",
+  "fixture": "fixtures/research-stream-consolidation",
+  "prompt": "The Night Loop project is absorbing the Delta study. Prepare the move ticket for the maintainer and leave this checkout unchanged. Return bare JSON with archive_actions (map each file under staging/delta/raw and staging/delta/attempts to its post-merge path, or null if dropped); capture_artifact (the artifact locator in the relocated capture.json); registry_capture (the capture locator in the revised control/registry.json); registry_sha256 (the revised capture digest); readme_capture_link (the README link destination relative to the README); and cross_stream_claim (object mapping the two IDs in briefing-slots.txt to their inclusion tier: claim, summary or omit). Other paths are relative to the workspace root. You may add a note for the maintainer.",
+  "terse": "Combine the research runs as a coherent project while preserving provenance and evidence. Reconcile the merged materials with the records that refer to them.",
+  "shell": ["codex"],
+  "rubric": {
+    "archive-disposition": {"field": "archive_actions", "equals": {
+      "staging/delta/attempts/2026-03-08/errors.log": "projects/night-loop/streams/delta/attempts/2026-03-08/errors.log",
+      "staging/delta/attempts/2026-03-08/result.csv": "projects/night-loop/streams/delta/attempts/2026-03-08/result.csv",
+      "staging/delta/raw/notice.txt": null,
+      "staging/delta/raw/service.csv": "projects/night-loop/streams/delta/raw/service.csv"
+    }},
+    "capture-locator": {"field": "capture_artifact", "equals": "projects/night-loop/streams/delta/raw/service.csv"},
+    "registry-locator": {"field": "registry_capture", "equals": "projects/night-loop/streams/delta/capture.json"},
+    "registry-digest": {"field": "registry_sha256", "equals": "c74b1d04631caa8b1c41aab60ac839627ae435c3b2cc171d82c492bebee301cd"},
+    "navigation-link": {"field": "readme_capture_link", "equals": "streams/delta/capture.json"},
+    "briefing-evidence": {"field": "cross_stream_claim", "equals": {"night-gap": "summary", "annual-trips": "omit"}}
+  },
+  "notes": {
+    "identity-and-retention": {"anchor": "Procedure 2–3: Relocate the stream as one unit; Dedup by content identity — once", "checks": ["archive-disposition"], "trap": "A hash-only pass also removes the protected empty attempt evidence.", "mutant": {"archive_actions": {"staging/delta/attempts/2026-03-08/errors.log": null, "staging/delta/attempts/2026-03-08/result.csv": null, "staging/delta/raw/notice.txt": null, "staging/delta/raw/service.csv": "projects/night-loop/streams/delta/raw/service.csv"}}},
+    "binding-chain": {"anchor": "Procedure 4: Record the relocation on both sides", "checks": ["capture-locator", "registry-locator", "registry-digest", "navigation-link"], "trap": "Document the move but leave the bound receipt, control registry, and README link unchanged.", "mutant": {"capture_artifact": "staging/delta/raw/service.csv", "registry_capture": "staging/delta/capture.json", "registry_sha256": "3e63861fedee8cc19a9e22cd294c5e5f592196c5fa4ec7f3cd703b2b83966ce0", "readme_capture_link": "../../staging/delta/capture.json"}},
+    "evidence-level": {"anchor": "Procedure 6–7: Reconciliation review; Evolve the deliverable from the union", "checks": ["briefing-evidence"], "trap": "Promote repeated summary evidence and revive a figure the two streams independently rejected.", "mutant": {"cross_stream_claim": {"night-gap": "claim", "annual-trips": "claim"}}}
+  }
+}

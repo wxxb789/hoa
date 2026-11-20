@@ -1,0 +1,6 @@
+id,slot,reader,child_exit,reported,reason
+backlog-64,feb26,readLatest,23,bounded-limit,fallback latest.json
+backlog-96,feb26,readLatest,23,bounded-limit,fallback latest.json
+backlog-128,feb26,readLatest,23,error,latest.json missing
+oversize-10m,feb26,readStdout,24,bounded-size,oversize record found on stdout
+backlog-48,feb19,readLatest,23,bounded-limit,fresh latest.json

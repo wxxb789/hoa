@@ -1,0 +1,3 @@
+09:09 candidate=m42-a job="Migration Apply" mode=execute rc=0
+09:20 candidate=m42-b job="Migration Apply" mode=dry-run rc=0
+09:20 candidate=m42-b job="Archive Diff" mode=read-only rc=0

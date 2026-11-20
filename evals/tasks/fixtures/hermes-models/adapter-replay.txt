@@ -1,0 +1,3 @@
+root edge-main swift-v4 ok
+inbox edge-main swift-v4 unavailable
+inbox relay-b finch-2.1 ok

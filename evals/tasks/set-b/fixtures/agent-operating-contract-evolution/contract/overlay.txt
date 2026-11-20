@@ -1,0 +1,5 @@
+Cedar checkout overlay export: OVERLAY
+
+Use the review queue for material that has not been cataloged.
+The public desk renders provenance badges when a record contains a source.
+This overlay was added for November desk shifts. It is not the base protocol.

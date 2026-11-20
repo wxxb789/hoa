@@ -1,0 +1,17 @@
+{
+  "id": "define-goal",
+  "skill": "define-goal",
+  "fixture": "fixtures/define-goal",
+  "prompt": "The last goal for the lending library is closed. Read the goal series and the closeout notes. Refine the next goal for a fresh agent without executing it or modifying the workspace. Return a bare JSON object with order (ordered three-digit ID strings), revised (IDs receiving replacement content), prerequisite (ID on which the replacement depends), milestone (one of the candidate IDs in closeout.md), minimum_passed_cases (integer), stop_for (sorted list of applicable trigger IDs in closeout.md), next_gate (the evidence ID that activates 003), and goal_markdown (complete replacement goal file contents including a Done when section).",
+  "terse": "Turn the ambition into numbered outcomes with evidence an operator can inspect. Use completed results to refine the next goal, leave later goals provisional, and specify what success looks like without dictating how to implement it.",
+  "shell": ["codex"],
+  "rubric": {
+    "ordered-series": {"field": "order", "equals": ["001", "002", "003"]},
+    "keep-other-goals": {"field": "revised", "equals": ["002"]},
+    "build-on-completed-work": {"field": "prerequisite", "equals": "001"},
+    "next-verifiable-outcome": {"field": "milestone", "equals": "M-B"},
+    "keep-owner-validator": {"field": "minimum_passed_cases", "equals": 12},
+    "stop-only-for-material-blocks": {"field": "stop_for", "equals": ["T-B", "T-D"]},
+    "keep-launch-provisional": {"field": "next_gate", "equals": "E-C"}
+  }
+}

@@ -1,0 +1,6 @@
+run,build,case,result,detail
+301,b18,preview renders clean,PASS,plan contains all intended operations and test store unchanged
+302,b18-revert-preview,preview renders clean,FAIL,plan contains duplicate operation
+303,b18,apply mode help,PASS,usage branch exited before opening test store
+304,b18,apply rolls back,PASS,runner discarded its temporary store before the fixture compared bytes
+305,b18-revert-rollback,apply rolls back,PASS,same assertion passed with rollback code absent

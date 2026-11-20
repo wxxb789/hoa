@@ -1,0 +1,19 @@
+{
+  "profile_policy": {
+    "weekday": {"allow": ["export-notes", "proof-packet", "pdf-preview"]},
+    "weekend": {"allow": ["export-notes", "pdf-preview"]}
+  },
+  "before": {
+    "profile": "weekend",
+    "configured_disabled": ["token-meter"],
+    "derived_disabled": ["token-meter"],
+    "loaded": ["export-notes", "pdf-preview", "proof-packet"]
+  },
+  "after": {
+    "profile": "weekend",
+    "configured_disabled": ["token-meter"],
+    "derived_disabled": ["proof-packet", "token-meter"],
+    "loaded": ["export-notes", "pdf-preview"]
+  },
+  "reconciler": {"message": "repaired: skill policy applied", "exit": 0}
+}

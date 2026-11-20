@@ -1,0 +1,4 @@
+{"id": 310, "at": "2028-09-08T07:25:00Z", "author": "PierBot", "body": "Completed review; issue found.", "review_marker": {"commit_sha": "64e4376050f66582505a1103bffaa88bfb261000", "verdict": "changes-requested"}}
+{"id": 314, "at": "2028-09-08T07:52:00Z", "author": "PierBot", "body": "Completed review; no findings.", "review_marker": {"commit_sha": "a28f930608e9c2aedd92350d538cfa17df941111", "verdict": "clear"}}
+{"id": 315, "at": "2028-09-08T08:01:00Z", "author": "PierBot", "body": "Dashboard sync complete. Review lane shows a clear badge."}
+{"id": 318, "at": "2028-09-08T08:11:00Z", "author": "build", "body": "Checks passed for 916cb240c61cebf048ff022a3da26e9233846999."}

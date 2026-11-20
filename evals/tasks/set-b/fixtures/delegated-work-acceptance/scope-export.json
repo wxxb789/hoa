@@ -1,0 +1,16 @@
+{
+  "dispatch": {
+    "head": "72d0f18",
+    "dirty": {"desk/calendar.md": "blob-07", "intake/aliases.csv": "blob-12"}
+  },
+  "intake": {
+    "head": "72d0f18",
+    "dirty": {
+      "audit/b18.json": "blob-49",
+      "desk/calendar.md": "blob-07",
+      "intake/aliases.csv": "blob-23",
+      "intake/normalize.ts": "blob-50"
+    }
+  },
+  "export_note": "Blob labels are normalized equality tokens; untracked files included."
+}

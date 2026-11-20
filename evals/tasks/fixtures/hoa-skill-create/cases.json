@@ -1,0 +1,6 @@
+{
+  "ready": {"has_time": true, "delivery": "stage", "release_approved": false},
+  "incomplete": {"has_time": false, "delivery": "stage", "release_approved": false},
+  "publish": {"has_time": true, "delivery": "publish", "release_approved": false},
+  "approved": {"has_time": true, "delivery": "publish", "release_approved": true}
+}

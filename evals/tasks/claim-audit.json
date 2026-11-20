@@ -1,15 +1,19 @@
 {
   "id": "claim-audit",
   "skill": "report-claim-audit",
-  "fixture": "fixtures/claim-audit",
-  "prompt": "Audit closeout.md before I sign it. Read the fixture's source records with read tools or shell builtins only; do not launch external commands, modify files, or claim to have run validation. Tell me what I should rule on and whether to sign. Return a bare JSON object (no fences) with verdict (sign or hold), actual_count, untracked (sorted IDs), unaccepted (sorted IDs of manifest entries not accepted), pending (sorted decision IDs), and brief (your recommendation with the cost of the other choice).",
-  "terse": "Recompute reported counts from the source records. Diff on-disk, tracked, and accepted artifacts. Separate pending decisions from approved ones and state the cost of the alternative before making a signoff recommendation.",
+  "fixture": "fixtures/report-claim-audit",
+  "prompt": "Can I sign the North Wharf digest and plan the next sprint from it? Audit the frozen workspace offline. No edits or external commands; read tools or shell builtins only. The sprint has 30 minutes available for dispatch review and the owner will not waive review. Return bare JSON with signoff (sign or hold), accepted_tickets (count), card_counts (object with disk, manifest, admitted, and mentioned counts), missing and unexpected (sorted relative card paths), validator_exit (exit code for this dispatch's seal), pending (object mapping outstanding decision IDs to owners), recommendation (decision option ID), and rejected_option_minutes (total immediate review minutes). Card mentions mean distinct planned paths named in the digest.",
+  "terse": "Recompute each decision-driving claim from its owning artifact. Reconcile what was expected, on disk, and accepted at the current revision. Distinguish discrepancies from open decisions, price the rejected option, and leave the report and evidence unchanged.",
   "shell": ["codex"],
   "rubric": {
-    "correct-signoff": {"field": "verdict", "equals": "hold"},
-    "recount": {"field": "actual_count", "equals": 4},
-    "omissions": {"field": "untracked", "equals": ["C-04"]},
-    "acceptance-diff": {"field": "unaccepted", "equals": ["C-03"]},
-    "pending-only": {"field": "pending", "equals": ["D-02"]}
+    "signoff": {"field": "signoff", "equals": "hold"},
+    "final-ticket-dispositions": {"field": "accepted_tickets", "equals": 3},
+    "distinct-card-calibers": {"field": "card_counts", "equals": {"disk": 3, "manifest": 4, "admitted": 2, "mentioned": 4}},
+    "missing-cards": {"field": "missing", "equals": ["cards/C.md", "cards/D.md"]},
+    "unregistered-preview": {"field": "unexpected", "equals": ["cards/E.md"]},
+    "same-seal-validation": {"field": "validator_exit", "equals": 2},
+    "pending-owner": {"field": "pending", "equals": {"Q-9": "Inez"}},
+    "within-budget": {"field": "recommendation", "equals": "carry-forward"},
+    "reseal-cost": {"field": "rejected_option_minutes", "equals": 72}
   }
 }

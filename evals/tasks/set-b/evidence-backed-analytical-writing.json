@@ -1,0 +1,18 @@
+{
+  "id": "set-b-evidence-backed-analytical-writing",
+  "skill": "evidence-backed-analytical-writing",
+  "fixture": "fixtures/evidence-backed-analytical-writing",
+  "prompt": "Prepare a short Simplified Chinese assessment for the Aster Archive Network funding board. Use the brief and saved research packet only. Return bare JSON with report (your three numbered paragraphs), current_coverage (object: census_source, active_branches, eligible_branches, baseline_source), sorting (object keyed by source ID for the two records behind the brief's 140-machine figure, each with count and status), and night_shift (object: outcome and excluded, with excluded mapping each look-alike record ID to one reason; do not include housekeeping records). Use the codes in desk-card.md. Source names can go inline in the report.",
+  "terse": "Build an evidence map for the assessment before drafting. For each important claim, connect what the source measures to the operational implication and state what the evidence cannot establish.",
+  "shell": ["codex"],
+  "rubric": {
+    "coverage-window-and-scope": {"field": "current_coverage", "equals": {"census_source": "C17", "active_branches": 17, "eligible_branches": 46, "baseline_source": "B04"}},
+    "status-and-denominator": {"field": "sorting", "equals": {"A09": {"count": 80, "status": "contract ceiling"}, "P11": {"count": 60, "status": "demonstration throughput"}}},
+    "auditable-negative": {"field": "night_shift", "equals": {"outcome": "no qualifying case located", "excluded": {"N01": "wrong operator", "N02": "simulation only", "N03": "bibliography only", "N04": "outside window", "N05": "wrong shift", "N06": "no independent measurement"}}}
+  },
+  "notes": {
+    "coverage-window-and-scope": "SKILL.md procedure 2, Set the recency boundary before searching. An older final census outranks the current provisional file in the saved search but is usable only as a baseline; a newer branch anecdote and a source-free generated estimate cannot replace the in-window network denominator. Trap answer uses B04 for current coverage.",
+    "status-and-denominator": "SKILL.md procedures 3, 5 and 7; references/claim-audit.md, Evidence-status ladder. The supplied 140 combines units allowed under an executed contract with demonstration passes on a counter, not machines in service. Trap answer treats both counts as delivered units.",
+    "auditable-negative": "SKILL.md Negative findings and evidence backfill. Return a bounded negative with an item-level exclusion ledger, including a bibliographic hit whose inaccessible full text cannot establish its findings. Trap answer promotes that lead to a qualifying case and omits its exclusion."
+  }
+}

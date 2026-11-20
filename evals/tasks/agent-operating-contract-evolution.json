@@ -1,0 +1,17 @@
+{
+  "id": "agent-operating-contract-evolution",
+  "skill": "agent-operating-contract-evolution",
+  "fixture": "fixtures/agent-operating-contract-evolution",
+  "prompt": "The review service just dispatched a peer reviewer that could write to the candidate. Correct its operating contract in this disposable workspace only. Keep both review entry points dispatching their existing reviewers and preserve the bounded contributor workflow and unrelated contract text. Read incident.md for the synthetic harness and run it using Bash builtins only; no external commands, host configuration, or real delegation. Preserve the observed regression and verification as harness receipts; do not write those receipts by hand or edit the harness. Report what you changed and why.",
+  "terse": "Identify the observed failure and the layer that owns its correction. Keep stable invariants in the operating contract, task procedures in skills, and enforcement in the runtime. Change the narrowest owner surface and check nearby behavior before broadening.",
+  "shell": true,
+  "rubric": {
+    "reproduced-original-grant": {"file": "before.txt", "contains": "peer-review: role=peer permission=write"},
+    "peer-review-write-blocked": {"file": "after.txt", "contains": "peer-review: role=peer permission=read"},
+    "audit-stays-read-only": {"file": "after.txt", "contains": "audit-review: role=audit permission=read"},
+    "bounded-contributor-can-write": {"file": "after.txt", "contains": "bounded-contributor: role=contributor permission=write"},
+    "unassigned-contributor-cannot-write": {"file": "after.txt", "contains": "unassigned-contributor: role=contributor permission=read"},
+    "only-active-role-policy-changed": {"file": "after.txt", "contains": "changed: policy/queue.roles\nend-changes"},
+    "preserve-original-policy": {"file": "before-queue.roles", "contains": "peer contributor\naudit readonly\ncontributor contributor"}
+  }
+}
