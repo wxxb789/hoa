@@ -1,0 +1,18 @@
+{
+  "id": "set-b-gdd-route-omp",
+  "skill": "gdd-route-omp",
+  "fixture": "fixtures/gdd-route-omp",
+  "prompt": "Four OMP runs from an overnight dispatch were captured under runs/ together with runner-list.txt and operator-note.md. This review is strictly offline: read only the local files in the current directory, run no commands, and open no connections. Return one bare JSON object: accepted (sorted list of run slugs whose captured record is complete enough to accept the stage as finished; the operator still re-runs gates before shipping); recovery (for the run killed mid-turn, an object with keys slug, session_id and action, where action is one of resume-same-stage, fresh-restart, interactive-restore, continue-last); endpoint (object mapping each run that failed on a model-endpoint connection fault to one of model-defect, transport-retry-once, transport-fallback-now, transport-retry-until-up). You may add a short note field. Use the exact slugs and session IDs recorded in the packet.",
+  "terse": "Treat the captured run records as claims, not proof. Decide from the evidence what is actually complete, how unfinished work should be resumed, and how to classify the one connection fault.",
+  "shell": ["codex"],
+  "rubric": {
+    "accepted-records": {"field": "accepted", "equals": ["alder-release-notes"]},
+    "mid-turn-recovery": {"field": "recovery", "equals": {"slug": "cedar-gatefix", "session_id": "ce07b4a2-5f6d-4c1e-9a03-77b1d2e4f8aa", "action": "resume-same-stage"}},
+    "endpoint-fault-class": {"field": "endpoint", "equals": {"dune-schema-lint": "transport-retry-once"}}
+  },
+  "notes": {
+    "accepted-records": "SKILL.md § Observe and accept, item 2: 'Require the last assistant `message_end.stopReason` to be present and not `error`, `aborted`, or `length`. Read `answer.md` and the result; exit zero alone cannot prove completion, especially for empty, truncated or still-waiting answers. Require actual gate exit codes; a background verifier may die at runner cleanup.' alder-release-notes shows stopReason stop, a completed answer and gate exit code 0 in its event stream; birch-doc-audit is done/exit 0 but its answer is still waiting on a background gate and no gate exit code exists in its record; cedar and dune are failed. Trap: accept birch from state=done/exit=0 alone.",
+    "mid-turn-recovery": "SKILL.md § Recover: 'Use runner `list` or `status` to distinguish a live run from a stale one and recover its recorded `session_id`. Start a new named runner invocation with `--agent omp` and `--resume <id>`; the prompt should state what remains in the same interrupted stage. Do not use implicit last-session selection or TTY-only restoration for headless recovery.' cedar-gatefix is the only failed(stale) line in runner-list.txt; its session_id is recorded in state.json and in the session event. Trap: fresh-restart, continue-last or interactive-restore.",
+    "endpoint-fault-class": "SKILL.md § Observe and accept, item 3: 'On `ECONNREFUSED`, check whether operator configuration or logs confirm an endpoint restart. If confirmed, retry once after recovery; if it fails again, report or select an authorized fallback rather than retrying indefinitely. Do not infer a model defect.' The operator note carries the declared 04:55-05:02 UTC daily restart window and dune-schema-lint failed with ECONNREFUSED at 04:58:07, so this is a transport fault: one retry after recovery, not a model defect and not unlimited retries."
+  }
+}

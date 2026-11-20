@@ -1,0 +1,5 @@
+2026-02-11T04:55:02Z start: dune-schema-lint agent=omp detach=systemd unit=gdd-dune-schema-lint.service
+2026-02-11T04:55:03Z spawn: runner pid 7710 agent pid 7712
+2026-02-11T04:58:07Z agent stderr: POST https://models.10.88.0.4:8443/v1/chat/completions: connect ECONNREFUSED 10.88.0.4:8443
+2026-02-11T04:58:08Z agent exited: code 1
+2026-02-11T04:58:08Z finalize: dune-schema-lint state=failed exit=1
