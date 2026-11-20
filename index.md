@@ -43,7 +43,7 @@ targets:  runtime-agnostic | repo-only |
 | gdd | skill | software-development,work-management | runtime-agnostic | `skills/gdd/` | goal contract → agent-authored stages → operator-run gates → scripted merge gate → resumable ledger; ships `gdd.py`, `delivery-state.py`, `pr-merge-check.py` |
 | gdd-route-cc | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-cc/` | Claude Code stream-JSON route with session resume and native JSON schema |
 | gdd-route-codex | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-codex/` | Codex exec and resume route with native JSON schema and integrations off by default |
-| gdd-route-dsh | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-dsh/` | dispatch and supervise a GDD stage on dsh headless: session/worktree rules, completion judgement, recovery, harness traps (requires skill `gdd`) |
+| gdd-route-dsh | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-dsh/` | hidden DeepSeek Harness headless route for gdd: configuration, session handling, and recovery |
 | gdd-route-omp | skill | software-development,work-management | pi | `skills/gdd-route-omp/` | detached runner for long `omp -p` runs; polled completion, session-id recovery (requires skill `gdd`) |
 | gdd-route-opencode | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-opencode/` | OpenCode standalone server route with session resume and model variant selection |
 | gdd-route-pi | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-pi/` | Pi stdin and JSON event route with session resume |

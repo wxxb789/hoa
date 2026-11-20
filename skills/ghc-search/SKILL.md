@@ -2,7 +2,7 @@
 name: ghc-search
 description: Open-ended web search and X/Twitter search through a local ghc-proxy (OpenAI-compatible Responses API). Use when you need to find something on the web and do not already have a URL, or when you need posts from X/Twitter. Fetch pages directly when you already have the URL; prefer a documentation MCP (e.g. context7) for library/API docs.
 metadata:
-  revision: "3"
+  revision: "4"
   areas: "software-development"
   targets: "runtime-agnostic"
   summary: "web and X/Twitter search via a local ghc-proxy Responses API; answer plus deduped sources"
@@ -80,16 +80,7 @@ environment variables (a different proxy host, or different default models):
 
 ## Prerequisite
 
-`ghc-proxy` must be running locally — this skill is useless without it:
-
-```bash
-curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:4141/v1/models \
-  -H "authorization: Bearer dummy"
-```
-
-`200` = up, and that endpoint also lists the models you can pass to `--model`. The
-script prints `ghc-proxy not reachable at ...` (with the configured endpoint) when it
-is not.
+A running `ghc-proxy` is required; the script reports the endpoint it could not reach.
 
 ## When this is not the right tool
 

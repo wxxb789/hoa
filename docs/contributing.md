@@ -66,7 +66,8 @@ For manual invocation on other runtimes, follow the
 | Create, evolve, or compose a defined capability | [hoa-skill-create](../skills/hoa-skill-create/SKILL.md) | A change, validation results, and any unverified paths |
 | Review practice across repos and agent sessions | [hoa-practice-retro](../skills/hoa-practice-retro/SKILL.md) (explicit only) | Evidence-backed findings and recurring-work candidates, no automatic creation |
 | Review one repo's practices and machinery | [hoa-repo-reckoning](../skills/hoa-repo-reckoning/SKILL.md) (explicit prompt shortcut) | Free-form report with ranked, evidence-backed findings |
-| Audit the set of skills offered to a session | [hoa-skill-set-audit](../skills/hoa-skill-set-audit/SKILL.md) (explicit only) | Set-level findings, necessity verdicts, or weekly recommendations, no changes |
+| Audit the set of skills offered to a session | [hoa-skill-set-audit](../skills/hoa-skill-set-audit/SKILL.md) (explicit only) | Set-level findings and necessity verdicts, no changes |
+| Recommend skills based on recent work | [hoa-skill-curate](../skills/hoa-skill-curate/SKILL.md) | Evidence-backed recommendations, no changes |
 
 Start with focused behavior checks and expand to variants, models, or runtimes
 as reach, risk, or conflicting evidence warrants. Retro candidates need owner

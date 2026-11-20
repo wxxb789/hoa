@@ -4,13 +4,13 @@ description: >-
   Use when asked to audit, prune or consolidate the whole set of skills a session is offered,
   across plugin, hub, project and repo sources. Finds overlapping or contradictory skills,
   shadowing, same-name drift, visibility mistakes, broken ../ closure and listing-budget
-  truncation, ranks fixes and gives necessity verdicts. Also offers weekly recommendations from
-  recent work. Not for reviewing one skill (hoa-skill-review), provenance or upstream freshness
+  truncation, ranks fixes and gives necessity verdicts. Not for reviewing one skill
+  (hoa-skill-review), provenance or upstream freshness
   (hoa-skill-curate), reviewing one repo's practices (the explicit hoa-repo-reckoning shortcut),
   or editing skills.
 disable-model-invocation: true
 metadata:
-  revision: "4"
+  revision: "5"
   areas: "software-development,self-management"
   targets: "runtime-agnostic"
   summary: "audit the whole offered skill set: per-skill quality, overlap, shadowing, contradictions, same-name drift, visibility, ../ closure, listing budget; report-only"
@@ -50,10 +50,7 @@ budgets: [references/hosts.md](references/hosts.md).
 
 ## Procedure
 
-For a request to recommend skills from recent work, skip the audit and follow sections 1–3 of
-[usage-based recommendations](references/usage-based-recommendations.md). Use a seven-day window,
-return at most three Simplified Chinese bullets or `[SILENT]`, and never change state or schedule
-a job in this mode.
+For recommendations based on recent work, use `hoa-skill-curate`.
 
 1. **Capture the offered set.** Copy the host's skill listing from this session's context
    verbatim into a scratch file outside the repo, one `- name: description` line per entry.

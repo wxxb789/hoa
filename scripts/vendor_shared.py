@@ -38,10 +38,7 @@ CONSUMERS: dict[str, list[str]] = {
     "rubrics.json": ["skills/ghc-decisions/scripts"],
     "findings.py": ["skills/hoa-practice-retro/scripts"],
     "panel.md": ["skills/hoa-practice-retro/references"],
-    "usage-based-recommendations.md": [
-        "skills/hoa-skill-curate/references",
-        "skills/hoa-skill-set-audit/references",
-    ],
+    "usage-based-recommendations.md": ["skills/hoa-skill-curate/references"],
     # The configuration resolution order; skills that document configuration keys.
     "configuration.md": [
         "skills/ai-coding-agent-delegation/references",

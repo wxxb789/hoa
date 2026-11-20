@@ -6,6 +6,9 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 ## 2026-11-20
 
+- Keep recommendations based on recent work in `hoa-skill-curate` only; keep `hoa-skill-set-audit` report-only.
+- Hide `gdd-route-dsh` from model routing, leaving OMP as the only model-visible GDD route.
+- Remove the `ghc-search` proxy health-check example; the script reports unreachable endpoints.
 - Record the B8 orchestration case study (native Paseo against gdd on one real goal) in
   `evals/results/2026-11-20-b8-orchestration.md`.
 - Give Pi necessity trials a 3000-second default timeout, ten times the other runtimes, for DeepSeek's long thinking.

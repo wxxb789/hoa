@@ -54,10 +54,8 @@ self-management. Start with the [generated skill catalog](index.md#catalog).
 For repository owners handing off a written, machine-checkable increment,
 [`gdd`](skills/gdd/SKILL.md) defines the delivery protocol: goal, staged agent
 runs, operator-run gates, and a scripted merge check. Install the agent route
-separately. The route design has visible OMP and DeepSeek Harness routes
-(`gdd-route-omp`, `gdd-route-dsh`) and hidden Codex, Claude Code, Pi, and
-OpenCode routes (`gdd-route-codex`, `gdd-route-cc`, `gdd-route-pi`,
-`gdd-route-opencode`). The optional
+separately. OMP (`gdd-route-omp`) is the only model-visible route; DeepSeek
+Harness, Codex, Claude Code, Pi, and OpenCode routes are hidden. The optional
 [Paseo GDD Observer](paseo-plugins/gdd-observer/README.md) is a read-only plugin,
 not part of skill installation.
 

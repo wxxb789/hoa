@@ -78,7 +78,7 @@
       "id": "route-to-skill-scout",
       "request": "Before I write a new skill for slide generation, check whether a good one already exists somewhere public.",
       "must_pick": ["skill-scout"],
-      "distractors": ["ghc-search", "hoa-practice-retro", "hoa-skill-create"]
+      "distractors": ["ghc-search", "hoa-practice-retro", "hoa-skill-create", "hoa-skill-curate"]
     },
     {
       "id": "route-to-harness-restructure",
@@ -114,7 +114,7 @@
       "id": "route-explicit-gdd",
       "request": "跑 GDD：下一个 goal 端到端交付并合并，合并后直接起下一个分支。",
       "must_pick": ["gdd"],
-      "distractors": ["hermes-kanban", "project-phase-closeout"]
+      "distractors": ["hermes-kanban", "project-phase-closeout", "gdd-route-dsh"]
     },
     {
       "id": "route-boundaryless-goal-to-spec-first",

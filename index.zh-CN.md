@@ -41,7 +41,7 @@ targets:  runtime-agnostic | repo-only |
 | gdd | skill | software-development,work-management | runtime-agnostic | `skills/gdd/` | 目标契约 → agent 分阶段产出 → operator 验收 → 脚本化合并门禁 → 可续跑账本；随附 `gdd.py`、`delivery-state.py`、`pr-merge-check.py` |
 | gdd-route-cc | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-cc/` | Claude Code stream-JSON 路由，支持会话恢复和原生 JSON schema |
 | gdd-route-codex | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-codex/` | Codex exec 与 resume 路由，支持原生 JSON schema，默认关闭集成 |
-| gdd-route-dsh | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-dsh/` | 把 GDD 阶段派发给 dsh headless 并监督：会话/worktree 规则、完成判定、恢复、harness 陷阱（需要 skill `gdd`） |
+| gdd-route-dsh | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-dsh/` | gdd 的隐藏 DeepSeek Harness headless route：配置、会话管理和恢复 |
 | gdd-route-omp | skill | software-development,work-management | pi | `skills/gdd-route-omp/` | 脱离会话的 runner 跑 `omp -p` 长任务；轮询完成、按 session id 恢复（需要 skill `gdd`） |
 | gdd-route-opencode | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-opencode/` | OpenCode 独立服务器路由，支持会话恢复和模型变体选择 |
 | gdd-route-pi | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-pi/` | Pi stdin 与 JSON 事件路由，支持会话恢复 |
