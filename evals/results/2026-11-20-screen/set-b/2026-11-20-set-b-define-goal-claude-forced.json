@@ -1,0 +1,893 @@
+{
+  "schema_version": 2,
+  "task": "set-b-define-goal",
+  "generated_at": "2026-11-20T00:53:36.975783-08:00",
+  "skill": "define-goal",
+  "skill_revision": "4",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "forced",
+  "shell": false,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "permit-boundary": {
+      "field": "permit",
+      "equals": {
+        "PKT": {
+          "number": 2,
+          "after": "INV",
+          "mode": "run"
+        },
+        "LIC": {
+          "number": 3,
+          "after": "PKT",
+          "mode": "record"
+        }
+      }
+    },
+    "owner-review-is-not-a-goal": {
+      "field": "lookup",
+      "equals": {
+        "FND": {
+          "number": 4,
+          "after": "INV",
+          "mode": "run"
+        }
+      }
+    },
+    "unresolved-acceptance": {
+      "field": "expansion",
+      "equals": {
+        "PUB": {
+          "number": 5,
+          "after": "LIC",
+          "mode": "provisional"
+        }
+      }
+    }
+  },
+  "rubric_flags": {
+    "permit-boundary": "flaky",
+    "owner-review-is-not-a-goal": "flaky",
+    "unresolved-acceptance": "flaky"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": false,
+      "passed": 0,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": null,
+      "pass^k": null,
+      "mean_score": null,
+      "sample_stddev": null
+    },
+    "terse": {
+      "valid": true,
+      "passed": 0,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.0,
+      "pass^k": false,
+      "mean_score": 0.1111111111111111,
+      "sample_stddev": 0.19245008972987523
+    },
+    "skill": {
+      "valid": true,
+      "passed": 2,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 0.6666666666666666,
+      "pass^k": false,
+      "mean_score": 0.6666666666666666,
+      "sample_stddev": 0.5773502691896257
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "terse": 0.5555555555555556
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": false,
+        "invalid_reasons": [
+          "control skill access"
+        ],
+        "error": null,
+        "contaminated": true,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"files\": {\n    \"002-permit-packet.md\": \"# 002: Lodge the BR-41 permit packet\\n\\nCheckpoint: PKT. Track: permit. Mode: run. After: INV (accepted November 16, see 001-inventory.md).\\n\\n## Goal\\nAssemble the BR-41 application dossier from the archive team's packet bundle (approved dossier, rights matrix, delegation letter), run packet-lint on the bundle, lodge the packet in the registry intake sandbox, and obtain the registry receipt for case BR-41.\\n\\n## Inputs\\n- Approved dossier, rights matrix, and delegation letter already in the archive team's packet bundle.\\n- Inventory INV (001-inventory.md). Do not edit it.\\n\\n## Done when\\n- packet-lint output for the bundle is saved.\\n- The intake receipt for case BR-41 is saved.\\n- A short handoff note lists the artifacts and their locations.\\n\\n## Constraints\\n- Sandbox filing does not distribute collection material and does not grant a license. Do not describe it as one.\\n- Do not edit the source records or the packet bundle contents.\\n- No owner input is expected. If a required input is missing, stop and report it.\\n- Work must fit in one unattended session of about eight hours, ending with inspectable artifacts.\\n\",\n    \"003-permit-license.md\": \"# 003: Record the BR-41 redistribution license decision\\n\\nCheckpoint: LIC. Track: permit. Mode: record. After: PKT (see 002-permit-packet.md).\\n\\n## Goal\\nRecord the outcome of the harbor records panel's decision on BR-41. Do not seek, request, or assume a license.\\n\\n## Facts\\n- Only the panel issues a redistribution license. It votes next month and files the signed resolution against BR-41 in its decision register.\\n- An intake receipt, a completeness email, or an agenda listing is not a decision.\\n\\n## Done when\\n- If the signed resolution for BR-41 is in the decision register, save a copy and record the resolution's grant or refusal, its date, and its reference.\\n- If it is not yet filed, record the status as pending with the date checked. Do not mark LIC as granted.\\n\\n## Constraints\\n- Do not treat the receipt from 002 as a license.\\n- Do not edit the register or the source records.\\n\",\n    \"004-staff-lookup.md\": \"# 004: Desk lookup pilot (November)\\n\\nCheckpoint: FND. Track: lookup. Mode: run. After: INV (see 001-inventory.md).\\n\\n## Goal\\nBuild an internal desk pilot that lets staff find the correct inventory record and see the applicable access category for each query in the existing desk test pack, without exposing restricted recordings.\\n\\n## Inputs\\n- Inventory INV (read only).\\n- The existing desk test pack queries.\\n\\n## Done when\\n- Every test-pack query returns the correct inventory record and access category, or a logged miss with a reason.\\n- No restricted recording is exposed in any output.\\n- A short demo note and the test results are saved for the owner's review.\\n\\n## Constraints\\n- Thumbnails are not required.\\n- Do not use the registry, and do not distribute recordings.\\n- This work does not depend on the permit or the license. It should be usable this winter even if the public program slips.\\n- Fits one afternoon. Must finish within one unattended session of about eight hours.\\n\",\n    \"005-owner-review.md\": \"# 005: Owner review of the desk lookup\\n\\nCheckpoint: RVW. Track: lookup. Mode: record. After: FND (see 004-staff-lookup.md).\\n\\n## Goal\\nRecord the owner's review of the desk lookup demonstration. The owner reviews as the lookup's owner. No separate catalog desk signoff applies.\\n\\n## Done when\\n- The demo note and test results from 004 are presented to the owner.\\n- The owner's review outcome (accepted, changes requested, or rejected) and date are recorded.\\n\\n## Constraints\\n- Do not start this goal until FND is complete.\\n- Do not edit the pilot's outputs during review.\\n\",\n    \"006-public-edition.md\": \"# 006: Public edition (provisional)\\n\\nCheckpoint: PUB. Track: expansion. Mode: provisional. After: LIC (see 003-permit-license.md).\\n\\n## Status\\nProvisional. Do not start until both of these hold:\\n1. LIC is recorded as granted.\\n2. The owner has recorded the disclosure scope.\\n\\n## Open decision\\nThe owner has not decided whether the public edition exposes transcripts or only abstracts. The decision comes after the permit stage. Do not assume either option.\\n\\n## Goal (once unblocked)\\nBuild a separate export from inventory INV, not from the desk tool, limited to the owner's recorded disclosure scope. The export requires a granted redistribution license.\\n\\n## Constraints\\n- Do not adopt the October suggestions of a public-first CMS or abstracts by default. Both were options, not decisions.\\n- The public edition is not a precondition for the staff lookup.\\n\"\n  },\n  \"permit\": {\n    \"PKT\": {\"number\": 2, \"after\": \"INV\", \"mode\": \"run\"},\n    \"LIC\": {\"number\": 3, \"after\": \"PKT\", \"mode\": \"record\"}\n  },\n  \"lookup\": {\n    \"FND\": {\"number\": 4, \"after\": \"INV\", \"mode\": \"run\"},\n    \"RVW\": {\"number\": 5, \"after\": \"FND\", \"mode\": \"record\"}\n  },\n  \"expansion\": {\n    \"PUB\": {\"number\": 6, \"after\": \"LIC\", \"mode\": \"provisional\"}\n  }\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "permit-boundary": true,
+          "owner-review-is-not-a-goal": false,
+          "unresolved-acceptance": false
+        },
+        "score": 0.3333333333333333,
+        "passed": false,
+        "seconds": 33.177,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 5379,
+          "cache_read_input_tokens": 28267,
+          "output_tokens": 6441,
+          "output_tokens_details": {
+            "thinking_tokens": 3860
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5379
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 40095,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.004176345,
+        "turns": 9
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"files\": {\n    \"002-permit-packet-lodging.md\": \"# 002: Lodge the BR-41 validated packet\\n\\nCheckpoint: PKT. Track: permit. Mode: run. Prerequisite: none (001 INV is accepted).\\n\\n## Goal\\nAssemble and validate the BR-41 application dossier from the archive team's packet bundle (approved dossier, rights matrix, delegation letter). Run packet-lint on the bundle, lodge the packet in the intake sandbox, and save the registry intake receipt for case BR-41.\\n\\n## Constraints\\n- Work unattended for no more than about 8 hours. Stop and write a status note if blocked.\\n- Do not edit the original inventory (001) or any source record in the bundle. Copy inputs before transforming them.\\n- Sandbox filing does not distribute collection material or grant a license. Do not describe it as one.\\n- Do not treat an intake receipt, completeness email, or agenda listing as a decision.\\n\\n## Done when\\n- packet-lint output is saved.\\n- The intake receipt for BR-41 is saved and referenced.\\n- A short inspectable report lists the inputs used, the lint result, and any open issues.\\n\",\n    \"003-permit-license-record.md\": \"# 003: Record the BR-41 redistribution license decision\\n\\nCheckpoint: LIC. Track: permit. Mode: record. Prerequisite: PKT (002).\\n\\n## Goal\\nThe harbor records panel votes next month and files a signed resolution against BR-41 in its decision register. Once that resolution exists, record the outcome in the archive records. Do not infer or simulate a decision.\\n\\n## Constraints\\n- Only the panel issues a redistribution license. Agenda listings, receipts, and emails do not count.\\n- Wait for the signed resolution. If none exists, mark LIC as pending and stop.\\n- Do not edit the inventory (001).\\n\\n## Done when\\n- The signed resolution for BR-41 is located and cited by identifier and date.\\n- The license status is recorded as granted or not granted, with the source.\\n\",\n    \"004-staff-lookup-pilot.md\": \"# 004: Desk lookup pilot\\n\\nCheckpoint: FND. Track: lookup. Mode: run. Prerequisite: INV (001, accepted).\\n\\n## Goal\\nRun an internal desk pilot with inventory INV and the sample queries in the existing desk test pack. Desk staff should be able to find the correct inventory record and see the applicable access category for each test-pack query.\\n\\n## Constraints\\n- Do not expose restricted recordings. Show access categories only.\\n- Thumbnails are not required.\\n- Do not use the registry or distribute recordings. This pilot does not need the license.\\n- Do not change the inventory or the test pack.\\n- Keep the work within about 8 hours, unattended.\\n\\n## Done when\\n- Each test-pack query has a recorded result: matched record and access category.\\n- Any failures are listed with the query and the reason.\\n- A short report is ready for owner review.\\n\",\n    \"005-owner-lookup-review.md\": \"# 005: Owner review of the desk lookup\\n\\nCheckpoint: RVW. Track: lookup. Mode: record. Prerequisite: FND (004).\\n\\n## Goal\\nThe owner reviews the desk lookup demonstration after the agent returns. Record the owner's decision on the lookup. The owner is the review authority for this lookup. No separate catalog-desk signoff is needed.\\n\\n## Constraints\\n- Do not treat the agent's own report as the review.\\n- The public edition scope is not decided here.\\n\\n## Done when\\n- The owner's review outcome (accepted, or changes requested with notes) is recorded with date.\\n\",\n    \"006-public-edition.md\": \"# 006: Public edition (provisional)\\n\\nCheckpoint: PUB. Track: expansion. Mode: provisional. Prerequisite: LIC (003).\\n\\n## Status\\nProvisional. Do not start until the BR-41 redistribution license is granted (LIC). The disclosure scope is not decided. Transcripts or abstracts-only has not been chosen. Decide this after the permit stage. Do not assume either option.\\n\\n## Goal (once unblocked and scope decided)\\nBuild a separate export from inventory INV, not from the desk tool, that matches the decided disclosure scope and the license terms. Make the public edition available.\\n\\n## Constraints\\n- Public distribution is the last track. Do not let it block staff use of the lookup.\\n- Do not use the October CMS rewrite plan as a requirement. It was superseded.\\n\"\n  },\n  \"permit\": {\n    \"PKT\": { \"number\": 2, \"after\": null, \"mode\": \"run\" },\n    \"LIC\": { \"number\": 3, \"after\": \"PKT\", \"mode\": \"record\" }\n  },\n  \"lookup\": {\n    \"FND\": { \"number\": 4, \"after\": \"INV\", \"mode\": \"run\" },\n    \"RVW\": { \"number\": 5, \"after\": \"FND\", \"mode\": \"record\" }\n  },\n  \"expansion\": {\n    \"PUB\": { \"number\": 6, \"after\": \"LIC\", \"mode\": \"provisional\" }\n  }\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "permit-boundary": false,
+          "owner-review-is-not-a-goal": false,
+          "unresolved-acceptance": false
+        },
+        "score": 0.0,
+        "passed": false,
+        "seconds": 19.918,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4882,
+          "cache_read_input_tokens": 19197,
+          "output_tokens": 3758,
+          "output_tokens_details": {
+            "thinking_tokens": 1413
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4882
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27843,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0026818199999999997,
+        "turns": 8
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"files\": {\n    \"002-lodge-permit-packet.md\": \"# 002: Lodge the BR-41 permit packet\\n\\nCheckpoint: PKT. Mode: run. After: INV (inventory accepted November 16, unchanged).\\n\\n## Goal\\nAssemble and validate the BR-41 dossier from the archive team's packet bundle (approved dossier, rights matrix, delegation letter). Run packet-lint on the bundle. Lodge the packet in the intake sandbox and record the registry receipt for case BR-41.\\n\\n## Boundaries\\n- Do not edit the records, the inventory, or the packet bundle contents. Work on copies.\\n- Sandbox filing does not distribute collection material and does not grant a license. Do not describe it as a license or decision.\\n- Do not contact the panel or request a decision. Only the panel issues a redistribution license.\\n- Stop and report if packet-lint fails or a required input is missing.\\n\\n## Done when\\n- The packet-lint output is saved and passes, or the failures are listed.\\n- The intake receipt for BR-41 is saved, with its reference.\\n- A short inspection note lists inputs used, the lint result, and the receipt. The owner can review this after the run, within an eight-hour unattended window.\",\n    \"003-staff-desk-lookup-pilot.md\": \"# 003: Staff desk lookup pilot\\n\\nCheckpoint: FND. Mode: run. After: INV.\\n\\n## Goal\\nBuild an internal desk lookup over inventory INV. Desk staff should be able to run the sample queries in the existing desk test pack, find the right inventory record, and see the applicable access category for each query.\\n\\n## Boundaries\\n- Restricted recordings must not be exposed. Show access categories, not restricted content.\\n- Thumbnails are not required.\\n- Do not use the registry, and do not distribute recordings or request permission to distribute.\\n- Do not edit INV or the desk test pack.\\n\\n## Done when\\n- Every test-pack query returns the correct inventory record and access category, or the mismatches are listed.\\n- A short inspection note records the results, how to run the lookup, and any open issues.\\n- The result is ready for owner review in an eight-hour unattended window. Desk work should fit in one afternoon.\",\n    \"004-owner-review-lookup-demo.md\": \"# 004: Owner review of the desk lookup demo\\n\\nCheckpoint: RVW. Mode: record. After: FND.\\n\\n## Goal\\nThe archive owner reviews the desk lookup demonstration from goal 003 and records the outcome: accepted, or accepted with changes listed.\\n\\n## Boundaries\\n- The owner reviews this as archive owner. There is no separate catalog desk signoff.\\n- The agent does not record approval on the owner's behalf.\\n\\n## Done when\\n- The owner's decision and any listed changes are recorded against FND.\",\n    \"005-public-edition-export.md\": \"# 005: Public edition export\\n\\nCheckpoint: PUB. Mode: provisional. After: LIC (redistribution license granted by the panel).\\n\\n## Goal\\nWhen a redistribution license for BR-41 is granted, produce the public edition as a separate export from the inventory INV. The export is not produced from the desk tool.\\n\\n## Open decision (do not assume)\\n- Whether the edition exposes transcripts or only abstracts. The owner decides after the permit stage. Do not choose either option.\\n- The disclosure scope is not fixed in the desk test pack. Confirm it with the owner before building the export.\\n\\n## Boundaries\\n- Do not start until LIC is recorded as granted in the panel's signed resolution for BR-41. A receipt, completeness email, or agenda listing is not a grant.\\n- Do not publish anything. Publication is an outward-facing action that needs owner confirmation.\\n\\n## Done when\\n- The export is built to the owner-confirmed disclosure scope and checked against restricted-category rules.\\n- The owner has confirmed the scope and the output is ready for review.\"\n  },\n  \"permit\": {\n    \"PKT\": { \"number\": 2, \"after\": \"INV\", \"mode\": \"run\" }\n  },\n  \"lookup\": {\n    \"FND\": { \"number\": 3, \"after\": \"INV\", \"mode\": \"run\" },\n    \"RVW\": { \"number\": 4, \"after\": \"FND\", \"mode\": \"record\" }\n  },\n  \"expansion\": {\n    \"PUB\": { \"number\": 5, \"after\": \"LIC\", \"mode\": \"provisional\" }\n  }\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "permit-boundary": false,
+          "owner-review-is-not-a-goal": false,
+          "unresolved-acceptance": true
+        },
+        "score": 0.3333333333333333,
+        "passed": false,
+        "seconds": 21.245,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4873,
+          "cache_read_input_tokens": 19180,
+          "output_tokens": 3999,
+          "output_tokens_details": {
+            "thinking_tokens": 1896
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4873
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 28058,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0028010249999999995,
+        "turns": 8
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"files\": {\n    \"002-permit-packet-lodged.md\": \"# 002: Lodge the BR-41 validated packet\\n\\nCheckpoint: PKT. Track: permit. Mode: run. After: null.\\n\\nGoal: Assemble the BR-41 dossier from the archive team's packet bundle (approved dossier, rights matrix, delegation letter), run packet-lint on it, and lodge it in the intake sandbox to obtain a registry receipt for case BR-41.\\n\\nVerifiable outcomes:\\n1. The dossier is assembled only from the approved dossier, rights matrix, and delegation letter already in the packet bundle. No new inputs are added.\\n2. packet-lint is run on the bundle and its output is saved with a timestamp. Outcome: zero blocking errors.\\n3. The packet is lodged in the intake sandbox for case BR-41.\\n4. A registry receipt for case BR-41 is saved in the work folder.\\n5. No file in the records folder is edited. The inventory (001) is not changed.\\n\\nBoundaries: Sandbox filing does not distribute material or grant a license. Do not describe the receipt as a decision, license, or panel outcome. Stop and report if packet-lint fails or an input is missing.\\n\\nEvidence to return: lint output, receipt, and a list of files used.\\n\\nTime budget: about one afternoon, within an eight-hour unattended window.\",\n\n    \"003-permit-license-recorded.md\": \"# 003: Record the BR-41 redistribution license decision\\n\\nCheckpoint: LIC. Track: permit. Mode: record. After: PKT.\\n\\nGoal: Record the panel's decision on BR-41 once the panel has filed its signed resolution. The agent does not grant or infer a license.\\n\\nVerifiable outcomes:\\n1. The panel's signed resolution against BR-41 is located in its decision register. The date and vote are noted.\\n2. The record states whether the license was granted, denied, or deferred, using the resolution's wording.\\n3. Intake receipts, completeness emails, and agenda listings are not counted as evidence of a grant.\\n4. If no signed resolution exists yet, the record is marked 'pending' with the date checked. Nothing else is claimed.\\n\\nBoundaries: The panel alone issues licenses. The agent only records. Do not start the public edition based on this goal.\\n\\nEvidence to return: a copy or link to the resolution and a one-paragraph status note.\\n\\nTiming: The panel votes next month. Run this goal after the vote is filed.\",\n\n    \"004-lookup-desk-pilot.md\": \"# 004: Desk lookup pilot usable by staff\\n\\nCheckpoint: FND. Track: lookup. Mode: run. After: null.\\n\\nGoal: Build an internal desk pilot that uses inventory INV and the sample queries in the existing desk test pack. Staff must find the right inventory record for each query and see its access category, without exposing restricted recordings.\\n\\nVerifiable outcomes:\\n1. The pilot reads only the accepted inventory (INV, 001). The inventory file is not changed.\\n2. For every query in the existing desk test pack, the pilot returns the matching inventory record ID.\\n3. For every query, the pilot shows the applicable access category.\\n4. Restricted recordings do not appear in any output, screen, or export. A test run that checks this is saved.\\n5. Thumbnails are not required.\\n6. The pilot does not use the registry, does not request permission, and does not distribute recordings.\\n\\nBoundaries: This is an internal pilot only. Do not design or expose disclosure scope for the public edition.\\n\\nEvidence to return: test-pack results table, restricted-leak check output, and run instructions for staff.\\n\\nTime budget: about one afternoon.\",\n\n    \"005-lookup-owner-demo-reviewed.md\": \"# 005: Owner reviews the desk lookup demonstration\\n\\nCheckpoint: RVW. Track: lookup. Mode: record. After: FND.\\n\\nGoal: Prepare the desk lookup demonstration for the owner, then record the owner's review result. The owner reviews as the owner, since the catalog desk has no separate signoff authority.\\n\\nVerifiable outcomes:\\n1. A demo script follows the test pack and shows FND's results for each query.\\n2. The demo package includes the test-pack results table and the restricted-leak check from 004.\\n3. The owner's review result is recorded as accepted, accepted with changes, or not accepted, in the owner's own words.\\n4. Any requested changes are listed as separate items. They are not applied without owner approval.\\n\\nBoundaries: The agent does not approve on the owner's behalf. Do not treat the demo as public-edition approval.\\n\\nEvidence to return: the demo package and the recorded review note.\",\n\n    \"006-expansion-public-edition.md\": \"# 006: Public edition available (provisional)\\n\\nCheckpoint: PUB. Track: expansion. Mode: provisional. After: LIC.\\n\\nStatus: Not committed. Do not start until LIC is recorded as granted (003). The owner has not decided whether the edition exposes transcripts or only abstracts. That choice is made after the permit stage. Do not assume either option.\\n\\nIf and when released, the goal is:\\n1. Build the public edition as a separate export from the accepted inventory (INV), not from the desk tool.\\n2. Export only the collection covered by a granted redistribution license.\\n3. Apply the disclosure scope the owner chooses after the permit stage. Record that choice in writing before export.\\n4. Confirm no restricted recordings are included.\\n\\nBoundaries: The October whiteboard's CMS rewrite and abstracts-by-default suggestion are superseded and are not requirements. Staff benefit from 004 and 005 do not depend on this goal and should proceed even if this one slips.\\n\\nEvidence to return: export manifest, license reference, disclosure-scope decision, and restricted-content check.\"\n  },\n  \"index\": {\n    \"permit\": {\n      \"PKT\": { \"number\": 2, \"after\": null, \"mode\": \"run\" },\n      \"LIC\": { \"number\": 3, \"after\": \"PKT\", \"mode\": \"record\" }\n    },\n    \"lookup\": {\n      \"FND\": { \"number\": 4, \"after\": null, \"mode\": \"run\" },\n      \"RVW\": { \"number\": 5, \"after\": \"FND\", \"mode\": \"record\" }\n    },\n    \"expansion\": {\n      \"PUB\": { \"number\": 6, \"after\": \"LIC\", \"mode\": \"provisional\" }\n    }\n  }\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "permit-boundary": false,
+          "owner-review-is-not-a-goal": false,
+          "unresolved-acceptance": false
+        },
+        "score": 0.0,
+        "passed": false,
+        "seconds": 23.061,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 7542,
+          "cache_read_input_tokens": 16733,
+          "output_tokens": 4455,
+          "output_tokens_details": {
+            "thinking_tokens": 1668
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 7542
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 28736,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0033381799999999996,
+        "turns": 8
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"files\":{\"002-permit-packet-lodged.md\":\"# 002: Lodge the validated BR-41 packet\\n\\nCheckpoint: PKT. Track: permit. Mode: run. Prerequisite: none.\\n\\n## Goal\\nAssemble and validate the BR-41 application dossier from the archive team's packet bundle (approved dossier, rights matrix, delegation letter), run packet-lint on the bundle, lodge the packet in the intake sandbox, and obtain a registry receipt for case BR-41.\\n\\n## Done when\\n1. The dossier and packet-lint result are saved in the archive work folder, with the lint output showing no unresolved errors.\\n2. The packet is lodged in the intake sandbox and a registry receipt for case BR-41 is saved.\\n3. The report states that sandbox filing does not distribute collection material or grant a license.\\n\\n## Out of scope\\n- Do not treat the receipt, a completeness email, or an agenda listing as a decision.\\n- Do not distribute recordings or change the inventory.\\n- Do not edit the registry bulletin or any source records.\\n\\n## Evidence to return\\nPacket-lint output, receipt identifier and date, and a list of every file touched.\\n\",\"003-redistribution-license-recorded.md\":\"# 003: Record the BR-41 redistribution license decision\\n\\nCheckpoint: LIC. Track: permit. Mode: record. Prerequisite: PKT.\\n\\n## Goal\\nWait for the harbor records panel to decide case BR-41. Record the decision only when the panel files its signed resolution in its decision register.\\n\\n## Done when\\n1. The signed resolution against BR-41 is located in the panel's decision register and saved as evidence.\\n2. The record states the grant, its date, and any conditions.\\n\\n## Out of scope\\n- The panel votes next month. Do not record a grant from an intake receipt, a completeness email, or an agenda listing.\\n- Do not issue or infer a license. Only the panel can grant one.\\n\\n## Evidence to return\\nThe signed resolution, the register reference, and the date of filing.\\n\",\"004-desk-lookup-pilot.md\":\"# 004: Run the desk lookup pilot\\n\\nCheckpoint: FND. Track: lookup. Mode: run. Prerequisite: none (depends only on the accepted inventory, INV).\\n\\n## Goal\\nBuild an internal desk pilot over inventory INV that lets desk staff find the correct inventory record and see the applicable access category for each query in the existing desk test pack.\\n\\n## Done when\\n1. Every test-pack query returns the correct inventory record and access category.\\n2. Restricted recordings are not exposed in any result, including thumbnails, previews, or logs.\\n3. The pilot runs in one session without registry access or distribution permission.\\n\\n## Out of scope\\n- Thumbnails are not required.\\n- The public edition is a separate export and is not part of this goal.\\n- Do not change the accepted inventory.\\n\\n## Evidence to return\\nTest-pack results per query, a list of restricted items checked, and the pilot's run instructions.\\n\",\"005-owner-review-lookup.md\":\"# 005: Owner reviews the desk lookup demo\\n\\nCheckpoint: RVW. Track: lookup. Mode: record. Prerequisite: FND.\\n\\n## Goal\\nThe archive owner reviews the desk lookup demonstration after the receiving agent returns and records the outcome.\\n\\n## Done when\\n1. The owner has reviewed the demo from goal 004.\\n2. The owner's decision (accept, or list of changes) is recorded with the date.\\n\\n## Out of scope\\n- The agent does not sign off on its own work.\\n- Do not treat the catalog desk as a separate signoff authority; the owner is the reviewer.\\n\\n## Evidence to return\\nThe owner's recorded decision and any requested changes.\\n\",\"006-public-edition-provisional.md\":\"# 006: Public edition (provisional)\\n\\nCheckpoint: PUB. Track: expansion. Mode: provisional. Prerequisite: LIC.\\n\\n## Status\\nDraft only. Do not start until goal 003 records a granted redistribution license.\\n\\n## Goal\\nBuild a public edition as a separate export from the inventory, not from the desk tool, so neighboring reading rooms can find the collection.\\n\\n## Open decisions (do not assume either option)\\n- Whether the edition exposes transcripts or only abstracts. The owner will decide after the permit stage.\\n- The disclosure scope, which the desk test pack does not fix.\\n\\n## Done when (once the decisions above are made)\\n1. The export contains only the disclosure scope the owner chose.\\n2. Restricted recordings are excluded.\\n3. The owner approves the public release.\\n\\n## Out of scope\\n- Do not default to publishing abstracts or transcripts.\\n- Do not rewrite the catalog or use a CMS preview for staff.\\n\"},\"permit\":{\"PKT\":{\"number\":2,\"after\":null,\"mode\":\"run\"},\"LIC\":{\"number\":3,\"after\":\"PKT\",\"mode\":\"record\"}},\"lookup\":{\"FND\":{\"number\":4,\"after\":null,\"mode\":\"run\"},\"RVW\":{\"number\":5,\"after\":\"FND\",\"mode\":\"record\"}},\"expansion\":{\"PUB\":{\"number\":6,\"after\":\"LIC\",\"mode\":\"provisional\"}}}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "permit-boundary": false,
+          "owner-review-is-not-a-goal": false,
+          "unresolved-acceptance": false
+        },
+        "score": 0.0,
+        "passed": false,
+        "seconds": 22.018,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4814,
+          "cache_read_input_tokens": 19351,
+          "output_tokens": 3699,
+          "output_tokens_details": {
+            "thinking_tokens": 1349
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4814
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27870,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00264536,
+        "turns": 8
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"files\":{\"002-permit-lodge-packet.md\":\"# 002: Lodge the BR-41 permit packet\\n\\nCheckpoint: PKT. Mode: run. After: INV (accepted November 16).\\n\\nGoal: Assemble, validate, and lodge the BR-41 application packet in the intake sandbox, then obtain the registry receipt for case BR-41.\\n\\nInputs, all already in the archive team's packet bundle: the approved dossier, the rights matrix, and the delegation letter. No new owner input is needed. Do not change the bundle or the inventory.\\n\\nVerifiable outcomes:\\n1. The dossier is assembled from the bundle inputs only. A handoff note lists each file with its checksum.\\n2. packet-lint runs on the bundle and its output is saved. Zero errors are required. If any error appears, record each one with its cause and stop.\\n3. The packet is lodged in the intake sandbox for case BR-41.\\n4. The registry receipt for BR-41 is saved to the handoff folder.\\n5. The handoff note states that sandbox filing does not distribute collection material and does not grant a license, and that the panel votes next month. It also states that the receipt, any completeness email, and any agenda listing are not a decision.\\n\\nBudget: about eight hours unattended. Write the handoff note before stopping, whether or not the goal finishes.\\n\",\"003-permit-license-record.md\":\"# 003: Record the BR-41 redistribution decision\\n\\nCheckpoint: LIC. Mode: record. After: PKT.\\n\\nGoal: Record the panel's decision on BR-41 once the panel files it. The agent does not seek, infer, or assume a license.\\n\\nVerifiable outcomes:\\n1. The signed resolution against BR-41 is confirmed in the panel's decision register. It must be filed after the panel's vote next month.\\n2. The decision, its date, and the license scope are recorded exactly as the resolution states them, with a link to the filed document.\\n3. If the resolution denies the license or attaches conditions, record that. Stop here and do not start 006.\\n4. An intake receipt, a completeness email, or an agenda listing does not count as a decision and must not be recorded as one.\\n\\nThe archive owner reviews the record afterward.\\n\",\"004-lookup-desk-pilot.md\":\"# 004: Run the staff desk lookup pilot\\n\\nCheckpoint: FND. Mode: run. After: INV (accepted November 16).\\n\\nGoal: Run an internal desk pilot over inventory INV, using the sample queries in the existing desk test pack. Desk staff should be able to find the correct INV record and see the applicable access category for each query.\\n\\nVerifiable outcomes:\\n1. For every query in the desk test pack, the pilot returns the matching INV record ID.\\n2. For every query, the applicable access category is shown.\\n3. No restricted recording appears in any result, screenshot, or log. Check each result against its access category and record the check.\\n4. A results log is saved with one row per query: query, record ID, access category, pass or fail.\\n5. Any failing query is listed with its cause.\\n\\nNot required: thumbnails. This pilot does not use the registry and does not need distribution permission. Do not change INV. Do not add public-facing output. The public edition is out of scope here.\\n\\nBudget: about one afternoon. Stop and report if a restricted recording cannot be kept out of the results.\\n\",\"005-lookup-owner-review.md\":\"# 005: Owner review of the desk lookup demo\\n\\nCheckpoint: RVW. Mode: record. After: FND.\\n\\nGoal: Record the archive owner's review of the desk lookup demo from goal 004.\\n\\nVerifiable outcomes:\\n1. The owner receives the 004 demo and results log after the agent returns.\\n2. The owner's decision (accept or reject) and notes are recorded against FND.\\n3. If the owner rejects it or asks for changes, list each requested change as a follow-up. Do not start 006 from this goal.\\n\\nThe catalog desk has no separate signoff authority, so this review is the only signoff for the lookup.\\n\",\"006-expansion-public-edition.md\":\"# 006: Public edition (provisional)\\n\\nCheckpoint: PUB. Mode: provisional. After: LIC (granted license recorded in 003).\\n\\nStatus: provisional. Do not start until 003 records a granted license. The disclosure scope is also undecided: whether the edition exposes transcripts or only abstracts will be decided after the permit stage. Do not assume either option.\\n\\nGoal, once the preconditions hold: create the public edition as a separate export from INV. It must not be produced from the desk tool.\\n\\nVerifiable outcomes:\\n1. 003 shows a granted license, and its scope is recorded.\\n2. The owner records the disclosure scope decision in writing: transcripts or abstracts.\\n3. The export is built from INV only, within the recorded license scope and the chosen disclosure scope. Restricted recordings are excluded and the exclusion is checked.\\n4. The owner approves the export in writing before anything is published.\\n5. Publication happens only after step 4.\\n\\nDo not rewrite the catalog or adopt a public-first CMS. Those were October workshop proposals and are not current decisions.\\n\"},\"permit\":{\"PKT\":{\"number\":2,\"after\":\"INV\",\"mode\":\"run\"},\"LIC\":{\"number\":3,\"after\":\"PKT\",\"mode\":\"record\"}},\"lookup\":{\"FND\":{\"number\":4,\"after\":\"INV\",\"mode\":\"run\"},\"RVW\":{\"number\":5,\"after\":\"FND\",\"mode\":\"record\"}},\"expansion\":{\"PUB\":{\"number\":6,\"after\":\"LIC\",\"mode\":\"provisional\"}}}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "permit-boundary": true,
+          "owner-review-is-not-a-goal": false,
+          "unresolved-acceptance": false
+        },
+        "score": 0.3333333333333333,
+        "passed": false,
+        "seconds": 29.258,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4876,
+          "cache_read_input_tokens": 19413,
+          "output_tokens": 5828,
+          "output_tokens_details": {
+            "thinking_tokens": 3316
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4876
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 30123,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00371823,
+        "turns": 8
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"files\":{\"002-permit-packet-lodged.md\":\"# 002: Lodge the BR-41 permit packet\\n\\nCheckpoint: PKT. Track: permit. Mode: run.\\nPrerequisite: none. The inventory (001) is already accepted, and this goal does not depend on it.\\n\\n## Intended advance\\n\\nThe Bracken archive team wants neighboring reading rooms to be able to find and eventually share its oral-history collection. The redistribution license is decided by the harbor records panel, not by this goal. This goal gets a valid application for collection BR-41 lodged with the registry.\\n\\nAssemble and validate the application dossier for BR-41 from the approved dossier, the rights matrix, and the delegation letter already in the archive team's packet bundle. Lodge it in the registry intake sandbox.\\n\\n## Scope and constraints\\n\\n- Use only the inputs in the packet bundle. No additional owner input is expected.\\n- Do not distribute collection material, and do not claim or assume a license. Sandbox filing does not distribute or grant a license.\\n- Do not alter the content of the approved source inputs.\\n\\n## Done when\\n\\n- The dossier is assembled from the approved inputs, and each input's source is identified in the report.\\n- packet-lint has been run on the bundle, and its full output is included in the report. Any failures are reported as they stand.\\n- The packet is lodged, and the registry receipt for case BR-41 is obtained and included in the report.\\n- The constraints above still hold at the end of the run.\\n\\nStop and report at once if, at the start of the run, something only the user can supply is missing, such as an absent or unapproved input. After the run starts, take and report reversible defaults. Stop only for irreversible or out-of-bounds decisions.\\n\\nEnd with a report that pairs each item above with its evidence: the dossier input list, the packet-lint output, and the registry receipt. An intake receipt is the end state of this goal. A completeness email or agenda listing is not a decision and is not part of Done when.\\n\",\"003-license-decision-recorded.md\":\"# 003: Redistribution license decision for BR-41 (external acceptance)\\n\\nCheckpoint: LIC. Track: permit. Mode: record. This goal is recorded when the decision arrives. It is not run by an agent.\\nPrerequisite: 002 (PKT) accepted.\\n\\n## Intended advance\\n\\nThe harbor records panel issues any redistribution license for collection BR-41. Only the panel can do this. The panel votes next month and then files its signed resolution against BR-41 in its decision register.\\n\\n## Acceptance evidence\\n\\nThe acceptance evidence is the panel's signed resolution, filed against BR-41 in the decision register, that grants a redistribution license. An intake receipt, a completeness email, and an agenda listing are not a decision and do not satisfy this goal.\\n\\n## Handoff\\n\\nThe agent's part ends with 002. Once 002 is accepted, the agent surfaces the BR-41 receipt and the panel's docket status so the owner can track the vote. No other agent work is expected under this goal.\\n\\n## Dependency\\n\\nGoal 005 (public edition) waits for this decision. Goal 004 does not depend on it.\\n\",\"004-desk-lookup-pilot.md\":\"# 004: Staff desk lookup pilot\\n\\nCheckpoint: FND. Track: lookup. Mode: run.\\nPrerequisite: 001 (INV) accepted. The pilot uses the accepted inventory as its data source. It does not depend on the permit goals, so it can run in parallel with 002.\\n\\n## Intended advance\\n\\nThe archive wants its own desk staff to benefit this winter, even if the public program slips. This goal produces an internal desk pilot that lets staff find the right inventory record for a query and see the access category that applies to it.\\n\\n## Scope and constraints\\n\\n- Use the accepted inventory (INV) and the sample queries in the existing desk test pack.\\n- The pilot is internal to desk staff. It does not use the registry, does not require permission to distribute recordings, and does not distribute collection material.\\n- Restricted recordings must not be exposed. Thumbnails are not required.\\n- Do not change the accepted inventory.\\n- The work fits in about one afternoon. The unattended window is about eight hours.\\n\\n## Done when\\n\\n- Each sample query in the desk test pack is run against the pilot. For each query, the report shows the matched inventory record and the access category that applies to it.\\n- For every query that matches a restricted recording, the report shows the access category without exposing the restricted recording. The evidence is the pilot output for those queries.\\n- The pilot is available to desk staff, and a demonstration is prepared for the owner's review.\\n- The constraints above still hold at the end of the run.\\n\\nStop and report at once if, at the start of the run, something only the user can supply is missing, such as a missing test pack. After the run starts, take and report reversible defaults. Stop only for irreversible or out-of-bounds decisions.\\n\\nEnd with a report that pairs each query with its evidence. The owner reviews the demonstration after the run. That review is not part of Done when.\\n\",\"005-public-edition.md\":\"# 005: Public edition of the Bracken oral-history collection\\n\\nCheckpoint: PUB. Track: expansion. Mode: provisional.\\nPrerequisite: 003 (LIC) accepted, because the public edition needs a granted redistribution license.\\n\\n## Intended advance\\n\\nThe public edition is a separate export from the inventory, not from the desk tool. It makes the collection available to neighboring reading rooms and, eventually, for sharing. Its goal is public availability. Staff benefit does not depend on it.\\n\\n## Provisional basis for acceptance\\n\\nAcceptance is not yet defined, and the owner has not set the acceptance authority or the evidence. The owner will decide these during refinement.\\n\\n## Open choices (refinement needed before activation)\\n\\n- Whether the public edition exposes transcripts or only abstracts. The owner will decide this after the permit stage (002 and 003). Do not assume either option now.\\n- The disclosure scope of the export. It is not fixed in the desk test pack or in the permit inputs.\\n- The export's acceptance authority and evidence.\\n\\nThis goal is not ready. Do not activate it until the open choices above are resolved and the file is refined against the results of 002 through 004.\\n\"},\"index\":{\"permit\":{\"PKT\":{\"number\":2,\"after\":null,\"mode\":\"run\"},\"LIC\":{\"number\":3,\"after\":\"PKT\",\"mode\":\"record\"}},\"lookup\":{\"FND\":{\"number\":4,\"after\":\"INV\",\"mode\":\"run\"}},\"expansion\":{\"PUB\":{\"number\":5,\"after\":\"LIC\",\"mode\":\"provisional\"}}}}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "permit-boundary": false,
+          "owner-review-is-not-a-goal": false,
+          "unresolved-acceptance": false
+        },
+        "score": 0.0,
+        "passed": false,
+        "seconds": 35.935,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 9440,
+          "cache_read_input_tokens": 34637,
+          "output_tokens": 7145,
+          "output_tokens_details": {
+            "thinking_tokens": 4180
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 9440
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 51230,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.005099670000000001,
+        "turns": 9
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"files\":{\"002-permit-packet-lodgement.md\":\"# 002: Lodge the BR-41 permit packet\\n\\nCheckpoint: PKT. Prerequisite: 001 (inventory INV, accepted). Mode: run.\\n\\n## Intended advance\\n\\nNeighboring reading rooms should be able to find and eventually share the Bracken oral-history collection. The permit track asks the Harbor records panel for a redistribution license for collection BR-41. This goal produces a validated, lodged application. It does not produce the license.\\n\\nThe archive team's packet bundle already holds the approved dossier, the rights matrix, and the delegation letter. Staff can assemble and validate the dossier from those inputs. The inventory from 001 is available to the permit preparer.\\n\\n## Done when\\n\\n- The BR-41 dossier is assembled from the packet bundle and packet-lint runs on the bundle. Show the lint output.\\n- The packet is lodged in the intake sandbox for case BR-41, and the registry receipt is captured. Show the receipt.\\n- Constraints: sandbox filing does not distribute collection material and does not grant a license. Do not describe the packet as licensed or accepted. Do not change the source inventory or the packet bundle contents.\\n- Stop and report at once, before filing, if a required input (dossier, rights matrix, or delegation letter) is missing or fails validation. After the run starts, take and report reversible defaults. Stop only for irreversible or out-of-bounds decisions.\\n- End with a report that pairs each item (lint result, lodgement, receipt) with its evidence. An intake receipt, a completeness email, or an agenda listing is not a decision and must not be reported as one.\\n\",\"003-redistribution-license-acceptance.md\":\"# 003: Record the redistribution license decision (external acceptance)\\n\\nCheckpoint: LIC. Prerequisite: 002 (PKT). Mode: record. This goal is not run by an agent. It is recorded when the decision arrives.\\n\\n## Intended advance\\n\\nThe Harbor records panel is the only body that can issue a redistribution license for BR-41. It votes next month and then files a signed resolution against BR-41 in its decision register. The license is the gate for the public edition in 005.\\n\\n## Acceptance\\n\\nThe checkpoint is met when the panel's signed resolution granting redistribution of collection BR-41 is filed in its decision register. Record the decision with a reference to that register entry. Intake receipts, completeness emails, and agenda listings do not count.\\n\\n## Handoff\\n\\nThe receiving agent's work ends with the registry receipt from 002. If the panel denies or conditions the license, record that outcome exactly as filed. Do not reopen or refile the packet without a new owner decision.\\n\",\"004-staff-desk-lookup-pilot.md\":\"# 004: Staff desk lookup pilot\\n\\nCheckpoint: FND. Prerequisite: 001 (inventory INV, accepted). This goal does not depend on the permit track. Mode: run.\\n\\n## Intended advance\\n\\nThe archive desk can run an internal pilot that helps staff find the right inventory record and see the access category that applies. This gives staff value this winter even if the public edition slips. The desk pilot does not use the registry and does not require permission to distribute recordings.\\n\\n## Done when\\n\\n- Using inventory INV and the sample queries in the existing desk test pack, staff can locate the correct inventory record for each query. Show the query-by-query results.\\n- For each query, the applicable access category is shown. Show it.\\n- Restricted recordings are not exposed in any result or view. Show evidence that restricted items are withheld.\\n- Constraints: thumbnails are not required. Do not use the registry. Do not distribute recordings. Do not change the inventory.\\n- Stop and report at once, before starting, if the desk test pack or inventory INV is missing or unreadable. After the run starts, take and report reversible defaults. Stop only for irreversible or out-of-bounds decisions.\\n- The owner reviews the demonstration after the run. That review is the owner's own step and is not a completion gate for this run.\\n- End with a report that pairs each query with its record match, access category, and restriction check.\\n\",\"005-public-edition-provisional.md\":\"# 005: Public edition (provisional)\\n\\nCheckpoint: PUB. Prerequisite: 003 (LIC, redistribution license granted). Mode: provisional. Refine this goal before activation. Do not start it.\\n\\n## Intended advance\\n\\nNeighboring reading rooms should be able to find and eventually share the Bracken oral-history collection through a public edition. The edition is a separate export from the inventory, not from the desk tool. It requires a granted redistribution license from 003.\\n\\n## Unresolved before activation\\n\\n- Disclosure scope is undecided. The owner will decide whether the edition exposes transcripts or only abstracts after the permit stage. Do not assume either option.\\n- Whether the granted license covers the chosen disclosure scope and channel. This depends on the terms of the 003 resolution.\\n- Final acceptance criteria. They depend on the disclosure decision.\\n\\n## Provisional basis for acceptance\\n\\nThe owner reviews the public edition, built under the chosen disclosure scope, and confirms that it makes the collection findable and shareable by neighboring reading rooms. Restricted recordings must remain unexposed. This basis is provisional until the open choices above are settled.\\n\\n## Scope note\\n\\nThe staff benefit in 004 does not depend on this goal. If the public program slips, 004 still stands.\\n\"},\"permit\":{\"PKT\":{\"number\":2,\"after\":\"INV\",\"mode\":\"run\"},\"LIC\":{\"number\":3,\"after\":\"PKT\",\"mode\":\"record\"}},\"lookup\":{\"FND\":{\"number\":4,\"after\":\"INV\",\"mode\":\"run\"}},\"expansion\":{\"PUB\":{\"number\":5,\"after\":\"LIC\",\"mode\":\"provisional\"}}}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "permit-boundary": true,
+          "owner-review-is-not-a-goal": true,
+          "unresolved-acceptance": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 33.051,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 9429,
+          "cache_read_input_tokens": 34625,
+          "output_tokens": 6392,
+          "output_tokens_details": {
+            "thinking_tokens": 3713
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 9429
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 50454,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.004721675,
+        "turns": 9
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"files\": {\n    \"002-permit-packet-lodge.md\": \"# 002: Lodge the BR-41 permit packet\\n\\nTrack: permit. Checkpoint: PKT (Validated packet lodged). Prerequisite: INV (inventory, accepted November 16). Mode: run.\\n\\n## Intended advance\\n\\nThe Bracken archive team's oral-history collection, case BR-41, needs a complete and validated application packet lodged with the Harbor records panel's intake sandbox. This is the first step toward neighboring reading rooms being able to find and eventually share the collection. It is the permit stage that the owner wants done first in this series.\\n\\n## Inputs and scope\\n\\n- Assemble and validate the dossier from the approved dossier, rights matrix, and delegation letter already in the archive team's packet bundle. No additional owner input is expected.\\n- Run packet-lint on the bundle.\\n- Lodge the packet in the intake sandbox for case BR-41.\\n- Sandbox filing does not distribute collection material and does not grant a license. Do not treat it as one.\\n\\n## Done when\\n\\nThe end state is a validated BR-41 packet lodged in the intake sandbox with a registry receipt for case BR-41. Show it in the final report with:\\n\\n- the packet contents used, matching the approved dossier, rights matrix, and delegation letter;\\n- the packet-lint output for the bundle;\\n- the registry intake receipt for BR-41, with its identifier.\\n\\nConstraints: do not distribute recordings, do not claim a license, and do not describe an intake receipt, completeness email, or agenda listing as a panel decision.\\n\\nAt the start of the run, if anything only the user can supply is missing, stop and report it at once. After that, take and report reversible defaults. Stop and report for any irreversible or out-of-bounds decision. End with a report that pairs each item above with its evidence.\\n\\nThe redistribution license decision is a separate goal (003), recorded when the panel decides.\",\n\n    \"003-redistribution-license-decision.md\": \"# 003: Record the BR-41 redistribution license decision\\n\\nTrack: permit. Checkpoint: LIC (Redistribution license granted). Prerequisite: PKT (002, lodged packet). Mode: record. This is external acceptance: it is recorded when the decision arrives and is not run by an agent.\\n\\n## Intended advance\\n\\nThe Harbor records panel, not the archive team, is the only body that issues a redistribution license for collection BR-41. Once the lodged packet (002) is in front of the panel, the license decision gates the public edition (005) and any sharing beyond staff.\\n\\n## What the agent does\\n\\nNothing beyond handoff. Once 002 is accepted, the agent surfaces the BR-41 registry receipt and the lodged packet so the panel can take its decision. The panel votes next month and files the signed resolution against BR-41 in its decision register.\\n\\n## Acceptance evidence\\n\\nThis goal is recorded when the panel's signed resolution granting a redistribution license for BR-41 is filed in its decision register. An intake receipt, a completeness email, or an agenda listing is not sufficient. A decision not to grant a license is also a result to record, and it stops the public edition (005) from proceeding as planned.\\n\\nNo agent should mark this goal accepted on its own judgment or on elapsed time.\",\n\n    \"004-staff-desk-lookup-pilot.md\": \"# 004: Staff desk lookup pilot\\n\\nTrack: lookup. Checkpoint: FND (Desk lookup usable). Prerequisite: INV (inventory, accepted November 16). Mode: run. The owner's recommended order places this after the permit stage. It does not depend on the permit track and could run earlier or in parallel.\\n\\n## Intended advance\\n\\nDesk staff can find the right inventory record for a query and see the applicable access category, so that staff benefit this winter even if the public program slips. This is an internal pilot. It is not the public edition.\\n\\n## Inputs and scope\\n\\n- Use inventory INV as the only data source.\\n- Use the sample queries in the existing desk test pack.\\n- The desk pilot does not use the registry and does not require permission to distribute recordings.\\n- Thumbnails are not required. A prior prototype used them, and they are out of scope.\\n- The desk tool is not the source of the public edition export.\\n\\n## Done when\\n\\nThe end state is a desk tool that, for each query in the existing desk test pack, returns the right inventory record and shows its applicable access category, without exposing restricted recordings. Show it in the final report with:\\n\\n- for each test-pack query, the matched inventory record and the access category shown;\\n- evidence that restricted recordings are not exposed to a query that should not see them;\\n- any test-pack query the tool could not answer correctly, with the reason.\\n\\nConstraints: no use of the registry, no distribution of recordings, and no change to the inventory records.\\n\\nThe owner reviews the demonstration after the agent returns. That review is the owner's own acceptance and follows the run.\\n\\nAt the start of the run, if anything only the user can supply is missing, stop and report it at once. After that, take and report reversible defaults. Stop and report for any irreversible or out-of-bounds decision. End with a report that pairs each item above with its evidence.\",\n\n    \"005-public-edition-provisional.md\": \"# 005: Public edition (provisional)\\n\\nTrack: expansion. Checkpoint: PUB (Public edition available). Prerequisite: LIC (003, redistribution license recorded). Mode: provisional.\\n\\nStatus: PROVISIONAL. Do not activate this goal until it has been refined against the results of 002 through 004 and the license decision in 003 is recorded.\\n\\n## Intended advance\\n\\nNeighboring reading rooms can find and eventually share the Bracken oral-history collection through a public edition. The public edition is a separate export from the inventory. It is not an export from the desk tool.\\n\\n## Known preconditions\\n\\n- A granted redistribution license from the Harbor records panel for BR-41 (003). Without it, this goal does not proceed.\\n- The disclosure scope is not decided. It is an open choice between exposing transcripts and exposing only abstracts. The owner will decide after the permit stage. Do not assume either option.\\n\\n## Open questions to resolve before activation\\n\\n- Which disclosure scope the owner chooses: transcripts or abstracts.\\n- What the public edition must show for restricted recordings, using the access categories in the inventory.\\n- Whether the license's terms impose conditions on the export that change its acceptance evidence.\\n\\n## Provisional basis for acceptance\\n\\nIf activated, acceptance would be a public edition that a reading room can find and use, showing only the content the owner's chosen disclosure scope allows and nothing the license does not cover. The owner is the acceptance authority for the disclosure scope. The exact acceptance criteria are not fixed here and must be set during refinement.\"\n  },\n  \"permit\": {\n    \"PKT\": { \"number\": 2, \"after\": \"INV\", \"mode\": \"run\" },\n    \"LIC\": { \"number\": 3, \"after\": \"PKT\", \"mode\": \"record\" }\n  },\n  \"lookup\": {\n    \"FND\": { \"number\": 4, \"after\": \"INV\", \"mode\": \"run\" }\n  },\n  \"expansion\": {\n    \"PUB\": { \"number\": 5, \"after\": \"LIC\", \"mode\": \"provisional\" }\n  }\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "permit-boundary": true,
+          "owner-review-is-not-a-goal": true,
+          "unresolved-acceptance": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 28.59,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 9451,
+          "cache_read_input_tokens": 34649,
+          "output_tokens": 5456,
+          "output_tokens_details": {
+            "thinking_tokens": 2264
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 9451
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 49564,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.004256665,
+        "turns": 9
+      }
+    ]
+  },
+  "verdict": "inconclusive",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 333973,
+  "skipped_trials": []
+}

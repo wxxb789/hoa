@@ -1,0 +1,1119 @@
+{
+  "schema_version": 2,
+  "task": "hermes-models",
+  "generated_at": "2026-11-20T00:50:36.349740-08:00",
+  "skill": "hermes-models",
+  "skill_revision": "6",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "forced",
+  "shell": true,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "configured-alias": {
+      "field": "requested_alias",
+      "equals": "swift"
+    },
+    "configured-provider": {
+      "field": "configured_provider",
+      "equals": "edge-main"
+    },
+    "session-model": {
+      "field": "session_model",
+      "equals": "finch-2.1"
+    },
+    "effective-provider": {
+      "field": "provider",
+      "equals": "relay-b"
+    },
+    "effective-effort": {
+      "field": "effort",
+      "equals": "low"
+    },
+    "fallback-was-active": {
+      "field": "fallback_active",
+      "equals": true
+    },
+    "inert-profile-probe": {
+      "file": "inbox-chat.txt",
+      "contains": "PROBE_OK session=inbox-probe fallback_active=true provider=relay-b"
+    },
+    "correlated-session-row": {
+      "file": "inbox-session.txt",
+      "contains": "session=inbox-probe model=finch-2.1"
+    },
+    "resolve-effort-for-served-model": {
+      "file": "inbox-reasoning.txt",
+      "contains": "session=inbox-probe model=finch-2.1 effort=low"
+    }
+  },
+  "rubric_flags": {
+    "configured-alias": "flaky",
+    "configured-provider": "non-discriminating",
+    "session-model": "non-discriminating",
+    "effective-provider": "non-discriminating",
+    "effective-effort": "non-discriminating",
+    "fallback-was-active": "non-discriminating",
+    "inert-profile-probe": "non-discriminating",
+    "correlated-session-row": "non-discriminating",
+    "resolve-effort-for-served-model": "non-discriminating"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 2,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.6666666666666666,
+      "pass^k": false,
+      "mean_score": 0.9629629629629629,
+      "sample_stddev": 0.06415002990995845
+    },
+    "terse": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    },
+    "skill": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": 0.03703703703703709,
+    "terse": 0.0
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"requested_alias\":\"swift\",\"configured_provider\":\"edge-main\",\"session_model\":\"finch-2.1\",\"provider\":\"relay-b\",\"effort\":\"low\",\"fallback_active\":true,\"mismatch\":\"The dashboard shows swift (edge-main, swift-v4, high), but a fresh ordinary Inbox session in the offline fixture falls back to relay-b serving finch-2.1 at low effort, because the adapter replay marks edge-main/swift-v4 as unavailable.\"}",
+        "answer_format": "bare",
+        "artifacts": {
+          "inbox-chat.txt": "PROBE_OK session=inbox-probe fallback_active=true provider=relay-b\n",
+          "inbox-session.txt": "session=inbox-probe model=finch-2.1\n",
+          "inbox-reasoning.txt": "session=inbox-probe model=finch-2.1 effort=low\n"
+        },
+        "checks": {
+          "configured-alias": true,
+          "configured-provider": true,
+          "session-model": true,
+          "effective-provider": true,
+          "effective-effort": true,
+          "fallback-was-active": true,
+          "inert-profile-probe": true,
+          "correlated-session-row": true,
+          "resolve-effort-for-served-model": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 21.554,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 5908,
+          "cache_read_input_tokens": 35032,
+          "output_tokens": 1907,
+          "output_tokens_details": {
+            "thinking_tokens": 773
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5908
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 42855,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0020431200000000003,
+        "turns": 11
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"requested_alias\":\"swift\",\"configured_provider\":\"edge-main\",\"session_model\":\"finch-2.1\",\"provider\":\"relay-b\",\"effort\":\"low\",\"fallback_active\":true,\"mismatch\":\"The dashboard shows swift at high effort, but the offline fixture's fresh inbox chat session is served by relay-b on finch-2.1 at low effort because edge-main's swift-v4 is marked unavailable and the spare route replaced it.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {
+          "inbox-chat.txt": "PROBE_OK session=inbox-probe fallback_active=true provider=relay-b\n",
+          "inbox-session.txt": "session=inbox-probe model=finch-2.1\n",
+          "inbox-reasoning.txt": "session=inbox-probe model=finch-2.1 effort=low\n"
+        },
+        "checks": {
+          "configured-alias": true,
+          "configured-provider": true,
+          "session-model": true,
+          "effective-provider": true,
+          "effective-effort": true,
+          "fallback-was-active": true,
+          "inert-profile-probe": true,
+          "correlated-session-row": true,
+          "resolve-effort-for-served-model": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 14.904,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 5383,
+          "cache_read_input_tokens": 35485,
+          "output_tokens": 1894,
+          "output_tokens_details": {
+            "thinking_tokens": 822
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5383
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 42770,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.001975525,
+        "turns": 11
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"requested_alias\":\"swift-v4\",\"configured_provider\":\"edge-main\",\"session_model\":\"finch-2.1\",\"provider\":\"relay-b\",\"effort\":\"low\",\"fallback_active\":true,\"mismatch\":\"The offline replay shows the Inbox dashboard's swift/high route is not what a fresh ordinary Inbox session uses: edge-main/swift-v4 is marked unavailable, so the session falls back to relay-b/finch-2.1 at low effort, which is the replay's stand-in output and not a query of real Hermes.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {
+          "inbox-chat.txt": "PROBE_OK session=inbox-probe fallback_active=true provider=relay-b\n",
+          "inbox-session.txt": "session=inbox-probe model=finch-2.1\n",
+          "inbox-reasoning.txt": "session=inbox-probe model=finch-2.1 effort=low\n"
+        },
+        "checks": {
+          "configured-alias": false,
+          "configured-provider": true,
+          "session-model": true,
+          "effective-provider": true,
+          "effective-effort": true,
+          "fallback-was-active": true,
+          "inert-profile-probe": true,
+          "correlated-session-row": true,
+          "resolve-effort-for-served-model": true
+        },
+        "score": 0.8888888888888888,
+        "passed": false,
+        "seconds": 17.777,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 5418,
+          "cache_read_input_tokens": 45976,
+          "output_tokens": 2365,
+          "output_tokens_details": {
+            "thinking_tokens": 1260
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5418
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 53769,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00232051,
+        "turns": 11
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"requested_alias\": \"swift\", \"configured_provider\": \"edge-main\", \"session_model\": \"finch-2.1\", \"provider\": \"relay-b\", \"effort\": \"low\", \"fallback_active\": true, \"mismatch\": \"The dashboard's edge-main swift-v4 at high effort is not the route a fresh ordinary Inbox session used in the offline replay, which fell back to relay-b finch-2.1 at low effort because the adapter marks inbox edge-main swift-v4 unavailable.\"}",
+        "answer_format": "bare",
+        "artifacts": {
+          "inbox-chat.txt": "PROBE_OK session=inbox-probe fallback_active=true provider=relay-b\n",
+          "inbox-session.txt": "session=inbox-probe model=finch-2.1\n",
+          "inbox-reasoning.txt": "session=inbox-probe model=finch-2.1 effort=low\n"
+        },
+        "checks": {
+          "configured-alias": true,
+          "configured-provider": true,
+          "session-model": true,
+          "effective-provider": true,
+          "effective-effort": true,
+          "fallback-was-active": true,
+          "inert-profile-probe": true,
+          "correlated-session-row": true,
+          "resolve-effort-for-served-model": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 19.852,
+        "usage": {
+          "input_tokens": 12,
+          "cache_creation_input_tokens": 8309,
+          "cache_read_input_tokens": 52339,
+          "output_tokens": 2178,
+          "output_tokens_details": {
+            "thinking_tokens": 1032
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 8309
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 62838,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002652215,
+        "turns": 11
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"requested_alias\": \"swift\", \"configured_provider\": \"edge-main\", \"session_model\": \"finch-2.1\", \"provider\": \"relay-b\", \"effort\": \"low\", \"fallback_active\": true, \"mismatch\": \"The dashboard's swift/edge-main/swift-v4/high route is not what a fresh Inbox session uses: the adapter replay marks inbox on edge-main with swift-v4 as unavailable, so the offline probe falls back to relay-b with finch-2.1, whose override resolves to low effort.\"}",
+        "answer_format": "bare",
+        "artifacts": {
+          "inbox-chat.txt": "PROBE_OK session=inbox-probe fallback_active=true provider=relay-b\n",
+          "inbox-session.txt": "session=inbox-probe model=finch-2.1\n",
+          "inbox-reasoning.txt": "session=inbox-probe model=finch-2.1 effort=low\n"
+        },
+        "checks": {
+          "configured-alias": true,
+          "configured-provider": true,
+          "session-model": true,
+          "effective-provider": true,
+          "effective-effort": true,
+          "fallback-was-active": true,
+          "inert-profile-probe": true,
+          "correlated-session-row": true,
+          "resolve-effort-for-served-model": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 16.632,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 5439,
+          "cache_read_input_tokens": 35833,
+          "output_tokens": 2266,
+          "output_tokens_details": {
+            "thinking_tokens": 1126
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5439
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 43546,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0021720050000000003,
+        "turns": 11
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"requested_alias\": \"swift\", \"configured_provider\": \"edge-main\", \"session_model\": \"finch-2.1\", \"provider\": \"relay-b\", \"effort\": \"low\", \"fallback_active\": true, \"mismatch\": \"The dashboard's swift/high route is not what a fresh Inbox session uses: the offline replay shows edge-main/swift-v4 marked unavailable, so the session falls back to relay-b serving finch-2.1 at low effort.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {
+          "inbox-chat.txt": "PROBE_OK session=inbox-probe fallback_active=true provider=relay-b\n",
+          "inbox-session.txt": "session=inbox-probe model=finch-2.1\n",
+          "inbox-reasoning.txt": "session=inbox-probe model=finch-2.1 effort=low\n"
+        },
+        "checks": {
+          "configured-alias": true,
+          "configured-provider": true,
+          "session-model": true,
+          "effective-provider": true,
+          "effective-effort": true,
+          "fallback-was-active": true,
+          "inert-profile-probe": true,
+          "correlated-session-row": true,
+          "resolve-effort-for-served-model": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 18.15,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 5358,
+          "cache_read_input_tokens": 46932,
+          "output_tokens": 1737,
+          "output_tokens_details": {
+            "thinking_tokens": 831
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5358
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 54037,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0020085700000000003,
+        "turns": 5
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"requested_alias\": \"swift\", \"configured_provider\": \"edge-main\", \"session_model\": \"finch-2.1\", \"provider\": \"relay-b\", \"effort\": \"low\", \"fallback_active\": true, \"mismatch\": \"The dashboard shows swift on edge-main at high effort, but a fresh inbox chat session in the offline replay fell back to relay-b finch-2.1 at low effort because edge-main swift-v4 is marked unavailable for inbox, so the dashboard does not reflect the route that session actually uses.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {
+          "inbox-chat.txt": "PROBE_OK session=inbox-probe fallback_active=true provider=relay-b\n",
+          "inbox-session.txt": "session=inbox-probe model=finch-2.1\n",
+          "inbox-reasoning.txt": "session=inbox-probe model=finch-2.1 effort=low\n"
+        },
+        "checks": {
+          "configured-alias": true,
+          "configured-provider": true,
+          "session-model": true,
+          "effective-provider": true,
+          "effective-effort": true,
+          "fallback-was-active": true,
+          "inert-profile-probe": true,
+          "correlated-session-row": true,
+          "resolve-effort-for-served-model": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 19.554,
+        "usage": {
+          "input_tokens": 12,
+          "cache_creation_input_tokens": 10335,
+          "cache_read_input_tokens": 70959,
+          "output_tokens": 2386,
+          "output_tokens_details": {
+            "thinking_tokens": 1061
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 10335
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 83692,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.003195665,
+        "turns": 13
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": true,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"requested_alias\": \"swift\", \"configured_provider\": \"edge-main\", \"session_model\": \"finch-2.1\", \"provider\": \"relay-b\", \"effort\": \"low\", \"fallback_active\": true, \"mismatch\": \"The dashboard's swift/edge-main/swift-v4 high route is not what a fresh Inbox chat session used in this offline fixture: the replay marked edge-main swift-v4 as unavailable for inbox, so the session fell back to relay-b finch-2.1 at low effort.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {
+          "inbox-chat.txt": "PROBE_OK session=inbox-probe fallback_active=true provider=relay-b\n",
+          "inbox-session.txt": "session=inbox-probe model=finch-2.1\n",
+          "inbox-reasoning.txt": "session=inbox-probe model=finch-2.1 effort=low\n"
+        },
+        "checks": {
+          "configured-alias": true,
+          "configured-provider": true,
+          "session-model": true,
+          "effective-provider": true,
+          "effective-effort": true,
+          "fallback-was-active": true,
+          "inert-profile-probe": true,
+          "correlated-session-row": true,
+          "resolve-effort-for-served-model": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 23.388,
+        "usage": {
+          "input_tokens": 14,
+          "cache_creation_input_tokens": 10568,
+          "cache_read_input_tokens": 84889,
+          "output_tokens": 2670,
+          "output_tokens_details": {
+            "thinking_tokens": 1180
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 10568
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 98141,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0035062900000000004,
+        "turns": 14
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": true,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"requested_alias\": \"swift\", \"configured_provider\": \"edge-main\", \"session_model\": \"finch-2.1\", \"provider\": \"relay-b\", \"effort\": \"low\", \"fallback_active\": true, \"mismatch\": \"The Inbox dashboard shows swift at high effort on edge-main, but a fresh ordinary Inbox session in the offline replay fell back to relay-b serving finch-2.1 at low effort, because edge-main's swift-v4 is marked unavailable for Inbox.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {
+          "inbox-chat.txt": "PROBE_OK session=inbox-probe fallback_active=true provider=relay-b\n",
+          "inbox-session.txt": "session=inbox-probe model=finch-2.1\n",
+          "inbox-reasoning.txt": "session=inbox-probe model=finch-2.1 effort=low\n"
+        },
+        "checks": {
+          "configured-alias": true,
+          "configured-provider": true,
+          "session-model": true,
+          "effective-provider": true,
+          "effective-effort": true,
+          "fallback-was-active": true,
+          "inert-profile-probe": true,
+          "correlated-session-row": true,
+          "resolve-effort-for-served-model": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 26.851,
+        "usage": {
+          "input_tokens": 18,
+          "cache_creation_input_tokens": 10709,
+          "cache_read_input_tokens": 113161,
+          "output_tokens": 2739,
+          "output_tokens_details": {
+            "thinking_tokens": 1166
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 10709
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 126627,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.003841535,
+        "turns": 15
+      }
+    ]
+  },
+  "verdict": "no-difference",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 608275,
+  "skipped_trials": []
+}

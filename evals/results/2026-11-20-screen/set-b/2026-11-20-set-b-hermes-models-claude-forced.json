@@ -1,0 +1,1110 @@
+{
+  "schema_version": 2,
+  "task": "set-b-hermes-models",
+  "generated_at": "2026-11-20T01:03:06.354363-08:00",
+  "skill": "hermes-models",
+  "skill_revision": "6",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "forced",
+  "shell": false,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "agent-cron-counts": {
+      "field": "background",
+      "equals": {
+        "root": {
+          "agent_jobs": 2,
+          "on_pool": 1
+        },
+        "desk": {
+          "agent_jobs": 2,
+          "on_pool": 2
+        },
+        "filing": {
+          "agent_jobs": 1,
+          "on_pool": 0
+        }
+      }
+    },
+    "managed-harness-catalog": {
+      "field": "omp_models",
+      "equals": {
+        "shoal-3": true,
+        "spray-2": false,
+        "dune-1": true
+      }
+    },
+    "correlated-proof-per-home": {
+      "field": "verified",
+      "equals": {
+        "root": true,
+        "desk": false,
+        "filing": false
+      }
+    }
+  },
+  "rubric_flags": {
+    "agent-cron-counts": "non-discriminating",
+    "managed-harness-catalog": "flaky",
+    "correlated-proof-per-home": "flaky"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 0,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.0,
+      "pass^k": false,
+      "mean_score": 0.3333333333333333,
+      "sample_stddev": 0.3333333333333333
+    },
+    "terse": {
+      "valid": true,
+      "passed": 0,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.0,
+      "pass^k": false,
+      "mean_score": 0.5555555555555556,
+      "sample_stddev": 0.19245008972987523
+    },
+    "skill": {
+      "valid": true,
+      "passed": 0,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 0.0,
+      "pass^k": false,
+      "mean_score": 0.6666666666666666,
+      "sample_stddev": 0.0
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": 0.3333333333333333,
+    "terse": 0.11111111111111105
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"background\": {\n    \"root\": {\"agent_jobs\": 3, \"on_pool\": 2},\n    \"desk\": {\"agent_jobs\": 3, \"on_pool\": 3},\n    \"filing\": {\"agent_jobs\": 2, \"on_pool\": 1}\n  },\n  \"omp_models\": {\n    \"shoal-3\": true,\n    \"spray-2\": false,\n    \"dune-1\": true\n  },\n  \"verified\": {\n    \"root\": true,\n    \"desk\": false,\n    \"filing\": true\n  },\n  \"evidence\": {\n    \"background\": \"Counted enabled jobs only; disabled jobs (f-reminder, r-legacy) and the historical paused schedules are excluded. Unpinned jobs (model null) are counted as model-using because they run on the home default. Pinned jobs use their own provider. root: r-index, r-brief (unpinned, default tide), r-meter; eddy = r-index, r-meter. desk: d-digest, d-reconcile (unpinned, default eddy), d-check; all eddy. filing: f-sweep (unpinned, default tide), f-mtime; eddy = f-mtime. The closeout's '5 of 5 on eddy' matches only the background-labelled subset (d-digest, d-check, f-mtime, r-index, r-meter); the full model-using set is 8 jobs, 6 on eddy.\",\n    \"omp_models\": \"omp/models-command.txt (recorded output of 'omp models' in the ticket window) lists tide/shoal-3 (managed), eddy/dune-1 (local), offshore/kelp-8. So shoal-3 is selectable, contrary to the closeout. spray-2 is absent from the list; it appears only in omp/models.yml, which the file itself says may be disabled or shadowed by the managed registry, so it is treated as not selectable. dune-1 is selectable.\",\n    \"verified\": \"root: config echo tide/shoal-3/high matches the table; resolver gives shoal-3 high; newest session R102 (after pre-change R101 on spray-2) shows shoal-3 with PROBE_OK. desk: config echo eddy/dune-1 matches, and newest session D205 shows dune-1 with PROBE_OK, but the resolver records effort 'low' while the intended and configured effort is 'medium'. The effort switch is not proven and the desk config conflicts with the table. filing: config echo tide/shoal-3/high matches, resolver gives high, newest session F306 shows shoal-3 with PROBE_OK. annex is inactive and excluded.\",\n    \"closeout_corrections\": \"The closeout's OMP claims are wrong for shoal-3 (present) and spray-2 (not selectable). Its claim that 'no more evidence is needed' is not supported for desk.\"\n  },\n  \"missing_checks\": [\n    \"Resolve the desk effort conflict: confirm whether desk should be medium (table, config) or low (resolver), and reconcile the config echo with resolve_reasoning_config output.\",\n    \"Re-run the OMP model listing after confirming the managed registry state, so spray-2 selectability is established rather than inferred from the local declaration file.\",\n    \"Confirm that unpinned jobs (d-reconcile, f-sweep, r-brief) really inherit the home default and that a null script field with a null model is model-using; this changes the background counts.\",\n    \"Confirm that the enabled jobs have no external scheduler overrides, as the closeout states, by reading the scheduler state directly.\",\n    \"Verify that the probe session rows are from the ticket window and that the 'fresh default session' invocation actually started with the default model, not a pinned one.\",\n    \"Review the cron highlights widget's filter so the 5-of-5 claim is labelled as the background-only subset, not the full background policy count.\"\n  ]\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "agent-cron-counts": false,
+          "managed-harness-catalog": true,
+          "correlated-proof-per-home": false
+        },
+        "score": 0.3333333333333333,
+        "passed": false,
+        "seconds": 23.923,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 6604,
+          "cache_read_input_tokens": 19132,
+          "output_tokens": 4482,
+          "output_tokens_details": {
+            "thinking_tokens": 2185
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6604
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 30224,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0032584199999999997,
+        "turns": 13
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"background\":{\"root\":{\"agent_jobs\":3,\"on_pool\":2},\"desk\":{\"agent_jobs\":3,\"on_pool\":3},\"filing\":{\"agent_jobs\":2,\"on_pool\":1}},\"omp_models\":{\"shoal-3\":true,\"spray-2\":false,\"dune-1\":true},\"verified\":{\"root\":true,\"desk\":false,\"filing\":false},\"evidence\":{\"scope\":\"Read-only review of exported files in the work directory. Hermes, OMP, and the live homes were not run or read. annex is inactive and excluded.\",\"background\":\"Counted enabled jobs that invoke a model: pinned jobs with a model set, plus unpinned agent jobs (script null), which resolve to the home default. Script-only unpinned jobs are excluded. root: r-index and r-meter pinned to eddy/dune-1; r-brief unpinned, resolves to tide/shoal-3. filing: f-mtime pinned to eddy/dune-1; f-sweep unpinned, resolves to tide/shoal-3. desk: d-digest and d-check pinned to eddy/dune-1; d-reconcile unpinned, resolves to eddy/dune-1. Disabled jobs f-reminder, r-legacy excluded. Totals: 8 model-using jobs, 6 on eddy. The closeout's 5 of 5 counts only background-labeled jobs and misses the unpinned desk job and the non-background eddy-resolving jobs.\",\"omp_models\":\"Recorded 'omp models' output (exit 0, ticket window) lists tide/shoal-3 (managed), eddy/dune-1 (local), offshore/kelp-8. spray-2 is absent. omp/models.yml is a copied pre-refresh local declaration that the managed registry may shadow, so it does not establish selectability. The closeout's claim that shoal-3 is missing is false.\",\"verified_detail\":\"root: newest session R102 is shoal-3 with PROBE_OK, the prior captured session R101 was spray-2, and the resolver gives high effort, matching the table. Switch proven. desk: newest D205 is dune-1 with PROBE_OK and the prior session D204 was kelp-8, so the model switch is shown. However the resolver gives effort low, while the table and homes.json say medium, so the intended default is not fully proven. filing: newest F306 is shoal-3, but the captured pre-change row F305 is already shoal-3, so the ticket shows no switch. PROBE_OK alone does not prove a change.\",\"closeout_claims\":\"Claim 1 (5 of 5 on eddy): misleading, see background. Claim 2 (shoal-3 missing, spray-2 and dune-1 selectable): false on the recorded data. Claim 3 (all three defaults verified, no more evidence needed): false for desk (effort mismatch) and filing (no pre-change switch).\"},\"recommended_missing_checks\":[\"Confirm desk's resolved effort: the resolver reports low, the table and homes.json say medium. Determine which is intended and whether the config echo is correct.\",\"Capture a true pre-change baseline for filing, such as a session from before the provisioner change, to show a switch from a different model.\",\"Confirm dune-1 and spray-2 selectability by running or reading the managed OMP registry after refresh, since models.yml is a pre-refresh copy. This review did not run OMP.\",\"Read each active home's live config file to confirm it matches homes.json and the table. The home directories were outside the readable working directory, so this was not checked.\",\"Confirm the background job rule with the operator: whether unpinned script-only jobs count, and whether jobs pinned to eddy in non-background labels count toward the pool.\"]}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "agent-cron-counts": false,
+          "managed-harness-catalog": true,
+          "correlated-proof-per-home": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 26.527,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 6265,
+          "cache_read_input_tokens": 19371,
+          "output_tokens": 5465,
+          "output_tokens_details": {
+            "thinking_tokens": 3245
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6265
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 31107,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0037099349999999997,
+        "turns": 13
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"background\":{\"root\":{\"agent_jobs\":3,\"on_pool\":2},\"desk\":{\"agent_jobs\":3,\"on_pool\":3},\"filing\":{\"agent_jobs\":2,\"on_pool\":1}},\"omp_models\":{\"shoal-3\":true,\"spray-2\":false,\"dune-1\":true},\"verified\":{\"root\":true,\"desk\":false,\"filing\":false},\"evidence\":{\"background\":\"Counted enabled jobs that use a model: a pinned model, or no pinned model (agent-run, so it uses the home default). Disabled jobs are excluded. root: r-index and r-meter (eddy/dune-1, pinned) and r-brief (unpinned, home default tide/shoal-3, not eddy). desk: d-digest and d-check (eddy/dune-1, pinned) and d-reconcile (unpinned, home default eddy/dune-1). filing: f-mtime (eddy/dune-1, pinned) and f-sweep (unpinned, home default tide/shoal-3, not eddy). Total 8 model-using jobs, 6 on eddy. The draft's '5 of 5 on eddy' claim is wrong. If unpinned jobs are excluded, the counts are root 2/2, desk 2/2, filing 1/1, which still contradicts the widget. The reading that unpinned jobs count as model-using is my assumption, based on the closeout's 'pinned or unpinned' wording.\",\"omp_models\":\"The recorded 'omp models' stdout from the ticket window lists tide/shoal-3 (managed), eddy/dune-1 (local), and offshore/kelp-8. spray-2 is not listed. omp/models.yml is a stale pre-refresh local declaration that the closeout itself says may be disabled or shadowed, so it was not used for selectability. The draft's claim that shoal-3 is missing is false, and its claim that spray-2 is selectable is also false.\",\"verified_root\":\"homes.json and the effort resolver both give shoal-3 with effort high, matching the table. Newest session R102 (started_order 2) is PROBE_OK on shoal-3. The captured pre-change row R101 was spray-2, so the switch is observed.\",\"verified_desk\":\"Config echo says medium, but resolve_reasoning_config under the desk home says effort low, which contradicts the intended medium. The probe D205 is PROBE_OK on dune-1 and the pre-change row D204 was kelp-8, but the effort mismatch means the intended default is not proven.\",\"verified_filing\":\"Config echo and resolver both give shoal-3 with effort high, and probe F306 is PROBE_OK on shoal-3. However, the captured pre-change row F305 was already shoal-3, so this ticket shows no transition to the new default. The intended switch is not demonstrated (the spray-2 row F304 is older and outside the captured pre-change window).\",\"recommended_missing_checks\":[\"Resolve desk effort again from the recorded config and explain why the resolver returns low while the config echo says medium. Confirm which value is intended before any closeout.\",\"For filing, obtain a pre-change session that differs from shoal-3, or record the prior default from the provisioner's change log, so the switch is shown as a transition.\",\"Use a current, non-stale OMP selectability listing after the managed registry refresh. Do not rely on models.yml.\",\"Confirm whether unpinned agent-run jobs count as model-using. Correct the background counts or the widget claim to match that definition.\",\"Check the cron widget's source against the job records, since it reported 5 of 5 but the records show 6 of 8 on eddy under the stated definition.\",\"Do not treat the closeout's 'no more evidence needed' statement as satisfied. Desk and filing are not verified.\"]}",
+        "answer_format": "none",
+        "artifacts": {},
+        "checks": {
+          "agent-cron-counts": false,
+          "managed-harness-catalog": false,
+          "correlated-proof-per-home": false
+        },
+        "score": 0.0,
+        "passed": false,
+        "seconds": 24.093,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 6034,
+          "cache_read_input_tokens": 19152,
+          "output_tokens": 4871,
+          "output_tokens_details": {
+            "thinking_tokens": 2713
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6034
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 30063,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0033818699999999995,
+        "turns": 12
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"background\": {\n    \"root\": {\"agent_jobs\": 3, \"on_pool\": 2},\n    \"desk\": {\"agent_jobs\": 3, \"on_pool\": 3},\n    \"filing\": {\"agent_jobs\": 2, \"on_pool\": 1}\n  },\n  \"omp_models\": {\n    \"shoal-3\": true,\n    \"spray-2\": false,\n    \"dune-1\": true\n  },\n  \"verified\": {\n    \"root\": true,\n    \"desk\": false,\n    \"filing\": false\n  },\n  \"evidence\": {\n    \"homes\": \"homes.json lists root, desk, filing as active and annex as inactive (excluded). Active config defaults match the closeout table: root tide/shoal-3/high, desk eddy/dune-1/medium, filing tide/shoal-3/high.\",\n    \"background\": \"Enabled jobs: root r-index (eddy), r-brief (unpinned, so home default tide/shoal-3), r-meter (eddy); desk d-digest (eddy), d-reconcile (unpinned, so home default eddy), d-check (eddy); filing f-sweep (unpinned, so home default tide/shoal-3), f-mtime (eddy). Disabled r-legacy and f-reminder are excluded. Total 8 enabled jobs, 6 on eddy. The closeout's '5 of 5 background jobs on eddy' is true only for the 5 background-labeled jobs and omits the unpinned enabled jobs. Assumption: unpinned jobs resolve to the home default, and jobs with a script field still count as model-using because they carry a model pin. Please confirm both.\",\n    \"omp\": \"omp/models-command.txt (recorded output, exit 0, ticket window) lists tide shoal-3 (managed), eddy dune-1 (local), offshore kelp-8 (managed). spray-2 is absent, so it is not selectable. omp/models.yml is a stale pre-refresh local declaration and says nothing about current selectability. The closeout claim that shoal-3 is missing is false.\",\n    \"root\": \"Newest session R102 (started_order 2) is shoal-3, with probe reply PROBE_OK. Pre-change R101 was spray-2, so the switch is visible. Resolver effort high matches the intended high. Verified.\",\n    \"desk\": \"Newest session D205 is dune-1, probe PROBE_OK, and the pre-change D204 was kelp-8. The model switch is shown. However, resolve_reasoning_config for desk returns effort low, while the intended and configured effort is medium, so the resolved effort does not match. Not verified.\",\n    \"filing\": \"Newest session F306 is shoal-3, probe PROBE_OK. But the pre-change row F305 is already shoal-3, so this ticket shows no switch from a prior default. The captured pre-change row does not exhibit the old default. Not verified.\"\n  },\n  \"recommended_missing_checks\": [\n    \"Desk: explain why resolve_reasoning_config yields low while homes.json and the intended table say medium. Check for an override in the desk config or resolver input, then re-run the resolver read-only.\",\n    \"Filing: obtain a true pre-change fresh session (before the provisioner switch) that shows the prior default. F305 is already shoal-3, so the switch is not demonstrated. Or confirm from the provisioner change log when the filing default changed.\",\n    \"Confirm whether unpinned jobs and script-backed jobs count as model-using, and whether unpinned jobs resolve to the home default. This changes the background counts.\",\n    \"Confirm the closeout's OMP claims against a fresh omp models listing after the managed registry refresh. The local models.yml is not evidence of selectability.\",\n    \"Correct the closeout: the cron widget's 5 of 5 covers only background-labeled jobs, the OMP shoal-3 and spray-2 claims are reversed, and 'no more evidence is needed' is unsupported for desk and filing.\"\n  ]\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "agent-cron-counts": false,
+          "managed-harness-catalog": true,
+          "correlated-proof-per-home": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 24.291,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 8959,
+          "cache_read_input_tokens": 16990,
+          "output_tokens": 5105,
+          "output_tokens_details": {
+            "thinking_tokens": 2742
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 8959
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 31060,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.003842875,
+        "turns": 13
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"background\": {\n    \"root\": {\"agent_jobs\": 2, \"on_pool\": 2},\n    \"desk\": {\"agent_jobs\": 2, \"on_pool\": 2},\n    \"filing\": {\"agent_jobs\": 1, \"on_pool\": 1}\n  },\n  \"omp_models\": {\n    \"shoal-3\": true,\n    \"spray-2\": false,\n    \"dune-1\": true\n  },\n  \"verified\": {\n    \"root\": false,\n    \"desk\": false,\n    \"filing\": false\n  },\n  \"evidence\": {\n    \"scope\": \"Active homes are root, desk, and filing. annex is inactive and excluded. Enabled model-using jobs are those with a non-null model. Disabled jobs (f-reminder, r-legacy) and the model-less jobs (d-reconcile, f-sweep, r-brief) are excluded.\",\n    \"background\": \"Enabled model-using jobs: d-digest and d-check (desk), f-mtime (filing), r-index and r-meter (root). All five are pinned to eddy/dune-1, so 5 of 5 resolve to the eddy pool. The count matches the draft's 5 of 5, but the draft's widget claim was not checked directly.\",\n    \"omp_models\": \"Source is the recorded 'omp models' stdout from the ticket window (exit 0): tide/shoal-3 managed, eddy/dune-1 local, offshore/kelp-8 managed. spray-2 is absent from that listing. omp/models.yml lists spray-2 and dune-1, but the file is a pre-refresh copy that the file itself says may be disabled or shadowed, so it does not establish current selectability. The draft's claim that shoal-3 is missing is wrong, and its claim that spray-2 is selectable is wrong.\",\n    \"root\": \"Config echo matches (tide/shoal-3/high). Resolver gives high. Captured pre-change session R101 was spray-2 and the probe R102 is shoal-3 with PROBE_OK. The switch is shown.\",\n    \"desk\": \"Config echo matches (eddy/dune-1/medium). Probe D205 is dune-1 with PROBE_OK. The resolver gives effort low, not the intended medium, so the resolved effort is not proven. Pre-change D204 was kelp-8, so the model switch is shown but the effort part is not.\",\n    \"filing\": \"Config echo matches (tide/shoal-3/high). Probe F306 is shoal-3 with PROBE_OK. The row immediately before the probe, F305, is already shoal-3, so this export does not capture a pre-change state. The only spray-2 row is F304, which is older and not the captured pre-change session. The switch is not demonstrated.\"\n  },\n  \"recommended_missing_checks\": [\n    \"desk: reconcile resolve_reasoning_config (low) with the intended medium. Find which config layer sets low and whether the resolver reads the same key as the config echo, then re-resolve.\",\n    \"filing: obtain the true pre-change session (the provisioner's before-state record or a session from before the change) so there is a real before/after pair. F305 cannot serve as the pre-change row.\",\n    \"omp: refresh 'omp models' in the current state (read-only listing or the recorded command output after the registry refresh) to confirm shoal-3 and dune-1 are selectable and spray-2 is not, rather than relying on the stale models.yml.\",\n    \"root: this home's switch is shown. Still confirm the resolver and probe for root reflect the same provider (tide) in a recorded log, since the probe log does not record provider.\",\n    \"background: confirm the widget claim by resolving each enabled job's provider from job config rather than by label. Counts already match, so this is a low-priority check.\"\n  ],\n  \"closeout_status\": \"The draft's 'all three defaults verified, no more evidence needed' is not supported. Root is supported. Desk has an effort mismatch. Filing has no pre-change proof. The OMP claims about shoal-3 and spray-2 are reversed.\"\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "agent-cron-counts": false,
+          "managed-harness-catalog": true,
+          "correlated-proof-per-home": false
+        },
+        "score": 0.3333333333333333,
+        "passed": false,
+        "seconds": 23.009,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 6303,
+          "cache_read_input_tokens": 19594,
+          "output_tokens": 4761,
+          "output_tokens_details": {
+            "thinking_tokens": 2404
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6303
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 30664,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0033649149999999996,
+        "turns": 13
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"background\": {\n    \"root\": {\"agent_jobs\": 3, \"on_pool\": 2},\n    \"desk\": {\"agent_jobs\": 3, \"on_pool\": 3},\n    \"filing\": {\"agent_jobs\": 2, \"on_pool\": 1}\n  },\n  \"omp_models\": {\n    \"shoal-3\": true,\n    \"spray-2\": false,\n    \"dune-1\": true\n  },\n  \"verified\": {\n    \"root\": true,\n    \"desk\": false,\n    \"filing\": false\n  },\n  \"evidence\": {\n    \"background\": \"Counted enabled jobs in profiles/desk, profiles/filing, and root cron files. Disabled jobs (f-reminder, r-legacy) are excluded. Jobs with model null (d-reconcile, f-sweep, r-brief) use their home default: desk is eddy, so d-reconcile is on_pool; root and filing default to tide, so those are off_pool. Totals: 8 enabled jobs, 6 on eddy. The draft's 5 of 5 is the background-label subset only, which is correct for that widget but not for the policy report.\",\n    \"omp_models\": \"Recorded omp models stdout (exit 0) lists tide shoal-3 (managed), eddy dune-1 (local), and offshore kelp-8. shoal-3 is present, so the draft claim that it is missing is false. spray-2 is absent from that list. The models.yml declaration for spray-2 is a pre-refresh copy that the file itself says may be shadowed or disabled, so it is not selectable. dune-1 is listed and selectable.\",\n    \"root\": \"Config is tide/shoal-3/high, matching the table. Resolver gives high. Newest session R102 is shoal-3 with PROBE_OK, and the pre-change session R101 was spray-2, so the switch is shown.\",\n    \"desk\": \"Config is eddy/dune-1, but the table expects medium effort. The resolver returns low for dune-1, so the resolved effort does not match the intended setting. Newest D205 is dune-1 with PROBE_OK, and pre-change D204 was kelp-8. The effort mismatch blocks verification.\",\n    \"filing\": \"Config is tide/shoal-3/high, and resolver gives high. Newest F306 is shoal-3, but the pre-change row F305 is already shoal-3, so this ticket does not capture a before-to-after switch. The older F304 was spray-2, which is outside the captured pre-change window.\",\n    \"annex\": \"Inactive (profiles/.deleted/annex) and excluded from the verification scope.\"\n  },\n  \"recommended_missing_checks\": [\n    \"Desk: determine why the resolver returns low while config and the table say medium. Re-check the effective reasoning_effort in the config echo and the resolver output for the same model.\",\n    \"Filing: capture a true pre-change session for the switch (the row before the probe must differ from shoal-3), or cite an archived pre-change export. Otherwise the switch is not proven.\",\n    \"Confirm the model ID in each probe session through a recorded runtime field, not just the PROBE_OK reply. The reply text does not show which model answered.\",\n    \"Confirm the eddy background pool result: check whether unpinned jobs in desk, root, and filing actually resolve to the home defaults in the cron runtime, since this review relies on config and not on a recorded job-resolution log.\",\n    \"For the OMP claims, the evidence is a single recorded stdout with an exit code. Confirm that the ticket window list is current, because the managed registry was refreshed after the local declarations were copied.\"\n  ]\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "agent-cron-counts": false,
+          "managed-harness-catalog": true,
+          "correlated-proof-per-home": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 25.331,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 6282,
+          "cache_read_input_tokens": 19573,
+          "output_tokens": 5122,
+          "output_tokens_details": {
+            "thinking_tokens": 2929
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6282
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 30983,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00354258,
+        "turns": 13
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": true,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"background\": {\n    \"root\": {\"agent_jobs\": 3, \"on_pool\": 2},\n    \"desk\": {\"agent_jobs\": 3, \"on_pool\": 3},\n    \"filing\": {\"agent_jobs\": 2, \"on_pool\": 1}\n  },\n  \"omp_models\": {\n    \"shoal-3\": true,\n    \"spray-2\": false,\n    \"dune-1\": true\n  },\n  \"verified\": {\n    \"root\": true,\n    \"desk\": false,\n    \"filing\": false\n  },\n  \"evidence\": {\n    \"background\": \"Enabled jobs only, from the three cron exports. root: r-index (pinned eddy), r-brief (unpinned, inherits root default tide), r-meter (pinned eddy, script meter.py). r-legacy is disabled and excluded. desk: d-digest and d-check are pinned eddy; d-reconcile is unpinned and inherits the desk default, which is eddy/dune-1, so it is on pool. filing: f-mtime is pinned eddy; f-sweep is unpinned and inherits the filing default, tide/shoal-3, so it is off pool; f-reminder is disabled. Total is 8 enabled model-using jobs, 6 on eddy. The draft's '5 of 5 on eddy' is wrong. The widget only sees rows labeled background, which is 5 of the 8 jobs. Assumption: jobs with a script and a model pin count as model-using. Jobs with model null count as agent jobs on the home default.\",\n    \"omp_models\": \"The ticket-window 'omp models' output lists tide/shoal-3 (managed), eddy/dune-1 (local), and offshore/kelp-8 (managed). spray-2 is absent. The draft says shoal-3 is missing and spray-2 is selectable; both are wrong. omp/models.yml is a pre-refresh local copy that declares spray-2 but is not a live listing, so it does not prove selectability.\",\n    \"root\": \"Newest session R102 is shoal-3 and the pre-change row R101 is spray-2, so the model changed. PROBE_OK is recorded for R102. Resolved effort for shoal-3 is high, matching the intended high. homes.json shows provider tide, matching the table. All three signals are present, so root is verified. Scope is the default session only, and delegation pins, bindings and roster tiers were not in the exports.\",\n    \"desk\": \"Newest session D205 is dune-1 and the pre-change row D204 is kelp-8, so the model changed. PROBE_OK is recorded for D205. However, resolved effort for dune-1 is low, while the intended and configured effort is medium. homes.json agent.reasoning_effort is medium, so config and resolved effort disagree. The desk switch is not proven.\",\n    \"filing\": \"Newest session F306 is shoal-3, and PROBE_OK is recorded for it. Resolved effort is high, matching the intent. But the captured pre-change row F305 is already shoal-3. The before/after comparison shows no change in this ticket window. spray-2 (F304) is older and is not the captured pre-change row. The switch is not proven by this ticket.\",\n    \"closeout_draft\": \"The draft's claim that 'no more evidence is needed' is not supported. Only root meets all three signals. desk has an effort mismatch and filing has no observable before/after change.\"\n  },\n  \"recommended_missing_checks\": [\n    \"desk: re-run resolve_reasoning_config under the desk home for dune-1 and inspect agent.reasoning_overrides and per-model overrides. Reconcile low (resolved) with medium (config). Then probe again.\",\n    \"filing: confirm the true pre-change state of the filing home (backup or config snapshot before the staged change) and check whether F305 reflects a session started after the switch. Then re-run a fresh default session and compare its row with the real prior state.\",\n    \"root and desk: verify the configured provider live per home with a real one-shot in each home, and read back the session rows after <path> or a fresh session start. Config echoes alone are not proof.\",\n    \"omp: re-run 'omp models' live (read-only, not in this ticket window) to confirm spray-2 is absent and that shoal-3 and dune-1 are selectable now. models.yml is stale and should not be used as evidence.\",\n    \"background: confirm whether r-meter and d-check (script jobs with model pins) actually invoke the model. Confirm whether unpinned jobs (r-brief, d-reconcile, f-sweep) run on the home default. Recount if either assumption is wrong.\",\n    \"Coverage: the exports do not include bot bindings, roster tiers, delegation pins, vision, or auxiliary routing. Report these as uncovered or run the checks.\",\n    \"The cutover child skill '..<path>' was not found under the home skills directory, so its checks were not applied. Confirm the skill is installed, or record the cutover checks as unavailable.\",\n    \"annex is inactive (profiles/.deleted/annex) and is excluded from all counts.\"\n  ]\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "agent-cron-counts": false,
+          "managed-harness-catalog": true,
+          "correlated-proof-per-home": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 27.804,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 10868,
+          "cache_read_input_tokens": 34630,
+          "output_tokens": 5281,
+          "output_tokens_details": {
+            "thinking_tokens": 2322
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 10868
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 50787,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0043461,
+        "turns": 15
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": true,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"background\": {\n    \"root\": {\"agent_jobs\": 2, \"on_pool\": 2},\n    \"desk\": {\"agent_jobs\": 2, \"on_pool\": 2},\n    \"filing\": {\"agent_jobs\": 1, \"on_pool\": 1}\n  },\n  \"omp_models\": {\n    \"shoal-3\": true,\n    \"spray-2\": false,\n    \"dune-1\": true\n  },\n  \"verified\": {\n    \"root\": true,\n    \"desk\": false,\n    \"filing\": false\n  },\n  \"evidence\": {\n    \"background\": \"Enabled jobs with a model pin: root r-index and r-meter (both dune-1/eddy); desk d-digest and d-check (both dune-1/eddy); filing f-mtime (dune-1/eddy). Excluded: r-brief, d-reconcile, f-sweep (no model), and r-legacy, f-reminder (disabled). Total 5 of 5 on eddy, which matches the closeout's 5 of 5 figure. The widget itself is not in the export, so its behaviour is unverified.\",\n    \"omp_models\": \"Recorded 'omp models' output (ticket window, exit 0) lists tide/shoal-3 (managed), eddy/dune-1 (local), offshore/kelp-8. spray-2 is absent. The local models.yml declares spray-2 under tide, but the file itself says the managed registry may shadow it. The closeout's claim that shoal-3 is missing is contradicted by the listing. The claim that spray-2 is selectable is also contradicted.\",\n    \"root\": \"Config (homes.json): tide/shoal-3, effort high. Newest probe session R102 is shoal-3 and replied PROBE_OK. Pre-change row R101 is spray-2, so the switch is visible. Resolved effort is high, matching intent. Provider is only echoed from config because sessions have no provider column.\",\n    \"desk\": \"Config: eddy/dune-1, effort medium. Newest session D205 is dune-1 with PROBE_OK, and pre-change D204 is kelp-8. However, resolve_reasoning_config gives low for dune-1, not the intended medium. The effort signal fails, so the default is not proven.\",\n    \"filing\": \"Config: tide/shoal-3, effort high. Newest session F306 is shoal-3 with PROBE_OK and effort resolves to high. But the closeout's pre-change row F305 is already shoal-3, so the session rows show no before/after change. F304 (spray-2) is older and is not the captured pre-change row. The switch is not demonstrated.\"\n  },\n  \"recommended_missing_checks\": [\n    \"desk: find why the resolver gives low when agent.reasoning_effort is medium (likely a per-model override in agent.reasoning_overrides or a surface difference). Check the resolved effort with a live probe and align it with the intended medium before marking desk verified.\",\n    \"filing: establish the true pre-change state. Confirm when the change was staged versus the F305 capture, and identify a session that actually ran on the prior default. Then re-compare the before/after sessions.model rows.\",\n    \"All homes: add per-home provider verification (the sessions table has no provider column). Use a live check of the provider the probe actually hit, not just the config echo.\",\n    \"Cron: confirm whether the script-backed jobs (r-meter, d-check, f-mtime, which carry a model pin plus a script) actually invoke the model. If they are no_agent jobs, they should not be counted: root becomes 1/1, desk 1/1, filing 0/0.\",\n    \"Widget: the closeout's widget claim cannot be checked from these exports. Compare the widget's output with the resolved routing, not only background-labelled rows.\",\n    \"OMP: the listing is from the ticket window. Re-check the current selectable list before the closeout relies on it, given that the local declaration for spray-2 may be shadowed.\"\n  ],\n  \"closeout_status\": \"Not ready to close. Root is proven. Desk fails the effort check, and filing has no demonstrated switch. The draft claims about OMP shoal-3 and spray-2 are contradicted by the recorded listing. The background count of 5 of 5 on eddy is consistent with the export, subject to the script-job question above.\",\n  \"scope_note\": \"Read-only review of exported files only. Hermes, OMP and live probes were not run and no settings were written. annex is inactive and excluded.\"\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "agent-cron-counts": false,
+          "managed-harness-catalog": true,
+          "correlated-proof-per-home": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 27.434,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 11536,
+          "cache_read_input_tokens": 35461,
+          "output_tokens": 5044,
+          "output_tokens_details": {
+            "thinking_tokens": 2476
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 11536
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 52049,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00431941,
+        "turns": 14
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": true,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"background\":{\"root\":{\"agent_jobs\":3,\"on_pool\":2},\"desk\":{\"agent_jobs\":3,\"on_pool\":2},\"filing\":{\"agent_jobs\":2,\"on_pool\":1}},\"omp_models\":{\"shoal-3\":true,\"spray-2\":false,\"dune-1\":true},\"verified\":{\"root\":true,\"desk\":false,\"filing\":false},\"evidence\":{\"scope\":\"Active homes are root, desk and filing. annex is inactive and excluded. Read-only; no Hermes, OMP or probe was run.\",\"background\":\"Enabled jobs only, counting any job with a model pin or no pin. Disabled retired jobs are excluded. root: r-index (eddy), r-brief (unpinned), r-meter (script, eddy). desk: d-digest (eddy), d-reconcile (unpinned), d-check (script, eddy). filing: f-sweep (unpinned), f-mtime (script, eddy). Total 8 enabled model-using jobs, 5 on eddy. The closeout's '5 of 5 background jobs on eddy' is accurate only for the background-labelled subset, and the policy count is 5 of 8. Script jobs are counted as model-using because they carry a model pin; this is an interpretation.\",\"omp_models_source\":\"The ticket-window 'omp models' stdout lists tide/shoal-3 (managed), eddy/dune-1 (local) and offshore/kelp-8. spray-2 does not appear. The models.yml declarations are pre-refresh and may be shadowed, so they were not used for selectability. The closeout's claim that shoal-3 is missing is contradicted by the recorded output. Its claim that spray-2 is selectable is also contradicted.\",\"root\":\"Config echo tide/shoal-3/high matches the table. Session rows: R102 shoal-3 is newest and R101 spray-2 is the captured pre-change row, so the switch is visible. Probe R102 returned PROBE_OK in a fresh default session. Resolved effort is high, matching the intent.\",\"desk\":\"Config echo eddy/dune-1/medium matches the table. Session rows: D205 dune-1 is newest and D204 kelp-8 is the pre-change row, and the probe returned PROBE_OK. However, the resolved effort for dune-1 is low, not the intended medium. The effort layer is wrong, so the switch is not proven.\",\"filing\":\"Config echo tide/shoal-3/high matches the table, and the probe F306 returned PROBE_OK with resolved effort high. However, the closeout's pre-change row F305 is already shoal-3, so the before/after comparison shows no change. The only earlier change is spray-2 at F304, which is outside the stated pre-change capture. The switch is not proven.\"},\"recommended_missing_checks\":[\"desk: diagnose why resolve_reasoning_config gives low for dune-1 when the intended tier is medium. Check agent.reasoning_overrides and the global agent.reasoning_effort, then re-resolve in the desk home and run a fresh-session probe.\",\"filing: obtain a true pre-change capture, meaning a session recorded before the provisioner switch that shows a non-shoal-3 model, and compare it with F306. Alternatively confirm the switch time against the session order.\",\"all active homes: confirm the configured provider live. The session table has no provider column, so the provider is only proven indirectly, through config echoes and the resolver.\",\"all active homes: re-run the 'omp models' listing live if a current selectability answer is required. The ticket-window recording is the only evidence here.\",\"background: confirm whether script-backed jobs (r-meter, d-check, f-mtime) actually invoke a model, and whether the unpinned jobs (r-brief, d-reconcile, f-sweep) resolve to tide or another default. Both affect the policy count.\",\"the closeout's 'no more evidence is needed' is not supported. The ticket cannot close on the current evidence.\"]}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "agent-cron-counts": false,
+          "managed-harness-catalog": true,
+          "correlated-proof-per-home": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 27.16,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 11532,
+          "cache_read_input_tokens": 35461,
+          "output_tokens": 5136,
+          "output_tokens_details": {
+            "thinking_tokens": 2721
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 11532
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 52137,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00436491,
+        "turns": 14
+      }
+    ]
+  },
+  "verdict": "no-difference",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 339074,
+  "skipped_trials": []
+}

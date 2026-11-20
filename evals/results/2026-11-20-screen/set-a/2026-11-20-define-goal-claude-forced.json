@@ -1,0 +1,839 @@
+{
+  "schema_version": 2,
+  "task": "define-goal",
+  "generated_at": "2026-11-20T00:42:02.797785-08:00",
+  "skill": "define-goal",
+  "skill_revision": "4",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "forced",
+  "shell": false,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "ordered-series": {
+      "field": "order",
+      "equals": [
+        "001",
+        "002",
+        "003"
+      ]
+    },
+    "keep-other-goals": {
+      "field": "revised",
+      "equals": [
+        "002"
+      ]
+    },
+    "build-on-completed-work": {
+      "field": "prerequisite",
+      "equals": "001"
+    },
+    "next-verifiable-outcome": {
+      "field": "milestone",
+      "equals": "M-B"
+    },
+    "keep-owner-validator": {
+      "field": "minimum_passed_cases",
+      "equals": 12
+    },
+    "stop-only-for-material-blocks": {
+      "field": "stop_for",
+      "equals": [
+        "T-B",
+        "T-D"
+      ]
+    },
+    "keep-launch-provisional": {
+      "field": "next_gate",
+      "equals": "E-C"
+    }
+  },
+  "rubric_flags": {
+    "ordered-series": "non-discriminating",
+    "keep-other-goals": "non-discriminating",
+    "build-on-completed-work": "non-discriminating",
+    "next-verifiable-outcome": "non-discriminating",
+    "keep-owner-validator": "non-discriminating",
+    "stop-only-for-material-blocks": "non-discriminating",
+    "keep-launch-provisional": "flaky"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 0,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.0,
+      "pass^k": false,
+      "mean_score": 0.8571428571428571,
+      "sample_stddev": 0.0
+    },
+    "terse": {
+      "valid": true,
+      "passed": 0,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.0,
+      "pass^k": false,
+      "mean_score": 0.8571428571428571,
+      "sample_stddev": 0.0
+    },
+    "skill": {
+      "valid": true,
+      "passed": 0,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 0.0,
+      "pass^k": false,
+      "mean_score": 0.8095238095238095,
+      "sample_stddev": 0.08247860988423221
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": -0.04761904761904756,
+    "terse": -0.04761904761904756
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"order\":[\"001\",\"002\",\"003\"],\"revised\":[\"002\"],\"prerequisite\":\"001\",\"milestone\":\"M-B\",\"minimum_passed_cases\":12,\"stop_for\":[\"T-A\",\"T-B\",\"T-D\"],\"next_gate\":\"E-C\",\"goal_markdown\":\"# 002: Make pilot lending and returns work for all twelve sandbox cases\\n\\nPrerequisite: 001 is accepted (E-A). The sealed stock ledger reconciles all 180 records in the two pilot branches, so no ledger repair is needed. Do not build the spreadsheet macro from the old draft (M-A). No approved method exists for it.\\n\\nGoal: Pilot branches can lend and return sandbox items correctly across all twelve owner-supplied sandbox lending cases, including cross-branch returns, unavailable stock, and reservation conflicts. Each case must complete without manual ledger reconciliation. Hand off the observed result of each case as case evidence (E-B) for the board packet.\\n\\nScope:\\n- Run every one of the twelve supplied sandbox cases against the pilot branches.\\n- Record the observed outcome of each case: pass or fail, the stock state before and after, and any manual step needed.\\n- Use only sandbox items and sandbox patron records.\\n- Choose reversible labels for demonstration output yourself and note them in the handoff (T-C is not a stop).\\n\\nOut of scope:\\n- Enabling borrowing for the public network. Only the regional board can authorize live lending through the signed decision E-C. That belongs to 003.\\n- Any patron record that would have to leave the sandbox (T-D).\\n- Presenting a single easy checkout as the milestone (M-D).\\n\\nStop and report, with the evidence gathered so far, if:\\n- A workday elapses with some cases still unverified (T-A).\\n- The sandbox credential that only the owner can issue is missing at startup (T-B).\\n- The only remaining option would send a patron record outside the sandbox (T-D).\\n\\nDone when:\\n- All twelve owner-supplied sandbox cases have been run, and each case has a recorded observed result.\\n- At least 12 of 12 cases pass without manual ledger reconciliation.\\n- The case evidence (E-B) is handed off for the board packet, with one entry per case.\\n- No patron record has left the sandbox, and no public lending has been enabled.\\n- Any stopped run states which cases remain unverified and why.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "ordered-series": true,
+          "keep-other-goals": true,
+          "build-on-completed-work": true,
+          "next-verifiable-outcome": true,
+          "keep-owner-validator": true,
+          "stop-only-for-material-blocks": false,
+          "keep-launch-provisional": true
+        },
+        "score": 0.8571428571428571,
+        "passed": false,
+        "seconds": 13.942,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4450,
+          "cache_read_input_tokens": 18769,
+          "output_tokens": 2103,
+          "output_tokens_details": {
+            "thinking_tokens": 869
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4450
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 25328,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00179604,
+        "turns": 6
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"order\":[\"001\",\"002\",\"003\"],\"revised\":[\"002\"],\"prerequisite\":\"001\",\"milestone\":\"M-B\",\"minimum_passed_cases\":12,\"stop_for\":[\"T-A\",\"T-B\",\"T-D\"],\"next_gate\":\"E-C\",\"goal_markdown\":\"# 002: Lend and return sandbox items at pilot branches\\n\\nPrerequisite: 001 is accepted (E-A, 2026-11-18). The stock ledger already reconciles all 180 records in the two pilot branches, so do not rebuild or reconcile it again. The spreadsheet macro from the old draft was never approved; do not use it.\\n\\nGoal: Pilot branches can lend and return sandbox items correctly across all twelve owner-supplied sandbox lending cases, including cross-branch returns, unavailable stock and reservation conflicts, with no manual ledger reconciliation. Record the observed result of each case as case evidence (E-B) for the regional board packet.\\n\\nStop and report when:\\n- T-A: a workday elapses with cases still unverified. Hand off the results so far, marked partial.\\n- T-B: the sandbox credential, which only the owner can issue, is missing at startup.\\n- T-D: the only remaining option would send a patron record outside the sandbox.\\n\\nDecide and record reversible naming choices for demonstration labels yourself. Do not stop for them (T-C).\\n\\nDo not enable live borrowing for the public network. Only the regional board's signed decision (E-C) activates 003.\\n\\nDone when:\\n- All 12 owner-supplied sandbox cases pass, with the observed result of each recorded (minimum_passed_cases: 12).\\n- The set includes the cross-branch return, unavailable stock and reservation conflict cases.\\n- No case needed manual ledger reconciliation.\\n- Case evidence (E-B) is handed off with a per-case observed result.\\n- No patron record left the sandbox.\\n\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "ordered-series": true,
+          "keep-other-goals": true,
+          "build-on-completed-work": true,
+          "next-verifiable-outcome": true,
+          "keep-owner-validator": true,
+          "stop-only-for-material-blocks": false,
+          "keep-launch-provisional": true
+        },
+        "score": 0.8571428571428571,
+        "passed": false,
+        "seconds": 14.582,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4181,
+          "cache_read_input_tokens": 19066,
+          "output_tokens": 2515,
+          "output_tokens_details": {
+            "thinking_tokens": 1429
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4181
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 25768,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.001971385,
+        "turns": 6
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"order\":[\"001\",\"002\",\"003\"],\"revised\":[\"002\"],\"prerequisite\":\"001\",\"milestone\":\"M-B\",\"minimum_passed_cases\":12,\"stop_for\":[\"T-A\",\"T-B\",\"T-D\"],\"next_gate\":\"E-C\",\"goal_markdown\":\"# 002: Pilot branches lend and return sandbox items\\n\\nReplaces the earlier provisional goal. The spreadsheet macro idea (M-A) is dropped; no method was approved.\\n\\nPrerequisite: 001 is accepted (E-A). The sealed stock ledger reconciles all 180 records in the two pilot branches, including damaged and reserved items. Do not re-do inventory work. Use the accepted ledger as-is.\\n\\n## Objective\\n\\nMake it possible for residents to borrow and return items at any pilot branch in the sandbox, without staff reconciling records by hand.\\n\\n## Scope\\n\\n- Run the owner's fixed set of twelve sandbox lending cases. They include cross-branch returns, unavailable stock, and reservation conflicts.\\n- For each case, record the observed result. This is the case evidence (E-B) for the board packet.\\n- Choose reversible names for demonstration labels yourself and note them in the handoff.\\n\\n## Out of scope\\n\\n- Enabling live or public borrowing. Only the regional board can authorize that through its signed decision (E-C). Do not assume approval.\\n- Sending any patron record outside the sandbox.\\n- Creating a spreadsheet macro or any other stock-ledger workaround.\\n\\n## Stop and hand off when\\n\\n- A workday elapses with some cases still unverified (T-A). Hand off the partial results and list the unverified cases.\\n- The sandbox credential, which only the owner can issue, is missing (T-B).\\n- The only remaining option requires sending a patron record outside the sandbox (T-D).\\n\\n## Done when\\n\\n- All twelve sandbox cases have been run, and at least 12 pass with no manual ledger reconciliation.\\n- Each case has a recorded observed result (E-B), including cases that failed.\\n- The handoff states the milestone M-B: pilot branches lend and return sandbox items correctly across all supplied cases, with case evidence handed off.\\n- The handoff confirms that no public borrowing was enabled and that 003 remains inactive until E-C arrives.\\n\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "ordered-series": true,
+          "keep-other-goals": true,
+          "build-on-completed-work": true,
+          "next-verifiable-outcome": true,
+          "keep-owner-validator": true,
+          "stop-only-for-material-blocks": false,
+          "keep-launch-provisional": true
+        },
+        "score": 0.8571428571428571,
+        "passed": false,
+        "seconds": 13.681,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4192,
+          "cache_read_input_tokens": 19071,
+          "output_tokens": 2285,
+          "output_tokens_details": {
+            "thinking_tokens": 1044
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4192
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 25554,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0018578099999999999,
+        "turns": 6
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"order\":[\"001\",\"002\",\"003\"],\"revised\":[\"002\"],\"prerequisite\":\"001\",\"milestone\":\"M-B\",\"minimum_passed_cases\":12,\"stop_for\":[\"T-A\",\"T-B\",\"T-D\"],\"next_gate\":\"E-C\",\"goal_markdown\":\"# 002: Lend and return the pilot sandbox cases\\n\\nStatus: Active. Depends on 001, whose accepted stock ledger (E-A, accepted 2026-11-18, reconciles all 180 records in the two pilot branches) is the only inventory source.\\n\\nPurpose: residents can borrow and return sandbox items at pilot branches without staff reconciling records by hand.\\n\\nScope:\\n- Run the owner's fixed set of twelve sandbox lending cases, including cross-branch returns, unavailable stock and reservation conflicts.\\n- Use the accepted ledger from 001 as the stock source. Do not add a spreadsheet macro or any other ledger method unless the owner approves it.\\n- Record the observed result of each case as case evidence (E-B) for the board packet.\\n\\nOut of scope:\\n- Public network lending. Only the regional board's signed decision (E-C) can authorize live lending, and that decision activates 003.\\n- Sending any patron record outside the sandbox.\\n\\nApproach (chosen by the agent; the owner may redirect):\\n- Choose the implementation that makes all twelve cases pass without manual ledger reconciliation.\\n- A reversible naming choice for demonstration labels may be decided by the agent and listed in the handoff.\\n\\nStop and report (do not work around) if:\\n- A workday elapses with some cases still unverified (T-A).\\n- The sandbox credential, which only the owner can issue, is missing at startup (T-B).\\n- The only remaining option requires sending a patron record outside the sandbox (T-D).\\n\\nDone when:\\n1. All twelve owner-supplied sandbox cases pass with no manual ledger reconciliation. Evidence: a per-case table in the handoff listing case ID, branch(es), action (borrow, return, cross-branch return, unavailable, reservation conflict), expected result, observed result, and PASS/FAIL. Required: 12 of 12 PASS (minimum_passed_cases = 12).\\n2. The ledger after the run matches the accepted 001 ledger plus the recorded transactions, with zero discrepancies. Evidence: a before/after count per branch and a diff of transactions against expected changes.\\n3. Case evidence (E-B) is handed off in a form the board packet can cite: the per-case table, the commands or steps used to run each case, and the timestamp of each run.\\n4. Any naming choice or deviation from the accepted ledger is listed explicitly in the handoff.\\n5. No patron record left the sandbox, and no step was taken on a stop trigger above. Evidence: a statement in the handoff with the list of stop triggers checked.\\n\\nNot done yet if any case is FAIL or unverified. Report the partial table rather than marking the goal complete.\\n\\nNext gate: 003 activates only when the regional board's signed decision (E-C) arrives. Do not assume approval or coverage in advance.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "ordered-series": true,
+          "keep-other-goals": true,
+          "build-on-completed-work": true,
+          "next-verifiable-outcome": true,
+          "keep-owner-validator": true,
+          "stop-only-for-material-blocks": false,
+          "keep-launch-provisional": true
+        },
+        "score": 0.8571428571428571,
+        "passed": false,
+        "seconds": 14.375,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 6798,
+          "cache_read_input_tokens": 16644,
+          "output_tokens": 2198,
+          "output_tokens_details": {
+            "thinking_tokens": 714
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6798
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 25646,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00211579,
+        "turns": 6
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"order\":[\"001\",\"002\",\"003\"],\"revised\":[\"002\"],\"prerequisite\":\"001\",\"milestone\":\"M-B\",\"minimum_passed_cases\":12,\"stop_for\":[\"T-A\",\"T-B\",\"T-D\"],\"next_gate\":\"E-C\",\"goal_markdown\":\"# 002: Lend and return sandbox items at pilot branches\\n\\nStatus: Active. Prerequisite 001 is accepted (2026-11-18): the sealed stock ledger reconciles all 180 records in the two pilot branches, including damaged and reserved items. Use that ledger as the source of truth. Do not rebuild or re-audit inventory unless a case shows a specific ledger error.\\n\\nPurpose: residents can borrow and return sandbox items at any pilot branch without staff reconciling records by hand.\\n\\nScope: the owner's fixed set of twelve sandbox lending cases. They include cross-branch returns, unavailable stock, and reservation conflicts. This goal covers the sandbox only. It does not enable public borrowing; that waits for the regional board decision E-C, which activates 003.\\n\\n## Outcomes\\n\\n1. All twelve supplied sandbox cases run end to end (checkout, return, and any reservation or unavailable-stock handling each case requires).\\n   Evidence: a case-results file with one row per case (case ID, branch(es), inputs, observed outcome, pass or fail).\\n2. Cross-branch returns are recorded at the receiving branch and the item's location and status in the ledger match the observed result.\\n   Evidence: the case rows for cross-branch returns show ledger state before and after each action.\\n3. Unavailable items and reservation conflicts are refused or resolved as each case specifies, with no item lent twice.\\n   Evidence: case rows for unavailable-stock and reservation-conflict cases, each with the observed refusal or resolution.\\n4. Every case completes without manual ledger reconciliation by staff. Any manual step is recorded as a failure.\\n   Evidence: each case row states \\\"no manual reconciliation\\\" as yes or no, with the reason for any no.\\n5. Case evidence is handed off for the board packet as E-B.\\n   Evidence: the case-results file and the ledger state snapshot, in a location the owner can inspect.\\n\\n## Constraints\\n\\n- Use only the sandbox. Do not send any patron record outside the sandbox. If the only remaining option requires that, stop and report it.\\n- The sandbox credential is issued only by the owner. If it is missing at startup, stop and report it; do not work around it.\\n- Choose reversible naming for demonstration labels yourself and record the choice in the results file. Do not stop for it.\\n- Work window: one workday of agent effort. If the window ends with cases unverified, stop and report which cases remain unverified and why.\\n- Do not treat this goal as board approval. The board decides public operation.\\n\\n## Done when\\n\\n- The case-results file contains exactly twelve rows, one per supplied case, each with an observed outcome.\\n- At least 12 of 12 cases pass, each with \\\"no manual reconciliation\\\" recorded as yes.\\n- Cross-branch return, unavailable-stock, and reservation-conflict rows are present and pass.\\n- The ledger state snapshot is included and matches the observed outcomes.\\n- The handoff (E-B) is in an inspectable location and the final report lists any case not passed, with reason.\\n- No patron record was sent outside the sandbox.\\n\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "ordered-series": true,
+          "keep-other-goals": true,
+          "build-on-completed-work": true,
+          "next-verifiable-outcome": true,
+          "keep-owner-validator": true,
+          "stop-only-for-material-blocks": false,
+          "keep-launch-provisional": true
+        },
+        "score": 0.8571428571428571,
+        "passed": false,
+        "seconds": 17.576,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4175,
+          "cache_read_input_tokens": 19287,
+          "output_tokens": 2555,
+          "output_tokens_details": {
+            "thinking_tokens": 967
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4175
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 26023,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.001992845,
+        "turns": 6
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"order\":[\"001\",\"002\",\"003\"],\"revised\":[\"002\"],\"prerequisite\":\"001\",\"milestone\":\"M-B\",\"minimum_passed_cases\":12,\"stop_for\":[\"T-A\",\"T-B\",\"T-D\"],\"next_gate\":\"E-C\",\"goal_markdown\":\"# 002: Pilot branches lend and return sandbox items\\n\\nStatus: Active. Prerequisite 001 accepted on 2026-11-18; the sealed stock ledger (E-A) reconciles all 180 records in the two pilot branches. Do not rebuild or re-audit inventory.\\n\\nPurpose: let residents borrow and return sandbox items at either pilot branch, including cross-branch returns, unavailable stock and reservation conflicts, without staff reconciling the ledger by hand.\\n\\n## Outcomes\\n\\n1. Run each of the twelve owner-supplied sandbox lending cases against the sealed ledger. Evidence: a case list with the case ID, the input, and the observed result for each case.\\n2. Each case completes with the ledger correct afterward, with no manual ledger edits or reconciliation steps. Evidence: a before and after ledger snapshot per case, showing the changed records.\\n3. Cross-branch returns, unavailable stock and reservation conflicts each have at least one passing case. Evidence: the case list marks which cases cover these categories.\\n4. Hand off the case evidence (E-B) for the board packet. Evidence: one folder or file containing the case list, the snapshots and a short summary stating how many cases passed.\\n\\nNo method for the stock-ledger spreadsheet macro (M-A) is approved. Do not use it. Choose any other method that meets the outcomes.\\n\\n## Boundaries\\n\\n- Work only in the sandbox. Do not send any patron record outside the sandbox.\\n- Do not enable live or public borrowing. Only the regional board can authorize that (E-C).\\n- If a naming choice for demonstration labels is reversible, make the choice and record it in the summary.\\n\\n## Stop and report if\\n\\n- A workday elapses with cases still unverified (T-A). Report which cases remain unverified and why.\\n- The sandbox credential is missing at startup. Only the owner can issue it (T-B).\\n- The only remaining option requires sending a patron record outside the sandbox (T-D).\\n\\n## Done when\\n\\n- At least 12 of the 12 owner-supplied sandbox cases are recorded as passed (minimum_passed_cases = 12).\\n- Every case has its observed result and ledger snapshot in the handoff evidence (E-B).\\n- No case needed manual ledger reconciliation.\\n- The handoff summary lists any case that did not pass, with the reason, and states the count of passed cases.\\n- No patron record left the sandbox, and no live lending was enabled.\\n\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "ordered-series": true,
+          "keep-other-goals": true,
+          "build-on-completed-work": true,
+          "next-verifiable-outcome": true,
+          "keep-owner-validator": true,
+          "stop-only-for-material-blocks": false,
+          "keep-launch-provisional": true
+        },
+        "score": 0.8571428571428571,
+        "passed": false,
+        "seconds": 14.877,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4184,
+          "cache_read_input_tokens": 19298,
+          "output_tokens": 2358,
+          "output_tokens_details": {
+            "thinking_tokens": 968
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4184
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 25846,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00189558,
+        "turns": 6
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"order\":[\"001\",\"002\",\"003\"],\"revised\":[\"002\"],\"prerequisite\":\"001\",\"milestone\":\"M-B\",\"minimum_passed_cases\":12,\"stop_for\":[\"T-A\",\"T-B\",\"T-D\"],\"next_gate\":\"E-C\",\"goal_markdown\":\"# 002: Pilot branches lend and return the sandbox cases correctly\\n\\n**Prerequisite:** 001 (accepted on 2026-11-18). The sealed stock ledger reconciles all 180 records in the two pilot branches, including damaged and reserved items. Do not redo inventory work.\\n\\n**Purpose:** Residents should be able to borrow and return items at any branch without staff reconciling records by hand. This goal produces the pilot evidence the regional board will review. It does not authorize public network lending. Only the regional board can do that (decision E-C), and goal 003 waits for it.\\n\\n**Intended advance:** Pilot branches can lend and return sandbox items correctly across the twelve sandbox lending cases that the owner supplies. The cases include cross-branch returns, unavailable stock, and reservation conflicts.\\n\\n**Scope and constraints:**\\n- Work only in the sandbox. Do not send any patron record outside the sandbox.\\n- Use the accepted 001 ledger as the stock baseline. Do not add a spreadsheet macro or any other manual reconciliation step. All cases must work without manual ledger reconciliation.\\n- Where the owner's case list or the sandbox credential is needed, the owner must supply it. Do not invent cases.\\n- Reversible naming choices for demonstration labels: take a reasonable default and record it in the report.\\n\\n**Done when:**\\n1. Each of the twelve owner-supplied sandbox cases has been run in the sandbox. For each case, the report states the observed result (pass or fail) and the evidence that shows it. Evidence is the case evidence for E-B.\\n2. All twelve cases pass without any manual ledger reconciliation. The report states this explicitly for each case.\\n3. The report includes cross-branch returns, unavailable-stock cases, and reservation-conflict cases, each with its observed result.\\n4. The sandbox constraints hold throughout: no patron record leaves the sandbox, and no live public lending is enabled.\\n\\n**Stop and report at once, instead of continuing, if:**\\n- At the start of the run, the sandbox credential or the owner's twelve-case list is missing. Only the owner can supply these.\\n- The only remaining option for a case requires sending a patron record outside the sandbox.\\n- The workday window elapses with some cases still unverified. Report the observed results so far, with evidence, and list the unverified cases.\\n\\n**Final report:** Pair each of the twelve cases with its observed result and evidence. State the number of passing cases out of twelve, and list any defaults taken. Keep the report factual. A partial pass is reported as partial.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "ordered-series": true,
+          "keep-other-goals": true,
+          "build-on-completed-work": true,
+          "next-verifiable-outcome": true,
+          "keep-owner-validator": true,
+          "stop-only-for-material-blocks": false,
+          "keep-launch-provisional": true
+        },
+        "score": 0.8571428571428571,
+        "passed": false,
+        "seconds": 17.382,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 8705,
+          "cache_read_input_tokens": 34516,
+          "output_tokens": 2513,
+          "output_tokens_details": {
+            "thinking_tokens": 1020
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 8705
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 45742,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0026905849999999997,
+        "turns": 7
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"order\":[\"001\",\"002\",\"003\"],\"revised\":[\"002\"],\"prerequisite\":\"001\",\"milestone\":\"M-B\",\"minimum_passed_cases\":12,\"stop_for\":[\"T-A\",\"T-B\",\"T-D\"],\"next_gate\":\"E-C\",\"goal_markdown\":\"# 002: Lend and return sandbox items at pilot branches\\n\\n**Prerequisite:** 001, accepted 2026-11-18. The sealed stock ledger reconciles all 180 records in the two pilot branches, including damaged and reserved items.\\n\\n**Purpose:** Residents can borrow and return items at any branch without staff reconciling records by hand. This goal shows that the two pilot branches can do this for the owner's fixed set of twelve sandbox lending cases, and hands off the case evidence for the regional board's packet. The board decides public operation (E-C). This goal does not enable public lending and does not decide whether the pilot is accepted for public use.\\n\\n**Intended advance:** The pilot branches lend and return sandbox items correctly across all twelve owner-supplied cases, including cross-branch returns, unavailable stock, and reservation conflicts, with no manual ledger reconciliation. The choice of how to do this is yours.\\n\\n**Done when:**\\n- All twelve owner-supplied sandbox lending cases have been run against the pilot branches. For each case, the report gives the inputs, the observed result, and whether it matched the expected outcome in the case.\\n- Every case passes without manual ledger reconciliation by staff. Any case that needed manual reconciliation counts as failed.\\n- At least 12 of 12 cases pass. Any failing case is reported with its evidence, not hidden.\\n- Case evidence is handed off for the board packet (E-B): per-case inputs, observed results, and the ledger state before and after each case.\\n- Constraints that must hold: work only in the sandbox; do not send any patron record outside the sandbox; do not state or imply that public lending is enabled.\\n- Stop and report at once, without finishing the remaining work, if: (a) at startup the sandbox credential, which only the owner can issue, is missing; (b) a workday of your effort elapses with some cases still unverified, in which case report which cases are verified and which are not; or (c) the only remaining option requires sending a patron record outside the sandbox.\\n- For reversible naming choices, such as demonstration labels, take a reasonable default and report it. Do not stop for these.\\n- End with a report that pairs each of the twelve cases with its evidence and states the pass count.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "ordered-series": true,
+          "keep-other-goals": true,
+          "build-on-completed-work": true,
+          "next-verifiable-outcome": true,
+          "keep-owner-validator": true,
+          "stop-only-for-material-blocks": false,
+          "keep-launch-provisional": true
+        },
+        "score": 0.8571428571428571,
+        "passed": false,
+        "seconds": 20.747,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 8709,
+          "cache_read_input_tokens": 34520,
+          "output_tokens": 3274,
+          "output_tokens_details": {
+            "thinking_tokens": 1909
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 8709
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 46511,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0030716249999999997,
+        "turns": 7
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"order\":[\"001\",\"002\",\"003\"],\"revised\":[\"002\"],\"prerequisite\":\"001\",\"milestone\":\"M-B\",\"minimum_passed_cases\":12,\"stop_for\":[\"T-A\",\"T-B\",\"T-D\"],\"next_gate\":\"E-B\",\"goal_markdown\":\"# 002: Pilot branches lend and return sandbox items correctly\\n\\n**Prerequisite:** 001 (accepted on 2026-11-18). The stock ledger reconciles all 180 records in the two pilot branches, including damaged and reserved items. Treat that accepted ledger as the starting stock.\\n\\n**Purpose:** Residents should be able to borrow and return items at any branch without staff reconciling records by hand. This goal is the pilot step toward that outcome. It proves that lending and returning behave correctly in the sandbox for the owner's fixed set of twelve cases. It does not enable public borrowing. Public network lending is a later goal (003) and needs the regional board's signed decision (E-C).\\n\\n**Scope:**\\n- Sandbox only. Do not use real patron records, and do not send any patron record outside the sandbox.\\n- The owner's fixed set of twelve sandbox lending cases is the acceptance basis. It includes cross-branch returns, unavailable stock, and reservation conflicts. Use the cases exactly as the owner supplies them.\\n- Use the accepted 001 ledger as the starting state. Change it only through the lending operations under test.\\n- Labels for demonstration items are a reversible choice. Take a reasonable default and record it in the report.\\n\\n**Done when:**\\n- Each of the twelve sandbox cases has been run, and its observed result has been recorded and compared with the owner's expected outcome, marked pass or fail.\\n- All twelve cases pass. The report states, for each case, whether any manual ledger reconciliation was needed. The answer for every case must be none.\\n- Case evidence is handed off in a form the regional board packet can cite. For each case, include the inputs, the observed result, and the ledger state before and after the operation.\\n- The constraints hold throughout: sandbox only, no real patron data, and no changes to the accepted 001 ledger except through the lending operations under test.\\n- Stop and report at once, without continuing, if any of these occur:\\n  - At startup, the sandbox credential (which only the owner can issue) or the owner's list of twelve cases is missing.\\n  - The only remaining option requires sending a patron record outside the sandbox.\\n  - A workday of effort has elapsed with some cases still unverified. In that case, report which cases passed, failed, or remain unverified, with the evidence for each.\\n- The final report pairs each of the twelve cases with its evidence. Also list every reversible default taken and every stop condition encountered, if any.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "ordered-series": true,
+          "keep-other-goals": true,
+          "build-on-completed-work": true,
+          "next-verifiable-outcome": true,
+          "keep-owner-validator": true,
+          "stop-only-for-material-blocks": false,
+          "keep-launch-provisional": false
+        },
+        "score": 0.7142857142857143,
+        "passed": false,
+        "seconds": 20.497,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 8682,
+          "cache_read_input_tokens": 34484,
+          "output_tokens": 3306,
+          "output_tokens_details": {
+            "thinking_tokens": 1880
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 8682
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 46480,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0030838899999999997,
+        "turns": 7
+      }
+    ]
+  },
+  "verdict": "no-difference",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 292898,
+  "skipped_trials": []
+}

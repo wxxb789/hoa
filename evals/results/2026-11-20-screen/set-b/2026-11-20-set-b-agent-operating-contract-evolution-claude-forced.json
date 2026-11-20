@@ -1,0 +1,1031 @@
+{
+  "schema_version": 2,
+  "task": "set-b-agent-operating-contract-evolution",
+  "generated_at": "2026-11-20T01:00:26.903480-08:00",
+  "skill": "agent-operating-contract-evolution",
+  "skill_revision": "6",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "forced",
+  "shell": false,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "global-invariant": {
+      "field": "placement",
+      "equals": "contract/identity.txt"
+    },
+    "delegation-context-loss": {
+      "field": "child_handoff",
+      "equals": {
+        "ATTR": true,
+        "TONE": false,
+        "SYNC": false
+      }
+    },
+    "gate-call-site": {
+      "field": "link_audit_blocks_sync",
+      "equals": false
+    }
+  },
+  "rubric_flags": {
+    "global-invariant": "flaky",
+    "delegation-context-loss": "non-discriminating",
+    "gate-call-site": "non-discriminating"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": false,
+      "passed": 1,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": null,
+      "pass^k": null,
+      "mean_score": null,
+      "sample_stddev": null
+    },
+    "terse": {
+      "valid": false,
+      "passed": 0,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": null,
+      "pass^k": null,
+      "mean_score": null,
+      "sample_stddev": null
+    },
+    "skill": {
+      "valid": false,
+      "passed": 0,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": null,
+      "pass^k": null,
+      "mean_score": null,
+      "sample_stddev": null
+    }
+  },
+  "mean_deltas_vs_skill": {},
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"placement\":\"contract/protocol.txt\",\"loaded\":{\"desk\":\"OVERLAY\",\"intake\":null,\"scratch\":\"SCRATCH-OPS\"},\"child_handoff\":{\"ATTR\":true,\"TONE\":false,\"SYNC\":false},\"link_audit_blocks_sync\":false,\"draft_patch\":\"--- a/contract/protocol.txt\\n+++ b/contract/protocol.txt\\n@@ -5,0 +6,4 @@\\n+Attribution is mandatory on every archive delivery, including entries drafted\\n+by delegated catalogers. Every claim in a delivery-bound entry must carry its\\n+accession source, or be explicitly marked unsourced and withheld from delivery.\\n+A cataloger drafts only; the parent verifies attribution before delivery.\\n\",\"rationale\":\"placement: protocol.txt is the base operating protocol (CEDAR-OPS, installed at the checkout root). overlay.txt states it 'is not the base protocol', and identity.txt is the identity input, not operating rules. loaded: starts.csv maps desk to OVERLAY (project slot per prompt-captures.json), intake to no project slot (empty), and scratch to SCRATCH-OPS. child_handoff: ATTR applies to drafted entries, so true. TONE governs direct owner reporting, which a cataloger never does (handoff.md: 'neither talks to me'), so false. SYNC is reserved to the persistence job, and a cataloger never persists, so false. link_audit_blocks_sync: the scheduled bundle in nightly.txt runs shape, status --check frontmatter, and sync, with no links check. The status-handler dispatcher only runs find_orphan_entries when 'links' is passed, and sync does not call it. The links invocation appears only in the maintainer cheat sheet and is not scheduled, so it does not block sync. Records relied on: starts.csv, handoff.md, prompt-captures.json, contract/identity.txt, contract/overlay.txt, contract/protocol.txt, contract/scratch-protocol.txt, persistence/nightly.txt, persistence/status-handler.txt. Nothing in the packet was edited or executed, and no runtime or delivery was touched.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "global-invariant": false,
+          "delegation-context-loss": true,
+          "gate-call-site": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 15.57,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 5639,
+          "cache_read_input_tokens": 18939,
+          "output_tokens": 2667,
+          "output_tokens_details": {
+            "thinking_tokens": 1077
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5639
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27251,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002228365,
+        "turns": 11
+      },
+      {
+        "valid": false,
+        "invalid_reasons": [
+          "control skill access"
+        ],
+        "error": null,
+        "contaminated": true,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": true,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"placement\": \"contract/protocol.txt\",\n  \"loaded\": {\n    \"desk\": \"OVERLAY\",\n    \"intake\": null,\n    \"scratch\": \"SCRATCH-OPS\"\n  },\n  \"child_handoff\": {\n    \"ATTR\": true,\n    \"TONE\": false,\n    \"SYNC\": false\n  },\n  \"link_audit_blocks_sync\": false,\n  \"draft_patch\": {\n    \"status\": \"draft only, not applied\",\n    \"target\": \"contract/protocol.txt\",\n    \"add_after\": \"In the accession repository, register dates in UTC and use shelf IDs.\",\n    \"text\": \"Attribution is mandatory on every archive delivery. Every claim in a delivery-bound entry must carry its accession source, or be explicitly marked unsourced and withheld from delivery. This applies to entries drafted by delegated catalogers; a parent who delivers a cataloger's draft must check attribution before delivery. Private accession details are never passed to a delivery recipient.\"\n  },\n  \"rationale\": \"placement: protocol.txt is the base operating protocol (CEDAR-OPS), and overlay.txt states it is not the base protocol, so the base contract is the right amendment target. identity.txt is the identity input and does not govern delivery rules. loaded: starts.csv maps desk to OVERLAY (project slot per prompt-captures.json), intake to null (empty project slot), and scratch to SCRATCH-OPS. child_handoff: ATTR goes in the cataloger brief because catalogers draft delivery-bound entries; the cataloger skips context files and has only BUILTIN identity, so it will not see the rule otherwise. TONE is false because catalogers do not report to the owner (handoff.md). SYNC is false because catalogers never commit, and handoff.md asks that the brief cover only work the cataloger actually does. link_audit_blocks_sync: false. The shipped nightly schedule runs store shape, store status --check frontmatter, and store sync. The links check appears only in the maintainer cheat sheet, and the dispatcher's sync path does not call find_orphan_entries. Records relied on: handoff.md, starts.csv, prompt-captures.json, contract/identity.txt, contract/overlay.txt, contract/protocol.txt, contract/scratch-protocol.txt, persistence/nightly.txt, persistence/status-handler.txt. No packet files were edited or executed and no delivery was attempted.\"\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "global-invariant": false,
+          "delegation-context-loss": true,
+          "gate-call-site": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 15.005,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 5491,
+          "cache_read_input_tokens": 19439,
+          "output_tokens": 2782,
+          "output_tokens_details": {
+            "thinking_tokens": 1001
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5491
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27718,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002272365,
+        "turns": 12
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"placement\": \"contract/identity.txt\",\n  \"loaded\": {\n    \"desk\": \"OVERLAY\",\n    \"intake\": null,\n    \"scratch\": \"SCRATCH-OPS\"\n  },\n  \"child_handoff\": {\n    \"ATTR\": true,\n    \"TONE\": false,\n    \"SYNC\": false\n  },\n  \"link_audit_blocks_sync\": false,\n  \"draft_patch\": \"--- a/contract/identity.txt\\n+++ b/contract/identity.txt\\n@@ -3,6 +3,9 @@\\n The archive steward keeps source material separate from interpretations.\\n Never pass private accession details to a delivery recipient.\\n+Attribution is mandatory on every archive delivery. Every claim in a\\n+delivery-bound entry must carry its accession source, or be explicitly marked\\n+unsourced and withheld from delivery. This applies to work produced by\\n+delegated catalogers, which must meet the same requirement before a parent\\n+delivers their drafts.\\n Tone: short and decisive in messages to the owner.\\n\",\n  \"rationale\": \"placement: identity.txt is the file the packet itself labels as the canonical identity input; the overlay is explicitly 'not the base protocol' and the CEDAR-OPS and SCRATCH-OPS files are operating protocols, so the base rule belongs in the identity contract. loaded: starts.csv lists desk with OVERLAY and scratch with SCRATCH-OPS as local candidates, and the startup captures show desk loading OVERLAY and scratch loading SCRATCH-OPS in the project slot; intake's capture shows an empty project slot, so null. Note the captures show intake loads only IDENTITY. child_handoff: handoff.md says a cataloger only drafts entries and neither talks to the owner nor persists a delivery, so ATTR is the only rule the cataloger's brief needs explicitly (it produces delivery-bound drafts); TONE applies only to reports to the owner and SYNC applies only to the persistence job. The captures also show the cataloger skips context files, so the brief must carry ATTR itself. link_audit_blocks_sync: the scheduled commands in the nightly export are shape, status --check frontmatter, and sync; the links check appears only in the maintainer cheat sheet and is not scheduled. The dispatcher skips find_orphan_entries unless 'links' is passed, and sync does not call it, so under the shipped job the link audit does not block sync. I did not rely on the old onboarding claims that the overlay supplements the protocol or that the nightly sync blocks orphan links, since the handoff asks not to and the records contradict them. Records relied on: handoff.md, starts.csv, prompt-captures.json, contract/identity.txt, contract/overlay.txt, contract/protocol.txt, contract/scratch-protocol.txt, persistence/nightly.txt, persistence/status-handler.txt. No files were edited, no commands were run, and no delivery was attempted. The patch is a draft only.\"\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "global-invariant": true,
+          "delegation-context-loss": true,
+          "gate-call-site": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 18.487,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 7746,
+          "cache_read_input_tokens": 26733,
+          "output_tokens": 3086,
+          "output_tokens_details": {
+            "thinking_tokens": 1248
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 7746
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 37573,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0027793799999999997,
+        "turns": 12
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"placement\": \"work/contract/protocol.txt\",\n  \"loaded\": {\n    \"desk\": \"OVERLAY\",\n    \"intake\": null,\n    \"scratch\": \"SCRATCH-OPS\"\n  },\n  \"child_handoff\": {\n    \"ATTR\": true,\n    \"TONE\": false,\n    \"SYNC\": false\n  },\n  \"link_audit_blocks_sync\": false,\n  \"draft_patch\": \"--- a/contract/protocol.txt\\n+++ b/contract/protocol.txt\\n@@ Cedar workspace operating protocol export: CEDAR-OPS @@\\n In the accession repository, register dates in UTC and use shelf IDs.\\n Public desk notes cite the accession receipt when a receipt is handy.\\n The persistence job owns commits to the store. A cataloger never commits.\\n+\\n+Attribution (mandatory for every archive delivery):\\n+- Every claim in a delivery-bound entry carries its accession source.\\n+- A claim with no accession source must be explicitly marked unsourced and withheld from delivery.\\n+- This applies to all work, including drafts produced by delegated catalogers and entries a parent delivers later.\\n+- A cataloger must apply this rule to every draft it produces, even though it does not deliver.\\n The protocol is installed at the Cedar checkout root, not in every intake lane.\",\n  \"rationale\": \"Placement: protocol.txt is the base workspace protocol (CEDAR-OPS), installed at the checkout root; overlay.txt is explicitly 'not the base protocol' and was added for desk shifts, so the durable rule belongs in the base. loaded: starts.csv lists desk with OVERLAY;CEDAR-OPS, and prompt-captures.json shows desk's project slot holds OVERLAY; intake's project slot is empty, so null; scratch's project slot holds SCRATCH-OPS. Identity is shared IDENTITY and is not the project slot. child_handoff: handoff.md says a cataloger only drafts, never talks to the owner or persists a delivery, and its brief should cover only work it does. So ATTR is true, because drafts must carry sources. TONE is false because the cataloger never reports to the owner. SYNC is false because the cataloger never commits, and that is the persistence job's role. link_audit_blocks_sync: persistence/nightly.txt schedules only shape, status --check frontmatter, and sync. The dispatcher runs the links check only when 'links' is requested, and that flag is not in the nightly schedule. The sync command does not call find_orphan_entries, so under the shipped job the link audit does not block sync. The maintainer cheat sheet's links check is not scheduled. Records relied on: starts.csv, handoff.md, prompt-captures.json, contract/identity.txt, contract/overlay.txt, contract/protocol.txt, contract/scratch-protocol.txt, persistence/nightly.txt, persistence/status-handler.txt. Nothing was edited, executed, or delivered. The patch is a draft only.\"\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "global-invariant": false,
+          "delegation-context-loss": true,
+          "gate-call-site": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 17.263,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 8274,
+          "cache_read_input_tokens": 24656,
+          "output_tokens": 2842,
+          "output_tokens_details": {
+            "thinking_tokens": 859
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 8274
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 35780,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0027026100000000003,
+        "turns": 12
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"placement\": \"contract/protocol.txt\", \"loaded\": {\"desk\": \"OVERLAY\", \"intake\": null, \"scratch\": \"SCRATCH-OPS\"}, \"child_handoff\": {\"ATTR\": true, \"TONE\": false, \"SYNC\": false}, \"link_audit_blocks_sync\": false, \"draft_patch\": \"--- a/contract/protocol.txt\\n+++ b/contract/protocol.txt\\n@@ Cedar workspace operating protocol export: CEDAR-OPS @@\\n In the accession repository, register dates in UTC and use shelf IDs.\\n Public desk notes cite the accession receipt when a receipt is handy.\\n The persistence job owns commits to the store. A cataloger never commits.\\n+Attribution is mandatory on every archive delivery. Every claim in a delivery-bound entry must carry its accession source, or be explicitly marked unsourced and withheld from delivery. This applies to work produced by delegated catalogers, which must be told this rule in their request and must not deliver directly.\\n The protocol is installed at the Cedar checkout root, not in every intake lane.\", \"rationale\": \"Placement: contract/protocol.txt is the operating protocol that owns delivery, commit, and cataloger rules (CEDAR-OPS). identity.txt is the identity input and holds tone and secrecy rules, so it is not the place for a delivery rule. overlay.txt states it is not the base protocol, and scratch-protocol.txt is scoped to scratch. Loaded: starts.csv lists desk with local candidates OVERLAY;CEDAR-OPS, but prompt-captures.json (startup marker extraction, which precedes reads) shows desk's project slot holds only OVERLAY. Intake's project slot is empty, so it maps to null. Scratch's slot holds SCRATCH-OPS. Child handoff: handoff.md says a cataloger only drafts, never talks to the owner, and never persists. The cataloger capture shows identity BUILTIN, no project files, and skipped context files, so ATTR must be stated explicitly. TONE applies only to owner-facing messages, and SYNC concerns the persistence job, so neither goes in the brief. Link audit: nightly.txt schedules shape, frontmatter status, and sync only. The links check appears only in the maintainer cheat sheet. status-handler.txt shows sync stages roots and scans for secrets without calling find_orphan_entries, and the links branch runs only when requested. Orphan-link checks therefore do not gate the shipped sync. Caveat: the patch reaches the desk runtime only if protocol.txt, not OVERLAY alone, is installed in the desk project slot. Nothing was edited, executed, or delivered.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "global-invariant": false,
+          "delegation-context-loss": true,
+          "gate-call-site": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 17.0,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 5552,
+          "cache_read_input_tokens": 19694,
+          "output_tokens": 3106,
+          "output_tokens_details": {
+            "thinking_tokens": 1265
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5552
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 28358,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00244454,
+        "turns": 12
+      },
+      {
+        "valid": false,
+        "invalid_reasons": [
+          "control skill access"
+        ],
+        "error": null,
+        "contaminated": true,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": true,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"placement\": \"contract/protocol.txt\", \"loaded\": {\"desk\": \"OVERLAY\", \"intake\": null, \"scratch\": \"SCRATCH-OPS\"}, \"child_handoff\": {\"ATTR\": true, \"TONE\": false, \"SYNC\": false}, \"link_audit_blocks_sync\": false, \"draft_patch\": \"--- a/contract/protocol.txt\\n+++ b/contract/protocol.txt\\n@@ -5,0 +6,3 @@\\n+Attribution is mandatory on every archive delivery, including entries drafted by delegated catalogers.\\n+Every claim in a delivery-bound entry carries its accession source. A claim with no source is marked unsourced and withheld from delivery.\\n+Only the persistence job publishes or commits the store.\", \"rationale\": \"placement: contract/protocol.txt is the base operating protocol (its own header names it 'Cedar workspace operating protocol'). overlay.txt says it 'is not the base protocol', and scratch-protocol.txt is scoped to the scratch checkout. identity.txt is the 'canonical identity input' and covers who the steward is and disclosure, not delivery rules. loaded: prompt-captures.json records startup markers before any reads. desk's project slot holds OVERLAY. intake's project slot is empty, so null. scratch's project slot holds SCRATCH-OPS. starts.csv lists OVERLAY;CEDAR-OPS as desk candidates, but the captures show CEDAR-OPS was not loaded there, so the captures govern. child_handoff: the cataloger's brief is limited to drafting entries (handoff.md), so ATTR applies to its work. Its identity is BUILTIN with no project context and skip_context_files is true. It neither talks to the owner (TONE is false) nor commits (protocol.txt says a cataloger never commits, so SYNC is false). link_audit_blocks_sync: the scheduled bundle in nightly.txt is shape, status --check frontmatter, and sync. The link check appears only in the maintainer cheat sheet and is not scheduled. status-handler.txt shows the links branch runs only when 'links' is requested, and sync does not call find_orphan_entries. Under the shipped job, orphan links do not block sync. No files were edited or executed, and no delivery was attempted.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "global-invariant": false,
+          "delegation-context-loss": true,
+          "gate-call-site": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 19.037,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 5744,
+          "cache_read_input_tokens": 27452,
+          "output_tokens": 3228,
+          "output_tokens_details": {
+            "thinking_tokens": 1402
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5744
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 36432,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0026073199999999998,
+        "turns": 13
+      }
+    ],
+    "skill": [
+      {
+        "valid": false,
+        "invalid_reasons": [
+          "agent failed (exit 1)"
+        ],
+        "error": "agent failed (exit 1)",
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "",
+        "answer_format": "none",
+        "artifacts": {},
+        "checks": {
+          "global-invariant": false,
+          "delegation-context-loss": false,
+          "gate-call-site": false
+        },
+        "score": 0.0,
+        "passed": false,
+        "seconds": 15.806,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 12544,
+          "cache_read_input_tokens": 47008,
+          "output_tokens": 1630,
+          "output_tokens_details": {
+            "thinking_tokens": 569
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 12544
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 61192,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00285408,
+        "turns": 13
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"placement\":\"contract/protocol.txt\",\"loaded\":{\"desk\":\"OVERLAY\",\"intake\":null,\"scratch\":\"SCRATCH-OPS\"},\"child_handoff\":{\"ATTR\":true,\"TONE\":false,\"SYNC\":false},\"link_audit_blocks_sync\":false,\"draft_patch\":\"--- a/contract/protocol.txt\\n+++ b/contract/protocol.txt\\n@@ Cedar workspace operating protocol export: CEDAR-OPS\\n+ATTR (applies to every archive delivery, including entries drafted by delegated catalogers):\\n+- Every claim in a delivery-bound entry carries its accession source.\\n+- A claim without a source is marked unsourced and withheld from delivery.\\n+- The parent who delivers a cataloger's draft checks this before delivery.\\n+- Catalogers apply this rule to their own drafts. Catalogers do not deliver or commit.\\n\",\"rationale\":\"placement: protocol.txt holds the base CEDAR-OPS protocol installed at the checkout root (protocol.txt line 6). overlay.txt states it is not the base protocol, and the owner's onboarding note says not to rely on the overlay alone (handoff.md lines 15-16). loaded: starts.csv maps desk to OVERLAY and scratch to SCRATCH-OPS, and intake has no project slot (prompt-captures.json lines 3-5). child_handoff: the cataloger has skip_context_files true, identity BUILTIN, and an empty project slot (prompt-captures.json line 6), so it does not load the protocol and needs ATTR passed explicitly. The handoff says the cataloger does not talk to the owner, so TONE is false (handoff.md lines 5-6). The cataloger never commits (protocol.txt line 5), so SYNC is false. link_audit_blocks_sync: the scheduled bundle runs store shape, store status --check frontmatter, and store sync, and it stops on nonzero exit (nightly.txt lines 3-7). The link audit runs only when 'links' is in --check (status-handler.txt lines 6-9), and the sync command does not call find_orphan_entries (status-handler.txt lines 11-12). The maintainer's --check links line is not scheduled (nightly.txt lines 8-9), so orphan links do not block the shipped sync. Records relied on: handoff.md, starts.csv, prompt-captures.json, contract/identity.txt, contract/overlay.txt, contract/protocol.txt, contract/scratch-protocol.txt, persistence/nightly.txt, persistence/status-handler.txt. No files were edited, no runtime was changed, and no delivery was attempted. The patch is a draft only and has not been applied. The skill's coverage and eval scripts were not run.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "global-invariant": false,
+          "delegation-context-loss": true,
+          "gate-call-site": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 18.966,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 10073,
+          "cache_read_input_tokens": 35105,
+          "output_tokens": 3059,
+          "output_tokens_details": {
+            "thinking_tokens": 1186
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 10073
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 48245,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0031404749999999998,
+        "turns": 12
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"placement\":\"contract/protocol.txt\",\"loaded\":{\"desk\":\"OVERLAY\",\"intake\":null,\"scratch\":\"SCRATCH-OPS\"},\"child_handoff\":{\"ATTR\":true,\"TONE\":false,\"SYNC\":false},\"link_audit_blocks_sync\":false,\"draft_patch\":{\"status\":\"draft only, not applied\",\"target\":\"contract/protocol.txt\",\"insert_after\":\"line 5: The persistence job owns commits to the store. A cataloger never commits.\",\"text\":\"+ ATTR: Every claim in a delivery-bound entry carries its accession source, or is marked `unsourced` and withheld from delivery. Applies to delegated cataloger drafts. Cite the source reference only; never disclose private accession details to a delivery recipient.\",\"child_brief_addition\":\"Each claim in your draft carries its accession source or is marked `unsourced`. Unsourced claims are withheld from delivery. Do not add private accession details to the draft.\"},\"rationale\":{\"placement\":\"ATTR is an operating rule about delivery and routing, so it belongs in the operating protocol (protocol.txt, CEDAR-OPS). identity.txt is the identity input and holds only the steward stance and tone. overlay.txt states it is not the base protocol, and scratch-protocol.txt is scoped to scratch receipts. The protocol's own header says it is installed at the checkout root, not in every intake lane, so intake and cataloger work need the rule passed explicitly.\",\"loaded\":\"starts.csv maps desk to overlay.txt (OVERLAY) in its project slot, intake to no project file, and scratch to scratch-protocol.txt (SCRATCH-OPS). The cataloger in prompt-captures.json has parent desk, skip_context_files true, and project []. The desk's protocol.txt is not in any startup capture, so the project slot IDs above are the answer.\",\"child_handoff\":\"The cataloger skips context files and loads only BUILTIN identity, so ATTR must be in its brief. TONE covers reports to the owner, and handoff.md says the cataloger does not talk to the owner, so it is false. SYNC covers publishing and commits, and the cataloger never commits, so it is false.\",\"link_audit\":\"The nightly schedule in nightly.txt runs shape, status --check frontmatter, and sync. The only link audit is status --check links, which the maintainer cheat sheet mentions and the schedule does not include. The dispatcher in status-handler.txt runs find_orphan_entries only when 'links' is in the check set, and sync does not call it. Under the shipped job the orphan-link audit does not block sync, which is false.\",\"stale_sources\":\"handoff.md's note that the overlay supplements the protocol and that nightly sync blocks orphan links is contradicted by overlay.txt ('not the base protocol') and the schedule and dispatcher above. Those statements were not relied on.\",\"not_done\":\"No files were edited, no command was run, and no delivery was attempted. The patch is a draft for the owner to approve.\"}}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "global-invariant": false,
+          "delegation-context-loss": true,
+          "gate-call-site": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 20.989,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 10067,
+          "cache_read_input_tokens": 35101,
+          "output_tokens": 3308,
+          "output_tokens_details": {
+            "thinking_tokens": 1380
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 10067
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 48484,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.003264185,
+        "turns": 12
+      }
+    ]
+  },
+  "verdict": "inconclusive",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 351033,
+  "skipped_trials": []
+}
