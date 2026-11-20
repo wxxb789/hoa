@@ -7,6 +7,8 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 ## 2026-11-19
 
 - Restore Dependabot checkouts and group weekly Actions and GDD Observer dependency updates.
+- GDD Observer moves to vitest 4 with a regenerated lockfile whose every entry carries sha512 integrity;
+  the corporate-feed gate now also rejects `sha1-` integrity in tracked `package-lock.json` files.
 - The README and the generated index tell users who do not run Hermes to skip the `hermes-*` skills, and
   the index carries an install-everything-but-Hermes command; `generate_index.py` fails if any other
   skill starts linking to a `hermes-*` skill.

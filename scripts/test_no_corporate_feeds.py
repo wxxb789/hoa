@@ -1,4 +1,4 @@
-"""Keep corporate package-feed hosts out of the public checkout."""
+"""Reject corporate package feeds and legacy npm lockfile integrity hashes."""
 
 import os
 import re
@@ -22,6 +22,7 @@ FEED_HOST = re.compile(
     """,
     re.IGNORECASE | re.VERBOSE,
 )
+SHA1_INTEGRITY = re.compile(rb'"integrity"\s*:\s*"(sha1-[^"\s]+)')
 
 
 def git(root: Path, *args: str) -> bytes:
@@ -36,14 +37,18 @@ def corporate_feed_findings(root: Path) -> list[str]:
     paths = git(root, "ls-files", "-z", "--", ".", ":(exclude,top)ref")
     for path in paths.split(b"\0")[:-1]:
         relative = os.fsdecode(path)
-        with (root / relative).open("rb") as file:
+        tracked = root / relative
+        with tracked.open("rb") as file:
             for number, line in enumerate(file, start=1):
                 for match in FEED_HOST.finditer(line):
                     findings.append(f"{relative}:{number}: {match[0].decode('ascii')}")
+                if tracked.name == "package-lock.json":
+                    for match in SHA1_INTEGRITY.finditer(line):
+                        findings.append(f"{relative}:{number}: {match[1].decode('ascii', 'replace')}")
     return findings
 
 
-def test_tracked_files_use_no_corporate_feeds():
+def test_tracked_files_use_no_corporate_feeds_or_sha1_integrity():
     findings = corporate_feed_findings(ROOT)
     assert not findings, "\n".join(findings)
 
@@ -77,3 +82,23 @@ def test_feed_scan_reports_tracked_feeds_only(tmp_path, host, path):
     with tracked.open("a", encoding="utf-8") as file:
         file.write(url)
     assert corporate_feed_findings(tmp_path) == [f"{tracked.name}:3: {host}"]
+
+
+def test_feed_scan_rejects_sha1_only_in_tracked_package_locks(tmp_path):
+    git(tmp_path, "init", "--quiet", "--template=")
+    weak = '{"packages":{"node_modules/example":{"integrity":"sha1-dGVzdA=="}}}\n'
+    strong = weak.replace("sha1-", "sha512-")
+    for path in (
+        "app/package-lock.json",
+        "ref/package-lock.json",
+        "ignored/package-lock.json",
+        "other.json",
+    ):
+        file = tmp_path / path
+        file.parent.mkdir(parents=True, exist_ok=True)
+        file.write_text(strong if path.startswith("app/") else weak, encoding="utf-8")
+    git(tmp_path, "add", "-f", "--", "app/package-lock.json", "ref/package-lock.json", "other.json")
+    assert corporate_feed_findings(tmp_path) == []
+
+    (tmp_path / "app/package-lock.json").write_text(weak, encoding="utf-8")
+    assert corporate_feed_findings(tmp_path) == ["app/package-lock.json:1: sha1-dGVzdA=="]

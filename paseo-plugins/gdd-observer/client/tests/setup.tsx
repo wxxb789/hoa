@@ -228,7 +228,7 @@ vi.mock("@getpaseo/plugin/client/ui", () => ({
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 // Let async act drain query notifications without wall-clock sleeps or timer races.
-notifyManager.setScheduler(queueMicrotask);
+notifyManager.setScheduler((callback) => void Promise.resolve().then(callback));
 // The host is a client runtime, but Node has no `window`, which TanStack Query's server detection
 // would read as "do not schedule polling timers". Model the client so refetch intervals exist.
 environmentManager.setIsServer(() => false);
