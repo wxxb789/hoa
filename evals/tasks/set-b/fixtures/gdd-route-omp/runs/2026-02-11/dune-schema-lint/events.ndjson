@@ -1,0 +1,4 @@
+{"type":"session","version":3,"id":"d950be27-3c81-7a64-b512-08f7e6a3c9d4","timestamp":"2026-02-11T04:55:02.400Z","cwd":"/srv/worktrees/dune-schema-lint"}
+{"type":"agent_start"}
+{"type":"turn_start"}
+{"type":"message_end","message":{"role":"assistant","content":[],"model":"gpt-6.1-sol","provider":"ghc","usage":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"totalTokens":0},"stopReason":"error","errorMessage":"connect ECONNREFUSED 10.88.0.4:8443","timestamp":1770785707000}}
