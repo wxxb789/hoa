@@ -1,0 +1,1299 @@
+{
+  "schema_version": 2,
+  "task": "research-stream-consolidation",
+  "generated_at": "2026-11-20T00:59:47.983285-08:00",
+  "skill": "research-stream-consolidation",
+  "skill_revision": "3",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "forced",
+  "shell": false,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "archive-disposition": {
+      "field": "archive_actions",
+      "equals": {
+        "staging/delta/attempts/2026-03-08/errors.log": "projects/night-loop/streams/delta/attempts/2026-03-08/errors.log",
+        "staging/delta/attempts/2026-03-08/result.csv": "projects/night-loop/streams/delta/attempts/2026-03-08/result.csv",
+        "staging/delta/raw/notice.txt": null,
+        "staging/delta/raw/service.csv": "projects/night-loop/streams/delta/raw/service.csv"
+      }
+    },
+    "capture-locator": {
+      "field": "capture_artifact",
+      "equals": "projects/night-loop/streams/delta/raw/service.csv"
+    },
+    "registry-locator": {
+      "field": "registry_capture",
+      "equals": "projects/night-loop/streams/delta/capture.json"
+    },
+    "registry-digest": {
+      "field": "registry_sha256",
+      "equals": "c74b1d04631caa8b1c41aab60ac839627ae435c3b2cc171d82c492bebee301cd"
+    },
+    "navigation-link": {
+      "field": "readme_capture_link",
+      "equals": "streams/delta/capture.json"
+    },
+    "briefing-evidence": {
+      "field": "cross_stream_claim",
+      "equals": {
+        "night-gap": "summary",
+        "annual-trips": "omit"
+      }
+    }
+  },
+  "rubric_flags": {
+    "archive-disposition": "flaky",
+    "capture-locator": "non-discriminating",
+    "registry-locator": "non-discriminating",
+    "registry-digest": "non-discriminating",
+    "navigation-link": "non-discriminating",
+    "briefing-evidence": "non-discriminating"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 0,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.0,
+      "pass^k": false,
+      "mean_score": 0.8333333333333334,
+      "sample_stddev": 0.0
+    },
+    "terse": {
+      "valid": true,
+      "passed": 0,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.0,
+      "pass^k": false,
+      "mean_score": 0.7777777777777778,
+      "sample_stddev": 0.09622504486493767
+    },
+    "skill": {
+      "valid": true,
+      "passed": 0,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 0.0,
+      "pass^k": false,
+      "mean_score": 0.7777777777777778,
+      "sample_stddev": 0.09622504486493767
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": -0.05555555555555558,
+    "terse": 0.0
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"archive_actions\":{\"staging/delta/raw/service.csv\":\"projects/night-loop/streams/delta/raw/service.csv\",\"staging/delta/raw/notice.txt\":null,\"staging/delta/attempts/2026-03-08/result.csv\":\"projects/night-loop/streams/delta/attempts/2026-03-08/result.csv\",\"staging/delta/attempts/2026-03-08/errors.log\":\"projects/night-loop/streams/delta/attempts/2026-03-08/errors.log\"},\"capture_artifact\":\"projects/night-loop/streams/delta/raw/service.csv\",\"registry_capture\":\"projects/night-loop/streams/delta/capture.json\",\"registry_sha256\":null,\"readme_capture_link\":\"streams/delta/capture.json\",\"cross_stream_claim\":{\"night-gap\":\"summary\",\"annual-trips\":\"omit\"},\"note\":\"Not applied; this checkout is unchanged. registry_sha256 is null because I had no tool to compute a SHA-256, so the maintainer must compute it after the move. The revised capture should be the single line {\\\"artifact\\\":\\\"projects/night-loop/streams/delta/raw/service.csv\\\",\\\"run\\\":\\\"D-08\\\",\\\"revision\\\":\\\"consultation-r2\\\"} with LF and a final newline. Raw service.csv is kept because it does not match the published project service.csv (19 vs 17 Saturday trips; consultation vs published release). notice.txt is dropped as a byte-identical duplicate of projects/night-loop/core/council-bulletin.txt. The empty attempt files are retained as run evidence. night-gap is 'summary' because the D-04 and N-12 timetable rows did not survive and are attribution only. annual-trips is 'omit' because both analysts excluded the 210,000 figure. The move target is projects/night-loop/streams/delta/ per the README's streams/<stream-id>/ convention.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "archive-disposition": true,
+          "capture-locator": true,
+          "registry-locator": true,
+          "registry-digest": false,
+          "navigation-link": true,
+          "briefing-evidence": true
+        },
+        "score": 0.8333333333333334,
+        "passed": false,
+        "seconds": 19.644,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 6176,
+          "cache_read_input_tokens": 28234,
+          "output_tokens": 3756,
+          "output_tokens_details": {
+            "thinking_tokens": 1781
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6176
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 38174,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00293314,
+        "turns": 16
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"archive_actions\":{\"staging/delta/raw/notice.txt\":null,\"staging/delta/raw/service.csv\":\"projects/night-loop/streams/delta/raw/service.csv\",\"staging/delta/attempts/2026-03-08/result.csv\":\"projects/night-loop/streams/delta/attempts/2026-03-08/result.csv\",\"staging/delta/attempts/2026-03-08/errors.log\":\"projects/night-loop/streams/delta/attempts/2026-03-08/errors.log\"},\"capture_artifact\":\"projects/night-loop/streams/delta/raw/service.csv\",\"registry_capture\":\"projects/night-loop/streams/delta/capture.json\",\"registry_sha256\":null,\"readme_capture_link\":\"streams/delta/capture.json\",\"cross_stream_claim\":{\"night-gap\":\"summary\",\"annual-trips\":\"omit\"},\"note\":\"Not done: I only have read and search tools here, so I have not moved files, edited control/registry.json or capture.json, or computed the new digest. registry_sha256 is null because I cannot run SHA-256. To produce it, write the relocated capture.json as one compact JSON line ending in LF with {\\\"artifact\\\":\\\"projects/night-loop/streams/delta/raw/service.csv\\\",\\\"run\\\":\\\"D-08\\\",\\\"revision\\\":\\\"consultation-r2\\\"} and hash that exact file. Basis: notice.txt is byte-for-byte the same text as projects/night-loop/core/council-bulletin.txt, so the project copy is canonical and the staged copy is dropped. raw/service.csv differs from core/service.csv (Saturday 19 consultation vs 17 published), so it is kept under streams/delta. The two attempt files are empty but kept as no-output run evidence. night-gap is summary because the D-04 timetable row did not survive and the core N-12 is attribution only. annual-trips is omit because neither analyst could verify the 210,000 figure's denominator or season. The D-08 Saturday count is a consultation figure, not the published timetable, so it should not be presented as the published count. staging/delta/findings.md was not in the archive list and is left in place.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "archive-disposition": true,
+          "capture-locator": true,
+          "registry-locator": true,
+          "registry-digest": false,
+          "navigation-link": true,
+          "briefing-evidence": true
+        },
+        "score": 0.8333333333333334,
+        "passed": false,
+        "seconds": 19.429,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 5829,
+          "cache_read_input_tokens": 28347,
+          "output_tokens": 3727,
+          "output_tokens_details": {
+            "thinking_tokens": 1694
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5829
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 37911,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0028763949999999995,
+        "turns": 16
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"archive_actions\":{\"staging/delta/raw/service.csv\":\"projects/night-loop/streams/delta/raw/service.csv\",\"staging/delta/raw/notice.txt\":null,\"staging/delta/attempts/2026-03-08/errors.log\":\"projects/night-loop/streams/delta/attempts/2026-03-08/errors.log\",\"staging/delta/attempts/2026-03-08/result.csv\":\"projects/night-loop/streams/delta/attempts/2026-03-08/result.csv\"},\"capture_artifact\":\"projects/night-loop/streams/delta/raw/service.csv\",\"registry_capture\":\"projects/night-loop/streams/delta/capture.json\",\"registry_sha256\":null,\"readme_capture_link\":\"streams/delta/capture.json\",\"cross_stream_claim\":{\"night-gap\":\"summary\",\"annual-trips\":\"omit\"},\"note\":\"Maintainer: no files were moved or edited, since this checkout must stay unchanged and I had no shell to run the moves or hash. registry_sha256 is null because I could not compute the SHA-256 of the relocated capture. After moving capture.json, rewrite it as one compact LF-terminated JSON line with artifact set to projects/night-loop/streams/delta/raw/service.csv, then hash it and set control/registry.json delta.sha256. Also update delta.capture to the new path. The delta raw/service.csv is kept under streams/delta because it differs from core/service.csv (19 vs 17 Saturday trips, consultation vs published), so it is not a duplicate. The delta raw/notice.txt is dropped as a duplicate of core council-bulletin.txt, which has the same text. The attempt files are kept as run evidence even though they are empty. staging/delta/findings.md is not in scope of the requested map and was left unmapped. night-gap is summary because the depot and core sources are attributed but have no locatable timetable row. annual-trips is omit because the 210,000 figure was excluded by both analysts.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "archive-disposition": true,
+          "capture-locator": true,
+          "registry-locator": true,
+          "registry-digest": false,
+          "navigation-link": true,
+          "briefing-evidence": true
+        },
+        "score": 0.8333333333333334,
+        "passed": false,
+        "seconds": 23.536,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 5766,
+          "cache_read_input_tokens": 28242,
+          "output_tokens": 4649,
+          "output_tokens_details": {
+            "thinking_tokens": 2729
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5766
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 38665,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00332847,
+        "turns": 16
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"archive_actions\":{\"staging/delta/raw/service.csv\":\"projects/night-loop/streams/delta/raw/service.csv\",\"staging/delta/raw/notice.txt\":\"projects/night-loop/streams/delta/raw/notice.txt\",\"staging/delta/attempts/2026-03-08/result.csv\":\"projects/night-loop/streams/delta/attempts/2026-03-08/result.csv\",\"staging/delta/attempts/2026-03-08/errors.log\":\"projects/night-loop/streams/delta/attempts/2026-03-08/errors.log\"},\"capture_artifact\":\"projects/night-loop/streams/delta/raw/service.csv\",\"registry_capture\":\"projects/night-loop/streams/delta/capture.json\",\"registry_sha256\":null,\"readme_capture_link\":\"streams/delta/capture.json\",\"cross_stream_claim\":{\"night-gap\":\"summary\",\"annual-trips\":\"omit\"},\"note\":\"Maintainer: this checkout is unchanged; the move was only planned. Not performed: no files moved, no capture.json or registry.json edits, no README edit. registry_sha256 is null because I have no shell or hashing tool here, so I could not compute the SHA-256 of the relocated capture. Once the capture is written as one compact JSON line with artifact set to projects/night-loop/streams/delta/raw/service.csv and LF plus a final newline, compute its digest and put it in control/registry.json delta.sha256, with delta.capture set to the relocated path. Also update the README link, which currently points to ..<path> Stream copy kept rather than merged: staging/delta/raw/service.csv differs from projects/night-loop/core/service.csv (L8 Saturday 19 consultation vs 17 published), so it is not the same export and the canonical collection rule does not apply. The four attempt files are empty but are kept as run evidence, not dropped. staging/delta/findings.md was not in scope for archive_actions and needs a decision. night-gap is summary: attributed, with no surviving timetable row. annual-trips is omit: the 210,000 figure was excluded on both analyst tracks because its denominator and season are unknown.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "archive-disposition": false,
+          "capture-locator": true,
+          "registry-locator": true,
+          "registry-digest": false,
+          "navigation-link": true,
+          "briefing-evidence": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 32.272,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 8771,
+          "cache_read_input_tokens": 36240,
+          "output_tokens": 6039,
+          "output_tokens_details": {
+            "thinking_tokens": 3957
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 8771
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 51060,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.004479275,
+        "turns": 17
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"archive_actions\": {\n    \"staging/delta/raw/service.csv\": \"projects/night-loop/streams/delta/raw/service.csv\",\n    \"staging/delta/raw/notice.txt\": null,\n    \"staging/delta/attempts/2026-03-08/errors.log\": \"projects/night-loop/streams/delta/attempts/2026-03-08/errors.log\",\n    \"staging/delta/attempts/2026-03-08/result.csv\": \"projects/night-loop/streams/delta/attempts/2026-03-08/result.csv\"\n  },\n  \"capture_artifact\": \"projects/night-loop/streams/delta/raw/service.csv\",\n  \"registry_capture\": \"projects/night-loop/streams/delta/capture.json\",\n  \"registry_sha256\": null,\n  \"readme_capture_link\": \"streams/delta/capture.json\",\n  \"cross_stream_claim\": {\n    \"night-gap\": \"summary\",\n    \"annual-trips\": \"omit\"\n  },\n  \"note\": \"Maintainer: this ticket was prepared without modifying the checkout. The move has not been executed. registry_sha256 is null because this session had no tool to compute SHA-256; after relocating capture.json (artifact changed to projects/night-loop/streams/delta/raw/service.csv, one compact line, LF, final newline), compute its digest and write it to control/registry.json. notice.txt is dropped as a duplicate of projects/night-loop/core/council-bulletin.txt (identical text), so the project copy is canonical. delta raw/service.csv is kept because it differs from core/service.csv (consultation release, L8 Saturday 19 vs published 17). The empty errors.log and result.csv in the delta attempt are retained as run evidence. Night-gap is summary because the depot and neighbourhood sources are attributed but have no locatable timetable row. Annual-trips is omit because both analysts excluded the 210,000 figure for missing denominator/season or unclear counting unit. The D-22 Saturday count is consultation data, not published, so it is not a claim source here.\"\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "archive-disposition": true,
+          "capture-locator": true,
+          "registry-locator": true,
+          "registry-digest": false,
+          "navigation-link": true,
+          "briefing-evidence": true
+        },
+        "score": 0.8333333333333334,
+        "passed": false,
+        "seconds": 20.892,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 5856,
+          "cache_read_input_tokens": 28610,
+          "output_tokens": 4038,
+          "output_tokens_details": {
+            "thinking_tokens": 2012
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5856
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 38512,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0030378999999999996,
+        "turns": 16
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"archive_actions\":{\"staging/delta/raw/notice.txt\":null,\"staging/delta/raw/service.csv\":\"projects/night-loop/streams/delta/raw/service.csv\",\"staging/delta/attempts/2026-03-08/result.csv\":\"projects/night-loop/streams/delta/attempts/2026-03-08/result.csv\",\"staging/delta/attempts/2026-03-08/errors.log\":\"projects/night-loop/streams/delta/attempts/2026-03-08/errors.log\"},\"capture_artifact\":\"projects/night-loop/streams/delta/raw/service.csv\",\"registry_capture\":\"projects/night-loop/streams/delta/capture.json\",\"registry_sha256\":null,\"readme_capture_link\":\"streams/delta/capture.json\",\"cross_stream_claim\":{\"night-gap\":\"summary\",\"annual-trips\":\"omit\"},\"note\":\"Checkout unchanged; nothing was written. registry_sha256 is null because I have no tool to compute SHA-256, so the maintainer must hash the revised capture (one compact JSON line with artifact changed to the new path, LF, final newline) and update control/registry.json. Also confirm the original capture.json ends with a newline before hashing. notice.txt is byte-identical in content to projects/night-loop/core/council-bulletin.txt, so it is dropped as a duplicate. raw/service.csv is not a duplicate: it holds consultation-release L8 Saturday=19, while core/service.csv holds published Saturday=17, so both are kept and not merged. The four attempt/errors files are empty but retained as no-output run evidence. night-gap is summary because the depot summary has no surviving timetable row and the N-12 digest is attribution only. annual-trips is omit because the 210,000 figure lacks denominator and season in both studies.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "archive-disposition": true,
+          "capture-locator": true,
+          "registry-locator": true,
+          "registry-digest": false,
+          "navigation-link": true,
+          "briefing-evidence": true
+        },
+        "score": 0.8333333333333334,
+        "passed": false,
+        "seconds": 53.88,
+        "usage": {
+          "input_tokens": 14,
+          "cache_creation_input_tokens": 6726,
+          "cache_read_input_tokens": 60808,
+          "output_tokens": 10402,
+          "output_tokens_details": {
+            "thinking_tokens": 8165
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6726
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 77950,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00665123,
+        "turns": 19
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"archive_actions\":{\"staging/delta/raw/notice.txt\":null,\"staging/delta/raw/service.csv\":\"projects/night-loop/streams/delta/raw/service.csv\",\"staging/delta/attempts/2026-03-08/errors.log\":\"projects/night-loop/streams/delta/attempts/2026-03-08/errors.log\",\"staging/delta/attempts/2026-03-08/result.csv\":\"projects/night-loop/streams/delta/attempts/2026-03-08/result.csv\"},\"capture_artifact\":\"projects/night-loop/streams/delta/raw/service.csv\",\"registry_capture\":\"projects/night-loop/streams/delta/capture.json\",\"registry_sha256\":null,\"readme_capture_link\":\"streams/delta/capture.json\",\"cross_stream_claim\":{\"night-gap\":\"summary\",\"annual-trips\":\"omit\"},\"note\":\"Ticket only; this checkout was not modified. Move the whole staging/delta tree to projects/night-loop/streams/delta as one unit, then apply the archive_actions. notice.txt is dropped as a duplicate of projects/night-loop/core/council-bulletin.txt, which is canonical. I matched it by reading both files, not by hashing, so run sha256sum on both before deleting. service.csv is kept because it differs from core/service.csv (Saturday 19 consultation vs 17 published). Both attempt files are empty but are retained as run evidence per the README. Rewrite capture.json as the single compact line {\\\"artifact\\\":\\\"projects/night-loop/streams/delta/raw/service.csv\\\",\\\"run\\\":\\\"D-08\\\",\\\"revision\\\":\\\"consultation-r2\\\"} with a final LF. registry_sha256 is null because I had no hashing tool in this session; compute SHA-256 of that exact file and set delta.sha256 in control/registry.json. Also update the README capture link, and add a relocation note in control/registry.json. night-gap is summary because both streams hold only attributed, non-locatable observations. annual-trips is omit because both streams independently dropped the 210,000 figure.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "archive-disposition": true,
+          "capture-locator": true,
+          "registry-locator": true,
+          "registry-digest": false,
+          "navigation-link": true,
+          "briefing-evidence": true
+        },
+        "score": 0.8333333333333334,
+        "passed": false,
+        "seconds": 26.488,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 8263,
+          "cache_read_input_tokens": 41909,
+          "output_tokens": 5082,
+          "output_tokens_details": {
+            "thinking_tokens": 2970
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 8263
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 55264,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0039939649999999995,
+        "turns": 17
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"archive_actions\":{\"staging/delta/raw/notice.txt\":\"projects/night-loop/streams/delta/raw/notice.txt\",\"staging/delta/raw/service.csv\":\"projects/night-loop/streams/delta/raw/service.csv\",\"staging/delta/attempts/2026-03-08/errors.log\":\"projects/night-loop/streams/delta/attempts/2026-03-08/errors.log\",\"staging/delta/attempts/2026-03-08/result.csv\":\"projects/night-loop/streams/delta/attempts/2026-03-08/result.csv\"},\"capture_artifact\":\"projects/night-loop/streams/delta/raw/service.csv\",\"registry_capture\":\"projects/night-loop/streams/delta/capture.json\",\"registry_sha256\":null,\"readme_capture_link\":\"streams/delta/capture.json\",\"cross_stream_claim\":{\"night-gap\":\"summary\",\"annual-trips\":\"omit\"},\"note\":\"Not applied; checkout left unchanged, and this session had no shell or file-write tools. registry_sha256 is null: it must be computed after the move and capture rewrite, as SHA-256 of the revised capture.json (one compact line, LF, final newline, only the artifact value changed to projects/night-loop/streams/delta/raw/service.csv). Note that the revised capture.json itself is not produced here. Dedup: no archive file is dropped. raw/service.csv differs from core service.csv (Saturday 19 consultation vs 17 published), so it is not a duplicate and is kept as a separate release. The attempts logs are empty in both trees, but the README says attempt outputs and no-output attempts are retained as run evidence, so they are kept, not deduplicated. Claims: night-gap is attributed-only in both streams (depot summary and neighborhood digest, no locatable timetable), so summary. annual-trips was rejected independently by both analysts, so omit. The registry's delta.capture and delta.sha256 bindings, and the README link, must be updated with the move. Old-path notes are needed in control/registry.json as well.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "archive-disposition": false,
+          "capture-locator": true,
+          "registry-locator": true,
+          "registry-digest": false,
+          "navigation-link": true,
+          "briefing-evidence": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 30.843,
+        "usage": {
+          "input_tokens": 12,
+          "cache_creation_input_tokens": 8451,
+          "cache_read_input_tokens": 54179,
+          "output_tokens": 5196,
+          "output_tokens_details": {
+            "thinking_tokens": 2960
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 8451
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 67838,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.004197365,
+        "turns": 18
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"archive_actions\": {\n    \"staging/delta/raw/notice.txt\": null,\n    \"staging/delta/raw/service.csv\": \"projects/night-loop/streams/delta/raw/service.csv\",\n    \"staging/delta/attempts/2026-03-08/errors.log\": \"projects/night-loop/streams/delta/attempts/2026-03-08/errors.log\",\n    \"staging/delta/attempts/2026-03-08/result.csv\": \"projects/night-loop/streams/delta/attempts/2026-03-08/result.csv\"\n  },\n  \"capture_artifact\": \"projects/night-loop/streams/delta/raw/service.csv\",\n  \"registry_capture\": \"projects/night-loop/streams/delta/capture.json\",\n  \"registry_sha256\": null,\n  \"readme_capture_link\": \"streams/delta/capture.json\",\n  \"cross_stream_claim\": {\n    \"night-gap\": \"summary\",\n    \"annual-trips\": \"omit\"\n  },\n  \"note\": \"Maintainer: this ticket was prepared without moving or editing anything in the checkout. registry_sha256 is null because this session has no hashing tool, so the SHA-256 of the revised capture.json (one compact LF-terminated JSON line, artifact changed to projects/night-loop/streams/delta/raw/service.csv) must be computed after the move and written to control/registry.json. Basis: notice.txt is byte-identical to projects/night-loop/core/council-bulletin.txt, and the project treats the collection copy as canonical, so it is dropped. raw/service.csv differs from core/service.csv (Saturday 19 vs 17, consultation vs published), so it is kept under streams/delta/. The empty attempt logs and results are kept as run evidence per the README. findings.md is not in the move list and stays put. night-gap is summary because both streams lack a locatable timetable row. annual-trips is omit because both streams rejected the 210,000 figure. The README link is relative to projects/night-loop/README.md. The registry's own link to ..<path> is unchanged.\"\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "archive-disposition": true,
+          "capture-locator": true,
+          "registry-locator": true,
+          "registry-digest": false,
+          "navigation-link": true,
+          "briefing-evidence": true
+        },
+        "score": 0.8333333333333334,
+        "passed": false,
+        "seconds": 22.244,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 8288,
+          "cache_read_input_tokens": 41554,
+          "output_tokens": 3845,
+          "output_tokens_details": {
+            "thinking_tokens": 1689
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 8288
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 53697,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0033750399999999997,
+        "turns": 17
+      }
+    ]
+  },
+  "verdict": "no-difference",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 459071,
+  "skipped_trials": []
+}

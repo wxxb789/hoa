@@ -1,0 +1,887 @@
+{
+  "schema_version": 2,
+  "task": "set-b-hoa-skill-curate",
+  "generated_at": "2026-11-20T01:07:47.832012-08:00",
+  "skill": "hoa-skill-curate",
+  "skill_revision": "4",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "forced",
+  "shell": false,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "warning-phase-and-impact": {
+      "field": "warnings",
+      "equals": {
+        "empty-label": {
+          "phase": "scan",
+          "disposition": "cosmetic",
+          "installed": false,
+          "source": "paperworks/dock-tools"
+        },
+        "shift-bundle": {
+          "phase": "scan",
+          "disposition": "upstream-defect",
+          "installed": false,
+          "source": "paperworks/dock-tools"
+        }
+      }
+    },
+    "content-not-recency": {
+      "field": "freshness",
+      "equals": {
+        "carton-map": "SAME",
+        "route-proof": "DIFF",
+        "queue-digest": "SAME",
+        "bin-audit": "SAME",
+        "seal-register": "ERR"
+      }
+    },
+    "activity-and-live-dependencies": {
+      "field": "retirement",
+      "equals": {
+        "carton-map": "keep",
+        "route-proof": "keep",
+        "queue-digest": "candidate",
+        "bin-audit": "blocked-live-reference",
+        "seal-register": "keep"
+      }
+    }
+  },
+  "rubric_flags": {
+    "warning-phase-and-impact": "flaky"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 0,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.0,
+      "pass^k": false,
+      "mean_score": 0.3333333333333333,
+      "sample_stddev": 0.0
+    },
+    "terse": {
+      "valid": true,
+      "passed": 0,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.0,
+      "pass^k": false,
+      "mean_score": 0.2222222222222222,
+      "sample_stddev": 0.19245008972987523
+    },
+    "skill": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": 0.6666666666666667,
+    "terse": 0.7777777777777778
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"warnings\": {\n    \"empty-label\": {\n      \"phase\": \"scan\",\n      \"disposition\": \"cosmetic\",\n      \"installed\": false,\n      \"source\": \"paperworks/dock-tools\"\n    },\n    \"shift-bundle\": {\n      \"phase\": \"scan\",\n      \"disposition\": \"upstream-defect\",\n      \"installed\": false,\n      \"source\": \"paperworks/dock-tools\"\n    }\n  },\n  \"freshness\": {\n    \"carton-map\": \"DIFF\",\n    \"route-proof\": \"DIFF\",\n    \"queue-digest\": \"SAME\",\n    \"bin-audit\": \"SAME\",\n    \"seal-register\": \"ERR\"\n  },\n  \"retirement\": {\n    \"carton-map\": \"candidate\",\n    \"route-proof\": \"candidate\",\n    \"queue-digest\": \"keep\",\n    \"bin-audit\": \"blocked-live-reference\",\n    \"seal-register\": \"keep\"\n  },\n  \"citations\": {\n    \"warnings\": {\n      \"empty-label\": \"install-log.txt:3 skipped tests/fixtures/empty-label/SKILL.md (missing description). scanner-export.txt:11-12 says this is an intentional test fixture for the missing-description path. lock-export.json:10 lists it as dismissed.\",\n      \"shift-bundle\": \"install-log.txt:4 skipped cards/shift-bundle/SKILL.md (missing description). scanner-export.txt:13-14 says it is listed in the user catalog under Dispatch as a real installable package, so the defect is upstream. It is not in the lock file.\"\n    },\n    \"freshness\": {\n      \"carton-map\": \"Local document has CRLF line endings (local-documents.json:4); HEAD body (head-export.json:9) uses LF. Content is otherwise identical, so this is a strict byte-level DIFF. If line endings are ignored it would be SAME.\",\n      \"route-proof\": \"Local body is 'Require the route field.' HEAD at the lock path cards/route-proof/SKILL.md (head-export.json:10) says 'Require the route and bay fields.' The examples/ path matches local, but the lock points to cards/. DIFF.\",\n      \"queue-digest\": \"Local body matches HEAD at dist/queue-digest/SKILL.md. The source repo is archived, but freshness is content-based, so SAME.\",\n      \"bin-audit\": \"Local body matches HEAD at release/bin-audit/SKILL.md. SAME.\",\n      \"seal-register\": \"HEAD fetch returned 503 temporary service error (head-export.json:12). No comparison possible. ERR.\"\n    },\n    \"retirement\": {\n      \"carton-map\": \"0 loads in the last year, not disabled, no live references (runtime-export.md:5, 11-19). Candidate.\",\n      \"route-proof\": \"0 loads, disabled, no live references (runtime-export.md:6). Candidate.\",\n      \"queue-digest\": \"20 loads (runtime-export.md:7). The only mention is the historical example in receipt-review, which is not a live reference. Keep.\",\n      \"bin-audit\": \"0 loads, but enabled job close-dock (next run 2026-11-22) says 'Use bin-audit for designated bins' (runtime-export.md:13-14). Blocked-live-reference.\",\n      \"seal-register\": \"3 loads (runtime-export.md:9). Keep.\"\n    }\n  }\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "warning-phase-and-impact": true,
+          "content-not-recency": false,
+          "activity-and-live-dependencies": false
+        },
+        "score": 0.3333333333333333,
+        "passed": false,
+        "seconds": 18.205,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 6320,
+          "cache_read_input_tokens": 18865,
+          "output_tokens": 3133,
+          "output_tokens_details": {
+            "thinking_tokens": 1430
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6320
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 28324,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0025457500000000003,
+        "turns": 8
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"warnings\": {\n    \"empty-label\": {\"phase\": \"scan\", \"disposition\": \"cosmetic\", \"installed\": false, \"source\": \"paperworks/dock-tools\"},\n    \"shift-bundle\": {\"phase\": \"scan\", \"disposition\": \"upstream-defect\", \"installed\": false, \"source\": \"paperworks/dock-tools\"}\n  },\n  \"freshness\": {\n    \"carton-map\": \"DIFF\",\n    \"route-proof\": \"DIFF\",\n    \"queue-digest\": \"SAME\",\n    \"bin-audit\": \"SAME\",\n    \"seal-register\": \"ERR\"\n  },\n  \"retirement\": {\n    \"carton-map\": \"candidate\",\n    \"route-proof\": \"candidate\",\n    \"queue-digest\": \"keep\",\n    \"bin-audit\": \"blocked-live-reference\",\n    \"seal-register\": \"keep\"\n  }\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "warning-phase-and-impact": true,
+          "content-not-recency": false,
+          "activity-and-live-dependencies": false
+        },
+        "score": 0.3333333333333333,
+        "passed": false,
+        "seconds": 21.072,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 5974,
+          "cache_read_input_tokens": 19157,
+          "output_tokens": 2127,
+          "output_tokens_details": {
+            "thinking_tokens": 1282
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5974
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27264,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0020024200000000004,
+        "turns": 8
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"warnings\": {\n    \"empty-label\": {\n      \"phase\": \"scan\",\n      \"disposition\": \"cosmetic\",\n      \"installed\": false,\n      \"source\": \"paperworks/dock-tools\"\n    },\n    \"shift-bundle\": {\n      \"phase\": \"scan\",\n      \"disposition\": \"upstream-defect\",\n      \"installed\": false,\n      \"source\": \"paperworks/dock-tools\"\n    }\n  },\n  \"freshness\": {\n    \"carton-map\": \"DIFF\",\n    \"route-proof\": \"DIFF\",\n    \"queue-digest\": \"SAME\",\n    \"bin-audit\": \"SAME\",\n    \"seal-register\": \"ERR\"\n  },\n  \"retirement\": {\n    \"carton-map\": \"candidate\",\n    \"route-proof\": \"candidate\",\n    \"queue-digest\": \"keep\",\n    \"bin-audit\": \"blocked-live-reference\",\n    \"seal-register\": \"keep\"\n  },\n  \"citations\": {\n    \"warnings\": \"install-log.txt:3-4 skip messages; scanner-export.txt:11-14 says empty-label is a test fixture for the missing-description path and shift-bundle is a real installable package in the Dispatch catalog.\",\n    \"freshness\": \"carton-map: local document uses CRLF line endings and the upstream body uses LF (lock-export/head-export vs local-documents.json:4); the text is otherwise identical, so this is a byte-level DIFF. route-proof: local body 'Require the route field.' vs upstream cards/route-proof 'Require the route and bay fields.' (head-export.json:10); the examples/ path matches local but is not the installed skillPath. queue-digest and bin-audit match upstream exactly; the queue-digest source is archived, which doesn't change freshness. seal-register: upstream fetch returned 503 (head-export.json:12).\",\n    \"retirement\": \"carton-map: 0 loads, not disabled, no references (runtime-export.md table and scan). route-proof: disabled, 0 loads, no references. queue-digest: 20 loads; the receipt-review mention is historical and not a live call. bin-audit: enabled job close-dock (next run 2026-11-22) says to use bin-audit, so it is blocked. seal-register: 3 loads, no references.\"\n  }\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "warning-phase-and-impact": true,
+          "content-not-recency": false,
+          "activity-and-live-dependencies": false
+        },
+        "score": 0.3333333333333333,
+        "passed": false,
+        "seconds": 17.509,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 5961,
+          "cache_read_input_tokens": 19152,
+          "output_tokens": 2878,
+          "output_tokens_details": {
+            "thinking_tokens": 1576
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5961
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27997,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002376245,
+        "turns": 8
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"warnings\": {\n    \"empty-label\": {\"phase\": \"scan\", \"disposition\": \"cosmetic\", \"installed\": false, \"source\": \"paperworks/dock-tools\"},\n    \"shift-bundle\": {\"phase\": \"scan\", \"disposition\": \"upstream-defect\", \"installed\": false, \"source\": \"paperworks/dock-tools\"}\n  },\n  \"freshness\": {\n    \"carton-map\": \"DIFF\",\n    \"route-proof\": \"DIFF\",\n    \"queue-digest\": \"SAME\",\n    \"bin-audit\": \"SAME\",\n    \"seal-register\": \"ERR\"\n  },\n  \"retirement\": {\n    \"carton-map\": \"candidate\",\n    \"route-proof\": \"candidate\",\n    \"queue-digest\": \"keep\",\n    \"bin-audit\": \"blocked-live-reference\",\n    \"seal-register\": \"keep\"\n  }\n}\n```\n\nCitations:\n\n```json\n{\n  \"warnings\": {\n    \"empty-label\": \"install-log.txt:3 and scanner-export.txt:11-12 (test fixture, missing description; lock-export.json:10 dismissed)\",\n    \"shift-bundle\": \"install-log.txt:4 and scanner-export.txt:13-14 (listed in user catalog as installable, missing description)\"\n  },\n  \"freshness\": {\n    \"carton-map\": \"local-documents.json:4 has CRLF endings; head-export.json:9 body is LF, so the text differs only by line endings\",\n    \"route-proof\": \"local-documents.json:5 says 'Require the route field.'; head-export.json:10 (cards/ path from lock-export.json:5) says 'route and bay fields'\",\n    \"queue-digest\": \"local-documents.json:6 matches head-export.json:13\",\n    \"bin-audit\": \"local-documents.json:7 matches head-export.json:14\",\n    \"seal-register\": \"head-export.json:12 returned 503; no upstream text to compare\"\n  },\n  \"retirement\": {\n    \"carton-map\": \"runtime-export.md:5 shows 0 loads, not disabled; no live references in the scan\",\n    \"route-proof\": \"runtime-export.md:6 shows 0 loads, disabled; no live references\",\n    \"queue-digest\": \"runtime-export.md:7 shows 20 loads; the receipt-review hit is historical text only (runtime-export.md:15-17), not a live use\",\n    \"bin-audit\": \"runtime-export.md:8 shows 0 loads, but job close-dock (enabled, next run 2026-11-22) references it (runtime-export.md:13-14)\",\n    \"seal-register\": \"runtime-export.md:9 shows 3 loads\"\n  }\n}\n```\n\nNotes on what the records can and cannot show:\n- The freshness checks compare against the exported HEAD fetches in `head-export.json` only. I did not use the network, and nothing was changed or retired.\n- `seal-register` is ERR because the upstream fetch returned 503, so its status is unknown, not confirmed stale. Its retirement is still \"keep\" on the usage data.\n- `route-proof` and `carton-map` are \"candidate\" based on zero recent loads and no references in the exported scan. The scan covers only the live docs, scheduled jobs, and installed bodies it lists. The lock records `route-proof` against the `cards/` path, so I compared against that path. The `examples/` copy matches the local file, but it is not the recorded source.\n- `queue-digest` is kept because it has 20 recent loads. Its upstream repo is archived, which I did not treat as a retirement signal.",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "warning-phase-and-impact": false,
+          "content-not-recency": false,
+          "activity-and-live-dependencies": false
+        },
+        "score": 0.0,
+        "passed": false,
+        "seconds": 19.349,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 8692,
+          "cache_read_input_tokens": 16761,
+          "output_tokens": 3643,
+          "output_tokens_details": {
+            "thinking_tokens": 1883
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 8692
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 29102,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00307621,
+        "turns": 8
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"warnings\": {\n    \"empty-label\": {\n      \"phase\": \"scan\",\n      \"disposition\": \"cosmetic\",\n      \"installed\": false,\n      \"source\": \"paperworks/dock-tools\"\n    },\n    \"shift-bundle\": {\n      \"phase\": \"scan\",\n      \"disposition\": \"upstream-defect\",\n      \"installed\": false,\n      \"source\": \"paperworks/dock-tools\"\n    }\n  },\n  \"freshness\": {\n    \"carton-map\": \"DIFF\",\n    \"route-proof\": \"DIFF\",\n    \"queue-digest\": \"SAME\",\n    \"bin-audit\": \"SAME\",\n    \"seal-register\": \"ERR\"\n  },\n  \"retirement\": {\n    \"carton-map\": \"candidate\",\n    \"route-proof\": \"candidate\",\n    \"queue-digest\": \"keep\",\n    \"bin-audit\": \"blocked-live-reference\",\n    \"seal-register\": \"keep\"\n  },\n  \"citations\": {\n    \"warnings\": \"install-log.txt lines 3-4 (skips); scanner-export.txt lines 11-14 (empty-label is a test fixture, shift-bundle is a catalogued installable package with no description field).\",\n    \"freshness\": \"local-documents.json vs lock-export.json skillPath and head-export.json head_fetches. carton-map differs only by CRLF line endings in the local copy, which is a real decoded-text difference. route-proof local text 'Require the route field.' differs from upstream cards/route-proof 'Require the route and bay fields.' (the examples/ path matches local, but it is not the installed path). seal-register upstream returned HTTP 503, so no comparison is possible.\",\n    \"retirement\": \"runtime-export.md: carton-map 0 loads, route-proof 0 loads and disabled, no live references. bin-audit 0 loads but enabled job close-dock (next run 2026-11-22) says to use it. queue-digest 20 loads; its only reference is a historical example, not live. seal-register 3 loads.\",\n    \"limits\": \"Evidence is the offline export only (captured_at 2026-11-20T12:00:00Z). No network fetches or changes were made. The seal-register freshness result is ERR, not SAME or DIFF, because of the transient 503. Both candidates are proposals only, and retirement requires owner action.\"\n  }\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "warning-phase-and-impact": true,
+          "content-not-recency": false,
+          "activity-and-live-dependencies": false
+        },
+        "score": 0.3333333333333333,
+        "passed": false,
+        "seconds": 16.993,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 6010,
+          "cache_read_input_tokens": 19429,
+          "output_tokens": 3055,
+          "output_tokens_details": {
+            "thinking_tokens": 1698
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6010
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 28500,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00247364,
+        "turns": 8
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"warnings\": {\n    \"empty-label\": {\n      \"phase\": \"scan\",\n      \"disposition\": \"cosmetic\",\n      \"installed\": false,\n      \"source\": \"paperworks/dock-tools\"\n    },\n    \"shift-bundle\": {\n      \"phase\": \"scan\",\n      \"disposition\": \"upstream-defect\",\n      \"installed\": false,\n      \"source\": \"paperworks/dock-tools\"\n    }\n  },\n  \"freshness\": {\n    \"carton-map\": \"DIFF\",\n    \"route-proof\": \"DIFF\",\n    \"queue-digest\": \"SAME\",\n    \"bin-audit\": \"SAME\",\n    \"seal-register\": \"ERR\"\n  },\n  \"retirement\": {\n    \"carton-map\": \"candidate\",\n    \"route-proof\": \"candidate\",\n    \"queue-digest\": \"keep\",\n    \"bin-audit\": \"blocked-live-reference\",\n    \"seal-register\": \"keep\"\n  },\n  \"citations\": {\n    \"warnings\": \"install-log.txt lines 3-4 (skip messages); scanner-export.txt lines 11-14 (empty-label is a test fixture; shift-bundle is a listed installable Dispatch package); lock-export.json has no entry for either name.\",\n    \"freshness\": \"carton-map: local document in local-documents.json uses CRLF line endings, while head-export.json body uses LF, so the bytes differ. route-proof: local says 'Require the route field.' but cards/route-proof HEAD says 'Require the route and bay fields.' (the examples/ path is a different file and was not used). queue-digest and bin-audit: local text equals the HEAD body. seal-register: HEAD fetch returned 503, so the comparison is ERR.\",\n    \"retirement\": \"carton-map: 0 loads, not disabled, no live references. route-proof: 0 loads, disabled, no live references. queue-digest: 20 loads; the only hit is a historical example in receipt-review, and the current workflow does not call it, so it is not a live reference. bin-audit: 0 loads, but enabled job close-dock (next run 2026-11-22) names it, which is a live reference. seal-register: 3 loads, keep.\",\n    \"limits\": \"All evidence comes from the offline packet captured at 2026-11-20T12:00:00Z. No network fetch was made and no changes or retirements were carried out. Retirement is a proposal only, and the 'candidate' decisions still need owner confirmation.\"\n  }\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "warning-phase-and-impact": true,
+          "content-not-recency": false,
+          "activity-and-live-dependencies": false
+        },
+        "score": 0.3333333333333333,
+        "passed": false,
+        "seconds": 16.011,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 5963,
+          "cache_read_input_tokens": 19382,
+          "output_tokens": 2591,
+          "output_tokens_details": {
+            "thinking_tokens": 1238
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5963
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27942,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002235295,
+        "turns": 8
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"warnings\": {\n    \"empty-label\": {\n      \"phase\": \"scan\",\n      \"disposition\": \"cosmetic\",\n      \"installed\": false,\n      \"source\": \"paperworks/dock-tools\"\n    },\n    \"shift-bundle\": {\n      \"phase\": \"scan\",\n      \"disposition\": \"upstream-defect\",\n      \"installed\": false,\n      \"source\": \"paperworks/dock-tools\"\n    }\n  },\n  \"freshness\": {\n    \"carton-map\": \"SAME\",\n    \"route-proof\": \"DIFF\",\n    \"queue-digest\": \"SAME\",\n    \"bin-audit\": \"SAME\",\n    \"seal-register\": \"ERR\"\n  },\n  \"retirement\": {\n    \"carton-map\": \"keep\",\n    \"route-proof\": \"keep\",\n    \"queue-digest\": \"candidate\",\n    \"bin-audit\": \"blocked-live-reference\",\n    \"seal-register\": \"keep\"\n  },\n  \"citations\": {\n    \"as_of\": \"2026-11-20T12:00:00Z\",\n    \"cutoff\": \"2026-08-20T12:00:00Z (3 months before as_of)\",\n    \"warnings\": \"scanner-export.txt: empty-label is a deliberately incomplete tests/fixtures file (frontmatter has only name) and is listed as dismissed in lock-export.json; shift-bundle is a real catalog package under cards/ with name only, so the missing description is an upstream defect. Neither name is a lock entry under skills.\",\n    \"freshness\": \"head-export.json vs local-documents.json (CRLF normalized). carton-map SAME. route-proof DIFF: local 'Require the route field.' vs upstream cards/route-proof 'Require the route and bay fields.' (the examples/ path is not the lock skillPath, so it was not used). queue-digest SAME. bin-audit SAME. seal-register ERR: HEAD fetch returned 503, so no comparison was possible.\",\n    \"retirement\": \"Repo activity from head-export.json. paperworks/dock-tools pushed 2026-11-20, not archived: carton-map, route-proof, seal-register keep. railhouse/queue-archive archived: queue-digest is a candidate despite 20 loads; the only hit is a historical example in receipt-review, not a live dependency. columnlab/bin-toolkit pushed 2026-05-02, more than 3 months before cutoff: bin-audit would be a candidate, but enabled job close-dock (next run 2026-11-22) calls it, so blocked-live-reference.\",\n    \"limits\": \"No network access, no changes made, no retirements performed. Repo data is the exported snapshot, not a live probe. seal-register freshness needs a re-fetch.\"\n  }\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "warning-phase-and-impact": true,
+          "content-not-recency": true,
+          "activity-and-live-dependencies": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 18.269,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 10953,
+          "cache_read_input_tokens": 35358,
+          "output_tokens": 3019,
+          "output_tokens_details": {
+            "thinking_tokens": 1393
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 10953
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 49338,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.003233005,
+        "turns": 9
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\n  \"warnings\": {\n    \"empty-label\": {\n      \"phase\": \"scan\",\n      \"disposition\": \"cosmetic\",\n      \"installed\": false,\n      \"source\": \"paperworks/dock-tools\"\n    },\n    \"shift-bundle\": {\n      \"phase\": \"scan\",\n      \"disposition\": \"upstream-defect\",\n      \"installed\": false,\n      \"source\": \"paperworks/dock-tools\"\n    }\n  },\n  \"freshness\": {\n    \"carton-map\": \"SAME\",\n    \"route-proof\": \"DIFF\",\n    \"queue-digest\": \"SAME\",\n    \"bin-audit\": \"SAME\",\n    \"seal-register\": \"ERR\"\n  },\n  \"retirement\": {\n    \"carton-map\": \"keep\",\n    \"route-proof\": \"keep\",\n    \"queue-digest\": \"candidate\",\n    \"bin-audit\": \"blocked-live-reference\",\n    \"seal-register\": \"keep\"\n  }\n}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "warning-phase-and-impact": true,
+          "content-not-recency": true,
+          "activity-and-live-dependencies": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 20.225,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 10952,
+          "cache_read_input_tokens": 35357,
+          "output_tokens": 3423,
+          "output_tokens_details": {
+            "thinking_tokens": 2395
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 10952
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 49740,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00343487,
+        "turns": 9
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"warnings\":{\"empty-label\":{\"phase\":\"scan\",\"disposition\":\"cosmetic\",\"installed\":false,\"source\":\"paperworks/dock-tools\"},\"shift-bundle\":{\"phase\":\"scan\",\"disposition\":\"upstream-defect\",\"installed\":false,\"source\":\"paperworks/dock-tools\"}},\"freshness\":{\"carton-map\":\"SAME\",\"route-proof\":\"DIFF\",\"queue-digest\":\"SAME\",\"bin-audit\":\"SAME\",\"seal-register\":\"ERR\"},\"retirement\":{\"carton-map\":\"keep\",\"route-proof\":\"keep\",\"queue-digest\":\"candidate\",\"bin-audit\":\"blocked-live-reference\",\"seal-register\":\"keep\"},\"citations\":{\"method\":\"Offline only, from the exported packet. No network fetches, no changes, no retirements. The 3-month cutoff is 2026-08-20T12:00:00Z.\",\"warnings\":{\"empty-label\":\"install-log.txt:3 and scanner-export.txt:11. The file carries only name:empty-label, and the fixture is deliberately incomplete per tests/read-metadata. empty-label is in lock dismissed, not in skills. Cosmetic.\",\"shift-bundle\":\"install-log.txt:4 and scanner-export.txt:13-14. The file has name only, but it is listed in the user catalog as a real installable package. Scan phase, since the path is under the mkdtemp clone. Not in the lock, so not installed. Upstream defect: the missing description is a real frontmatter gap in an installable package.\"},\"freshness\":{\"carton-map\":\"lock-export.json:4 points to cards/carton-map/SKILL.md. head-export.json:9 is identical to local-documents.json:4 once CRLF is normalized. SAME.\",\"route-proof\":\"lock-export.json:5 points to cards/route-proof/SKILL.md. HEAD body 'Require the route and bay fields.' (head-export.json:10) differs from local 'Require the route field.' (local-documents.json:5). The examples/ path at head-export.json:11 is not the locked path, so it was ignored. DIFF.\",\"queue-digest\":\"lock-export.json:6 points to dist/queue-digest/SKILL.md. head-export.json:13 matches local-documents.json:6. SAME. The archived repo does not affect the content comparison.\",\"bin-audit\":\"lock-export.json:7 points to release/bin-audit/SKILL.md. head-export.json:14 matches local-documents.json:7. SAME.\",\"seal-register\":\"lock-export.json:8 points to cards/seal-register/SKILL.md. HEAD returned 503 (head-export.json:12), so no comparison was possible. ERR. A local copy exists (local-documents.json:8), but a re-check is needed.\"},\"retirement\":{\"carton-map\":\"runtime-export.md: 0 loads, enabled. Upstream dock-tools pushed_at 2026-11-20T07:10:00Z, archived false (repo-export: head-export.json:4). Active author, so keep. Zero use is not a criterion.\",\"route-proof\":\"Upstream dock-tools is active (pushed 2026-11-20). Keep. Disabled and 0 loads do not trigger the rule, and the freshness DIFF is a content issue, not a retirement one.\",\"queue-digest\":\"Upstream railhouse/queue-archive is archived=true, pushed_at 2026-11-19 (head-export.json:5). Upstream abandoned, so candidate under the owner's policy. Live-reference check: the only hit is receipt-review's historical example (runtime-export.md:15-17), which the rule treats as not a live dependency. Usage (20 loads) is not a rule criterion. Candidate pending owner confirmation.\",\"bin-audit\":\"Upstream columnlab/bin-toolkit pushed_at 2026-05-02 (before the 2026-08-20 cutoff), archived=false (head-export.json:6). Inactive more than 3 months, so it would be a delete candidate. But job close-dock is enabled with next run 2026-11-22 and calls bin-audit (runtime-export.md:13-14). That is a live dependency, so blocked-live-reference.\",\"seal-register\":\"Upstream dock-tools is active. Keep. Freshness is ERR, which is separate from the retirement rule.\"}}}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "warning-phase-and-impact": true,
+          "content-not-recency": true,
+          "activity-and-live-dependencies": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 19.622,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 10919,
+          "cache_read_input_tokens": 35326,
+          "output_tokens": 3343,
+          "output_tokens_details": {
+            "thinking_tokens": 1206
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 10919
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 49596,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.003390435,
+        "turns": 9
+      }
+    ]
+  },
+  "verdict": "skill-wins",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 317803,
+  "skipped_trials": []
+}

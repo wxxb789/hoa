@@ -1,0 +1,1023 @@
+{
+  "schema_version": 2,
+  "task": "set-b-evidence-backed-analytical-writing",
+  "generated_at": "2026-11-20T01:02:34.806913-08:00",
+  "skill": "evidence-backed-analytical-writing",
+  "skill_revision": "3",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "forced",
+  "shell": false,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "coverage-window-and-scope": {
+      "field": "current_coverage",
+      "equals": {
+        "census_source": "C17",
+        "active_branches": 17,
+        "eligible_branches": 46,
+        "baseline_source": "B04"
+      }
+    },
+    "status-and-denominator": {
+      "field": "sorting",
+      "equals": {
+        "A09": {
+          "count": 80,
+          "status": "contract ceiling"
+        },
+        "P11": {
+          "count": 60,
+          "status": "demonstration throughput"
+        }
+      }
+    },
+    "auditable-negative": {
+      "field": "night_shift",
+      "equals": {
+        "outcome": "no qualifying case located",
+        "excluded": {
+          "N01": "wrong operator",
+          "N02": "simulation only",
+          "N03": "bibliography only",
+          "N04": "outside window",
+          "N05": "wrong shift",
+          "N06": "no independent measurement"
+        }
+      }
+    }
+  },
+  "rubric_flags": {
+    "coverage-window-and-scope": "non-discriminating",
+    "status-and-denominator": "non-discriminating",
+    "auditable-negative": "non-discriminating"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    },
+    "terse": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    },
+    "skill": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": 0.0,
+    "terse": 0.0
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"report\":\"一是、现有覆盖。据2028年11月30日《系统登记册》（C17，临时数据，待年终复核），全网合格分支点46个，其中已有活跃标签箱流程的为17个，约占37%。储存仓库不计入合格，上线准备中的11个站点不算活跃。作为对照，8月31日《最终普查》（B04）记录活跃分支12个，虽早于窗口，但相较之下约增加5个。\\n二是、设备数量。聊天称在役140台，证据不足。《采购授标通告》（A09）仅为框架上限，最多可叫购80台，分两个预算年度，并未承诺全部采购。《公开演示记录》（P11）的计数器显示60，但该计数每完成一次分拣即加一（含重复），且为两台借用机的台架测试，并非在役数量。两者不能相加为140台，只能推断合同上限与演示吞吐，不能据此归因分支排队改善，也不能推断分支层面的工作量。\\n三是、夜班周转。没有独立测量证明永久市政夜班已在实际服务中改善周转。窗口内候选均不合格：《克洛克塔大学审计办公室》（N01）运营方为私营公司；《市研究索引》（N03）仅有书目；《市政系统研究所》（N02）为模拟；《北分支通讯》（N06）为内部统计，无独立观测；《市审计署》（N04）虽有独立测量，但8月31日发布，早于窗口；《市审计署》（N05）为早班延时服务，非夜班。结论：未找到合格案例，不可外推至全部分支。\",\"current_coverage\":{\"census_source\":\"C17\",\"active_branches\":17,\"eligible_branches\":46,\"baseline_source\":\"B04\"},\"sorting\":{\"A09\":{\"count\":80,\"status\":\"contract ceiling\"},\"P11\":{\"count\":60,\"status\":\"demonstration throughput\"}},\"night_shift\":{\"outcome\":\"no qualifying case located\",\"excluded\":{\"N01\":\"wrong operator\",\"N02\":\"simulation only\",\"N03\":\"bibliography only\",\"N04\":\"outside window\",\"N05\":\"wrong shift\",\"N06\":\"no independent measurement\"}}}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "coverage-window-and-scope": true,
+          "status-and-denominator": true,
+          "auditable-negative": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 25.578,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 7126,
+          "cache_read_input_tokens": 18777,
+          "output_tokens": 4891,
+          "output_tokens_details": {
+            "thinking_tokens": 3357
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 7126
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 30800,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00352462,
+        "turns": 11
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"report\":\"一是、以C17（2028年11月30日，临时系统登记册）为准，窗口内合格市政分馆共46个（不含7个仅作储存的仓库点），已有有效定制板条箱流程的为17个，约占37%；另有11个处于启用准备阶段，未计为活跃。上一基线B04（2028年8月31日，最终普查）为12个，发布于窗口之前，仅供比较。覆盖面有所扩大，但数据仍待年终审核。\\n二是、议会聊天中的“140台在用”证据不足。A09（采购授标公告，2028年10月12日）仅为框架协议下最多80台的调用上限，并不保证全部订购或在用；P11（实验室公开演示记录，2028年11月15日）的计数器显示60，但计的是完成分拣循环的板条箱次数（含重复），且使用借用设备做受控演示，不代表服务中的台数。两者相加不能得出在用数量，分馆工作也无法据此推断设备贡献或将排队改善归因于设备。\\n三是、目前没有独立测量证明档案夜班周转时间已在实际服务中永久改善。N01（大学审计办公室，2028年10月5日）的运营方为私营公司，非市政机构；N02（制度研究所，2028年10月30日）为模拟数据；N03（市政研究索引，2028年12月4日）仅有题录，无法获取方法与结论；N04（市审计署，2028年8月31日）虽为独立测量，但发布于窗口之前；N05（市审计署，2028年9月20日）所测为白天延长柜台服务；N06（北分馆通讯，2028年11月21日）的15%提升仅来自内部统计。结论为未找到合格案例，不能外推至所有分馆。\",\"current_coverage\":{\"census_source\":\"C17\",\"active_branches\":17,\"eligible_branches\":46,\"baseline_source\":\"B04\"},\"sorting\":{\"A09\":{\"count\":80,\"status\":\"contract ceiling\"},\"P11\":{\"count\":60,\"status\":\"demonstration throughput\"}},\"night_shift\":{\"outcome\":\"no qualifying case located\",\"excluded\":{\"N01\":\"wrong operator\",\"N02\":\"simulation only\",\"N03\":\"bibliography only\",\"N04\":\"outside window\",\"N05\":\"wrong shift\",\"N06\":\"no independent measurement\"}}}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "coverage-window-and-scope": true,
+          "status-and-denominator": true,
+          "auditable-negative": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 24.77,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 6865,
+          "cache_read_input_tokens": 19051,
+          "output_tokens": 4646,
+          "output_tokens_details": {
+            "thinking_tokens": 3056
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6865
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 30568,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0033722349999999995,
+        "turns": 11
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"report\":[\"一是、截至2028年11月30日的C17登记册（临时数据），46个符合条件的市政分馆中有17个已活跃使用标签箱工作流，占比约37%；对比2028年8月31日B04终版普查的12/46（约26%），有所提升。不含7个仅用于存储的仓库，也不含11个仅处于上线准备阶段的分馆。L22与R02不能用于网络覆盖率。\",\"二是、现有证据支持的是：采购办公室A09框架最多可调用80台分拣机，但并不要求采购全部80台；档案系统实验室P11演示中计数器显示60，但该计数器每完成一次分拣循环即计数（含重复），且使用两台借用设备，因此60并非在役机器数。140台在服务中的说法缺乏依据，不能归因于排队改善，分馆层面的在役分拣能力也无法由此推断。\",\"三是、尚无独立测量证明市政夜班周转改善已在实际服务中永久成立。城市审计办公室的Delta分馆数据（47→39分钟）发布于8月31日，不在窗口内；克拉克塔大学审计办公室所涉夜班由私营公司运营；北分馆通讯仅为主管自报；研究所数据为模拟；另一审计报告的延长服务为06:00至14:00白班；市政研究索引仅有题录。结论：无合格案例，不得外推至全部分馆。\"],\"current_coverage\":{\"census_source\":\"C17\",\"active_branches\":17,\"eligible_branches\":46,\"baseline_source\":\"B04\"},\"sorting\":{\"A09\":{\"count\":80,\"status\":\"contract ceiling\"},\"P11\":{\"count\":60,\"status\":\"demonstration throughput\"}},\"night_shift\":{\"outcome\":\"no qualifying case located\",\"excluded\":{\"N01\":\"wrong operator\",\"N02\":\"simulation only\",\"N03\":\"bibliography only\",\"N04\":\"outside window\",\"N05\":\"wrong shift\",\"N06\":\"no independent measurement\"}}}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "coverage-window-and-scope": true,
+          "status-and-denominator": true,
+          "auditable-negative": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 27.185,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 6877,
+          "cache_read_input_tokens": 19060,
+          "output_tokens": 5684,
+          "output_tokens_details": {
+            "thinking_tokens": 4200
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6877
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 31627,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0038928250000000004,
+        "turns": 11
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"report\": [\"一是、截至2028年11月30日的C17临时登记显示，46个符合条件的市政分支中有17个活跃使用标记板条箱，约占37%；另有11个仅处于上线准备阶段，不计为活跃。作为先前对比，B04（8月31日，早于统计窗口）为12/46。C17仍待年终复核。\", \"二是、现有证据不能支持“140台在役”。A09仅是分期订购最多80台的合同上限，不要求全部采购或验收；P11是一次受控演示，计数器显示60，但它对每个完成分拣循环的板条箱计数（含重复），使用两台借用分拣机，周期时间为实验台测量。两者不能证明在役数量，因此分支层面的在役分拣机数量及队列改善的归因均无法推断，状态未定。\", \"三是、尚无独立测量证明永久市政夜班已在实际服务中改善周转。N06（北分支）的15%提速仅来自内部班次统计，无独立观测；N01由私营公司运营；N02为模拟；N03只有题录，无法核对方法与结论；N04（德尔塔分支）有独立观测，但发布于8月31日，早于窗口；N05为06:00至14:00的白天延长服务。因此本次检索未找到合格案例，结论不能外推至所有分支。\"], \"current_coverage\": {\"census_source\": \"C17\", \"active_branches\": 17, \"eligible_branches\": 46, \"baseline_source\": \"B04\"}, \"sorting\": {\"A09\": {\"count\": 80, \"status\": \"contract ceiling\"}, \"P11\": {\"count\": 60, \"status\": \"demonstration throughput\"}}, \"night_shift\": {\"outcome\": \"no qualifying case located\", \"excluded\": {\"N01\": \"wrong operator\", \"N02\": \"simulation only\", \"N03\": \"bibliography only\", \"N04\": \"outside window\", \"N05\": \"wrong shift\", \"N06\": \"no independent measurement\"}}}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "coverage-window-and-scope": true,
+          "status-and-denominator": true,
+          "auditable-negative": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 24.911,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 9491,
+          "cache_read_input_tokens": 16632,
+          "output_tokens": 4803,
+          "output_tokens_details": {
+            "thinking_tokens": 3326
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 9491
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 30932,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.003754795,
+        "turns": 11
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"report\":\"一是，网络覆盖仍然有限。以符合条件的市立分馆为分母，C17（2028年11月30日，临时登记）显示共46家，其中17家在常规公共收藏中已有活跃的标记箱流程，约占37%，另有11家仅处于启用准备阶段、不计为活跃。对比基准为B04（2028年8月31日）的12/46，约26%，但其日期早于9月1日的证据窗口，只作先前比较。\\n\\n二是，140台分拣机的说法缺乏依据。A09（2028年10月12日采购授标）只允许分批调用最多80台，并不表示已下单、验收或投入服务；P11（2028年11月15日实验室演示）计数器显示60，但它按完成分拣的次数累计、包括重复，并非分馆常规服务的周转时间。因此现有证据既不能确认在用数量，也不能把排队改善归因于这些机器。分馆工作应以在用数量未定为前提规划。\\n\\n三是，尚无独立测量确立夜班周转的永久改善。北分馆夜班（N06，2028年11月21日）称周转快15%，但仅为主管的内部班次统计，无独立观察。N01为私营公司运营，N02为模拟，N05为非夜间柜台，N03仅有题录，N04（Delta分馆，2028年8月31日）虽有独立测量，但早于窗口。故未找到合格案例，亦不能外推至所有分馆。\",\"current_coverage\":{\"census_source\":\"C17\",\"active_branches\":17,\"eligible_branches\":46,\"baseline_source\":\"B04\"},\"sorting\":{\"A09\":{\"count\":80,\"status\":\"contract ceiling\"},\"P11\":{\"count\":60,\"status\":\"demonstration throughput\"}},\"night_shift\":{\"outcome\":\"no qualifying case located\",\"excluded\":{\"N01\":\"wrong operator\",\"N02\":\"simulation only\",\"N03\":\"bibliography only\",\"N04\":\"outside window\",\"N05\":\"wrong shift\",\"N06\":\"no independent measurement\"}}}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "coverage-window-and-scope": true,
+          "status-and-denominator": true,
+          "auditable-negative": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 29.891,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 6896,
+          "cache_read_input_tokens": 19256,
+          "output_tokens": 5949,
+          "output_tokens_details": {
+            "thinking_tokens": 4429
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6896
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 32107,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00402966,
+        "turns": 11
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"report\":[\"一是、现有覆盖范围。以网络内46个合格市政分馆为分母，依据2028年11月30日的系统登记册（C17，暂列数）：17个分馆在常规公共收藏中实际登记过标记箱，覆盖率约37%；另有11个仅完成接入、尚未活跃，不计入。与2028年8月31日的最终普查（B04）相比，活跃分馆由12个增至17个，可作前后对比，但数字尚待年终复核。L22的单站数据及侧栏“约28个分馆”的无来源估计，均不能代表全网。\",\"二是、140台的说法缺乏支持。采购公告A09只是框架协议的上限，最多80台，并不强制全部订购，订单和验收均不在其内；实验室P11的60是一次受控演示中两台借用机器的计数，且计数包括重复通过的箱子，不是在用数量。两者相加不能证明在用140台，也无法据此推断分馆的分拣能力，更不能把队列改善归因于分拣机。\",\"三是、尚无独立测量确立的永久夜班改善。窗口内未找到合格案例：N01的运营方为私营公司；N02为模拟；N03仅有题录，正文不可获取；N06只有内部班次统计，无独立测量；N04虽有独立测量，但发表于8月31日，在窗口之外；N05为日间延长服务，不是夜班。结论不能外推至全部分馆。\"],\"current_coverage\":{\"census_source\":\"C17\",\"active_branches\":17,\"eligible_branches\":46,\"baseline_source\":\"B04\"},\"sorting\":{\"A09\":{\"count\":80,\"status\":\"contract ceiling\"},\"P11\":{\"count\":60,\"status\":\"demonstration throughput\"}},\"night_shift\":{\"outcome\":\"no qualifying case located\",\"excluded\":{\"N01\":\"wrong operator\",\"N02\":\"simulation only\",\"N03\":\"bibliography only\",\"N04\":\"outside window\",\"N05\":\"wrong shift\",\"N06\":\"no independent measurement\"}}}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "coverage-window-and-scope": true,
+          "status-and-denominator": true,
+          "auditable-negative": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 30.454,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 6877,
+          "cache_read_input_tokens": 19233,
+          "output_tokens": 6135,
+          "output_tokens_details": {
+            "thinking_tokens": 4638
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6877
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 32251,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.004120055000000001,
+        "turns": 11
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"report\":\"一是，现行覆盖以《市政档案馆系统登记册》（C17，2028年11月30日，临时数据，待年终复核）为准：合格市立分馆46个，已激活17个，覆盖率约37%；另有11个处于仅上线未激活状态，仓储型站点不计入合格范围。基线为《市政档案馆最终普查》（B04，2028年8月31日）：合格分馆46个，已激活12个，约26%。两者口径一致，可作前后比较，但C17尚未终审。\\n\\n二是，现有证据不支持“140台分拣机在役”。《采购办公室授标通知》（A09）显示框架协议允许分两个预算年度调拨至80台，但不构成采购或接收承诺。《档案系统实验室公开演示记录》（P11）中计数器C显示60，系两台借用设备的受控演示结果，计数含重复分拣，周期为台架测量，并非分馆日常周转时间。两者属于不同口径，不能相加为在役数量，也不足以归因分馆排队改善。在役台数目前未确定，分馆层面的工作量推断应以已激活分馆的实际记录为准。\\n\\n三是，目前没有符合条件的独立测量证据，不能确认永久性市立档案夜班已在实际服务中改善周转。《北分馆通讯》（N06）称周转快15%，但仅为内部班次统计，无独立观测或外部审计。《市审计署》发布的Delta分馆既有夜班数据（N04，47分钟降至39分钟）虽有独立测量，但发布于2028年8月31日，超出窗口；《大学审计办公室》（N01）涉及私营机构；《市民研究索引》（N03）仅有题录；《公民系统研究所》（N02）为模拟；《市审计署》西分馆研究（N05）为白天延长服务。因此结论为“未见合格案例”，不应推及全部分馆。\\n\\n来源：《市政档案馆最终普查》、《系统登记册》、《采购办公室授标通知》、《档案系统实验室公开演示记录》、《北分馆通讯》、《市审计署》、《大学审计办公室》、《市民研究索引》、《公民系统研究所》（2028年8月至12月）。\",\"current_coverage\":{\"census_source\":\"C17\",\"active_branches\":17,\"eligible_branches\":46,\"baseline_source\":\"B04\"},\"sorting\":{\"A09\":{\"count\":80,\"status\":\"contract ceiling\"},\"P11\":{\"count\":60,\"status\":\"demonstration throughput\"}},\"night_shift\":{\"outcome\":\"no qualifying case located\",\"excluded\":{\"N01\":\"wrong operator\",\"N02\":\"simulation only\",\"N03\":\"bibliography only\",\"N04\":\"outside window\",\"N05\":\"wrong shift\",\"N06\":\"no independent measurement\"}}}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "coverage-window-and-scope": true,
+          "status-and-denominator": true,
+          "auditable-negative": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 23.237,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 11637,
+          "cache_read_input_tokens": 34993,
+          "output_tokens": 3993,
+          "output_tokens_details": {
+            "thinking_tokens": 2114
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 11637
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 50631,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.003801855,
+        "turns": 12
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"report\":\"一是，网络覆盖仍然有限。以46个符合条件的市属分馆为分母，《市档案馆记录办公室系统登记册》（C17，2028年11月30日，临时数据）显示17个分馆已有效使用定制板条箱，约占37%；窗口前的《最终普查》（B04，2028年8月31日）为12个，约占26%，仅作趋势基线。劳雷尔分馆通讯与产权办公室名录不能代表网络覆盖。\\n\\n二是，现有证据不支持“140台在役”。《采购办公室授标公告》（A09）显示框架协议至多分批订购80台，并不承诺全部采购，属合同上限；《档案系统实验室演示记录》（P11）的60为计数器值，含重复计数，且为两台借用设备的受控演示，属演示吞吐。二者不能相加，也不能将队列改善归因于此；分馆层面亦无在役设备数据，不应据此推断分馆工作量或改善幅度。\\n\\n三是，尚未确立。窗口内未找到由网络市属人员在分馆运行、经独立测量的永久夜班案例。《市审计署》德尔塔分馆测量（N04）虽为独立测量，但发布于8月31日，早于窗口；《钟楼大学审计办公室》（N01）的运营方为私营企业；《北分馆通讯》（N06）仅为内部班次统计；《市民系统研究所》（N02）为模拟研究；《市审计署》（N05）为非夜班的延长柜台服务。只能判定为“未见合格案例”，不能外推至全部分馆。\",\"current_coverage\":{\"census_source\":\"C17\",\"active_branches\":17,\"eligible_branches\":46,\"baseline_source\":\"B04\"},\"sorting\":{\"A09\":{\"count\":80,\"status\":\"contract ceiling\"},\"P11\":{\"count\":60,\"status\":\"demonstration throughput\"}},\"night_shift\":{\"outcome\":\"no qualifying case located\",\"excluded\":{\"N01\":\"wrong operator\",\"N02\":\"simulation only\",\"N03\":\"bibliography only\",\"N04\":\"outside window\",\"N05\":\"wrong shift\",\"N06\":\"no independent measurement\"}}}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "coverage-window-and-scope": true,
+          "status-and-denominator": true,
+          "auditable-negative": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 28.593,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 11619,
+          "cache_read_input_tokens": 34977,
+          "output_tokens": 5511,
+          "output_tokens_details": {
+            "thinking_tokens": 3858
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 11619
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 52115,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.004558445,
+        "turns": 12
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"report\":\"一是，现行覆盖：以2028年11月30日《系统登记册》（C17）为准，全网合格分馆46个，已有活跃包裹标签流程的17个，约占37%；另11个处于启用准备阶段，未计为活跃，数字为年终复核前临时值。较2028年8月31日《市政档案办公室终版普查》（B04）的12个（约26%）有所提升，但后者早于窗口，仅作基线。《分馆通讯》《产权办公室》等不能代表全网，不予采用。\\n\\n二是，140台之说缺乏依据。《采购办公室授标公告》（A09）仅为分期调用上限80台，不构成采购义务，并非在役数量。《档案系统实验室》演示（P11）计数器显示60，但其按每次完成的分拣循环累计，含重复且使用两台借用设备，属演示吞吐量，不能换算为台数。二者不能相加，亦无证据表明设备已投入分馆日常运行，因此不能将队列改善归因于分拣机，也不能推断分馆工作量。\\n\\n三是，尚无独立测量确立永久夜班周转改善。《网络北分馆通讯》（N06）称周转快15%，但仅为主管比较内部记录，无独立观测；《钟楼大学审计办公室》（N01）测得中位数由51分钟降至43分钟，但运营方为私营企业，非网络人员；《市政研究索引》（N03）仅有题录，全文不可获取；其余材料或为模拟、或超出窗口、或非夜班。故结论为未找到合格案例，不得外推至全部分馆。\",\"current_coverage\":{\"census_source\":\"C17\",\"active_branches\":17,\"eligible_branches\":46,\"baseline_source\":\"B04\"},\"sorting\":{\"A09\":{\"count\":80,\"status\":\"contract ceiling\"},\"P11\":{\"count\":60,\"status\":\"demonstration throughput\"}},\"night_shift\":{\"outcome\":\"no qualifying case located\",\"excluded\":{\"N01\":\"wrong operator\",\"N02\":\"simulation only\",\"N03\":\"bibliography only\",\"N04\":\"outside window\",\"N05\":\"wrong shift\",\"N06\":\"no independent measurement\"}}}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "coverage-window-and-scope": true,
+          "status-and-denominator": true,
+          "auditable-negative": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 33.715,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 11615,
+          "cache_read_input_tokens": 23332,
+          "output_tokens": 7011,
+          "output_tokens_details": {
+            "thinking_tokens": 5354
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 11615
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 41964,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.005191295,
+        "turns": 12
+      }
+    ]
+  },
+  "verdict": "no-difference",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 332995,
+  "skipped_trials": []
+}

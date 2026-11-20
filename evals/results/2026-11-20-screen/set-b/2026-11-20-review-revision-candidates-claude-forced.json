@@ -1,0 +1,1255 @@
+{
+  "schema_version": 2,
+  "task": "review-revision-candidates",
+  "generated_at": "2026-11-20T01:07:16.728181-08:00",
+  "skill": "review-revision-candidates",
+  "skill_revision": "3",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "forced",
+  "shell": false,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "schedule-candidate": {
+      "field": "schedule",
+      "equals": {
+        "service": "Rainline",
+        "start": "2026-10-19",
+        "updated": "2026-10-02",
+        "route_label": "Quay Circut",
+        "friday_extra": false
+      }
+    },
+    "counts-candidate": {
+      "field": "counts",
+      "equals": {
+        "prior": {
+          "period": "2024-Q4",
+          "value": 812,
+          "source": "BR-14/p3",
+          "measure": "unverified"
+        },
+        "current": {
+          "period": "2026-Q3",
+          "value": 529,
+          "source": "OPS-62/t2",
+          "measure": "completed duty blocks"
+        },
+        "relationship": "not_comparable"
+      }
+    },
+    "access-candidate": {
+      "field": "access",
+      "equals": {
+        "index": "listed",
+        "attempt": {
+          "client": "desk-preview/4",
+          "date": "2026-10-18",
+          "path": "/documents/appendix-g.pdf",
+          "http_status": 403
+        },
+        "alternative": "CL-9/a2",
+        "filed": "unverified",
+        "filing_requirement": "unverified"
+      }
+    }
+  },
+  "rubric_flags": {
+    "schedule-candidate": "flaky",
+    "counts-candidate": "flaky",
+    "access-candidate": "flaky"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 1,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.3333333333333333,
+      "pass^k": false,
+      "mean_score": 0.7777777777777778,
+      "sample_stddev": 0.1924500897298753
+    },
+    "terse": {
+      "valid": true,
+      "passed": 1,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.3333333333333333,
+      "pass^k": false,
+      "mean_score": 0.7777777777777778,
+      "sample_stddev": 0.1924500897298753
+    },
+    "skill": {
+      "valid": true,
+      "passed": 0,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 0.0,
+      "pass^k": false,
+      "mean_score": 0.2222222222222222,
+      "sample_stddev": 0.38490017945975047
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": -0.5555555555555556,
+    "terse": -0.5555555555555556
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "The candidate is below as one bare JSON object. I did not edit the packet or apply anything.\n\n```json\n{\"baseline_id\":\"2d6c3e1\",\"schedule\":{\"service\":\"Rainline\",\"start\":\"2026-10-19\",\"updated\":\"2026-10-02\",\"route_label\":\"Quay Circut\",\"friday_extra\":false},\"counts\":{\"prior\":{\"period\":\"2024-Q4\",\"value\":812,\"source\":\"BR-14/p3\",\"measure\":\"unverified\"},\"current\":{\"period\":\"2026-Q3\",\"value\":529,\"source\":\"OPS-62/t2\",\"measure\":\"completed duty blocks\"},\"relationship\":\"not_comparable\"},\"access\":{\"index\":\"listed\",\"attempt\":{\"client\":\"desk-preview/4\",\"date\":\"2026-10-18\",\"path\":\"<path>\",\"http_status\":403},\"alternative\":\"CL-9/a2\",\"filed\":\"unverified\",\"filing_requirement\":\"unverified\"},\"anchors\":{\"review_items\":{\"schedule\":\"review.md item 1\",\"counts\":\"review.md item 2\",\"access\":\"review.md item 3\"},\"evidence\":{\"schedule_start\":\"evidence/operations.md: Notice RN-22 §3, final revision 5, 2026-10-15 (\\\"The revised service begins Monday 19 October.\\\")\",\"counts_prior\":\"evidence/operations.md: BR-14/p3, January 2025 (\\\"Rainline coverage, 2024-Q4: 812.\\\"; no measure label or source table)\",\"counts_current\":\"evidence/operations.md: OPS-62/t2, 2026-10-12 export (\\\"Rainline | 2026-Q3 | completed duty blocks | 529.\\\")\",\"access_index\":\"evidence/access-log.csv: desk-preview/4, 2026-10-18, <path>, 200\",\"access_attempt\":\"evidence/access-log.csv: desk-preview/4, 2026-10-18, <path>, 403\",\"access_alternative\":\"evidence/access-log.csv: civic-library/2, 2026-10-18, <path>, 200; evidence/register.md R-6 (CL-9/a2 public alternative)\",\"access_filing\":\"evidence/register.md R-6 (no appendix filing status; counsel notes cover the main bulletin only)\"}}}\n```\n\nChoices I made that you may want to check:\n\n- **Schedule:** Only `start` changes, to 2026-10-19 per the notice. `route_label` stays \"Quay Circut\" and `friday_extra` stays false, as the review says. The 09:00 advice is superseded, so the v3 label and Friday values are not carried forward.\n- **Counts:** The 2024-Q4 headcount figure stays, but its measure is `unverified`. The BR-14 slide has no label or source table, so \"headcount\" cannot be traced. Current value 529 is \"completed duty blocks\", not the 610 scheduled blocks. Relationship is `not_comparable` because the measures differ. The 812 vs 529 \"lower\" trend is removed.\n- **Access:** Index is `listed` because the live index still links Appendix G. The attempt is the 403 on `appendix-g.pdf`. The alternative is the confirmed public copy `CL-9/a2`. Filed and filing requirement are `unverified`, since the register has no appendix filing status. The Appendix F note is not used as evidence for G.\n- **Baseline ID:** I used `2d6c3e1` from the `HEAD` line in `checkout.txt`.\n- **Structure:** The schema does not define a combined wrapper, so I put `schedule`, `counts` and `access` under top-level keys next to `baseline_id` and `anchors`. If the intake expects each file as its own top-level object, the desk will need to split it.",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "schedule-candidate": true,
+          "counts-candidate": true,
+          "access-candidate": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 21.846,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 6587,
+          "cache_read_input_tokens": 27536,
+          "output_tokens": 3964,
+          "output_tokens_details": {
+            "thinking_tokens": 1512
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6587
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 38095,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0030815350000000003,
+        "turns": 16
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"baseline_id\": \"2d6c3e1\",\n  \"schedule\": {\"service\":\"Rainline\",\"start\":\"2026-10-19\",\"updated\":\"2026-10-02\",\"route_label\":\"Quay Circut\",\"friday_extra\":false},\n  \"counts\": {\"prior\":{\"period\":\"2024-Q4\",\"value\":812,\"source\":\"BR-14/p3\",\"measure\":\"unverified\"},\"current\":{\"period\":\"2026-Q3\",\"value\":529,\"source\":\"OPS-62/t2\",\"measure\":\"completed duty blocks\"},\"relationship\":\"not_comparable\"},\n  \"access\": {\"index\":\"listed\",\"attempt\":{\"client\":\"desk-preview/4\",\"date\":\"2026-10-18\",\"path\":\"<path>\",\"http_status\":403},\"alternative\":\"<path>\",\"filed\":\"unverified\",\"filing_requirement\":\"unverified\"},\n  \"anchors\": {\n    \"review_item_1\": \"schedule.start set to 2026-10-19 from RN-22 §3 (final revision 5, 2026-10-15); all other schedule fields kept at baseline; friday_extra stays false (worksheet stamped TRAINING ONLY)\",\n    \"review_item_2\": \"counts.relationship set to not_comparable: prior is 2024-Q4 headcount (BR-14/p3, no traceable measure label, so measure is unverified); current is 2026-Q3 completed duty blocks (OPS-62/t2, not the same measure as the prior observation)\",\n    \"review_item_3\": \"access: index listed (desk-preview/4 <path> 200, Appendix G still linked); attempt desk-preview/4 <path> 403; public copy CL-9/a2 via civic-library/2 <path> 200; filed and filing_requirement unverified (register has no appendix filing status; counsel notes cover the main bulletin only)\",\n    \"evidence_locators\": [\"evidence/register.md R-6\", \"evidence/operations.md RN-22 §3; BR-14/p3; OPS-62/t2\", \"evidence/access-log.csv rows 2-5\", \"forwarded-0900.txt is excluded (superseded by review.md item 1)\"]\n  }\n}\n```\n\nNotes for the desk:\n- **Baseline ID:** `2d6c3e1` is taken from the `baseline HEAD` line in `checkout.txt`.\n- **Schedule:** only `start` changes. `route_label` stays as \"Quay Circut\" and `updated` stays \"2026-10-02\", because review item 1 excludes every other schedule field. Those values may need a separate fix later.\n- **Counts:** the prior measure is `unverified` because the headcount caption could not be traced to a definition. The relationship is `not_comparable` because the two measures differ, so the earlier observation is kept.\n- **Access:** the attempt is the 403 on the desk copy of Appendix G. The alternative is the public copy locator `<path>` from the access log. The register's `CL-9/a2` is the same reference without the path prefix. Filing status is `unverified` because no record establishes it for appendices.\n- **Extra key:** the JSON adds an `anchors` object that `schema.md` does not list. If the intake rejects unknown keys, drop that object and keep the rest.\n\nI did not edit the packet or apply the candidate.",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "schedule-candidate": true,
+          "counts-candidate": true,
+          "access-candidate": false
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 22.755,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 6352,
+          "cache_read_input_tokens": 27737,
+          "output_tokens": 4025,
+          "output_tokens_details": {
+            "thinking_tokens": 1714
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6352
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 38122,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00308467,
+        "turns": 16
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "Here is the candidate as a single bare JSON object. I did not write any files or apply anything.\n\n```json\n{\n  \"baseline_id\": \"2d6c3e1\",\n  \"schedule\": {\"service\":\"Rainline\",\"start\":\"2026-10-19\",\"updated\":\"2026-10-02\",\"route_label\":\"Quay Circut\",\"friday_extra\":false},\n  \"counts\": {\"prior\":{\"period\":\"2024-Q4\",\"value\":812,\"source\":\"BR-14/p3\",\"measure\":\"unverified\"},\"current\":{\"period\":\"2026-Q3\",\"value\":529,\"source\":\"OPS-62/t2\",\"measure\":\"completed duty blocks\"},\"relationship\":\"not_comparable\"},\n  \"access\": {\"index\":\"listed\",\"attempt\":{\"client\":\"desk-preview/4\",\"date\":\"2026-10-18\",\"path\":\"<path>\",\"http_status\":403},\"alternative\":\"<path>\",\"filed\":\"unverified\",\"filing_requirement\":\"unverified\"},\n  \"anchors\": {\n    \"review_items\": {\"1\":\"schedule.start\",\"2\":\"counts\",\"3\":\"access\"},\n    \"evidence\": {\n      \"schedule_start\": \"evidence/operations.md: RN-22 §3, final revision 5, 2026-10-15 ('The revised service begins Monday 19 October.')\",\n      \"schedule_friday_excluded\": \"evidence/operations.md: attached Friday extra worksheet stamped TRAINING ONLY; forwarded-0900.txt advice superseded by review.md item 1\",\n      \"counts_prior\": \"evidence/operations.md: BR-14/p3 'Rainline coverage, 2024-Q4: 812', no measure label or source table\",\n      \"counts_current\": \"evidence/operations.md: OPS-62/t2 2026-10-12 export, 2026-Q3 completed duty blocks 529; 610 scheduled duty blocks is a separate row, not the final observation\",\n      \"access_index\": \"evidence/access-log.csv: desk-preview/4, 2026-10-18, <path>, 200, Appendix G still linked\",\n      \"access_attempt\": \"evidence/access-log.csv: desk-preview/4, 2026-10-18, <path>, 403\",\n      \"access_alternative\": \"evidence/access-log.csv: civic-library/2, 2026-10-18, <path>, 200; evidence/register.md R-6: CL-9/a2 public alternative\",\n      \"access_filing\": \"evidence/register.md R-6: no appendix filing status; counsel notes cover main bulletin only; 2025 withdrawal annotation is for Appendix F only\"\n    }\n  }\n}\n```\n\nChoices I made:\n- **Schedule:** Start is set to 2026-10-19 per the notice's effective date. The other fields are kept at the baseline values (`updated` 2026-10-02, `route_label` \"Quay Circut\", `friday_extra` false). Review item 1 excludes the Friday, label and timestamp changes, and the 18 October forwarded advice is superseded.\n- **Counts:** The 2024-Q4 headcount is kept as the prior observation, since v3 requires the earlier record to stay. Its measure is `unverified` because the caption can't be traced to a definition. The 2026-Q3 figure is recorded as completed duty blocks (529), and the relationship is `not_comparable` because the two measures differ. The 610 scheduled-block row is not used.\n- **Access:** The index is `listed` (the 18 Oct check still shows Appendix G linked). The attempt is the 403 on `<path>`. The alternative is the confirmed public copy `<path>`, which I chose over the bare `CL-9/a2` label because it is the locator the log actually verified; the desk may prefer the bare label. Filed and filing requirement are both `unverified`, since the register and counsel notes don't cover appendices. The Appendix F note is not used as evidence for G.\n- **baseline_id:** Set to \"2d6c3e1\" from the checkout export's baseline HEAD.",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "schedule-candidate": true,
+          "counts-candidate": true,
+          "access-candidate": false
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 20.479,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 6331,
+          "cache_read_input_tokens": 27720,
+          "output_tokens": 3635,
+          "output_tokens_details": {
+            "thinking_tokens": 1096
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6331
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 37694,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0028868749999999997,
+        "turns": 16
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "The bare JSON object is below. Each file value is a complete replacement for the matching `baseline/` file, and I did not edit the packet or apply anything.\n\n```json\n{\n  \"baseline_id\": \"2d6c3e1\",\n  \"schedule\": {\"service\":\"Rainline\",\"start\":\"2026-10-19\",\"updated\":\"2026-10-02\",\"route_label\":\"Quay Circut\",\"friday_extra\":false},\n  \"counts\": {\"prior\":{\"period\":\"2024-Q4\",\"value\":812,\"source\":\"BR-14/p3\",\"measure\":\"unverified\"},\"current\":{\"period\":\"2026-Q3\",\"value\":529,\"source\":\"OPS-62/t2\",\"measure\":\"completed duty blocks\"},\"relationship\":\"not_comparable\"},\n  \"access\": {\"index\":\"listed\",\"attempt\":{\"client\":\"desk-preview/4\",\"date\":\"2026-10-18\",\"path\":\"<path>\",\"http_status\":403},\"alternative\":\"<path>\",\"filed\":\"unverified\",\"filing_requirement\":\"unverified\"},\n  \"anchors\": [\n    {\"review_item\":\"review.md 1 (schedule start)\",\"evidence\":[\"evidence/source-excerpts: RN-22 §3 rev 5, 2026-10-15, 'The revised service begins Monday 19 October.'\",\"evidence/source-excerpts: Friday extra worksheet stamped TRAINING ONLY (not applied)\"]},\n    {\"review_item\":\"review.md 2 (trend statement)\",\"evidence\":[\"evidence/source-excerpts: BR-14/p3 'coverage, 2024-Q4: 812', no measure label or source table; measure set to unverified\",\"evidence/source-excerpts: OPS-62/t2 '2026-Q3 | completed duty blocks | 529'; 610 scheduled duty blocks is a separate row and not used\",\"relationship not_comparable: prior measure unverified and current measure differs\"]},\n    {\"review_item\":\"review.md 3 (Appendix G closure)\",\"evidence\":[\"evidence/access-log.csv desk-preview/4 2026-10-18 <path> 200 (Appendix G still linked => index listed)\",\"evidence/access-log.csv desk-preview/4 2026-10-18 <path> 403 (attempt)\",\"evidence/access-log.csv civic-library/2 2026-10-18 <path> 200 (confirmed public copy, compared to docket title and revision)\",\"evidence/register.md R-6: no appendix filing status in archive register; filing and filing_requirement left unverified; F withdrawal annotation not used for G\"]}\n  ]\n}\n```\n\nChoices I made:\n- **Schedule:** only `start` changed, to 2026-10-19. `route_label` stays as in baseline (\"Quay Circut\"), `updated` stays 2026-10-02, and `friday_extra` stays false. The review excludes those fields, and the 18 October forwarded preapproval is not used.\n- **Counts:** the 2024-Q4 headcount figure is kept, but its measure is `unverified` because the slide has no traceable label. The 2026-Q3 figure is the completed-duty-blocks observation, not the 610 scheduled figure. The relationship is `not_comparable`, not `lower`.\n- **Access:** Appendix G is `listed`. The attempt is the desk's own 403 on the appendix PDF, and the alternative is the confirmed civic-library copy path `<path>`. Filing and filing requirement stay `unverified`, since the register has no appendix filing status. Use the `<path>` form as the locator; if the desk wants the bare `CL-9/a2` reference, change that one string.",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "schedule-candidate": true,
+          "counts-candidate": true,
+          "access-candidate": false
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 21.944,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 8948,
+          "cache_read_input_tokens": 25506,
+          "output_tokens": 3929,
+          "output_tokens_details": {
+            "thinking_tokens": 1466
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 8948
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 38391,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00333886,
+        "turns": 16
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "Candidate v4 is below. It is built from the baseline bytes and limited to the three review items. The packet and baseline are unchanged, and I did not apply anything.\n\n```json\n{\"baseline_id\":\"2d6c3e1\",\"schedule\":{\"service\":\"Rainline\",\"start\":\"2026-10-19\",\"updated\":\"2026-10-02\",\"route_label\":\"Quay Circut\",\"friday_extra\":false},\"counts\":{\"prior\":{\"period\":\"2024-Q4\",\"value\":812,\"source\":\"BR-14/p3\",\"measure\":\"unverified\"},\"current\":{\"period\":\"2026-Q3\",\"value\":529,\"source\":\"OPS-62/t2\",\"measure\":\"completed duty blocks\"},\"relationship\":\"not_comparable\"},\"access\":{\"index\":\"listed\",\"attempt\":{\"client\":\"desk-preview/4\",\"date\":\"2026-10-18\",\"path\":\"<path>\",\"http_status\":403},\"alternative\":\"CL-9/a2\",\"filed\":\"unverified\",\"filing_requirement\":\"unverified\"},\"anchors\":{\"review_item_1\":\"review.md item 1: start set to notice effective date; evidence: evidence/operations.md (RN-22 §3, rev 5, 2026-10-15: 'The revised service begins Monday 19 October.'); Friday extra and label left at baseline values\",\"review_item_2\":\"review.md item 2: trend replaced by what the records establish; evidence: evidence/operations.md (BR-14/p3 unlabeled slide, 812; OPS-62/t2 2026-10-12, 529 completed duty blocks, measure differs so not_comparable); earlier 812 observation retained\",\"review_item_3\":\"review.md item 3: Appendix G closure claim replaced; evidence: evidence/access-log.csv (desk-preview/4 2026-10-18 <path> 200 still linked; <path> 403; civic-library/2 <path> 200 compared to docket title and revision); evidence/register.md (R-6: Appendix G live index entry, CL-9/a2 public alternative; no appendix filing status in register, so filed and filing_requirement unverified); 2025 withdrawal annotation applies to Appendix F only; appendix-f 404 not used as evidence about G\",\"excluded\":\"forwarded-0900.txt preapproval of normalized label, October freshness stamp and Friday extra is superseded by review.md (v3 rejected) and is not applied\"}}\n```\n\nChoices I made:\n- **Schedule:** only `start` changed, to 2026-10-19. `route_label` stays at the baseline's \"Quay Circut\", and `updated` stays at 2026-10-02. The review excludes the label, timestamps, and Friday, so I did not carry v3's corrections.\n- **Counts:** I changed the prior measure to `unverified`. The baseline's \"headcount\" traces only to an unlabeled slide and an untraced caption. I added the 2026-Q3 observation (529, completed duty blocks) and set the relationship to `not_comparable`, since the two measures differ. The 812 observation stays in the candidate.\n- **Access:** The schema allows one attempt object, so I used the Appendix G PDF request (403). The 200 response from `<path>` is recorded in the anchors. `index` is `listed` because the index entry is still live. `alternative` is `CL-9/a2`, which was confirmed against the docket title and revision. `filed` and `filing_requirement` stay `unverified` because the register has no appendix filing status.",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "schedule-candidate": true,
+          "counts-candidate": true,
+          "access-candidate": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 22.447,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 6384,
+          "cache_read_input_tokens": 28064,
+          "output_tokens": 3916,
+          "output_tokens_details": {
+            "thinking_tokens": 1525
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6384
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 38372,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0030374399999999998,
+        "turns": 16
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "I built v4 as one bare JSON object, with each replacement file nested under its own key. I have not edited the packet or applied anything.\n\n```json\n{\"baseline_id\":\"2d6c3e1\",\"schedule\":{\"service\":\"Rainline\",\"start\":\"2026-10-19\",\"updated\":\"2026-10-02\",\"route_label\":\"Quay Circut\",\"friday_extra\":false},\"counts\":{\"prior\":{\"period\":\"2024-Q4\",\"value\":812,\"source\":\"BR-14/p3\",\"measure\":\"headcount\"},\"current\":{\"period\":\"2026-Q3\",\"value\":529,\"source\":\"OPS-62/t2\",\"measure\":\"completed duty blocks\"},\"relationship\":\"not_comparable\"},\"access\":{\"index\":\"listed\",\"attempt\":{\"client\":\"desk-preview/4\",\"date\":\"2026-10-18\",\"path\":\"<path>\",\"http_status\":403},\"alternative\":\"CL-9/a2\",\"filed\":\"unverified\",\"filing_requirement\":\"unverified\"},\"anchors\":[{\"review_item\":\"review.md item 1 (schedule.start)\",\"evidence\":[\"evidence/operations.md: RN-22 §3 rev 5, 2026-10-15, 'The revised service begins Monday 19 October.'\",\"evidence/operations.md: Friday extra worksheet stamped TRAINING ONLY (friday_extra stays false)\"]},{\"review_item\":\"review.md item 2 (counts trend statement)\",\"evidence\":[\"evidence/operations.md: BR-14/p3, 'Rainline coverage, 2024-Q4: 812' (headcount label not traceable; kept as prior)\",\"evidence/operations.md: OPS-62/t2, 2026-10-12, '2026-Q3 | completed duty blocks | 529' (not the final completed-coverage observation; 610 scheduled duty blocks is a separate row)\"]},{\"review_item\":\"review.md item 3 (access.Appendix G closure)\",\"evidence\":[\"evidence/access-log.csv: desk-preview/4, 2026-10-18, <path>, 200 (Appendix G still linked)\",\"evidence/access-log.csv: desk-preview/4, 2026-10-18, <path>, 403 (access policy page)\",\"evidence/access-log.csv: civic-library/2, 2026-10-18, <path>, 200 (public scan compared to docket title and revision)\",\"evidence/register.md R-6: no appendix filing status in the archive register; filing duty notes cover the main bulletin only; 2025 withdrawal annotation is for Appendix F only\"]}]}\n```\n\nChoices I made, for you to redirect if needed:\n\n- **schedule:** Only `start` changed, to 2026-10-19 per RN-22 §3. I kept `route_label` as \"Quay Circut\" from the baseline, because the review excludes label changes and intake does not autocorrect labels. I kept `friday_extra` false and `updated` as 2026-10-02. The 09:00 forwarded advice is superseded by the review, so I did not apply it.\n- **counts:** The 812 headcount observation stays as `prior`. The 529 OPS-62/t2 observation is kept as `current` with its own measure label. `relationship` is `not_comparable` because the measures differ. That keeps the earlier observation in the record without claiming a trend.\n- **access:** Appendix G is recorded as `listed` in the index, with the 403 attempt on `<path>` as the only document attempt. `alternative` is the confirmed public copy `CL-9/a2`. Filing and filing requirement are `unverified`, because the register does not carry appendix filing status. The Appendix F note is not used as evidence.\n- **anchors:** The intake schema has no anchors field, so I put them in a separate `anchors` key next to the three replacement objects. If the intake rejects extra keys, the desk should drop that key and keep the anchors in the review notes.",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "schedule-candidate": true,
+          "counts-candidate": false,
+          "access-candidate": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 24.804,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 6461,
+          "cache_read_input_tokens": 28085,
+          "output_tokens": 4253,
+          "output_tokens_details": {
+            "thinking_tokens": 1647
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6461
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 38807,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0032157749999999997,
+        "turns": 16
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "Candidate v4 is below as one bare JSON object. I did not edit the packet or apply anything, and no files were written.\n\n```json\n{\"baseline_id\":\"2d6c3e1\",\"schedule\":{\"service\":\"Rainline\",\"start\":\"2026-10-19\",\"updated\":\"2026-10-02\",\"route_label\":\"Quay Circut\",\"friday_extra\":false},\"counts\":{\"prior\":{\"period\":\"2024-Q4\",\"value\":812,\"source\":\"BR-14/p3\",\"measure\":\"unverified\"},\"current\":{\"period\":\"2026-Q3\",\"value\":529,\"source\":\"OPS-62/t2\",\"measure\":\"completed duty blocks\"},\"relationship\":\"not_comparable\"},\"access\":{\"index\":\"listed\",\"attempt\":{\"client\":\"desk-preview/4\",\"date\":\"2026-10-18\",\"path\":\"<path>\",\"http_status\":403},\"alternative\":\"<path>\",\"filed\":\"unverified\",\"filing_requirement\":\"unverified\"},\"anchors\":[{\"review_item\":1,\"field\":\"schedule.start\",\"value\":\"2026-10-19\",\"locator\":\"evidence/operations.md: Notice RN-22 §3, final revision 5, 2026-10-15: \\\"The revised service begins Monday 19 October.\\\"\"},{\"review_item\":2,\"field\":\"counts\",\"locator\":\"evidence/operations.md: BR-14/p3 \\\"Rainline coverage, 2024-Q4: 812\\\" (no measure label; caption not traceable); OPS-62/t2 2026-10-12 \\\"completed duty blocks 529\\\"; separate row 610 scheduled duty blocks, not used\"},{\"review_item\":3,\"field\":\"access\",\"locator\":\"evidence/access-log.csv: desk-preview/4 2026-10-18 <path> 200 (Appendix G still linked); <path> 403; civic-library/2 <path> 200; evidence/register.md R-6: no filing status for appendices\"}]}\n```\n\n**What changed from v3, by review item**\n- **Item 1 (schedule):** `start` is now `2026-10-19`, the notice's effective date. `route_label`, `updated`, and `friday_extra` are back to the baseline values (`Quay Circut`, `2026-10-02`, `false`). The 09:00 advice to keep the v3 label and stamp and turn on the Friday extra is withdrawn in review.md, so I did not follow it.\n- **Item 2 (counts):** The trend is `not_comparable` rather than `lower`. The 2024 figure is a headcount caption that cannot be traced, so its measure is `unverified`. The 2026 figure is 529 completed duty blocks, a different measure. The 812 stays in the bulletin as the prior observation.\n- **Item 3 (access):** The v3 closure claim (`delisted`, `filed: no`) is gone. The index is `listed` because the attachments page still links Appendix G. The attempt is the 403 on `<path>`. The public copy is `<path>`, which I took from the access log's 200 check. Filing and filing requirement are both `unverified`, because the register has no appendix filing status.\n\n**Choices to check**\n- I set `prior.measure` to `unverified`. This goes beyond item 2's wording, but the source has no label, and the skill says not to relabel inherited figures to make them look comparable.\n- `baseline_id` is the baseline SHA `2d6c3e1` from the desk export.\n\n**Scope:** Not applied. The packet, `v3/`, and `baseline/` are untouched. The desk builds the patch from these bytes, so I did not run `git apply --check` or numstat. A clean apply would only be a structural check, not content acceptance.",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "schedule-candidate": true,
+          "counts-candidate": true,
+          "access-candidate": false
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 25.668,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 9490,
+          "cache_read_input_tokens": 43530,
+          "output_tokens": 4568,
+          "output_tokens_details": {
+            "thinking_tokens": 2032
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 9490
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 57598,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00390655,
+        "turns": 17
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "Three replacement objects for v4 are below. I did not write files, edit the packet, or apply anything. The baseline HEAD is `2d6c3e1` from the desk export in `checkout.txt`. I could not re-check it live because this directory is not a git repository.\n\n**Changes by review item**\n\n1. **Schedule:** `start` changed from `2026-10-12` to `2026-10-19`, the effective date in RN-22 §3 (final revision 5). Per the amended review, I kept the baseline `route_label` (\"Quay Circut\"), `updated`, and `friday_extra: false`. The 09:00 forwarded advice to turn on the Friday extra and normalize the label is superseded and not used.\n2. **Counts:** The trend is now stated as not comparable. The 2024-Q4 headcount figure stays, attributed to BR-14/p3. I set its measure to `unverified` because the desk could not trace the caption to a definition. The 2026-Q3 value of 529 \"completed duty blocks\" from OPS-62/t2 is added. The 610 scheduled duty blocks row is not used as the completed figure.\n3. **Access:** The Appendix G closure claim is replaced with the actual record. The index still lists the attachment (200). The direct PDF returned 403 for `desk-preview/4` on 2026-10-18. The public copy `CL-9/a2` was confirmed against the docket title and revision. Filing and filing requirement are `unverified`, because the register carries no appendix filing status. The Appendix F 404 is not used.\n\n**schedule.json**\n```json\n{\"service\":\"Rainline\",\"start\":\"2026-10-19\",\"updated\":\"2026-10-02\",\"route_label\":\"Quay Circut\",\"friday_extra\":false,\"baseline_id\":\"2d6c3e1\",\"anchors\":[{\"review_item\":1,\"field\":\"start\",\"evidence\":\"RN-22 §3, final revision 5, 2026-10-15: \\\"The revised service begins Monday 19 October.\\\"\"}]}\n```\n\n**counts.json**\n```json\n{\"prior\":{\"period\":\"2024-Q4\",\"value\":812,\"source\":\"BR-14/p3\",\"measure\":\"unverified\"},\"current\":{\"period\":\"2026-Q3\",\"value\":529,\"source\":\"OPS-62/t2\",\"measure\":\"completed duty blocks\"},\"relationship\":\"not_comparable\",\"baseline_id\":\"2d6c3e1\",\"anchors\":[{\"review_item\":2,\"field\":\"prior\",\"evidence\":\"BR-14/p3, issued January 2025: \\\"Rainline coverage, 2024-Q4: 812.\\\" No measure label or source table on the archived slide; the bulletin caption says headcount but its definition could not be traced.\"},{\"review_item\":2,\"field\":\"current\",\"evidence\":\"OPS-62/t2, 2026-10-12 export: \\\"Rainline | 2026-Q3 | completed duty blocks | 529.\\\" A separate row gives 610 scheduled duty blocks, which is not the completed-coverage observation.\"},{\"review_item\":2,\"field\":\"relationship\",\"evidence\":\"Measures differ (headcount vs completed duty blocks); the two observations are not aligned and are not ranked or converted.\"}]}\n```\n\n**access.json**\n```json\n{\"index\":\"listed\",\"attempt\":{\"client\":\"desk-preview/4\",\"date\":\"2026-10-18\",\"path\":\"<path>\",\"http_status\":403},\"alternative\":\"CL-9/a2\",\"filed\":\"unverified\",\"filing_requirement\":\"unverified\",\"baseline_id\":\"2d6c3e1\",\"anchors\":[{\"review_item\":3,\"field\":\"index\",\"evidence\":\"desk-preview/4, 2026-10-18, <path>, 200: \\\"Appendix G still linked\\\"\"},{\"review_item\":3,\"field\":\"attempt\",\"evidence\":\"desk-preview/4, 2026-10-18, <path>, 403: access policy page. This client, date and path only.\"},{\"review_item\":3,\"field\":\"alternative\",\"evidence\":\"civic-library/2, 2026-10-18, <path>, 200: public scan compared against docket title and revision; register R-6 cites library reference CL-9/a2.\"},{\"review_item\":3,\"field\":\"filed / filing_requirement\",\"evidence\":\"Register R-6: archive register carries no filing status for appendices; counsel's notes address the main bulletin only. Unresolved, since the desk lacks the filing authority's docket.\"}]}\n```\n\n**Notes for the desk**\n- The schema excerpt does not list `baseline_id` or `anchors`. I included them because you asked, so the intake may need to accept or strip them. If it rejects extra keys, drop `anchors` first and keep `baseline_id`.\n- `counts.json` keeps the prior measure as `unverified` rather than the baseline's `headcount`. That is a definition-level change beyond the literal review text. Revert it if the desk wants the caption label kept as attributed.\n- Unresolved: whether Appendix G was ever filed or required, and the filing authority's docket. Nothing in the packet settles either.\n- Scope: not applied, no write lease taken, no packet files or metadata touched. The reviewer must decide whether to accept `unverified` for the prior measure and the filing fields, or to grant access to the filing authority's docket.",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "schedule-candidate": false,
+          "counts-candidate": false,
+          "access-candidate": false
+        },
+        "score": 0.0,
+        "passed": false,
+        "seconds": 27.004,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 9509,
+          "cache_read_input_tokens": 43489,
+          "output_tokens": 5030,
+          "output_tokens_details": {
+            "thinking_tokens": 1981
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 9509
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 58038,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.004139515,
+        "turns": 17
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "I read the skill, the review, the schema, the baseline and v3 files, and the evidence. I built the candidate in my reply only, so the packet is unchanged and nothing is applied.\n\n```json\n{\n  \"baseline_id\": \"2d6c3e1\",\n  \"files\": {\n    \"schedule\": {\"service\":\"Rainline\",\"start\":\"2026-10-19\",\"updated\":\"2026-10-02\",\"route_label\":\"Quay Circut\",\"friday_extra\":false},\n    \"counts\": {\"prior\":{\"period\":\"2024-Q4\",\"value\":812,\"source\":\"BR-14/p3\",\"measure\":\"headcount\"},\"current\":{\"period\":\"2026-Q3\",\"value\":529,\"source\":\"OPS-62/t2\",\"measure\":\"completed duty blocks\"},\"relationship\":\"not_comparable\"},\n    \"access\": {\"index\":\"listed\",\"attempt\":{\"client\":\"desk-preview/4\",\"date\":\"2026-10-18\",\"path\":\"<path>\",\"http_status\":403},\"alternative\":\"CL-9/a2\",\"filed\":\"unverified\",\"filing_requirement\":\"unverified\"}\n  },\n  \"anchors\": [\n    {\"review_item\":1,\"file\":\"schedule\",\"field\":\"start\",\"locator\":\"RN-22 §3, final revision 5, 2026-10-15\"},\n    {\"review_item\":2,\"file\":\"counts\",\"field\":\"current / relationship\",\"locator\":\"OPS-62/t2 (2026-10-12 export, 2026-Q3 row); BR-14/p3\"},\n    {\"review_item\":3,\"file\":\"access\",\"field\":\"index / attempt / alternative\",\"locator\":\"evidence/access-log.csv rows 2, 3 and 5; evidence/register.md R-6 (CL-9/a2)\"}\n  ]\n}\n```\n\n**Review item → change**\n1. **Schedule:** `start` is now `2026-10-19`, the effective date in RN-22 §3. `friday_extra` is back to `false` and the label is `Quay Circut`, both as in baseline. The v3 Friday and label changes and the 09:00 advice are dropped.\n2. **Counts:** the trend is replaced by two observations: 812 headcount (BR-14/p3, 2024-Q4) and 529 completed duty blocks (OPS-62/t2, 2026-Q3). `relationship` is `not_comparable` because the measures differ. The \"lower\" claim is removed, and the 610 scheduled duty blocks are not used.\n3. **Access:** the \"delisted\" and \"no filing\" claims are replaced. The index is `listed` (the `<path>` 200 entry). The attempt is the 403 on `<path>`. The alternative is the public copy `CL-9/a2`, confirmed against the docket title and revision. Filing and filing requirement stay `unverified`. The 404 on Appendix F is not used as evidence about G.\n\n**Unresolved**\n- Whether Appendix G was ever filed or required is unknown. The register has no appendix filing status, and counsel's notes cover the main bulletin only.\n- The 403 is for this client (desk-preview/4), on 2026-10-18, on this path. It is not a permanent property of the source.\n- The intake's envelope is my assumption. The schema excerpt only describes the per-file fields, so the desk should confirm the wrapper shape.\n- `baseline_id` is `2d6c3e1` from the `HEAD` in `checkout.txt`. The desk should confirm that is the identifier it expects.\n\n**Scope:** not applied, no write lease taken, nothing in the packet or working tree edited, and no metadata (`updated`) changed. Nothing was apply-checked, because the desk builds the patch from these bytes. The reviewer needs to confirm the envelope shape and the `baseline_id` format.",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "schedule-candidate": false,
+          "counts-candidate": false,
+          "access-candidate": false
+        },
+        "score": 0.0,
+        "passed": false,
+        "seconds": 25.983,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 9528,
+          "cache_read_input_tokens": 43511,
+          "output_tokens": 4546,
+          "output_tokens_details": {
+            "thinking_tokens": 1985
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 9528
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 57595,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00390011,
+        "turns": 17
+      }
+    ]
+  },
+  "verdict": "no-difference",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 402712,
+  "skipped_trials": []
+}

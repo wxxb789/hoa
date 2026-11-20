@@ -1,0 +1,820 @@
+{
+  "schema_version": 2,
+  "task": "review-revision-candidates",
+  "generated_at": "2026-11-20T01:03:59.054536-08:00",
+  "skill": "review-revision-candidates",
+  "skill_revision": "3",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "forced",
+  "shell": true,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "frozen-baseline": {
+      "field": "baseline",
+      "equals": "bulletin-base-6"
+    },
+    "apply-check": {
+      "field": "apply_check",
+      "equals": "pass"
+    },
+    "evidence-anchors": {
+      "field": "anchors",
+      "equals": {
+        "1": "JUN-06:T2",
+        "2": "MAR-11:N4",
+        "3": "CAT-02:S7",
+        "4": "FETCH-13:E2"
+      }
+    },
+    "candidate-content": {
+      "file": "scratch/bulletin.md",
+      "contains": "# Weekly Bulletin\nupdated: 2026-04-04\nStatus: 48 verified sessions in the June sample.\nPrior: 52 actions were attributed to the March log; definitions are not aligned.\nCoverage: The inspected February catalog lists an annex in section 7.\nAccess: The June 13 client attempt returned HTTP 403.\nFooter: Send questions to the desk.\n"
+    },
+    "root-applicable-patch": {
+      "file": "scratch/v3-bulletin.patch",
+      "contains": "--- a/bulletin.md\n+++ b/bulletin.md\n@@ -1,7 +1,7 @@\n # Weekly Bulletin\n updated: 2026-04-04\n-Status: The archive is closed.\n-Prior: The March log counted 52 verified sessions.\n-Coverage: No catalog lists an annex.\n-Access: The archive is unavailable.\n+Status: 48 verified sessions in the June sample.\n+Prior: 52 actions were attributed to the March log; definitions are not aligned.\n+Coverage: The inspected February catalog lists an annex in section 7.\n+Access: The June 13 client attempt returned HTTP 403.\n Footer: Send questions to the desk.\n"
+    },
+    "original-target-proxy": {
+      "file": "bulletin.md",
+      "contains": "# Weekly Bulletin\nupdated: 2026-04-04\nStatus: The archive is closed.\nPrior: The March log counted 52 verified sessions.\nCoverage: No catalog lists an annex.\nAccess: The archive is unavailable.\nFooter: Send questions to the desk.\n"
+    },
+    "rejected-v2-proxy": {
+      "file": "candidates/v2-bulletin.patch",
+      "contains": "--- a/bulletin.md\n+++ b/bulletin.md\n@@ -1,7 +1,7 @@\n # Weekly Bulletin\n-updated: 2026-04-04\n-Status: The archive is closed.\n-Prior: The March log counted 52 verified sessions.\n-Coverage: No catalog lists an annex.\n-Access: The archive is unavailable.\n-Footer: Send questions to the desk.\n+updated: 2026-06-14\n+Status: The archive is effectively closed.\n+Prior: The March baseline of 52 sessions was superseded.\n+Coverage: Catalogs do not list the annex.\n+Access: The endpoint is unavailable to readers.\n+Footer: Contact the editorial desk.\n"
+    }
+  },
+  "rubric_flags": {
+    "frozen-baseline": "non-discriminating",
+    "apply-check": "non-discriminating",
+    "evidence-anchors": "non-discriminating",
+    "candidate-content": "non-discriminating",
+    "root-applicable-patch": "non-discriminating",
+    "original-target-proxy": "non-discriminating",
+    "rejected-v2-proxy": "non-discriminating"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    },
+    "terse": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    },
+    "skill": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": 0.0,
+    "terse": 0.0
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"baseline\":\"bulletin-base-6\",\"apply_check\":\"pass\",\"anchors\":{\"1\":\"JUN-06:T2\",\"2\":\"MAR-11:N4\",\"3\":\"CAT-02:S7\",\"4\":\"FETCH-13:E2\"}}",
+        "answer_format": "bare",
+        "artifacts": {
+          "scratch/bulletin.md": "# Weekly Bulletin\nupdated: 2026-04-04\nStatus: 48 verified sessions in the June sample.\nPrior: 52 actions were attributed to the March log; definitions are not aligned.\nCoverage: The inspected February catalog lists an annex in section 7.\nAccess: The June 13 client attempt returned HTTP 403.\nFooter: Send questions to the desk.\n",
+          "scratch/v3-bulletin.patch": "--- a/bulletin.md\n+++ b/bulletin.md\n@@ -1,7 +1,7 @@\n # Weekly Bulletin\n updated: 2026-04-04\n-Status: The archive is closed.\n-Prior: The March log counted 52 verified sessions.\n-Coverage: No catalog lists an annex.\n-Access: The archive is unavailable.\n+Status: 48 verified sessions in the June sample.\n+Prior: 52 actions were attributed to the March log; definitions are not aligned.\n+Coverage: The inspected February catalog lists an annex in section 7.\n+Access: The June 13 client attempt returned HTTP 403.\n Footer: Send questions to the desk.\n",
+          "bulletin.md": "# Weekly Bulletin\nupdated: 2026-04-04\nStatus: The archive is closed.\nPrior: The March log counted 52 verified sessions.\nCoverage: No catalog lists an annex.\nAccess: The archive is unavailable.\nFooter: Send questions to the desk.\n",
+          "candidates/v2-bulletin.patch": "--- a/bulletin.md\n+++ b/bulletin.md\n@@ -1,7 +1,7 @@\n # Weekly Bulletin\n-updated: 2026-04-04\n-Status: The archive is closed.\n-Prior: The March log counted 52 verified sessions.\n-Coverage: No catalog lists an annex.\n-Access: The archive is unavailable.\n-Footer: Send questions to the desk.\n+updated: 2026-06-14\n+Status: The archive is effectively closed.\n+Prior: The March baseline of 52 sessions was superseded.\n+Coverage: Catalogs do not list the annex.\n+Access: The endpoint is unavailable to readers.\n+Footer: Contact the editorial desk.\n"
+        },
+        "checks": {
+          "frozen-baseline": true,
+          "apply-check": true,
+          "evidence-anchors": true,
+          "candidate-content": true,
+          "root-applicable-patch": true,
+          "original-target-proxy": true,
+          "rejected-v2-proxy": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 21.137,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 6118,
+          "cache_read_input_tokens": 46099,
+          "output_tokens": 2293,
+          "output_tokens_details": {
+            "thinking_tokens": 1225
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6118
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 54520,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00237324,
+        "turns": 5
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"baseline\":\"bulletin-base-6\",\"apply_check\":\"pass\",\"anchors\":{\"1\":\"JUN-06:T2\",\"2\":\"MAR-11:N4\",\"3\":\"CAT-02:S7\",\"4\":\"FETCH-13:E2\"}}",
+        "answer_format": "bare",
+        "artifacts": {
+          "scratch/bulletin.md": "# Weekly Bulletin\nupdated: 2026-04-04\nStatus: 48 verified sessions in the June sample.\nPrior: 52 actions were attributed to the March log; definitions are not aligned.\nCoverage: The inspected February catalog lists an annex in section 7.\nAccess: The June 13 client attempt returned HTTP 403.\nFooter: Send questions to the desk.\n",
+          "scratch/v3-bulletin.patch": "--- a/bulletin.md\n+++ b/bulletin.md\n@@ -1,7 +1,7 @@\n # Weekly Bulletin\n updated: 2026-04-04\n-Status: The archive is closed.\n-Prior: The March log counted 52 verified sessions.\n-Coverage: No catalog lists an annex.\n-Access: The archive is unavailable.\n+Status: 48 verified sessions in the June sample.\n+Prior: 52 actions were attributed to the March log; definitions are not aligned.\n+Coverage: The inspected February catalog lists an annex in section 7.\n+Access: The June 13 client attempt returned HTTP 403.\n Footer: Send questions to the desk.\n",
+          "bulletin.md": "# Weekly Bulletin\nupdated: 2026-04-04\nStatus: The archive is closed.\nPrior: The March log counted 52 verified sessions.\nCoverage: No catalog lists an annex.\nAccess: The archive is unavailable.\nFooter: Send questions to the desk.\n",
+          "candidates/v2-bulletin.patch": "--- a/bulletin.md\n+++ b/bulletin.md\n@@ -1,7 +1,7 @@\n # Weekly Bulletin\n-updated: 2026-04-04\n-Status: The archive is closed.\n-Prior: The March log counted 52 verified sessions.\n-Coverage: No catalog lists an annex.\n-Access: The archive is unavailable.\n-Footer: Send questions to the desk.\n+updated: 2026-06-14\n+Status: The archive is effectively closed.\n+Prior: The March baseline of 52 sessions was superseded.\n+Coverage: Catalogs do not list the annex.\n+Access: The endpoint is unavailable to readers.\n+Footer: Contact the editorial desk.\n"
+        },
+        "checks": {
+          "frozen-baseline": true,
+          "apply-check": true,
+          "evidence-anchors": true,
+          "candidate-content": true,
+          "root-applicable-patch": true,
+          "original-target-proxy": true,
+          "rejected-v2-proxy": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 17.467,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 5530,
+          "cache_read_input_tokens": 36385,
+          "output_tokens": 2081,
+          "output_tokens_details": {
+            "thinking_tokens": 1223
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5530
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 44004,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0020964,
+        "turns": 4
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"baseline\":\"bulletin-base-6\",\"apply_check\":\"pass\",\"anchors\":{\"1\":\"JUN-06:T2\",\"2\":\"MAR-11:N4\",\"3\":\"CAT-02:S7\",\"4\":\"FETCH-13:E2\"}}",
+        "answer_format": "bare",
+        "artifacts": {
+          "scratch/bulletin.md": "# Weekly Bulletin\nupdated: 2026-04-04\nStatus: 48 verified sessions in the June sample.\nPrior: 52 actions were attributed to the March log; definitions are not aligned.\nCoverage: The inspected February catalog lists an annex in section 7.\nAccess: The June 13 client attempt returned HTTP 403.\nFooter: Send questions to the desk.\n",
+          "scratch/v3-bulletin.patch": "--- a/bulletin.md\n+++ b/bulletin.md\n@@ -1,7 +1,7 @@\n # Weekly Bulletin\n updated: 2026-04-04\n-Status: The archive is closed.\n-Prior: The March log counted 52 verified sessions.\n-Coverage: No catalog lists an annex.\n-Access: The archive is unavailable.\n+Status: 48 verified sessions in the June sample.\n+Prior: 52 actions were attributed to the March log; definitions are not aligned.\n+Coverage: The inspected February catalog lists an annex in section 7.\n+Access: The June 13 client attempt returned HTTP 403.\n Footer: Send questions to the desk.\n",
+          "bulletin.md": "# Weekly Bulletin\nupdated: 2026-04-04\nStatus: The archive is closed.\nPrior: The March log counted 52 verified sessions.\nCoverage: No catalog lists an annex.\nAccess: The archive is unavailable.\nFooter: Send questions to the desk.\n",
+          "candidates/v2-bulletin.patch": "--- a/bulletin.md\n+++ b/bulletin.md\n@@ -1,7 +1,7 @@\n # Weekly Bulletin\n-updated: 2026-04-04\n-Status: The archive is closed.\n-Prior: The March log counted 52 verified sessions.\n-Coverage: No catalog lists an annex.\n-Access: The archive is unavailable.\n-Footer: Send questions to the desk.\n+updated: 2026-06-14\n+Status: The archive is effectively closed.\n+Prior: The March baseline of 52 sessions was superseded.\n+Coverage: Catalogs do not list the annex.\n+Access: The endpoint is unavailable to readers.\n+Footer: Contact the editorial desk.\n"
+        },
+        "checks": {
+          "frozen-baseline": true,
+          "apply-check": true,
+          "evidence-anchors": true,
+          "candidate-content": true,
+          "root-applicable-patch": true,
+          "original-target-proxy": true,
+          "rejected-v2-proxy": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 27.282,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 6264,
+          "cache_read_input_tokens": 48284,
+          "output_tokens": 3736,
+          "output_tokens_details": {
+            "thinking_tokens": 2288
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6264
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 58294,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00313484,
+        "turns": 5
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"baseline\": \"bulletin-base-6\", \"apply_check\": \"pass\", \"anchors\": {\"1\": \"JUN-06:T2\", \"2\": \"MAR-11:N4\", \"3\": \"CAT-02:S7\", \"4\": \"FETCH-13:E2\"}}",
+        "answer_format": "bare",
+        "artifacts": {
+          "scratch/bulletin.md": "# Weekly Bulletin\nupdated: 2026-04-04\nStatus: 48 verified sessions in the June sample.\nPrior: 52 actions were attributed to the March log; definitions are not aligned.\nCoverage: The inspected February catalog lists an annex in section 7.\nAccess: The June 13 client attempt returned HTTP 403.\nFooter: Send questions to the desk.\n",
+          "scratch/v3-bulletin.patch": "--- a/bulletin.md\n+++ b/bulletin.md\n@@ -1,7 +1,7 @@\n # Weekly Bulletin\n updated: 2026-04-04\n-Status: The archive is closed.\n-Prior: The March log counted 52 verified sessions.\n-Coverage: No catalog lists an annex.\n-Access: The archive is unavailable.\n+Status: 48 verified sessions in the June sample.\n+Prior: 52 actions were attributed to the March log; definitions are not aligned.\n+Coverage: The inspected February catalog lists an annex in section 7.\n+Access: The June 13 client attempt returned HTTP 403.\n Footer: Send questions to the desk.\n",
+          "bulletin.md": "# Weekly Bulletin\nupdated: 2026-04-04\nStatus: The archive is closed.\nPrior: The March log counted 52 verified sessions.\nCoverage: No catalog lists an annex.\nAccess: The archive is unavailable.\nFooter: Send questions to the desk.\n",
+          "candidates/v2-bulletin.patch": "--- a/bulletin.md\n+++ b/bulletin.md\n@@ -1,7 +1,7 @@\n # Weekly Bulletin\n-updated: 2026-04-04\n-Status: The archive is closed.\n-Prior: The March log counted 52 verified sessions.\n-Coverage: No catalog lists an annex.\n-Access: The archive is unavailable.\n-Footer: Send questions to the desk.\n+updated: 2026-06-14\n+Status: The archive is effectively closed.\n+Prior: The March baseline of 52 sessions was superseded.\n+Coverage: Catalogs do not list the annex.\n+Access: The endpoint is unavailable to readers.\n+Footer: Contact the editorial desk.\n"
+        },
+        "checks": {
+          "frozen-baseline": true,
+          "apply-check": true,
+          "evidence-anchors": true,
+          "candidate-content": true,
+          "root-applicable-patch": true,
+          "original-target-proxy": true,
+          "rejected-v2-proxy": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 20.396,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 8808,
+          "cache_read_input_tokens": 34267,
+          "output_tokens": 2292,
+          "output_tokens_details": {
+            "thinking_tokens": 1291
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 8808
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 45375,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00259047,
+        "turns": 4
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"baseline\":\"bulletin-base-6\",\"apply_check\":\"pass\",\"anchors\":{\"1\":\"JUN-06:T2\",\"2\":\"MAR-11:N4\",\"3\":\"CAT-02:S7\",\"4\":\"FETCH-13:E2\"}}",
+        "answer_format": "bare",
+        "artifacts": {
+          "scratch/bulletin.md": "# Weekly Bulletin\nupdated: 2026-04-04\nStatus: 48 verified sessions in the June sample.\nPrior: 52 actions were attributed to the March log; definitions are not aligned.\nCoverage: The inspected February catalog lists an annex in section 7.\nAccess: The June 13 client attempt returned HTTP 403.\nFooter: Send questions to the desk.\n",
+          "scratch/v3-bulletin.patch": "--- a/bulletin.md\n+++ b/bulletin.md\n@@ -1,7 +1,7 @@\n # Weekly Bulletin\n updated: 2026-04-04\n-Status: The archive is closed.\n-Prior: The March log counted 52 verified sessions.\n-Coverage: No catalog lists an annex.\n-Access: The archive is unavailable.\n+Status: 48 verified sessions in the June sample.\n+Prior: 52 actions were attributed to the March log; definitions are not aligned.\n+Coverage: The inspected February catalog lists an annex in section 7.\n+Access: The June 13 client attempt returned HTTP 403.\n Footer: Send questions to the desk.\n",
+          "bulletin.md": "# Weekly Bulletin\nupdated: 2026-04-04\nStatus: The archive is closed.\nPrior: The March log counted 52 verified sessions.\nCoverage: No catalog lists an annex.\nAccess: The archive is unavailable.\nFooter: Send questions to the desk.\n",
+          "candidates/v2-bulletin.patch": "--- a/bulletin.md\n+++ b/bulletin.md\n@@ -1,7 +1,7 @@\n # Weekly Bulletin\n-updated: 2026-04-04\n-Status: The archive is closed.\n-Prior: The March log counted 52 verified sessions.\n-Coverage: No catalog lists an annex.\n-Access: The archive is unavailable.\n-Footer: Send questions to the desk.\n+updated: 2026-06-14\n+Status: The archive is effectively closed.\n+Prior: The March baseline of 52 sessions was superseded.\n+Coverage: Catalogs do not list the annex.\n+Access: The endpoint is unavailable to readers.\n+Footer: Contact the editorial desk.\n"
+        },
+        "checks": {
+          "frozen-baseline": true,
+          "apply-check": true,
+          "evidence-anchors": true,
+          "candidate-content": true,
+          "root-applicable-patch": true,
+          "original-target-proxy": true,
+          "rejected-v2-proxy": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 18.72,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 6318,
+          "cache_read_input_tokens": 38071,
+          "output_tokens": 2415,
+          "output_tokens_details": {
+            "thinking_tokens": 1344
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6318
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 46812,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00237876,
+        "turns": 6
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"baseline\": \"bulletin-base-6\", \"apply_check\": \"pass\", \"anchors\": {\"1\": \"JUN-06:T2\", \"2\": \"MAR-11:N4\", \"3\": \"CAT-02:S7\", \"4\": \"FETCH-13:E2\"}}",
+        "answer_format": "bare",
+        "artifacts": {
+          "scratch/bulletin.md": "# Weekly Bulletin\nupdated: 2026-04-04\nStatus: 48 verified sessions in the June sample.\nPrior: 52 actions were attributed to the March log; definitions are not aligned.\nCoverage: The inspected February catalog lists an annex in section 7.\nAccess: The June 13 client attempt returned HTTP 403.\nFooter: Send questions to the desk.\n",
+          "scratch/v3-bulletin.patch": "--- a/bulletin.md\n+++ b/bulletin.md\n@@ -1,7 +1,7 @@\n # Weekly Bulletin\n updated: 2026-04-04\n-Status: The archive is closed.\n-Prior: The March log counted 52 verified sessions.\n-Coverage: No catalog lists an annex.\n-Access: The archive is unavailable.\n+Status: 48 verified sessions in the June sample.\n+Prior: 52 actions were attributed to the March log; definitions are not aligned.\n+Coverage: The inspected February catalog lists an annex in section 7.\n+Access: The June 13 client attempt returned HTTP 403.\n Footer: Send questions to the desk.\n",
+          "bulletin.md": "# Weekly Bulletin\nupdated: 2026-04-04\nStatus: The archive is closed.\nPrior: The March log counted 52 verified sessions.\nCoverage: No catalog lists an annex.\nAccess: The archive is unavailable.\nFooter: Send questions to the desk.\n",
+          "candidates/v2-bulletin.patch": "--- a/bulletin.md\n+++ b/bulletin.md\n@@ -1,7 +1,7 @@\n # Weekly Bulletin\n-updated: 2026-04-04\n-Status: The archive is closed.\n-Prior: The March log counted 52 verified sessions.\n-Coverage: No catalog lists an annex.\n-Access: The archive is unavailable.\n-Footer: Send questions to the desk.\n+updated: 2026-06-14\n+Status: The archive is effectively closed.\n+Prior: The March baseline of 52 sessions was superseded.\n+Coverage: Catalogs do not list the annex.\n+Access: The endpoint is unavailable to readers.\n+Footer: Contact the editorial desk.\n"
+        },
+        "checks": {
+          "frozen-baseline": true,
+          "apply-check": true,
+          "evidence-anchors": true,
+          "candidate-content": true,
+          "root-applicable-patch": true,
+          "original-target-proxy": true,
+          "rejected-v2-proxy": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 19.006,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 5292,
+          "cache_read_input_tokens": 36213,
+          "output_tokens": 2153,
+          "output_tokens_details": {
+            "thinking_tokens": 1091
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5292
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 43666,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00210093,
+        "turns": 6
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": true,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"baseline\":\"bulletin-base-6\",\"apply_check\":\"pass\",\"anchors\":{\"1\":\"JUN-06:T2\",\"2\":\"MAR-11:N4\",\"3\":\"CAT-02:S7\",\"4\":\"FETCH-13:E2\"}}",
+        "answer_format": "bare",
+        "artifacts": {
+          "scratch/bulletin.md": "# Weekly Bulletin\nupdated: 2026-04-04\nStatus: 48 verified sessions in the June sample.\nPrior: 52 actions were attributed to the March log; definitions are not aligned.\nCoverage: The inspected February catalog lists an annex in section 7.\nAccess: The June 13 client attempt returned HTTP 403.\nFooter: Send questions to the desk.\n",
+          "scratch/v3-bulletin.patch": "--- a/bulletin.md\n+++ b/bulletin.md\n@@ -1,7 +1,7 @@\n # Weekly Bulletin\n updated: 2026-04-04\n-Status: The archive is closed.\n-Prior: The March log counted 52 verified sessions.\n-Coverage: No catalog lists an annex.\n-Access: The archive is unavailable.\n+Status: 48 verified sessions in the June sample.\n+Prior: 52 actions were attributed to the March log; definitions are not aligned.\n+Coverage: The inspected February catalog lists an annex in section 7.\n+Access: The June 13 client attempt returned HTTP 403.\n Footer: Send questions to the desk.\n",
+          "bulletin.md": "# Weekly Bulletin\nupdated: 2026-04-04\nStatus: The archive is closed.\nPrior: The March log counted 52 verified sessions.\nCoverage: No catalog lists an annex.\nAccess: The archive is unavailable.\nFooter: Send questions to the desk.\n",
+          "candidates/v2-bulletin.patch": "--- a/bulletin.md\n+++ b/bulletin.md\n@@ -1,7 +1,7 @@\n # Weekly Bulletin\n-updated: 2026-04-04\n-Status: The archive is closed.\n-Prior: The March log counted 52 verified sessions.\n-Coverage: No catalog lists an annex.\n-Access: The archive is unavailable.\n-Footer: Send questions to the desk.\n+updated: 2026-06-14\n+Status: The archive is effectively closed.\n+Prior: The March baseline of 52 sessions was superseded.\n+Coverage: Catalogs do not list the annex.\n+Access: The endpoint is unavailable to readers.\n+Footer: Contact the editorial desk.\n"
+        },
+        "checks": {
+          "frozen-baseline": true,
+          "apply-check": true,
+          "evidence-anchors": true,
+          "candidate-content": true,
+          "root-applicable-patch": true,
+          "original-target-proxy": true,
+          "rejected-v2-proxy": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 21.904,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 9350,
+          "cache_read_input_tokens": 42022,
+          "output_tokens": 2864,
+          "output_tokens_details": {
+            "thinking_tokens": 1727
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 9350
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 54244,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00302177,
+        "turns": 5
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"baseline\":\"bulletin-base-6\",\"apply_check\":\"pass\",\"anchors\":{\"1\":\"JUN-06:T2\",\"2\":\"MAR-11:N4\",\"3\":\"CAT-02:S7\",\"4\":\"FETCH-13:E2\"}}",
+        "answer_format": "bare",
+        "artifacts": {
+          "scratch/bulletin.md": "# Weekly Bulletin\nupdated: 2026-04-04\nStatus: 48 verified sessions in the June sample.\nPrior: 52 actions were attributed to the March log; definitions are not aligned.\nCoverage: The inspected February catalog lists an annex in section 7.\nAccess: The June 13 client attempt returned HTTP 403.\nFooter: Send questions to the desk.\n",
+          "scratch/v3-bulletin.patch": "--- a/bulletin.md\n+++ b/bulletin.md\n@@ -1,7 +1,7 @@\n # Weekly Bulletin\n updated: 2026-04-04\n-Status: The archive is closed.\n-Prior: The March log counted 52 verified sessions.\n-Coverage: No catalog lists an annex.\n-Access: The archive is unavailable.\n+Status: 48 verified sessions in the June sample.\n+Prior: 52 actions were attributed to the March log; definitions are not aligned.\n+Coverage: The inspected February catalog lists an annex in section 7.\n+Access: The June 13 client attempt returned HTTP 403.\n Footer: Send questions to the desk.\n",
+          "bulletin.md": "# Weekly Bulletin\nupdated: 2026-04-04\nStatus: The archive is closed.\nPrior: The March log counted 52 verified sessions.\nCoverage: No catalog lists an annex.\nAccess: The archive is unavailable.\nFooter: Send questions to the desk.\n",
+          "candidates/v2-bulletin.patch": "--- a/bulletin.md\n+++ b/bulletin.md\n@@ -1,7 +1,7 @@\n # Weekly Bulletin\n-updated: 2026-04-04\n-Status: The archive is closed.\n-Prior: The March log counted 52 verified sessions.\n-Coverage: No catalog lists an annex.\n-Access: The archive is unavailable.\n-Footer: Send questions to the desk.\n+updated: 2026-06-14\n+Status: The archive is effectively closed.\n+Prior: The March baseline of 52 sessions was superseded.\n+Coverage: Catalogs do not list the annex.\n+Access: The endpoint is unavailable to readers.\n+Footer: Contact the editorial desk.\n"
+        },
+        "checks": {
+          "frozen-baseline": true,
+          "apply-check": true,
+          "evidence-anchors": true,
+          "candidate-content": true,
+          "root-applicable-patch": true,
+          "original-target-proxy": true,
+          "rejected-v2-proxy": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 22.797,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 9476,
+          "cache_read_input_tokens": 41394,
+          "output_tokens": 3222,
+          "output_tokens_details": {
+            "thinking_tokens": 1834
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 9476
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 54100,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00321024,
+        "turns": 5
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"baseline\":\"bulletin-base-6\",\"apply_check\":\"pass\",\"anchors\":{\"1\":\"JUN-06:T2\",\"2\":\"MAR-11:N4\",\"3\":\"CAT-02:S7\",\"4\":\"FETCH-13:E2\"}}",
+        "answer_format": "bare",
+        "artifacts": {
+          "scratch/bulletin.md": "# Weekly Bulletin\nupdated: 2026-04-04\nStatus: 48 verified sessions in the June sample.\nPrior: 52 actions were attributed to the March log; definitions are not aligned.\nCoverage: The inspected February catalog lists an annex in section 7.\nAccess: The June 13 client attempt returned HTTP 403.\nFooter: Send questions to the desk.\n",
+          "scratch/v3-bulletin.patch": "--- a/bulletin.md\n+++ b/bulletin.md\n@@ -1,7 +1,7 @@\n # Weekly Bulletin\n updated: 2026-04-04\n-Status: The archive is closed.\n-Prior: The March log counted 52 verified sessions.\n-Coverage: No catalog lists an annex.\n-Access: The archive is unavailable.\n+Status: 48 verified sessions in the June sample.\n+Prior: 52 actions were attributed to the March log; definitions are not aligned.\n+Coverage: The inspected February catalog lists an annex in section 7.\n+Access: The June 13 client attempt returned HTTP 403.\n Footer: Send questions to the desk.\n",
+          "bulletin.md": "# Weekly Bulletin\nupdated: 2026-04-04\nStatus: The archive is closed.\nPrior: The March log counted 52 verified sessions.\nCoverage: No catalog lists an annex.\nAccess: The archive is unavailable.\nFooter: Send questions to the desk.\n",
+          "candidates/v2-bulletin.patch": "--- a/bulletin.md\n+++ b/bulletin.md\n@@ -1,7 +1,7 @@\n # Weekly Bulletin\n-updated: 2026-04-04\n-Status: The archive is closed.\n-Prior: The March log counted 52 verified sessions.\n-Coverage: No catalog lists an annex.\n-Access: The archive is unavailable.\n-Footer: Send questions to the desk.\n+updated: 2026-06-14\n+Status: The archive is effectively closed.\n+Prior: The March baseline of 52 sessions was superseded.\n+Coverage: Catalogs do not list the annex.\n+Access: The endpoint is unavailable to readers.\n+Footer: Contact the editorial desk.\n"
+        },
+        "checks": {
+          "frozen-baseline": true,
+          "apply-check": true,
+          "evidence-anchors": true,
+          "candidate-content": true,
+          "root-applicable-patch": true,
+          "original-target-proxy": true,
+          "rejected-v2-proxy": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 26.901,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 9306,
+          "cache_read_input_tokens": 54051,
+          "output_tokens": 2840,
+          "output_tokens_details": {
+            "thinking_tokens": 1716
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 9306
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 66207,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00312476,
+        "turns": 5
+      }
+    ]
+  },
+  "verdict": "no-difference",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 467222,
+  "skipped_trials": []
+}

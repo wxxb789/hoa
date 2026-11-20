@@ -1,0 +1,877 @@
+{
+  "schema_version": 2,
+  "task": "official-document-verification",
+  "generated_at": "2026-11-20T00:51:45.974050-08:00",
+  "skill": "official-document-verification",
+  "skill_revision": "5",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "forced",
+  "shell": false,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "supporting-version": {
+      "field": "supporting_print",
+      "equals": "ES"
+    },
+    "supporting-dateline": {
+      "field": "supporting_date",
+      "equals": "2027-08-12"
+    },
+    "supporting-fingerprint": {
+      "field": "supporting_sha256",
+      "equals": "a530cb1015fd06e686694953db303f3590a3f0d1f5f4a843fd04fdb57cd30034"
+    },
+    "supporting-section": {
+      "field": "supporting_section",
+      "equals": 904
+    },
+    "operative-extension": {
+      "field": "supporting_quote",
+      "equals": "Section 18(b) of the Harbor Services Act is amended by striking \"September 30, 2029\" and inserting \"September 30, 2031\"."
+    },
+    "compared-version": {
+      "field": "other_print",
+      "equals": "EH"
+    },
+    "report-deadline-not-extension": {
+      "field": "other_904_extends_eligibility",
+      "equals": false
+    },
+    "other-substantive-section": {
+      "field": "other_transition_section",
+      "equals": 911
+    },
+    "payment-not-eligibility": {
+      "field": "other_transition_quote",
+      "equals": "Payments under section 18 of the Harbor Services Act may be made after September 30, 2029, solely for claims approved on or before that date."
+    },
+    "versionless-index-insufficient": {
+      "field": "summary_only",
+      "equals": false
+    }
+  },
+  "rubric_flags": {
+    "supporting-version": "non-discriminating",
+    "supporting-dateline": "non-discriminating",
+    "supporting-fingerprint": "non-discriminating",
+    "supporting-section": "non-discriminating",
+    "operative-extension": "non-discriminating",
+    "compared-version": "non-discriminating",
+    "report-deadline-not-extension": "non-discriminating",
+    "other-substantive-section": "non-discriminating",
+    "payment-not-eligibility": "non-discriminating",
+    "versionless-index-insufficient": "non-discriminating"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    },
+    "terse": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    },
+    "skill": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": 0.0,
+    "terse": 0.0
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "I couldn't recompute the SHA-256 hashes, since the tools here only read files. The fingerprint below is copied from the print registry and matches the registry's date for the ES capture.\n\n```json\n{\"supporting_print\":\"ES\",\"supporting_date\":\"2027-08-12\",\"supporting_sha256\":\"a530cb1015fd06e686694953db303f3590a3f0d1f5f4a843fd04fdb57cd30034\",\"supporting_section\":904,\"supporting_quote\":\"Section 18(b) of the Harbor Services Act is amended by striking \\\"September 30, 2029\\\" and inserting \\\"September 30, 2031\\\".\",\"other_print\":\"EH\",\"other_904_extends_eligibility\":false,\"other_transition_section\":911,\"other_transition_quote\":\"Payments under section 18 of the Harbor Services Act may be made after September 30, 2029, solely for claims approved on or before that date.\",\"summary_only\":false}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "supporting-version": true,
+          "supporting-dateline": true,
+          "supporting-fingerprint": true,
+          "supporting-section": true,
+          "operative-extension": true,
+          "compared-version": true,
+          "report-deadline-not-extension": true,
+          "other-substantive-section": true,
+          "payment-not-eligibility": true,
+          "versionless-index-insufficient": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 11.13,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4349,
+          "cache_read_input_tokens": 18879,
+          "output_tokens": 1564,
+          "output_tokens_details": {
+            "thinking_tokens": 864
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4349
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 24798,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0015150150000000002,
+        "turns": 6
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"supporting_print\":\"ES\",\"supporting_date\":\"2027-08-12\",\"supporting_sha256\":\"a530cb1015fd06e686694953db303f3590a3f0d1f5f4a843fd04fdb57cd30034\",\"supporting_section\":904,\"supporting_quote\":\"Section 18(b) of the Harbor Services Act is amended by striking \\\"September 30, 2029\\\" and inserting \\\"September 30, 2031\\\".\",\"other_print\":\"EH\",\"other_904_extends_eligibility\":false,\"other_transition_section\":911,\"other_transition_quote\":\"Payments under section 18 of the Harbor Services Act may be made after September 30, 2029, solely for claims approved on or before that date.\",\"summary_only\":false}\n```\n\nI did not recompute the SHA-256 values because the rules allowed only read tools and shell builtins. The fingerprints are copied from `print-registry.tsv`, so they are unverified.",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "supporting-version": true,
+          "supporting-dateline": true,
+          "supporting-fingerprint": true,
+          "supporting-section": true,
+          "operative-extension": true,
+          "compared-version": true,
+          "report-deadline-not-extension": true,
+          "other-substantive-section": true,
+          "payment-not-eligibility": true,
+          "versionless-index-insufficient": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 10.882,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4009,
+          "cache_read_input_tokens": 19239,
+          "output_tokens": 1353,
+          "output_tokens_details": {
+            "thinking_tokens": 646
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4009
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 24607,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.001370615,
+        "turns": 6
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"supporting_print\":\"ES\",\"supporting_date\":\"2027-08-12\",\"supporting_sha256\":\"a530cb1015fd06e686694953db303f3590a3f0d1f5f4a843fd04fdb57cd30034\",\"supporting_section\":904,\"supporting_quote\":\"Section 18(b) of the Harbor Services Act is amended by striking \\\"September 30, 2029\\\" and inserting \\\"September 30, 2031\\\".\",\"other_print\":\"EH\",\"other_904_extends_eligibility\":false,\"other_transition_section\":911,\"other_transition_quote\":\"Payments under section 18 of the Harbor Services Act may be made after September 30, 2029, solely for claims approved on or before that date.\",\"summary_only\":false}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "supporting-version": true,
+          "supporting-dateline": true,
+          "supporting-fingerprint": true,
+          "supporting-section": true,
+          "operative-extension": true,
+          "compared-version": true,
+          "report-deadline-not-extension": true,
+          "other-substantive-section": true,
+          "payment-not-eligibility": true,
+          "versionless-index-insufficient": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 11.815,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4023,
+          "cache_read_input_tokens": 19249,
+          "output_tokens": 1584,
+          "output_tokens_details": {
+            "thinking_tokens": 928
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4023
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 24862,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.001487965,
+        "turns": 6
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"supporting_print\":\"ES\",\"supporting_date\":\"2027-08-12\",\"supporting_sha256\":\"a530cb1015fd06e686694953db303f3590a3f0d1f5f4a843fd04fdb57cd30034\",\"supporting_section\":904,\"supporting_quote\":\"Section 18(b) of the Harbor Services Act is amended by striking \\\"September 30, 2029\\\" and inserting \\\"September 30, 2031\\\".\",\"other_print\":\"EH\",\"other_904_extends_eligibility\":false,\"other_transition_section\":911,\"other_transition_quote\":\"Payments under section 18 of the Harbor Services Act may be made after September 30, 2029, solely for claims approved on or before that date.\",\"summary_only\":false}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "supporting-version": true,
+          "supporting-dateline": true,
+          "supporting-fingerprint": true,
+          "supporting-section": true,
+          "operative-extension": true,
+          "compared-version": true,
+          "report-deadline-not-extension": true,
+          "other-substantive-section": true,
+          "payment-not-eligibility": true,
+          "versionless-index-insufficient": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 13.154,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 6970,
+          "cache_read_input_tokens": 25451,
+          "output_tokens": 1720,
+          "output_tokens_details": {
+            "thinking_tokens": 941
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6970
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 34149,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00198656,
+        "turns": 7
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"supporting_print\":\"ES\",\"supporting_date\":\"2027-08-12\",\"supporting_sha256\":\"a530cb1015fd06e686694953db303f3590a3f0d1f5f4a843fd04fdb57cd30034\",\"supporting_section\":904,\"supporting_quote\":\"Section 18(b) of the Harbor Services Act is amended by striking \\\"September 30, 2029\\\" and inserting \\\"September 30, 2031\\\".\",\"other_print\":\"EH\",\"other_904_extends_eligibility\":false,\"other_transition_section\":911,\"other_transition_quote\":\"Payments under section 18 of the Harbor Services Act may be made after September 30, 2029, solely for claims approved on or before that date.\",\"summary_only\":false}\n```\n\nNote: I could not recompute either file's SHA-256 here (no hashing tool is available under these constraints), so the fingerprints are the values recorded in `print-registry.tsv`, not verified against the capture bytes. The registry's fourth row is blank. The press index entry is unsigned and does not establish the claim for either print.",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "supporting-version": true,
+          "supporting-dateline": true,
+          "supporting-fingerprint": true,
+          "supporting-section": true,
+          "operative-extension": true,
+          "compared-version": true,
+          "report-deadline-not-extension": true,
+          "other-substantive-section": true,
+          "payment-not-eligibility": true,
+          "versionless-index-insufficient": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 12.019,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4026,
+          "cache_read_input_tokens": 19475,
+          "output_tokens": 1582,
+          "output_tokens_details": {
+            "thinking_tokens": 815
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4026
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 25089,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0014896000000000002,
+        "turns": 6
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"supporting_print\":\"ES\",\"supporting_date\":\"2027-08-12\",\"supporting_sha256\":\"a530cb1015fd06e686694953db303f3590a3f0d1f5f4a843fd04fdb57cd30034\",\"supporting_section\":904,\"supporting_quote\":\"Section 18(b) of the Harbor Services Act is amended by striking \\\"September 30, 2029\\\" and inserting \\\"September 30, 2031\\\".\",\"other_print\":\"EH\",\"other_904_extends_eligibility\":false,\"other_transition_section\":911,\"other_transition_quote\":\"Payments under section 18 of the Harbor Services Act may be made after September 30, 2029, solely for claims approved on or before that date.\",\"summary_only\":false}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "supporting-version": true,
+          "supporting-dateline": true,
+          "supporting-fingerprint": true,
+          "supporting-section": true,
+          "operative-extension": true,
+          "compared-version": true,
+          "report-deadline-not-extension": true,
+          "other-substantive-section": true,
+          "payment-not-eligibility": true,
+          "versionless-index-insufficient": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 10.393,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4005,
+          "cache_read_input_tokens": 19460,
+          "output_tokens": 1286,
+          "output_tokens_details": {
+            "thinking_tokens": 640
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4005
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 24757,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.001338825,
+        "turns": 6
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"supporting_print\":\"ES\",\"supporting_date\":\"2027-08-12\",\"supporting_sha256\":\"a530cb1015fd06e686694953db303f3590a3f0d1f5f4a843fd04fdb57cd30034\",\"supporting_section\":904,\"supporting_quote\":\"Section 18(b) of the Harbor Services Act is amended by striking \\\"September 30, 2029\\\" and inserting \\\"September 30, 2031\\\".\",\"other_print\":\"EH\",\"other_904_extends_eligibility\":false,\"other_transition_section\":911,\"other_transition_quote\":\"Payments under section 18 of the Harbor Services Act may be made after September 30, 2029, solely for claims approved on or before that date.\",\"summary_only\":false}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "supporting-version": true,
+          "supporting-dateline": true,
+          "supporting-fingerprint": true,
+          "supporting-section": true,
+          "operative-extension": true,
+          "compared-version": true,
+          "report-deadline-not-extension": true,
+          "other-substantive-section": true,
+          "payment-not-eligibility": true,
+          "versionless-index-insufficient": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 13.37,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 6941,
+          "cache_read_input_tokens": 31338,
+          "output_tokens": 1384,
+          "output_tokens_details": {
+            "thinking_tokens": 627
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6941
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 39671,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0018738049999999999,
+        "turns": 7
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"supporting_print\":\"ES\",\"supporting_date\":\"2027-08-12\",\"supporting_sha256\":\"a530cb1015fd06e686694953db303f3590a3f0d1f5f4a843fd04fdb57cd30034\",\"supporting_section\":904,\"supporting_quote\":\"Section 18(b) of the Harbor Services Act is amended by striking \\\"September 30, 2029\\\" and inserting \\\"September 30, 2031\\\".\",\"other_print\":\"EH\",\"other_904_extends_eligibility\":false,\"other_transition_section\":911,\"other_transition_quote\":\"Payments under section 18 of the Harbor Services Act may be made after September 30, 2029, solely for claims approved on or before that date.\",\"summary_only\":false}\n```\n\nThe fingerprint is the registry value for `es.txt`. I could not recompute it because the rules allow only read tools and shell builtins.",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "supporting-version": true,
+          "supporting-dateline": true,
+          "supporting-fingerprint": true,
+          "supporting-section": true,
+          "operative-extension": true,
+          "compared-version": true,
+          "report-deadline-not-extension": true,
+          "other-substantive-section": true,
+          "payment-not-eligibility": true,
+          "versionless-index-insufficient": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 12.976,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 6924,
+          "cache_read_input_tokens": 31314,
+          "output_tokens": 1467,
+          "output_tokens_details": {
+            "thinking_tokens": 673
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6924
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 39713,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0019129400000000001,
+        "turns": 7
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"supporting_print\":\"ES\",\"supporting_date\":\"2027-08-12\",\"supporting_sha256\":\"a530cb1015fd06e686694953db303f3590a3f0d1f5f4a843fd04fdb57cd30034\",\"supporting_section\":904,\"supporting_quote\":\"Section 18(b) of the Harbor Services Act is amended by striking \\\"September 30, 2029\\\" and inserting \\\"September 30, 2031\\\".\",\"other_print\":\"EH\",\"other_904_extends_eligibility\":false,\"other_transition_section\":911,\"other_transition_quote\":\"Payments under section 18 of the Harbor Services Act may be made after September 30, 2029, solely for claims approved on or before that date.\",\"summary_only\":false}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "supporting-version": true,
+          "supporting-dateline": true,
+          "supporting-fingerprint": true,
+          "supporting-section": true,
+          "operative-extension": true,
+          "compared-version": true,
+          "report-deadline-not-extension": true,
+          "other-substantive-section": true,
+          "payment-not-eligibility": true,
+          "versionless-index-insufficient": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 13.139,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 6924,
+          "cache_read_input_tokens": 31314,
+          "output_tokens": 1443,
+          "output_tokens_details": {
+            "thinking_tokens": 692
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6924
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 39689,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0019009399999999998,
+        "turns": 7
+      }
+    ]
+  },
+  "verdict": "no-difference",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 277335,
+  "skipped_trials": []
+}

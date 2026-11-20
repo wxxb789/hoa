@@ -1,0 +1,1056 @@
+{
+  "schema_version": 2,
+  "task": "research-stream-consolidation",
+  "generated_at": "2026-11-20T00:51:50.479222-08:00",
+  "skill": "research-stream-consolidation",
+  "skill_revision": "3",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "forced",
+  "shell": true,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "retire-incoming": {
+      "file": "study/relocations.tsv",
+      "contains": "fieldwork/oriole\tfieldwork/atlas/oriole\tmoved"
+    },
+    "dedup-record": {
+      "file": "study/relocations.tsv",
+      "contains": "fieldwork/oriole/evidence/weather-copy.txt\tfieldwork/atlas/evidence/weather.txt\tdeduplicated"
+    },
+    "retain-atlas-receipt": {
+      "file": "fieldwork/atlas/run/empty.receipt",
+      "contains": "records=0\n"
+    },
+    "retain-oriole-receipt": {
+      "file": "fieldwork/atlas/oriole/run/empty.receipt",
+      "contains": "records=0\n"
+    },
+    "canonical-duplicate": {
+      "file": "fieldwork/atlas/evidence/weather.txt",
+      "contains": "West transect: rain began at 09:20."
+    },
+    "preserve-first-same-name": {
+      "file": "fieldwork/atlas/evidence/counts.txt",
+      "contains": "West transect: 12 tagged reeds."
+    },
+    "preserve-second-same-name": {
+      "file": "fieldwork/atlas/oriole/evidence/counts.txt",
+      "contains": "East transect: 17 tagged reeds."
+    },
+    "union-origins": {
+      "file": "fieldwork/atlas/provenance.tsv",
+      "contains": "atlas-wx\tfieldwork/atlas/evidence/weather.txt\tWX-3\noriole-wx\tfieldwork/atlas/evidence/weather.txt\tWX-9"
+    },
+    "incoming-citation": {
+      "file": "fieldwork/atlas/oriole/MATERIALS.md",
+      "contains": "[Weather sheet](../evidence/weather.txt)"
+    },
+    "outside-navigation": {
+      "file": "fieldwork/README.md",
+      "contains": "[East materials](atlas/oriole/MATERIALS.md)"
+    },
+    "control-canonical-duplicate": {
+      "file": "study/artifacts.tsv",
+      "contains": "oriole-wx\tfieldwork/atlas/evidence/weather.txt\twx-shared-0920"
+    },
+    "control-distinct-bytes": {
+      "file": "study/artifacts.tsv",
+      "contains": "oriole-count\tfieldwork/atlas/oriole/evidence/counts.txt\tcount-east-17"
+    },
+    "control-keep-sentinel": {
+      "file": "study/artifacts.tsv",
+      "contains": "oriole-empty\tfieldwork/atlas/oriole/run/empty.receipt\tempty"
+    },
+    "unrelated-fixture": {
+      "file": "study/schedule.txt",
+      "contains": "Next observation window: 14:30."
+    }
+  },
+  "rubric_flags": {
+    "retire-incoming": "non-discriminating",
+    "dedup-record": "non-discriminating",
+    "retain-atlas-receipt": "non-discriminating",
+    "retain-oriole-receipt": "non-discriminating",
+    "canonical-duplicate": "non-discriminating",
+    "preserve-first-same-name": "non-discriminating",
+    "preserve-second-same-name": "non-discriminating",
+    "union-origins": "non-discriminating",
+    "incoming-citation": "non-discriminating",
+    "outside-navigation": "non-discriminating",
+    "control-canonical-duplicate": "non-discriminating",
+    "control-distinct-bytes": "non-discriminating",
+    "control-keep-sentinel": "non-discriminating",
+    "unrelated-fixture": "non-discriminating"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    },
+    "terse": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    },
+    "skill": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": 0.0,
+    "terse": 0.0
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "The Oriole stream is merged into Atlas. Every study row and content ID is preserved, and all study paths and Markdown links resolve. I made no commits and no writes outside the workspace.\n\n**What changed**\n- **Layout:** `fieldwork/oriole/` moved to `fieldwork/atlas/oriole/` with its internal structure intact (`evidence/`, `run/`, `MATERIALS.md`).\n- **Dedup:** `oriole/evidence/weather-copy.txt` was byte-identical to `atlas/evidence/weather.txt` (checked with `cmp`), so I removed the copy and kept Atlas's file.\n- **Receipts:** Both `empty.receipt` files are kept, including the Oriole sentinel.\n- **Provenance:** `atlas/provenance.tsv` now holds both source IDs, ordered by ID, with repo-relative paths. `atlas-wx` (WX-3) and `oriole-wx` (WX-9) both point to the canonical weather file, so `WX-9` is kept as a reference to the same bytes.\n- **Links:** `fieldwork/README.md` and `atlas/oriole/MATERIALS.md` use relative links. The Oriole weather link now goes to the canonical file.\n- **Study:** `study/artifacts.tsv` keeps all five rows and content IDs, with repointed paths. `study/relocations.tsv` is new and records `fieldwork/oriole` as `moved` and the weather copy as `deduplicated`.\n- **Atlas README:** I appended a short relocation record. The original text is unchanged.\n- **Not touched:** `study/schedule.txt`, as the atlas README asked.\n\n**Choices I made**\n- The Oriole weather row in `artifacts.tsv` now points to Atlas's file. Its content ID (`wx-shared-0920`) is unchanged.\n- The relocation record is a section appended to the Atlas README, not a separate file.",
+        "answer_format": "none",
+        "artifacts": {
+          "study/relocations.tsv": "old_path\tcanonical_path\taction\nfieldwork/oriole\tfieldwork/atlas/oriole\tmoved\nfieldwork/oriole/evidence/weather-copy.txt\tfieldwork/atlas/evidence/weather.txt\tdeduplicated\n",
+          "fieldwork/atlas/run/empty.receipt": "records=0\n",
+          "fieldwork/atlas/oriole/run/empty.receipt": "records=0\n",
+          "fieldwork/atlas/evidence/weather.txt": "West transect: rain began at 09:20.\n",
+          "fieldwork/atlas/evidence/counts.txt": "West transect: 12 tagged reeds.\n",
+          "fieldwork/atlas/oriole/evidence/counts.txt": "East transect: 17 tagged reeds.\n",
+          "fieldwork/atlas/provenance.tsv": "source_id\tpath\tsource_ref\natlas-wx\tfieldwork/atlas/evidence/weather.txt\tWX-3\noriole-wx\tfieldwork/atlas/evidence/weather.txt\tWX-9\n",
+          "fieldwork/atlas/oriole/MATERIALS.md": "# East materials\n\n- [East tally](evidence/counts.txt)\n- [Weather sheet](..<path>)\n- [Run receipt](run/empty.receipt)\n",
+          "fieldwork/README.md": "# Fieldwork\n\n- [Atlas](atlas/README.md)\n- [East materials](atlas/oriole/MATERIALS.md)\n",
+          "study/artifacts.tsv": "record_id\tpath\tcontent_id\natlas-count\tfieldwork/atlas/evidence/counts.txt\tcount-west-12\natlas-wx\tfieldwork/atlas/evidence/weather.txt\twx-shared-0920\noriole-count\tfieldwork/atlas/oriole/evidence/counts.txt\tcount-east-17\noriole-wx\tfieldwork/atlas/evidence/weather.txt\twx-shared-0920\noriole-empty\tfieldwork/atlas/oriole/run/empty.receipt\tempty\n",
+          "study/schedule.txt": "Next observation window: 14:30.\n"
+        },
+        "checks": {
+          "retire-incoming": true,
+          "dedup-record": true,
+          "retain-atlas-receipt": true,
+          "retain-oriole-receipt": true,
+          "canonical-duplicate": true,
+          "preserve-first-same-name": true,
+          "preserve-second-same-name": true,
+          "union-origins": true,
+          "incoming-citation": true,
+          "outside-navigation": true,
+          "control-canonical-duplicate": true,
+          "control-distinct-bytes": true,
+          "control-keep-sentinel": true,
+          "unrelated-fixture": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 48.08,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 8990,
+          "cache_read_input_tokens": 49865,
+          "output_tokens": 7939,
+          "output_tokens_details": {
+            "thinking_tokens": 4759
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 8990
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 66804,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0055929000000000005,
+        "turns": 7
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "The two streams are merged into one collection under `fieldwork/atlas`, and the study records are updated. Nothing was committed, and all changes are inside the workspace.\n\n**What moved and what was deduplicated**\n- `fieldwork/oriole` is now `fieldwork/atlas/oriole`, with its internal layout kept (`MATERIALS.md`, `evidence/`, `run/`, `provenance.tsv`).\n- `oriole/evidence/weather-copy.txt` was byte-identical to `atlas/evidence/weather.txt` (same SHA-256), so I removed the copy and kept Atlas's.\n- Both `run/empty.receipt` files are byte-identical, but I kept both because the README says to retain all run receipts for audit.\n- The two `counts.txt` files differ, so both stay.\n\n**Repairs**\n- `fieldwork/atlas/provenance.tsv` now lists `atlas-wx` and `oriole-wx`, ordered by source ID, with repo-relative paths. Both point to `fieldwork/atlas/evidence/weather.txt`.\n- `fieldwork/atlas/oriole/provenance.tsv` points its `oriole-wx` path at the canonical weather file.\n- `fieldwork/atlas/oriole/MATERIALS.md` links to `..<path>` instead of the deleted copy.\n- `fieldwork/README.md` now links to `atlas/README.md` and `atlas/oriole/MATERIALS.md`.\n- `fieldwork/atlas/README.md` has a new Relocation section that notes the move and the dedup.\n- `study/artifacts.tsv` keeps all five record IDs and content IDs. Only the paths changed, to the new locations. The `oriole-wx` row now points to the canonical weather file, since the old path no longer exists.\n- `study/relocations.tsv` is new. It records `fieldwork/oriole` as `moved` to `fieldwork/atlas/oriole`, and `fieldwork/oriole/evidence/weather-copy.txt` as `deduplicated` to `fieldwork/atlas/evidence/weather.txt`.\n\n**Checks**\n- All five `artifacts.tsv` paths resolve to files.\n- All relative Markdown links in the edited READMEs resolve.\n- `study/schedule.txt` is untouched, as the README requires.\n\n**Choices to review**\n- `study/artifacts.tsv` has two rows that now share a path with a different record ID (`atlas-wx` and `oriole-wx`). That is the expected result of deduplication, but the study runner may need to accept it.\n- I did not hash-check the content IDs. The study README says they are labels, not recomputed from bytes, so I kept them as given.",
+        "answer_format": "none",
+        "artifacts": {
+          "study/relocations.tsv": "old_path\tcanonical_path\taction\nfieldwork/oriole\tfieldwork/atlas/oriole\tmoved\nfieldwork/oriole/evidence/weather-copy.txt\tfieldwork/atlas/evidence/weather.txt\tdeduplicated\n",
+          "fieldwork/atlas/run/empty.receipt": "records=0\n",
+          "fieldwork/atlas/oriole/run/empty.receipt": "records=0\n",
+          "fieldwork/atlas/evidence/weather.txt": "West transect: rain began at 09:20.\n",
+          "fieldwork/atlas/evidence/counts.txt": "West transect: 12 tagged reeds.\n",
+          "fieldwork/atlas/oriole/evidence/counts.txt": "East transect: 17 tagged reeds.\n",
+          "fieldwork/atlas/provenance.tsv": "source_id\tpath\tsource_ref\natlas-wx\tfieldwork/atlas/evidence/weather.txt\tWX-3\noriole-wx\tfieldwork/atlas/evidence/weather.txt\tWX-9\n",
+          "fieldwork/atlas/oriole/MATERIALS.md": "# East materials\n\n- [East tally](evidence/counts.txt)\n- [Weather sheet](..<path>)\n- [Run receipt](run/empty.receipt)\n",
+          "fieldwork/README.md": "# Fieldwork\n\n- [Atlas](atlas/README.md)\n- [East materials](atlas/oriole/MATERIALS.md)\n",
+          "study/artifacts.tsv": "record_id\tpath\tcontent_id\natlas-count\tfieldwork/atlas/evidence/counts.txt\tcount-west-12\natlas-wx\tfieldwork/atlas/evidence/weather.txt\twx-shared-0920\noriole-count\tfieldwork/atlas/oriole/evidence/counts.txt\tcount-east-17\noriole-wx\tfieldwork/atlas/evidence/weather.txt\twx-shared-0920\noriole-empty\tfieldwork/atlas/oriole/run/empty.receipt\tempty\n",
+          "study/schedule.txt": "Next observation window: 14:30.\n"
+        },
+        "checks": {
+          "retire-incoming": true,
+          "dedup-record": true,
+          "retain-atlas-receipt": true,
+          "retain-oriole-receipt": true,
+          "canonical-duplicate": true,
+          "preserve-first-same-name": true,
+          "preserve-second-same-name": true,
+          "union-origins": true,
+          "incoming-citation": true,
+          "outside-navigation": true,
+          "control-canonical-duplicate": true,
+          "control-distinct-bytes": true,
+          "control-keep-sentinel": true,
+          "unrelated-fixture": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 34.874,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 7750,
+          "cache_read_input_tokens": 36761,
+          "output_tokens": 5259,
+          "output_tokens_details": {
+            "thinking_tokens": 2374
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 7750
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 49778,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00396666,
+        "turns": 4
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "The two fieldwork streams are merged into one collection under `fieldwork/atlas/`. Nothing was committed, and all changes are local to this workspace.\n\n- **Oriole nested, not flattened:** its `MATERIALS.md`, `evidence/counts.txt`, and `run/empty.receipt` now live under `fieldwork/atlas/oriole/` with the same internal layout.\n- **Duplicate removed:** `oriole/evidence/weather-copy.txt` was byte-identical to Atlas's `weather.txt` (same SHA-256), so I deleted it and pointed Oriole's links at the canonical file.\n- **Provenance merged:** both ledgers are now one `fieldwork/atlas/provenance.tsv`, ordered by source ID (`atlas-wx`, then `oriole-wx`). Paths are repo-relative, and the `oriole-wx` row points at the canonical weather file.\n- **Receipts kept:** both `empty.receipt` files are preserved, including the Oriole one.\n- **Study tooling repaired:** `study/artifacts.tsv` keeps every row and content ID. Only the paths changed, and every path now resolves to a file.\n- **Relocation record filed:** `study/relocations.tsv` logs the stream root as `moved` and the duplicate weather file as `deduplicated`.\n- **Navigation fixed:** `fieldwork/README.md` links to the new Oriole location. Atlas's README has a short relocation note.\n- **Untouched:** `study/schedule.txt` and `study/README.md`.\n\nChecks: all relative Markdown links in the touched READMEs resolve, and every `artifacts.tsv` path exists. One link was broken during the work, and I fixed it. The only remaining references to the old paths are in the relocation log and the Atlas note, where they are meant to be.\n\nTwo choices you may want to review:\n- I logged the retired Oriole `provenance.tsv` as `deduplicated`. Its rows were merged rather than duplicated, and the spec allows only `moved` or `deduplicated`, so `deduplicated` was the closer fit.\n- I did not verify content IDs against the bytes. The study README calls them stable labels, so I kept them as written.",
+        "answer_format": "none",
+        "artifacts": {
+          "study/relocations.tsv": "old_path\tcanonical_path\taction\nfieldwork/oriole\tfieldwork/atlas/oriole\tmoved\nfieldwork/oriole/evidence/weather-copy.txt\tfieldwork/atlas/evidence/weather.txt\tdeduplicated\nfieldwork/oriole/provenance.tsv\tfieldwork/atlas/provenance.tsv\tdeduplicated\n",
+          "fieldwork/atlas/run/empty.receipt": "records=0\n",
+          "fieldwork/atlas/oriole/run/empty.receipt": "records=0\n",
+          "fieldwork/atlas/evidence/weather.txt": "West transect: rain began at 09:20.\n",
+          "fieldwork/atlas/evidence/counts.txt": "West transect: 12 tagged reeds.\n",
+          "fieldwork/atlas/oriole/evidence/counts.txt": "East transect: 17 tagged reeds.\n",
+          "fieldwork/atlas/provenance.tsv": "source_id\tpath\tsource_ref\natlas-wx\tfieldwork/atlas/evidence/weather.txt\tWX-3\noriole-wx\tfieldwork/atlas/evidence/weather.txt\tWX-9\n",
+          "fieldwork/atlas/oriole/MATERIALS.md": "# East materials\n\n- [East tally](evidence/counts.txt)\n- [Weather sheet](..<path>)\n- [Run receipt](run/empty.receipt)\n",
+          "fieldwork/README.md": "# Fieldwork\n\n- [Atlas](atlas/README.md)\n- [East materials](atlas/oriole/MATERIALS.md)\n",
+          "study/artifacts.tsv": "record_id\tpath\tcontent_id\natlas-count\tfieldwork/atlas/evidence/counts.txt\tcount-west-12\natlas-wx\tfieldwork/atlas/evidence/weather.txt\twx-shared-0920\noriole-count\tfieldwork/atlas/oriole/evidence/counts.txt\tcount-east-17\noriole-wx\tfieldwork/atlas/evidence/weather.txt\twx-shared-0920\noriole-empty\tfieldwork/atlas/oriole/run/empty.receipt\tempty\n",
+          "study/schedule.txt": "Next observation window: 14:30.\n"
+        },
+        "checks": {
+          "retire-incoming": true,
+          "dedup-record": true,
+          "retain-atlas-receipt": true,
+          "retain-oriole-receipt": true,
+          "canonical-duplicate": true,
+          "preserve-first-same-name": true,
+          "preserve-second-same-name": true,
+          "union-origins": true,
+          "incoming-citation": true,
+          "outside-navigation": true,
+          "control-canonical-duplicate": true,
+          "control-distinct-bytes": true,
+          "control-keep-sentinel": true,
+          "unrelated-fixture": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 49.174,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 8911,
+          "cache_read_input_tokens": 51444,
+          "output_tokens": 8144,
+          "output_tokens_details": {
+            "thinking_tokens": 4753
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 8911
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 68509,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.005701315,
+        "turns": 6
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "Oriole is merged into `fieldwork/atlas/oriole/`, the duplicate weather sheet is deduplicated, and all study and ledger paths resolve.\n\n**What changed**\n- **Moved** `fieldwork/oriole/` to `fieldwork/atlas/oriole/` as a unit. Its internal layout is unchanged.\n- **Deduplicated** `oriole/evidence/weather-copy.txt`. A byte comparison showed it matched `atlas/evidence/weather.txt`, so I removed the copy. Both source IDs (`atlas-wx` WX-3 and `oriole-wx` WX-9) now point to the canonical file, and both ledger rows are kept.\n- **Kept distinct:** `counts.txt` differs between the two streams (12 west vs. 17 east reeds), so both stay. Both `empty.receipt` files are identical, but per the README I kept both for audit.\n- **Ledgers:** `atlas/provenance.tsv` now lists both source IDs in source-ID order with repo-relative paths. The moved `atlas/oriole/provenance.tsv` is repointed to the canonical weather path.\n- **Links:** `fieldwork/README.md` now points to `atlas/oriole/MATERIALS.md`. The East materials page points its weather link at the canonical `..<path>`. I checked that every relative link resolves.\n- **Study:** `study/artifacts.tsv` keeps all five rows and their content IDs, with paths repointed. The `oriole-wx` row now points to the canonical weather file. I filed `study/relocations.tsv` with `moved` for the stream root and `deduplicated` for the weather copy.\n- **Relocation note:** added a \"Relocation\" section to `fieldwork/atlas/README.md`.\n\n**Verification:** every `artifacts.tsv` path and every ledger path resolves to an existing file. The schedule file was left untouched, as the README asked.\n\n**Choices to review**\n- The stale `atlas/oriole/provenance.tsv` is kept alongside the merged Atlas ledger, since the README only mentions one ledger.\n- I did not touch the top-level `fieldwork/README.md` beyond the one link.\n\nNo Git operations, remote access, or writes outside the workspace were made.",
+        "answer_format": "none",
+        "artifacts": {
+          "study/relocations.tsv": "old_path\tcanonical_path\taction\nfieldwork/oriole\tfieldwork/atlas/oriole\tmoved\nfieldwork/oriole/evidence/weather-copy.txt\tfieldwork/atlas/evidence/weather.txt\tdeduplicated\n",
+          "fieldwork/atlas/run/empty.receipt": "records=0\n",
+          "fieldwork/atlas/oriole/run/empty.receipt": "records=0\n",
+          "fieldwork/atlas/evidence/weather.txt": "West transect: rain began at 09:20.\n",
+          "fieldwork/atlas/evidence/counts.txt": "West transect: 12 tagged reeds.\n",
+          "fieldwork/atlas/oriole/evidence/counts.txt": "East transect: 17 tagged reeds.\n",
+          "fieldwork/atlas/provenance.tsv": "source_id\tpath\tsource_ref\natlas-wx\tfieldwork/atlas/evidence/weather.txt\tWX-3\noriole-wx\tfieldwork/atlas/evidence/weather.txt\tWX-9\n",
+          "fieldwork/atlas/oriole/MATERIALS.md": "# East materials\n\n- [East tally](evidence/counts.txt)\n- [Weather sheet](..<path>)\n- [Run receipt](run/empty.receipt)\n",
+          "fieldwork/README.md": "# Fieldwork\n\n- [Atlas](atlas/README.md)\n- [East materials](atlas/oriole/MATERIALS.md)\n",
+          "study/artifacts.tsv": "record_id\tpath\tcontent_id\natlas-count\tfieldwork/atlas/evidence/counts.txt\tcount-west-12\natlas-wx\tfieldwork/atlas/evidence/weather.txt\twx-shared-0920\noriole-count\tfieldwork/atlas/oriole/evidence/counts.txt\tcount-east-17\noriole-wx\tfieldwork/atlas/evidence/weather.txt\twx-shared-0920\noriole-empty\tfieldwork/atlas/oriole/run/empty.receipt\tempty\n",
+          "study/schedule.txt": "Next observation window: 14:30.\n"
+        },
+        "checks": {
+          "retire-incoming": true,
+          "dedup-record": true,
+          "retain-atlas-receipt": true,
+          "retain-oriole-receipt": true,
+          "canonical-duplicate": true,
+          "preserve-first-same-name": true,
+          "preserve-second-same-name": true,
+          "union-origins": true,
+          "incoming-citation": true,
+          "outside-navigation": true,
+          "control-canonical-duplicate": true,
+          "control-distinct-bytes": true,
+          "control-keep-sentinel": true,
+          "unrelated-fixture": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 56.253,
+        "usage": {
+          "input_tokens": 12,
+          "cache_creation_input_tokens": 10615,
+          "cache_read_input_tokens": 57923,
+          "output_tokens": 8385,
+          "output_tokens_details": {
+            "thinking_tokens": 4966
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 10615
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 76935,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.006099805,
+        "turns": 6
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "The two streams are merged into one collection under `fieldwork/atlas/`, and every path, link, and study record now resolves. The merge is local to this workspace, with no commits or remotes.\n\n**What changed**\n- **Layout:** `fieldwork/oriole/` moved to `fieldwork/atlas/oriole/` with its internal structure unchanged.\n- **Dedupe:** `oriole/evidence/weather-copy.txt` was byte-identical to `atlas/evidence/weather.txt`, so I deleted the copy and kept Atlas's file.\n- **Kept as distinct:** the two `counts.txt` files differ (West 12 vs. East 17), so both stay. Both `empty.receipt` sentinels are kept for audit, as the Atlas README asks.\n- **Ledger:** `fieldwork/atlas/provenance.tsv` now has `atlas-wx` (WX-3) and `oriole-wx` (WX-9), ordered by source ID, with repo-relative paths. Both source refs point to the single weather file.\n- **Links:** `fieldwork/README.md` and `oriole/MATERIALS.md` were repointed. The Atlas README has a new \"Relocation\" section.\n- **Study records:** in `study/artifacts.tsv`, the five rows and their content IDs are preserved, with the two paths repointed. The `oriole-wx` row now points at the canonical weather file. I filed `study/relocations.tsv` with `fieldwork/oriole` as `moved` and the weather copy as `deduplicated`.\n\n**Verification**\n- All five study paths and both ledger paths resolve, and their content IDs match the bytes.\n- All relative links in the edited READMEs resolve.\n- A search for `fieldwork/oriole` and `weather-copy` finds only the relocation log, which is expected.\n\n**Choices to review**\n- The Oriole ledger file moved with its tree as `fieldwork/atlas/oriole/provenance.tsv`. I repointed its row to the canonical weather file. The project-level ledger is the authoritative one.\n- The schedule file was left alone, as the Atlas README instructs.",
+        "answer_format": "none",
+        "artifacts": {
+          "study/relocations.tsv": "old_path\tcanonical_path\taction\nfieldwork/oriole\tfieldwork/atlas/oriole\tmoved\nfieldwork/oriole/evidence/weather-copy.txt\tfieldwork/atlas/evidence/weather.txt\tdeduplicated\n",
+          "fieldwork/atlas/run/empty.receipt": "records=0\n",
+          "fieldwork/atlas/oriole/run/empty.receipt": "records=0\n",
+          "fieldwork/atlas/evidence/weather.txt": "West transect: rain began at 09:20.\n",
+          "fieldwork/atlas/evidence/counts.txt": "West transect: 12 tagged reeds.\n",
+          "fieldwork/atlas/oriole/evidence/counts.txt": "East transect: 17 tagged reeds.\n",
+          "fieldwork/atlas/provenance.tsv": "source_id\tpath\tsource_ref\natlas-wx\tfieldwork/atlas/evidence/weather.txt\tWX-3\noriole-wx\tfieldwork/atlas/evidence/weather.txt\tWX-9\n",
+          "fieldwork/atlas/oriole/MATERIALS.md": "# East materials\n\n- [East tally](evidence/counts.txt)\n- [Weather sheet](..<path>)\n- [Run receipt](run/empty.receipt)\n",
+          "fieldwork/README.md": "# Fieldwork\n\n- [Atlas](atlas/README.md)\n- [East materials](atlas/oriole/MATERIALS.md)\n\nNote: the East stream was moved under Atlas; see the [Atlas relocation note](atlas/README.md#relocation).\n",
+          "study/artifacts.tsv": "record_id\tpath\tcontent_id\natlas-count\tfieldwork/atlas/evidence/counts.txt\tcount-west-12\natlas-wx\tfieldwork/atlas/evidence/weather.txt\twx-shared-0920\noriole-count\tfieldwork/atlas/oriole/evidence/counts.txt\tcount-east-17\noriole-wx\tfieldwork/atlas/evidence/weather.txt\twx-shared-0920\noriole-empty\tfieldwork/atlas/oriole/run/empty.receipt\tempty\n",
+          "study/schedule.txt": "Next observation window: 14:30.\n"
+        },
+        "checks": {
+          "retire-incoming": true,
+          "dedup-record": true,
+          "retain-atlas-receipt": true,
+          "retain-oriole-receipt": true,
+          "canonical-duplicate": true,
+          "preserve-first-same-name": true,
+          "preserve-second-same-name": true,
+          "union-origins": true,
+          "incoming-citation": true,
+          "outside-navigation": true,
+          "control-canonical-duplicate": true,
+          "control-distinct-bytes": true,
+          "control-keep-sentinel": true,
+          "unrelated-fixture": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 49.237,
+        "usage": {
+          "input_tokens": 12,
+          "cache_creation_input_tokens": 8903,
+          "cache_read_input_tokens": 63531,
+          "output_tokens": 6981,
+          "output_tokens_details": {
+            "thinking_tokens": 3465
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 8903
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 79427,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.005239885,
+        "turns": 6
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "The two fieldwork streams are merged into one collection under `fieldwork/atlas/`. Every study artifact path and ledger path resolves, and every Markdown link in the fieldwork and study trees resolves.\n\n**What changed**\n- **Moved:** the East stream now lives at `fieldwork/atlas/oriole/`, with its internal `evidence/` and `run/` layout unchanged. `fieldwork/oriole/` is gone.\n- **Deduplicated:** `oriole/evidence/weather-copy.txt` was byte-identical to `atlas/evidence/weather.txt`, so I removed the copy and kept Atlas's file.\n- **Kept on purpose:** both `empty.receipt` files are identical, but the Atlas README says to keep all run receipts, so both remain.\n- **Provenance:** `atlas/provenance.tsv` lists `atlas-wx` (WX-3) and `oriole-wx` (WX-9), both pointing at the canonical weather file, sorted by source ID. The nested `oriole/provenance.tsv` points to the same file and keeps WX-9.\n- **Links:** `fieldwork/README.md`, `atlas/README.md`, and `oriole/MATERIALS.md` now use correct relative paths. I added a short relocation note to the Atlas README.\n- **Study records:** `study/artifacts.tsv` keeps all five rows and content IDs with repaired paths. `oriole-wx` and `atlas-wx` now share a path, which is expected because both records remain. I created `study/relocations.tsv` with one `moved` row for the stream root and one `deduplicated` row for the weather copy.\n\n**Left alone:** `study/schedule.txt`, as the README requires.\n\nNo commits, remote access, or writes outside this workspace. The workspace has no Git metadata, so I used local file operations only.",
+        "answer_format": "none",
+        "artifacts": {
+          "study/relocations.tsv": "old_path\tcanonical_path\taction\nfieldwork/oriole\tfieldwork/atlas/oriole\tmoved\nfieldwork/oriole/evidence/weather-copy.txt\tfieldwork/atlas/evidence/weather.txt\tdeduplicated\n",
+          "fieldwork/atlas/run/empty.receipt": "records=0\n",
+          "fieldwork/atlas/oriole/run/empty.receipt": "records=0\n",
+          "fieldwork/atlas/evidence/weather.txt": "West transect: rain began at 09:20.\n",
+          "fieldwork/atlas/evidence/counts.txt": "West transect: 12 tagged reeds.\n",
+          "fieldwork/atlas/oriole/evidence/counts.txt": "East transect: 17 tagged reeds.\n",
+          "fieldwork/atlas/provenance.tsv": "source_id\tpath\tsource_ref\natlas-wx\tfieldwork/atlas/evidence/weather.txt\tWX-3\noriole-wx\tfieldwork/atlas/evidence/weather.txt\tWX-9\n",
+          "fieldwork/atlas/oriole/MATERIALS.md": "# East materials\n\n- [East tally](evidence/counts.txt)\n- [Weather sheet](..<path>)\n- [Run receipt](run/empty.receipt)\n",
+          "fieldwork/README.md": "# Fieldwork\n\n- [Atlas](atlas/README.md)\n- [East materials](atlas/oriole/MATERIALS.md)\n",
+          "study/artifacts.tsv": "record_id\tpath\tcontent_id\natlas-count\tfieldwork/atlas/evidence/counts.txt\tcount-west-12\natlas-wx\tfieldwork/atlas/evidence/weather.txt\twx-shared-0920\noriole-count\tfieldwork/atlas/oriole/evidence/counts.txt\tcount-east-17\noriole-wx\tfieldwork/atlas/evidence/weather.txt\twx-shared-0920\noriole-empty\tfieldwork/atlas/oriole/run/empty.receipt\tempty\n",
+          "study/schedule.txt": "Next observation window: 14:30.\n"
+        },
+        "checks": {
+          "retire-incoming": true,
+          "dedup-record": true,
+          "retain-atlas-receipt": true,
+          "retain-oriole-receipt": true,
+          "canonical-duplicate": true,
+          "preserve-first-same-name": true,
+          "preserve-second-same-name": true,
+          "union-origins": true,
+          "incoming-citation": true,
+          "outside-navigation": true,
+          "control-canonical-duplicate": true,
+          "control-distinct-bytes": true,
+          "control-keep-sentinel": true,
+          "unrelated-fixture": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 67.438,
+        "usage": {
+          "input_tokens": 14,
+          "cache_creation_input_tokens": 10237,
+          "cache_read_input_tokens": 78866,
+          "output_tokens": 10625,
+          "output_tokens_details": {
+            "thinking_tokens": 6429
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 10237
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 99742,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0073821849999999994,
+        "turns": 7
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "The Oriole stream is merged into Atlas. Its layout is intact at `fieldwork/atlas/oriole/`, and the study records point at the new paths.\n\n- **Moved:** `fieldwork/oriole/` is now `fieldwork/atlas/oriole/`, moved as one unit.\n- **Deduplicated:** `oriole/evidence/weather-copy.txt` was byte-identical to Atlas's `evidence/weather.txt` (same sha256), so I deleted the copy and kept Atlas's.\n- **Kept:** Both `run/empty.receipt` files, since the Atlas README says empty sentinels are audit evidence. Their hashes match.\n- **Ledger:** `atlas/provenance.tsv` now has both source IDs ordered by source ID: `atlas-wx` (WX-3) and `oriole-wx` (WX-9), with repo-relative paths. The Oriole ledger also points at the surviving weather file.\n- **Links:** `fieldwork/README.md` and `oriole/MATERIALS.md` now resolve. The weather link in MATERIALS.md points at the surviving Atlas file. I checked every Markdown link.\n- **Study records:** `study/artifacts.tsv` has the same rows and content IDs, with the paths repointed. I filed `study/relocations.tsv` with `fieldwork/oriole` → `moved` and the weather copy → `deduplicated`.\n- **Relocation note:** Added to `fieldwork/atlas/README.md`.\n\nChecks: every `artifacts.tsv` path resolves, and all hashes still match their originals. The one \"MISSING path\" line in my ledger check was the TSV header row, not a broken path.\n\nNot done:\n- **Study validator:** The workspace has no validator script, so I could not run one. The study README describes the runner reading `artifacts.tsv` directly, which I checked by hand.\n- **Commit:** Nothing was committed, and nothing was written outside the workspace.\n- **Schedule:** `study/schedule.txt` was left alone, as the Atlas README says.",
+        "answer_format": "none",
+        "artifacts": {
+          "study/relocations.tsv": "old_path\tcanonical_path\taction\nfieldwork/oriole\tfieldwork/atlas/oriole\tmoved\nfieldwork/oriole/evidence/weather-copy.txt\tfieldwork/atlas/evidence/weather.txt\tdeduplicated\n",
+          "fieldwork/atlas/run/empty.receipt": "records=0\n",
+          "fieldwork/atlas/oriole/run/empty.receipt": "records=0\n",
+          "fieldwork/atlas/evidence/weather.txt": "West transect: rain began at 09:20.\n",
+          "fieldwork/atlas/evidence/counts.txt": "West transect: 12 tagged reeds.\n",
+          "fieldwork/atlas/oriole/evidence/counts.txt": "East transect: 17 tagged reeds.\n",
+          "fieldwork/atlas/provenance.tsv": "source_id\tpath\tsource_ref\natlas-wx\tfieldwork/atlas/evidence/weather.txt\tWX-3\noriole-wx\tfieldwork/atlas/evidence/weather.txt\tWX-9\n",
+          "fieldwork/atlas/oriole/MATERIALS.md": "# East materials\n\n- [East tally](evidence/counts.txt)\n- [Weather sheet](..<path>)\n- [Run receipt](run/empty.receipt)\n",
+          "fieldwork/README.md": "# Fieldwork\n\n- [Atlas](atlas/README.md)\n- [East materials](atlas/oriole/MATERIALS.md)\n",
+          "study/artifacts.tsv": "record_id\tpath\tcontent_id\natlas-count\tfieldwork/atlas/evidence/counts.txt\tcount-west-12\natlas-wx\tfieldwork/atlas/evidence/weather.txt\twx-shared-0920\noriole-count\tfieldwork/atlas/oriole/evidence/counts.txt\tcount-east-17\noriole-wx\tfieldwork/atlas/evidence/weather.txt\twx-shared-0920\noriole-empty\tfieldwork/atlas/oriole/run/empty.receipt\tempty\n",
+          "study/schedule.txt": "Next observation window: 14:30.\n"
+        },
+        "checks": {
+          "retire-incoming": true,
+          "dedup-record": true,
+          "retain-atlas-receipt": true,
+          "retain-oriole-receipt": true,
+          "canonical-duplicate": true,
+          "preserve-first-same-name": true,
+          "preserve-second-same-name": true,
+          "union-origins": true,
+          "incoming-citation": true,
+          "outside-navigation": true,
+          "control-canonical-duplicate": true,
+          "control-distinct-bytes": true,
+          "control-keep-sentinel": true,
+          "unrelated-fixture": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 63.641,
+        "usage": {
+          "input_tokens": 16,
+          "cache_creation_input_tokens": 12451,
+          "cache_read_input_tokens": 99465,
+          "output_tokens": 10246,
+          "output_tokens_details": {
+            "thinking_tokens": 6312
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 12451
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 122178,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.007675625,
+        "turns": 10
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "The Oriole stream is merged into Atlas, and the study records point at the new locations. Nothing was committed, and all changes stayed inside this workspace.\n\n**What changed**\n- **Moved as one unit:** `fieldwork/oriole/` is now `fieldwork/atlas/oriole/`, with its internal layout unchanged.\n- **Deduplicated:** `oriole/evidence/weather-copy.txt` was byte-identical to `atlas/evidence/weather.txt`, so I removed the copy and kept Atlas's file. Both empty run receipts are kept as audit evidence.\n- **Provenance ledger:** the Oriole row was merged into `fieldwork/atlas/provenance.tsv`, ordered by source ID (`atlas-wx`, then `oriole-wx`). Both rows point at the canonical repo-relative weather path. The Oriole ledger was removed.\n- **Navigation links:** `fieldwork/README.md` now links to `atlas/oriole/MATERIALS.md`. The moved `MATERIALS.md` links to the shared weather sheet via `..<path>`. Every relative link resolves.\n- **Study records:** `study/artifacts.tsv` has the new paths for the Oriole rows. Every record ID and content ID is unchanged. All five paths resolve to files.\n- **Relocation records:** `study/relocations.tsv` is new, with `moved` and `deduplicated` rows in the format the study README specifies. The Atlas README has a short relocation section.\n\n**Choices I made**\n- The `oriole-wx` row in `artifacts.tsv` now points at Atlas's copy of the weather sheet. Its content ID is the same, so the shared bytes are still the bound evidence.\n- I left `study/schedule.txt` alone, as the Atlas README asks.\n\n**Not verified:** the workspace has no study validator script, so I checked the study paths and links by hand, not by running the study tool.",
+        "answer_format": "none",
+        "artifacts": {
+          "study/relocations.tsv": "old_path\tcanonical_path\taction\nfieldwork/oriole\tfieldwork/atlas/oriole\tmoved\nfieldwork/oriole/evidence/weather-copy.txt\tfieldwork/atlas/evidence/weather.txt\tdeduplicated\n",
+          "fieldwork/atlas/run/empty.receipt": "records=0\n",
+          "fieldwork/atlas/oriole/run/empty.receipt": "records=0\n",
+          "fieldwork/atlas/evidence/weather.txt": "West transect: rain began at 09:20.\n",
+          "fieldwork/atlas/evidence/counts.txt": "West transect: 12 tagged reeds.\n",
+          "fieldwork/atlas/oriole/evidence/counts.txt": "East transect: 17 tagged reeds.\n",
+          "fieldwork/atlas/provenance.tsv": "source_id\tpath\tsource_ref\natlas-wx\tfieldwork/atlas/evidence/weather.txt\tWX-3\noriole-wx\tfieldwork/atlas/evidence/weather.txt\tWX-9\n",
+          "fieldwork/atlas/oriole/MATERIALS.md": "# East materials\n\n- [East tally](evidence/counts.txt)\n- [Weather sheet](..<path>)\n- [Run receipt](run/empty.receipt)\n",
+          "fieldwork/README.md": "# Fieldwork\n\n- [Atlas](atlas/README.md)\n- [East materials](atlas/oriole/MATERIALS.md)\n",
+          "study/artifacts.tsv": "record_id\tpath\tcontent_id\natlas-count\tfieldwork/atlas/evidence/counts.txt\tcount-west-12\natlas-wx\tfieldwork/atlas/evidence/weather.txt\twx-shared-0920\noriole-count\tfieldwork/atlas/oriole/evidence/counts.txt\tcount-east-17\noriole-wx\tfieldwork/atlas/evidence/weather.txt\twx-shared-0920\noriole-empty\tfieldwork/atlas/oriole/run/empty.receipt\tempty\n",
+          "study/schedule.txt": "Next observation window: 14:30.\n"
+        },
+        "checks": {
+          "retire-incoming": true,
+          "dedup-record": true,
+          "retain-atlas-receipt": true,
+          "retain-oriole-receipt": true,
+          "canonical-duplicate": true,
+          "preserve-first-same-name": true,
+          "preserve-second-same-name": true,
+          "union-origins": true,
+          "incoming-citation": true,
+          "outside-navigation": true,
+          "control-canonical-duplicate": true,
+          "control-distinct-bytes": true,
+          "control-keep-sentinel": true,
+          "unrelated-fixture": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 58.819,
+        "usage": {
+          "input_tokens": 14,
+          "cache_creation_input_tokens": 11406,
+          "cache_read_input_tokens": 80934,
+          "output_tokens": 8593,
+          "output_tokens_details": {
+            "thinking_tokens": 5433
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 11406
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 100947,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.006532989999999999,
+        "turns": 8
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "The Oriole stream is merged into Atlas. The workspace has no validator script, so I checked the study paths and links by hand.\n\n**What changed**\n- **Relocated:** `fieldwork/oriole/` is now `fieldwork/atlas/oriole/`, with its internal layout unchanged.\n- **Deduplicated:** `oriole/evidence/weather-copy.txt` was byte-identical to `atlas/evidence/weather.txt` (same sha256), so I removed the copy and kept Atlas's.\n- **Kept:** both `empty.receipt` sentinels, as the Atlas README asks for run receipts. Also `oriole/evidence/counts.txt`, which differs from Atlas's counts file.\n- **Provenance:** Atlas's ledger now has `atlas-wx` (WX-3) and `oriole-wx` (WX-9), ordered by source ID, both pointing at the canonical weather file. The nested Oriole ledger points there too.\n- **Links:** `fieldwork/README.md` and `oriole/MATERIALS.md` now resolve. I parsed every Markdown link and each one resolves.\n- **Study bindings:** `study/artifacts.tsv` keeps all five rows and their content IDs. Only the paths changed. Every path resolves.\n- **Records:** `study/relocations.tsv` is created with `moved` and `deduplicated` rows, using repo-relative paths. The Atlas README has a relocation section.\n\n**Choices I made**\n- I used plain `mv` and `rm`, not `git mv`, because the workspace has no Git metadata.\n- I kept the `oriole-wx` row in the nested Oriole ledger as well as Atlas's, so the source ID still appears where it was. The Atlas README asks for all source IDs in the project ledger, so the Atlas copy is the one that matters.\n\nNothing was committed, pushed, or written outside the workspace. The schedule file was not touched.",
+        "answer_format": "none",
+        "artifacts": {
+          "study/relocations.tsv": "old_path\tcanonical_path\taction\nfieldwork/oriole\tfieldwork/atlas/oriole\tmoved\nfieldwork/oriole/evidence/weather-copy.txt\tfieldwork/atlas/evidence/weather.txt\tdeduplicated\n",
+          "fieldwork/atlas/run/empty.receipt": "records=0\n",
+          "fieldwork/atlas/oriole/run/empty.receipt": "records=0\n",
+          "fieldwork/atlas/evidence/weather.txt": "West transect: rain began at 09:20.\n",
+          "fieldwork/atlas/evidence/counts.txt": "West transect: 12 tagged reeds.\n",
+          "fieldwork/atlas/oriole/evidence/counts.txt": "East transect: 17 tagged reeds.\n",
+          "fieldwork/atlas/provenance.tsv": "source_id\tpath\tsource_ref\natlas-wx\tfieldwork/atlas/evidence/weather.txt\tWX-3\noriole-wx\tfieldwork/atlas/evidence/weather.txt\tWX-9\n",
+          "fieldwork/atlas/oriole/MATERIALS.md": "# East materials\n\n- [East tally](evidence/counts.txt)\n- [Weather sheet](..<path>) (deduplicated; canonical copy in Atlas)\n- [Run receipt](run/empty.receipt)\n",
+          "fieldwork/README.md": "# Fieldwork\n\n- [Atlas](atlas/README.md)\n- [East materials](atlas/oriole/MATERIALS.md)\n",
+          "study/artifacts.tsv": "record_id\tpath\tcontent_id\natlas-count\tfieldwork/atlas/evidence/counts.txt\tcount-west-12\natlas-wx\tfieldwork/atlas/evidence/weather.txt\twx-shared-0920\noriole-count\tfieldwork/atlas/oriole/evidence/counts.txt\tcount-east-17\noriole-wx\tfieldwork/atlas/evidence/weather.txt\twx-shared-0920\noriole-empty\tfieldwork/atlas/oriole/run/empty.receipt\tempty\n",
+          "study/schedule.txt": "Next observation window: 14:30.\n"
+        },
+        "checks": {
+          "retire-incoming": true,
+          "dedup-record": true,
+          "retain-atlas-receipt": true,
+          "retain-oriole-receipt": true,
+          "canonical-duplicate": true,
+          "preserve-first-same-name": true,
+          "preserve-second-same-name": true,
+          "union-origins": true,
+          "incoming-citation": true,
+          "outside-navigation": true,
+          "control-canonical-duplicate": true,
+          "control-distinct-bytes": true,
+          "control-keep-sentinel": true,
+          "unrelated-fixture": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 47.804,
+        "usage": {
+          "input_tokens": 14,
+          "cache_creation_input_tokens": 11243,
+          "cache_read_input_tokens": 81130,
+          "output_tokens": 7726,
+          "output_tokens_details": {
+            "thinking_tokens": 4245
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 11243
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 100113,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.006081075,
+        "turns": 7
+      }
+    ]
+  },
+  "verdict": "no-difference",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 764433,
+  "skipped_trials": []
+}

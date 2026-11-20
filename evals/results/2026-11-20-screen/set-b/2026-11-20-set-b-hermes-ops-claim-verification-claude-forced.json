@@ -1,0 +1,1097 @@
+{
+  "schema_version": 2,
+  "task": "set-b-hermes-ops-claim-verification",
+  "generated_at": "2026-11-20T00:57:49.961297-08:00",
+  "skill": "hermes-ops-claim-verification",
+  "skill_revision": "3",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "forced",
+  "shell": false,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "scheduler-owns-payload": {
+      "field": "first_run",
+      "equals": {
+        "scheduled_payload_rc": 78,
+        "agent_woken": true,
+        "manual_payload_rc": 0
+      }
+    },
+    "transient-green": {
+      "field": "recovery",
+      "equals": {
+        "disposition": "transient",
+        "release_paths": [
+          "/srv/tools/releases/r17/bin/python3",
+          "/srv/tools/releases/r18/bin/python3"
+        ],
+        "latest_scheduled_payload_rc": 0
+      }
+    },
+    "head-bound-review": {
+      "field": "merge_review",
+      "equals": {
+        "head": "916cb240c61cebf048ff022a3da26e9233846999",
+        "last_clear_head": "a28f930608e9c2aedd92350d538cfa17df941111",
+        "state": "unreviewed"
+      }
+    }
+  },
+  "rubric_flags": {
+    "scheduler-owns-payload": "flaky"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": false,
+      "passed": 0,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": null,
+      "pass^k": null,
+      "mean_score": null,
+      "sample_stddev": null
+    },
+    "terse": {
+      "valid": false,
+      "passed": 0,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": null,
+      "pass^k": null,
+      "mean_score": null,
+      "sample_stddev": null
+    },
+    "skill": {
+      "valid": true,
+      "passed": 0,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 0.0,
+      "pass^k": false,
+      "mean_score": 0.6666666666666666,
+      "sample_stddev": 0.0
+    }
+  },
+  "mean_deltas_vs_skill": {},
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"first_run\":{\"scheduled_payload_rc\":78,\"agent_woken\":true,\"manual_payload_rc\":0},\"recovery\":{\"disposition\":\"unresolved\",\"release_paths\":[\"<path>\",\"<path>\"],\"latest_scheduled_payload_rc\":0,\"scheduled_interpreter_paths\":[\"<path>\",\"<path>\"]},\"merge_review\":{\"head\":\"916cb240c61cebf048ff022a3da26e9233846999\",\"last_clear_head\":\"a28f930608e9c2aedd92350d538cfa17df941111\",\"state\":\"unreviewed\"},\"operator_decision\":\"Do not close the incident or land the patch. The handoff's 'restored' claim is contradicted by the scheduled runs R-0600 and R-0700, which exited 78 on r17 with rollup_reader missing. The only green scheduled run (R-0800, rc 0) came after the tools pointer moved to r18 at 07:42, and the host baseline does not promise that pointer is stable. The 06:01 manual replay passed under a different PATH (<path>), so it does not reproduce the scheduled path. The dashboard 'clear' badge and the 08:11 green build refer to older or different commits, not head 916cb240, which has no verdict marker. A clear review on the current head is required before landing.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "scheduler-owns-payload": true,
+          "transient-green": false,
+          "head-bound-review": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 20.209,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 6844,
+          "cache_read_input_tokens": 29077,
+          "output_tokens": 3632,
+          "output_tokens_details": {
+            "thinking_tokens": 2047
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6844
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 39561,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00296307,
+        "turns": 13
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"first_run\": {\"scheduled_payload_rc\": 0, \"agent_woken\": true, \"manual_payload_rc\": 0}, \"recovery\": {\"disposition\": \"unresolved\", \"release_paths\": [\"<path>\", \"<path>\"], \"latest_scheduled_payload_rc\": 0}, \"merge_review\": {\"head\": \"916cb240c61cebf048ff022a3da26e9233846999\", \"last_clear_head\": \"a28f930608e9c2aedd92350d538cfa17df941111\", \"state\": \"unreviewed\"}, \"operator_decision\": \"Do not close the incident or land the patch yet. The handoff's claims are not supported by the snapshots. Scheduled runs R-0600, R-0700 and R-0800 all returned 0, but <path> was repointed from r17 to r18 at 07:42 and the root cause is not established, so the disposition is unresolved, not restored. The clear verdict (PierBot, 07:52) is for a28f930, which predates the head push at 07:55. The head 916cb240 has no clear review, so merge state is unreviewed, and the 07:25 changes-requested verdict on 64e4376 is not superseded for the head. The UI green status reflects checks on the head, not a review of it. Interpreter paths: the logs do not record the interpreter used by scheduled runs. The only interpreter recorded is <path>, from the manual shell at M-0601, which is not a scheduled run, so the scheduled-run list is left empty and needs the scheduler's per-run environment to fill in.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "scheduler-owns-payload": false,
+          "transient-green": false,
+          "head-bound-review": true
+        },
+        "score": 0.3333333333333333,
+        "passed": false,
+        "seconds": 14.17,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 5653,
+          "cache_read_input_tokens": 19180,
+          "output_tokens": 2396,
+          "output_tokens_details": {
+            "thinking_tokens": 1105
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5653
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27235,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0020970249999999998,
+        "turns": 10
+      },
+      {
+        "valid": false,
+        "invalid_reasons": [
+          "control skill access"
+        ],
+        "error": null,
+        "contaminated": true,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": true,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"first_run\":{\"scheduled_payload_rc\":78,\"agent_woken\":true,\"manual_payload_rc\":0},\"recovery\":{\"disposition\":\"unresolved\",\"release_paths\":[\"<path>\",\"<path>\"],\"latest_scheduled_payload_rc\":0},\"merge_review\":{\"head\":\"916cb240c61cebf048ff022a3da26e9233846999\",\"last_clear_head\":\"a28f930608e9c2aedd92350d538cfa17df941111\",\"state\":\"unreviewed\"},\"operator_decision\":\"Do not close the incident or land the patch. The handoff's 'restored' rests on the 07:42 <path> swap from r17 to r18, not on a fix to the r17 rollup_reader gap, and the host baseline does not promise that link stays stable. The 06:01 manual replay ran through <path>, not the scheduled interpreter. The current head 916cb240 was pushed at 07:55, after the last clear verdict (a28f9306, 07:52), and has no review verdict, so the green dashboard badge is stale. Re-review the head and confirm the root cause before closing.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "scheduler-owns-payload": true,
+          "transient-green": false,
+          "head-bound-review": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 27.918,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 6892,
+          "cache_read_input_tokens": 40881,
+          "output_tokens": 5057,
+          "output_tokens_details": {
+            "thinking_tokens": 3362
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6892
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 52840,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00379981,
+        "turns": 15
+      }
+    ],
+    "terse": [
+      {
+        "valid": false,
+        "invalid_reasons": [
+          "control skill access"
+        ],
+        "error": null,
+        "contaminated": true,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": true,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"first_run\": {\"scheduled_payload_rc\": 0, \"agent_woken\": true, \"manual_payload_rc\": 0}, \"recovery\": {\"disposition\": \"restored; transient; unresolved\", \"release_paths\": [\"<path>\", \"<path>\"], \"latest_scheduled_payload_rc\": 0}, \"merge_review\": {\"head\": \"916cb240c61cebf048ff022a3da26e9233846999\", \"last_clear_head\": \"a28f930608e9c2aedd92350d538cfa17df941111\", \"state\": \"unreviewed\"}, \"operator_decision\": \"Do not close the incident or land the patch yet. Head 916cb240 has no review verdict; the clear badge applies to a28f9306, which predates the 07:55 push. The scheduled interpreter paths are not recorded in the logs, so the interpreter list is empty. The only interpreter evidence is the manual shell's <path>, and <path> moved to r18 at 07:42 after the 06:01 check. Get a clear review on 916cb240 and confirm the scheduled interpreter before closing.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "scheduler-owns-payload": false,
+          "transient-green": false,
+          "head-bound-review": true
+        },
+        "score": 0.3333333333333333,
+        "passed": false,
+        "seconds": 16.145,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 8672,
+          "cache_read_input_tokens": 24608,
+          "output_tokens": 2397,
+          "output_tokens_details": {
+            "thinking_tokens": 1064
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 8672
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 35685,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0025293800000000003,
+        "turns": 12
+      },
+      {
+        "valid": false,
+        "invalid_reasons": [
+          "control skill access"
+        ],
+        "error": null,
+        "contaminated": true,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": true,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"first_run\":{\"scheduled_payload_rc\":78,\"agent_woken\":true,\"manual_payload_rc\":0},\"recovery\":{\"disposition\":\"unresolved\",\"release_paths\":[\"<path>\",\"<path>\"],\"latest_scheduled_payload_rc\":0},\"merge_review\":{\"head\":\"916cb240c61cebf048ff022a3da26e9233846999\",\"last_clear_head\":\"a28f930608e9c2aedd92350d538cfa17df941111\",\"state\":\"unreviewed\"},\"operator_decision\":\"Do not close the incident or land the patch yet. The 06:00 scheduled run failed with rc 78 (rollup_reader missing in r17) and the 07:00 run also failed, so the handoff's 'ran successfully' claim is wrong. The manual 06:01 replay used PATH with <path> first, not the scheduled PATH, so it does not reproduce the scheduled failure. The 08:00 green run used r18, after <path> was repointed at 07:42 and the baseline does not guarantee stability, so the cause is unidentified. The 07:52 clear verdict covers a28f930, not head 916cb24, which was pushed at 07:55, so head has no clear review and the dashboard badge is stale. Needed: root cause for the r17 missing rollup_reader, a pinned release, and a clear verdict on 916cb24.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "scheduler-owns-payload": true,
+          "transient-green": false,
+          "head-bound-review": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 21.182,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 6700,
+          "cache_read_input_tokens": 29869,
+          "output_tokens": 3945,
+          "output_tokens_details": {
+            "thinking_tokens": 2268
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6700
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 40522,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00310949,
+        "turns": 14
+      },
+      {
+        "valid": false,
+        "invalid_reasons": [
+          "control skill access"
+        ],
+        "error": null,
+        "contaminated": true,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": true,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"first_run\": {\"scheduled_payload_rc\": 0, \"agent_woken\": true, \"manual_payload_rc\": 0}, \"recovery\": {\"disposition\": \"restored; transient; unresolved\", \"release_paths\": [\"<path>\", \"<path>\"], \"latest_scheduled_payload_rc\": 0, \"collector_interpreter_paths\": []}, \"merge_review\": {\"head\": \"916cb240c61cebf048ff022a3da26e9233846999\", \"last_clear_head\": \"a28f930608e9c2aedd92350d538cfa17df941111\", \"state\": \"unreviewed\"}, \"operator_decision\": \"Do not close the incident or land the patch yet. The head 916cb240 has no review verdict; the last clear verdict was for a28f9306, and the 08:01 clear badge is a dashboard sync, not a verdict on the head. <path> was repointed to r18 at 07:42, after the 06:00 run, and the scheduled interpreter paths are not recorded in the logs, so the 06:01 manual rc=0 (using <path>) does not prove the scheduled runs' environment.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "scheduler-owns-payload": false,
+          "transient-green": false,
+          "head-bound-review": true
+        },
+        "score": 0.3333333333333333,
+        "passed": false,
+        "seconds": 16.371,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 5823,
+          "cache_read_input_tokens": 19473,
+          "output_tokens": 2600,
+          "output_tokens_details": {
+            "thinking_tokens": 1344
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5823
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27902,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002223205,
+        "turns": 11
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"first_run\":{\"scheduled_payload_rc\":78,\"agent_woken\":true,\"manual_payload_rc\":0},\"recovery\":{\"disposition\":\"unresolved\",\"release_paths\":[\"<path>\",\"<path>\"],\"latest_scheduled_payload_rc\":0},\"merge_review\":{\"head\":\"916cb240c61cebf048ff022a3da26e9233846999\",\"last_clear_head\":\"a28f930608e9c2aedd92350d538cfa17df941111\",\"state\":\"unreviewed\"},\"operator_decision\":\"Do not close the incident or land the patch. R-0600 and R-0700 exited 78 after the interpreter resolved to r17, which lacks rollup_reader. R-0800 exited 0 only after the r18 reprovision at 07:42Z, so one success after a toolchain change is not restoration. Head 916cb240 has no review marker; the last clear marker is on a28f9306, and the 08:01 dashboard badge does not cover the head. Re-request review on 916cb240 and keep the incident open.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "scheduler-owns-payload": true,
+          "transient-green": false,
+          "head-bound-review": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 15.711,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 11010,
+          "cache_read_input_tokens": 34714,
+          "output_tokens": 2477,
+          "output_tokens_details": {
+            "thinking_tokens": 982
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 11010
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 48209,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0029626900000000005,
+        "turns": 14
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": true,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"first_run\": {\"scheduled_payload_rc\": 78, \"agent_woken\": true, \"manual_payload_rc\": 0}, \"recovery\": {\"disposition\": \"unresolved\", \"release_paths\": [\"<path>\", \"<path>\"], \"latest_scheduled_payload_rc\": 0}, \"merge_review\": {\"head\": \"916cb240c61cebf048ff022a3da26e9233846999\", \"last_clear_head\": \"a28f930608e9c2aedd92350d538cfa17df941111\", \"state\": \"unreviewed\"}, \"operator_decision\": \"Do not close the incident or land patch #62 yet. The 08:00 green run came after the 07:42 <path> switch to r18, and the 06:00 and 07:00 scheduled runs exited 78 on r17, so this is one success after an environment change, not a restoration. The head 916cb240 has no verdict marker; the last clear marker names a28f9306, and the 07:25 changes-requested marker names 64e43760. The 08:01 dashboard badge and the 08:11 build check do not cover the current head. Re-request PierBot review on 916cb240 and pin the collector interpreter before closing.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "scheduler-owns-payload": true,
+          "transient-green": false,
+          "head-bound-review": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 16.729,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 11350,
+          "cache_read_input_tokens": 35054,
+          "output_tokens": 2724,
+          "output_tokens_details": {
+            "thinking_tokens": 1067
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 11350
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 49136,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00313209,
+        "turns": 15
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"first_run\":{\"scheduled_payload_rc\":78,\"agent_woken\":true,\"manual_payload_rc\":0},\"recovery\":{\"disposition\":\"unresolved\",\"release_paths\":[\"<path>\",\"<path>\"],\"latest_scheduled_payload_rc\":0},\"merge_review\":{\"head\":\"916cb240c61cebf048ff022a3da26e9233846999\",\"last_clear_head\":\"a28f930608e9c2aedd92350d538cfa17df941111\",\"state\":\"unreviewed\"},\"decision\":\"Do not close the incident as restored or land the patch yet. The 06:00 and 07:00 scheduled runs exited 78 with rollup_reader missing under r17, the 08:00 run passed only after <path> moved to r18 at 07:42, and the 06:01 manual replay (rc 0, <path>) does not count as a scheduled outcome. Head 916cb24 has no clear verdict; the clear marker names a28f930, and it predates the 07:55 push. Request a fresh PierBot review on the head and pin the collector interpreter before closure.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "scheduler-owns-payload": true,
+          "transient-green": false,
+          "head-bound-review": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 15.526,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 11030,
+          "cache_read_input_tokens": 34726,
+          "output_tokens": 2383,
+          "output_tokens_details": {
+            "thinking_tokens": 832
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 11030
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 48147,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00291831,
+        "turns": 14
+      }
+    ]
+  },
+  "verdict": "inconclusive",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 369237,
+  "skipped_trials": []
+}

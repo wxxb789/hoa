@@ -1,0 +1,1213 @@
+{
+  "schema_version": 2,
+  "task": "set-b-report-claim-audit",
+  "generated_at": "2026-11-20T00:43:50.151875-08:00",
+  "skill": "report-claim-audit",
+  "skill_revision": "2",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "forced",
+  "shell": false,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "ready-from-receipts": {
+      "field": "release_ready",
+      "equals": {
+        "ready": 5,
+        "total": 12,
+        "ready_ids": [
+          "QA-01",
+          "QA-04",
+          "QA-06",
+          "QA-07",
+          "QA-10"
+        ]
+      }
+    },
+    "reconciled-inventory": {
+      "field": "inventory",
+      "equals": {
+        "disk": 6,
+        "manifest": 5,
+        "accepted": 3,
+        "mentioned": 4,
+        "disk_only": [
+          "AL-05",
+          "AL-06"
+        ],
+        "manifest_only": [
+          "AL-07"
+        ],
+        "accepted_missing": [
+          "AL-07"
+        ]
+      }
+    },
+    "rulings-and-cost": {
+      "field": "decisions",
+      "equals": {
+        "pending": [
+          "D-12",
+          "D-13"
+        ],
+        "covered": [
+          "D-11"
+        ],
+        "replacement_review_pages": 27
+      }
+    }
+  },
+  "rubric_flags": {
+    "ready-from-receipts": "non-discriminating",
+    "reconciled-inventory": "non-discriminating",
+    "rulings-and-cost": "flaky"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 2,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.6666666666666666,
+      "pass^k": false,
+      "mean_score": 0.8888888888888888,
+      "sample_stddev": 0.1924500897298753
+    },
+    "terse": {
+      "valid": true,
+      "passed": 1,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.3333333333333333,
+      "pass^k": false,
+      "mean_score": 0.7777777777777778,
+      "sample_stddev": 0.1924500897298753
+    },
+    "skill": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": 0.11111111111111116,
+    "terse": 0.2222222222222222
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"release_ready\": {\n    \"ready\": 5,\n    \"total\": 12,\n    \"ready_ids\": [\"QA-01\", \"QA-04\", \"QA-06\", \"QA-07\", \"QA-10\"]\n  },\n  \"inventory\": {\n    \"disk\": 6,\n    \"manifest\": 5,\n    \"accepted\": 3,\n    \"mentioned\": 4,\n    \"disk_only\": [\"AL-05\", \"AL-06\"],\n    \"manifest_only\": [\"AL-07\"],\n    \"accepted_missing\": [\"AL-07\"]\n  },\n  \"decisions\": {\n    \"pending\": 2,\n    \"covered\": 1,\n    \"replacement_review_pages\": 27\n  },\n  \"brief\": \"Recommend holding the Alder closeout; do not sign. The dispatch overstates readiness: only 5 of 12 QA cases have a final exit-0 receipt at the pinned revision (QA-02, QA-03, QA-05, QA-08, QA-09, QA-11 and QA-12 fail), not the nine it claims. The dispatch also says the exhibit directory is fully manifested, but AL-05 and AL-06 exist on disk without manifest entries, and AL-07 is accepted in the signed register yet absent from disk and reserved in the manifest, so the substitution is not retrievable. D-11 is waived by W-18 for the observer portal only; D-12 (signatory portal) is not covered by that waiver and D-13 (substitution index to missing exhibit) remains open, so 2 items are pending and 1 is covered. If the replacement lane is opened, each seal packet must be re-reviewed in full (station 1-13 plus owner 8-21 = 27 page reviews, not the 21 distinct pages the dispatch cites); the morning preview of pages 1-5 does not count toward review.\"\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "ready-from-receipts": true,
+          "reconciled-inventory": true,
+          "rulings-and-cost": false
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 16.359,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 5863,
+          "cache_read_input_tokens": 28378,
+          "output_tokens": 2680,
+          "output_tokens_details": {
+            "thinking_tokens": 1347
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5863
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 36929,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002357455,
+        "turns": 10
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"release_ready\":{\"ready\":5,\"total\":12,\"ready_ids\":[\"QA-01\",\"QA-04\",\"QA-06\",\"QA-07\",\"QA-10\"]},\"inventory\":{\"disk\":6,\"manifest\":5,\"accepted\":3,\"mentioned\":4,\"disk_only\":[\"AL-05\",\"AL-06\"],\"manifest_only\":[\"AL-07\"],\"accepted_missing\":[\"AL-07\"]},\"decisions\":{\"pending\":[\"D-12\",\"D-13\"],\"covered\":[\"D-11\"],\"replacement_review_pages\":27},\"brief\":\"Hold the Alder closeout. The dispatch's claims do not survive audit: only 5 of 12 QA cases have a final exit-0 receipt at the pinned revision (not 9), AL-07 is accepted under signoff-184 but is absent from the exhibit directory, and AL-05 and AL-06 are on disk but not registered in the manifest. D-12 (signatory portal) is outside the W-18 waiver, and D-13 is open, so the packet cannot be signed as is. If the replacement lane is opened, budget 27 page reviews (station pages 1-13 plus owner pages 8-21, with 8-13 reviewed twice), not 21. The morning dry run is a preview and does not count toward either seal.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "ready-from-receipts": true,
+          "reconciled-inventory": true,
+          "rulings-and-cost": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 17.376,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 6466,
+          "cache_read_input_tokens": 28661,
+          "output_tokens": 3124,
+          "output_tokens_details": {
+            "thinking_tokens": 1471
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6466
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 38259,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00265766,
+        "turns": 16
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"release_ready\":{\"ready\":5,\"total\":12,\"ready_ids\":[\"QA-01\",\"QA-04\",\"QA-06\",\"QA-07\",\"QA-10\"]},\"inventory\":{\"disk\":6,\"manifest\":5,\"accepted\":3,\"mentioned\":4,\"disk_only\":[\"AL-05\",\"AL-06\"],\"manifest_only\":[\"AL-07\"],\"accepted_missing\":[\"AL-07\"]},\"decisions\":{\"pending\":[\"D-12\",\"D-13\"],\"covered\":[\"D-11\"],\"replacement_review_pages\":27},\"brief\":\"Do not sign the Alder closeout. The dispatch's '9 of 12 ready' is wrong: only 5 cases have a final receipt at the pinned revision with exit 0. QA-02, QA-03, QA-05, QA-08, QA-09, QA-11 and QA-12 fail on their pinned revision (neighbor-revision or preflight receipts do not count). The dispatch says everything on disk is in the manifest, but AL-05 and AL-06 are not registered. AL-07 is accepted in the signed register but is reserved in the manifest and absent from disk, which is what leaves D-13 open. AL-04 is held, not retained. D-11 is covered by waiver W-18 (observer portal only). D-12 is a signatory link and outside the waiver. The replacement lane is not cheaper: each signing packet is re-reviewed in full, so pages 8-13 are reviewed twice (13 + 14 = 27), not the 21 the dispatch claims. Recommendation: hold the packet and resolve QA failures, the AL-07 retrieval and D-12/D-13 before any signature. Pending/covered split is my reading of the open queue; the other reading would list all three IDs as pending.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "ready-from-receipts": true,
+          "reconciled-inventory": true,
+          "rulings-and-cost": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 27.256,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 6644,
+          "cache_read_input_tokens": 39624,
+          "output_tokens": 5215,
+          "output_tokens_details": {
+            "thinking_tokens": 3312
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6644
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 51493,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00383524,
+        "turns": 17
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"release_ready\":{\"ready\":5,\"total\":12,\"ready_ids\":[\"QA-01\",\"QA-04\",\"QA-06\",\"QA-07\",\"QA-10\"]},\"inventory\":{\"disk\":6,\"manifest\":5,\"accepted\":3,\"mentioned\":4,\"disk_only\":[\"AL-05\",\"AL-06\"],\"manifest_only\":[\"AL-07\"],\"accepted_missing\":[\"AL-07\"]},\"decisions\":{\"pending\":[\"D-11\",\"D-12\",\"D-13\"],\"covered\":[\"D-11\"],\"replacement_review_pages\":27},\"brief\":\"Recommend holding the Alder closeout. The dispatch's nine-of-twelve QA claim is wrong: only five cases have a final exit-0 receipt for their pinned revision. QA-02, QA-03, QA-05, QA-08, QA-09, QA-11 and QA-12 are not ready, and the dispatch's QA-03/08/12 list omits four of them. AL-07 is a reserved manifest entry with no file on disk, yet it is the signed accepted substitution, so the acceptance cannot be verified from the exhibit directory; the dispatch's claim that it can be retrieved there is unsupported. D-13 (substitution index points to a missing exhibit) follows from that. W-18 waives only the observer-portal outlet redirect (D-11); D-12 is the signatory portal and is outside the waiver, so it stays open. The replacement lane is not cheaper: station seal pages 1-13 and owner seal pages 8-21 are each re-reviewed in full, giving 27 review pages, not the 21 deduplicated pages the dispatch cites. The morning preview (pages 1-5) is display-only and does not count toward signing. Next steps for the owner: obtain a final exit-0 receipt for each non-ready case at its pinned revision, retrieve or re-register AL-07, and close D-12 and D-13 before signing.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "ready-from-receipts": true,
+          "reconciled-inventory": true,
+          "rulings-and-cost": false
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 19.818,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 9104,
+          "cache_read_input_tokens": 26351,
+          "output_tokens": 3485,
+          "output_tokens_details": {
+            "thinking_tokens": 1593
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 9104
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 38948,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00314481,
+        "turns": 16
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"release_ready\":{\"ready\":5,\"total\":12,\"ready_ids\":[\"QA-01\",\"QA-04\",\"QA-06\",\"QA-07\",\"QA-10\"]},\"inventory\":{\"disk\":6,\"manifest\":5,\"accepted\":3,\"mentioned\":4,\"disk_only\":[\"AL-05\",\"AL-06\"],\"manifest_only\":[\"AL-07\"],\"accepted_missing\":[\"AL-07\"]},\"decisions\":{\"pending\":3,\"covered\":1,\"replacement_review_pages\":27},\"brief\":\"Recommend holding the Alder closeout; do not sign. The dispatch's 'nine of twelve ready' is wrong: only QA-01, 04, 06, 07 and 10 have a final exit-0 receipt for the pinned revision (QA-02, 03, 05, 08, 09, 11 and 12 fail or lack a final receipt at the pinned revision). The dispatch's claim that everything in the exhibit directory is in the manifest is also wrong: AL-05 (late scan with an old survey overlay) and AL-06 (migration preview) are on disk but unregistered. AL-07 is accepted in the signed register but is reserved in the manifest and absent from disk, so the accepted exhibit cannot be retrieved from the directory as the dispatch states. Pending owner items are D-11, D-12 and D-13; waiver W-18 covers only D-11 (observer portal), while D-12 (signatory) is outside the waiver and D-13 (substitution index to missing exhibit) is tied to AL-07. The replacement lane is not cheaper: the contract requires full re-review of each signing packet, giving 13 station pages plus 14 owner pages = 27 review pages, not the 21 deduplicated pages the dispatch cites; the morning 1-5 preview is display-only and is excluded. Counts are from the release matrix, the north and south receipt files, the manifest, the signed acceptance register, the decision register and the exhibit directory; nothing was changed.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "ready-from-receipts": true,
+          "reconciled-inventory": true,
+          "rulings-and-cost": false
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 22.704,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 5985,
+          "cache_read_input_tokens": 39297,
+          "output_tokens": 4078,
+          "output_tokens_details": {
+            "thinking_tokens": 2488
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5985
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 49370,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.003181095,
+        "turns": 12
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"release_ready\":{\"ready\":5,\"total\":12,\"ready_ids\":[\"QA-01\",\"QA-04\",\"QA-06\",\"QA-07\",\"QA-10\"]},\"inventory\":{\"disk\":6,\"manifest\":5,\"accepted\":3,\"mentioned\":4,\"disk_only\":[\"AL-05\",\"AL-06\"],\"manifest_only\":[\"AL-07\"],\"accepted_missing\":[\"AL-07\"]},\"decisions\":{\"pending\":[\"D-12\",\"D-13\"],\"covered\":[\"D-11\"],\"replacement_review_pages\":27},\"brief\":\"Do not sign. The dispatch's 9-of-12 readiness claim is wrong: only 5 cases have a final exit-0 receipt for their pinned revision (QA-02, QA-03, QA-05, QA-08, QA-09, QA-11, QA-12 fail or lack a final receipt for that revision; neighbor-revision and preflight receipts do not count). AL-07 is accepted in the signed register but is reserved in the manifest and absent from the exhibit directory, so it cannot be retrieved. AL-05 and AL-06 are on disk but not registered in the manifest, contrary to the dispatch's claim that everything is in the manifest. D-11 is covered by waiver W-18 (observer portal only); D-12 (signatory portal) is outside the waiver; D-13 is the missing AL-07 substitution. The replacement lane would need 27 signing-packet pages (1-13 and 8-21, overlaps counted per packet), not the 21 deduplicated pages the dispatch cites. Recommended: hold the release until the 7 non-ready QA cases pass on pinned revisions, AL-07 is retrieved or the substitution index is corrected, and AL-05/AL-06 are dispositioned.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "ready-from-receipts": true,
+          "reconciled-inventory": true,
+          "rulings-and-cost": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 17.428,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 6483,
+          "cache_read_input_tokens": 28931,
+          "output_tokens": 3189,
+          "output_tokens_details": {
+            "thinking_tokens": 1349
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6483
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 38611,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002694985,
+        "turns": 16
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"release_ready\":{\"ready\":5,\"total\":12,\"ready_ids\":[\"QA-01\",\"QA-04\",\"QA-06\",\"QA-07\",\"QA-10\"]},\"inventory\":{\"disk\":6,\"manifest\":5,\"accepted\":3,\"mentioned\":4,\"disk_only\":[\"AL-05\",\"AL-06\"],\"manifest_only\":[\"AL-07\"],\"accepted_missing\":[\"AL-07\"]},\"decisions\":{\"pending\":[\"D-12\",\"D-13\"],\"covered\":[\"D-11\"],\"replacement_review_pages\":27},\"brief\":\"Recommend the owner does not sign the Alder closeout as written. The dispatch's '9 of 12 ready' is not reproduced: only 5 cases have a final exit-0 receipt on the matrix-pinned revision; QA-02, QA-03, QA-05, QA-08, QA-09, QA-11 and QA-12 are not ready, not just QA-03/08/12. AL-07 is accepted in the signed register but has no file in exhibits/ (it is reserved in the manifest), so the dispatch's claim that it can be retrieved from the directory is false; AL-05 is on disk but unregistered, and AL-06 is only referenced as a migration preview, so 'everything is in the manifest' is false. D-11 is covered by waiver W-18 (observer portal only). D-12 (signatory portal) is outside the waiver and D-13 is the missing substitution exhibit. The replacement lane is not cheaper: the two seal schedules are 13 pages (station) and 14 pages (owner), and each signing packet must be re-reviewed in full, so 27 pages, not the 21 distinct pages the dispatch cites. Holding until AL-07 is retrieved does not re-open either seal. Audit only: no files were edited, committed or repaired.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "ready-from-receipts": true,
+          "reconciled-inventory": true,
+          "rulings-and-cost": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 23.888,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 9511,
+          "cache_read_input_tokens": 43872,
+          "output_tokens": 4143,
+          "output_tokens_details": {
+            "thinking_tokens": 2173
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 9511
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 57536,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0037000949999999996,
+        "turns": 17
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"release_ready\":{\"ready\":5,\"total\":12,\"ready_ids\":[\"QA-01\",\"QA-04\",\"QA-06\",\"QA-07\",\"QA-10\"]},\"inventory\":{\"disk\":6,\"manifest\":5,\"accepted\":3,\"mentioned\":4,\"disk_only\":[\"AL-05\",\"AL-06\"],\"manifest_only\":[\"AL-07\"],\"accepted_missing\":[\"AL-07\"]},\"decisions\":{\"pending\":[\"D-12\",\"D-13\"],\"covered\":[\"D-11\"],\"replacement_review_pages\":27},\"brief\":\"Recommend holding the Alder packet and not opening the replacement lane yet. Only 5 of 12 QA cases are ready, not 9: QA-02, QA-03, QA-05, QA-08, QA-09, QA-11 and QA-12 are not ready, because each pinned revision lacks a passing final receipt. AL-07 is accepted in the signed register but is absent from disk, so D-13 cannot be cleared by retrieval from the directory as the dispatch claims. D-12 is a signatory link outside waiver W-18, so it stays pending. D-11 is covered by W-18 for the observer portal while it is archived. The lane's real cost is 27 page reviews (station 1-13 plus owner 8-21, each packet re-reviewed in full), not the dispatch's 21 distinct pages. Holding does not re-open either seal. Nothing was modified; the audit was read-only.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "ready-from-receipts": true,
+          "reconciled-inventory": true,
+          "rulings-and-cost": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 23.415,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 9491,
+          "cache_read_input_tokens": 43817,
+          "output_tokens": 4104,
+          "output_tokens_details": {
+            "thinking_tokens": 2267
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 9491
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 57422,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.003677545,
+        "turns": 17
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"release_ready\": {\n    \"ready\": 5,\n    \"total\": 12,\n    \"ready_ids\": [\"QA-01\", \"QA-04\", \"QA-06\", \"QA-07\", \"QA-10\"]\n  },\n  \"inventory\": {\n    \"disk\": 6,\n    \"manifest\": 5,\n    \"accepted\": 3,\n    \"mentioned\": 4,\n    \"disk_only\": [\"AL-05\", \"AL-06\"],\n    \"manifest_only\": [\"AL-07\"],\n    \"accepted_missing\": [\"AL-07\"]\n  },\n  \"decisions\": {\n    \"pending\": [\"D-12\", \"D-13\"],\n    \"covered\": [\"D-11\"],\n    \"replacement_review_pages\": 27\n  },\n  \"brief\": \"Do not sign the Alder closeout as dispatched. The dispatch says 9 of 12 QA cases are ready; the receipts show 5 of 12. QA-02, QA-03, QA-05, QA-08, QA-09, QA-11 and QA-12 fail the pinned-revision rule. Their only passing receipts are for neighboring revisions or preflight stages, or they have a nonzero final exit. The dispatch also says every exhibit is in the manifest. That is false: AL-05 and AL-06 are on disk but not registered in groups[].entries. AL-07 is reserved in the manifest and accepted in the signed register, but it is not in the exhibit directory, so it cannot be retrieved from there. D-11 is covered by the standing W-18 waiver for the observer portal. D-12 (signatory portal) is outside that waiver and is pending, as is D-13 (missing substitution exhibit). The replacement lane is not a 21-page review. Station seal pages 1-13 and owner seal pages 8-21 each require full re-review, so that is 27 pages (13 + 14). Pages 8-13 are reviewed twice, not once. The morning preview covers pages 1-5 and is display-only, so it does not count. Recommendation: hold the packet. Holding does not re-open either seal. Resolve D-12 and D-13, restore or formally retire AL-07, and clear the failing QA cases before any signature. Opening the replacement lane now costs 27 full page reviews and does not clear the QA failures. No files were modified. This was a read-only audit. The repo is not a git repository, so no git status check was run.\"\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "ready-from-receipts": true,
+          "reconciled-inventory": true,
+          "rulings-and-cost": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 24.219,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 9495,
+          "cache_read_input_tokens": 43825,
+          "output_tokens": 4203,
+          "output_tokens_details": {
+            "thinking_tokens": 2062
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 9495
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 57533,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.003727625,
+        "turns": 17
+      }
+    ]
+  },
+  "verdict": "skill-wins",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 426101,
+  "skipped_trials": []
+}

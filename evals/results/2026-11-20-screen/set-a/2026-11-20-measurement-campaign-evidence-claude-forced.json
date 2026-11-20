@@ -1,0 +1,887 @@
+{
+  "schema_version": 2,
+  "task": "measurement-campaign-evidence",
+  "generated_at": "2026-11-20T00:47:07.788830-08:00",
+  "skill": "measurement-campaign-evidence",
+  "skill_revision": "2",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "forced",
+  "shell": false,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "release-decision": {
+      "field": "decision",
+      "equals": "reject"
+    },
+    "one-campaign": {
+      "field": "campaign",
+      "equals": "replay-07"
+    },
+    "shipped-identity": {
+      "field": "candidate_digest",
+      "equals": "a61dad1f70653432101ec2dd3ffaad4c93186e318a7f87170335b2b3bddc9a86"
+    },
+    "same-workloads": {
+      "field": "dataset_ids",
+      "equals": [
+        "reed-100-b",
+        "reed-500-b",
+        "reed-1000-b"
+      ]
+    },
+    "candidate-percentiles": {
+      "field": "candidate_p95_ms",
+      "equals": {
+        "100": 48,
+        "500": 119,
+        "1000": 260
+      }
+    },
+    "comparator-percentiles": {
+      "field": "comparator_p95_ms",
+      "equals": {
+        "100": 61,
+        "500": 138,
+        "1000": 281
+      }
+    },
+    "failing-workload": {
+      "field": "failed_dataset",
+      "equals": "reed-1000-b"
+    },
+    "serial-intervals": {
+      "field": "serial",
+      "equals": true
+    },
+    "short-circuit": {
+      "field": "invalid_comparator_run",
+      "equals": "r09"
+    },
+    "cross-lane-overlap": {
+      "field": "conflicting_slots",
+      "equals": [
+        "r13",
+        "r14"
+      ]
+    }
+  },
+  "rubric_flags": {
+    "release-decision": "non-discriminating",
+    "one-campaign": "non-discriminating",
+    "shipped-identity": "non-discriminating",
+    "same-workloads": "non-discriminating",
+    "candidate-percentiles": "non-discriminating",
+    "comparator-percentiles": "non-discriminating",
+    "failing-workload": "non-discriminating",
+    "serial-intervals": "non-discriminating",
+    "short-circuit": "non-discriminating",
+    "cross-lane-overlap": "non-discriminating"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    },
+    "terse": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    },
+    "skill": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": 0.0,
+    "terse": 0.0
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"decision\":\"reject\",\"campaign\":\"replay-07\",\"candidate_digest\":\"a61dad1f70653432101ec2dd3ffaad4c93186e318a7f87170335b2b3bddc9a86\",\"dataset_ids\":[\"reed-100-b\",\"reed-500-b\",\"reed-1000-b\"],\"candidate_p95_ms\":{\"100\":48,\"500\":119,\"1000\":260},\"comparator_p95_ms\":{\"100\":61,\"500\":138,\"1000\":281},\"failed_dataset\":\"reed-1000-b\",\"serial\":true,\"invalid_comparator_run\":\"r09\",\"conflicting_slots\":[\"r13\",\"r14\"]}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "release-decision": true,
+          "one-campaign": true,
+          "shipped-identity": true,
+          "same-workloads": true,
+          "candidate-percentiles": true,
+          "comparator-percentiles": true,
+          "failing-workload": true,
+          "serial-intervals": true,
+          "short-circuit": true,
+          "cross-lane-overlap": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 12.035,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 5476,
+          "cache_read_input_tokens": 19885,
+          "output_tokens": 1459,
+          "output_tokens_details": {
+            "thinking_tokens": 849
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5476
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 26826,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0016134500000000002,
+        "turns": 6
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"decision\":\"reject\",\"campaign\":\"replay-07\",\"candidate_digest\":\"a61dad1f70653432101ec2dd3ffaad4c93186e318a7f87170335b2b3bddc9a86\",\"dataset_ids\":[\"reed-100-b\",\"reed-500-b\",\"reed-1000-b\"],\"candidate_p95_ms\":{\"100\":48,\"500\":119,\"1000\":260},\"comparator_p95_ms\":{\"100\":61,\"500\":138,\"1000\":281},\"failed_dataset\":\"reed-1000-b\",\"serial\":true,\"invalid_comparator_run\":\"r09\",\"conflicting_slots\":[\"r13\",\"r14\"]}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "release-decision": true,
+          "one-campaign": true,
+          "shipped-identity": true,
+          "same-workloads": true,
+          "candidate-percentiles": true,
+          "comparator-percentiles": true,
+          "failing-workload": true,
+          "serial-intervals": true,
+          "short-circuit": true,
+          "cross-lane-overlap": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 13.335,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 5100,
+          "cache_read_input_tokens": 20265,
+          "output_tokens": 1867,
+          "output_tokens_details": {
+            "thinking_tokens": 1257
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5100
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27238,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0017742499999999998,
+        "turns": 6
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"decision\":\"reject\",\"campaign\":\"replay-07\",\"candidate_digest\":\"a61dad1f70653432101ec2dd3ffaad4c93186e318a7f87170335b2b3bddc9a86\",\"dataset_ids\":[\"reed-100-b\",\"reed-500-b\",\"reed-1000-b\"],\"candidate_p95_ms\":{\"100\":48,\"500\":119,\"1000\":260},\"comparator_p95_ms\":{\"100\":61,\"500\":138,\"1000\":281},\"failed_dataset\":\"reed-1000-b\",\"serial\":true,\"invalid_comparator_run\":\"r09\",\"conflicting_slots\":[\"r13\",\"r14\"]}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "release-decision": true,
+          "one-campaign": true,
+          "shipped-identity": true,
+          "same-workloads": true,
+          "candidate-percentiles": true,
+          "comparator-percentiles": true,
+          "failing-workload": true,
+          "serial-intervals": true,
+          "short-circuit": true,
+          "cross-lane-overlap": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 13.378,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 5092,
+          "cache_read_input_tokens": 28505,
+          "output_tokens": 1897,
+          "output_tokens_details": {
+            "thinking_tokens": 1329
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5092
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 35502,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00187085,
+        "turns": 6
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"decision\":\"reject\",\"campaign\":\"replay-07\",\"candidate_digest\":\"a61dad1f70653432101ec2dd3ffaad4c93186e318a7f87170335b2b3bddc9a86\",\"dataset_ids\":[\"reed-100-b\",\"reed-500-b\",\"reed-1000-b\"],\"candidate_p95_ms\":{\"100\":48,\"500\":119,\"1000\":260},\"comparator_p95_ms\":{\"100\":61,\"500\":138,\"1000\":281},\"failed_dataset\":\"reed-1000-b\",\"serial\":true,\"invalid_comparator_run\":\"r09\",\"conflicting_slots\":[\"r13\",\"r14\"]}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "release-decision": true,
+          "one-campaign": true,
+          "shipped-identity": true,
+          "same-workloads": true,
+          "candidate-percentiles": true,
+          "comparator-percentiles": true,
+          "failing-workload": true,
+          "serial-intervals": true,
+          "short-circuit": true,
+          "cross-lane-overlap": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 11.412,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 7854,
+          "cache_read_input_tokens": 17805,
+          "output_tokens": 1717,
+          "output_tokens_details": {
+            "thinking_tokens": 1097
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 7854
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27382,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0020189,
+        "turns": 6
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"decision\":\"reject\",\"campaign\":\"replay-07\",\"candidate_digest\":\"a61dad1f70653432101ec2dd3ffaad4c93186e318a7f87170335b2b3bddc9a86\",\"dataset_ids\":[\"reed-100-b\",\"reed-500-b\",\"reed-1000-b\"],\"candidate_p95_ms\":{\"100\":48,\"500\":119,\"1000\":260},\"comparator_p95_ms\":{\"100\":61,\"500\":138,\"1000\":281},\"failed_dataset\":\"reed-1000-b\",\"serial\":true,\"invalid_comparator_run\":\"r09\",\"conflicting_slots\":[\"r13\",\"r14\"]}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "release-decision": true,
+          "one-campaign": true,
+          "shipped-identity": true,
+          "same-workloads": true,
+          "candidate-percentiles": true,
+          "comparator-percentiles": true,
+          "failing-workload": true,
+          "serial-intervals": true,
+          "short-circuit": true,
+          "cross-lane-overlap": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 12.132,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 5117,
+          "cache_read_input_tokens": 20556,
+          "output_tokens": 1861,
+          "output_tokens_details": {
+            "thinking_tokens": 1236
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5117
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27540,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.001776285,
+        "turns": 6
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"decision\":\"reject\",\"campaign\":\"replay-07\",\"candidate_digest\":\"a61dad1f70653432101ec2dd3ffaad4c93186e318a7f87170335b2b3bddc9a86\",\"dataset_ids\":[\"reed-100-b\",\"reed-500-b\",\"reed-1000-b\"],\"candidate_p95_ms\":{\"100\":48,\"500\":119,\"1000\":260},\"comparator_p95_ms\":{\"100\":61,\"500\":138,\"1000\":281},\"failed_dataset\":\"reed-1000-b\",\"serial\":true,\"invalid_comparator_run\":\"r09\",\"conflicting_slots\":[\"r13\",\"r14\"]}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "release-decision": true,
+          "one-campaign": true,
+          "shipped-identity": true,
+          "same-workloads": true,
+          "candidate-percentiles": true,
+          "comparator-percentiles": true,
+          "failing-workload": true,
+          "serial-intervals": true,
+          "short-circuit": true,
+          "cross-lane-overlap": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 11.547,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 5114,
+          "cache_read_input_tokens": 20549,
+          "output_tokens": 1736,
+          "output_tokens_details": {
+            "thinking_tokens": 1116
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5114
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27405,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0017133399999999998,
+        "turns": 6
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"decision\":\"reject\",\"campaign\":\"replay-07\",\"candidate_digest\":\"a61dad1f70653432101ec2dd3ffaad4c93186e318a7f87170335b2b3bddc9a86\",\"dataset_ids\":[\"reed-100-b\",\"reed-500-b\",\"reed-1000-b\"],\"candidate_p95_ms\":{\"100\":48,\"500\":119,\"1000\":260},\"comparator_p95_ms\":{\"100\":61,\"500\":138,\"1000\":281},\"failed_dataset\":\"reed-1000-b\",\"serial\":true,\"invalid_comparator_run\":\"r09\",\"conflicting_slots\":[\"r13\",\"r14\"]}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "release-decision": true,
+          "one-campaign": true,
+          "shipped-identity": true,
+          "same-workloads": true,
+          "candidate-percentiles": true,
+          "comparator-percentiles": true,
+          "failing-workload": true,
+          "serial-intervals": true,
+          "short-circuit": true,
+          "cross-lane-overlap": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 13.867,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 8873,
+          "cache_read_input_tokens": 22436,
+          "output_tokens": 2071,
+          "output_tokens_details": {
+            "thinking_tokens": 1355
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 8873
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 33386,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002369585,
+        "turns": 7
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"decision\":\"reject\",\"campaign\":\"replay-07\",\"candidate_digest\":\"a61dad1f70653432101ec2dd3ffaad4c93186e318a7f87170335b2b3bddc9a86\",\"dataset_ids\":[\"reed-100-b\",\"reed-500-b\",\"reed-1000-b\"],\"candidate_p95_ms\":{\"100\":48,\"500\":119,\"1000\":260},\"comparator_p95_ms\":{\"100\":61,\"500\":138,\"1000\":281},\"failed_dataset\":\"reed-1000-b\",\"serial\":true,\"invalid_comparator_run\":\"r09\",\"conflicting_slots\":[\"r13\",\"r14\"]}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "release-decision": true,
+          "one-campaign": true,
+          "shipped-identity": true,
+          "same-workloads": true,
+          "candidate-percentiles": true,
+          "comparator-percentiles": true,
+          "failing-workload": true,
+          "serial-intervals": true,
+          "short-circuit": true,
+          "cross-lane-overlap": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 15.039,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 8885,
+          "cache_read_input_tokens": 33140,
+          "output_tokens": 2039,
+          "output_tokens_details": {
+            "thinking_tokens": 1320
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 8885
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 44072,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002462325,
+        "turns": 7
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"decision\":\"reject\",\"campaign\":\"replay-07\",\"candidate_digest\":\"a61dad1f70653432101ec2dd3ffaad4c93186e318a7f87170335b2b3bddc9a86\",\"dataset_ids\":[\"reed-100-b\",\"reed-500-b\",\"reed-1000-b\"],\"candidate_p95_ms\":{\"100\":48,\"500\":119,\"1000\":260},\"comparator_p95_ms\":{\"100\":61,\"500\":138,\"1000\":281},\"failed_dataset\":\"reed-1000-b\",\"serial\":true,\"invalid_comparator_run\":\"r09\",\"conflicting_slots\":[\"r13\",\"r14\"]}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "release-decision": true,
+          "one-campaign": true,
+          "shipped-identity": true,
+          "same-workloads": true,
+          "candidate-percentiles": true,
+          "comparator-percentiles": true,
+          "failing-workload": true,
+          "serial-intervals": true,
+          "short-circuit": true,
+          "cross-lane-overlap": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 13.003,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 8873,
+          "cache_read_input_tokens": 22436,
+          "output_tokens": 2061,
+          "output_tokens_details": {
+            "thinking_tokens": 1344
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 8873
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 33376,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0023645849999999998,
+        "turns": 7
+      }
+    ]
+  },
+  "verdict": "no-difference",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 282727,
+  "skipped_trials": []
+}

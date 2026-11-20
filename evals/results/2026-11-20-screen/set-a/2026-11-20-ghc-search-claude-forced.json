@@ -1,0 +1,819 @@
+{
+  "schema_version": 2,
+  "task": "ghc-search",
+  "generated_at": "2026-11-20T00:44:32.743134-08:00",
+  "skill": "ghc-search",
+  "skill_revision": "3",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "forced",
+  "shell": false,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "follow-known-vendor-index": {
+      "field": "next_step",
+      "equals": {
+        "sdk": "A2",
+        "social": "A5"
+      }
+    },
+    "stable-version": {
+      "field": "version",
+      "equals": "4.7.2"
+    },
+    "official-release-date": {
+      "field": "release_date",
+      "equals": "2026-11-17"
+    },
+    "declared-release-channel": {
+      "field": "channel",
+      "equals": "stable"
+    },
+    "cite-release-not-index-or-preview": {
+      "field": "source_url",
+      "equals": "https://sdk.morrow.invalid/releases/4.7.2"
+    },
+    "no-evidence-from-sourceless-answer": {
+      "field": "social_confirmation",
+      "equals": "unverified"
+    }
+  },
+  "rubric_flags": {
+    "follow-known-vendor-index": "non-discriminating",
+    "stable-version": "non-discriminating",
+    "official-release-date": "non-discriminating",
+    "declared-release-channel": "non-discriminating",
+    "cite-release-not-index-or-preview": "non-discriminating",
+    "no-evidence-from-sourceless-answer": "non-discriminating"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    },
+    "terse": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    },
+    "skill": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": 0.0,
+    "terse": 0.0
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"next_step\":{\"sdk\":\"A2\",\"social\":\"A5\"},\"version\":\"4.7.2\",\"release_date\":\"2026-11-17\",\"channel\":\"stable\",\"source_url\":\"https://sdk.morrow.invalid/releases/4.7.2\",\"social_confirmation\":\"unverified\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "follow-known-vendor-index": true,
+          "stable-version": true,
+          "official-release-date": true,
+          "declared-release-channel": true,
+          "cite-release-not-index-or-preview": true,
+          "no-evidence-from-sourceless-answer": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 8.96,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4567,
+          "cache_read_input_tokens": 19506,
+          "output_tokens": 958,
+          "output_tokens_details": {
+            "thinking_tokens": 448
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4567
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 25037,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.001245535,
+        "turns": 6
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"next_step\":{\"sdk\":\"A2\",\"social\":\"A5\"},\"version\":\"4.7.2\",\"release_date\":\"2026-11-17\",\"channel\":\"stable\",\"source_url\":\"https://sdk.morrow.invalid/releases/4.7.2\",\"social_confirmation\":\"unverified\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "follow-known-vendor-index": true,
+          "stable-version": true,
+          "official-release-date": true,
+          "declared-release-channel": true,
+          "cite-release-not-index-or-preview": true,
+          "no-evidence-from-sourceless-answer": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 8.547,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4281,
+          "cache_read_input_tokens": 19818,
+          "output_tokens": 921,
+          "output_tokens_details": {
+            "thinking_tokens": 395
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4281
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 25026,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0011944050000000002,
+        "turns": 6
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"next_step\":{\"sdk\":\"A2\",\"social\":\"A5\"},\"version\":\"4.7.2\",\"release_date\":\"2026-11-17\",\"channel\":\"stable\",\"source_url\":\"https://sdk.morrow.invalid/releases/4.7.2\",\"social_confirmation\":\"unverified\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "follow-known-vendor-index": true,
+          "stable-version": true,
+          "official-release-date": true,
+          "declared-release-channel": true,
+          "cite-release-not-index-or-preview": true,
+          "no-evidence-from-sourceless-answer": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 8.648,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4278,
+          "cache_read_input_tokens": 19812,
+          "output_tokens": 985,
+          "output_tokens_details": {
+            "thinking_tokens": 463
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4278
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 25081,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0012259699999999998,
+        "turns": 6
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"next_step\":{\"sdk\":\"A2\",\"social\":\"A5\"},\"version\":\"4.7.2\",\"release_date\":\"2026-11-17\",\"channel\":\"stable\",\"source_url\":\"https://sdk.morrow.invalid/releases/4.7.2\",\"social_confirmation\":\"unverified\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "follow-known-vendor-index": true,
+          "stable-version": true,
+          "official-release-date": true,
+          "declared-release-channel": true,
+          "cite-release-not-index-or-preview": true,
+          "no-evidence-from-sourceless-answer": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 9.452,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 6937,
+          "cache_read_input_tokens": 17406,
+          "output_tokens": 1198,
+          "output_tokens_details": {
+            "thinking_tokens": 671
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6937
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 25547,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.001640785,
+        "turns": 6
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"next_step\":{\"sdk\":\"A2\",\"social\":\"A5\"},\"version\":\"4.7.2\",\"release_date\":\"2026-11-17\",\"channel\":\"stable\",\"source_url\":\"https://sdk.morrow.invalid/releases/4.7.2\",\"social_confirmation\":\"unverified\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "follow-known-vendor-index": true,
+          "stable-version": true,
+          "official-release-date": true,
+          "declared-release-channel": true,
+          "cite-release-not-index-or-preview": true,
+          "no-evidence-from-sourceless-answer": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 9.288,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 4307,
+          "cache_read_input_tokens": 28070,
+          "output_tokens": 872,
+          "output_tokens_details": {
+            "thinking_tokens": 332
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4307
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 33257,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.001255875,
+        "turns": 6
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"next_step\":{\"sdk\":\"A2\",\"social\":\"A5\"},\"version\":\"4.7.2\",\"release_date\":\"2026-11-17\",\"channel\":\"stable\",\"source_url\":\"https://sdk.morrow.invalid/releases/4.7.2\",\"social_confirmation\":\"unverified\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "follow-known-vendor-index": true,
+          "stable-version": true,
+          "official-release-date": true,
+          "declared-release-channel": true,
+          "cite-release-not-index-or-preview": true,
+          "no-evidence-from-sourceless-answer": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 9.816,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4285,
+          "cache_read_input_tokens": 20053,
+          "output_tokens": 1163,
+          "output_tokens_details": {
+            "thinking_tokens": 641
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4285
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 25507,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.001318255,
+        "turns": 6
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"next_step\":{\"sdk\":\"A2\",\"social\":\"A5\"},\"version\":\"4.7.2\",\"release_date\":\"2026-11-17\",\"channel\":\"stable\",\"source_url\":\"https://sdk.morrow.invalid/releases/4.7.2\",\"social_confirmation\":\"unverified\"}\n```\n\nI did not run the ghc-search script or any network step. The social verdict is \"unverified\" because the replay has no captured post, and the only claim it holds has an empty source list. The 4.8.0-rc.2 preview doesn't count as a stable claim. The build-notes mirror says 4.7.1, but the vendor's own page for 4.7.2 is the authoritative source.",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "follow-known-vendor-index": true,
+          "stable-version": true,
+          "official-release-date": true,
+          "declared-release-channel": true,
+          "cite-release-not-index-or-preview": true,
+          "no-evidence-from-sourceless-answer": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 11.174,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 7030,
+          "cache_read_input_tokens": 31621,
+          "output_tokens": 1276,
+          "output_tokens_details": {
+            "thinking_tokens": 490
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 7030
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 39935,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0018337599999999998,
+        "turns": 7
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"next_step\":{\"sdk\":\"A2\",\"social\":\"A5\"},\"version\":\"4.7.2\",\"release_date\":\"2026-11-17\",\"channel\":\"stable\",\"source_url\":\"https://sdk.morrow.invalid/releases/4.7.2\",\"social_confirmation\":\"unverified\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "follow-known-vendor-index": true,
+          "stable-version": true,
+          "official-release-date": true,
+          "declared-release-channel": true,
+          "cite-release-not-index-or-preview": true,
+          "no-evidence-from-sourceless-answer": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 11.123,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 7034,
+          "cache_read_input_tokens": 31621,
+          "output_tokens": 1187,
+          "output_tokens_details": {
+            "thinking_tokens": 510
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 7034
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 39850,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00178976,
+        "turns": 7
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"next_step\":{\"sdk\":\"A2\",\"social\":\"A5\"},\"version\":\"4.7.2\",\"release_date\":\"2026-11-17\",\"channel\":\"stable\",\"source_url\":\"https://sdk.morrow.invalid/releases/4.7.2\",\"social_confirmation\":\"unverified\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "follow-known-vendor-index": true,
+          "stable-version": true,
+          "official-release-date": true,
+          "declared-release-channel": true,
+          "cite-release-not-index-or-preview": true,
+          "no-evidence-from-sourceless-answer": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 11.214,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 6973,
+          "cache_read_input_tokens": 32283,
+          "output_tokens": 1036,
+          "output_tokens_details": {
+            "thinking_tokens": 413
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6973
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 40300,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.001713255,
+        "turns": 7
+      }
+    ]
+  },
+  "verdict": "no-difference",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 279540,
+  "skipped_trials": []
+}

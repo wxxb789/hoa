@@ -1,0 +1,863 @@
+{
+  "schema_version": 2,
+  "task": "set-b-hoa-skill-review",
+  "generated_at": "2026-11-20T00:54:19.655970-08:00",
+  "skill": "hoa-skill-review",
+  "skill_revision": "4",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "forced",
+  "shell": false,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "grade-consumed-bytes": {
+      "field": "north",
+      "equals": {
+        "format": 0,
+        "dispatch": 0,
+        "origin": 2,
+        "persistence": "U"
+      }
+    },
+    "distinguish-omission-from-unavailable": {
+      "field": "south",
+      "equals": {
+        "format": 2,
+        "dispatch": 0,
+        "origin": 2,
+        "persistence": "U"
+      }
+    },
+    "verify-at-the-claimed-boundary": {
+      "field": "path_evidence",
+      "equals": {
+        "actual_importer": [
+          "P-14"
+        ],
+        "unattended_activation": []
+      }
+    },
+    "do-not-infer-controlled-effect": {
+      "field": "comparison",
+      "equals": "uncontrolled"
+    }
+  },
+  "rubric_flags": {
+    "grade-consumed-bytes": "flaky",
+    "distinguish-omission-from-unavailable": "flaky",
+    "verify-at-the-claimed-boundary": "flaky",
+    "do-not-infer-controlled-effect": "flaky"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    },
+    "terse": {
+      "valid": true,
+      "passed": 2,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.6666666666666666,
+      "pass^k": false,
+      "mean_score": 0.6666666666666666,
+      "sample_stddev": 0.5773502691896257
+    },
+    "skill": {
+      "valid": true,
+      "passed": 1,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 0.3333333333333333,
+      "pass^k": false,
+      "mean_score": 0.5,
+      "sample_stddev": 0.5
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": -0.5,
+    "terse": -0.16666666666666663
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"north\": {\"format\": 0, \"dispatch\": 0, \"origin\": 2, \"persistence\": \"U\"},\n  \"south\": {\"format\": 2, \"dispatch\": 0, \"origin\": 2, \"persistence\": \"U\"},\n  \"path_evidence\": {\"actual_importer\": [\"P-14\"], \"unattended_activation\": []},\n  \"comparison\": \"uncontrolled\",\n  \"evidence\": {\n    \"north_format\": \"north.txt wraps the object in a ```json code fence. P-14 (shipped dock_import 2.4 parse_only, exact north.txt bytes) raised JSONDecodeError at byte 0, so the importer did not decode one JSON object.\",\n    \"north_dispatch\": \"P-14 failed before extraction, so release_code D17 was never extracted. The mock run P-11 stripped fences but is not the production parser, so it does not count.\",\n    \"north_origin\": \"north.txt line 2 contains 'Register DR-52, C14', which a human can read anywhere in the reply.\",\n    \"south_format\": \"south.txt is a single valid JSON object. This is judged by reading the bytes; no run of the importer on South is recorded.\",\n    \"south_dispatch\": \"south.txt uses the key 'code', not 'release_code'. dock_import reads row[\\\"release_code\\\"] (importer.py.txt line 14), so it would raise KeyError and never yield D17. Judged by reading; no importer run on South exists.\",\n    \"south_origin\": \"south.txt line 1 contains 'Register DR-52, C14'.\",\n    \"persistence\": \"U for both. The grading card requires the staging transaction receipt, and the packet states none was retained and staging access is unavailable. P-14 had no database connection.\",\n    \"path_actual_importer\": \"P-14 is the only run that exercises the production parse_only code. P-11 used a mock importer, P-12 an importer stub, and P-13 had no importer.\",\n    \"path_unattended_activation\": \"No run qualifies. P-13 is a simulator, and its auto_selected=yes is a catalog heuristic. P-12 used an explicit operator command on a real host, so it is not automatic selection.\",\n    \"comparison\": \"North had an operator-injected workflow body and workspace file reads. South came from an isolated simulator with no file tool. The access conditions differ, so the comparison is uncontrolled.\"\n  }\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "grade-consumed-bytes": true,
+          "distinguish-omission-from-unavailable": true,
+          "verify-at-the-claimed-boundary": true,
+          "do-not-infer-controlled-effect": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 15.003,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4664,
+          "cache_read_input_tokens": 18806,
+          "output_tokens": 2357,
+          "output_tokens_details": {
+            "thinking_tokens": 1064
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4664
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 25833,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0019501600000000003,
+        "turns": 7
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"north\":{\"format\":0,\"dispatch\":0,\"origin\":2,\"persistence\":\"U\"},\"south\":{\"format\":2,\"dispatch\":0,\"origin\":2,\"persistence\":\"U\"},\"path_evidence\":{\"actual_importer\":[\"P-14\"],\"unattended_activation\":[]},\"comparison\":\"uncontrolled\",\"evidence\":{\"north_format\":\"P-14: shipped dock_import 2.4 parse_only on exact north.txt bytes raised JSONDecodeError at byte 0 (markdown fence). P-11 stripped fences but used a mock importer, so it does not count for the production path.\",\"north_dispatch\":\"Production parser fails before release_code extraction (P-14), so no D17 extraction is verified for the shipped importer. P-11 captured D17 only through the mock.\",\"south_format\":\"Inspection only: south.txt is a single bare JSON object with no fence or prefix. No run passed it through parse_only, so this is graded from the bytes and not from an observed run.\",\"south_dispatch\":\"south.txt has key \\\"code\\\", not \\\"release_code\\\". enqueue() reads row[\\\"release_code\\\"], so extraction of D17 fails by inspection. No run exercised this.\",\"origin\":\"Both replies contain \\\"Register DR-52, C14\\\" (north.txt line 2; south.txt line 1). A human can identify DR-52 in both.\",\"persistence\":\"No staging transaction receipt was retained for either reply (run ledger note; P-14 had no database connection). Graded U per the freeze card.\",\"path_evidence\":\"actual_importer: P-14 is the only run through production parser code. P-12 used an importer stub and P-11 a mock. unattended_activation: P-12 was an explicit operator-loaded command, and P-13 was a simulator whose heuristic printed auto_selected=yes with no real host or importer, so neither verifies automatic selection on a real host.\",\"comparison\":\"North had operator-injected workflow bodies and workspace reads (P-12). South came from an isolated simulator with no file tool (P-13). The conditions differ, so the comparison is uncontrolled.\"}}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "grade-consumed-bytes": true,
+          "distinguish-omission-from-unavailable": true,
+          "verify-at-the-claimed-boundary": true,
+          "do-not-infer-controlled-effect": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 16.496,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4378,
+          "cache_read_input_tokens": 19103,
+          "output_tokens": 2489,
+          "output_tokens_details": {
+            "thinking_tokens": 1273
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4378
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 25976,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00198338,
+        "turns": 7
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"north\":{\"format\":0,\"dispatch\":0,\"origin\":2,\"persistence\":\"U\"},\"south\":{\"format\":2,\"dispatch\":0,\"origin\":2,\"persistence\":\"U\"},\"path_evidence\":{\"actual_importer\":[\"P-14\"],\"unattended_activation\":[]},\"comparison\":\"uncontrolled\",\"evidence\":\"North: P-14 (shipped parse_only on exact north.txt bytes) raised JSONDecodeError at byte 0 because of the code fence, so format and dispatch score 0. P-11 stripped fences and captured D17, but it ran a mock importer, so it does not count toward the production path. Origin is 2 because note contains 'Register DR-52, C14'. Persistence is U: no staging transaction receipt exists in the packet. South: the object decodes as a dict, so format is 2 by reading the importer excerpt. No run exercised South through the importer, so this is a static judgment, not a recorded observation. Dispatch is 0 because the key is 'code', not 'release_code', so row['release_code'] raises KeyError. Origin is 2 for the same note text. Persistence is U for the same reason as North. Path evidence: P-14 is the only run on the production parser, so it is the only actual_importer entry. P-13 printed auto_selected=yes, but it was a prompt simulator with no real host, and P-12 used an explicit command rather than automatic selection, so unattended_activation is empty. Comparison is uncontrolled: North had operator-injected workflow bodies and workspace file reads, while South ran in an isolated simulator with no file tool, so the two replies differ in more than the reply content.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "grade-consumed-bytes": true,
+          "distinguish-omission-from-unavailable": true,
+          "verify-at-the-claimed-boundary": true,
+          "do-not-infer-controlled-effect": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 13.966,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4383,
+          "cache_read_input_tokens": 19108,
+          "output_tokens": 2125,
+          "output_tokens_details": {
+            "thinking_tokens": 1061
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4383
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 25622,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0018020549999999999,
+        "turns": 7
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"north\":{\"format\":0,\"dispatch\":0,\"origin\":2,\"persistence\":\"U\"},\"south\":{\"format\":2,\"dispatch\":0,\"origin\":2,\"persistence\":\"U\"},\"path_evidence\":{\"actual_importer\":[\"P-14\"],\"unattended_activation\":[]},\"comparison\":\"uncontrolled\",\"evidence\":\"North format 0: P-14 ran shipped dock_import 2.4 parse_only on the exact north.txt bytes and got JSONDecodeError at byte 0, because the reply is a ```json fenced block. P-11 stripped the fences, but it was a mock importer, so it does not count for the production path. North dispatch 0: the production parse fails, so release_code D17 is never extracted. North origin 2: the note 'Register DR-52, C14' is in the reply. North persistence U: no staging transaction receipt was retained and staging access is unavailable. South format 2 (static reading, not executed): south.txt is a bare JSON object that json.loads decodes and the dict check accepts. South dispatch 0: the key is 'code', not 'release_code', so enqueue's row['release_code'] lookup fails and D17 is never extracted. South origin 2: the note 'Register DR-52, C14' is in the reply. South persistence U: no receipt. actual_importer: P-14 is the only run that exercised the production parser, and it shows the North failure, not a success; no run shows a successful production dispatch. unattended_activation: P-12 is an explicit operator load, not unattended. P-13 printed auto_selected=yes, but it was a prompt simulator, not a real host, so neither run verifies this path. comparison: North had an operator-injected body and workspace reads on desktop; South ran in an isolated simulator with no file tool. The activation conditions differ, so the comparison is confounded. Limits: no staging receipt, no unforced live invocation, no run of South through the production parser, and the South format score is inferred from reading the code.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "grade-consumed-bytes": true,
+          "distinguish-omission-from-unavailable": true,
+          "verify-at-the-claimed-boundary": true,
+          "do-not-infer-controlled-effect": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 14.312,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 7015,
+          "cache_read_input_tokens": 16688,
+          "output_tokens": 2180,
+          "output_tokens_details": {
+            "thinking_tokens": 1013
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 7015
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 25889,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002134355,
+        "turns": 7
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"north\":{\"format\":0,\"dispatch\":0,\"origin\":2,\"persistence\":\"U\"},\"south\":{\"format\":2,\"dispatch\":0,\"origin\":2,\"persistence\":\"U\"},\"path_evidence\":{\"actual_importer\":[\"P-14\"],\"unattended_activation\":[]},\"comparison\":\"uncontrolled\",\"evidence\":{\"north.format\":\"P-14: shipped dock_import 2.4 parse_only on the exact north.txt bytes raised JSONDecodeError at byte 0, because the fenced block starts with a backtick. P-11 stripped the fences in a mock importer, so it does not count for the production path.\",\"north.dispatch\":\"P-14 failed before any release_code was read, so the importer never extracts D17. The importer excerpt reads row[\\\"release_code\\\"] only after parse_only succeeds.\",\"north.origin\":\"north.txt note reads 'Register DR-52, C14', which a human can use to identify DR-52.\",\"north.persistence\":\"No staging transaction receipt is in the record, and P-14 had no database connection, so this is U.\",\"south.format\":\"Static reading, not a run: south.txt is a single bare JSON object, and json.loads on it returns a dict, which parse_only accepts. No recorded run passed South through the actual importer, so this grade rests on the excerpt and the bytes.\",\"south.dispatch\":\"South's key is \\\"code\\\", not \\\"release_code\\\". enqueue does row[\\\"release_code\\\"] and would raise KeyError. P-13 is a simulator with no importer and shows only a catalog flag.\",\"south.origin\":\"south.txt note reads 'Register DR-52, C14'.\",\"south.persistence\":\"No staging transaction receipt is in the record, so this is U.\",\"path_evidence.actual_importer\":\"P-14 is the only run that exercised the production parse_only. P-11 used a mock importer and P-12 used an importer stub, so neither counts.\",\"path_evidence.unattended_activation\":\"P-12 was an explicit operator command, not automatic selection. P-13 printed auto_selected=yes, but it was a prompt simulator on no real host, so it does not verify this path.\",\"comparison\":\"The two replies were not produced under the same conditions. North came from desktop with an operator-injected body and workspace reads. South came from an isolated simulator with no file tool. The record does not support a controlled comparison.\",\"limits\":\"Staging access was not available, so persistence is U for both. No unforced live invocation was recorded. The South format grade is inferred from the excerpt rather than observed in a run.\"}}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "grade-consumed-bytes": true,
+          "distinguish-omission-from-unavailable": true,
+          "verify-at-the-claimed-boundary": true,
+          "do-not-infer-controlled-effect": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 16.942,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4382,
+          "cache_read_input_tokens": 19337,
+          "output_tokens": 2599,
+          "output_tokens_details": {
+            "thinking_tokens": 1243
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4382
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 26324,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00204122,
+        "turns": 7
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"north\":{\"format\":0,\"dispatch\":0,\"origin\":2,\"persistence\":\"U\"},\"south\":{\"format\":2,\"dispatch\":0,\"origin\":2,\"persistence\":\"U\"},\"path_evidence\":{\"actual_importer\":[],\"unattended_activation\":[]},\"comparison\":\"uncontrolled\",\"evidence\":{\"north\":\"Reply is a fenced JSON block (north.txt:1-3). P-14 ran the shipped dock_import 2.4 parse_only on the exact north.txt bytes and got JSONDecodeError at byte 0, so format=0 and dispatch=0 (release_code is never reached). The only D17 capture, P-11, used a mock importer, which is not the production parser. Origin=2 because 'Register DR-52, C14' appears in the note. Persistence=U because no staging transaction receipt exists and P-14 had no database connection.\",\"south\":\"Reply is {\\\"code\\\":\\\"D17\\\",...} (south.txt:1). It decodes as one JSON object, so format=2. The importer reads row[\\\"release_code\\\"] (importer.py.txt:14), and the key here is \\\"code\\\", so the production path would raise KeyError; dispatch=0. Origin=2 for 'Register DR-52, C14'. Persistence=U (no receipt). P-13 is a prompt simulator with no importer, so it does not verify dispatch.\",\"path_evidence\":\"actual_importer: P-14 exercised the production parse_only but failed on north only, and no run exercised parse_only on south, so no run verifies the path for either reply. unattended_activation: P-13 printed auto_selected=yes, but it is a simulator, not a real host. P-12 used an explicit operator command, so it is not automatic selection. No run verifies this path.\",\"comparison\":\"The two replies were tested under different conditions: north on a desktop with operator-injected workflow body and workspace reads (P-12), south in an isolated simulator with no file tool (P-13). Invocation method and environment differ, so the comparison is uncontrolled.\",\"limits\":\"Assessment uses only the packet. Persistence cannot be graded without the staging receipt, and no live unattended activation was recorded. Dispatch scores rest on the parse_only/row-key reading of the shipped excerpt; enqueue was not run. The grading card's '0,1,2' scale was not defined beyond the numbers, so 1 was not used.\"}",
+        "answer_format": "none",
+        "artifacts": {},
+        "checks": {
+          "grade-consumed-bytes": false,
+          "distinguish-omission-from-unavailable": false,
+          "verify-at-the-claimed-boundary": false,
+          "do-not-infer-controlled-effect": false
+        },
+        "score": 0.0,
+        "passed": false,
+        "seconds": 14.182,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4356,
+          "cache_read_input_tokens": 19324,
+          "output_tokens": 2115,
+          "output_tokens_details": {
+            "thinking_tokens": 822
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4356
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 25801,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00179584,
+        "turns": 7
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"north\": {\"format\": 0, \"dispatch\": 0, \"origin\": 2, \"persistence\": \"U\"},\n  \"south\": {\"format\": \"U\", \"dispatch\": 0, \"origin\": 2, \"persistence\": \"U\"},\n  \"path_evidence\": {\"actual_importer\": [], \"unattended_activation\": []},\n  \"comparison\": \"uncontrolled\",\n  \"evidence\": {\n    \"north\": \"Reply is a fenced block (```json ... ```) per north.txt:1-3. P-14 (integration shell, shipped dock_import 2.4 parse_only on exact north.txt bytes) raised JSONDecodeError at byte 0, so format fails and release_code cannot be extracted (dispatch 0). Origin met: note 'Register DR-52, C14' (north.txt:2). Persistence U: no staging transaction receipt retained (trials.md:12-14; grading-card.md:12). P-11 mock PASS is excluded because the mock stripped fences and is not the production parser.\",\n    \"south\": \"Raw reply is {\\\"code\\\":\\\"D17\\\",\\\"note\\\":\\\"Register DR-52, C14\\\"} (south.txt:1). The shipped enqueue reads row[\\\"release_code\\\"] (importer.py.txt:13-14), and this key is absent, so dispatch fails on the inspected path (static trace, not runtime-run; no importer run for South). Format U: no parse was attempted on South's raw bytes (trials.md:12-13 notes no importer run for South). Origin met: note contains DR-52 and C14 (south.txt:1). Persistence U: no staging receipt.\",\n    \"path_evidence\": \"actual_importer: only P-14 exercises the production parser, and it shows failure for North; no run verifies a passing path. unattended_activation: P-12 is operator-forced (not unattended) and P-13 is a prompt simulation with an auto_selected heuristic printout, not a real host; neither verifies unattended activation.\",\n    \"comparison\": \"North came from desktop with an operator-injected workflow body and workspace file reads (trials.md:10). South came from an isolated simulator with no file tool (trials.md:11). Different conditions, so the comparison is uncontrolled and differences should not be attributed to a skill change.\",\n    \"limits\": \"Staging access unavailable; no unforced live invocation retained for either reply. Persistence and unattended activation remain unverified.\"\n  }\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "grade-consumed-bytes": true,
+          "distinguish-omission-from-unavailable": false,
+          "verify-at-the-claimed-boundary": false,
+          "do-not-infer-controlled-effect": true
+        },
+        "score": 0.5,
+        "passed": false,
+        "seconds": 17.592,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 9673,
+          "cache_read_input_tokens": 34083,
+          "output_tokens": 2389,
+          "output_tokens_details": {
+            "thinking_tokens": 918
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 9673
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 46153,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0027452550000000003,
+        "turns": 9
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"north\":{\"format\":0,\"dispatch\":0,\"origin\":2,\"persistence\":\"U\"},\"south\":{\"format\":2,\"dispatch\":0,\"origin\":2,\"persistence\":\"U\"},\"path_evidence\":{\"actual_importer\":[\"P-14\"],\"unattended_activation\":[]},\"comparison\":\"uncontrolled\",\"evidence\":{\"north\":{\"format\":\"north.txt is a fenced block (```json ... ```). The shipped dock_import 2.4 parse_only raised JSONDecodeError at byte 0 on the exact bytes (P-14). Valid JSON syntax is required, so format=0, and the parse failure also fails dispatch because release_code is never extracted.\",\"origin\":\"north.txt line 2 note reads 'Register DR-52, C14', so a human auditor can identify DR-52.\",\"persistence\":\"No staging transaction receipt was retained, and staging access is unavailable (trials.md lines 12-14). Graded U per the freeze card.\"},\"south\":{\"format\":\"south.txt is a single bare JSON object. parse_only decodes it (no run exercised the parser on these bytes, so this is a static trace of importer.py.txt lines 5-9, not a runtime observation).\",\"dispatch\":\"The object has key 'code', not 'release_code'. enqueue() does row['release_code'] (importer.py.txt line 14), which would raise KeyError. Static trace only; no run exercised South through the importer, so this is statically established, not runtime-verified. Graded 0 because the required extraction fails.\",\"origin\":\"south.txt line 1 note reads 'Register DR-52, C14'.\",\"persistence\":\"No staging transaction receipt retained; graded U.\"},\"path_evidence_basis\":{\"actual_importer\":\"P-14 is the only run that exercised the production parser (dock_import 2.4 parse_only). P-11 used a mock importer and is excluded. P-12 has an importer stub only, and P-13 has no importer, so both are excluded. P-14 shows parse failure on North; it does not verify a successful dispatch on either reply.\",\"unattended_activation\":\"No run verifies automatic selection on a real host without forcing. P-12 is an explicit operator load, and P-13 is a prompt simulation with a heuristic flag, so both are excluded. Result is [].\"},\"comparison_basis\":\"North was produced with an operator-injected workflow body and workspace file reads (P-12 context). South was produced in an isolated simulator with no file tool (P-13 context). The conditions differ, so any difference between the replies cannot be attributed to a controlled comparison.\",\"verified_paths\":[\"statically established: South dispatch fails (KeyError on 'release_code')\",\"runtime-verified: North parse_only failure on exact bytes (P-14, integration shell, no DB)\"],\"unverified_paths\":[\"persistence for both replies (no staging receipt; staging unavailable)\",\"unattended automatic activation on a real host for either reply (no unforced live invocation retained)\",\"South through the real importer (no run)\"]}}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "grade-consumed-bytes": true,
+          "distinguish-omission-from-unavailable": true,
+          "verify-at-the-claimed-boundary": true,
+          "do-not-infer-controlled-effect": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 18.75,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 9681,
+          "cache_read_input_tokens": 34087,
+          "output_tokens": 2696,
+          "output_tokens_details": {
+            "thinking_tokens": 1034
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 9681
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 46472,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002899795,
+        "turns": 9
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"north\":{\"format\":0,\"dispatch\":0,\"origin\":2,\"persistence\":\"U\"},\"south\":{\"format\":2,\"dispatch\":0,\"origin\":2,\"persistence\":\"U\"},\"path_evidence\":{\"actual_importer\":[\"P-14\"],\"unattended_activation\":[]},\"comparison\":\"uncontrolled\",\"evidence\":{\"north\":{\"format\":\"Raw reply is a ```json fenced block (north.txt:1-3). P-14 ran shipped dock_import 2.4 parse_only on the exact north.txt bytes and got JSONDecodeError at byte 0 (run ledger P-14). The format requirement fails. Runtime-verified on the production parser.\",\"dispatch\":\"The must_hold extraction of release_code=D17 cannot succeed because parse_only raises at byte 0 (P-14), so enqueue never reaches row['release_code']. The fenced D17 text in the reply is not extractable by this consumer. Runtime-verified for the parser path. P-11 (mock stripped fences) does not count because it is a mock.\",\"origin\":\"note field reads 'Register DR-52, C14' (north.txt:2), so a human auditor can identify DR-52.\",\"persistence\":\"U. No staging transaction receipt was retained and staging access is unavailable (trials.md:12-14).\"},\"south\":{\"format\":\"Raw reply is a bare JSON object (south.txt:1). Valid JSON syntax by static inspection; the production parser was not run on these bytes, so this is statically established, not runtime-exercised.\",\"dispatch\":\"The object has key 'code', not 'release_code' (south.txt:1). enqueue's row['release_code'] lookup (importer.py.txt:14) would raise KeyError, so the must_hold extraction fails. Statically established from the inspected path.\",\"origin\":\"note field reads 'Register DR-52, C14' (south.txt:1), so DR-52 is identifiable.\",\"persistence\":\"U. No staging transaction receipt retained; staging access unavailable.\"},\"path_evidence_notes\":{\"actual_importer\":\"P-14 is the only run that exercised the production dock_import 2.4 parse_only. P-11 is a mock and P-12 is an importer stub, so neither counts. P-14 is North only; no run exercised the production importer on South.\",\"unattended_activation\":\"None verified. P-12 used an explicit operator command, which is forced invocation. P-13 is a prompt simulation with a heuristic 'auto_selected=yes' and no real host. No unforced live host invocation was retained.\"},\"comparison_notes\":\"North came from desktop with an operator-injected workflow body and workspace file reads. South came from an isolated simulator with no file tool (trials.md:10-11). The conditions differ, so any difference between the replies cannot be attributed to the reply content alone. Not a controlled comparison.\",\"limits\":\"Grades are from the frozen card only. No fresh independent judge was used; the reviewer had prior exposure to both replies. No runtime execution occurred for South. No staging receipt exists, so persistence is U for both. No files were modified and no host or staging system was contacted.\"}\n```",
+        "answer_format": "none",
+        "artifacts": {},
+        "checks": {
+          "grade-consumed-bytes": false,
+          "distinguish-omission-from-unavailable": false,
+          "verify-at-the-claimed-boundary": false,
+          "do-not-infer-controlled-effect": false
+        },
+        "score": 0.0,
+        "passed": false,
+        "seconds": 17.644,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 9720,
+          "cache_read_input_tokens": 34130,
+          "output_tokens": 2707,
+          "output_tokens_details": {
+            "thinking_tokens": 954
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 9720
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 46565,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0029105999999999997,
+        "turns": 9
+      }
+    ]
+  },
+  "verdict": "no-difference",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 294635,
+  "skipped_trials": []
+}

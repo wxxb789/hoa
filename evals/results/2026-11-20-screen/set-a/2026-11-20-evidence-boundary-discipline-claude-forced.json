@@ -1,0 +1,773 @@
+{
+  "schema_version": 2,
+  "task": "evidence-boundary-discipline",
+  "generated_at": "2026-11-20T00:47:07.889678-08:00",
+  "skill": "evidence-boundary-discipline",
+  "skill_revision": "4",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "forced",
+  "shell": false,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "dated-plan-with-citation": {
+      "field": "milestone",
+      "equals": {
+        "status": "planned",
+        "target_month": "2027-05",
+        "source": "A",
+        "source_date": "2027-03-19",
+        "url": "https://vale-water.example/releases/0319",
+        "locator": "paragraph 2",
+        "quote": "We plan to open the river intake dashboard in May 2027."
+      }
+    },
+    "lapsed-target-not-observation": {
+      "field": "dashboard_now",
+      "equals": "unknown"
+    },
+    "silence-not-cancellation": {
+      "field": "sensor_now",
+      "equals": "unknown"
+    },
+    "page-provenance": {
+      "field": "page_labels",
+      "equals": {
+        "milestone": "attributed",
+        "dashboard_now": "unknown",
+        "sensor_now": "unknown"
+      }
+    },
+    "delivery-parity": {
+      "field": "delivery_labels",
+      "equals": {
+        "milestone": "attributed",
+        "dashboard_now": "unknown",
+        "sensor_now": "unknown"
+      }
+    }
+  },
+  "rubric_flags": {
+    "dated-plan-with-citation": "flaky",
+    "lapsed-target-not-observation": "non-discriminating",
+    "silence-not-cancellation": "non-discriminating",
+    "page-provenance": "non-discriminating",
+    "delivery-parity": "non-discriminating"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 2,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.6666666666666666,
+      "pass^k": false,
+      "mean_score": 0.9333333333333333,
+      "sample_stddev": 0.11547005383792512
+    },
+    "terse": {
+      "valid": true,
+      "passed": 2,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.6666666666666666,
+      "pass^k": false,
+      "mean_score": 0.9333333333333333,
+      "sample_stddev": 0.11547005383792512
+    },
+    "skill": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": 0.06666666666666665,
+    "terse": 0.06666666666666665
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"milestone\":{\"status\":\"planned\",\"target_month\":\"2027-05\",\"source\":\"Source A\",\"source_date\":\"2027-03-19\",\"url\":\"https://vale-water.example/releases/0319\",\"locator\":\"paragraph 2\",\"quote\":\"We plan to open the river intake dashboard in May 2027.\"},\"dashboard_now\":\"unknown\",\"sensor_now\":\"unknown\",\"page_labels\":{\"milestone\":\"attributed\",\"dashboard_now\":\"unknown\",\"sensor_now\":\"unknown\"},\"delivery_labels\":{\"milestone\":\"attributed\",\"dashboard_now\":\"unknown\",\"sensor_now\":\"unknown\"},\"paragraphs\":[\"River intake dashboard: planned for May 2027 (release dated 2027-03-19, carried from a previous capture). The packet cannot establish whether it has opened.\",\"Foam-sensor pilot: the packet cannot establish its current status. The May 2027 update does not mention it, but that silence alone does not establish cancellation.\"]}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "dated-plan-with-citation": false,
+          "lapsed-target-not-observation": true,
+          "silence-not-cancellation": true,
+          "page-provenance": true,
+          "delivery-parity": true
+        },
+        "score": 0.8,
+        "passed": false,
+        "seconds": 13.029,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4054,
+          "cache_read_input_tokens": 18803,
+          "output_tokens": 1692,
+          "output_tokens_details": {
+            "thinking_tokens": 1033
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4054
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 24555,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00154138,
+        "turns": 5
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"milestone\":{\"status\":\"planned\",\"target_month\":\"2027-05\",\"source\":\"A\",\"source_date\":\"2027-03-19\",\"url\":\"https://vale-water.example/releases/0319\",\"locator\":\"paragraph 2\",\"quote\":\"We plan to open the river intake dashboard in May 2027.\"},\"dashboard_now\":\"unknown\",\"sensor_now\":\"unknown\",\"page_labels\":{\"milestone\":\"attributed\",\"dashboard_now\":\"unknown\",\"sensor_now\":\"unknown\"},\"delivery_labels\":{\"milestone\":\"attributed\",\"dashboard_now\":\"unknown\",\"sensor_now\":\"unknown\"},\"paragraphs\":[\"River intake dashboard: planned for May 2027 in a March 2027 release (Source A, captured excerpt only). The packet cannot establish whether it is operating now.\",\"Foam-sensor pilot: the packet has no source that mentions it, so its status is unknown at the 2027-06-07 cutoff. The May 2027 update (Source B) does not refer to it.\"]}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "dated-plan-with-citation": true,
+          "lapsed-target-not-observation": true,
+          "silence-not-cancellation": true,
+          "page-provenance": true,
+          "delivery-parity": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 12.001,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 3754,
+          "cache_read_input_tokens": 19114,
+          "output_tokens": 1413,
+          "output_tokens_details": {
+            "thinking_tokens": 733
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 3754
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 24287,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0013674899999999999,
+        "turns": 5
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"milestone\": {\n    \"status\": \"planned\",\n    \"target_month\": \"2027-05\",\n    \"source\": \"A\",\n    \"source_date\": \"2027-03-19\",\n    \"url\": \"https://vale-water.example/releases/0319\",\n    \"locator\": \"paragraph 2\",\n    \"quote\": \"We plan to open the river intake dashboard in May 2027.\"\n  },\n  \"dashboard_now\": \"unknown\",\n  \"sensor_now\": \"unknown\",\n  \"page_labels\": {\n    \"milestone\": \"attributed\",\n    \"dashboard_now\": \"unknown\",\n    \"sensor_now\": \"unknown\"\n  },\n  \"delivery_labels\": {\n    \"milestone\": \"attributed\",\n    \"dashboard_now\": \"unknown\",\n    \"sensor_now\": \"unknown\"\n  },\n  \"paragraphs\": [\n    \"River intake dashboard: planned for May 2027 according to a March 2027 release; the local packet does not establish whether it is operating as of the 2027-06-07 editorial cutoff.\",\n    \"Foam-sensor pilot: the local packet does not establish its status as of the 2027-06-07 editorial cutoff, including whether it was canceled.\"\n  ]\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "dated-plan-with-citation": true,
+          "lapsed-target-not-observation": true,
+          "silence-not-cancellation": true,
+          "page-provenance": true,
+          "delivery-parity": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 12.268,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 3742,
+          "cache_read_input_tokens": 19104,
+          "output_tokens": 1702,
+          "output_tokens_details": {
+            "thinking_tokens": 973
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 3742
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 24554,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00151039,
+        "turns": 5
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"milestone\":{\"status\":\"planned\",\"target_month\":\"2027-05\",\"source\":\"Source A\",\"source_date\":\"2027-03-19\",\"url\":\"https://vale-water.example/releases/0319\",\"locator\":\"paragraph 2\",\"quote\":\"We plan to open the river intake dashboard in May 2027.\"},\"dashboard_now\":\"unknown\",\"sensor_now\":\"unknown\",\"page_labels\":{\"milestone\":\"attributed\",\"dashboard_now\":\"unknown\",\"sensor_now\":\"unknown\"},\"delivery_labels\":{\"milestone\":\"attributed\",\"dashboard_now\":\"unknown\",\"sensor_now\":\"unknown\"},\"paragraphs\":[\"River intake dashboard: planned for May 2027 in a March 19, 2027 release (Source A, carried from a previous capture and not re-read this round). Current status at the 2027-06-07 cutoff is unknown.\",\"Foam-sensor pilot: no status established. The May 28, 2027 release (Source B, inspected in full) does not mention it, and that silence does not establish cancellation; current status is unknown.\"]}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "dated-plan-with-citation": false,
+          "lapsed-target-not-observation": true,
+          "silence-not-cancellation": true,
+          "page-provenance": true,
+          "delivery-parity": true
+        },
+        "score": 0.8,
+        "passed": false,
+        "seconds": 11.569,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 6404,
+          "cache_read_input_tokens": 16676,
+          "output_tokens": 1562,
+          "output_tokens_details": {
+            "thinking_tokens": 883
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6404
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 24648,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00174886,
+        "turns": 5
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"milestone\": {\n    \"status\": \"planned\",\n    \"target_month\": \"2027-05\",\n    \"source\": \"A\",\n    \"source_date\": \"2027-03-19\",\n    \"url\": \"https://vale-water.example/releases/0319\",\n    \"locator\": \"paragraph 2\",\n    \"quote\": \"We plan to open the river intake dashboard in May 2027.\"\n  },\n  \"dashboard_now\": \"unknown\",\n  \"sensor_now\": \"unknown\",\n  \"page_labels\": {\n    \"milestone\": \"attributed\",\n    \"dashboard_now\": \"unknown\",\n    \"sensor_now\": \"unknown\"\n  },\n  \"delivery_labels\": {\n    \"milestone\": \"attributed\",\n    \"dashboard_now\": \"unknown\",\n    \"sensor_now\": \"unknown\"\n  },\n  \"paragraphs\": [\n    \"River intake dashboard: planned for May 2027 according to a March 2027 release (source A, captured earlier and not re-read this round). Its status at the 2027-06-07 editorial cutoff cannot be established from the packet.\",\n    \"Foam-sensor pilot: the packet does not establish its status at the 2027-06-07 editorial cutoff. The May 2027 release (source B) does not mention it, but that silence does not confirm a cancellation.\"\n  ]\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "dated-plan-with-citation": true,
+          "lapsed-target-not-observation": true,
+          "silence-not-cancellation": true,
+          "page-provenance": true,
+          "delivery-parity": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 13.266,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 3693,
+          "cache_read_input_tokens": 19281,
+          "output_tokens": 1674,
+          "output_tokens_details": {
+            "thinking_tokens": 963
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 3693
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 24654,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.001492035,
+        "turns": 5
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"milestone\": {\n    \"status\": \"planned\",\n    \"target_month\": \"2027-05\",\n    \"source\": \"A\",\n    \"source_date\": \"2027-03-19\",\n    \"url\": \"https://vale-water.example/releases/0319\",\n    \"locator\": \"paragraph 2\",\n    \"quote\": \"We plan to open the river intake dashboard in May 2027.\"\n  },\n  \"dashboard_now\": \"unknown\",\n  \"sensor_now\": \"unknown\",\n  \"page_labels\": {\n    \"milestone\": \"attributed\",\n    \"dashboard_now\": \"unknown\",\n    \"sensor_now\": \"unknown\"\n  },\n  \"delivery_labels\": {\n    \"milestone\": \"attributed\",\n    \"dashboard_now\": \"unknown\",\n    \"sensor_now\": \"unknown\"\n  },\n  \"paragraphs\": [\n    \"River intake dashboard: Planned for May 2027 according to a March 19, 2027 release (Source A, a previous capture only). The packet does not establish its status at the June 7, 2027 cutoff.\",\n    \"Foam-sensor pilot: The packet contains no source establishing its status. The May 28, 2027 release (Source B) does not mention it, so its status at the June 7, 2027 cutoff is unknown.\"\n  ]\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "dated-plan-with-citation": true,
+          "lapsed-target-not-observation": true,
+          "silence-not-cancellation": true,
+          "page-provenance": true,
+          "delivery-parity": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 12.523,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 3740,
+          "cache_read_input_tokens": 19328,
+          "output_tokens": 1777,
+          "output_tokens_details": {
+            "thinking_tokens": 1029
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 3740
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 24851,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00154988,
+        "turns": 5
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"milestone\": {\n    \"status\": \"planned\",\n    \"target_month\": \"2027-05\",\n    \"source\": \"A\",\n    \"source_date\": \"2027-03-19\",\n    \"url\": \"https://vale-water.example/releases/0319\",\n    \"locator\": \"paragraph 2\",\n    \"quote\": \"We plan to open the river intake dashboard in May 2027.\"\n  },\n  \"dashboard_now\": \"unknown\",\n  \"sensor_now\": \"unknown\",\n  \"page_labels\": {\n    \"milestone\": \"attributed\",\n    \"dashboard_now\": \"unknown\",\n    \"sensor_now\": \"unknown\"\n  },\n  \"delivery_labels\": {\n    \"milestone\": \"attributed\",\n    \"dashboard_now\": \"unknown\",\n    \"sensor_now\": \"unknown\"\n  },\n  \"paragraphs\": [\n    \"River intake dashboard (attributed): The release of 2027-03-19 (https://vale-water.example/releases/0319, paragraph 2) said \\\"We plan to open the river intake dashboard in May 2027.\\\" That is a plan as of that report, and no text read this round confirms whether it opened. Its current status at the 2027-06-07 editorial cutoff is unknown.\",\n    \"Foam-sensor pilot (unknown): The packet contains no source that mentions the foam-sensor pilot, so its status at the 2027-06-07 editorial cutoff is unknown. The earlier cancellation statement is not supported by the packet and has been removed.\"\n  ]\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "dated-plan-with-citation": true,
+          "lapsed-target-not-observation": true,
+          "silence-not-cancellation": true,
+          "page-provenance": true,
+          "delivery-parity": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 14.832,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 7066,
+          "cache_read_input_tokens": 32103,
+          "output_tokens": 1946,
+          "output_tokens_details": {
+            "thinking_tokens": 1018
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 7066
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 41123,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0021780799999999998,
+        "turns": 6
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"milestone\":{\"status\":\"planned\",\"target_month\":\"2027-05\",\"source\":\"A\",\"source_date\":\"2027-03-19\",\"url\":\"https://vale-water.example/releases/0319\",\"locator\":\"paragraph 2\",\"quote\":\"We plan to open the river intake dashboard in May 2027.\"},\"dashboard_now\":\"unknown\",\"sensor_now\":\"unknown\",\"page_labels\":{\"milestone\":\"attributed\",\"dashboard_now\":\"unknown\",\"sensor_now\":\"unknown\"},\"delivery_labels\":{\"milestone\":\"attributed\",\"dashboard_now\":\"unknown\",\"sensor_now\":\"unknown\"},\"paragraphs\":[\"Dashboard (attributed: carried from a previous round's capture, not re-read this round): The release of 2027-03-19 (https://vale-water.example/releases/0319, paragraph 2) records a plan to open the river intake dashboard in May 2027; the original uses the future tense (\\\"We plan to open the river intake dashboard in May 2027.\\\"). No current status was obtained from the packet, so the dashboard's state at the 2027-06-07 editorial cutoff is unknown.\",\"Foam-sensor pilot (unknown): The May 2027 update (https://vale-water.example/releases/0528, paragraph 4; full text inspected this round) reports that \\\"The school tap-sampling pilot completed its spring intake on May 21.\\\" It does not mention the foam-sensor pilot. That observation covers only this release's text, so the foam-sensor pilot's status at the 2027-06-07 editorial cutoff is unknown.\"]}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "dated-plan-with-citation": true,
+          "lapsed-target-not-observation": true,
+          "silence-not-cancellation": true,
+          "page-provenance": true,
+          "delivery-parity": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 15.75,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 7046,
+          "cache_read_input_tokens": 32075,
+          "output_tokens": 2251,
+          "output_tokens_details": {
+            "thinking_tokens": 1309
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 7046
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 41380,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0023277999999999997,
+        "turns": 6
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"milestone\":{\"status\":\"planned\",\"target_month\":\"2027-05\",\"source\":\"A\",\"source_date\":\"2027-03-19\",\"url\":\"https://vale-water.example/releases/0319\",\"locator\":\"paragraph 2\",\"quote\":\"We plan to open the river intake dashboard in May 2027.\"},\"dashboard_now\":\"unknown\",\"sensor_now\":\"unknown\",\"page_labels\":{\"milestone\":\"attributed\",\"dashboard_now\":\"unknown\",\"sensor_now\":\"unknown\"},\"delivery_labels\":{\"milestone\":\"attributed\",\"dashboard_now\":\"unknown\",\"sensor_now\":\"unknown\"},\"paragraphs\":[\"River intake dashboard: The release of 2027-03-19 (https://vale-water.example/releases/0319, paragraph 2) records a plan to open the river intake dashboard in May 2027; the original uses the future tense. Source A was captured in a previous round and was not re-read this round (attributed). No source in the packet reports on the dashboard after that date, so its status at the editorial cutoff of 2027-06-07 is unknown.\",\"Foam-sensor pilot: The packet contains no source that mentions the foam-sensor pilot, so its status at the editorial cutoff of 2027-06-07 is unknown. The earlier claim that it was canceled rested on the May update not mentioning it; that absence does not establish cancellation and is withdrawn. Source B (https://vale-water.example/releases/0528, paragraph 4, 2027-05-28, re-read this round) concerns the school tap-sampling pilot, not the foam-sensor pilot.\"]}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "dated-plan-with-citation": true,
+          "lapsed-target-not-observation": true,
+          "silence-not-cancellation": true,
+          "page-provenance": true,
+          "delivery-parity": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 15.233,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 7054,
+          "cache_read_input_tokens": 32087,
+          "output_tokens": 1835,
+          "output_tokens_details": {
+            "thinking_tokens": 881
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 7054
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 40984,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00212092,
+        "turns": 6
+      }
+    ]
+  },
+  "verdict": "no-difference",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 271036,
+  "skipped_trials": []
+}

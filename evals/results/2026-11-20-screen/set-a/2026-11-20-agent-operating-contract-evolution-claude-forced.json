@@ -1,0 +1,967 @@
+{
+  "schema_version": 2,
+  "task": "agent-operating-contract-evolution",
+  "generated_at": "2026-11-20T00:46:02.947518-08:00",
+  "skill": "agent-operating-contract-evolution",
+  "skill_revision": "6",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "forced",
+  "shell": true,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "reproduced-original-grant": {
+      "file": "before.txt",
+      "contains": "peer-review: role=peer permission=write"
+    },
+    "peer-review-write-blocked": {
+      "file": "after.txt",
+      "contains": "peer-review: role=peer permission=read"
+    },
+    "audit-stays-read-only": {
+      "file": "after.txt",
+      "contains": "audit-review: role=audit permission=read"
+    },
+    "bounded-contributor-can-write": {
+      "file": "after.txt",
+      "contains": "bounded-contributor: role=contributor permission=write"
+    },
+    "unassigned-contributor-cannot-write": {
+      "file": "after.txt",
+      "contains": "unassigned-contributor: role=contributor permission=read"
+    },
+    "only-active-role-policy-changed": {
+      "file": "after.txt",
+      "contains": "changed: policy/queue.roles\nend-changes"
+    },
+    "preserve-original-policy": {
+      "file": "before-queue.roles",
+      "contains": "peer contributor\naudit readonly\ncontributor contributor"
+    }
+  },
+  "rubric_flags": {
+    "reproduced-original-grant": "non-discriminating",
+    "peer-review-write-blocked": "non-discriminating",
+    "audit-stays-read-only": "non-discriminating",
+    "bounded-contributor-can-write": "non-discriminating",
+    "unassigned-contributor-cannot-write": "non-discriminating",
+    "only-active-role-policy-changed": "non-discriminating",
+    "preserve-original-policy": "non-discriminating"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    },
+    "terse": {
+      "valid": false,
+      "passed": 2,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": null,
+      "pass^k": null,
+      "mean_score": null,
+      "sample_stddev": null
+    },
+    "skill": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": 0.0
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "The peer reviewer can no longer write to the candidate. The harness now shows `peer-review` as `permission=read`, and the bounded contributor still has write access.\n\n**What was wrong:** `policy/queue.roles` granted the `peer` role `contributor`, which gave `peer-review` write access. The dashboard policy had it as `readonly`. The harness gives write access only to `contributor` roles with an assignment, so the queue grant was the cause.\n\n**What I changed:**\n- `policy/queue.roles`: changed the `peer` line from `contributor` to `readonly`, so it matches `policy/dashboard.roles`. The `audit` and `contributor` lines are unchanged.\n\n**What I did not change:**\n- `contract/AGENTS.md`, `contract/review-workflow.md`, and `contract/SOUL.md` are untouched. Their wording already says reviewers never change candidate files, and the workflow still routes peer-review to peer and audit-review to audit.\n- `policy/service.conf` is unchanged, so both entry points still use their existing policy files.\n- `exercise.sh` and `incident.md` are unchanged.\n\n**Harness receipts:** I ran `source .<path> before` before the edit and `source .<path> after` after it, using only the harness. Both returned rc=0. The receipts are:\n- `before.txt`: `peer-review: role=peer permission=write` (the regression), `bounded-contributor` still `write`.\n- `after.txt`: `peer-review: role=peer permission=read`, `bounded-contributor` still `write`, and `changed: policy/queue.roles` listed as the only changed input.\n\nI did not write the receipt files by hand. The branding mismatch (\"North Desk\" vs. \"Intake Desk\") is a separate ticket and I left it alone.",
+        "answer_format": "none",
+        "artifacts": {
+          "before.txt": "peer-review: role=peer permission=write\naudit-review: role=audit permission=read\nbounded-contributor: role=contributor permission=write\nunassigned-contributor: role=contributor permission=read\n",
+          "after.txt": "peer-review: role=peer permission=read\naudit-review: role=audit permission=read\nbounded-contributor: role=contributor permission=write\nunassigned-contributor: role=contributor permission=read\nchanged: policy/queue.roles\nend-changes\n",
+          "before-queue.roles": "peer contributor\naudit readonly\ncontributor contributor\n"
+        },
+        "checks": {
+          "reproduced-original-grant": true,
+          "peer-review-write-blocked": true,
+          "audit-stays-read-only": true,
+          "bounded-contributor-can-write": true,
+          "unassigned-contributor-cannot-write": true,
+          "only-active-role-policy-changed": true,
+          "preserve-original-policy": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 19.23,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 5855,
+          "cache_read_input_tokens": 46226,
+          "output_tokens": 1757,
+          "output_tokens_details": {
+            "thinking_tokens": 407
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5855
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 53848,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002073635,
+        "turns": 5
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Edit",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "The peer reviewer is now read-only in the queue policy. The `before` and `after` harness receipts show the change.\n\n**What I changed**\n\n- `policy/queue.roles`: changed the `peer` grant from `contributor` to `readonly`. This was the only edit. The queue policy is what let the peer reviewer write to the candidate. The dashboard policy already had `peer readonly`, so the two routes now agree.\n- I used a full rewrite of `queue.roles` because the Edit tool was disabled in this session. I read the file first, and the other two lines are unchanged.\n\n**What I left alone**\n\n- Both review entry points still dispatch their existing reviewers. `review-workflow.md` still sends peer-review to peer and audit-review to audit.\n- The bounded contributor workflow is unchanged: `bounded-contributor` still gets write access, and `unassigned-contributor` stays read-only.\n- The contract text in `AGENTS.md`, `SOUL.md`, and `review-workflow.md` is unchanged. This includes the \"North Desk\" name. The dashboard's \"Intake Desk\" label is a separate branding ticket.\n- I did not edit `exercise.sh`, and I did not write the receipts by hand. The harness wrote `inputs-before.txt`, `before-queue.roles`, `before.txt`, and `after.txt`.\n\n**Harness results**\n\n- Before: `peer-review: role=peer permission=write`\n- After: `peer-review: role=peer permission=read`\n- The after receipt lists `changed: policy/queue.roles`, which is the only input that changed.\n\nI used only the harness's Bash builtins. I did not run any external commands, change host configuration, or start any real delegation.",
+        "answer_format": "none",
+        "artifacts": {
+          "before.txt": "peer-review: role=peer permission=write\naudit-review: role=audit permission=read\nbounded-contributor: role=contributor permission=write\nunassigned-contributor: role=contributor permission=read\n",
+          "after.txt": "peer-review: role=peer permission=read\naudit-review: role=audit permission=read\nbounded-contributor: role=contributor permission=write\nunassigned-contributor: role=contributor permission=read\nchanged: policy/queue.roles\nend-changes\n",
+          "before-queue.roles": "peer contributor\naudit readonly\ncontributor contributor\n"
+        },
+        "checks": {
+          "reproduced-original-grant": true,
+          "peer-review-write-blocked": true,
+          "audit-stays-read-only": true,
+          "bounded-contributor-can-write": true,
+          "unassigned-contributor-cannot-write": true,
+          "only-active-role-policy-changed": true,
+          "preserve-original-policy": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 29.457,
+        "usage": {
+          "input_tokens": 18,
+          "cache_creation_input_tokens": 6226,
+          "cache_read_input_tokens": 93094,
+          "output_tokens": 2681,
+          "output_tokens_details": {
+            "thinking_tokens": 897
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6226
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 102019,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0030514900000000005,
+        "turns": 9
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Edit",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "The peer reviewer no longer has write access in this workspace. The only change is one line in the queue policy.\n\n**What changed**\n- `policy/queue.roles`: `peer contributor` became `peer readonly`. The dashboard policy already had `peer readonly`, and the contract says reviewers never change candidate files, so the queue now matches both.\n\n**Harness receipts**\n- `before.txt` (before the edit): `peer-review: role=peer permission=write`. This is the observed regression.\n- `after.txt` (after the edit): `peer-review: role=peer permission=read`, `changed: policy/queue.roles`. `bounded-contributor` still has write, and `unassigned-contributor` and `audit-review` are still read-only.\n- I ran `source .<path> before` and `source .<path> after` through Bash. I did not edit the harness or write any receipt by hand.\n\n**Left alone**\n- Both review entry points still dispatch their existing reviewers (`peer-review` and `audit-review`).\n- `contract/AGENTS.md`, `contract/review-workflow.md`, and `contract/SOUL.md` are unchanged, including the \"North Desk\" name, which the incident notes as a separate branding ticket.\n- `policy/dashboard.roles` and `policy/service.conf` are unchanged.\n\n**Notes**\n- The Edit tool was disabled in this session, so I wrote the file with Write. I re-read the policy before writing, and the only difference is the `peer` line.\n- The harness refuses to run `before` a second time because `before.txt` exists, so the baseline receipt stands as recorded.",
+        "answer_format": "none",
+        "artifacts": {
+          "before.txt": "peer-review: role=peer permission=write\naudit-review: role=audit permission=read\nbounded-contributor: role=contributor permission=write\nunassigned-contributor: role=contributor permission=read\n",
+          "after.txt": "peer-review: role=peer permission=read\naudit-review: role=audit permission=read\nbounded-contributor: role=contributor permission=write\nunassigned-contributor: role=contributor permission=read\nchanged: policy/queue.roles\nend-changes\n",
+          "before-queue.roles": "peer contributor\naudit readonly\ncontributor contributor\n"
+        },
+        "checks": {
+          "reproduced-original-grant": true,
+          "peer-review-write-blocked": true,
+          "audit-stays-read-only": true,
+          "bounded-contributor-can-write": true,
+          "unassigned-contributor-cannot-write": true,
+          "only-active-role-policy-changed": true,
+          "preserve-original-policy": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 29.489,
+        "usage": {
+          "input_tokens": 16,
+          "cache_creation_input_tokens": 6537,
+          "cache_read_input_tokens": 81585,
+          "output_tokens": 3069,
+          "output_tokens_details": {
+            "thinking_tokens": 1198
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6537
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 91207,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.003169075,
+        "turns": 10
+      }
+    ],
+    "terse": [
+      {
+        "valid": false,
+        "invalid_reasons": [
+          "control skill access"
+        ],
+        "error": null,
+        "contaminated": true,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": true,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Edit",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "The peer reviewer no longer has write access. The fix is one line in the queue policy copy, and the harness now shows `peer-review` as `read`.\n\n**What I changed**\n- `work/policy/queue.roles`: `peer contributor` → `peer readonly`. The dashboard policy already had `peer readonly`, and the queue service is what dispatches production reviews. The other two lines are unchanged.\n- I didn't change the contract files or `review-workflow.md`. They already say reviewers never write and only assigned contributors can. The bug was the policy grant, not the wording. Both entry points still dispatch their existing reviewers.\n\n**Harness results**\n- Before the edit: `peer-review: role=peer permission=write`, which is the regression.\n- After the edit: `peer-review` is `read`. `bounded-contributor` is still `write`, and `unassigned-contributor` is still `read`. The output also lists `changed: policy/queue.roles`, which is the intended edit.\n\n**Problem with the receipts:** I ran the `after` phase once before making the edit, to confirm the regression, and then again after the edit. The second run overwrote `after.txt`, so the receipt of the observed regression is gone. `before.txt` is intact, and it still records the baseline. The harness won't let `before` run again while `before.txt` exists, so I couldn't regenerate that receipt. If you need it, restore it from your own copy or from the original fixture. I didn't write or edit any receipt by hand.\n\nEdit was disabled in this session, so I made the change with a full-file Write. I rewrote the file with the same three lines and only changed the first one.",
+        "answer_format": "none",
+        "artifacts": {
+          "before.txt": "peer-review: role=peer permission=write\naudit-review: role=audit permission=read\nbounded-contributor: role=contributor permission=write\nunassigned-contributor: role=contributor permission=read\n",
+          "after.txt": "peer-review: role=peer permission=read\naudit-review: role=audit permission=read\nbounded-contributor: role=contributor permission=write\nunassigned-contributor: role=contributor permission=read\nchanged: policy/queue.roles\nend-changes\n",
+          "before-queue.roles": "peer contributor\naudit readonly\ncontributor contributor\n"
+        },
+        "checks": {
+          "reproduced-original-grant": true,
+          "peer-review-write-blocked": true,
+          "audit-stays-read-only": true,
+          "bounded-contributor-can-write": true,
+          "unassigned-contributor-cannot-write": true,
+          "only-active-role-policy-changed": true,
+          "preserve-original-policy": true
+        },
+        "score": 1.0,
+        "passed": false,
+        "seconds": 28.654,
+        "usage": {
+          "input_tokens": 12,
+          "cache_creation_input_tokens": 9580,
+          "cache_read_input_tokens": 57791,
+          "output_tokens": 3729,
+          "output_tokens_details": {
+            "thinking_tokens": 1522
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 9580
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 71112,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0036411100000000004,
+        "turns": 16
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Edit",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "The queue service's `peer` role is fixed. The harness now shows `peer-review` as read-only, and the bounded contributor still has write access.\n\n**Cause:** `policy/queue.roles` granted `peer` the `contributor` role. The dashboard policy grants `readonly`, so the two entry points disagreed. The baseline harness run recorded `peer-review: permission=write`, which matches the incident.\n\n**Change:** `policy/queue.roles` now reads `peer readonly`. The other two lines are unchanged. I made this edit with a `printf` write because the Edit tool is disabled in this session. The file content is what the edit would have produced.\n\n**Verification:** I ran `source .<path> before` before the edit, then `source .<path> after` after it. Both exited 0, and I did not write the receipts by hand or edit the harness.\n- `before.txt`: `peer-review` had `write`.\n- `after.txt`: `peer-review` has `read`, `bounded-contributor` still has `write`, and `unassigned-contributor` has `read`. The only changed input is `policy/queue.roles`.\n\n**Left alone:**\n- `contract/AGENTS.md` already says reviewers never change candidate files, so it did not need correcting.\n- `contract/review-workflow.md` still sends peer-review to peer and audit-review to audit, and it still says the harness grants capabilities.\n- `contract/SOUL.md` still says \"North Desk\". The branding ticket is separate.\n- The dashboard policy file is unchanged.\n\nI did not dispatch a real reviewer or contact any review service.",
+        "answer_format": "none",
+        "artifacts": {
+          "before.txt": "peer-review: role=peer permission=write\naudit-review: role=audit permission=read\nbounded-contributor: role=contributor permission=write\nunassigned-contributor: role=contributor permission=read\n",
+          "after.txt": "peer-review: role=peer permission=read\naudit-review: role=audit permission=read\nbounded-contributor: role=contributor permission=write\nunassigned-contributor: role=contributor permission=read\nchanged: policy/queue.roles\nend-changes\n",
+          "before-queue.roles": "peer contributor\naudit readonly\ncontributor contributor\n"
+        },
+        "checks": {
+          "reproduced-original-grant": true,
+          "peer-review-write-blocked": true,
+          "audit-stays-read-only": true,
+          "bounded-contributor-can-write": true,
+          "unassigned-contributor-cannot-write": true,
+          "only-active-role-policy-changed": true,
+          "preserve-original-policy": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 28.591,
+        "usage": {
+          "input_tokens": 12,
+          "cache_creation_input_tokens": 5909,
+          "cache_read_input_tokens": 59519,
+          "output_tokens": 2811,
+          "output_tokens_details": {
+            "thinking_tokens": 1232
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 5909
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 68251,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0027405150000000002,
+        "turns": 7
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Edit",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "The regression is fixed in the queue policy copy. The harness now shows `peer-review` as read-only, and the bounded contributor still has write access.\n\n**Changed:** `policy/queue.roles` only. The `peer` grant went from `contributor` to `readonly`, which matches `policy/dashboard.roles` and the policy editor's read-only rule. The rest of the file is unchanged.\n\n**Why there:** The queue service owns production dispatch, and its copy was the one granting write. The dashboard copy was already correct. The contract files (`AGENTS.md`, `SOUL.md`, `review-workflow.md`) were left as they were. Enforcement lives in the role grants, and the workflow text says it is not an access control.\n\n**Harness receipts:**\n- `before.txt` (baseline, before the edit): `peer-review: role=peer permission=write`. This is the observed regression.\n- `after.txt` (after the edit): `peer-review` is `read`, `bounded-contributor` is still `write`, `audit-review` is `read`, and `unassigned-contributor` is `read`. It also lists `changed: policy/queue.roles`, and no contract files changed.\n\n**Process notes:**\n- The Edit tool was unavailable, so I made the one-line change with a Bash `while read` loop and an `mv`. The result is verified by the harness output and the file contents.\n- I ran the `after` phase once before the edit by mistake. That run was overwritten by the correct post-edit run, so `after.txt` reflects the final state. Receipts were produced only by `exercise.sh`, not by hand.\n- I did not change \"North Desk\" vs. \"Intake Desk\" branding, since the incident calls that a separate ticket. I did not commit anything, because this workspace is not a git repository.",
+        "answer_format": "none",
+        "artifacts": {
+          "before.txt": "peer-review: role=peer permission=write\naudit-review: role=audit permission=read\nbounded-contributor: role=contributor permission=write\nunassigned-contributor: role=contributor permission=read\n",
+          "after.txt": "peer-review: role=peer permission=read\naudit-review: role=audit permission=read\nbounded-contributor: role=contributor permission=write\nunassigned-contributor: role=contributor permission=read\nchanged: policy/queue.roles\nend-changes\n",
+          "before-queue.roles": "peer contributor\naudit readonly\ncontributor contributor\n"
+        },
+        "checks": {
+          "reproduced-original-grant": true,
+          "peer-review-write-blocked": true,
+          "audit-stays-read-only": true,
+          "bounded-contributor-can-write": true,
+          "unassigned-contributor-cannot-write": true,
+          "only-active-role-policy-changed": true,
+          "preserve-original-policy": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 32.194,
+        "usage": {
+          "input_tokens": 14,
+          "cache_creation_input_tokens": 6207,
+          "cache_read_input_tokens": 70054,
+          "output_tokens": 3468,
+          "output_tokens_details": {
+            "thinking_tokens": 1609
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6207
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 79743,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.003211815,
+        "turns": 8
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "The peer reviewer no longer gets write access in the queue route. The harness receipts show the change, and nothing outside this fixture was touched.\n\n**What changed**\n\n- `policy/queue.roles`: the `peer` grant went from `contributor` to `readonly`. This was the only edit, and the harness's `changed:` list confirms `policy/queue.roles` is the only input that differs from the baseline.\n- Backup: `policy/queue.roles.bak-20261120-004715` holds the original line.\n\n**Why**\n\nThe dashboard policy already had `peer readonly`. The queue policy had `peer contributor`, so the queue service gave the peer reviewer write access. That is the regression in R-38. The contract text in `AGENTS.md` and `review-workflow.md` already said reviewers never write, but the harness grants capabilities from the policy files, not from the wording. So I fixed the policy and left the text alone.\n\n**Harness receipts**\n\n- `before.txt` (from `source .<path> before`): `peer-review: role=peer permission=write`. This reproduces the regression.\n- `after.txt` (from `source .<path> after`): `peer-review: role=peer permission=read`. The other three cases are unchanged: `audit-review` is read, `bounded-contributor` is write, and `unassigned-contributor` is read.\n- `after.txt` also lists `changed: policy/queue.roles` and `end-changes`.\n\nI ran both phases with Bash builtins only and did not write any receipt by hand or edit the harness.\n\n**Left as is**\n\n- Both review entry points still dispatch their existing reviewers: `peer-review` to peer, `audit-review` to audit.\n- The bounded contributor workflow still has write access within its assigned scope.\n- The \"North Desk\" vs \"Intake Desk\" naming in `SOUL.md` and the dashboard is a separate branding ticket, so I did not touch it.\n- No other files were edited.",
+        "answer_format": "none",
+        "artifacts": {
+          "before.txt": "peer-review: role=peer permission=write\naudit-review: role=audit permission=read\nbounded-contributor: role=contributor permission=write\nunassigned-contributor: role=contributor permission=read\n",
+          "after.txt": "peer-review: role=peer permission=read\naudit-review: role=audit permission=read\nbounded-contributor: role=contributor permission=write\nunassigned-contributor: role=contributor permission=read\nchanged: policy/queue.roles\nend-changes\n",
+          "before-queue.roles": "peer contributor\naudit readonly\ncontributor contributor\n"
+        },
+        "checks": {
+          "reproduced-original-grant": true,
+          "peer-review-write-blocked": true,
+          "audit-stays-read-only": true,
+          "bounded-contributor-can-write": true,
+          "unassigned-contributor-cannot-write": true,
+          "only-active-role-policy-changed": true,
+          "preserve-original-policy": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 33.904,
+        "usage": {
+          "input_tokens": 12,
+          "cache_creation_input_tokens": 10745,
+          "cache_read_input_tokens": 73309,
+          "output_tokens": 2652,
+          "output_tokens_details": {
+            "thinking_tokens": 830
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 10745
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 86718,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.003403415,
+        "turns": 6
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Edit",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "The queue service's `peer` role now grants read-only access, so `peer-review` no longer gets write access. I changed one line in the fixture, and the harness receipts show the before and after state.\n\n**What was wrong:** `policy/queue.roles` granted `peer contributor`, while the dashboard already grants `peer readonly`. Both entry points run the same workflow, so the queue route let a peer reviewer write to the candidate. The baseline receipt (`before.txt`) recorded `peer-review: role=peer permission=write`.\n\n**What I changed:**\n- `policy/queue.roles`: `peer contributor` → `peer readonly`. Nothing else in the file changed.\n- Backup of the original: `policy/queue.roles.bak-20261120-004742`.\n- I left `contract/AGENTS.md`, `contract/review-workflow.md`, `contract/SOUL.md`, `policy/dashboard.roles`, and `policy/service.conf` untouched. The dashboard route already had the correct grant, and the contract text already says reviewers don't write.\n- The \"North Desk\" versus \"Intake Desk\" naming mismatch is a separate branding ticket, so I didn't touch it.\n\n**Verification:**\n- `before.txt` (baseline): `peer-review` was `write`. `inputs-before.txt` holds the pre-edit snapshot.\n- `after.txt` (final): `peer-review` is now `read`. `bounded-contributor` stays `write` and `unassigned-contributor` stays `read`. The changed-input report lists only `policy/queue.roles`.\n- `diff` against the backup shows exactly one line changed.\n\n**Things you should know:**\n- I ran `after` once before making the edit, by mistake. That run was overwritten by the post-edit run, so `after.txt` now reflects only the final state. The baseline is intact because the harness refuses to re-run `before`.\n- The Edit tool was disabled in this session, so I made the change with a Bash builtin. The result is the same single-line replacement.\n- I did not edit the harness or write any receipts by hand. The harness wrote `before.txt`, `after.txt`, `inputs-before.txt` and `before-queue.roles` itself.",
+        "answer_format": "none",
+        "artifacts": {
+          "before.txt": "peer-review: role=peer permission=write\naudit-review: role=audit permission=read\nbounded-contributor: role=contributor permission=write\nunassigned-contributor: role=contributor permission=read\n",
+          "after.txt": "peer-review: role=peer permission=read\naudit-review: role=audit permission=read\nbounded-contributor: role=contributor permission=write\nunassigned-contributor: role=contributor permission=read\nchanged: policy/queue.roles\nend-changes\n",
+          "before-queue.roles": "peer contributor\naudit readonly\ncontributor contributor\n"
+        },
+        "checks": {
+          "reproduced-original-grant": true,
+          "peer-review-write-blocked": true,
+          "audit-stays-read-only": true,
+          "bounded-contributor-can-write": true,
+          "unassigned-contributor-cannot-write": true,
+          "only-active-role-policy-changed": true,
+          "preserve-original-policy": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 37.768,
+        "usage": {
+          "input_tokens": 16,
+          "cache_creation_input_tokens": 12341,
+          "cache_read_input_tokens": 107851,
+          "output_tokens": 4548,
+          "output_tokens_details": {
+            "thinking_tokens": 2066
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 12341
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 124756,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.004896735,
+        "turns": 10
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "The peer reviewer is now read-only in the queue policy. The harness shows `peer-review` changed from `write` to `read`, and the bounded contributor still has write access.\n\n**Changed**\n- `policy/queue.roles`: the `peer` grant went from `contributor` to `readonly`. This matches the dashboard policy and the owner's rule that reviewers never change candidate files.\n- `policy/queue.roles.bak-20261120-000000`: backup of the original queue policy, taken before the edit. I used a fixed timestamp rather than the system clock, so the name may not match the actual edit time.\n\n**Not changed**\n- `policy/service.conf` and `contract/review-workflow.md` still dispatch peer-review to peer and audit-review to audit, so both entry points keep their reviewers.\n- `contract/AGENTS.md`, `contract/SOUL.md`, and the bounded-contributor text are untouched.\n- `exercise.sh` and `incident.md` are untouched. The \"North Desk\" versus \"Intake Desk\" branding mismatch is out of scope.\n\n**Harness receipts** (written by `source .<path>`, not by hand)\n- Before: `peer-review: role=peer permission=write`. This is the observed regression.\n- After: `peer-review` is `read`, `bounded-contributor` is `write`, `unassigned-contributor` is `read`, and `changed: policy/queue.roles` is the only changed input.\n\nI edited only the copy in this fixture. Nothing was dispatched or delegated, and the harness used only Bash builtins.",
+        "answer_format": "none",
+        "artifacts": {
+          "before.txt": "peer-review: role=peer permission=write\naudit-review: role=audit permission=read\nbounded-contributor: role=contributor permission=write\nunassigned-contributor: role=contributor permission=read\n",
+          "after.txt": "peer-review: role=peer permission=read\naudit-review: role=audit permission=read\nbounded-contributor: role=contributor permission=write\nunassigned-contributor: role=contributor permission=read\nchanged: policy/queue.roles\nend-changes\n",
+          "before-queue.roles": "peer contributor\naudit readonly\ncontributor contributor\n"
+        },
+        "checks": {
+          "reproduced-original-grant": true,
+          "peer-review-write-blocked": true,
+          "audit-stays-read-only": true,
+          "bounded-contributor-can-write": true,
+          "unassigned-contributor-cannot-write": true,
+          "only-active-role-policy-changed": true,
+          "preserve-original-policy": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 32.029,
+        "usage": {
+          "input_tokens": 12,
+          "cache_creation_input_tokens": 10506,
+          "cache_read_input_tokens": 73210,
+          "output_tokens": 2693,
+          "output_tokens_details": {
+            "thinking_tokens": 1159
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 10506
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 86421,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0033930500000000003,
+        "turns": 6
+      }
+    ]
+  },
+  "verdict": "inconclusive",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 764075,
+  "skipped_trials": []
+}

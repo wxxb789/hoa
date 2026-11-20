@@ -1,0 +1,892 @@
+{
+  "schema_version": 2,
+  "task": "hermes-ops-claim-verification",
+  "generated_at": "2026-11-20T00:56:19.647367-08:00",
+  "skill": "hermes-ops-claim-verification",
+  "skill_revision": "3",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "forced",
+  "shell": false,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "target-profile": {
+      "field": "profile",
+      "equals": "ledger"
+    },
+    "target-dispatch": {
+      "field": "event",
+      "equals": "L-851"
+    },
+    "scheduled-time": {
+      "field": "started_utc",
+      "equals": "2027-09-06T02:00:00Z"
+    },
+    "schedule-configured": {
+      "field": "configured",
+      "equals": true
+    },
+    "schedule-fired": {
+      "field": "fired",
+      "equals": true
+    },
+    "archive-outcome-not-wrapper-exit": {
+      "field": "backup_outcome",
+      "equals": "unverified"
+    },
+    "no-matching-seal": {
+      "field": "matching_seal_receipt",
+      "equals": null
+    },
+    "manual-is-not-scheduled": {
+      "field": "manual_seal_receipt",
+      "equals": "R-61"
+    },
+    "bucket-is-not-profile": {
+      "field": "other_profile_seal_receipt",
+      "equals": "R-62"
+    },
+    "no-closure": {
+      "field": "close_repair",
+      "equals": false
+    }
+  },
+  "rubric_flags": {
+    "target-profile": "non-discriminating",
+    "target-dispatch": "non-discriminating",
+    "scheduled-time": "non-discriminating",
+    "schedule-configured": "non-discriminating",
+    "schedule-fired": "non-discriminating",
+    "archive-outcome-not-wrapper-exit": "non-discriminating",
+    "no-matching-seal": "non-discriminating",
+    "manual-is-not-scheduled": "non-discriminating",
+    "bucket-is-not-profile": "non-discriminating",
+    "no-closure": "non-discriminating"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    },
+    "terse": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    },
+    "skill": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": 0.0,
+    "terse": 0.0
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"profile\":\"ledger\",\"event\":\"L-851\",\"started_utc\":\"2027-09-06T02:00:00Z\",\"configured\":true,\"fired\":true,\"backup_outcome\":\"unverified\",\"matching_seal_receipt\":null,\"manual_seal_receipt\":\"R-61\",\"other_profile_seal_receipt\":\"R-62\",\"close_repair\":false}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "target-profile": true,
+          "target-dispatch": true,
+          "scheduled-time": true,
+          "schedule-configured": true,
+          "schedule-fired": true,
+          "archive-outcome-not-wrapper-exit": true,
+          "no-matching-seal": true,
+          "manual-is-not-scheduled": true,
+          "bucket-is-not-profile": true,
+          "no-closure": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 8.957,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4551,
+          "cache_read_input_tokens": 18699,
+          "output_tokens": 850,
+          "output_tokens_details": {
+            "thinking_tokens": 312
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4551
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 24106,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.001181465,
+        "turns": 6
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"profile\":\"ledger\",\"event\":\"L-851\",\"started_utc\":\"2027-09-06T02:00:00Z\",\"configured\":true,\"fired\":true,\"backup_outcome\":\"unverified\",\"matching_seal_receipt\":null,\"manual_seal_receipt\":\"R-61\",\"other_profile_seal_receipt\":\"R-62\",\"close_repair\":false}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "target-profile": true,
+          "target-dispatch": true,
+          "scheduled-time": true,
+          "schedule-configured": true,
+          "schedule-fired": true,
+          "archive-outcome-not-wrapper-exit": true,
+          "no-matching-seal": true,
+          "manual-is-not-scheduled": true,
+          "bucket-is-not-profile": true,
+          "no-closure": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 9.219,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4314,
+          "cache_read_input_tokens": 18960,
+          "output_tokens": 925,
+          "output_tokens_details": {
+            "thinking_tokens": 382
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4314
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 24205,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00119195,
+        "turns": 6
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"profile\":\"ledger\",\"event\":\"L-851\",\"started_utc\":\"2027-09-06T02:00:00Z\",\"configured\":true,\"fired\":true,\"backup_outcome\":\"unverified\",\"matching_seal_receipt\":null,\"manual_seal_receipt\":\"R-61\",\"other_profile_seal_receipt\":\"R-62\",\"close_repair\":false}\n```\n\nDo not close the repair. The handoff's claim is not supported by the packet:\n\n- **L-851 has no seal receipt.** Its only archive row, R-63, is still `queued` with no finish time. The \"completed successfully\" message is the wrapper's exit code 0, and the log says that only means the request was accepted by the queue. The worker writes a separate receipt after verification and seal.\n- **R-62 is training's, not ledger's.** The sealed receipt just after 02:01 belongs to training event T-851. Its `bucket: \"ledger\"` is a display alias, and the store notes say aliases are not execution identities.\n- **R-61 is a manual run from before the slot.** It is ledger's sealed archive for L-850, finished at 01:55:48Z. It does not seal the 02:00 scheduled run.\n- **The path fix is not in the packet.** Nothing I read confirms it was installed before 01:55 UTC.\n\nI made no changes, ran no commands, and retried nothing. The snapshot is from 02:10 UTC, so the 02:10 cutoff has passed. Closing the repair would need a seal receipt for L-851 from the archive worker.",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "target-profile": true,
+          "target-dispatch": true,
+          "scheduled-time": true,
+          "schedule-configured": true,
+          "schedule-fired": true,
+          "archive-outcome-not-wrapper-exit": true,
+          "no-matching-seal": true,
+          "manual-is-not-scheduled": true,
+          "bucket-is-not-profile": true,
+          "no-closure": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 9.854,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4311,
+          "cache_read_input_tokens": 18955,
+          "output_tokens": 1322,
+          "output_tokens_details": {
+            "thinking_tokens": 401
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4311
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 24594,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.001390025,
+        "turns": 6
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"profile\":\"ledger\",\"event\":\"L-851\",\"started_utc\":\"2027-09-06T02:00:00Z\",\"configured\":true,\"fired\":true,\"backup_outcome\":\"unverified\",\"matching_seal_receipt\":null,\"manual_seal_receipt\":\"R-61\",\"other_profile_seal_receipt\":\"R-62\",\"close_repair\":false}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "target-profile": true,
+          "target-dispatch": true,
+          "scheduled-time": true,
+          "schedule-configured": true,
+          "schedule-fired": true,
+          "archive-outcome-not-wrapper-exit": true,
+          "no-matching-seal": true,
+          "manual-is-not-scheduled": true,
+          "bucket-is-not-profile": true,
+          "no-closure": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 9.148,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 6964,
+          "cache_read_input_tokens": 16651,
+          "output_tokens": 1056,
+          "output_tokens_details": {
+            "thinking_tokens": 488
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6964
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 24677,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0015656099999999998,
+        "turns": 6
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"profile\":\"ledger\",\"event\":\"L-851\",\"started_utc\":\"2027-09-06T02:00:00Z\",\"configured\":true,\"fired\":true,\"backup_outcome\":\"unverified\",\"matching_seal_receipt\":null,\"manual_seal_receipt\":\"R-61\",\"other_profile_seal_receipt\":\"R-62\",\"close_repair\":false}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "target-profile": true,
+          "target-dispatch": true,
+          "scheduled-time": true,
+          "schedule-configured": true,
+          "schedule-fired": true,
+          "archive-outcome-not-wrapper-exit": true,
+          "no-matching-seal": true,
+          "manual-is-not-scheduled": true,
+          "bucket-is-not-profile": true,
+          "no-closure": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 8.525,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4336,
+          "cache_read_input_tokens": 19253,
+          "output_tokens": 895,
+          "output_tokens_details": {
+            "thinking_tokens": 337
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4336
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 24490,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00118263,
+        "turns": 6
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"profile\":\"ledger\",\"event\":\"L-851\",\"started_utc\":\"2027-09-06T02:00:00Z\",\"configured\":true,\"fired\":true,\"backup_outcome\":\"unverified\",\"matching_seal_receipt\":null,\"manual_seal_receipt\":\"R-61\",\"other_profile_seal_receipt\":\"R-62\",\"close_repair\":false}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "target-profile": true,
+          "target-dispatch": true,
+          "scheduled-time": true,
+          "schedule-configured": true,
+          "schedule-fired": true,
+          "archive-outcome-not-wrapper-exit": true,
+          "no-matching-seal": true,
+          "manual-is-not-scheduled": true,
+          "bucket-is-not-profile": true,
+          "no-closure": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 8.86,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 4318,
+          "cache_read_input_tokens": 19239,
+          "output_tokens": 1013,
+          "output_tokens_details": {
+            "thinking_tokens": 465
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4318
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 24576,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0012392400000000002,
+        "turns": 6
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": true,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"profile\":\"ledger\",\"event\":\"L-851\",\"started_utc\":\"2027-09-06T02:00:00Z\",\"configured\":true,\"fired\":true,\"backup_outcome\":\"unverified\",\"matching_seal_receipt\":null,\"manual_seal_receipt\":\"R-61\",\"other_profile_seal_receipt\":\"R-62\",\"close_repair\":false}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "target-profile": true,
+          "target-dispatch": true,
+          "scheduled-time": true,
+          "schedule-configured": true,
+          "schedule-fired": true,
+          "archive-outcome-not-wrapper-exit": true,
+          "no-matching-seal": true,
+          "manual-is-not-scheduled": true,
+          "bucket-is-not-profile": true,
+          "no-closure": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 13.227,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 9465,
+          "cache_read_input_tokens": 46824,
+          "output_tokens": 1438,
+          "output_tokens_details": {
+            "thinking_tokens": 589
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 9465
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 57737,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0023713650000000003,
+        "turns": 9
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"profile\":\"ledger\",\"event\":\"L-851\",\"started_utc\":\"2027-09-06T02:00:00Z\",\"configured\":true,\"fired\":true,\"backup_outcome\":\"unverified\",\"matching_seal_receipt\":null,\"manual_seal_receipt\":\"R-61\",\"other_profile_seal_receipt\":\"R-62\",\"close_repair\":false}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "target-profile": true,
+          "target-dispatch": true,
+          "scheduled-time": true,
+          "schedule-configured": true,
+          "schedule-fired": true,
+          "archive-outcome-not-wrapper-exit": true,
+          "no-matching-seal": true,
+          "manual-is-not-scheduled": true,
+          "bucket-is-not-profile": true,
+          "no-closure": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 10.026,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 9090,
+          "cache_read_input_tokens": 34739,
+          "output_tokens": 1046,
+          "output_tokens_details": {
+            "thinking_tokens": 316
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 9090
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 44883,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00200744,
+        "turns": 8
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": true,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"profile\":\"ledger\",\"event\":\"L-851\",\"started_utc\":\"2027-09-06T02:00:00Z\",\"configured\":true,\"fired\":true,\"backup_outcome\":\"unverified\",\"matching_seal_receipt\":null,\"manual_seal_receipt\":\"R-61\",\"other_profile_seal_receipt\":\"R-62\",\"close_repair\":false}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "target-profile": true,
+          "target-dispatch": true,
+          "scheduled-time": true,
+          "schedule-configured": true,
+          "schedule-fired": true,
+          "archive-outcome-not-wrapper-exit": true,
+          "no-matching-seal": true,
+          "manual-is-not-scheduled": true,
+          "bucket-is-not-profile": true,
+          "no-closure": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 10.888,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 9217,
+          "cache_read_input_tokens": 34876,
+          "output_tokens": 1216,
+          "output_tokens_details": {
+            "thinking_tokens": 452
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 9217
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 45317,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002109685,
+        "turns": 8
+      }
+    ]
+  },
+  "verdict": "no-difference",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 294585,
+  "skipped_trials": []
+}

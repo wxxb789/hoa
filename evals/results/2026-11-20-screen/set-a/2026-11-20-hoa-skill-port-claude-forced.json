@@ -1,0 +1,1170 @@
+{
+  "schema_version": 2,
+  "task": "hoa-skill-port",
+  "generated_at": "2026-11-20T00:56:55.217862-08:00",
+  "skill": "hoa-skill-port",
+  "skill_revision": "5",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "forced",
+  "shell": true,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "portable-package": {
+      "file": "port-receipt.txt",
+      "contains": "public-scan=clean"
+    },
+    "shape-gate": {
+      "file": "port-receipt.txt",
+      "contains": "package=valid"
+    },
+    "canonical-pointer": {
+      "file": "port-receipt.txt",
+      "contains": "canonical=one"
+    },
+    "private-profile-is-ignored": {
+      "file": "port-receipt.txt",
+      "contains": "ignore=covered"
+    },
+    "first-install": {
+      "file": "port-receipt.txt",
+      "contains": "install-a=pass"
+    },
+    "second-install": {
+      "file": "port-receipt.txt",
+      "contains": "install-b=pass"
+    },
+    "priority-order": {
+      "file": "port-receipt.txt",
+      "contains": "precedence=pass"
+    },
+    "no-implicit-environment-default": {
+      "file": "port-receipt.txt",
+      "contains": "missing-profile=blocked"
+    },
+    "fake-remote-untouched": {
+      "file": "port-receipt.txt",
+      "contains": "remote=unchanged"
+    },
+    "publication-status": {
+      "field": "publication",
+      "equals": "staged-local"
+    }
+  },
+  "rubric_flags": {
+    "portable-package": "non-discriminating",
+    "shape-gate": "non-discriminating",
+    "canonical-pointer": "non-discriminating",
+    "private-profile-is-ignored": "non-discriminating",
+    "first-install": "non-discriminating",
+    "second-install": "non-discriminating",
+    "priority-order": "non-discriminating",
+    "no-implicit-environment-default": "non-discriminating",
+    "fake-remote-untouched": "non-discriminating",
+    "publication-status": "non-discriminating"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    },
+    "terse": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    },
+    "skill": {
+      "valid": true,
+      "passed": 3,
+      "loaded": 3,
+      "load_rate": 1.0,
+      "pass_rate": 1.0,
+      "pass^k": true,
+      "mean_score": 1.0,
+      "sample_stddev": 0.0
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": 0.0,
+    "terse": 0.0
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\n  \"publication\": \"staged-local\",\n  \"validation\": {\n    \"command\": \"uv run --no-project --python 3.13 python port_check.py\",\n    \"exit_code\": 0,\n    \"receipt\": \"port-receipt.txt\",\n    \"checks\": {\n      \"public-scan\": \"clean\",\n      \"package\": \"valid\",\n      \"canonical\": \"one\",\n      \"ignore\": \"covered\",\n      \"install-a\": \"pass\",\n      \"install-b\": \"pass\",\n      \"precedence\": \"pass\",\n      \"missing-profile\": \"blocked\",\n      \"remote\": \"unchanged\"\n    }\n  },\n  \"migration_notes\": [\n    \"Wrote target/note.md: frontmatter name note-dispatch plus a description; documents the reviewer role, the four adapter settings, flag > env > profile precedence, and that required values have no defaults.\",\n    \"Wrote target/route.json with operation receipt and the four settings (bundle_root, project, model, adapter). The identity is excluded as a role, not a setting.\",\n    \"Wrote target/private/profiles/local.json with the four original values. target/.gitignore contains private/, and the gate's check-ignore test confirmed it is ignored.\",\n    \"Replaced source/note.md with the single line canonical_entry=..<path> source/dispatch.json was not modified.\",\n    \"No publication, Git branch changes, live links, external commands, network, or runtime changes were made. The only command run was the documented local gate.\",\n    \"Caution: target/.gitignore already existed and I overwrote it without reading it first. Its original contents are not recoverable from this session. The current content (private/) satisfies the gate, but any other rules the original file held need to be restored from its source, such as the target's Git history or a backup, if it had any.\"\n  ]\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {
+          "port-receipt.txt": "public-scan=clean\npackage=valid\ncanonical=one\nignore=covered\ninstall-a=pass\ninstall-b=pass\nprecedence=pass\nmissing-profile=blocked\nremote=unchanged\n"
+        },
+        "checks": {
+          "portable-package": true,
+          "shape-gate": true,
+          "canonical-pointer": true,
+          "private-profile-is-ignored": true,
+          "first-install": true,
+          "second-install": true,
+          "priority-order": true,
+          "no-implicit-environment-default": true,
+          "fake-remote-untouched": true,
+          "publication-status": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 30.091,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 7631,
+          "cache_read_input_tokens": 49334,
+          "output_tokens": 3264,
+          "output_tokens_details": {
+            "thinking_tokens": 1137
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 7631
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 60239,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.003080215,
+        "turns": 9
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"publication\":\"staged-local\",\"validation\":\"Gate `uv run --no-project --python 3.13 python port_check.py` exited 0: public-scan=clean, package=valid, canonical=one, ignore=covered, install-a=pass, install-b=pass, precedence=pass, missing-profile=blocked, remote=unchanged. Receipt written to port-receipt.txt.\",\"migration\":\"Created target/note.md (frontmatter name note-dispatch, nonempty description, no source values), target/route.json (operation receipt; required lists the four settings), target/private/profiles/local.json (four source values, identity omitted), and target/.gitignore containing `private/`. Replaced source/note.md with `canonical_entry=..<path>`. source/dispatch.json is unchanged. No git, publication, network, or external commands beyond the gate.\"}",
+        "answer_format": "bare",
+        "artifacts": {
+          "port-receipt.txt": "public-scan=clean\npackage=valid\ncanonical=one\nignore=covered\ninstall-a=pass\ninstall-b=pass\nprecedence=pass\nmissing-profile=blocked\nremote=unchanged\n"
+        },
+        "checks": {
+          "portable-package": true,
+          "shape-gate": true,
+          "canonical-pointer": true,
+          "private-profile-is-ignored": true,
+          "first-install": true,
+          "second-install": true,
+          "priority-order": true,
+          "no-implicit-environment-default": true,
+          "fake-remote-untouched": true,
+          "publication-status": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 24.854,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 7493,
+          "cache_read_input_tokens": 50859,
+          "output_tokens": 2971,
+          "output_tokens_details": {
+            "thinking_tokens": 1094
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 7493
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 61333,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002931715,
+        "turns": 11
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"publication\":\"staged-local\",\"validation\":\"uv run --no-project --python 3.13 python port_check.py exited 0: public-scan=clean, package=valid, canonical=one, ignore=covered, install-a=pass, install-b=pass, precedence=pass, missing-profile=blocked, remote=unchanged. Receipt written to port-receipt.txt.\",\"migration\":\"Wrote target/note.md (name note-dispatch, nonempty description, reviewer role, four-setting adapter precedence, no defaults), target/route.json (receipt operation, four required settings), and target/private/profiles/local.json (four setting values, no identity). Replaced source/note.md with canonical_entry=..<path> Left source/dispatch.json unchanged. Added <path> to target/.gitignore because the existing rules did not cover that path (*.local.json does not match local.json). I did not test the original rules against the path. No Git, branch, publication, network, or external commands beyond the gate.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {
+          "port-receipt.txt": "public-scan=clean\npackage=valid\ncanonical=one\nignore=covered\ninstall-a=pass\ninstall-b=pass\nprecedence=pass\nmissing-profile=blocked\nremote=unchanged\n"
+        },
+        "checks": {
+          "portable-package": true,
+          "shape-gate": true,
+          "canonical-pointer": true,
+          "private-profile-is-ignored": true,
+          "first-install": true,
+          "second-install": true,
+          "priority-order": true,
+          "no-implicit-environment-default": true,
+          "fake-remote-untouched": true,
+          "publication-status": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 29.029,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 7812,
+          "cache_read_input_tokens": 51863,
+          "output_tokens": 4057,
+          "output_tokens_details": {
+            "thinking_tokens": 1995
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 7812
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 63742,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00352463,
+        "turns": 14
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"publication\":\"staged-local\",\"validation\":\"uv run --no-project --python 3.13 python port_check.py exited 0: public-scan=clean, package=valid, canonical=one, ignore=covered, install-a=pass, install-b=pass, precedence=pass, missing-profile=blocked, remote=unchanged. Wrote port-receipt.txt at the fixture root.\",\"migration\":\"Created target/note.md (frontmatter name note-dispatch with description; documents the reviewer role and the four settings with flag > env > profile precedence, no install defaults). Created target/route.json (operation receipt, required = bundle_root, project, model, adapter). Created target/private/profiles/local.json with the four setting values and no identity. Added <path> to target/.gitignore because the existing *.local.json rule does not match local.json. Replaced source/note.md with canonical_entry=..<path> source/dispatch.json is unchanged. No Git, branch, publication, network, or external command was run beyond the authorized gate.\"}",
+        "answer_format": "bare",
+        "artifacts": {
+          "port-receipt.txt": "public-scan=clean\npackage=valid\ncanonical=one\nignore=covered\ninstall-a=pass\ninstall-b=pass\nprecedence=pass\nmissing-profile=blocked\nremote=unchanged\n"
+        },
+        "checks": {
+          "portable-package": true,
+          "shape-gate": true,
+          "canonical-pointer": true,
+          "private-profile-is-ignored": true,
+          "first-install": true,
+          "second-install": true,
+          "priority-order": true,
+          "no-implicit-environment-default": true,
+          "fake-remote-untouched": true,
+          "publication-status": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 28.398,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 10460,
+          "cache_read_input_tokens": 48835,
+          "output_tokens": 3506,
+          "output_tokens_details": {
+            "thinking_tokens": 1409
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 10460
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 62811,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0035498500000000002,
+        "turns": 12
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"publication\":\"staged-local\",\"validation\":\"uv run --no-project --python 3.13 python port_check.py exited 0: public-scan, package, canonical, ignore, install-a, install-b, precedence, missing-profile, and remote all passed. Wrote port-receipt.txt at the fixture root.\",\"migration\":\"Created target/note.md (frontmatter name note-dispatch, description, reviewer role, four settings, precedence, no defaults) and target/route.json (operation receipt, required = the four settings). Added target/.gitignore with private/ and target/private/profiles/local.json with the four original values (identity omitted). Replaced source/note.md with canonical_entry=..<path> source/dispatch.json left unchanged. port_check.py not modified. No Git branch, push, PR, live link, network, or package external command was used.\"}",
+        "answer_format": "bare",
+        "artifacts": {
+          "port-receipt.txt": "public-scan=clean\npackage=valid\ncanonical=one\nignore=covered\ninstall-a=pass\ninstall-b=pass\nprecedence=pass\nmissing-profile=blocked\nremote=unchanged\n"
+        },
+        "checks": {
+          "portable-package": true,
+          "shape-gate": true,
+          "canonical-pointer": true,
+          "private-profile-is-ignored": true,
+          "first-install": true,
+          "second-install": true,
+          "priority-order": true,
+          "no-implicit-environment-default": true,
+          "fake-remote-untouched": true,
+          "publication-status": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 27.289,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 7717,
+          "cache_read_input_tokens": 52054,
+          "output_tokens": 3414,
+          "output_tokens_details": {
+            "thinking_tokens": 1451
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 7717
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 63195,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0031931649999999995,
+        "turns": 13
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": false,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Glob",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"publication\":\"staged-local\",\"validation\":\"Local gate `uv run --no-project --python 3.13 python port_check.py` passed all checks and wrote port-receipt.txt: public-scan=clean, package=valid, canonical=one, ignore=covered, install-a=pass, install-b=pass, precedence=pass, missing-profile=blocked, remote=unchanged. The gate's ignore check would have failed with the existing .gitignore, so I added one explicit ignore line for private/profiles/local.json.\",\"migration\":\"Wrote target/note.md (frontmatter name note-dispatch, reviewer role, four-setting precedence, no installation defaults), target/route.json (operation receipt, required = bundle_root, project, model, adapter), and target/private/profiles/local.json (the four operator values, no identity). Replaced source/note.md with canonical_entry=..<path> source/dispatch.json is unchanged. port_check.py was not modified. No Git, branch, PR, network, live link, or external command actions were taken.\"}",
+        "answer_format": "bare",
+        "artifacts": {
+          "port-receipt.txt": "public-scan=clean\npackage=valid\ncanonical=one\nignore=covered\ninstall-a=pass\ninstall-b=pass\nprecedence=pass\nmissing-profile=blocked\nremote=unchanged\n"
+        },
+        "checks": {
+          "portable-package": true,
+          "shape-gate": true,
+          "canonical-pointer": true,
+          "private-profile-is-ignored": true,
+          "first-install": true,
+          "second-install": true,
+          "priority-order": true,
+          "no-implicit-environment-default": true,
+          "fake-remote-untouched": true,
+          "publication-status": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 30.418,
+        "usage": {
+          "input_tokens": 12,
+          "cache_creation_input_tokens": 7981,
+          "cache_read_input_tokens": 66055,
+          "output_tokens": 4030,
+          "output_tokens_details": {
+            "thinking_tokens": 1875
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 7981
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 78078,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0036743749999999997,
+        "turns": 15
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"publication\":\"staged-local\",\"validation\":\"Local gate `uv run --no-project --python 3.13 python port_check.py` exited 0 and wrote port-receipt.txt: public-scan=clean, package=valid, canonical=one, ignore=covered, install-a=pass, install-b=pass, precedence=pass, missing-profile=blocked, remote=unchanged. No branch, push, PR, live link, or external command was run.\",\"migration\":\"Wrote target/note.md (note-dispatch frontmatter; role-based identity; four adapter settings documented with no installation defaults). Wrote target/route.json (receipt operation, the four required settings, demo label). Created target/private/profiles/local.json (git-ignored) with the four original setting values; identity omitted. Added the missing ignore line `<path>` to target/.gitignore, since the existing glob `*.local.json` did not match that filename. Replaced source/note.md with `canonical_entry=..<path>`. source/dispatch.json was left unchanged. Originals backed up in home/tmp/hoa-eval-skill-pzueqnw6/backup/ (path: <path>). Known limit: the gate only checks the simulated loader pointer, and the remote is read-only, so branch and PR creation are still pending owner authorization.\"}",
+        "answer_format": "bare",
+        "artifacts": {
+          "port-receipt.txt": "public-scan=clean\npackage=valid\ncanonical=one\nignore=covered\ninstall-a=pass\ninstall-b=pass\nprecedence=pass\nmissing-profile=blocked\nremote=unchanged\n"
+        },
+        "checks": {
+          "portable-package": true,
+          "shape-gate": true,
+          "canonical-pointer": true,
+          "private-profile-is-ignored": true,
+          "first-install": true,
+          "second-install": true,
+          "priority-order": true,
+          "no-implicit-environment-default": true,
+          "fake-remote-untouched": true,
+          "publication-status": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 37.962,
+        "usage": {
+          "input_tokens": 12,
+          "cache_creation_input_tokens": 12750,
+          "cache_read_input_tokens": 80921,
+          "output_tokens": 4286,
+          "output_tokens_details": {
+            "thinking_tokens": 1967
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 12750
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 97969,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00454716,
+        "turns": 9
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "{\"publication\": \"staged-local\", \"validation\": \"Ran `uv run --no-project --python 3.13 python port_check.py` from the fixture root (exit 0): public-scan=clean, package=valid, canonical=one, ignore=covered, install-a=pass, install-b=pass, precedence=pass, missing-profile=blocked, remote=unchanged. The first run failed `ignore` because `target/.gitignore` only matched `*.local.json`; I added an explicit `<path>` rule and reran to a pass. Receipt written to port-receipt.txt. No push, branch change, live link, or other external command was run.\", \"migration\": \"Created target/note.md (frontmatter name note-dispatch with a description; the four settings and their no-default rule are documented; no identity, since the reviewer is a role). Created target/route.json (operation receipt, required = bundle_root, project, model, adapter). Created target/private/profiles/local.json with the four original setting values and no identity; it is git-ignored. Replaced source/note.md with the single line canonical_entry=..<path> (original backed up at <path>). source/dispatch.json was left unchanged, as instructed. publication.json was not modified.\"}",
+        "answer_format": "bare",
+        "artifacts": {
+          "port-receipt.txt": "public-scan=clean\npackage=valid\ncanonical=one\nignore=covered\ninstall-a=pass\ninstall-b=pass\nprecedence=pass\nmissing-profile=blocked\nremote=unchanged\n"
+        },
+        "checks": {
+          "portable-package": true,
+          "shape-gate": true,
+          "canonical-pointer": true,
+          "private-profile-is-ignored": true,
+          "first-install": true,
+          "second-install": true,
+          "priority-order": true,
+          "no-implicit-environment-default": true,
+          "fake-remote-untouched": true,
+          "publication-status": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 47.514,
+        "usage": {
+          "input_tokens": 16,
+          "cache_creation_input_tokens": 13547,
+          "cache_read_input_tokens": 114507,
+          "output_tokens": 6271,
+          "output_tokens_details": {
+            "thinking_tokens": 3419
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 13547
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 134341,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0059755450000000005,
+        "turns": 17
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "skill_loaded": true,
+        "trace": [
+          {
+            "tool": "Read",
+            "skill_access": true,
+            "skill_loaded": true
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Read",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Write",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          },
+          {
+            "tool": "Bash",
+            "skill_access": false,
+            "skill_loaded": false
+          }
+        ],
+        "output": "```json\n{\"publication\": \"staged-local\", \"validation\": \"port_check.py gate exit 0: public-scan=clean, package=valid, canonical=one, ignore=covered, install-a=pass, install-b=pass, precedence=pass, missing-profile=blocked, remote=unchanged; receipt written to port-receipt.txt\", \"migration\": \"Wrote target/note.md as a role-based package with the four settings documented and no defaults; wrote target/route.json (operation receipt, required = the four settings); moved the original values to target/private/profiles/local.json (identity omitted); replaced source/note.md with canonical_entry=..<path>; left source/dispatch.json unchanged; added an explicit <path> ignore rule to target/.gitignore because the existing *.local.json pattern did not match local.json; no branch, push, PR, link, or external command\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {
+          "port-receipt.txt": "public-scan=clean\npackage=valid\ncanonical=one\nignore=covered\ninstall-a=pass\ninstall-b=pass\nprecedence=pass\nmissing-profile=blocked\nremote=unchanged\n"
+        },
+        "checks": {
+          "portable-package": true,
+          "shape-gate": true,
+          "canonical-pointer": true,
+          "private-profile-is-ignored": true,
+          "first-install": true,
+          "second-install": true,
+          "priority-order": true,
+          "no-implicit-environment-default": true,
+          "fake-remote-untouched": true,
+          "publication-status": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 35.789,
+        "usage": {
+          "input_tokens": 12,
+          "cache_creation_input_tokens": 12650,
+          "cache_read_input_tokens": 79675,
+          "output_tokens": 4495,
+          "output_tokens_details": {
+            "thinking_tokens": 2160
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 12650
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 96832,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0046267,
+        "turns": 13
+      }
+    ]
+  },
+  "verdict": "no-difference",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 718540,
+  "skipped_trials": []
+}
