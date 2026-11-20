@@ -1,0 +1,1061 @@
+{
+  "schema_version": 3,
+  "task": "set-b-official-document-verification",
+  "generated_at": "2026-11-20T02:04:57.074451-08:00",
+  "skill": "official-document-verification",
+  "skill_revision": "5",
+  "cli_version": "2.1.329 (Claude Code)",
+  "model": "claude-haiku-5.5",
+  "repeats": 3,
+  "runtime": "claude",
+  "mode": "natural",
+  "shell": false,
+  "order": [
+    "none",
+    "terse",
+    "skill",
+    "skill",
+    "terse",
+    "none",
+    "none",
+    "terse",
+    "skill"
+  ],
+  "rubric": {
+    "extension-by-subject": {
+      "field": "extension",
+      "equals": {
+        "print": "H52-EH",
+        "section": 126,
+        "prior_law": "Island Docks Act 8(b)",
+        "sunset": "2032-03-31"
+      }
+    },
+    "relay-by-current-print": {
+      "field": "deck_relay",
+      "equals": {
+        "H52-EH": true,
+        "S14-RS": false
+      }
+    },
+    "staffing-calibers": {
+      "field": "staffing",
+      "equals": {
+        "F-28": {
+          "count": 48,
+          "unit": "authorized positions"
+        },
+        "C-09": {
+          "count": 31,
+          "unit": "people on duty"
+        }
+      }
+    }
+  },
+  "rubric_flags": {
+    "extension-by-subject": "flaky",
+    "relay-by-current-print": "non-discriminating",
+    "staffing-calibers": "non-discriminating"
+  },
+  "thresholds": {
+    "min_mean_gain": 0.1,
+    "max_terse_gap": 0.05,
+    "min_pass_rate": 1.0,
+    "min_natural_load_rate": 1.0
+  },
+  "summary": {
+    "none": {
+      "valid": true,
+      "passed": 0,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.0,
+      "pass^k": false,
+      "mean_score": 0.6666666666666666,
+      "sample_stddev": 0.0
+    },
+    "terse": {
+      "valid": true,
+      "passed": 0,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.0,
+      "pass^k": false,
+      "mean_score": 0.6666666666666666,
+      "sample_stddev": 0.0
+    },
+    "skill": {
+      "valid": true,
+      "passed": 1,
+      "loaded": 0,
+      "load_rate": 0.0,
+      "pass_rate": 0.3333333333333333,
+      "pass^k": false,
+      "mean_score": 0.7777777777777778,
+      "sample_stddev": 0.1924500897298753
+    }
+  },
+  "mean_deltas_vs_skill": {
+    "none": 0.11111111111111116,
+    "terse": 0.11111111111111116
+  },
+  "runs": {
+    "none": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\"extension\": {\"print\": \"H52-EH\", \"section\": 126, \"prior_law\": \"2029-03-31\", \"sunset\": \"2032-03-31\"}, \"deck_relay\": {\"H52-EH\": true, \"S14-RS\": false}, \"staffing\": {\"C-09\": {\"count\": 31, \"unit\": \"people on duty\"}, \"F-28\": {\"count\": 48, \"unit\": \"authorized positions\"}}, \"brief\": \"Corrected: The Island Docks Act pilot extension is in H52-EH Sec. 126 (not Sec. 904), moving the Act 8(b) date from March 31, 2029 to March 31, 2032. Sec. 904 in H52-EH amends Municipal Purchasing Act 4(d) to September 30, 2031, and Sec. 904 in S14-RS sets a temporary bidder registration form sunset of September 30, 2031. The Senate has not passed the pilot extension. Deck Relay: H52-EH Sec. 134 would permit an inspector to waive the fixed shore relay requirement for a Deck Relay at a pier served fewer than twelve days per quarter. S14-RS Sec. 415 confers no exemption or waiver, so this is a chamber difference. Staffing: F-28 shows 48 authorized positions (establishment, including vacancies), which is the district total. C-09 counts 31 unique people reported for duty across all shifts (Bay 12, Crane 10, East 9); it is not a single shift. The 3 people on leave are excluded, and 21 applicant files are a separate count.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "extension-by-subject": false,
+          "relay-by-current-print": true,
+          "staffing-calibers": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 17.019,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 6301,
+          "cache_read_input_tokens": 19147,
+          "output_tokens": 2549,
+          "output_tokens_details": {
+            "thinking_tokens": 1300
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6301
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 28003,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0022541949999999996,
+        "turns": 10
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\"extension\":{\"print\":\"H52-EH\",\"section\":126,\"prior_law\":\"Island Docks Act 8(b): March 31, 2029\",\"sunset\":\"2032-03-31\"},\"deck_relay\":{\"H52-EH\":true,\"S14-RS\":false},\"staffing\":{\"F-28\":{\"count\":48,\"unit\":\"authorized positions\"},\"C-09\":{\"count\":31,\"unit\":\"people on duty\"}},\"brief\":\"Corrected: The House engrossed print H52-EH (Sec. 126) amends Island Docks Act 8(b), extending the pilot from March 31, 2029 to March 31, 2032. It is not Sec. 904 and not September 2031. Sec. 904 of H52-EH amends Municipal Purchasing Act 4(d) to September 30, 2031, and Sec. 904 of S14-RS sets a registration sunset of September 30, 2031. The Senate has not extended the Island Docks pilot. The Deck Relay waiver is not on both sides: H52-EH Sec. 134 permits an inspector to waive the fixed shore relay requirement for a Deck Relay at piers served fewer than twelve days per quarter, but the latest Senate print, S14-RS Sec. 415, confers no exemption or waiver (the Senate waiver in S14-IS was superseded). Staffing: F-28 reports 48 authorized positions, including vacancies (payroll-coded posts are 34, which include officers on extended leave, and are not the establishment). C-09 reports 31 unique people on duty across all shifts (Bay 12, Crane 10, East 9). It is not a single shift, and the 3 people on leave are excluded. Its 21 applicant files are a separate unit and are not counted here.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "extension-by-subject": false,
+          "relay-by-current-print": true,
+          "staffing-calibers": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 17.449,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 6012,
+          "cache_read_input_tokens": 19419,
+          "output_tokens": 2719,
+          "output_tokens_details": {
+            "thinking_tokens": 1416
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6012
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 28156,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0023057900000000003,
+        "turns": 10
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\"extension\": {\"print\": \"H52-EH\", \"section\": 126, \"prior_law\": \"2029-03-31\", \"sunset\": \"2032-03-31\"}, \"deck_relay\": {\"H52-EH\": true, \"S14-RS\": false}, \"staffing\": {\"F-28\": {\"count\": 48, \"unit\": \"authorized positions\"}, \"C-09\": {\"count\": 31, \"unit\": \"people on duty\"}}, \"brief\": \"The pilot extension is in House print H52-EH, Sec. 126, which amends Island Docks Act 8(b) from March 31, 2029 to March 31, 2032. Sec. 904 of H52-EH is a separate Municipal Purchasing Act sunset (September 30, 2031). The Deck Relay waiver is not shared by both chambers: H52-EH Sec. 134 permits an inspector waiver for piers served fewer than twelve days per quarter, while S14-RS Sec. 415 confers no exemption or waiver. Staffing: F-28 reports 48 authorized positions, including vacancies, and C-09 reports 31 unique people on duty across the month (12 Bay, 10 Crane, 9 East), with 3 on leave excluded. C-09 is not a single-shift count.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "extension-by-subject": false,
+          "relay-by-current-print": true,
+          "staffing-calibers": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 18.149,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 6016,
+          "cache_read_input_tokens": 19419,
+          "output_tokens": 2684,
+          "output_tokens_details": {
+            "thinking_tokens": 1550
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6016
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 28125,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00228879,
+        "turns": 10
+      }
+    ],
+    "terse": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "```json\n{\n  \"extension\": {\n    \"print\": \"H52-EH\",\n    \"section\": 126,\n    \"prior_law\": \"Island Docks Act 8(b): March 31, 2029\",\n    \"sunset\": \"2032-03-31\"\n  },\n  \"deck_relay\": {\n    \"H52-EH\": true,\n    \"S14-RS\": false\n  },\n  \"staffing\": {\n    \"F-28\": {\n      \"count\": 48,\n      \"unit\": \"authorized positions\"\n    },\n    \"C-09\": {\n      \"count\": 31,\n      \"unit\": \"people on duty\"\n    }\n  },\n  \"brief\": \"Corrected wording: The House engrossed print H52-EH (Sec. 126) extends the Island Docks Act 8(b) pier-service date from March 31, 2029 to March 31, 2032; it is not a section 904 item. Section 904 of H52-EH instead replaces the Municipal Purchasing Act 4(d) sunset with September 30, 2031. The Senate has not passed the package; its latest print, S14-RS (Sec. 415), expressly confers no Deck Relay exemption or waiver, so the Deck Relay waiver is a chamber difference (H52-EH Sec. 134 permits it; S14-RS does not). Finance return F-28 reports 48 authorized positions including vacancies (the footer total); controller return C-09 reports 31 unique people on duty across the district for September (Bay 12, Crane 10, East 9), not one shift, and excludes 3 people on leave.\"\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "extension-by-subject": false,
+          "relay-by-current-print": true,
+          "staffing-calibers": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 16.724,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 8647,
+          "cache_read_input_tokens": 16985,
+          "output_tokens": 2537,
+          "output_tokens_details": {
+            "thinking_tokens": 1287
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 8647
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 28175,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002519825,
+        "turns": 10
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "```json\n{\"extension\":{\"print\":\"H52-EH\",\"section\":126,\"prior_law\":\"Island Docks Act 8(b): March 31, 2029\",\"sunset\":\"2032-03-31\"},\"deck_relay\":{\"H52-EH\":true,\"S14-RS\":false},\"staffing\":{\"F-28\":{\"count\":48,\"unit\":\"authorized positions\"},\"C-09\":{\"count\":31,\"unit\":\"people on duty\"}},\"brief\":\"Corrected: The House print H52-EH (Sec. 126) extends the Island Docks Act pilot under Island Docks Act 8(b) from March 31, 2029 to March 31, 2032. Sec. 904 of H52-EH instead moves the Municipal Purchasing Act 4(d) bundled-contract sunset to September 30, 2031. The Senate reported substitute S14-RS does not amend any Act date. The Deck Relay waiver is not on both sides: H52-EH Sec. 134 permits an inspector waiver for piers served fewer than twelve days per quarter, while S14-RS Sec. 415 expressly confers no waiver and only requires an incident count. Staffing: F-28 reports 48 authorized positions, including vacancies (34 payroll-coded posts, which include officers on extended leave), not 48 people on duty. C-09 is not a single-shift count: it counts 31 unique people on duty across all shifts (12 Bay, 10 Crane, 9 East), excluding 3 on leave, and 21 applicant files.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "extension-by-subject": false,
+          "relay-by-current-print": true,
+          "staffing-calibers": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 15.403,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 6038,
+          "cache_read_input_tokens": 19581,
+          "output_tokens": 2504,
+          "output_tokens_details": {
+            "thinking_tokens": 1259
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6038
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 28129,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00220316,
+        "turns": 10
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\"extension\": {\"print\": \"H52-EH\", \"section\": 126, \"prior_law\": \"March 31, 2029\", \"sunset\": \"2032-03-31\"}, \"deck_relay\": {\"H52-EH\": true, \"S14-RS\": false}, \"staffing\": {\"C-09\": {\"count\": 31, \"unit\": \"people on duty\"}, \"F-28\": {\"count\": 48, \"unit\": \"authorized positions\"}}, \"brief\": \"The Island Docks Act pilot extension is in House print H52-EH, Sec. 126, which amends Island Docks Act 8(b) to change March 31, 2029 to March 31, 2032. It is not Sec. 904, which in H52-EH sets a Municipal Purchasing Act sunset of September 30, 2031. The Senate print S14-RS does not amend any Act 8(b) dates. The Deck Relay waiver is not the same across chambers: H52-EH Sec. 134 permits an inspector to waive the fixed shore relay requirement for a Deck Relay at a pier served fewer than twelve days per quarter, while S14-RS Sec. 415 confers no exemption or waiver. Staffing: C-09 counts 31 unique people on duty across all September shifts (12 Bay, 10 Crane, 9 East), excluding 3 on leave; it is not a single shift. F-28's District establishment of 48 is authorized positions, including vacancies, not people on duty.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "extension-by-subject": false,
+          "relay-by-current-print": true,
+          "staffing-calibers": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 24.322,
+        "usage": {
+          "input_tokens": 8,
+          "cache_creation_input_tokens": 6494,
+          "cache_read_input_tokens": 30179,
+          "output_tokens": 4029,
+          "output_tokens_details": {
+            "thinking_tokens": 2736
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6494
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 40710,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00312884,
+        "turns": 11
+      }
+    ],
+    "skill": [
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "{\"extension\": {\"print\": \"H52-EH\", \"section\": 126, \"prior_law\": \"Island Docks Act 8(b)\", \"sunset\": \"2032-03-31\"}, \"deck_relay\": {\"H52-EH\": true, \"S14-RS\": false}, \"staffing\": {\"F-28\": {\"count\": 48, \"unit\": \"authorized positions\"}, \"C-09\": {\"count\": 31, \"unit\": \"people on duty\"}}, \"brief\": \"The Island Docks Act pilot is extended by H52-EH section 126, which strikes March 31, 2029 and inserts March 31, 2032 in Island Docks Act 8(b). Section 904 of H52-EH concerns Municipal Purchasing Act 4(d) and sets a September 30, 2031 sunset for bundled contracts; it is not the pilot extension. The Senate has not passed a pilot extension in the supplied packet. The Deck Relay waiver is a chamber difference: H52-EH section 134 permits an inspector waiver for remote piers served fewer than twelve days per quarter, but the latest Senate print, S14-RS section 415, confers no exemption or waiver (the Senate introduced text S14-IS section 415 did permit one, but it is superseded). Staffing: F-28 reports 48 authorized positions, including vacancies, from the establishment column, not a footer total. C-09 reports 31 unique people on duty across the month (12 Bay, 10 Crane, 9 East), with 3 more on leave excluded; it is not a single shift count.\"}",
+        "answer_format": "bare",
+        "artifacts": {},
+        "checks": {
+          "extension-by-subject": true,
+          "relay-by-current-print": true,
+          "staffing-calibers": true
+        },
+        "score": 1.0,
+        "passed": true,
+        "seconds": 14.535,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 6034,
+          "cache_read_input_tokens": 19431,
+          "output_tokens": 2271,
+          "output_tokens_details": {
+            "thinking_tokens": 1023
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6034
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27742,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.00208466,
+        "turns": 10
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "```json\n{\n  \"extension\": {\n    \"print\": \"H52-EH\",\n    \"section\": 126,\n    \"prior_law\": \"2029-03-31\",\n    \"sunset\": \"2032-03-31\"\n  },\n  \"deck_relay\": {\n    \"H52-EH\": true,\n    \"S14-RS\": false\n  },\n  \"staffing\": {\n    \"F-28\": {\n      \"count\": 48,\n      \"unit\": \"authorized positions\"\n    },\n    \"C-09\": {\n      \"count\": 31,\n      \"unit\": \"people on duty\"\n    }\n  },\n  \"brief\": \"As of October 2, 2028: The Island Docks Act pilot sunset (Island Docks Act 8(b)) would be extended from March 31, 2029 to March 31, 2032 by House engrossed print H52-EH, Sec. 126, not Sec. 904. Sec. 904 of H52-EH instead moves the Municipal Purchasing Act 4(d) sunset to September 30, 2031. The Senate has not passed the measure. The Deck Relay waiver does not survive on both sides: H52-EH Sec. 134 permits a waiver for piers served fewer than twelve days per quarter, subject to a written decision, while the latest Senate print, S14-RS Sec. 415, states that it confers no exemption or waiver, so this is a chamber difference. Staffing: F-28 reports 48 authorized positions (establishment, including vacancies), not 48 people on duty. C-09 reports 31 unique people on duty across the September shifts (Bay 12, Crane 10, East 9); the 3 people on leave are excluded, and C-09 covers the whole month, not one shift.\"\n}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "extension-by-subject": false,
+          "relay-by-current-print": true,
+          "staffing-calibers": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 16.148,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 6023,
+          "cache_read_input_tokens": 19079,
+          "output_tokens": 2509,
+          "output_tokens_details": {
+            "thinking_tokens": 1210
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6023
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27617,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.002198765,
+        "turns": 10
+      },
+      {
+        "valid": true,
+        "invalid_reasons": [],
+        "error": null,
+        "contaminated": false,
+        "contamination_reasons": [],
+        "skill_loaded": false,
+        "skill_probe_count": 0,
+        "trace": [
+          {
+            "tool": "Glob",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          },
+          {
+            "tool": "Read",
+            "skill_probe": false,
+            "skill_loaded": false,
+            "contamination_reasons": []
+          }
+        ],
+        "output": "```json\n{\"extension\": {\"print\": \"H52-EH\", \"section\": 126, \"prior_law\": \"2029-03-31\", \"sunset\": \"2032-03-31\"}, \"deck_relay\": {\"H52-EH\": true, \"S14-RS\": false}, \"staffing\": {\"F-28\": {\"count\": 48, \"unit\": \"authorized positions\"}, \"C-09\": {\"count\": 31, \"unit\": \"people on duty\"}}, \"brief\": \"Corrected: The Island Docks Act 8(b) pilot is extended to March 31, 2032 by H52-EH (House engrossed, Sec. 126), not by Sec. 904. H52-EH Sec. 904 instead moves the Municipal Purchasing Act 4(d) sunset to September 30, 2031. Deck Relay: only H52-EH Sec. 134 would permit the waiver (remote piers served fewer than 12 days per quarter, by written inspector decision). S14-RS Sec. 415 expressly confers no exemption or waiver, so this is a chamber difference. Staffing: F-28 reports 48 authorized positions, including vacancies. C-09 counts 31 people on duty district-wide across all shifts (12 Bay, 10 Crane, 9 East), not a single shift; 3 people on leave are excluded.\"}\n```",
+        "answer_format": "fenced",
+        "artifacts": {},
+        "checks": {
+          "extension-by-subject": false,
+          "relay-by-current-print": true,
+          "staffing-calibers": true
+        },
+        "score": 0.6666666666666666,
+        "passed": false,
+        "seconds": 17.274,
+        "usage": {
+          "input_tokens": 6,
+          "cache_creation_input_tokens": 6005,
+          "cache_read_input_tokens": 19073,
+          "output_tokens": 2699,
+          "output_tokens_details": {
+            "thinking_tokens": 1535
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 6005
+          },
+          "inference_geo": "global",
+          "iterations": [],
+          "speed": "standard",
+          "fallback_credit": null
+        },
+        "tokens": 27783,
+        "models": [
+          "claude-haiku-5.5"
+        ],
+        "cost_usd": 0.0022914550000000004,
+        "turns": 10
+      }
+    ]
+  },
+  "verdict": "inconclusive",
+  "limits": {
+    "seconds_per_run": 300,
+    "total_tokens": 1500000,
+    "turns_per_run": 12,
+    "usd_per_run": 1.0
+  },
+  "total_tokens": 264440,
+  "skipped_trials": []
+}
