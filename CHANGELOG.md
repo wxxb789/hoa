@@ -8,6 +8,7 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 - Fix necessity eval contamination checks to exempt fixture paths, recover JSON answers from
   wrapped replies, and stop scheduling trials at an optional cumulative token cap.
+- Update GDD Observer to the Paseo 0.16.1 SDK and keep its React dependencies aligned with the host.
 - Compare no skill, frozen terse guidance, and a full skill in the necessity runner. Add forced
   and natural activation modes, isolated Codex trials, and threshold-based verdicts.
 - Update GDD Observer to the Paseo 0.16 SDK and matching React runtime dependencies while retaining

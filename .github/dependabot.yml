@@ -13,6 +13,12 @@ updates:
     schedule:
       interval: weekly
     ignore:
+      # These follow the Paseo host; update them together with @getpaseo/plugin.
+      - dependency-name: react
+      - dependency-name: react-native
+      - dependency-name: react-test-renderer
+      - dependency-name: "@types/react"
+      - dependency-name: "@types/react-test-renderer"
       # Match the Observer's minimum supported Node.js major.
       - dependency-name: "@types/node"
         versions: [">=21"]
