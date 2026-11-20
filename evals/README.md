@@ -152,6 +152,56 @@ allows discovery, with the copy in `<trial>/home/.pi/agent/skills/<name>/SKILL.m
 Neither control has an installed copy. These settings isolate default home
 lookups, not explicit file access outside the trial.
 
+### Run Pi with the WSL filesystem boundary
+
+On Windows, use `--runtime pi --sandbox wsl` to prevent explicit reads of
+Windows drives and other WSL home directories. From the repository root in
+PowerShell:
+
+```powershell
+$repo = (Get-Location).Path
+uv run --script "$repo/evals/setup_pi_wsl.py"
+uv run --script "$repo/evals/run_necessity_eval.py" "$repo/evals/tasks/set-b/ghc-search.json" --runtime pi --sandbox wsl --mode natural --repeats 1 --results "$repo/.tmp-artifacts/pi-wsl-smoke"
+```
+
+Setup uses root in the existing WSL2 `Ubuntu-24.04` distro to install Bubblewrap
+and a checksum-verified Pi release (default `1.6.0`, override with
+`--pi-version`). It creates the dedicated non-login `hoa-trial` account with no
+sudo or supplementary groups. It copies only
+`tencent-litellm/deepseek-v4.1-flash-fast` and its existing Windows Pi provider
+credentials to a root-only file in WSL. The runner checks them against the
+Windows Pi configuration so report redaction cannot use stale credentials.
+Rerun setup to refresh credentials or repair the installation. Use the same
+`--wsl-distro` on setup and runs to select
+another Ubuntu 24.04 instance. Neither command changes global WSL settings.
+On non-Windows systems both commands skip without running Pi.
+
+The supervisor stages each trial under the dedicated account's home. Pi and its
+children run under that account in a separate mount and PID namespace, with
+no mount of `/mnt`, other home directories, or the WSL Windows interop bridge.
+Only read-only runtime/system files and the fresh trial profile and workspace
+are mounted. Startup aborts if the boundary check fails. For a credential-free
+probe of the installed boundary in PowerShell:
+
+```powershell
+$wsl = (Get-Command wsl.exe).Source
+'null' | & $wsl --distribution Ubuntu-24.04 --user root --cd / --exec /usr/bin/unshare --mount --propagation private -- /usr/bin/python3 -I /opt/hoa-pi-sandbox/wsl_pi.py --probe
+```
+
+Only the fixture and the treatment's skill files are sent in from Windows.
+The transient JSON session stream and rubric-listed regular files (no links,
+up to 64 KiB each) are returned for existing trace checks and scoring. Schema 3
+reports record `"sandbox": "wsl"`; no raw traces or Pi sessions are retained.
+The sandbox shares networking with WSL so Pi can reach its provider, and Pi can
+read its own provider configuration. Use only trusted tasks and providers.
+
+To run a batch, choose a fresh results directory and invoke the same runner
+once per task, serially, with `--sandbox wsl --mode natural --repeats 3` (or
+another fixed repeat count). Use one common `--results` directory for distinct
+task IDs; reruns of the same task and mode on the same day need a fresh directory.
+
+### Interpret tool traces
+
 Codex CLI 0.171.0 still discovers `$CODEX_HOME/skills/<name>/SKILL.md`, the
 legacy user root intentionally used here. On Windows it also enumerates the real
 Known Folder profile's `.agents/skills`; the runner excludes those documents
@@ -179,8 +229,8 @@ This tool-trace check is necessary for a valid comparison, but is not an OS-leve
 file-access audit; it does not reconstruct all shell behavior or observe untraced reads.
 
 Run only trusted tasks, skills, executables and providers in an unmanaged
-environment. Profile and tool isolation do not constrain an arbitrary native
-process or a shell command to the temporary workspace. Do not opt in to shells
+environment. Without the WSL sandbox, profile and tool isolation do not constrain
+an arbitrary native process or a shell command to the temporary workspace. Do not opt in to shells
 for tasks that can modify the real host, start servers, spawn background
 processes, or open windows. Sibling skill dependencies are not installed.
 
