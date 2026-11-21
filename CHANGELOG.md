@@ -6,6 +6,8 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 ## 2026-11-21
 
+- gdd-route-pi: pair DeepSeek with an independent reviewer for multi-brief features, review the spec's
+  failure modes before the first brief, and name where overflow goes under a size cap.
 - Delegate gdd's fresh `implement` stage to a runtime-offered `ce-work mode:return-to-caller` only
   when it takes an explicit plan path or bounded statement, can carry the verbatim gate and working
   directory as separate caller context, and will run natively or on an operator-authorized route;
