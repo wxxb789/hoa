@@ -33,7 +33,8 @@ contract is satisfied and the gates have actually run.
    update its index, reconcile any contract/grammar/stability document the change makes stale).
 5. **Run the gates yourself** and record real output:
    `${GATES}`
-   Run them as given: one runnable command with its explicit working directory. A gate you did not
+   When the repo supports it, `${GATES}` is one runnable command with an explicit working directory
+   (the operator passes it through `--gates`); otherwise run each gate as given. A gate you did not
    run is missing; never report a check as passed without its exit code.
 6. Sequencing rule: never run a measurement/benchmark harness concurrently with the full test
    suite on this host — that gets both killed for memory and looks like a code failure.

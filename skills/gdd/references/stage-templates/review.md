@@ -9,21 +9,32 @@ Start only after the simplify findings were applied or the pass was recorded as 
 ## Prefer the runtime's read-only reviewer
 
 If your runtime's own skill discovery offers a `ce-code-review` skill that accepts a read-only
-`mode:agent`, invoke it through that runtime's skill mechanism — never install it. Verify
-the checkout is at `${HEAD_SHA}`, then pass `mode:agent` and `base:${BASE_SHA}` so the review covers
-exactly this increment; never pass an apply token. **Local-only:** state in the invocation that no
-external or peer model receives the diff. Only a project profile that names a peer and grants that
-call its own authority may override that.
+`mode:agent`, invoke it through that runtime's skill mechanism — never install it. Before it gets
+the diff, establish two things. First, the checkout is clean at `${HEAD_SHA}`: `git status
+--porcelain` shows no staged or unstaged tracked delta — a dirty checkout reviews something other
+than what ships. Second, the invocation supports the declared no-peer boundary. Then pass
+`mode:agent` and `base:${BASE_SHA}` and state explicitly that no external or peer model receives
+the diff. A dirty checkout gets a clean authorized checkout pinned to `${HEAD_SHA}`, or the fallback
+below; never stash or clean paths you were not asked to move. If the no-peer boundary is not
+established before launch, fall back before the diff is sent. Only a project profile that names a
+peer and holds separate authority for that review run may override the local-only rule; the profile
+preference alone is not current authorization.
 
-Accept the result only when it reports `status: complete`, carries an artifact path or run id, and
-its receipt names head `${HEAD_SHA}` and base `${BASE_SHA}`. Anything else — skill absent, failed or
-degraded run, no receipt, different range — is **unavailable**: name which one in your report and run
-the report-only review below yourself. A degraded receipt is not a clean review. Carry the receipt
-(status, verdict, run id or artifact path, reviewed range) into your report and the result `summary`,
-and map every retained finding into `findings` below: `location` = `file:line`, `claim` = what is
-wrong and why it matters, `fix` = suggested fix or null. Judge those findings under the rules below;
-the receipt does not set the stage verdict, and it never replaces the head-bound machine-review
-marker the operator runs at merge.
+Let a started invocation settle and finish its documented recovery and cleanup — terminal
+unavailability is an outcome after recovery, not a first error. Accept the result only when it
+reports `status: complete`, carries an artifact path or run id, its receipt names head `${HEAD_SHA}`
+and base `${BASE_SHA}`, and its scope evidence covers the same changed paths. Keep the full receipt
+retrievable from the gdd run. Anything else — skill absent, failed or degraded run, no receipt,
+different range or scope, or required coverage the run left out — is **unavailable** or
+**incomplete**: name which one in your report and run the report-only review below yourself, filling
+any materially missing coverage before approval is considered. An omission the invocation declares
+intentional (depth, peer) is not a coverage failure; a required reviewer that failed is. A degraded
+receipt is not a clean review. Carry the receipt (status, verdict, run id or artifact path, reviewed
+range and scope) into your report and the result `summary`, and map every retained finding into
+`findings` below: `location` = `file:line`, `claim` = what is wrong and why it matters, `fix` =
+suggested fix or null. Judge those findings under the rules below; the receipt does not set the
+stage verdict, and it never replaces the head-bound machine-review marker the operator runs at
+merge.
 
 MODE: **report only**. Do not edit files, do not commit, do not push.
 
@@ -71,7 +82,8 @@ range, changed paths and contract — each with its own verdict line (`APPROVE |
 DECISION_NEEDED (<question>) | BLOCKED:no_progress`) and stable IDs (`STD-A01…`, `SPEC-A01…`). Keep
 the test-code triage above in the Standards axis; the Spec axis answers one line per acceptance
 clause. If a `(axis, rule, file, mechanism)` quadruple repeats a prior round, stop at
-`BLOCKED:no_progress` instead of starting another round.
+`BLOCKED:no_progress` instead of starting another round. A single receipt from an optional reviewer
+cannot substitute for the two verdicts; use its findings as input to both.
 
 ## Stage result
 

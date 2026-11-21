@@ -8,14 +8,17 @@
    `--dry-run` range covers exactly the whole increment.
 2. **Reuse the runtime's read-only reviewer first where it is installed.** The `review` stage
    template has the worker try `ce-code-review mode:agent` first, through its own runtime's skill
-   discovery, on `${BASE_SHA}..${HEAD_SHA}`, local-only, with gdd's own report-only review as the
-   fallback. Accept the receipt only if it reports `status: complete` with an artifact path or run id
-   and its reported base and head match the dispatched range; retain the receipt with the run and
-   re-read every finding it produced. A missing skill, a failed or degraded run, a missing receipt,
-   or a mismatched range is disclosed — a degraded receipt is not a clean review. No external or
-   peer model receives the diff unless the project profile names that peer and carries its own
-   authority. This authoring-stage receipt never replaces the head-bound machine-review marker in
-   Phase 6.
+   discovery, on `${BASE_SHA}..${HEAD_SHA}` from a checkout clean at that head, with gdd's own
+   report-only review as the fallback — and only when the invocation supports the declared no-peer
+   boundary before it gets the diff. Let it settle and finish its documented recovery; accept the
+   receipt only if it reports `status: complete` with an artifact path or run id, its reported base,
+   head and scope cover the dispatched range, and no required coverage failed — an intentional
+   depth/peer omission is not a failure. Retain the full receipt with the run and re-read every
+   finding it produced. A missing skill, a failed or degraded run, an incomplete receipt, or a
+   mismatched range is disclosed, and the fallback completes any materially missing coverage — a
+   degraded receipt is not a clean review. No external or peer model receives the diff unless the
+   project profile names that peer and the operator holds separate authority for that review run.
+   This authoring-stage receipt never replaces the head-bound machine-review marker in Phase 6.
 3. Grade by what is FALSE, not by the reviewer's severity label: a P2 that makes documentation state
    something untrue outranks every tidy-up. Gaps that pin a documented promise are real; gaps that
    mirror an internal shape are not.

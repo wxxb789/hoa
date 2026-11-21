@@ -14,7 +14,7 @@ last generation of prompts drifted from the transport it was written for.
 | implement | `implement.md` | yes | full contract + gates + goal-close ritual |
 | simplify | `simplify.md` | yes | report only, standalone mode |
 | apply | `apply.md` | yes | needs `--findings FILE` (accepted/rejected table) |
-| review | `review.md` | yes | report only; start after apply |
+| review | `review.md` | yes | report only; start after apply or a recorded skip |
 | fix | `fix.md` | yes | needs `--findings FILE` |
 | verify, gates, pr, babysit, merge | — | no | mechanical; the operator runs them |
 
@@ -31,6 +31,10 @@ last generation of prompts drifted from the transport it was written for.
 | `${GATES}` | `--gates`, else `$GDD_GATES`, else `-` |
 | `${FINDINGS_FILE}` | `--findings` (absolute path) |
 | `${DATE}` | local date of dispatch |
+
+`${GATES}` is free-form text substituted verbatim, not a command object: when the repo supports it,
+pass one runnable command with an explicit working directory through `--gates`; otherwise the worker
+runs each gate as given.
 
 ## Findings files (apply / fix)
 

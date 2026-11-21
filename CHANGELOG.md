@@ -56,6 +56,14 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
   `project-phase-closeout` into `report-claim-audit`.
 - Replace `ai-coding-agent-delegation` with lightweight delegation in `gdd`:
   isolated CLI handoffs stop at independent acceptance, without a stage ledger or merge.
+- Harden the gdd CE integration per the independent review: require a clean checkout at the
+  dispatched head, a no-peer-capable invocation before the diff is sent, a settled receipt whose
+  scope evidence matches, and both dual-axis verdicts.
+- Gate the settled tree in Phase 2 and the shipping commit in Phase 5 with per-finding before/after
+  evidence; count the whole verified increment, including removals and executable tests, for the
+  simplify threshold; record the simplify skip with base, head and next action; re-prove freshness
+  before measuring and after probes; require print-only drafting from the sealed input; and
+  paraphrase the CE-derived simplify and probe passages with public attribution.
 
 ## 2026-11-20
 
