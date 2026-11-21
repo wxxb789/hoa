@@ -8,6 +8,10 @@ uv run scripts/delivery-state.py show --repo <path> --goal <id>
 uv run scripts/gdd.py close --repo <path> --goal <id> --pr <N>
 ```
 
+A stage that was deliberately skipped still gets a completion row — same `--base` and `--head` as the
+increment, `--next review`, and a note starting `exit=not-run skipped: <reason>`. Set all three:
+`append` defaults them to missing and `show` can only print what was stored.
+
 `gdd.py stage` counts the rows for this repo+goal+stage before dispatching and refuses the third
 `implement`, `simplify` or `review` run; `--over-budget` is the explicit override, and every dispatch
 writes its `rounds_simplify` / `rounds_review` value so the next session can read the count instead of

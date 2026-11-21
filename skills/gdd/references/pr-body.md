@@ -3,6 +3,10 @@
 Copy this shape; replace every `<…>`. The previous goal's merged PR body is the best starting
 point — open it with `gh pr view <PR> --json body` and reuse its structure.
 
+Draft on the final tree from the sealed diff plus the verified clause map, evidence and limits —
+never from an earlier stage's numbers. A description-only draft from a PR-writing skill is raw
+material, not the contract: this shape wins, and every value is re-derived before it ships.
+
 ```markdown
 ## Goal <NNNN> — <goal title as written in the goal file>
 

@@ -16,17 +16,27 @@ contract is satisfied and the gates have actually run.
 
 ## Deliver
 
-1. **Plan first**, in the repo's designated plan location (never in a directory the repo forbids for
-   new work): public/API shape, exact edge-case semantics the contract demands, evidence plan,
-   design trade-offs, and anything you consider out of scope with a reason.
-2. **Then implement**: source, tests, docs, evidence record, examples, and any baseline/manifest
+1. **Reuse the accepted plan.** Execute the accepted plan by path (the goal file, the design doc it
+   names, the shape reference); do not replan a settled design, reopen a decided dependency, or weaken
+   a contract clause. Write a short plan only for implementation choices the accepted plan leaves
+   unresolved, in the repo's designated plan location (never in a directory the repo forbids for new
+   work): public/API shape, exact edge-case semantics the contract demands, evidence plan, design
+   trade-offs, and anything you consider out of scope with a reason.
+2. **Check before you change.** For each contract clause, check whether the tree already satisfies it
+   and find the existing test that pins it. Where practical, observe the expected failure before
+   changing behaviour — extend or add the clause test and watch it fail — or capture a
+   characterization baseline of the current behaviour first. If neither is practical, say so and name
+   the replacement proof.
+3. **Then implement**: source, tests, docs, evidence record, examples, and any baseline/manifest
    updates the repo requires.
-3. **Close the increment** the way this repo closes one (archive/move the contract file unchanged,
+4. **Close the increment** the way this repo closes one (archive/move the contract file unchanged,
    update its index, reconcile any contract/grammar/stability document the change makes stale).
-4. **Run the gates yourself** and record real output:
+5. **Run the gates yourself** and record real output:
    `${GATES}`
-   A gate you did not run is missing; never report a check as passed without its exit code.
-5. Sequencing rule: never run a measurement/benchmark harness concurrently with the full test
+   When the repo supports it, `${GATES}` is one runnable command with an explicit working directory
+   (the operator passes it through `--gates`); otherwise run each gate as given. A gate you did not
+   run is missing; never report a check as passed without its exit code.
+6. Sequencing rule: never run a measurement/benchmark harness concurrently with the full test
    suite on this host — that gets both killed for memory and looks like a code failure.
 
 ## Rules
@@ -41,8 +51,10 @@ contract is satisfied and the gates have actually run.
 
 ## Finish with a report
 
-Files written (grouped), gate results with counts and exit codes, contract clauses you consider
-covered and how, residual risks and known limits. No adjectives in place of numbers.
+Files written (grouped); gate results with counts and exit codes; and per contract clause the green
+command, its exit code, the evidence row that proves it, and the expected failure or baseline you
+observed first (or the replacement proof you used). Residual risks and known limits. No adjectives
+in place of numbers.
 
 ## Stage result
 

@@ -82,3 +82,7 @@ IRREVERSIBLE and therefore needs owner confirmation — never fold publishing in
 
 Anything that must never be committed (private paths, personal notes, credentials) beyond the usual,
 and whether the repo is public (it changes what prose is allowed).
+
+## 12. Simplify threshold
+
+`default`, a substantive-code-line number, or `required`. A non-default value states its reason.

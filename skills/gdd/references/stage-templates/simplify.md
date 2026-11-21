@@ -18,10 +18,10 @@ would have caught it). Then a short list of what is already sound and should NOT
 ## Hard constraints
 
 1. Contract, evidence and decision records are deliverables, not prose to prune: do not propose
-   deleting measured rows, disclosed limits, non-adoptions, maintainer judgments or boundary
-   statements.
-2. Tests that pin a contract clause are proof, not noise: do not propose deleting, weakening,
-   renaming or merging them, nor the test-only code they call.
+   deleting an evidence row, a disclosed limit, a non-adoption, a maintainer judgment or a boundary
+   statement.
+2. The increment's proof tests are proof, not noise: do not propose deleting, weakening, renaming,
+   moving or merging a test that pins a contract clause, nor removing the test-only code it calls.
 3. Do not propose unmeasured micro-optimizations, and do not propose representation changes that
    alter default-value semantics.
 

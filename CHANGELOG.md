@@ -6,6 +6,21 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 ## 2026-11-21
 
+- Reuse the runtime's read-only `ce-code-review mode:agent` in gdd's fresh review stage when the
+  runtime offers it: gdd's exact base/head, local-only, a complete receipt with a matching range or
+  gdd's own report-only fallback, findings mapped into the existing review result. The receipt does
+  not replace the head-bound machine-review marker at merge.
+- Make the gdd `implement` and `fix` stage prompts proof-first: reuse the accepted plan by path,
+  observe the expected failure or baseline before changing behaviour, record the green command, exit
+  code and clause it proves in the existing report, and hand gates as one runnable command.
+- Make the gdd simplify/apply pass conditional: skip it for a documentation-only, mechanical, or
+  sub-threshold diff and record the skip and its reason in the ledger; a contract or profile may set
+  the threshold or require the pass, and correctness review still runs.
+- Reuse PR drafting without `ce-commit-push-pr`'s publishing tail: gdd may take a description-only,
+  print-only draft built from the sealed diff plus its verified clause, evidence and limits, with
+  `pr-body.md` as the fallback. Branch, remote and PR probes run fresh, one argv call each, and a
+  probe error means unknown, never "no PR"; commits stay explicit-path, the seal is verified
+  before push, and gdd owns publication and its own CI watcher.
 - Add brief-shaping guidance for bounded DeepSeek jobs to `gdd-route-pi`.
 - Record the first sandboxed Pi natural-mode screen in `evals/results/2026-11-21-pi-sandbox-natural.md`.
 - Record the offending path (`contamination_paths`) for catalog and host-skill reads in necessity trial traces.
@@ -41,6 +56,14 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
   `project-phase-closeout` into `report-claim-audit`.
 - Replace `ai-coding-agent-delegation` with lightweight delegation in `gdd`:
   isolated CLI handoffs stop at independent acceptance, without a stage ledger or merge.
+- Harden the gdd CE integration per the independent review: require a clean checkout at the
+  dispatched head, a no-peer-capable invocation before the diff is sent, a settled receipt whose
+  scope evidence matches, and both dual-axis verdicts.
+- Gate the settled tree in Phase 2 and the shipping commit in Phase 5 with per-finding before/after
+  evidence; count the whole verified increment, including removals and executable tests, for the
+  simplify threshold; record the simplify skip with base, head and next action; re-prove freshness
+  before measuring and after probes; require print-only drafting from the sealed input; and
+  paraphrase the CE-derived simplify and probe passages with public attribution.
 
 ## 2026-11-20
 
