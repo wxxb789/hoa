@@ -49,12 +49,22 @@ You are about to create or change a skill. Before writing its content, settle th
 Hand-off to hoa (the operator's skill library):
 - hoa does not track Hermes built-in skills; do not propose them.
 - Check in, don't fork. Write every non-built-in skill as a candidate to
-  `unfettered-skills/<name>/SKILL.md` in hoa. That is the landing zone for this runtime's
-  skills: unconstrained, reached only by explicit path, `--full-depth` or a name retry, and
-  never a replacement for a curated skill. Never edit `skills/` directly.
-- Before publishing, run `uv run --script scripts/check_unfettered.py` in a hoa checkout and
-  fix every finding: sensitive content, a missing or mismatched candidate shape, or a name
-  collision with `skills/` or the retired list.
+  `unfettered-skills/<name>/SKILL.md` in hoa (required), with any support files under
+  `unfettered-skills/<name>/`; that is the landing zone for this runtime's skills:
+  unconstrained, not shown in normal root discovery while standard locations yield valid
+  skills, and reachable by explicit path, recursive fallback, `--full-depth` or a
+  specific-name retry. Never a replacement for a curated skill, and never edit `skills/`
+  directly.
+- Preflight the exact candidate, committed. Make the candidate-only local commit first
+  (only paths under `unfettered-skills/`), then run
+  `uv run --script scripts/check_unfettered.py --base <publication base>` in the checkout
+  against committed HEAD, using the base the change will actually be compared against
+  (`origin/main`, or the branch's merge base), and fix every finding: sensitive content, a
+  missing or mismatched candidate shape, or a name collision with `skills/` or the retired
+  list. A staged or uncommitted candidate is invisible to the checker, and a mixed change
+  that also touches another path must fail the base comparison. CI runs the same scan only
+  after the push, and neither the preflight nor CI can see content that an intermediate
+  commit added and a later commit removed.
 - Promotion is the operator's move, never a sync or a copy. One authorized PR deletes the raw
   copy and lands the normalized package in `skills/<name>/` at `metadata.revision: "1"`
   through hoa's port review and curated gates. Send the operator what changed and why (the

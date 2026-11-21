@@ -2,9 +2,10 @@
 
 Run: python -m pytest scripts/test_check_unfettered.py
 
-Every repository here is synthetic and throwaway. Token-shaped samples are
-assembled at runtime so this file carries no token-like literal; the feed-host
-sample is assembled for the same reason.
+Every repository here is synthetic and throwaway. Token-shaped and
+address-shaped samples are assembled at runtime so this file carries no
+token-like or address-like literal; the feed-host sample is assembled for the
+same reason.
 """
 from __future__ import annotations
 
@@ -25,16 +26,30 @@ BS = chr(92)
 
 # --- synthetic samples (never real values) ---------------------------------
 
+def ip4(a: int, b: int, c: int, d: int) -> str:
+    """Assemble an IPv4 sample so this source carries no literal address."""
+    return ".".join(str(part) for part in (a, b, c, d))
+
+
+def ip6(*hextets: str) -> str:
+    """Assemble an IPv6 sample; an empty hextet makes the `::` run."""
+    return ":".join(hextets)
+
+
 PRIVATE_KEY = "-----BEGIN RSA " + "PRIVATE KEY-----"
+OPENSSH_KEY = "-----BEGIN OPENSSH " + "PRIVATE KEY-----"
 ENCRYPTED_KEY = "-----BEGIN ENCRYPTED " + "PRIVATE KEY-----"
 PGP_KEY = "-----BEGIN PGP " + "PRIVATE KEY BLOCK-----"
 GITHUB_TOKEN = "gh" + "p_" + "A" * 20
 GITHUB_PAT = "github" + "_pat_" + "A" * 20
 SLACK_TOKEN = "xoxb" + "-" + "A" * 20
 AWS_KEY = "AKIA" + "A1B2C3D4E5F6G7H8"
+AWS_SESSION_KEY = "ASIA" + "A1B2C3D4E5F6G7H8"
 OPENAI_PROJECT = "sk-" + "proj-" + "A" * 20
+OPENAI_SERVICE = "sk-" + "svcacct-" + "A" * 20
 OPENAI_LEGACY = "sk-" + "A" * 48
 STRIPE_KEY = "sk_" + "live_" + "A" * 16
+STRIPE_TEST_KEY = "sk_" + "test_" + "A" * 16
 EMAIL_SAMPLE = "person@" + "acme-corp.com"
 HOME_POSIX = "/home/" + "alice42"
 HOME_WINDOWS = "C:" + BS + "Users" + BS + "bob"
@@ -52,7 +67,13 @@ CLEAN_SAMPLES = [
     "AKIA" + "A" * 15,
     "AKIA" + "A" * 17,
     "AKIA" + "A" * 16 + "z",
+    "ASIA" + "A" * 15,
+    "ASIA" + "A" * 17,
+    "ASIA" + "A" * 16 + "z",
     "sk-" + "A" * 47,
+    "sk-" + "svcacct-" + "A" * 19,
+    "sk_" + "test_" + "A" * 15,
+    "sk_" + "test_" + "A" * 16 + "-",
     "-----BEGIN PUBLIC " + "KEY-----",
     "/home/" + "<user>" + "/project",
     "/Users/" + "<name>",
@@ -64,20 +85,20 @@ CLEAN_SAMPLES = [
     "C:" + BS + "Users" + BS + "~",
     "/srv/home/" + "alice",
     "/home//x",
-    "127.0.0.1",
-    "169.254.10.10",
-    "192.0.2.1",
-    "198.51.100.1",
-    "203.0.113.1",
-    "fe80::1",
-    "::1",
-    "172.15.255.255",
-    "172.32.0.0",
-    "192.169.0.1",
-    "11.0.0.1",
-    "::ffff:8.8.8.8",
-    "::ffff:127.0.0.1",
-    "2001:db8::1",
+    ip4(127, 0, 0, 1),
+    ip4(169, 254, 10, 10),
+    ip4(192, 0, 2, 1),
+    ip4(198, 51, 100, 1),
+    ip4(203, 0, 113, 1),
+    ip6("fe80", "", "1"),
+    ip6("", "", "1"),
+    ip4(172, 15, 255, 255),
+    ip4(172, 32, 0, 0),
+    ip4(192, 169, 0, 1),
+    ip4(11, 0, 0, 1),
+    ip6("", "", "ffff", ip4(8, 8, 8, 8)),
+    ip6("", "", "ffff", ip4(127, 0, 0, 1)),
+    ip6("2001", "db8", "", "1"),
     "dev." + "azure.com/org/project/_git/repo",
 ]
 
@@ -134,6 +155,14 @@ def run_checker(root: Path, *args: str, env: dict[str, str] | None = None):
         [sys.executable, str(CHECKER), "--root", str(root), *args],
         capture_output=True, text=True, encoding="utf-8", errors="replace",
         creationflags=NO_WINDOW, env=process_env)
+
+
+def assert_no_sample_leak(output: str, sample: str, min_len: int = 4) -> None:
+    """No diagnostic may echo the value or any part of it."""
+    for size in range(min_len, len(sample) + 1):
+        for start in range(len(sample) - size + 1):
+            part = sample[start:start + size]
+            assert part not in output, f"diagnostic leaked {part!r}"
 
 
 def _blob(root: Path, data: bytes) -> str:
@@ -408,24 +437,34 @@ class TestEventEndpoints:
     def test_pr_non_main_branch_compares_merge_base_to_head(self, tmp_path):
         root = init_repo(tmp_path)
         write(root, "keep.txt", "keep\n")
-        base = commit_all(root)
+        fork = commit_all(root)
         git_text(root, "checkout", "--quiet", "-b", "release")
+        write(root, "release-only.txt", "release\n")
+        target = commit_all(root, "release change")
+        git_text(root, "checkout", "--quiet", fork)
+        git_text(root, "checkout", "--quiet", "-b", "feature")
         write(root, "unfettered-skills/probe/SKILL.md", valid_skill("probe"))
-        passing = commit_all(root)
-        result = run_checker(root, "--event", env=pr_env(base, passing))
+        head = commit_all(root, "candidate")
+        assert target != fork
+        result = run_checker(root, "--event", env=pr_env(target, head))
         assert result.returncode == 0, result.stdout + result.stderr
 
     def test_pr_non_main_branch_mixed_change_fails(self, tmp_path):
         root = init_repo(tmp_path)
         write(root, "keep.txt", "keep\n")
-        base = commit_all(root)
+        fork = commit_all(root)
         git_text(root, "checkout", "--quiet", "-b", "release")
+        write(root, "release-only.txt", "release\n")
+        target = commit_all(root, "release change")
+        git_text(root, "checkout", "--quiet", fork)
+        git_text(root, "checkout", "--quiet", "-b", "feature")
         write(root, "unfettered-skills/probe/SKILL.md", valid_skill("probe"))
         write(root, "outside.txt", "o\n")
-        head = commit_all(root)
-        result = run_checker(root, "--event", env=pr_env(base, head))
+        head = commit_all(root, "candidate and outside")
+        result = run_checker(root, "--event", env=pr_env(target, head))
         assert result.returncode == 1
         assert "outside.txt" in result.stdout
+        assert "release-only.txt" not in result.stdout
 
     def test_pr_snapshot_uses_checked_out_merge_tree(self, tmp_path):
         root = init_repo(tmp_path)
@@ -519,6 +558,18 @@ class TestShape:
         assert result.returncode == 1
         assert "unfettered-skills/probe: missing SKILL.md" in result.stdout
 
+    def test_empty_candidate_tree_reports_shape_and_path(self, tmp_path):
+        root = init_repo(tmp_path)
+        plumb_commit(root, {
+            "unfettered-skills/" + EMAIL_SAMPLE: {},
+        })
+        result = run_checker(root)
+        assert result.returncode == 1
+        lines = result.stdout.splitlines()
+        assert any(line.endswith("missing SKILL.md") for line in lines)
+        assert any(line.endswith(":1: email") for line in lines)
+        assert EMAIL_SAMPLE not in result.stdout + result.stderr
+
     def test_skill_md_as_symlink_fails(self, tmp_path):
         root = init_repo(tmp_path)
         plumb_commit(root, {
@@ -534,7 +585,7 @@ class TestShape:
         commit_all(root)
         result = run_checker(root)
         assert result.returncode == 1
-        assert "does not match directory 'probe'" in result.stdout
+        assert "does not match its directory name" in result.stdout
 
     @pytest.mark.parametrize("field, line", [
         ("name", 'name: ""'),
@@ -650,7 +701,7 @@ class TestCollisions:
         commit_all(root)
         result = run_checker(root)
         assert result.returncode == 1
-        assert "name collides with retired name 'foo'" in result.stdout
+        assert "name collides with a retired name" in result.stdout
 
     def test_collision_reported_on_outside_only_change(self, tmp_path):
         root = init_repo(tmp_path)
@@ -662,6 +713,55 @@ class TestCollisions:
         assert result.returncode == 1
         assert "landing-zone write mixed" not in result.stdout
         assert "name collides with curated skills/foo" in result.stdout
+
+    def test_empty_curated_tree_still_collides(self, tmp_path):
+        root = init_repo(tmp_path)
+        plumb_commit(root, {
+            "unfettered-skills/foo/SKILL.md": valid_skill("foo").encode(),
+            "skills/foo": {},
+        })
+        result = run_checker(root)
+        assert result.returncode == 1
+        assert "name collides with curated skills/foo" in result.stdout
+
+    def test_curated_gitlink_is_not_a_curated_directory(self, tmp_path):
+        root = init_repo(tmp_path)
+        write(root, "keep.txt", "keep\n")
+        seed = commit_all(root)
+        plumb_commit(root, {
+            "unfettered-skills/foo/SKILL.md": valid_skill("foo").encode(),
+            "skills/foo": ("160000", seed.encode()),
+        })
+        result = run_checker(root)
+        assert result.returncode == 0, result.stdout + result.stderr
+
+    def test_retired_collision_on_outside_only_registry_change(self, tmp_path):
+        root = init_repo(tmp_path)
+        write(root, "unfettered-skills/foo/SKILL.md", valid_skill("foo"))
+        base = commit_all(root)
+        write(root, "scripts/retired_skills.toml",
+              '[retired.foo]\nreplacement = "skills/bar"\nreason = "test"\n')
+        commit_all(root)
+        result = run_checker(root, "--base", base)
+        assert result.returncode == 1
+        assert "name collides with a retired name" in result.stdout
+
+    def test_candidate_free_snapshot_ignores_a_malformed_registry(self, tmp_path):
+        root = init_repo(tmp_path)
+        write(root, "keep.txt", "keep\n")
+        write(root, "scripts/retired_skills.toml", "this is not = [ toml\n")
+        commit_all(root)
+        result = run_checker(root)
+        assert result.returncode == 0, result.stdout + result.stderr
+
+    def test_malformed_registry_still_fails_with_candidates(self, tmp_path):
+        root = init_repo(tmp_path)
+        write(root, "unfettered-skills/foo/SKILL.md", valid_skill("foo"))
+        write(root, "scripts/retired_skills.toml", "this is not = [ toml\n")
+        commit_all(root)
+        result = run_checker(root)
+        assert result.returncode == 1
+        assert "cannot read retired names" in result.stdout
 
 
 # --- sensitive scan --------------------------------------------------------
@@ -679,29 +779,34 @@ class TestSensitiveScan:
     def test_each_signature_is_reported(self, tmp_path):
         samples = [
             (PRIVATE_KEY, "private-key"),
+            (OPENSSH_KEY, "private-key"),
             (ENCRYPTED_KEY, "private-key"),
             (PGP_KEY, "private-key"),
             (GITHUB_TOKEN, "github-token"),
             (GITHUB_PAT, "github-token"),
             (SLACK_TOKEN, "slack-token"),
             (AWS_KEY, "aws-access-key"),
+            (AWS_SESSION_KEY, "aws-access-key"),
             (OPENAI_PROJECT, "openai-key"),
+            (OPENAI_SERVICE, "openai-key"),
             (OPENAI_LEGACY, "openai-key"),
             (STRIPE_KEY, "stripe-key"),
+            (STRIPE_TEST_KEY, "stripe-key"),
             (EMAIL_SAMPLE, "email"),
             (HOME_POSIX, "home-path"),
             (HOME_WINDOWS, "home-path"),
-            ("10.0.0.0", "private-ip"),
-            ("10.255.255.255", "private-ip"),
-            ("172.16.0.0", "private-ip"),
-            ("172.31.255.255", "private-ip"),
-            ("192.168.0.0", "private-ip"),
-            ("192.168.255.255", "private-ip"),
-            ("fc00::", "private-ip"),
-            ("fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff", "private-ip"),
-            ("::ffff:10.20.30.40", "private-ip"),
-            ("[fd00::1]:443", "private-ip"),
-            ("192.168.1.1:8080", "private-ip"),
+            (ip4(10, 0, 0, 0), "private-ip"),
+            (ip4(10, 255, 255, 255), "private-ip"),
+            (ip4(172, 16, 0, 0), "private-ip"),
+            (ip4(172, 31, 255, 255), "private-ip"),
+            (ip4(192, 168, 0, 0), "private-ip"),
+            (ip4(192, 168, 255, 255), "private-ip"),
+            (ip6("fc00", "", ""), "private-ip"),
+            (ip6("fdff", "ffff", "ffff", "ffff", "ffff", "ffff", "ffff", "ffff"),
+             "private-ip"),
+            (ip6("", "", "ffff", ip4(10, 20, 30, 40)), "private-ip"),
+            ("[" + ip6("fd00", "", "1") + "]:443", "private-ip"),
+            (ip4(192, 168, 1, 1) + ":8080", "private-ip"),
             (FEED_URL, "corporate-feed"),
         ]
         hits = "\n".join(sample for sample, _rule in samples) + "\n"
@@ -740,7 +845,7 @@ class TestSensitiveScan:
             "assets/mixed.txt":
                 "/home/<user> and " + HOME_POSIX + "\n"
                 "C:" + BS + "Users" + BS + "Public and " + HOME_WINDOWS + "\n"
-                "10.0.0.1 10.0.0.2\n",
+                + ip4(10, 0, 0, 1) + " " + ip4(10, 0, 0, 2) + "\n",
         })
         result = run_checker(root)
         assert result.returncode == 1
@@ -753,12 +858,12 @@ class TestSensitiveScan:
     def test_path_hit_is_reported_redacted(self, tmp_path):
         root = init_repo(tmp_path)
         write(root, "unfettered-skills/probe/SKILL.md", valid_skill("probe"))
-        write(root, "unfettered-skills/probe/" + EMAIL_SAMPLE + ".t1", "clean\n")
+        write(root, "unfettered-skills/probe/" + EMAIL_SAMPLE + "+t1", "clean\n")
         commit_all(root)
         result = run_checker(root)
         assert result.returncode == 1
         assert result.stdout.splitlines() == [
-            "unfettered-skills/<redacted>.t1:1: email",
+            "unfettered-skills/<redacted>+t1:1: email",
         ]
 
     def test_home_path_in_a_tree_path_is_redacted(self, tmp_path):
@@ -773,6 +878,105 @@ class TestSensitiveScan:
             "unfettered-skills/probe/<redacted>:1: home-path",
         ]
 
+    def test_malformed_addresses_are_not_reported(self, tmp_path):
+        malformed = [
+            ip4(10, 0, 0, 1) + ".:8080",
+            ip4(10, 0, 0, 1) + "..",
+            ip6("fc00", "", "1", "", ""),
+        ]
+        root = scan_repo(tmp_path, {
+            "assets/malformed.txt": "\n".join(malformed) + "\n",
+        })
+        result = run_checker(root)
+        assert result.returncode == 0, result.stdout + result.stderr
+
+    def test_field_delimited_address_is_found(self, tmp_path):
+        root = scan_repo(tmp_path, {
+            "assets/field.txt": "src:" + ip4(10, 0, 0, 5) + "\n",
+        })
+        result = run_checker(root)
+        assert result.returncode == 1
+        assert result.stdout.splitlines() == [
+            "unfettered-skills/probe/assets/field.txt:1: private-ip",
+        ]
+
+    def test_email_whole_candidate_validation(self, tmp_path):
+        invalid_final_label = "person@" + "host.com.invalid9"
+        unapproved_after_approved = "person@" + "example.com.evil.com"
+        root = scan_repo(tmp_path, {
+            "assets/emails.txt":
+                invalid_final_label + "\n" + unapproved_after_approved + "\n",
+        })
+        result = run_checker(root)
+        assert result.returncode == 1
+        assert result.stdout.splitlines() == [
+            "unfettered-skills/probe/assets/emails.txt:2: email",
+        ]
+
+    def test_path_and_blob_hits_never_echo_the_filename(self, tmp_path):
+        root = scan_repo(tmp_path, {
+            "assets/" + EMAIL_SAMPLE + ".txt": "x " + GITHUB_TOKEN + "\n",
+        })
+        result = run_checker(root)
+        assert result.returncode == 1
+        output = result.stdout + result.stderr
+        assert "email" in output and "github-token" in output
+        assert_no_sample_leak(output, EMAIL_SAMPLE)
+        assert_no_sample_leak(output, GITHUB_TOKEN)
+
+    def test_unicode_prefix_path_hit_never_leaks_a_match_part(self, tmp_path):
+        root = init_repo(tmp_path)
+        plumb_commit(root, {
+            "unfettered-skills/probe/SKILL.md": valid_skill("probe").encode(),
+            "unfettered-skills/probe/\u65e5\u672c\u8a9e" + EMAIL_SAMPLE + ".txt":
+                b"clean\n",
+        })
+        result = run_checker(root)
+        assert result.returncode == 1
+        output = result.stdout + result.stderr
+        assert "email" in output
+        assert_no_sample_leak(output, EMAIL_SAMPLE)
+
+    def test_mixed_change_diagnostics_never_echo_matched_text(self, tmp_path):
+        root = init_repo(tmp_path)
+        write(root, "keep.txt", "keep\n")
+        base = commit_all(root)
+        write(root, "keep.txt", "edited\n")
+        write(root, "unfettered-skills/" + EMAIL_SAMPLE + "/SKILL.md",
+              valid_skill(EMAIL_SAMPLE) + "\n" + GITHUB_TOKEN + "\n")
+        write(root, "outside/" + EMAIL_SAMPLE + ".txt", "o\n")
+        commit_all(root)
+        result = run_checker(root, "--base", base)
+        assert result.returncode == 1
+        output = result.stdout + result.stderr
+        assert "landing-zone write mixed with other paths" in result.stdout
+        assert_no_sample_leak(output, EMAIL_SAMPLE)
+        assert_no_sample_leak(output, GITHUB_TOKEN)
+
+    def test_shape_diagnostics_never_echo_a_frontmatter_value(self, tmp_path):
+        root = init_repo(tmp_path)
+        write(root, "unfettered-skills/probe/SKILL.md",
+              "---\nname: " + EMAIL_SAMPLE + "\ndescription: ok.\n---\n\n# x\n")
+        commit_all(root)
+        result = run_checker(root)
+        assert result.returncode == 1
+        output = result.stdout + result.stderr
+        assert "does not match its directory name" in result.stdout
+        assert_no_sample_leak(output, EMAIL_SAMPLE)
+
+    def test_collision_diagnostics_never_echo_a_candidate_name(self, tmp_path):
+        root = init_repo(tmp_path)
+        write(root, "unfettered-skills/" + EMAIL_SAMPLE + "/SKILL.md",
+              valid_skill(EMAIL_SAMPLE))
+        write(root, "skills/" + EMAIL_SAMPLE + "/SKILL.md",
+              valid_skill(EMAIL_SAMPLE))
+        commit_all(root)
+        result = run_checker(root)
+        assert result.returncode == 1
+        output = result.stdout + result.stderr
+        assert "name collides with curated" in result.stdout
+        assert_no_sample_leak(output, EMAIL_SAMPLE)
+
     def test_diagnostics_never_echo_matched_text(self, tmp_path):
         samples = [PRIVATE_KEY, GITHUB_TOKEN, EMAIL_SAMPLE, HOME_POSIX, FEED_URL]
         root = scan_repo(tmp_path, {
@@ -784,6 +988,7 @@ class TestSensitiveScan:
         output = result.stdout + result.stderr
         for sample in samples:
             assert sample not in output
+            assert_no_sample_leak(output, sample, min_len=5)
 
 
 # --- repository integration confirmations ----------------------------------

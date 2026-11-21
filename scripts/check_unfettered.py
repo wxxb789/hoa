@@ -68,9 +68,9 @@ def git(root: Path, *args: str, check: bool = True) -> subprocess.CompletedProce
         creationflags=_creation_flags(),
     )
     if check and result.returncode != 0:
-        detail = result.stderr.decode("utf-8", "replace").strip()
-        raise CheckError(f"git {args[0]} failed: {detail}" if detail
-                         else f"git {args[0]} failed with exit code {result.returncode}")
+        # Never forward Git stderr: it can echo a repository path that carries
+        # sensitive content.
+        raise CheckError(f"git {args[0]} failed with exit code {result.returncode}")
     return result
 
 
@@ -142,9 +142,9 @@ def isolation_findings(root: Path, base: str, head: str) -> list[str]:
         f"landing-zone write mixed with other paths: "
         f"{len(inside_writes)} inside write(s), {len(outside)} outside change(s)"
     ]
-    findings += [f"  inside  {record.status} {_display(record.path)}"
+    findings += [f"  inside  {record.status} {_safe_path(record.path)}"
                  for record in inside_writes]
-    findings += [f"  outside {record.status} {_display(record.path)}"
+    findings += [f"  outside {record.status} {_safe_path(record.path)}"
                  for record in outside]
     return findings
 
@@ -161,7 +161,7 @@ class Entry:
 
 
 def tree_entries(root: Path, rev: str) -> list[Entry]:
-    output = git(root, "ls-tree", "-r", "-z", "--full-tree", rev).stdout
+    output = git(root, "ls-tree", "-r", "-t", "-z", "--full-tree", rev).stdout
     entries: list[Entry] = []
     for record in output.split(b"\0"):
         if not record:
@@ -210,19 +210,37 @@ _REGEX_RULES: tuple[tuple[str, re.Pattern[bytes]], ...] = (
     ("corporate-feed", FEED_HOST),
 )
 
-_EMAIL = re.compile(
+_EMAIL_CANDIDATE = re.compile(
     rb"(?<![A-Za-z0-9.!#$%&'*+/=?^_`{|}~@-])"
     rb"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@"
-    rb"(?:[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\.)+[A-Za-z]{2,}"
-    rb"(?![A-Za-z0-9_-])"
+    rb"[A-Za-z0-9.-]+"
 )
+_EMAIL_LABEL = re.compile(rb"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?")
+_EMAIL_FINAL = re.compile(rb"[A-Za-z]{2,}")
 _EMAIL_EXEMPT = (b"example.com", b"example.net", b"example.org")
 
-_IP_TOKEN = re.compile(rb"[0-9A-Fa-f:.]+")
-_WORD_BYTE = re.compile(rb"[A-Za-z0-9_]")
-_IPV4_PRIVATE = tuple(ipaddress.ip_network(net)
-                      for net in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"))
-_ULA_PRIVATE = ipaddress.ip_network("fc00::/7")
+_IPV4_CANDIDATE = re.compile(
+    rb"(?<![0-9A-Za-z_.-])"
+    rb"((?:\d{1,3}\.){3}\d{1,3})"
+    rb"(?::[0-9]{1,5})?"
+    rb"\.?"
+    rb"(?![0-9A-Za-z_:.-])"
+)
+_IPV6_CANDIDATE = re.compile(
+    rb"(?<![A-Za-z0-9_-])(::[0-9A-Fa-f:.]*|[0-9A-Fa-f][0-9A-Fa-f:.]*)"
+)
+_ADJACENT = re.compile(rb"[A-Za-z0-9_-]")
+
+# Assembled from integers so this source carries no literal private address.
+_IPV4_PRIVATE = tuple(
+    ipaddress.ip_network((network, prefix))
+    for network, prefix in (
+        (10 << 24, 8),
+        ((172 << 24) | (16 << 16), 12),
+        ((192 << 24) | (168 << 16), 16),
+    )
+)
+_ULA_PRIVATE = ipaddress.ip_network((0xFC00 << 112, 7))
 
 _BOMS = (
     (codecs.BOM_UTF32_LE, "utf-32-le"),
@@ -234,33 +252,28 @@ _BOMS = (
 
 
 def _email_rules(line: bytes) -> list[tuple[str, int, int]]:
-    hits = []
-    for match in _EMAIL.finditer(line):
-        host = line[match.start():match.end()].rsplit(b"@", 1)[1].lower()
+    hits: list[tuple[str, int, int]] = []
+    for match in _EMAIL_CANDIDATE.finditer(line):
+        start, end = match.span()
+        candidate = match.group(0)
+        if end < len(line) and _ADJACENT.match(line[end:end + 1]):
+            continue
+        if candidate.endswith(b"."):
+            candidate = candidate[:-1]
+            end -= 1
+        host = candidate.rsplit(b"@", 1)[1].lower()
+        labels = host.split(b".")
+        if len(labels) < 2 or _EMAIL_FINAL.fullmatch(labels[-1]) is None:
+            continue
+        if not all(_EMAIL_LABEL.fullmatch(label) for label in labels[:-1]):
+            continue
         if any(host == domain or host.endswith(b"." + domain)
                for domain in _EMAIL_EXEMPT):
             continue
         if host.endswith((b".example", b".test", b".invalid")):
             continue
-        hits.append(("email", match.start(), match.end()))
+        hits.append(("email", start, end))
     return hits
-
-
-def _ip_variants(token: bytes) -> list[bytes]:
-    variants: list[bytes] = []
-
-    def add(value: bytes) -> None:
-        value = value.strip(b"[]")
-        if value and value not in variants:
-            variants.append(value)
-
-    add(token)
-    add(token.rstrip(b".:"))
-    for base in list(variants):
-        suffix = re.search(rb":\d+$", base)
-        if suffix:
-            add(base[:suffix.start()].rstrip(b".:"))
-    return variants
 
 
 def _landing_private(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
@@ -273,21 +286,30 @@ def _landing_private(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> 
 
 
 def _ip_rules(line: bytes) -> list[tuple[str, int, int]]:
-    hits = []
-    for match in _IP_TOKEN.finditer(line):
+    hits: list[tuple[str, int, int]] = []
+    for match in _IPV4_CANDIDATE.finditer(line):
+        try:
+            address = ipaddress.ip_address(match.group(1).decode("ascii"))
+        except ValueError:
+            continue
+        if _landing_private(address):
+            hits.append(("private-ip", match.start(), match.end()))
+    for match in _IPV6_CANDIDATE.finditer(line):
         start, end = match.span()
-        if start and _WORD_BYTE.match(line[start - 1:start]):
+        candidate = match.group(0)
+        if b":" not in candidate:
             continue
-        if end < len(line) and _WORD_BYTE.match(line[end:end + 1]):
+        if end < len(line) and _ADJACENT.match(line[end:end + 1]):
             continue
-        for candidate in _ip_variants(match.group(0)):
-            try:
-                address = ipaddress.ip_address(candidate.decode("ascii"))
-            except ValueError:
-                continue
-            if _landing_private(address):
-                hits.append(("private-ip", start, start + len(candidate)))
-                break
+        if candidate.endswith(b"."):
+            candidate = candidate[:-1]
+            end -= 1
+        try:
+            address = ipaddress.ip_address(candidate.decode("ascii"))
+        except ValueError:
+            continue
+        if _landing_private(address):
+            hits.append(("private-ip", start, end))
     return hits
 
 
@@ -321,37 +343,55 @@ def _scan_blob(relative: str, data: bytes) -> list[str]:
         for number, line in enumerate(text.split("\n"), start=1):
             for rule, _start, _end in scan_line(line.encode("utf-8")):
                 hits.add((number, rule))
-    return [f"{_display(relative)}:{number}: {rule}"
+    display = _safe_path(relative)
+    return [f"{display}:{number}: {rule}"
             for number, rule in sorted(hits)]
 
 
-def _redact(path: str, spans: list[tuple[int, int]]) -> str:
+def _path_bytes(path: str) -> bytes:
+    return path.encode("utf-8", "surrogateescape")
+
+
+def _redact(data: bytes, spans: list[tuple[int, int]]) -> bytes:
     merged: list[tuple[int, int]] = []
     for start, end in sorted(spans):
         if merged and start <= merged[-1][1]:
             merged[-1] = (merged[-1][0], max(merged[-1][1], end))
         else:
             merged.append((start, end))
-    pieces = []
+    pieces: list[bytes] = []
     last = 0
     for start, end in merged:
-        pieces.append(path[last:start])
-        pieces.append("<redacted>")
+        pieces.append(data[last:start])
+        pieces.append(b"<redacted>")
         last = end
-    pieces.append(path[last:])
-    return "".join(pieces)
+    pieces.append(data[last:])
+    return b"".join(pieces)
+
+
+def _safe_path(path: str) -> str:
+    """Redact sensitive spans, then escape control characters.
+
+    A landing-zone path is scanned below its root; span bytes are applied to
+    the encoded path, so a match that follows a multibyte character is still
+    replaced whole.
+    """
+    data = _path_bytes(path)
+    offset = len(INSIDE) + 1 if path.startswith(INSIDE + "/") else 0
+    hits = scan_line(data[offset:])
+    if hits:
+        data = _redact(data, [(offset + start, offset + end)
+                              for _rule, start, end in hits])
+    return _display(os.fsdecode(data))
 
 
 def _scan_path(relative: str) -> list[str]:
     if not relative.startswith(INSIDE + "/"):
         return []
-    prefix = len(INSIDE) + 1
-    hits = scan_line(relative[prefix:].encode("utf-8"))
+    hits = scan_line(_path_bytes(relative)[len(INSIDE) + 1:])
     if not hits:
         return []
-    redacted = _redact(relative, [(prefix + start, prefix + end)
-                                  for _rule, start, end in hits])
-    return [f"{_display(redacted)}:1: {rule}"
+    return [f"{_safe_path(relative)}:1: {rule}"
             for rule in sorted({rule for rule, _start, _end in hits})]
 
 
@@ -364,7 +404,7 @@ def _scan_findings(root: Path, inside: list[Entry]) -> list[str]:
         try:
             data = git(root, "cat-file", "blob", entry.object).stdout
         except CheckError as error:
-            findings.append(f"{_display(entry.path)}: {error}")
+            findings.append(f"{_safe_path(entry.path)}: {error}")
             continue
         findings.extend(_scan_blob(entry.path, data))
     return findings
@@ -385,7 +425,7 @@ def _frontmatter(text: str) -> str:
 
 def _frontmatter_findings(root: Path, path: str, object_id: str,
                           directory: str) -> list[str]:
-    display = _display(path)
+    display = _safe_path(path)
     try:
         data = git(root, "cat-file", "blob", object_id).stdout
     except CheckError as error:
@@ -413,41 +453,45 @@ def _frontmatter_findings(root: Path, path: str, object_id: str,
             findings.append(f"{display}: {key} must be a nonblank string")
     name = parsed.get("name")
     if isinstance(name, str) and name.strip() and name != directory:
-        findings.append(f"{display}: name {name!r} does not match directory {directory!r}")
+        findings.append(f"{display}: name does not match its directory name")
     return findings
 
 
 def _shape_findings(root: Path, inside: list[Entry]) -> list[str]:
     findings: list[str] = []
-    candidates: dict[str, list[Entry]] = {}
+    candidates: list[Entry] = []
     for entry in inside:
         if entry.path == INSIDE:
-            findings.append(f"{_display(entry.path)}: landing root must be a directory")
+            if entry.kind != "tree":
+                findings.append(f"{_safe_path(entry.path)}: landing root must be a directory")
+            continue
+        suffix = entry.path[len(INSIDE) + 1:]
+        if "/" in suffix:
+            continue
+        if entry.kind == "tree":
+            candidates.append(entry)
+        elif suffix != "README.md":
+            findings.append(
+                f"{_safe_path(entry.path)}: only README.md may sit in the landing root")
+        elif not _regular(entry):
+            findings.append(f"{_safe_path(entry.path)}: README.md must be a regular file")
+    for tree in sorted(candidates, key=lambda entry: entry.path):
+        name = tree.path[len(INSIDE) + 1:]
+        skill_path = f"{INSIDE}/{name}/SKILL.md"
+        skill_md = next((entry for entry in inside if entry.path == skill_path), None)
+        if skill_md is None:
+            findings.append(f"{_safe_path(f'{INSIDE}/{name}')}: missing SKILL.md")
+        elif not _regular(skill_md):
+            findings.append(f"{_safe_path(skill_path)}: SKILL.md must be a regular file")
+        if skill_md is not None and _regular(skill_md):
+            findings.extend(_frontmatter_findings(root, skill_path,
+                                                 skill_md.object, name))
+    for entry in inside:
+        if not entry.path.startswith(INSIDE + "/"):
             continue
         parts = entry.path[len(INSIDE) + 1:].split("/")
-        if len(parts) == 1:
-            if parts[0] != "README.md":
-                findings.append(
-                    f"{_display(entry.path)}: only README.md may sit in the landing root")
-            elif not _regular(entry):
-                findings.append(f"{_display(entry.path)}: README.md must be a regular file")
-            continue
-        candidates.setdefault(parts[0], []).append(entry)
-    for name in sorted(candidates):
-        entries = candidates[name]
-        skill_md = next((entry for entry in entries
-                         if entry.path == f"{INSIDE}/{name}/SKILL.md"), None)
-        if skill_md is None:
-            findings.append(f"{INSIDE}/{name}: missing SKILL.md")
-        elif not _regular(skill_md):
-            findings.append(f"{_display(skill_md.path)}: SKILL.md must be a regular file")
-        for entry in entries:
-            suffix = entry.path[len(INSIDE) + 1:].split("/")
-            if len(suffix) > 2 and suffix[-1] == "SKILL.md":
-                findings.append(f"{_display(entry.path)}: nested SKILL.md is not allowed")
-        if skill_md is not None and _regular(skill_md):
-            findings.extend(_frontmatter_findings(root, skill_md.path,
-                                                 skill_md.object, name))
+        if len(parts) > 2 and parts[-1] == "SKILL.md":
+            findings.append(f"{_safe_path(entry.path)}: nested SKILL.md is not allowed")
     return findings
 
 
@@ -456,18 +500,20 @@ def _collision_findings(root: Path, entries: list[Entry],
     findings: list[str] = []
     candidates: set[str] = set()
     for entry in inside:
-        if entry.path == INSIDE:
+        if not entry.path.startswith(INSIDE + "/") or entry.kind != "tree":
             continue
-        parts = entry.path[len(INSIDE) + 1:].split("/")
-        if len(parts) >= 2:
-            candidates.add(parts[0])
+        suffix = entry.path[len(INSIDE) + 1:]
+        if "/" not in suffix:
+            candidates.add(suffix)
+    if not candidates:
+        return findings
     curated: set[str] = set()
     for entry in entries:
-        parts = entry.path.split("/")
-        if parts[0] != CURATED or len(parts) < 2:
+        if entry.kind != "tree" or not entry.path.startswith(CURATED + "/"):
             continue
-        if len(parts) >= 3 or entry.kind == "commit":
-            curated.add(parts[1])
+        suffix = entry.path[len(CURATED) + 1:]
+        if "/" not in suffix:
+            curated.add(suffix)
     retired: set[str] = set()
     registry = next((entry for entry in entries if entry.path == RETIRED), None)
     if registry is not None:
@@ -481,9 +527,12 @@ def _collision_findings(root: Path, entries: list[Entry],
                 retired = set(table)
     for name in sorted(candidates):
         if name in curated:
-            findings.append(f"{INSIDE}/{name}: name collides with curated {CURATED}/{name}")
+            findings.append(
+                f"{_safe_path(f'{INSIDE}/{name}')}: name collides with curated "
+                f"{_safe_path(f'{CURATED}/{name}')}")
         if name in retired:
-            findings.append(f"{INSIDE}/{name}: name collides with retired name {name!r}")
+            findings.append(
+                f"{_safe_path(f'{INSIDE}/{name}')}: name collides with a retired name")
     return findings
 
 
