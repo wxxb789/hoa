@@ -6,7 +6,7 @@ description: >-
   run on such a host or its pasted output needs checking. Not for wizard scripts or steps you can
   run yourself.
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "probe the host, pin what runs, hand over self-contained gated blocks, dry run before execute, read the paste as evidence"
@@ -32,12 +32,17 @@ as, what it can reach (control plane, repositories, registries), its shell and l
 which steps run there. A step that must read something a host's identity cannot reach goes to
 another host; name the host in every block heading.
 
-Then prove every capability the route depends on with a read-only probe the operator can run in
-seconds: `Get-Command <tool>` / `command -v <tool>`, `<tool> --version`, one GET against each API,
-the language mode, a per-target capability list. Build the route only on probed facts. Locked-down
-hosts routinely block binaries, ship patched CLIs, log command text, or restrict the language; a
-route designed from assumed policy is the most expensive failure in this loop. Mark anything you
-derived from docs or source as unverified until a probe confirms it.
+If the developer tenant and the privileged host's production or admin tenant are isolated, do
+all developer-tenant control-plane, repository, registry, and CI metadata and artifact reads on
+the dev workstation first. Prepare the pinned bundle there and transfer it by the approved route.
+Keep privileged-host blocks on local checks and APIs reachable by the verified privileged identity;
+never put developer-tenant API calls in those blocks.
+
+Prove every capability the route depends on with one read-only probe block per host: tool presence
+and versions, language mode, a GET against each API assigned to that host, and per-target capabilities.
+Build the route only on probed facts. Locked-down hosts routinely block binaries, ship patched CLIs,
+log command text, or restrict the language. Mark anything derived from docs or source as unverified
+until a probe confirms it.
 
 When the host is a locked-down Windows/PowerShell machine, or a block fails there in a way your own
 machine does not reproduce, read [references/restricted-shells.md](references/restricted-shells.md).
@@ -53,6 +58,10 @@ the next block.
 
 ## 3. Write each block to the contract
 
+Batch all probes, preflight checks, or cohesive steps for the same host and phase into one
+self-contained script block. One paste completes the phase and prints its results; do not send
+one command per turn.
+
 Every block is pasted into a fresh or long-lived console by a tired human. It must:
 
 - be self-contained: one scope (`& { ... }` in PowerShell, `( ... )` or `set -euo pipefail` in a
@@ -61,14 +70,17 @@ Every block is pasted into a fresh or long-lived console by a tired human. It mu
   read the next pasted line), no reliance on a previous window's variables;
 - open with gates that throw on mismatch: signed-in identity and tenant/subscription, target
   context (cluster, account, workspace), and each pinned file hash;
-- write evidence to a fresh timestamped directory and print a compact summary in a `finally`, so
-  evidence appears even on failure; keep output small with tight queries instead of dumping JSON;
+- write evidence to a fresh timestamped directory and print a compact, structured summary in a
+  `finally`, even on failure: phase result and per-check outcomes; use tight queries, not JSON dumps;
 - label itself read-only or mutating, and state above it the expected outcome with counts and
   order, plus the stop rule for anything else.
 
 Skeletons for PowerShell and bash: [references/block-templates.md](references/block-templates.md).
 
 ## 4. Run in phases
+
+Split handoffs only at a phase gate or host boundary, not between checks in the same phase.
+Review is a human gate, not a script step; never combine dry run and execute in one paste.
 
 1. **Inventory / probe** (read-only).
 2. **Dry run**: the mutating script in plan mode. State the expected plan before the operator runs
