@@ -34,8 +34,8 @@ The agent's report is a claim, never evidence:
   operator; do not let it be absorbed silently into the current apply round.
 - Diff the plan's file list against `git status`; missing tests or docs are the usual gap.
 - **The worker's exit codes are claims.** Re-run the gates yourself on the settled implementation
-  tree, even if they passed earlier — the author does not commit, so `HEAD` still names the base and
-  a commit object would test the wrong tree. Phase 5 repeats the gates on the shipping commit. A
+  tree, even if they passed earlier — gdd's own author does not commit (a delegated ce-work run may), so
+  test the working tree, not a commit object that can miss uncommitted output. Phase 5 repeats the gates on the shipping commit. A
   resumed run keeps adding code and the counts move.
 - Research-outcome increment: the deliverable is a decision, not a feature →
   [`references/evidence-fairness.md`](../evidence-fairness.md) before accepting any
