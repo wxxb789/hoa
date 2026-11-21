@@ -16,25 +16,36 @@ contract is satisfied and the gates have actually run.
 
 ## Optional delegation — `ce-work mode:return-to-caller`
 
-If your runtime's own skill discovery offers `ce-work` with `mode:return-to-caller`, you may hand it
-this loop in the current worktree: pass an explicit plan path or a bounded work statement plus the
-exact `${GATES}` command — never blank input, never a "latest plan" lookup — and never install or
-fetch the skill.
+Decide eligibility before invoking, and delegate only when all of these hold: your runtime's own
+skill discovery offers `ce-work` with `mode:return-to-caller`; it accepts an explicit plan path or
+bounded work statement as the invocation argument; the verbatim `${GATES}` command and its working
+directory can travel in separate caller context — in statement mode, written into the statement;
+`${GATES}` is a real command, not `-` (no gate supplied); and the runtime will run the loop natively
+or on a route the operator already authorized. `mode:return-to-caller` bounds the shipping tail, not
+onward routing — a standing cross-model engine can still send the work packet elsewhere, so never
+inherit routing authority from this dispatch. If any of these fails, skip this section and run the
+loop below yourself. Never install or fetch the skill.
 
-Accept its unit commits on this branch and a mid-loop simplification; it must not push or open a PR.
-After it returns and before you report, check and show:
+Hand over the loop in the current worktree, recording the expected goal branch first
+(`git rev-parse --abbrev-ref HEAD`). Accept its unit commits on this branch and a mid-loop
+simplification; it must not push or open a PR. After it returns and before you report, check and show:
 
-- the checkout is still on the goal branch (no switch or detached HEAD), and
+- the checkout is still on the recorded goal branch (no switch or detached HEAD), and
   `git merge-base --is-ancestor ${BASE_SHA} HEAD` holds;
-- every path in `git diff --name-only ${BASE_SHA}..HEAD` and in `git status --porcelain` is inside
-  the goal's scope;
-- its summary status is complete and its verification evidence covers `${GATES}`;
-- its run id or summary, in the report and in the stage `summary`.
+- every path touched by every commit in `${BASE_SHA}..HEAD`, enumerated per commit —
+  `git log --no-renames --name-status --format=%H ${BASE_SHA}..HEAD` — and every path in a fully
+  expanded `git status --porcelain -z -uall --no-renames` inventory is inside the goal's scope, so a
+  path added and later removed outside it is still caught;
+- it ran the exact `${GATES}` command to completion on the settled final output, and its evidence
+  shows the command, working directory and exit status; a complete delegate status never waives
+  gdd's gate;
+- its run id or archived summary as a recovery pointer, in the report and in the stage `summary` — a
+  paraphrase in the stage summary alone is not a recovery artifact.
 
-A moved base, an out-of-scope path or a non-complete status stops the stage: leave the tree and its
-commits as they are, report `BLOCKED` with the reason, and do not retry it inline. If discovery does
-not offer the skill, it does not accept `mode:return-to-caller`, or the summary is incomplete or
-mismatched, skip this section and run the loop below yourself.
+After the invocation, any failed check above stops the stage: preserve the original scope snapshot,
+leave the tree and its commits as they are, report `BLOCKED` with the reason, and do not fall back to
+the loop below, retry inline, resume, or advance. A capability decided absent before invoking is the
+only reason to fall back.
 
 The delegation contract above adapts Compound Engineering (MIT, Copyright 2025 Every), paraphrased
 rather than copied.

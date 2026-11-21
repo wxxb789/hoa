@@ -21,11 +21,19 @@
    operator which writer owns each path — do not commit across it.
 3. Commit with explicit paths — never `git add -A` or `git add .`. **Do not push yet**: verify
    the seal first.
-4. **After committing and before pushing, verify the sealed scope.** `uv run "<scope-tool>" verify --repo <path>
-   --label <goal>`. The recomputation spans the whole branch, so `ce-work`'s unit commits are verified
-   exactly like every other changed path; drift ⇒ stop, name the paths, and require either a
-   re-review or an explicit operator acceptance recorded in the PR body. Do not move this check into
-   `pr-merge-check.py`: that gate declares `Environment: none` and only judges the remote PR.
+4. **After committing and before pushing, audit every committed path and verify the sealed scope on
+   the shipping commit.** First enumerate the changed paths commit by commit over the recorded base,
+   not an endpoint diff — `git log --no-renames --name-status --format=%H <base>..HEAD` — so a path
+   added in one commit and removed in a later one is still caught, and union that with a fully
+   expanded `git status --porcelain -z -uall --no-renames` inventory; every path must be inside the
+   sealed scope. Then, on a clean checkout of the exact commit that will be pushed, run
+   `uv run "<scope-tool>" verify --repo <path> --label <goal>`: `git status --porcelain` must be
+   empty and `HEAD` must be the commit that ships. The seal records on-disk bytes, so only a clean
+   checkout proves `HEAD` carries them; a dirty index or working tree, a rebase or a new commit
+   invalidates the check. Drift ⇒ stop, name the paths, and require either a re-review or an explicit
+   operator acceptance recorded in the PR body. Record the verified SHA; re-audit the history and
+   re-verify the exact commit that will be pushed whenever the head moves. Do not move this check
+   into `pr-merge-check.py`: that gate declares `Environment: none` and only judges the remote PR.
 5. **Re-run the gates on the shipping commit.** Phase 2 gated the settled working tree; this run
    names the commit that ships, so record that SHA with the evidence.
 6. **Check every number on the final tree:** every count, duration or table value in the PR body and

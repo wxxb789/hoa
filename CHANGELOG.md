@@ -6,12 +6,20 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 ## 2026-11-21
 
-- Delegate gdd's fresh `implement` stage to a runtime-offered `ce-work mode:return-to-caller` when
-  discovered: explicit plan path or bounded statement plus the exact gate command, never blank or
-  "latest plan" discovery, never installed. Unit commits and a mid-loop simplification are accepted;
-  the stage must show descent from the recorded base, in-scope committed and uncommitted paths, a
-  complete summary and the run id, else stop and keep state — and gdd's own prompt is the fallback.
-  Phase 5 seals and verifies the whole branch, so those commits are covered like every other path.
+- Delegate gdd's fresh `implement` stage to a runtime-offered `ce-work mode:return-to-caller` only
+  when it takes an explicit plan path or bounded statement, can carry the verbatim gate and working
+  directory as separate caller context, and will run natively or on an operator-authorized route;
+  decide eligibility before invoking, never install, and never fall back after the call. Unit commits
+  and a mid-loop simplification are accepted; the stage must show the recorded goal branch, descent
+  from the recorded base, in-scope paths across every commit plus the uncommitted inventory, a
+  complete summary with a recovery pointer, and the exact gate run, else stop and keep state.
+- Apply the delegation review's operator procedure: audit every changed path commit by commit over
+  the recorded base and verify the seal on the clean shipping commit; reconcile a failed or
+  interrupted run as one ledger row naming the archived result, outer handle, run/summary pointer,
+  recorded base and observed HEAD, with both layers and partial writes inspected before recovery —
+  no auto-resume, force-dispatch, fallback or phase advance, and any authorized new dispatch still
+  counts against the cap. Phase 5 seals and verifies the whole branch, so `ce-work`'s commits are
+  covered like every other path.
 - Reuse the runtime's read-only `ce-code-review mode:agent` in gdd's fresh review stage when the
   runtime offers it: gdd's exact base/head, local-only, a complete receipt with a matching range or
   gdd's own report-only fallback, findings mapped into the existing review result. The receipt does

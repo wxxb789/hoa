@@ -14,14 +14,17 @@
    comparable increment as the shape reference, the gates as one runnable command with an explicit
    working directory when the repo supports it, and no push. The contract's accepted plan is reused
    by path, not replanned. The `implement` template may delegate its loop to a runtime-offered
-   `ce-work mode:return-to-caller` with an explicit plan path or bounded statement and the exact
-   gate command; its unit commits and a mid-loop simplification on this branch are accepted, and the
-   stage verifies descent from the recorded base, scope across committed and uncommitted paths, and
-   a complete summary before it reports. A missing or mismatched mode falls back to the template's
-   own loop; never install the skill. A moved base, an out-of-scope path or a non-complete summary
-   stops the stage with the state left for the operator — no inline retry. Neither the delegation
-   nor its simplification decides phase 3: the simplify preflight still runs on the whole increment.
-   Use `uv run scripts/gdd.py stage` so prompt, run name and ledger row come from one template.
+   `ce-work mode:return-to-caller` with an explicit plan path or bounded statement, the verbatim gate
+   command and its working directory in separate caller context, and native execution or an
+   operator-authorized route; its unit commits and a mid-loop simplification on this branch are
+   accepted. Decide that eligibility before invoking: a missing or mismatched capability means the
+   template's own loop, never an install, and after an invocation there is no fallback. The stage
+   verifies the recorded goal branch, descent from the recorded base, scope across every commit and
+   uncommitted path, and a complete summary with a recovery pointer. After an invocation, any failed
+   check stops the stage with the state and the original snapshot left for the operator — no inline
+   retry, resume or fallback. Neither the delegation nor its simplification decides phase 3: the
+   simplify preflight still runs on the whole increment. Use `uv run scripts/gdd.py stage` so prompt,
+   run name and ledger row come from one template.
 
 ## Dispatch tooling
 
