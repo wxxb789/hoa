@@ -59,17 +59,19 @@ recorded scope with `scripts/worktree-scope.py`:
 2. `diff` after the work: `changed_paths` are the increment, `excluded_preexisting_paths` were
    already dirty and are untouched, `overlapping_paths` had two writers — stop and ask the operator
    which one owns each path before going further.
-3. `seal` once the review passes; `--accept-overlap` is an explicit operator decision and is
-   recorded, so the fact survives into the record. `seal --index` additionally freezes the staged
-   index as `commit_seal`: per path the Git mode and full blob OID (null for a deletion), so the
-   verdict binds to the commit that ships rather than to disk bytes.
+3. Seal once the review passes; `--accept-overlap` is an explicit operator decision and is
+   recorded, so the fact survives into the record. Then take one of two pairs: `seal` + `verify`
+   reads disk bytes, so it judges the working tree; `seal --index` + `verify --commit <rev>` binds
+   to the shipped commit. A flagged seal writes only `commit_seal` (no legacy `seal`), per path the
+   Git mode and full blob OID (null for a deletion); the legacy `diff`/`seal` receipts stay
+   untouched, so pick the pair that matches what you are accepting.
 4. `verify` after committing and before landing: exit 1 names every `added`, `modified` or `removed`
    path, so a post-review edit cannot ship unexamined. `verify --commit <rev>` resolves one commit
    and checks that commit's path set and per-path mode/OID against `commit_seal`, then walks
    `baseline.head..<rev>` for paths touched outside the seal; it reads no file, status or index, so a
    dirty worktree cannot weaken or fake the verdict. It never falls back to a legacy seal, and it
    refuses a shallow repository, an active graft file or a candidate that is not a descendant of the
-   sealed base.
+   sealed base. History audits path membership, not intermediate blob contents at sealed paths.
 
 The oracle is the path set, not a content hash of the report: a document can be rewritten without
 changing the increment, and a one-line edit can change everything. Put the same path set and

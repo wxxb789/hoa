@@ -58,8 +58,8 @@
    the final tree, and write the body from the recipe in [`references/pr-body.md`](../pr-body.md)
    directly when the mode is unsupported, the run failed, or the result is mismatched or
    incomplete. **Never run the skill's full shipping path**: it can push before the seal
-   verification above and start a competing CI watcher. gdd keeps explicit-path commits, the
-   pre-push seal check, publication authority and its own CI watcher.
+   verification above and start a competing CI watcher. gdd keeps explicit staging with a no-path
+   commit of the sealed index, the pre-push seal check, publication authority and its own CI watcher.
 8. The PR body is a contract artifact — shape in [`references/pr-body.md`](../pr-body.md):
    what landed by subsystem, decisions with explicit non-adoptions naming the goal that owns them, one
    evidence table measured on the **final** tree, every "Done when" clause mapped to the command that
@@ -75,8 +75,9 @@
    `[]` on a fork — and match the head owner and branch name, not the name alone. An exit-0 empty
    list (`[]`) means no open PR for this branch; a probe error is **unknown**, never "no PR" —
    resolve auth or connectivity, or stop rather than open a duplicate. Reuse the exact matching
-   open PR; stop on an ambiguous or unknown PR state. Push and open the PR as the operator's
-   publication act, carrying the composed body. If a probe changes the candidate — a rebase or a
+   open PR; stop on an ambiguous or unknown PR state. Push the verified OID with
+   `git push <remote> <oid>:refs/heads/<branch>` and open the PR as the operator's publication act,
+   carrying the composed body. If a probe changes the candidate — a rebase or a
    moved head — restart from step 1, discard the gate, seal and number receipts, and redraft the
    body.
 10. Treat PR checks as a floor, not a gate — Phase 6 decides.

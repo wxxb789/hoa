@@ -100,7 +100,26 @@ def head(repo: Path) -> str:
     return _git(repo, "rev-parse", "HEAD").decode("ascii").strip()
 
 
-def _index_modes(repo: Path, no_replace: bool = False) -> dict[str, str]:
+def _decode_path(raw: bytes, context: str, flag_scope: bool) -> str:
+    """Decode one raw Git path; flagged modes refuse undecodable or changed bytes."""
+    if not flag_scope:
+        return os.fsdecode(raw)
+    try:
+        path = os.fsdecode(raw)
+        encoded = os.fsencode(path)
+    except UnicodeError as error:
+        raise Refusal(
+            f"refusing: git path {raw!r} in {context} cannot be decoded: "
+            f"{error}") from error
+    if encoded != raw:
+        raise Refusal(
+            f"refusing: git path {raw!r} in {context} does not round-trip "
+            "through os.fsdecode/os.fsencode")
+    return path
+
+
+def _index_modes(repo: Path, no_replace: bool = False,
+                 flag_scope: bool = False) -> dict[str, str]:
     """Map every index path to its mode (gitlink, executable, symlink, file)."""
     modes: dict[str, str] = {}
     for entry in _git(repo, "ls-files", "-s", "-z",
@@ -110,12 +129,14 @@ def _index_modes(repo: Path, no_replace: bool = False) -> dict[str, str]:
         meta, _, path = entry.partition(b"\t")
         if not path:
             continue
-        modes[os.fsdecode(path)] = meta.split(b" ", 1)[0].decode("ascii")
+        modes[_decode_path(path, "git ls-files", flag_scope)] = (
+            meta.split(b" ", 1)[0].decode("ascii"))
     return modes
 
 
 def _status_entries(repo: Path, no_renames: bool = False,
-                    no_replace: bool = False) -> list[tuple[str, str, str | None]]:
+                    no_replace: bool = False,
+                    flag_scope: bool = False) -> list[tuple[str, str, str | None]]:
     """Parse porcelain v1 -z into (code, path, original path for R/C)."""
     arguments = ["status", "--porcelain=v1", "-z", "--untracked-files=all"]
     if no_renames:
@@ -131,28 +152,25 @@ def _status_entries(repo: Path, no_renames: bool = False,
         if len(entry) < 4:
             raise Refusal(f"cannot parse git status entry {entry!r}")
         code = entry[:2].decode("ascii", "replace")
-        path = os.fsdecode(entry[3:])
+        path = _decode_path(entry[3:], "git status", flag_scope)
         original = None
         if code[0] in "RC" or code[1] in "RC":
             if index >= len(parts):
-                raise Refusal(f"git status truncated after rename of {path}")
-            original = os.fsdecode(parts[index])
+                shown = json.dumps(path) if flag_scope else path
+                raise Refusal(f"git status truncated after rename of {shown}")
+            original = _decode_path(parts[index], "git status", flag_scope)
             index += 1
         entries.append((code, path, original))
     return entries
 
 
-def _digest(repo: Path, relative: str) -> str | None:
+def _digest(repo: Path, relative: str, flag_scope: bool = False) -> str | None:
     """sha256 of the working-tree bytes, None when the path is absent."""
     target = repo / relative
     try:
         info = os.lstat(target)
     except FileNotFoundError:
         return None
-    except NotADirectoryError as error:
-        raise Refusal(
-            f"refusing: {relative} crosses a file/directory transition; "
-            "resolve the path shape by hand") from error
     if stat.S_ISLNK(info.st_mode):
         raw = os.fsencode(os.readlink(target))
     elif stat.S_ISREG(info.st_mode):
@@ -162,46 +180,70 @@ def _digest(repo: Path, relative: str) -> str | None:
                 digest.update(chunk)
         return digest.hexdigest()
     else:
+        shown = json.dumps(relative) if flag_scope else relative
         raise Refusal(
-            f"refusing: {relative} is a directory or special file; "
+            f"refusing: {shown} is a directory or special file; "
             "nested repositories and gitlinks are not supported -- resolve it by hand")
     return hashlib.sha256(raw).hexdigest()
 
 
-def _refuse_unrepresentable(repo: Path, relative: str, mode: str) -> None:
+def _refuse_unrepresentable(repo: Path, relative: str, mode: str,
+                            flag_scope: bool = False) -> None:
+    shown = json.dumps(relative) if flag_scope else relative
     if relative.endswith("/"):
         raise Refusal(
-            f"refusing: {relative} is a nested repository or a directory entry git "
+            f"refusing: {shown} is a nested repository or a directory entry git "
             "reports as a unit; remove or resolve it by hand")
     if mode == GITLINK:
         raise Refusal(
-            f"refusing: {relative} is a dirty submodule (gitlink {GITLINK}); "
+            f"refusing: {shown} is a dirty submodule (gitlink {GITLINK}); "
             "commit or clean the submodule before recording scope")
     target = repo / relative
     if target.is_dir() and not target.is_symlink():
         raise Refusal(
-            f"refusing: {relative} is a directory entry; nested repositories and "
+            f"refusing: {shown} is a directory entry; nested repositories and "
             "gitlinks are not supported -- resolve it by hand")
 
 
+def _refuse_prefix_collisions(paths, context: str) -> None:
+    """One path cannot be a component prefix of another in a sealed path set."""
+    present = set(paths)
+    for path in sorted(present):
+        parts = path.split("/")
+        for count in range(1, len(parts)):
+            prefix = "/".join(parts[:count])
+            if prefix in present:
+                raise Refusal(
+                    f"refusing: path set for {context} contains both "
+                    f"{json.dumps(prefix)} and {json.dumps(path)}; a file/directory "
+                    "transition cannot be sealed -- resolve the shape by hand")
+
+
 def dirty_manifest(repo: Path, no_renames: bool = False,
-                   no_replace: bool = False) -> list[dict]:
+                   no_replace: bool = False,
+                   flag_scope: bool = False) -> list[dict]:
     """Every path that is not clean: staged, unstaged, untracked-but-not-ignored."""
-    modes = _index_modes(repo, no_replace=no_replace)
+    modes = _index_modes(repo, no_replace=no_replace, flag_scope=flag_scope)
+    entries = _status_entries(repo, no_renames=no_renames, no_replace=no_replace,
+                              flag_scope=flag_scope)
+    if flag_scope:
+        _refuse_prefix_collisions(
+            [name for _code, path, original in entries
+             for name in (path, original) if name is not None],
+            "the worktree scope")
     seen: set[str] = set()
     manifest: list[dict] = []
-    for _code, path, original in _status_entries(repo, no_renames=no_renames,
-                                                 no_replace=no_replace):
+    for _code, path, original in entries:
         for relative in (path, original):
             if relative is None or relative in seen:
                 continue
             seen.add(relative)
             mode = modes.get(relative, "untracked")
-            _refuse_unrepresentable(repo, relative, mode)
+            _refuse_unrepresentable(repo, relative, mode, flag_scope)
             manifest.append({
                 "path": relative,
                 "mode": mode,
-                "sha256": _digest(repo, relative),
+                "sha256": _digest(repo, relative, flag_scope),
             })
     return sorted(manifest, key=lambda entry: entry["path"])
 
@@ -217,10 +259,11 @@ def _baseline_entries(state: dict) -> dict[str, dict]:
 
 
 def _diff(repo: Path, state: dict, no_renames: bool = False,
-          no_replace: bool = False) -> dict:
+          no_replace: bool = False, flag_scope: bool = False) -> dict:
     baseline = _baseline_entries(state)
     baseline_head = state["baseline"]["head"]
-    current = dirty_manifest(repo, no_renames=no_renames, no_replace=no_replace)
+    current = dirty_manifest(repo, no_renames=no_renames, no_replace=no_replace,
+                             flag_scope=flag_scope)
     candidates = set(baseline)
     candidates.update(entry["path"] for entry in current)
     arguments = ["diff", "--name-only", "-z"]
@@ -229,13 +272,15 @@ def _diff(repo: Path, state: dict, no_renames: bool = False,
     arguments += [baseline_head, "--"]
     for raw in _git(repo, *arguments, no_replace=no_replace).split(b"\0"):
         if raw:
-            candidates.add(os.fsdecode(raw))
+            candidates.add(_decode_path(raw, "git diff --name-only", flag_scope))
+    if flag_scope:
+        _refuse_prefix_collisions(candidates, "the recomputed scope")
 
     changed: list[str] = []
     excluded: list[str] = []
     overlapping: list[str] = []
     for path in sorted(candidates):
-        digest = _digest(repo, path)
+        digest = _digest(repo, path, flag_scope)
         previous = baseline.get(path)
         if previous is None:
             changed.append(path)
@@ -279,6 +324,8 @@ def _commit_scope_sha(paths: list[dict]) -> str:
 _TREE_DIFF_ARGS = ("diff-tree", "-r", "--raw", "-z", "--no-abbrev", "--no-renames",
                    "--ignore-submodules=none", "--no-commit-id")
 GRAFT_FILE = "info/grafts"
+_LEAF_MODES = ("100644", "100755", "120000")
+_OID_LENGTHS = {"sha1": 40, "sha256": 64}
 
 
 def _tree_entries(repo: Path, left: str | None = None, right: str | None = None,
@@ -307,11 +354,7 @@ def _tree_entries(repo: Path, left: str | None = None, right: str | None = None,
         if len(fields) != 5 or not path_bytes:
             raise Refusal(f"cannot parse git diff-tree record {header!r} in {context}")
         oldmode, newmode, oldoid, newoid, status = fields
-        if os.fsencode(os.fsdecode(path_bytes)) != path_bytes:
-            raise Refusal(
-                f"refusing: git path {path_bytes!r} in {context} does not round-trip "
-                "through os.fsdecode/os.fsencode")
-        path = os.fsdecode(path_bytes)
+        path = _decode_path(path_bytes, context, True)
         for mode in (oldmode, newmode):
             if mode.decode("ascii", "replace") == GITLINK:
                 raise Refusal(
@@ -328,22 +371,24 @@ def _refuse_unsupported_history(repo: Path) -> None:
                    no_replace=True).decode("ascii", "replace").strip()
     if shallow == "true":
         raise Refusal(
-            f"refusing: {repo} is a shallow repository; commit-bound verification "
-            "needs the complete history")
+            f"refusing: {json.dumps(os.fspath(repo))} is a shallow repository; "
+            "commit-bound verification needs the complete history")
     raw = _git(repo, "rev-parse", "--git-path", GRAFT_FILE, no_replace=True)
-    graft = os.fsdecode(raw).strip()
-    graft_path = Path(graft)
+    if raw.endswith(b"\n"):
+        raw = raw[:-1]
+    graft_path = Path(os.fsdecode(raw))
     if not graft_path.is_absolute():
         graft_path = repo / graft_path
     try:
         active = graft_path.is_file() and graft_path.stat().st_size > 0
     except OSError as error:
         raise Refusal(
-            f"refusing: cannot inspect graft file {graft_path}: {error}") from error
+            f"refusing: cannot inspect graft file "
+            f"{json.dumps(os.fspath(graft_path))}: {error}") from error
     if active:
         raise Refusal(
-            f"refusing: active graft file {graft_path} rewrites history; "
-            "commit-bound verification is disabled")
+            f"refusing: active graft file {json.dumps(os.fspath(graft_path))} "
+            "rewrites history; commit-bound verification is disabled")
 
 
 def _is_ancestor(repo: Path, ancestor: str, descendant: str) -> bool:
@@ -378,6 +423,13 @@ def _commit_seal_entries(state: dict, repo: Path,
     raw_paths = seal.get("paths")
     if not isinstance(raw_paths, list):
         raise Refusal("state file is corrupt: commit_seal.paths is not a list")
+    raw_format = _git(repo, "rev-parse", "--show-object-format",
+                      no_replace=True).decode("ascii", "replace").strip()
+    oid_length = _OID_LENGTHS.get(raw_format)
+    if oid_length is None:
+        raise Refusal(
+            f"refusing: unsupported git object format {raw_format!r}; "
+            "commit-bound verification needs sha1 or sha256")
     entries: dict[str, tuple[str | None, str | None]] = {}
     for entry in raw_paths:
         if not isinstance(entry, dict) or not isinstance(entry.get("path"), str):
@@ -386,16 +438,41 @@ def _commit_seal_entries(state: dict, repo: Path,
         if path in entries:
             raise Refusal(
                 f"state file is corrupt: commit_seal repeats {json.dumps(path)}")
-        mode = entry.get("mode")
-        oid = entry.get("oid")
-        if (mode is None) != (oid is None) or (mode is not None and
-               (not isinstance(mode, str) or not isinstance(oid, str))):
+        if "mode" not in entry or "oid" not in entry:
             raise Refusal(
                 f"state file is corrupt: commit_seal record {json.dumps(path)} must "
-                "have both mode and oid or neither")
+                "carry explicit mode and oid keys (null for a deletion)")
+        mode = entry["mode"]
+        oid = entry["oid"]
+        if mode is None and oid is None:
+            entries[path] = (None, None)
+            continue
+        if not isinstance(mode, str) or not isinstance(oid, str):
+            raise Refusal(
+                f"state file is corrupt: commit_seal record {json.dumps(path)} must "
+                "have both mode and oid as strings or neither")
+        if mode not in _LEAF_MODES:
+            raise Refusal(
+                f"state file is corrupt: commit_seal record {json.dumps(path)} has "
+                f"unsupported mode {mode!r}")
+        if not re.fullmatch(f"[0-9a-f]{{{oid_length}}}", oid):
+            raise Refusal(
+                f"state file is corrupt: commit_seal record {json.dumps(path)} has "
+                f"invalid oid {oid!r}; expected {oid_length} hexadecimal characters")
         entries[path] = (mode, oid)
+    _refuse_prefix_collisions(list(entries), "the sealed scope")
     scope = seal.get("scope_sha")
-    return base, entries, scope if isinstance(scope, str) else ""
+    canonical = [{"path": path, "mode": mode, "oid": oid}
+                 for path, (mode, oid) in entries.items()]
+    if not isinstance(scope, str) or not re.fullmatch("[0-9a-f]{64}", scope):
+        raise Refusal(
+            "state file is corrupt: commit_seal.scope_sha is missing or not a "
+            "sha256 digest")
+    if scope != _commit_scope_sha(canonical):
+        raise Refusal(
+            "state file is corrupt: commit_seal.scope_sha does not match its path "
+            "records; rerun seal --index")
+    return base, entries, scope
 
 
 def _state_dir(override: str | None) -> Path:
@@ -561,11 +638,9 @@ def cmd_seal(args) -> int:
 
 def _seal_index(args, repo: Path, state_path: Path, state: dict) -> int:
     _refuse_unsupported_history(repo)
-    result = _diff(repo, state, no_renames=True, no_replace=True)
+    result = _diff(repo, state, no_renames=True, no_replace=True, flag_scope=True)
     overlap = result["overlapping_paths"]
     if overlap and not args.accept_overlap:
-        state["diff"] = result
-        _save(state_path, state)
         listing = "\n".join(f"  overlapping {json.dumps(path)}" for path in overlap)
         raise Refusal(
             "overlapping paths are dirty in the baseline and changed since; "
@@ -573,8 +648,8 @@ def _seal_index(args, repo: Path, state_path: Path, state: dict) -> int:
             + listing)
     changed = set(result["changed_paths"])
     unstaged = sorted({
-        path for code, path, _original in _status_entries(repo, no_renames=True,
-                                                          no_replace=True)
+        path for code, path, _original in _status_entries(
+            repo, no_renames=True, no_replace=True, flag_scope=True)
         if path in changed and (code == "??" or code[1] != " ")
     })
     if unstaged:
@@ -612,10 +687,9 @@ def _seal_index(args, repo: Path, state_path: Path, state: dict) -> int:
         "accepted_overlap": bool(overlap) and args.accept_overlap,
         "overlap_paths": overlap if args.accept_overlap else [],
     }
-    state["diff"] = result
     state["commit_seal"] = seal
     _save(state_path, state)
-    lines = [f"commit seal ok: {len(paths)} paths, scope_sha {seal['scope_sha'][:12]}"]
+    lines = [f"commit seal ok: {len(paths)} paths, scope_sha {seal['scope_sha']}"]
     if seal["accepted_overlap"]:
         lines.append(f"accepted_overlap: {len(overlap)} paths")
     lines.append(f"state: {state_path}")
