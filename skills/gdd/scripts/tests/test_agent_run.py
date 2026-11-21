@@ -84,7 +84,8 @@ sys.exit(agent_run.main())
             for label, extra in (("new", ()), ("resume", ("--resume", "S1"))):
                 with self.subTest(agent=agent, session=label):
                     name = f"{agent}-{label}"
-                    self.start(name, agent, "ok", "--max-time", "10m", *extra)
+                    self.start(name, agent, "ok", "--max-time", "10m", *extra,
+                               in_process=bool(extra) and agent != "omp")
                     record = self.recorded()
                     run_dir = Path(self.run_dir(name))
                     plan = json.loads(read(run_dir / "run.json"))
@@ -94,10 +95,14 @@ sys.exit(agent_run.main())
                     self.assertEqual(os.path.realpath(record["cwd"]), os.path.realpath(self.work))
                     state = self.finished(name)
                     self.assertEqual((state["state"], state["exit"]), ("done", 0), state)
+                    self.assertEqual(state["resumed_from"], "S1" if extra else None)
+                    if IS_WINDOWS:
+                        self.assertTrue(state["spawn"]["creationflags"] & gdd_process.NO_WINDOW, state["spawn"])
                     self.assertEqual(stage_result.error(state, SCHEMA), "")
                     self.assertEqual({key: state[key] for key in metrics}, {key: expected[key] for key in metrics})
                     self.assertEqual(read(run_dir / "exit.code").strip(), "0")
-                    answer = self.cli("answer", name)
+                    answer_cli = self.cli if agent == "omp" and not extra else self.in_process_cli
+                    answer = answer_cli("answer", name)
                     self.assertEqual(read(run_dir / "answer.md"), expected["answer"])
                     self.assertEqual((answer.returncode, answer.stdout), (0, expected["answer"]))
 
@@ -420,6 +425,12 @@ sys.exit(agent_run.main())
                 self.assertEqual((state["state"], state["result"], state.get("result_error")), ("done", verdict, error))
                 self.assertEqual(os.path.exists(os.path.join(self.run_dir(name), "result.json")), verdict == "valid")
                 self.assertEqual(stage_result.error(state, SCHEMA), "")
+                if verdict == "valid":
+                    result = self.cli("result", name)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    reported, end = json.JSONDecoder().raw_decode(result.stdout)
+                    self.assertEqual(reported["result"], "valid")
+                    self.assertIn(answer, result.stdout[end:])
         refused = self.cli("start", "--name", "noschema", "--prompt", self.prompt, "--schema", os.path.join(self.tmp, "nope"))
         self.assertEqual(refused.returncode, 1)
         self.assertIn("is not a readable JSON object", refused.stderr)

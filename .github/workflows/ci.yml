@@ -59,7 +59,7 @@ jobs:
       # Python tests: every test_*.py under scripts/ evals/ skills/ (pytest.ini)
       - name: pytest
         timeout-minutes: 12
-        run: python -m pytest
+        run: python -m pytest -n auto --dist load
 
       # Script checks: the exit code is the contract
       - name: Trigger cases

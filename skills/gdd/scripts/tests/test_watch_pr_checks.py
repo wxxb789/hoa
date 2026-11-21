@@ -10,6 +10,7 @@ is asserted here instead of by hand.
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 import tempfile
 import unittest
@@ -85,6 +86,21 @@ PENDING_ROW = "test\tpending\t0\thttps://github.com/o/r/actions/runs/11/job/1\n"
 
 
 class WatchTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.seed = Path(tempfile.mkdtemp(prefix="watch-pr.seed."))
+        cls.addClassCleanup(remove_tree, cls.seed)
+        for args in (
+            ["init", "-q", "--template="],
+            ["-c", "user.email=t@example.invalid", "-c", "user.name=t",
+             "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "seed"],
+        ):
+            gdd_process.run(["git", "-C", str(cls.seed), *args], capture_output=True, text=True, check=True)
+        cls.head = gdd_process.run(
+            ["git", "-C", str(cls.seed), "rev-parse", "--short", "HEAD"],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix="watch-pr."))
         self.addCleanup(remove_tree, self.tmp)
@@ -103,20 +119,7 @@ class WatchTests(unittest.TestCase):
             executable.write_text(GH_STUB, encoding="utf-8")
             executable.chmod(0o755)
         self.repo = self.tmp / "repo"
-        self.repo.mkdir()
-        for args in (
-            ["init", "-q"],
-            ["-c", "user.email=t@example.invalid", "-c", "user.name=t",
-             "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "seed"],
-        ):
-            done = gdd_process.run(
-                ["git", "-C", str(self.repo), *args], capture_output=True, text=True
-            )
-            self.assertEqual(done.returncode, 0, done.stderr)
-        self.head = gdd_process.run(
-            ["git", "-C", str(self.repo), "rev-parse", "--short", "HEAD"],
-            capture_output=True, text=True,
-        ).stdout.strip()
+        shutil.copytree(self.seed, self.repo)
         self.log = self.tmp / "watch.log"
 
     def script(self, checks, views):
