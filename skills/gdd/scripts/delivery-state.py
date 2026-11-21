@@ -49,6 +49,7 @@ import agent_run
 import gdd_process
 
 STAGES = [
+    "setup",
     "contract",
     "implement",
     "verify",
@@ -354,14 +355,20 @@ def cmd_show(args):
             continue
         matching.append(row)
 
+    latest = matching[-1] if matching else None
+    # A setup row is a record, not work: an earlier actionable row keeps LATEST so the
+    # operator still sees the stage and next action to resume.
+    actionable = [row for row in matching if row["stage"] != "setup"]
+    if actionable:
+        latest = actionable[-1]
+
+    # LIVE and the state snapshot path follow the row LATEST came from, so a later setup
+    # for another repo cannot mix a different repo's context into this view.
     if repo_filter:
         repo = repo_filter
-    elif matching:
-        repo = matching[-1]["repo"]
     else:
-        repo = None
+        repo = latest["repo"] if latest else None
 
-    latest = matching[-1] if matching else None
     lines = ["LATEST"]
     if latest:
         for column in COLUMNS:
@@ -432,7 +439,11 @@ def cmd_list(args):
     rows = read_rows(args.state_file)
     newest = {}
     for row in rows:
-        newest[(row["repo"], row["goal"])] = row
+        key = (row["repo"], row["goal"])
+        current = newest.get(key)
+        # A later setup row never replaces a current stage/next action in the list view.
+        if current is None or row["stage"] != "setup" or current["stage"] == "setup":
+            newest[key] = row
     for (repo, goal), row in sorted(newest.items()):
         print(
             f"{repo} {goal} {row['stage']} {human_age(row['ts'])} {row['next_action']}"

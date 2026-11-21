@@ -13,6 +13,7 @@ Usage:
     gdd.py stage --repo PATH --goal 0041 --stage implement
     gdd.py stage --repo PATH --goal 0041 --stage simplify --dry-run
     gdd.py stage --repo PATH --goal 0041 --stage apply --findings FILE --wait
+    gdd.py setup --repo PATH --goal 0041 [--plan-file FILE]
     gdd.py status --repo PATH --goal 0041
 
 Agent stages: implement, simplify, apply, review, fix. Every other stage is
@@ -31,10 +32,12 @@ Environment or operator config file:
     GDD_TEMPLATES   template root
                     (default <script dir>/../references/stage-templates)
     GDD_GOAL_GLOB   goal-contract glob (default docs/goals/*<goal>*.md)
+    GDD_RUN_PLAN_DEFAULTS
+                    JSON defaults `setup` merges under --plan-file
     GDD_MODEL, GDD_THINKING, GDD_MAX_TIME
                     passed to the launcher only when set; never defaulted here
 
-The seven keys above GDD_MODEL resolve through the shared resolver: flag, then environment,
+The eight keys above GDD_MODEL resolve through the shared resolver: flag, then environment,
 then $XDG_CONFIG_HOME/gdd/config.yaml (fallback ~/.config/...),
 then the default. The rule is owned by hoa-skill-port.
 
@@ -63,8 +66,10 @@ warns on stderr and never affects the run or the ledger.
 import argparse
 import glob
 import json
+import math
 import os
 import re
+import secrets
 import shlex
 import sys
 import tempfile
@@ -82,6 +87,7 @@ import skill_config
 import stage_result
 
 STAGES = [
+    "setup",
     "contract",
     "implement",
     "verify",
@@ -296,15 +302,15 @@ def final_head_for(stage, head_supplied, head, post_head):
 
 
 STAGE_BUDGETS = {"implement": 2, "simplify": 2, "review": 2}
+RUN_PLAN_ROLE_FIELDS = ("agent", "model", "thinking", "max_time")
 LEDGER_COLUMNS = (
     "ts repo goal stage base_sha head_sha pr gates rounds_simplify rounds_review "
     "findings next_action note"
 ).split()
 
 
-def budget_problem(stage, rounds, over_budget=False):
+def budget_problem(stage, rounds, cap, over_budget=False):
     """The message that refuses one dispatch too many, or None."""
-    cap = STAGE_BUDGETS.get(stage)
     if over_budget or not cap or rounds < cap:
         return None
     return (
@@ -313,38 +319,358 @@ def budget_problem(stage, rounds, over_budget=False):
     )
 
 
-def ledger_rounds(state_path, repo_name, goal, stage):
-    """How many runs of this stage the ledger already records for this repo+goal."""
+def non_negative_int(value):
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def run_usage(state):
+    """The launcher's normalized token count, or None when it reports none.
+
+    `total_tokens` when the launcher records it; otherwise input + output only.
+    Cache reads are never added: some routes count them inside the total. An
+    all-zero accumulator is the bundled launcher's no-usage placeholder and is
+    unknown, never an explicit zero: no state field records a usage event.
+    """
+    usage = state.get("usage") if isinstance(state.get("usage"), dict) else {}
+    total = usage.get("total_tokens")
+    if total is not None:
+        return total if non_negative_int(total) and total > 0 else None
+    parts = []
+    for key in ("input_tokens", "output_tokens"):
+        value = usage.get(key)
+        if not non_negative_int(value):
+            return None
+        parts.append(value)
+    total = sum(parts)
+    return total if total > 0 else None
+
+
+def path_segment_problem(value):
+    """Why `value` cannot stand as one portable path segment, or None."""
+    if not isinstance(value, str) or not value.strip():
+        return "is empty"
+    if "/" in value or "\\" in value:
+        return "contains a path separator"
+    if os.path.splitdrive(value)[0]:
+        return "contains a drive prefix"
+    if value in (".", ".."):
+        return "is a relative path component"
+    return None
+
+
+DURATION_RE = re.compile(r"(\d+(?:\.\d+)?)([smh]?)")
+DURATION_SCALES = {"": 1, "s": 1, "m": 60, "h": 3600}
+
+
+def duration_seconds(value):
+    """Positive finite seconds for a plan duration, or None when the launcher would reject it.
+
+    Mirrors agent_run.max_time_seconds, which exits the launcher on invalid input, so setup
+    cannot reuse it. A string keeps the launcher's grammar and is forwarded verbatim; a number is
+    checked in the plain decimal form `forwarded_duration` sends.
+    """
+    value = forwarded_duration(value)
+    if value is None:
+        return None
+    match = DURATION_RE.fullmatch(value.strip())
+    if not match:
+        return None
+    try:
+        seconds = float(match.group(1)) * DURATION_SCALES[match.group(2)]
+    except (OverflowError, ValueError):
+        return None
+    return seconds if math.isfinite(seconds) and seconds > 0 else None
+
+
+def forwarded_duration(value):
+    """The string a plan duration reaches the launcher as, or None for a non-duration type.
+
+    Numbers use plain decimal notation: `str(0.00001)` is `1e-05`, which the launcher rejects.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            return None
+        return format(value, "f").rstrip("0").rstrip(".") or "0"
+    return value if isinstance(value, str) else None
+
+
+def plan_path_problem(repo_name, goal):
+    """Why this repo+goal cannot name a plan path, or None when it can."""
+    for value, label in ((repo_name, "repo"), (goal, "goal")):
+        if problem := path_segment_problem(value):
+            return f"run plan: {label} {value!r} {problem}"
+    root = os.path.realpath(task_root())
+    directory = os.path.join(root, f"{repo_name}-{goal}")
+    resolved = os.path.realpath(directory)
+    if resolved != directory and not resolved.startswith(root + os.sep):
+        return f"run plan directory {directory} resolves outside the task root {root}"
+    return None
+
+
+def run_plan_path(repo_name, goal):
+    """The goal's plan file under the resolved task root; refuse a segment or link escape."""
+    if problem := plan_path_problem(repo_name, goal):
+        fail(problem)
+    return os.path.join(os.path.realpath(task_root()), f"{repo_name}-{goal}", "run-plan.json")
+
+
+def plan_problem(plan):
+    """The validation message for a run plan, or None when it is well-formed."""
+    if not isinstance(plan, dict):
+        return "run plan: top level must be a JSON object"
+    for key in plan:
+        if key not in ("roles", "budgets", "notes"):
+            return f"run plan: unknown key '{key}'"
+    roles = plan.get("roles", {})
+    if not isinstance(roles, dict):
+        return "run plan: 'roles' must be an object"
+    for stage, role in roles.items():
+        if stage not in AGENT_STAGES:
+            return f"run plan: unknown role 'roles.{stage}'"
+        if not isinstance(role, dict):
+            return f"run plan: 'roles.{stage}' must be an object"
+        for field, value in role.items():
+            if field not in RUN_PLAN_ROLE_FIELDS:
+                return f"run plan: unknown field 'roles.{stage}.{field}'"
+            if not isinstance(value, str) or not value.strip():
+                return f"run plan: 'roles.{stage}.{field}' must be a non-empty string"
+            if field == "max_time" and duration_seconds(value) is None:
+                return (f"run plan: 'roles.{stage}.max_time' must be a positive duration "
+                        "like 30m")
+            if field in ("agent", "model", "thinking") and (
+                    re.search(r"\s", value) or "=" in value):
+                return (f"run plan: 'roles.{stage}.{field}' must not contain whitespace "
+                        "or '='")
+    budgets = plan.get("budgets", {})
+    if not isinstance(budgets, dict):
+        return "run plan: 'budgets' must be an object"
+    for key in budgets:
+        if key not in ("rounds", "max_time", "token_cap"):
+            return f"run plan: unknown key 'budgets.{key}'"
+    rounds = budgets.get("rounds", {})
+    if not isinstance(rounds, dict):
+        return "run plan: 'budgets.rounds' must be an object"
+    for stage, cap in rounds.items():
+        if stage not in AGENT_STAGES:
+            return f"run plan: unknown stage 'budgets.rounds.{stage}'"
+        if cap is None:
+            continue  # null means the default cap
+        if not (isinstance(cap, int) and not isinstance(cap, bool) and cap > 0):
+            return f"run plan: 'budgets.rounds.{stage}' must be a positive integer or null"
+    for key in ("max_time", "token_cap"):
+        if key not in budgets:
+            continue
+        value = budgets[key]
+        if key == "token_cap":
+            if value is None or non_negative_int(value):
+                continue
+            return f"run plan: 'budgets.token_cap' must be a non-negative integer or null"
+        if duration_seconds(value) is None:
+            return "run plan: 'budgets.max_time' must be a positive duration like 30m"
+    notes = plan.get("notes", [])
+    if not isinstance(notes, list):
+        return "run plan: 'notes' must be a list of strings"
+    for index, note in enumerate(notes):
+        if not isinstance(note, str):
+            return f"run plan: 'notes[{index}]' must be a string"
+    return None
+
+
+def merge_plans(defaults, override):
+    """The plan file wins field by field over the defaults file; notes are replaced whole."""
+    merged = {}
+    roles = {stage: dict(role) for stage, role in (defaults.get("roles") or {}).items()}
+    for stage, role in (override.get("roles") or {}).items():
+        roles[stage] = {**(roles.get(stage) or {}), **role}
+    if roles:
+        merged["roles"] = roles
+    default_budgets = defaults.get("budgets") or {}
+    override_budgets = override.get("budgets") or {}
+    budgets = {}
+    rounds = {**(default_budgets.get("rounds") or {}), **(override_budgets.get("rounds") or {})}
+    if rounds:
+        budgets["rounds"] = rounds
+    for key in ("max_time", "token_cap"):
+        if key in override_budgets:
+            budgets[key] = override_budgets[key]
+        elif key in default_budgets:
+            budgets[key] = default_budgets[key]
+    if budgets:
+        merged["budgets"] = budgets
+    if "notes" in override:
+        merged["notes"] = override["notes"]
+    elif "notes" in defaults:
+        merged["notes"] = defaults["notes"]
+    return merged
+
+
+def read_plan_source(path, label):
+    """Load and validate one JSON plan source; fail naming the file and the offending key."""
+    expanded = os.path.expanduser(path)
+    try:
+        with open(expanded, encoding="utf-8") as handle:
+            plan = json.load(handle)
+    except OSError as exc:
+        fail(f"{label}: cannot read {expanded}: {exc}")
+    except ValueError as exc:
+        fail(f"{label}: invalid JSON in {expanded}: {exc}")
+    problem = plan_problem(plan)
+    if problem:
+        fail(f"{problem} (in {expanded})")
+    return plan
+
+
+def read_run_plan(repo_name, goal):
+    """The validated plan for one repo+goal; None when setup has not run or the selector is legacy.
+
+    A selector that cannot name a plan path (or whose directory redirects outside the task root)
+    is treated as "no plan": plan lookup must not change the failure text, exit status or bytes
+    of a command origin/main accepted. `setup` still refuses such a selector before writing.
+    """
+    if plan_path_problem(repo_name, goal):
+        return None
+    path = run_plan_path(repo_name, goal)
+    if not os.path.exists(path):
+        return None
+    return read_plan_source(path, "run plan")
+
+
+def write_run_plan(path, plan):
+    """Replace the plan atomically: a temp sibling keeps an interrupted write from truncating it."""
+    directory = os.path.dirname(path)
+    os.makedirs(directory, exist_ok=True)
+    fd, temp_path = tempfile.mkstemp(dir=directory, prefix=".run-plan.json.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
+            json.dump(plan, handle, ensure_ascii=False, indent=2)
+            handle.write("\n")
+        os.replace(temp_path, path)
+    except BaseException:
+        try:
+            os.remove(temp_path)
+        except OSError:
+            pass
+        raise
+
+
+def resolve_field(flag, plan_value, env_value):
+    """One field's resolution: explicit flag, then the run plan, then the environment."""
+    if flag is not None:
+        return flag
+    if plan_value:
+        return plan_value
+    return env_value
+
+
+def ledger_rows(state_path, repo_name, goal, *, exact=False):
+    """(stage, note) for this repo+goal's ledger rows, oldest first.
+
+    A plan-governed reader matches the canonical repo key exactly; without a plan the
+    legacy substring match is kept.
+    """
     try:
         with open(os.path.expanduser(state_path), encoding="utf-8", errors="replace") as handle:
             lines = handle.read().splitlines()
     except OSError:
-        return 0
+        return []
     if not lines:
-        return 0
+        return []
     header = lines[0].split("\t")
     try:
         i_repo = header.index("repo")
         i_goal = header.index("goal")
         i_stage = header.index("stage")
     except ValueError:
-        return 0
+        return []
     i_note = header.index("note") if "note" in header else None
-    count = 0
+    rows = []
     for line in lines[1:]:
         cells = line.split("\t")
         if len(cells) <= max(i_repo, i_goal, i_stage):
             continue
-        if cells[i_stage] != stage or cells[i_goal] != goal:
+        if cells[i_goal] != goal:
             continue
-        if repo_name and repo_name not in cells[i_repo]:
+        if repo_name:
+            same_repo = cells[i_repo] == repo_name if exact else repo_name in cells[i_repo]
+            if not same_repo:
+                continue
+        note = cells[i_note] if i_note is not None and len(cells) > i_note else ""
+        rows.append((cells[i_stage], note))
+    return rows
+
+
+def ledger_rounds(state_path, repo_name, goal, stage, *, exact=False):
+    """How many runs of this stage the ledger already records for this repo+goal."""
+    # `--wait` writes a dispatch row and then a completion row for the same stage (its note
+    # starts with `exit=`). The cap counts dispatches, so a completion must not spend a round.
+    return sum(
+        1 for row_stage, note in ledger_rows(state_path, repo_name, goal, exact=exact)
+        if row_stage == stage and not note.startswith("exit=")
+    )
+
+
+RUN_NOTE_RE = re.compile(r"^run=(\S+)$")
+
+# agent_run.observed_state() may also answer "stale" for a dead `running` run; a stale attempt
+# is terminal for accounting.
+TERMINAL_RUN_STATES = tuple(
+    name for name in agent_run.STATES if name != "running"
+) + ("stale",)
+
+
+def dispatch_run_name(note):
+    """The run name a dispatch row records, or None for a legacy row."""
+    match = RUN_NOTE_RE.match(note.strip())
+    return match.group(1) if match else None
+
+
+def run_state_for(run_name):
+    """(state, run_dir) for one recorded run name; ({}, None) when it is missing or ambiguous.
+
+    A plan-governed dispatch names its run `<repo>-<goal>-<stage>-a<n>`, so the name
+    identifies exactly one `<run_root>/<date>/<run_name>/state.json`; zero or several
+    matches stay unknown instead of a newest-mtime guess.
+    """
+    if not run_name or path_segment_problem(run_name):
+        return {}, None
+    try:
+        matches = glob.glob(os.path.join(run_root(), "*", glob.escape(run_name), "state.json"))
+    except (OSError, ValueError):
+        return {}, None
+    if len(matches) != 1:
+        return {}, None
+    run_dir = os.path.dirname(matches[0])
+    return agent_run.read_state(run_dir), run_dir
+
+
+def accounted_usage(state_path, repo_name, goal, stage=None, *, exact=True):
+    """(tokens known from launcher state, unknown attempts) over agent dispatch rows.
+
+    Reading is best effort: a running, missing or malformed run state is unknown and is
+    never summed, and accounting never fails the stage.
+    """
+    known = unknown = 0
+    for row_stage, note in ledger_rows(state_path, repo_name, goal, exact=exact):
+        if row_stage not in AGENT_STAGES or note.startswith("exit="):
             continue
-        # `--wait` writes a dispatch row and then a completion row for the same stage (its note
-        # starts with `exit=`). The cap counts dispatches, so a completion must not spend a round.
-        if i_note is not None and len(cells) > i_note and cells[i_note].startswith("exit="):
+        if stage is not None and row_stage != stage:
             continue
-        count += 1
-    return count
+        value = None
+        try:
+            state, run_dir = run_state_for(dispatch_run_name(note))
+            if state and agent_run.observed_state(run_dir, state) in TERMINAL_RUN_STATES:
+                value = run_usage(state)
+        except (OSError, ValueError, TypeError):
+            value = None
+        if value is None:
+            unknown += 1
+        else:
+            known += value
+    return known, unknown
 
 
 def ledger_append(repo, goal, stage, base, head, gates, next_stage=None, note=None, pr=None, rounds=None):
@@ -491,8 +817,47 @@ def write_lineage_sidecar(run_root, run_name, run_dir, goal, stage):
         print(f"gdd: warning: lineage sidecar not written: {reason}", file=sys.stderr)
 
 
-def launch(launcher, prompt_path, repo, goal, stage, model, thinking, max_time):
+RUN_NAME_LIMIT = len(agent_run.sanitize("x" * 4096))
+
+
+def plan_run_name(repo_name, goal, stage, attempt, ident):
+    """A plan-governed run name whose `-<goal>-<stage>-a<n>-<id>` tail survives the launcher's sanitize.
+
+    The launcher lowercases, substitutes and truncates the requested slug itself, so only the
+    repo part is shortened here, using the launcher's own limit; the goal stays whole because
+    `delivery-state.py show` finds a goal's runs by name. The result is verified through the
+    same function.
+    """
+    suffix = f"-a{attempt}-{ident}"
+    tail = "-" + agent_run.sanitize(f"{goal}-{stage}").strip("-") + suffix
+    keep = RUN_NAME_LIMIT - len(tail)
+    repo_part = agent_run.sanitize(repo_name).strip("-")[:max(keep, 0)].rstrip("-")
+    name = (repo_part or "run") + tail
+    final = agent_run.sanitize(name)
+    if not final.endswith(suffix):
+        raise LaunchError(f"launcher sanitize would drop the attempt suffix from {name!r}")
+    return final
+
+
+def unused_plan_run_name(root, repo_name, goal, stage, attempt, new_id=None):
+    """A plan run name no retained run dir under `root` uses, live or archived.
+
+    The random id alone can repeat, and a ledger reset reuses attempt numbers, so the
+    name is checked against every date directory before it is handed out.
+    """
+    new_id = new_id or (lambda: secrets.token_hex(3))
+    while True:
+        name = plan_run_name(repo_name, goal, stage, attempt, new_id())
+        if not glob.glob(os.path.join(glob.escape(root), "*", glob.escape(name) + "*")):
+            return name
+
+
+def launch(launcher, prompt_path, repo, goal, stage, agent, model, thinking, max_time,
+           attempt=None):
     name = f"{os.path.basename(repo)}-{goal}-{stage}"
+    if attempt is not None:
+        # A plan-governed re-dispatch must not alias the previous attempt's run dir.
+        name = unused_plan_run_name(run_root(), os.path.basename(repo), goal, stage, attempt)
     resolved_run_root = run_root()
     prefix = launcher_command(launcher)
     cmd = [
@@ -507,8 +872,6 @@ def launch(launcher, prompt_path, repo, goal, stage, model, thinking, max_time):
         "--schema",
         stage_result.SCHEMA,
     ]
-    if prefix[1:2] == ["/c"] and (problem := agent_run.shim_hazard(prefix[-1], cmd[len(prefix):])):
-        raise LaunchError(f"{problem}; configure a native executable or Python launcher")
     for flag, value in (
         ("--model", model),
         ("--thinking", thinking),
@@ -516,12 +879,15 @@ def launch(launcher, prompt_path, repo, goal, stage, model, thinking, max_time):
     ):
         if value:
             cmd += [flag, str(value)]
+    # The final vector is what a Windows .cmd shim receives through cmd.exe; guard it after
+    # every plan/flag/env value is in, immediately before the spawn.
+    if prefix[1:2] == ["/c"] and (problem := agent_run.shim_hazard(prefix[-1], cmd[len(prefix):])):
+        raise LaunchError(f"{problem}; configure a native executable or Python launcher")
     # The launcher resolves its run root and agent from GDD_RUN_ROOT / GDD_AGENT; export
     # what this process resolved so a config-file value reaches it too.
     child_env = dict(os.environ)
     child_env["GDD_RUN_ROOT"] = resolved_run_root
     child_env["PYTHONIOENCODING"] = "utf-8"
-    agent = config("GDD_AGENT")
     if agent:
         child_env["GDD_AGENT"] = agent
     try:
@@ -581,7 +947,9 @@ def cmd_stage(args):
     if not os.path.isdir(args.repo):
         fail(f"--repo is not a directory: {args.repo}")
     repo = os.path.realpath(git(args.repo, "rev-parse", "--show-toplevel"))
-    repo_name = os.path.basename(repo)
+    repo_name = repo_key(args.repo)
+    plan = read_run_plan(repo_name, args.goal)
+    role = ((plan or {}).get("roles") or {}).get(args.stage) or {}
 
     templates = os.path.expanduser(
         config("GDD_TEMPLATES", flag=args.templates, default=DEFAULT_TEMPLATES)
@@ -635,13 +1003,31 @@ def cmd_stage(args):
         return 3
 
     rounds_state = os.path.expanduser(state_file())
-    rounds_seen = ledger_rounds(rounds_state, repo_name, args.goal, args.stage)
+    # A plan governs accounting with the exact repo key; without one, keep the legacy match.
+    rounds_seen = ledger_rounds(rounds_state, repo_name, args.goal, args.stage,
+                                exact=plan is not None)
+    budgets = (plan or {}).get("budgets") or {}
+    cap = budgets.get("rounds", {}).get(args.stage)
+    if cap is None:
+        cap = STAGE_BUDGETS.get(args.stage)
     budget_message = budget_problem(
-        args.stage, rounds_seen, over_budget=args.over_budget
+        args.stage, rounds_seen, cap, over_budget=args.over_budget
     )
     if budget_message:
         print(f"gdd: {budget_message}", file=sys.stderr)
         return 3
+
+    token_cap = budgets.get("token_cap")
+    if token_cap is not None and not args.over_budget:
+        used, unknown = accounted_usage(rounds_state, repo_name, args.goal, exact=True)
+        if used >= token_cap:
+            print(
+                f"gdd: {args.stage}: goal {args.goal} token cap {token_cap} reached "
+                f"({used} used, {unknown} unknown) — pass --over-budget only if a "
+                "different attempt is worth the tokens",
+                file=sys.stderr,
+            )
+            return 3
 
     gates = args.gates or os.environ.get("GDD_GATES") or "-"
     findings = os.path.abspath(os.path.expanduser(args.findings)) if args.findings else "-"
@@ -659,6 +1045,7 @@ def cmd_stage(args):
         "RESULT_SCHEMA": stage_result.SCHEMA,
     }
     rendered = render(template_text, variables)
+    notes = (plan or {}).get("notes") or []
 
     stamp = datetime.now().strftime("%H%M%S")
     prompt_dir = os.path.join(
@@ -674,7 +1061,16 @@ def cmd_stage(args):
         counter += 1
     os.makedirs(prompt_dir, exist_ok=True)
     with open(prompt_path, "w", encoding="utf-8") as handle:
-        handle.write(rendered)
+        handle.write(rendered.rstrip("\n") if notes else rendered)
+    if notes:
+        # The notes suffix is written without newline translation, so a CRLF inside one
+        # note reaches the prompt byte for byte.
+        with open(prompt_path, "a", encoding="utf-8", newline="") as handle:
+            handle.write(
+                "\n\n## Owner notes (run plan)\n\n"
+                + "\n".join(f"- {note}" for note in notes)
+                + "\n"
+            )
     print(f"prompt: {prompt_path}")
 
     if args.dry_run:
@@ -695,6 +1091,16 @@ def cmd_stage(args):
             3,
         )
 
+    agent = resolve_field(args.agent, role.get("agent"), config("GDD_AGENT"))
+    model = resolve_field(args.model, role.get("model"), os.environ.get("GDD_MODEL") or None)
+    thinking = resolve_field(args.thinking, role.get("thinking"), os.environ.get("GDD_THINKING") or None)
+    max_time = resolve_field(
+        args.max_time,
+        role.get("max_time") or budgets.get("max_time"),
+        os.environ.get("GDD_MAX_TIME") or None,
+    )
+    if isinstance(max_time, (int, float)) and not isinstance(max_time, bool):
+        max_time = forwarded_duration(max_time)
     try:
         run_name, run_dir, launch_run_root = launch(
             launcher,
@@ -702,9 +1108,11 @@ def cmd_stage(args):
             repo,
             args.goal,
             args.stage,
-            args.model,
-            args.thinking,
-            args.max_time,
+            agent,
+            model,
+            thinking,
+            max_time,
+            attempt=rounds_seen + 1 if plan is not None else None,
         )
     except (LaunchError, OSError) as exc:
         message = str(exc).strip() or exc.__class__.__name__
@@ -729,6 +1137,7 @@ def cmd_stage(args):
         head,
         gates,
         next_stage=args.stage,
+        note=f"run={run_name}" if plan is not None else None,
         rounds=rounds_seen + 1 if args.stage in ("simplify", "review") else None,
     )
     print(f"run: {run_name}")
@@ -750,10 +1159,22 @@ def cmd_stage(args):
         exit_code = state.get("exit")
         duration = state.get("duration_s")
         if final_state != "done":
+            ended = (
+                f"wait: run ended in {final_state} "
+                f"(exit={exit_code if exit_code is not None else '-'}) instead of done"
+            )
+            if plan is not None:
+                # A plan-governed attempt is already a ledger row; a raw launcher resume would
+                # spend no round and skip the plan's routing and budgets.
+                fail(
+                    f"{ended} — the attempt is recorded; a further attempt goes through "
+                    "gdd.py stage (it spends a round), or --over-budget with the owner's "
+                    "approval",
+                    1,
+                )
             resume = state.get("session_id") or "?"
             fail(
-                f"wait: run ended in {final_state} (exit={exit_code if exit_code is not None else '-'}) "
-                f"instead of done — resume with: {launcher} start --name {run_name}-r2 "
+                f"{ended} — resume with: {launcher} start --name {run_name}-r2 "
                 f"--prompt <same prompt> --resume {resume}",
                 1,
             )
@@ -761,12 +1182,22 @@ def cmd_stage(args):
         final_head = final_head_for(args.stage, bool(args.head), head, post_head)
         result = agent_run.read_json(os.path.join(run_dir, "result.json"), {})
         verdict = result.get("verdict") if state.get("result") == "valid" else None
+        tokens = run_usage(state)
+        wall = f"{duration}s" if duration is not None else "unknown"
         note = (
             f"exit={exit_code if exit_code is not None else '-'} "
             f"dur={duration if duration is not None else '-'} "
             f"head={post_head[:7]}"
-            + (f" verdict={verdict}" if verdict else "")
         )
+        if plan is not None:
+            note += (
+                f" role={args.stage} route={reported_field(state, 'agent', agent)}"
+                f" model={reported_field(state, 'model', model, observed=True)}"
+                f" thinking={reported_field(state, 'thinking', thinking, observed=True)}"
+                f" wall={wall} tokens={tokens if tokens is not None else 'unknown'}"
+            )
+        if verdict:
+            note += f" verdict={verdict}"
         ledger_append(
             repo,
             args.goal,
@@ -785,6 +1216,24 @@ def cmd_stage(args):
                 print(f"  unmet: {criterion}")
         elif state.get("result"):
             print(f"result: {state['result']} {state.get('result_error') or ''}".rstrip())
+    return 0
+
+
+def cmd_setup(args):
+    """Write the goal's run plan and record one setup row; never invent a field."""
+    if not os.path.isdir(args.repo):
+        fail(f"--repo is not a directory: {args.repo}")
+    repo = os.path.realpath(git(args.repo, "rev-parse", "--show-toplevel"))
+    repo_name = repo_key(args.repo)
+    defaults = {}
+    defaults_path = config("GDD_RUN_PLAN_DEFAULTS")
+    if defaults_path:
+        defaults = read_plan_source(defaults_path, "GDD_RUN_PLAN_DEFAULTS")
+    override = read_plan_source(args.plan_file, "--plan-file") if args.plan_file else {}
+    path = run_plan_path(repo_name, args.goal)
+    write_run_plan(path, merge_plans(defaults, override))
+    ledger_append(repo, args.goal, "setup", "-", "-", "-", note=f"plan={path}")
+    print(f"run plan: {path}")
     return 0
 
 
@@ -824,6 +1273,46 @@ def cmd_close(args):
     return 0
 
 
+def repo_key(value):
+    """The repo key delivery-state.py writes for --repo: git toplevel basename, else the value.
+
+    Kept identical to delivery-state.py's normalize_repo so the ledger reader and the plan
+    reader agree, including tilde expansion.
+    """
+    path = os.path.expanduser(value)
+    if os.path.isdir(path):
+        try:
+            proc = gdd_process.run(
+                ["git", "-C", path, "rev-parse", "--show-toplevel"],
+                capture_output=True, text=True,
+            )
+        except OSError:
+            proc = None
+        root = (proc.stdout or "").strip() if proc is not None and proc.returncode == 0 else ""
+        return os.path.basename(root) if root else os.path.basename(os.path.abspath(path))
+    default_root = os.environ.get("GDD_REPO_ROOT") or ""
+    if default_root:
+        candidate = os.path.join(os.path.expanduser(default_root), value)
+        if os.path.isdir(candidate):
+            return os.path.basename(os.path.abspath(candidate))
+    return value
+
+
+def reported_field(state, key, requested, *, observed=False):
+    """The launcher-observed value, else the requested value marked `req:`, else `default`.
+
+    The bundled launcher records its request arguments as model/thinking, not what the
+    provider actually resolved, so those fields are trusted only when the state marks them
+    observed (`<key>_observed`: true). The route is what the launcher ran, so it stands as-is.
+    """
+    value = state.get(key)
+    if observed and state.get(f"{key}_observed") is not True:
+        value = None
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return f"req:{requested}" if requested else "default"
+
+
 def cmd_status(args):
     cmd = [
         agent_run.interpreter(),
@@ -844,7 +1333,37 @@ def cmd_status(args):
                              env={**os.environ, "PYTHONIOENCODING": "utf-8"})
     sys.stdout.write(result.stdout)
     sys.stderr.write(result.stderr)
-    return result.returncode
+    if result.returncode != 0:
+        return result.returncode
+
+    repo_name = repo_key(args.repo)
+    plan = read_run_plan(repo_name, args.goal)
+    if plan is None:
+        return 0  # no plan file: exactly the legacy show output
+    state_path = os.path.expanduser(state_file())
+    print()
+    print("RUN PLAN")
+    print(f"plan: {run_plan_path(repo_name, args.goal)}")
+    print(json.dumps(plan, ensure_ascii=False, sort_keys=True))
+    budgets = plan.get("budgets") or {}
+    token_cap = budgets.get("token_cap")
+    if token_cap is not None:
+        total, unknown = accounted_usage(state_path, repo_name, args.goal, exact=True)
+        print(f"tokens: {total} used, {unknown} unknown (cap {token_cap})")
+    for stage in [name for name in STAGES if name in AGENT_STAGES]:
+        role = (plan.get("roles") or {}).get(stage)
+        cap = budgets.get("rounds", {}).get(stage)
+        if cap is None:
+            cap = STAGE_BUDGETS.get(stage)
+        used = ledger_rounds(state_path, repo_name, args.goal, stage, exact=True)
+        if role is None and cap is None and not used:
+            continue
+        total, unknown = accounted_usage(state_path, repo_name, args.goal, stage, exact=True)
+        print(
+            f"{stage}: rounds={used}/{cap if cap is not None else '-'} "
+            f"tokens={total} unknown={unknown}"
+        )
+    return 0
 
 
 EPILOG = """\
@@ -861,10 +1380,12 @@ Environment or operator config file:
                   (agent_run.py: an installed route; default omp, claude uses gdd-route-cc)
   GDD_TEMPLATES   template root (default <script dir>/../references/stage-templates)
   GDD_GOAL_GLOB   goal-contract glob (default docs/goals/*<goal>*.md)
+  GDD_RUN_PLAN_DEFAULTS
+                  JSON defaults `setup` merges under --plan-file
   GDD_MODEL, GDD_THINKING, GDD_MAX_TIME
                   passed to the launcher only when set; never defaulted here
 
-The seven keys above GDD_MODEL also resolve from
+The eight keys above GDD_MODEL also resolve from
 $XDG_CONFIG_HOME/gdd/config.yaml (fallback ~/.config/...).
 Order: CLI flag, then environment variable, then that file, then the default.
 The shared rule is documented in hoa-skill-port.
@@ -904,14 +1425,13 @@ def build_parser():
         help="launcher command (default: $GDD_LAUNCHER, config file, or the bundled adapter)",
     )
     stage.add_argument(
-        "--model", default=os.environ.get("GDD_MODEL") or None, help="passed through only when set"
+        "--agent", default=None,
+        help="agent route exported to the launcher (default: $GDD_AGENT, config file, "
+             "or the launcher's own default)",
     )
-    stage.add_argument(
-        "--thinking", default=os.environ.get("GDD_THINKING") or None, help="passed through only when set"
-    )
-    stage.add_argument(
-        "--max-time", default=os.environ.get("GDD_MAX_TIME") or None, help="passed through only when set"
-    )
+    stage.add_argument("--model", default=None, help="passed through only when set")
+    stage.add_argument("--thinking", default=None, help="passed through only when set")
+    stage.add_argument("--max-time", default=None, help="passed through only when set")
     stage.add_argument("--templates", default=None, help="template directory")
     stage.add_argument("--dry-run", action="store_true", help="render only")
     stage.add_argument("--wait", action="store_true", help="poll until the run ends")
@@ -922,6 +1442,14 @@ def build_parser():
         help="dispatch past the stage's round cap (implement/simplify/review: 2)",
     )
     stage.set_defaults(func=cmd_stage)
+
+    setup = sub.add_parser("setup", help="write the goal's run plan and record a setup row")
+    setup.add_argument("--repo", required=True, help="repo path")
+    setup.add_argument("--goal", required=True, help="goal / increment id")
+    setup.add_argument(
+        "--plan-file", default=None, help="plan JSON merged over $GDD_RUN_PLAN_DEFAULTS"
+    )
+    setup.set_defaults(func=cmd_setup)
 
     scope = sub.add_parser(
         "scope", help="print the resolved worktree-scope.py path (GDD_WORKTREE_SCOPE)"

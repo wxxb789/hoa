@@ -22,6 +22,17 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
   no auto-resume, force-dispatch, fallback or phase advance, and any authorized new dispatch still
   counts against the cap. Phase 5 seals and verifies the whole branch, so `ce-work`'s commits are
   covered like every other path.
+- Add a per-goal gdd run plan: `setup` merges `GDD_RUN_PLAN_DEFAULTS` under the goal's plan once, `stage`
+  resolves flag > plan role > environment (max time also checks `budgets.max_time`) and enforces round and
+  token caps, and `status` prints the plan with per-role usage. Token use is summed only from a dispatched run's
+  launcher `state.json` in a recognized terminal state, looked up by the exact
+  `<repo>-<goal>-<stage>-a<n>-<6 hex>` name the dispatch row records, so detached, failed and stale attempts
+  count while running, missing, unknown-state, malformed and all-zero-usage attempts stay `unknown`; completion
+  notes label the route as executed and model/thinking as `req:<value>` unless the launcher state marks them
+  observed.
+  With no plan, ledger notes and `status` bytes stay origin/main's, and the batch-shim check runs on the final
+  argument vector before spawn, deliberately refusing an unsafe legacy shim launch.
+  The dsh route accepts neither `model` nor `thinking`; opencode takes `thinking` only with `model`.
 - Reuse the runtime's read-only `ce-code-review mode:agent` in gdd's fresh review stage when the
   runtime offers it: gdd's exact base/head, local-only, a complete receipt with a matching range or
   gdd's own report-only fallback, findings mapped into the existing review result. The receipt does
