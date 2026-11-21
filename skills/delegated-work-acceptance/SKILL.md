@@ -6,7 +6,7 @@ description: >-
   command under the reporter's PATH and cwd, route it to the maintainer who owns the fix, and
   escalate one scoped landing decision. Not for dispatch.
 metadata:
-  revision: "11"
+  revision: "12"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
   summary: "verify delegated work against artifacts and write scope; route rejected or out-of-scope fixes to their owner"
