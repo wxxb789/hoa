@@ -12,6 +12,7 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
   with no disk reads, and gdd phase 5 verifies and pushes that exact SHA instead of enumerating
   committed history by hand.
 
+- Land the `unfettered-skills/` landing-zone checker (`scripts/check_unfettered.py`): the path-isolation write rule, the snapshot sensitive scan, candidate shape and name-collision checks, a CI event-mode step before the static gates, and its CLI tests.
 - gdd-route-pi: pair DeepSeek with an independent reviewer for multi-brief features, review the spec's
   failure modes before the first brief, and name where overflow goes under a size cap.
 - Delegate gdd's fresh `implement` stage to a runtime-offered `ce-work mode:return-to-caller` only

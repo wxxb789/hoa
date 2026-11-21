@@ -1,27 +1,22 @@
-"""Reject corporate package feeds and legacy npm lockfile integrity hashes."""
+"""Reject corporate package feeds and legacy npm lockfile integrity hashes.
+
+Scans every tracked file except `ref/` and the `unfettered-skills/` landing zone;
+the landing-zone checker owns those candidates.
+"""
 
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-FEED_HOST = re.compile(
-    rb"""
-    (?<![a-z0-9_.-])
-    (?:[a-z0-9_-]+\.)*
-    (?:
-        pkgs\.(?:visualstudio|dev\.azure)\.com
-        | [a-z0-9_-]*packagefeed[p]roxy[a-z0-9_-]*(?:\.[a-z0-9_-]+)*
-        | (?:visualstudio\.com|dev\.azure\.com)
-          (?=(?::[0-9]+)?/(?:[^\s"'<>?#]*/)?_packaging(?:[/\s"'<>?#]|$))
-    )
-    (?![a-z0-9_-]|\.[a-z0-9_-])
-    """,
-    re.IGNORECASE | re.VERBOSE,
-)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from feed_host import FEED_HOST  # noqa: E402
+
 SHA1_INTEGRITY = re.compile(rb'"integrity"\s*:\s*"(sha1-[^"\s]+)')
 
 
@@ -34,7 +29,8 @@ def git(root: Path, *args: str) -> bytes:
 
 def corporate_feed_findings(root: Path) -> list[str]:
     findings = []
-    paths = git(root, "ls-files", "-z", "--", ".", ":(exclude,top)ref")
+    paths = git(root, "ls-files", "-z", "--", ".",
+                ":(exclude,top)ref", ":(exclude,top)unfettered-skills")
     for path in paths.split(b"\0")[:-1]:
         relative = os.fsdecode(path)
         tracked = root / relative
@@ -75,8 +71,11 @@ def test_feed_scan_reports_tracked_feeds_only(tmp_path, host, path):
     (tmp_path / "ref").mkdir()
     url = f"https://{host}{path}\n"
     (tmp_path / "ref" / "excluded.txt").write_text(url, encoding="utf-8")
+    (tmp_path / "unfettered-skills").mkdir()
+    (tmp_path / "unfettered-skills" / "candidate.txt").write_text(url, encoding="utf-8")
     (tmp_path / "untracked.txt").write_text(url, encoding="utf-8")
-    git(tmp_path, "add", "-f", "--", tracked.name, "ref/excluded.txt")
+    git(tmp_path, "add", "-f", "--", tracked.name, "ref/excluded.txt",
+        "unfettered-skills/candidate.txt")
     assert corporate_feed_findings(tmp_path) == []
 
     with tracked.open("a", encoding="utf-8") as file:
@@ -91,13 +90,15 @@ def test_feed_scan_rejects_sha1_only_in_tracked_package_locks(tmp_path):
     for path in (
         "app/package-lock.json",
         "ref/package-lock.json",
+        "unfettered-skills/package-lock.json",
         "ignored/package-lock.json",
         "other.json",
     ):
         file = tmp_path / path
         file.parent.mkdir(parents=True, exist_ok=True)
         file.write_text(strong if path.startswith("app/") else weak, encoding="utf-8")
-    git(tmp_path, "add", "-f", "--", "app/package-lock.json", "ref/package-lock.json", "other.json")
+    git(tmp_path, "add", "-f", "--", "app/package-lock.json", "ref/package-lock.json",
+        "unfettered-skills/package-lock.json", "other.json")
     assert corporate_feed_findings(tmp_path) == []
 
     (tmp_path / "app/package-lock.json").write_text(weak, encoding="utf-8")
