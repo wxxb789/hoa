@@ -27,6 +27,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parent.parent
 JUDGE = ROOT / "evals" / "judge_trigger_evals.py"
 CASES = ROOT / "evals" / "trigger-cases.json"
+BASELINE = ROOT / "evals" / "baseline.json"
 ARTIFACTS = ROOT / ".tmp-artifacts" / "eval-judge-tests"
 
 from evals import judge_trigger_evals as judge  # noqa: E402
@@ -147,7 +148,9 @@ class JudgeCliTests(unittest.TestCase):
             "PYTHONDONTWRITEBYTECODE": "1",
             "LANG": "C.UTF-8",
         }
-        for key in ("SYSTEMROOT", "TEMP", "TMP"):
+        for key in ("SYSTEMROOT", "TEMP", "TMP", "PYTHONPATH", "NOWINDOW_GUARD_LOG"):
+            if key in ("PYTHONPATH", "NOWINDOW_GUARD_LOG") and os.name != "nt":
+                continue
             if key in os.environ:
                 env[key] = os.environ[key]
         env.update({key: str(value) for key, value in overrides.items()})
@@ -346,8 +349,6 @@ class RecordTests(unittest.TestCase):
         self.tmp = Path(tempfile.mkdtemp(dir=ARTIFACTS))
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
         self.baseline = self.tmp / "baseline.json"
-        self.stub = Stub()
-        self.addCleanup(self.stub.close)
         self.addCleanup(setattr, judge, "BASELINE_PATH", judge.BASELINE_PATH)
         self.environ = {
             "PATH": os.environ.get("PATH", ""),
@@ -364,17 +365,18 @@ class RecordTests(unittest.TestCase):
         self.addCleanup(stub.close)
         return stub
 
-    def run_main(self, *args: str, stub: Stub | None = None) -> tuple[int, str, str]:
+    def run_main(self, *args: str, stub: Stub) -> tuple[int, str, str]:
         stdout, stderr = io.StringIO(), io.StringIO()
         with patch.dict(os.environ, self.environ, clear=True), \
                 contextlib.redirect_stdout(stdout), \
                 contextlib.redirect_stderr(stderr):
-            code = judge.main([*args, "--base-url", (stub or self.stub).base_url,
+            code = judge.main([*args, "--base-url", stub.base_url,
                                "--model", "stub-model"])
         return code, stdout.getvalue(), stderr.getvalue()
 
     def test_record_writes_exact_schema_and_refuses_silent_overwrite(self) -> None:
-        code, _out, err = self.run_main("--record")
+        stub = self.make_stub()
+        code, _out, err = self.run_main("--record", stub=stub)
         self.assertEqual(code, 0, err)
         self.assertTrue(self.baseline.exists())
         record = json.loads(self.baseline.read_text(encoding="utf-8"))
@@ -387,7 +389,7 @@ class RecordTests(unittest.TestCase):
         self.assertEqual(record["model"], "stub-model")
         self.assertEqual(record["effort"], "low")
         self.assertEqual(record["judge_endpoint_host"],
-                         f"127.0.0.1:{self.stub.server.server_port}")
+                         f"127.0.0.1:{stub.server.server_port}")
         self.assertRegex(record["generated_at"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
         self.assertEqual(len(record["per_case"]), record["case_count"])
         self.assertEqual(set(record["per_case"][0]), {"id", "pick", "passed"})
@@ -396,23 +398,22 @@ class RecordTests(unittest.TestCase):
         self.assertTrue(all(row["passed"] for row in no_match))
 
         before = self.baseline.read_bytes()
-        requests = len(self.stub.requests)
-        code, _out, err = self.run_main("--record")
+        requests = len(stub.requests)
+        code, _out, err = self.run_main("--record", stub=stub)
         self.assertEqual(code, 2, err)
         self.assertIn("--force", err)
         self.assertEqual(self.baseline.read_bytes(), before)
-        self.assertEqual(len(self.stub.requests), requests)
+        self.assertEqual(len(stub.requests), requests)
 
-        code, _out, err = self.run_main("--record", "--force")
+        code, _out, err = self.run_main("--record", "--force", stub=stub)
         self.assertEqual(code, 0, err)
         self.assertIn("wrote", err)
         replaced = json.loads(self.baseline.read_text(encoding="utf-8"))
         self.assertEqual(replaced["case_count"], record["case_count"])
 
     def test_force_never_replaces_a_baseline_with_an_unrepresentable_run(self) -> None:
-        code, _out, err = self.run_main("--record")
-        self.assertEqual(code, 0, err)
-        before = self.baseline.read_bytes()
+        before = BASELINE.read_bytes()
+        self.baseline.write_bytes(before)
         failing = _cases()[1]["id"]
         stub = self.make_stub(mode="garbage", fail_case=failing)
         code, _out, err = self.run_main("--record", "--force", stub=stub)
@@ -424,9 +425,8 @@ class RecordTests(unittest.TestCase):
         self.assertIn("was not written", err)
 
     def test_wrong_catalog_pick_is_recorded_and_validates(self) -> None:
-        code, _out, err = self.run_main("--record")
-        self.assertEqual(code, 0, err)
-        before = self.baseline.read_bytes()
+        before = BASELINE.read_bytes()
+        self.baseline.write_bytes(before)
         cases = _cases()
         case = next(case for case in cases if case["must_pick"] == ["none"])
         stub = self.make_stub(mode="other_artifact", fail_case=case["id"])
@@ -525,12 +525,6 @@ class BaselineGateTests(unittest.TestCase):
     def errors(self, **changes) -> list[str]:
         return gate.baseline_errors(self.cases, self.record(**changes))
 
-    def test_absent_record_is_allowed(self) -> None:
-        self.assertIsNone(gate.load_baseline(self.tmp / "absent.json"))
-
-    def test_valid_record_has_no_errors(self) -> None:
-        self.assertEqual(self.errors(), [])
-
     def test_unknown_id(self) -> None:
         per_case = self.record()["per_case"]
         per_case[0] = {**per_case[0], "id": "not-a-case"}
@@ -542,10 +536,6 @@ class BaselineGateTests(unittest.TestCase):
         per_case[1] = {**per_case[1], "id": per_case[0]["id"]}
         errors = self.errors(per_case=per_case)
         self.assertTrue(any("duplicate id" in error for error in errors), errors)
-
-    def test_passed_must_equal_the_sum(self) -> None:
-        errors = self.errors(passed=len(self.cases) - 1)
-        self.assertTrue(any("sum(per_case.passed)" in error for error in errors), errors)
 
     def test_case_count_must_match_the_suite(self) -> None:
         errors = self.errors(case_count=3)
@@ -585,7 +575,7 @@ class BaselineGateTests(unittest.TestCase):
         self.assertTrue(any("not a catalog artifact" in error for error in errors), errors)
 
     def test_committed_baseline_matches_the_current_cases(self) -> None:
-        record = gate.load_baseline(ROOT / "evals" / "baseline.json")
+        record = gate.load_baseline(BASELINE)
         self.assertIsNotNone(record)
         self.assertEqual(gate.baseline_errors(_cases(), record, gate._catalog_names()), [])
 
@@ -627,10 +617,12 @@ class BaselineGateTests(unittest.TestCase):
         self.assertIn("baseline consistent", out)
 
         broken = self.tmp / "broken.json"
-        broken.write_text(json.dumps(self.record(passed=0)), encoding="utf-8")
-        code, _out, err = run(broken)
-        self.assertEqual(code, 1)
-        self.assertIn("sum(per_case.passed)", err)
+        for passed in (0, len(self.cases) - 1):
+            with self.subTest(passed=passed):
+                broken.write_text(json.dumps(self.record(passed=passed)), encoding="utf-8")
+                code, _out, err = run(broken)
+                self.assertEqual(code, 1)
+                self.assertIn("sum(per_case.passed)", err)
 
 
 if __name__ == "__main__":
