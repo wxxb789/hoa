@@ -38,14 +38,17 @@ Require a written brief, isolated Git worktree, explicit CLI and stop authority,
 acceptance. Stop on unsafe or out-of-scope work. No ledger, commit, push, PR, merge gate or merge.
 The stages below apply only to full delivery.
 
-## Stage order — fixed, no skipping
+## Stage order — fixed
 
 ```
-contract → implement → verify → simplify-report → apply → code-review-report → fix
+contract → implement → verify → [simplify-report → apply] → code-review-report → fix
         → gates → PR → babysit → merge → reset
 ```
 
-Both two-phase steps are mandatory: an unapplied report or an unfixed review does not close a stage.
+A dispatched two-phase step must close: an unapplied report or an unfixed review is not a finished
+stage. The simplify/apply pair is the one conditional pass — skip it for a documentation-only,
+mechanical, or sub-threshold diff and record the skip in the ledger; correctness review still runs
+([phase 3](references/phases/03-simplify-apply.md)).
 Caps: `implement` 2 recovery attempts, `simplify` 2 rounds, `review→fix` 2 rounds. On a third round,
 stop and report — do not burn budget in silence.
 
@@ -65,7 +68,7 @@ stop and report — do not burn budget in silence.
 | 0 contract | a dispatchable goal contract | all six clauses: observable pass condition, judging artifact, failure control, out of scope, evidence plan, mergeable alone; one goal ≈ one run ≈ one PR; fix the contract, never dispatch and hope | [`references/phases/00-contract.md`](references/phases/00-contract.md) |
 | 1 branch + dispatch | baseline snapshot and one implementation run | branch from `origin/main` and report the base SHA; report pre-existing dirty paths; `gdd.py stage` renders prompt, run name and ledger row from one template | [`references/phases/01-branch-dispatch.md`](references/phases/01-branch-dispatch.md) |
 | 2 verify | gate evidence and a clause→test map | exit 0 means the process ended, not the phase finished; re-run gates on the FINAL tree; a proof test must fail when the feature is deleted; a weak proof test is its own increment | [`references/phases/02-verify.md`](references/phases/02-verify.md) |
-| 3 simplify → apply | accepted fixes | report only, never silent apply; name rejected numbers in the apply prompt; a dead-code finding needs mechanical evidence; re-derive changed counts from the tree | [`references/phases/03-simplify-apply.md`](references/phases/03-simplify-apply.md) |
+| 3 simplify → apply | accepted fixes, or a recorded skip | conditional: skip a documentation-only, mechanical, or sub-threshold diff and record the reason in the ledger; report only, never silent apply; name rejected numbers in the apply prompt; a dead-code finding needs mechanical evidence; re-derive changed counts from the tree | [`references/phases/03-simplify-apply.md`](references/phases/03-simplify-apply.md) |
 | 4 review → fix | per-finding fixes | commit stage output before the next stage; reproduce every finding; classify regression vs pre-existing; a third same-class dispatch changes the mechanism | [`references/phases/04-review-fix.md`](references/phases/04-review-fix.md) |
 | 5 gates → commit → PR | a sealed increment and its PR | `overlapping_paths` stops the commit; `worktree-scope.py verify` after committing; prove the branch is not behind main; every number is re-derived on the final tree | [`references/phases/05-gates-pr.md`](references/phases/05-gates-pr.md) |
 | 6 merge | a merge verdict, then the next branch | `--verified-head` is the SHA the gates ran on; bot marker `status: completed` with `commit_sha` matching the SAME head; no merge without the script's verdict | [`references/phases/06-merge.md`](references/phases/06-merge.md) |

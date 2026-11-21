@@ -13,6 +13,9 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 - Make the gdd `implement` and `fix` stage prompts proof-first: reuse the accepted plan by path,
   observe the expected failure or baseline before changing behaviour, record the green command, exit
   code and clause it proves in the existing report, and hand gates as one runnable command.
+- Make the gdd simplify/apply pass conditional: skip it for a documentation-only, mechanical, or
+  sub-threshold diff and record the skip and its reason in the ledger; a contract or profile may set
+  the threshold or require the pass, and correctness review still runs.
 - Add brief-shaping guidance for bounded DeepSeek jobs to `gdd-route-pi`.
 - Record the first sandboxed Pi natural-mode screen in `evals/results/2026-11-21-pi-sandbox-natural.md`.
 - Record the offending path (`contamination_paths`) for catalog and host-skill reads in necessity trial traces.
