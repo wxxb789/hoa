@@ -6,8 +6,9 @@
    --repo <path> --label <goal>`, then `seal`. (Phase 4 already committed the stage output to give the
    reviewer a range; this step seals the increment that ships, so run it against the whole branch.) If `overlapping_paths` is non-empty, stop and ask the operator which
    writer owns each path — do not commit across it.
-3. Commit with explicit paths; push; open the PR.
-4. **After committing, verify the sealed scope.** `uv run "<scope-tool>" verify --repo <path>
+3. Commit with explicit paths — never `git add -A` or `git add .`. **Do not push yet**: verify
+   the seal first.
+4. **After committing and before pushing, verify the sealed scope.** `uv run "<scope-tool>" verify --repo <path>
    --label <goal>`. Drift ⇒ stop, name the paths, and require either a re-review or an explicit operator
    acceptance recorded in the PR body. Do not move this check into `pr-merge-check.py`: that gate
    declares `Environment: none` and only judges the remote PR.
@@ -24,12 +25,31 @@
    `uv run --no-project --with-requirements scripts/requirements.txt python scripts/version.py check-revisions`)
    before asking for a merge. A repo whose profile declares no such gate skips it — never invent one
    and never skip one silently.
-7. The PR body is a contract artifact — shape in [`references/pr-body.md`](../pr-body.md):
+7. **Optionally draft the body with a PR-writing skill, under gdd's contract.** Where the
+   executing runtime's own skill discovery offers `ce-commit-push-pr` — never install it — ask for a
+   **description-only** draft — print it, never apply it — and pass the sealed diff plus gdd's
+   verified clause map, evidence and limits. The draft is raw material for the body contract below,
+   not a substitute: check it against that shape and the numbers re-derived on the final tree, and
+   write the body from the recipe in [`references/pr-body.md`](../pr-body.md) directly when the
+   skill is missing or the draft drops required sections. **Never run the skill's full shipping
+   path**: it can push before the seal verification above and start a competing CI watcher. gdd
+   keeps explicit-path commits, the pre-push seal check, publication authority and its own CI
+   watcher.
+8. The PR body is a contract artifact — shape in [`references/pr-body.md`](../pr-body.md):
    what landed by subsystem, decisions with explicit non-adoptions naming the goal that owns them, one
    evidence table measured on the **final** tree, every "Done when" clause mapped to the command that
    observes it, and a **Known limits** section. Copy the previous goal's merged PR body as the starting
    shape rather than inventing one per goal.
-8. Treat PR checks as a floor, not a gate — Phase 6 decides.
+9. **Publish from fresh probes, one argv call per probe.** Re-probe the branch, its remote and any
+   open PR immediately before the push and again before opening the PR — an earlier snapshot is a
+   hint, not ground truth. Run each probe as its own argv-form call, program and arguments only: `;`,
+   `&&`, pipes, `$(...)` and redirects parse only under POSIX shells and abort under Windows
+   PowerShell. An exit-0 empty PR list (`[]`) means no open PR for this branch; a probe error is
+   **unknown**, never "no PR" — resolve auth or connectivity, or stop rather than open a duplicate.
+   Pass the branch name only to `gh pr list --head`: the `<owner>:<branch>` form silently returns
+   `[]` on a fork. Push and open the PR as the operator's publication act, carrying the composed
+   body.
+10. Treat PR checks as a floor, not a gate — Phase 6 decides.
 
 ## Pitfalls this phase answers
 

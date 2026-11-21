@@ -16,6 +16,11 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 - Make the gdd simplify/apply pass conditional: skip it for a documentation-only, mechanical, or
   sub-threshold diff and record the skip and its reason in the ledger; a contract or profile may set
   the threshold or require the pass, and correctness review still runs.
+- Reuse PR drafting without `ce-commit-push-pr`'s publishing tail: gdd may take a description-only,
+  print-only draft built from the sealed diff plus its verified clause, evidence and limits, with
+  `pr-body.md` as the fallback. Branch, remote and PR probes run fresh, one argv call each, and a
+  probe error means unknown, never "no PR"; commits stay explicit-path, the seal is verified
+  before push, and gdd owns publication and its own CI watcher.
 - Add brief-shaping guidance for bounded DeepSeek jobs to `gdd-route-pi`.
 - Record the first sandboxed Pi natural-mode screen in `evals/results/2026-11-21-pi-sandbox-natural.md`.
 - Record the offending path (`contamination_paths`) for catalog and host-skill reads in necessity trial traces.
