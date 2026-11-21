@@ -45,11 +45,8 @@ contract → implement → verify → [simplify-report → apply] → code-revie
         → gates → PR → babysit → merge → reset
 ```
 
-A dispatched two-phase step must close: an unapplied report or an unfixed review is not a finished
-stage. The simplify/apply pair is the one conditional pass — skip it for a documentation-only,
-mechanical, or sub-threshold diff and record the skip in the ledger; correctness review still runs
-([phase 3](references/phases/03-simplify-apply.md)).
-Caps: `implement` 2 recovery attempts, `simplify` 2 rounds, `review→fix` 2 rounds. On a third round,
+A dispatched two-phase step must close; simplify/apply is the one conditional pass (phase 3), review always
+runs. Caps: `implement` 2 recovery attempts, `simplify` 2 rounds, `review→fix` 2 rounds. On a third round,
 stop and report — do not burn budget in silence.
 
 ## Roles — authoring vs inspection
