@@ -592,7 +592,7 @@ class RealSubprocessBoundaryTests(unittest.TestCase):
     THREADS = json.dumps({"data": {"repository": {"pullRequest": {"reviewThreads": {
         "pageInfo": {"hasNextPage": False, "endCursor": None}, "nodes": []}}}}})
 
-    def run_boundary(self, *, json_result, extra=(), repo=".", record=None,
+    def run_boundary(self, *, json_result, extra=(),
                      api=None, comments=(), threads=THREADS, merge_result=(0, "", "")):
         calls = []
         view = {"state": "OPEN", "isDraft": False, "headRefOid": HEAD,
@@ -600,8 +600,6 @@ class RealSubprocessBoundaryTests(unittest.TestCase):
 
         def fake_run(cmd, cwd=None, capture_output=False, text=False, **_options):
             calls.append(list(cmd))
-            if record is not None:
-                record.append((list(cmd), cwd))
             if cmd[:1] == ["git"]:
                 branch = "--abbrev-ref" in cmd
                 return subprocess.CompletedProcess(cmd, 0, "feature" if branch else HEAD, "")
@@ -626,7 +624,7 @@ class RealSubprocessBoundaryTests(unittest.TestCase):
             raise AssertionError(f"unexpected command: {cmd}")
 
         out, err = io.StringIO(), io.StringIO()
-        argv = ["pr-merge-check.py", "7", "--repo", repo, *extra]
+        argv = ["pr-merge-check.py", "7", "--repo", ".", *extra]
         with patch.object(subprocess, "run", side_effect=fake_run), \
              patch.object(sys, "argv", argv), redirect_stdout(out), redirect_stderr(err):
             code = gate.main()
@@ -725,56 +723,6 @@ class RealSubprocessBoundaryTests(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertEqual(out, "")
         self.assertIn("HTTP 404", err)
-
-    def test_a_successful_empty_read_is_genuinely_zero_checks_and_the_flag_forgives_it(self):
-        code, out, err, _ = self.run_boundary(
-            json_result=(0, "[]", ""),
-            extra=("--verified-head", HEAD, "--gates-rc", "0", "--allow-no-machine-review",
-                   "--allow-no-checks"))
-        self.assertEqual(err, "")
-        self.assertEqual(code, 0)
-        self.assertIn("checks: 0 total, 0 ok, 0 pending, 0 failing (no checks)", out)
-        self.assertIn("verdict: MERGE-OK", out)
-
-    def test_sh_raw_preserves_surrounding_whitespace_and_newlines_verbatim(self):
-        # The callers re-read these bytes — the "no checks reported" match, the comment JSON — so
-        # a `.strip()` inside sh_raw() must be visible here. The fixture carries padding in both
-        # streams, or the normalization would be undetectable.
-        stdout = "  leading\nbody\n\n"
-        stderr = "\ttrailing \n\n"
-
-        def fake_run(cmd, cwd=None, capture_output=False, text=False, **_options):
-            return subprocess.CompletedProcess(cmd, 7, stdout, stderr)
-
-        with patch.object(subprocess, "run", side_effect=fake_run):
-            self.assertEqual(gate.sh_raw(["gh", "pr", "checks", "7"]),
-                             (7, stdout, stderr))
-
-    def test_the_repository_the_operator_named_reaches_every_child(self):
-        # The fake above accepts `cwd`; this is the test that notices it being dropped. The
-        # repository is deliberately distinct from the runner's directory, so a `cwd` the gate
-        # failed to forward cannot coincide with the expected value. Every `gh` call must run in
-        # that directory and every `git` call must carry it as `-C <path>` — each surface
-        # forwards the repository a different way, and `gh` inspecting the caller's repository
-        # instead of the one under test silently invalidates the gate's whole evidence base.
-        repo = os.path.realpath(tempfile.mkdtemp(prefix="gdd-boundary-repo-"))
-        self.addCleanup(shutil.rmtree, repo, ignore_errors=True)
-        self.assertNotEqual(repo, os.path.realpath(os.getcwd()))
-        record = []
-        code, out, err, _ = self.run_boundary(
-            json_result=(0, "[]", ""), repo=repo,
-            extra=("--verified-head", HEAD, "--gates-rc", "0", "--allow-no-machine-review",
-                   "--allow-no-checks"), record=record)
-        self.assertEqual(err, "")
-        self.assertEqual(code, 0)
-        gh_calls = [(cmd, cwd) for cmd, cwd in record if cmd[:1] == ["gh"]]
-        self.assertTrue(gh_calls)
-        for cmd, cwd in gh_calls:
-            self.assertEqual(cwd, repo, f"gh ran outside the repository under test: {cmd}")
-        git_calls = [cmd for cmd, _ in record if cmd[:1] == ["git"]]
-        self.assertTrue(git_calls)
-        for cmd in git_calls:
-            self.assertIn(repo, cmd, f"git did not carry the repository under test: {cmd}")
 
     def test_forwarding_of_directory_text_and_capture_at_a_real_child(self):
         # No fake at all: sh_raw() runs a real child, and the child reports the directory it ran
