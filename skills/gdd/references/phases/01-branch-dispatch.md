@@ -37,23 +37,34 @@ Ask the owner once, in one round, only for what `GDD_RUN_PLAN_DEFAULTS` does not
 - `notes`.
 
 Do not re-ask mid-run. Change the plan only on the owner's request, by re-running setup. Setup validates the plan
-and names the offending key: `max_time` accepts the launcher's duration grammar (`90`, `90s`, `0.5h`), rounds must
-be a positive integer or null (null means the default 2x), `token_cap` a non-negative integer or null, and
-`agent`/`model`/`thinking` must not contain whitespace or `=` so the completion note stays parseable.
+and names the offending key: `max_time` accepts the launcher's duration grammar (`90`, `90s`, `0.5h`); a numeric
+value must be a whole positive second count, so `0.00001` is refused rather than forwarded as `1e-05`; overflow and
+non-finite values are refused. Rounds must be a positive integer or null (null means the default 2x), `token_cap` a
+non-negative integer or null, and `agent`/`model`/`thinking` must not contain whitespace or `=` so the completion
+note stays parseable.
 
 `gdd.py stage` resolves each field in this order: flag, role, environment, default; for max time the order is
 flag, `roles.<stage>.max_time`, `budgets.max_time`, `GDD_MAX_TIME`, default. It appends the notes to every prompt
 under `## Owner notes (run plan)`. It refuses past a stage's round cap or the plan's `token_cap`; `--over-budget`
 overrides for one dispatch.
 
-Token accounting reads exactly the run's launcher `state.json` by the `run=<name>` its dispatch row records:
-under a plan each dispatch names its run `<repo>-<goal>-<stage>-a<n>` for that stage's 1-based dispatch
-number, so a re-dispatch never aliases the previous attempt and detached, failed and interrupted attempts
-count too; a running, missing or malformed run state and a pre-plan legacy row are listed as `unknown` and
-never summed. A completion note records the launcher-reported
-route/model/thinking when the state carries them, else the requested value as `req:<value>`, else `default`.
-`gdd.py status` prints the plan, the goal-wide known/unknown total beside the cap, and per-stage usage; with no
-plan file it prints the legacy ledger view unchanged.
+Token accounting reads exactly the run's launcher `state.json` by the `run=<name>` its dispatch row records: under a
+plan each dispatch names its run `<repo>-<goal>-<stage>-a<n>-<6 lowercase hex chars>`; a long prefix is shortened so
+the `-a<n>-<id>` suffix always survives the launcher's 48-character sanitize, and the random id means an attempt
+number reused after a ledger reset cannot alias an older run dir. Only a run in a recognized terminal state
+(`done`, `failed`, `killed`, or a stale `running`) is summed; a running, missing, unknown-state, malformed or
+all-zero-usage state is listed as `unknown` and never summed — the bundled launcher writes an all-zero accumulator
+even when it saw no usage event, and no state field distinguishes that placeholder from a reported zero. A
+completion note labels the route as executed and model/thinking as `req:<value>` unless the state marks them
+observed (`<key>_observed: true`); the bundled launcher records its request arguments, not the provider's
+effective settings. `gdd.py status` prints the plan, the goal-wide known/unknown total beside the cap, and
+per-stage usage; with no plan file it prints the legacy ledger view and dispatch notes unchanged.
+
+Run-plan limits are deliberate and operator-owned: one operator dispatches per goal at a time, and `GDD_TASK_ROOT`
+must be owner-only. The tool takes no reservation, so concurrent dispatches of one goal can still race the round
+cap. A dispatch interrupted between the launcher spawn and its ledger append is not accounted; the operator
+reconciles it from `GDD_RUN_ROOT`. Completion-row notes and metadata are for display only — accounting never
+reads them.
 
 Roles fields per route: `agent` (the route selector) and `max_time` are accepted by every bundled route;
 `model` and `thinking` by claude, codex, copilot, omo, omp and pi; opencode takes `thinking` only together with

@@ -12,8 +12,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SCRIPTS = os.path.dirname(HERE)
 sys.path.insert(0, SCRIPTS)
 import gdd_process
+import agent_run
 from gdd_test_support import finalized, route_fixture, wait_for_json
-from test_gdd import DELIVERY, GddCase, read, write
+from test_gdd import DELIVERY, GddCase, dead_pid, read, write
 
 GDD = os.path.join(SCRIPTS, "gdd.py")
 REFERENCES = os.path.normpath(os.path.join(SCRIPTS, os.pardir, "references"))
@@ -49,7 +50,7 @@ class RunPlanCase(GddCase):
     def append_dispatch(self, stage, run_name, *, repo=None, goal="0001"):
         self.append_row(stage, f"run={run_name}", repo=repo, goal=goal)
 
-    def craft_usage_run(self, name, *, usage=None, state="done", exit_code=0, cwd=None):
+    def craft_usage_run(self, name, *, usage=None, state="done", exit_code=0, cwd=None, extra=None):
         run_dir = os.path.join(self.state_home, "gdd", "runs", "2024-01-01", name)
         payload = {
             "name": name, "agent": "omp", "state": state,
@@ -58,8 +59,10 @@ class RunPlanCase(GddCase):
             "started": "2024-01-01T00:00:00+00:00",
             "ended": None if state == "running" else "2024-01-01T00:01:00+00:00",
             "duration_s": None if state == "running" else 60,
-            "usage": {} if usage is None else usage,
         }
+        if usage is not None:
+            payload["usage"] = usage
+        payload.update(extra or {})
         write(os.path.join(run_dir, "state.json"), json.dumps(payload))
         return run_dir
 
@@ -71,7 +74,8 @@ class RunPlanCase(GddCase):
     def run_state(self, stage="implement"):
         candidates = [d for d in self.run_dirs()
                       if ".prev-" not in os.path.basename(d)
-                      and re.search(rf"-{re.escape(stage)}(-a\d+)?$", os.path.basename(d))]
+                      and re.search(rf"-{re.escape(stage)}(-a\d+-[0-9a-f]{{6}})?$",
+                                    os.path.basename(d))]
         latest = max(candidates, key=lambda d: os.path.getmtime(os.path.join(d, "state.json")))
         return json.loads(read(os.path.join(latest, "state.json")))
 
@@ -257,6 +261,7 @@ class UsageNoteTests(RunPlanCase):
         return launcher
 
     def test_completion_note_records_usage_fields(self):
+        self.setup({})
         done = self.stage("implement", "--wait")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         note = self.ledger()[-1]["note"]
@@ -270,6 +275,7 @@ class UsageNoteTests(RunPlanCase):
         self.assertEqual(int(match.group(2)), self.run_state()["usage"]["total_tokens"])
 
     def test_completion_note_reports_unknown_without_usage(self):
+        self.setup({})
         launcher = self.reported_launcher("no-usage-launcher.py")
         done = self.stage("implement", "--wait", env={"GDD_LAUNCHER": launcher})
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
@@ -277,9 +283,11 @@ class UsageNoteTests(RunPlanCase):
         self.assertIn("wall=3.5s tokens=unknown", note)
         self.assertNotIn("tokens=0", note)
 
-    def test_completion_note_prefers_the_launcher_reported_fields(self):
+    def test_completion_note_prefers_state_fields_marked_observed(self):
+        self.setup({})
         launcher = self.reported_launcher("reported-launcher.py", state={
             "agent": "actual-agent", "model": "actual-model", "thinking": "actual-thinking",
+            "model_observed": True, "thinking_observed": True,
             "usage": {"total_tokens": 7}})
         done = self.stage("implement", "--wait", "--agent", "omp", "--model", "requested-model",
                           "--thinking", "requested-thinking", env={"GDD_LAUNCHER": launcher})
@@ -290,7 +298,24 @@ class UsageNoteTests(RunPlanCase):
         self.assertIn("thinking=actual-thinking", note)
         self.assertIn("tokens=7", note)
 
+    def test_completion_note_labels_unmarked_state_model_as_requested(self):
+        # The bundled launcher fills model/thinking from its request arguments, so an
+        # unmarked state value is not evidence of what the provider actually resolved.
+        self.setup({})
+        launcher = self.reported_launcher("unmarked-launcher.py", state={
+            "agent": "actual-agent", "model": "actual-model", "thinking": "actual-thinking",
+            "usage": {"total_tokens": 7}})
+        done = self.stage("implement", "--wait", "--model", "requested-model",
+                          "--thinking", "requested-thinking", env={"GDD_LAUNCHER": launcher})
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        note = self.ledger()[-1]["note"]
+        self.assertIn("route=actual-agent", note)
+        self.assertIn("model=req:requested-model", note)
+        self.assertIn("thinking=req:requested-thinking", note)
+        self.assertNotIn("model=actual-model", note)
+
     def test_completion_note_marks_requested_values_the_launcher_did_not_report(self):
+        self.setup({})
         launcher = self.reported_launcher("silent-launcher.py", state={"usage": {"total_tokens": 7}})
         done = self.stage("implement", "--wait", "--agent", "omp", "--model", "requested-model",
                           "--thinking", "requested-thinking", env={"GDD_LAUNCHER": launcher})
@@ -369,6 +394,8 @@ class UsageAccountingTests(RunPlanCase):
 
 
 class AttemptNameTests(RunPlanCase):
+    ATTEMPT_NAME = re.compile(r"^(?P<stem>.+)-a(?P<attempt>\d+)-(?P<ident>[0-9a-f]{6})$")
+
     def dispatched(self, output):
         name = re.search(r"(?m)^run: (\S+)$", output)
         run_dir = re.search(r"(?m)^run_dir: (.+)$", output)
@@ -376,11 +403,30 @@ class AttemptNameTests(RunPlanCase):
         self.assertIsNotNone(run_dir, output)
         return name.group(1), run_dir.group(1).strip()
 
+    def attempt_parts(self, name):
+        match = self.ATTEMPT_NAME.fullmatch(name)
+        self.assertIsNotNone(match, name)
+        return match.groupdict()
+
     def patch_usage(self, run_dir, tokens):
         state_path = os.path.join(run_dir, "state.json")
         state = json.loads(read(state_path))
         state["usage"] = {"total_tokens": tokens}
         write(state_path, json.dumps(state))
+
+    def test_plan_run_name_shortens_the_prefix_and_keeps_the_suffix(self):
+        import gdd
+
+        long_prefix = "r" * 34 + "-0001-implement"
+        first = gdd.plan_run_name(long_prefix, 1, "aaaaaa")
+        second = gdd.plan_run_name(long_prefix, 2, "bbbbbb")
+        limit = len(agent_run.sanitize("x" * 4096))
+        self.assertEqual(first, agent_run.sanitize(first), first)
+        self.assertEqual(second, agent_run.sanitize(second), second)
+        self.assertLessEqual(len(first), limit)
+        self.assertTrue(first.endswith("-a1-aaaaaa"), first)
+        self.assertTrue(second.endswith("-a2-bbbbbb"), second)
+        self.assertNotEqual(first, second)
 
     def test_two_dispatches_of_a_stage_use_their_own_names_and_state(self):
         self.setup({"budgets": {"rounds": {"implement": 10}, "token_cap": 100000}})
@@ -390,8 +436,10 @@ class AttemptNameTests(RunPlanCase):
         second = self.stage("implement", "--wait")
         self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
         second_name, second_dir = self.dispatched(second.stdout)
-        self.assertEqual(first_name, "workrepo-0001-implement-a1")
-        self.assertEqual(second_name, "workrepo-0001-implement-a2")
+        first_parts, second_parts = self.attempt_parts(first_name), self.attempt_parts(second_name)
+        self.assertEqual(first_parts["stem"], "workrepo-0001-implement")
+        self.assertEqual((first_parts["attempt"], second_parts["attempt"]), ("1", "2"))
+        self.assertNotEqual(first_parts["ident"], second_parts["ident"])
         dispatch_notes = [row["note"] for row in self.ledger()
                           if row["stage"] == "implement" and row["note"].startswith("run=")]
         self.assertEqual(dispatch_notes, [f"run={first_name}", f"run={second_name}"])
@@ -403,6 +451,24 @@ class AttemptNameTests(RunPlanCase):
         out = self.status()
         self.assertIn("implement: rounds=2/10 tokens=33 unknown=0", out)
         self.assertIn("tokens: 33 used, 0 unknown (cap 100000)", out)
+
+    def test_a_ledger_reset_cannot_alias_an_old_run_dir(self):
+        self.setup({"budgets": {"rounds": {"implement": 10}}})
+        first = self.stage("implement", "--wait")
+        self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+        first_name, first_dir = self.dispatched(first.stdout)
+        self.assertEqual(self.attempt_parts(first_name)["attempt"], "1")
+        # Simulate a lost or hand-edited ledger: the round count starts over. The random
+        # identity must keep the new a1 attempt out of the old attempt's run dir.
+        os.remove(os.path.join(self.state_home, "gdd", "ledger.tsv"))
+        second = self.stage("implement", "--wait")
+        self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
+        second_name, second_dir = self.dispatched(second.stdout)
+        self.assertEqual(self.attempt_parts(second_name)["attempt"], "1")
+        self.assertNotEqual(first_name, second_name)
+        self.assertNotEqual(first_dir, second_dir)
+        self.assertTrue(os.path.isdir(first_dir), first_dir)
+        self.assertTrue(os.path.isdir(second_dir), second_dir)
 
     def test_the_token_cap_counts_both_attempts(self):
         self.setup({"budgets": {"rounds": {"implement": 10}, "token_cap": 100000}})
@@ -427,9 +493,10 @@ class AttemptNameTests(RunPlanCase):
             self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
             name, _ = self.dispatched(done.stdout)
             self.assertEqual(name, "workrepo-0001-implement")
-        names = [row["note"] for row in self.ledger()
-                 if row["stage"] == "implement" and row["note"].startswith("run=")]
-        self.assertEqual(names, ["run=workrepo-0001-implement"] * 2)
+        # origin/main passes --next and no --note, and records nothing else on the row.
+        notes = [row["note"] for row in self.ledger()
+                 if row["stage"] == "implement" and not row["note"].startswith("exit=")]
+        self.assertEqual(notes, ["-", "-"])
         # The second launch still archives the first run dir instead of aliasing it.
         self.assertTrue(any(".prev-" in os.path.basename(d) for d in self.run_dirs()))
         self.assertNotIn("RUN PLAN", self.status())
@@ -488,22 +555,33 @@ class ExactRepoMatchTests(RunPlanCase):
 
 
 class PlanPathTests(RunPlanCase):
-    def test_unsafe_goal_segments_are_rejected_by_setup_and_stage(self):
+    def test_unsafe_goal_segments_are_rejected_by_setup_but_legacy_for_stage(self):
         for goal in ("a/b", "a\\b", "..", ".", "C:/x", ""):
             with self.subTest(goal=goal):
                 rejected = self.run_tool(GDD, "setup", "--repo", self.repo, "--goal", goal,
                                          "--plan-file", self.write_source({}))
                 self.assertEqual(rejected.returncode, 2, rejected.stdout)
                 self.assertIn("goal", rejected.stderr)
-        refused = self.run_tool(GDD, "stage", "--repo", self.repo, "--goal", "../x",
-                                "--stage", "implement", "--dry-run")
-        self.assertEqual(refused.returncode, 2, refused.stdout)
-        self.assertIn("goal", refused.stderr)
+        # No plan file can exist for an unsafe segment, so stage lookup keeps origin/main's
+        # behavior: render the legacy prompt instead of failing before the dispatch guards.
+        rendered = self.run_tool(GDD, "stage", "--repo", self.repo, "--goal", "a/b",
+                                 "--stage", "implement", "--dry-run",
+                                 env={"GDD_DISPATCH_GUARDS": "off"})
+        self.assertEqual(rendered.returncode, 0, rendered.stdout + rendered.stderr)
+        self.assertNotIn("run plan", rendered.stderr)
+        self.assertTrue(rendered.stdout.startswith("prompt: "), rendered.stdout)
 
-    def test_status_rejects_a_raw_path_selector(self):
-        refused = self.run_tool(GDD, "status", "--repo", "../evil", "--goal", "0001")
-        self.assertEqual(refused.returncode, 2, refused.stdout)
-        self.assertIn("repo", refused.stderr)
+    def test_status_with_an_unsafe_repo_selector_keeps_legacy_bytes(self):
+        cmd = [DELIVERY, "show", "--repo", "../evil", "--goal", "0001",
+               "--state-file", os.path.join(self.state_home, "gdd", "ledger.tsv"),
+               "--task-root", os.path.join(self.state_home, "gdd", "tasks"),
+               "--run-root", os.path.join(self.state_home, "gdd", "runs")]
+        direct = self.run_tool(*cmd)
+        self.assertEqual(direct.returncode, 0, direct.stderr)
+        status = self.run_tool(GDD, "status", "--repo", "../evil", "--goal", "0001")
+        self.assertEqual(status.returncode, 0, status.stderr)
+        self.assertEqual(status.stdout, direct.stdout)
+        self.assertNotIn("RUN PLAN", status.stdout)
 
     def test_a_linked_goal_directory_cannot_escape_the_task_root(self):
         outside = os.path.join(self.tmp, "outside-target")
@@ -589,14 +667,37 @@ class StatusTests(RunPlanCase):
                              "--task-root", os.path.join(self.state_home, "gdd", "tasks"),
                              "--run-root", os.path.join(self.state_home, "gdd", "runs"))
 
-    def test_status_without_a_plan_is_exactly_the_legacy_show_output(self):
+    def test_status_without_a_plan_matches_main_show_bytes(self):
         self.append_implement()
-        direct = self.legacy_show()
-        self.assertEqual(direct.returncode, 0, direct.stderr)
+        row = self.ledger()[-1]
+        # The bytes origin/main's cmd_status passed through for one implement row.
+        expected = "\n".join([
+            "LATEST",
+            f"ts: {row['ts']}",
+            "repo: workrepo",
+            "goal: 0001",
+            "stage: implement",
+            f"base_sha: {self.base}",
+            f"head_sha: {self.head}",
+            "pr: -",
+            "gates: -",
+            "rounds_simplify: -",
+            "rounds_review: -",
+            "findings: -",
+            "next_action: -",
+            "note: -",
+            "",
+            "HISTORY",
+            f"{row['ts']} implement {self.head[:7]} - -",
+            "",
+        ])
         status = self.run_tool(GDD, "status", "--repo", self.repo, "--goal", "0001")
         self.assertEqual(status.returncode, 0, status.stderr)
-        self.assertEqual(status.stdout, direct.stdout)
+        self.assertTrue(status.stdout.startswith(expected + "\nLIVE\n"), status.stdout)
         self.assertNotIn("RUN PLAN", status.stdout)
+        direct = self.legacy_show()
+        self.assertEqual(direct.returncode, 0, direct.stderr)
+        self.assertEqual(status.stdout, direct.stdout)
 
     def test_status_with_an_empty_plan_shows_the_path_and_default_caps(self):
         self.setup_without_file()
@@ -673,6 +774,142 @@ class InvalidPlanTests(RunPlanCase):
                            "budgets": {"rounds": {"implement": None}, "max_time": "0.5h",
                                        "token_cap": None}})
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+
+class NoPlanByteTests(RunPlanCase):
+    def test_no_plan_dispatch_row_note_matches_main(self):
+        done = self.stage("implement")  # no --wait: only the dispatch row lands
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        dispatch = [row for row in self.ledger() if row["stage"] == "implement"][-1]
+        # origin/main passed --next implement and no --note; delivery-state stores "-".
+        self.assertEqual((dispatch["next_action"], dispatch["note"]), ("implement", "-"))
+
+    def test_no_plan_completion_note_matches_main(self):
+        done = self.stage("implement", "--wait")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        state = json.loads(read(os.path.join(self.run_dirs()[0], "state.json")))
+        expected = (
+            f"exit={state['exit']} "
+            f"dur={state['duration_s']} "
+            f"head={self.head[:7]}"
+        )
+        self.assertEqual(self.ledger()[-1]["note"], expected)
+        self.assertNotIn("role=", self.ledger()[-1]["note"])
+
+    def test_a_plan_adds_the_run_note_and_the_completion_metadata(self):
+        self.setup({})
+        done = self.stage("implement", "--wait")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        dispatch = [row for row in self.ledger()
+                    if row["stage"] == "implement" and row["note"].startswith("run=")]
+        self.assertEqual(len(dispatch), 1)
+        completion = self.ledger()[-1]["note"]
+        self.assertIn(" role=implement ", completion)
+        self.assertIn(" tokens=", completion)
+
+
+class UsageTruthTests(RunPlanCase):
+    def test_an_all_zero_accumulator_is_unknown(self):
+        self.setup({"budgets": {"token_cap": 10}})
+        self.craft_usage_run("zero-a", usage={"total_tokens": 0})
+        self.craft_usage_run("zero-b", usage={"input_tokens": 0, "output_tokens": 0})
+        self.append_dispatch("implement", "zero-a")
+        self.append_dispatch("implement", "zero-b")
+        out = self.status()
+        self.assertIn("tokens: 0 used, 2 unknown (cap 10)", out)
+
+    def test_only_recognized_terminal_states_are_summed(self):
+        self.setup({"budgets": {"token_cap": 100}})
+        self.craft_usage_run("done-1", usage={"total_tokens": 1}, state="done")
+        self.craft_usage_run("failed-2", usage={"total_tokens": 2}, state="failed", exit_code=1)
+        self.craft_usage_run("killed-4", usage={"total_tokens": 4}, state="killed", exit_code=143)
+        pid, recorded = dead_pid(self.children)
+        self.craft_usage_run("stale-8", usage={"total_tokens": 8}, state="running", extra={
+            "started": "2000-01-01T00:00:00+00:00", "pid": pid, "pid_identity": recorded})
+        self.craft_usage_run("running-100", usage={"total_tokens": 100}, state="running")
+        self.craft_usage_run("unknown-200", usage={"total_tokens": 200}, state="unknown")
+        self.craft_usage_run("weird-400", usage={"total_tokens": 400}, state="weird")
+        missing = self.craft_usage_run("missing-state", usage={"total_tokens": 800})
+        write(os.path.join(missing, "state.json"), json.dumps({"name": "missing-state"}))
+        for name in ("done-1", "failed-2", "killed-4", "stale-8", "running-100",
+                     "unknown-200", "weird-400", "missing-state"):
+            self.append_dispatch("implement", name)
+        out = self.status()
+        self.assertIn("tokens: 15 used, 4 unknown (cap 100)", out)
+
+
+class DurationTests(RunPlanCase):
+    def test_the_validator_matches_the_launcher_grammar(self):
+        import gdd
+
+        for value in ("90", "90s", "0.5h", " 7m ", "0.00001"):
+            with self.subTest(value=value):
+                self.assertEqual(gdd.duration_seconds(value), agent_run.max_time_seconds(value))
+        self.assertEqual(gdd.duration_seconds(900), 900.0)
+        for value in (0, -1, True, 0.5, 0.00001, float("inf"), float("nan"), 10**400,
+                      "0m", "soon", "1e3", "9" * 320 + "h"):
+            with self.subTest(value=value):
+                self.assertIsNone(gdd.duration_seconds(value))
+
+    def test_setup_rejects_unforwardable_or_overflowing_durations_by_key(self):
+        cases = [
+            ({"roles": {"review": {"max_time": 0.00001}}}, "roles.review.max_time"),
+            ({"roles": {"implement": {"max_time": float("nan")}}}, "roles.implement.max_time"),
+            ({"budgets": {"max_time": 10**400}}, "budgets.max_time"),
+            ({"budgets": {"max_time": float("inf")}}, "budgets.max_time"),
+            ({"budgets": {"max_time": "9" * 320 + "h"}}, "budgets.max_time"),
+        ]
+        for plan, path in cases:
+            with self.subTest(path=path):
+                rejected = self.setup(plan)
+                self.assertEqual(rejected.returncode, 2, rejected.stdout)
+                self.assertIn(path, rejected.stderr)
+                self.assertFalse(os.path.exists(self.plan_path()))
+
+    def test_a_whole_number_of_seconds_is_forwarded_as_an_integer(self):
+        self.setup({"budgets": {"max_time": 900.0}})
+        done = self.stage("implement", "--wait")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        [run_dir] = [d for d in self.run_dirs() if ".prev-" not in os.path.basename(d)]
+        state = json.loads(read(os.path.join(run_dir, "state.json")))
+        # The launcher records the forwarded --max-time: the integer form, not "900.0".
+        self.assertEqual(state["max_time"], "900")
+
+
+class GoalOnlyShowTests(RunPlanCase):
+    def other_repo(self):
+        other = os.path.join(self.tmp, "otherrepo")
+        os.makedirs(other, exist_ok=True)
+
+        def run(*args):
+            return gdd_process.run(["git", "-C", other, *args], env=self.env,
+                                   capture_output=True, text=True, check=True)
+
+        run("init", "-q", "-b", "main")
+        write(os.path.join(other, "file.txt"), "x\n")
+        run("add", "-A")
+        run("commit", "-q", "-m", "init")
+        return other
+
+    def test_goal_only_show_derives_live_and_state_path_from_the_latest_row(self):
+        other = self.other_repo()
+        self.append_row("implement", repo=self.repo, goal="0001")
+        appended = self.run_tool(DELIVERY, "append", "--repo", other, "--goal", "0001",
+                                 "--stage", "setup")
+        self.assertEqual(appended.returncode, 0, appended.stderr)
+        show = self.run_tool(DELIVERY, "show", "--goal", "0001",
+                             "--state-file", os.path.join(self.state_home, "gdd", "ledger.tsv"),
+                             "--task-root", os.path.join(self.state_home, "gdd", "tasks"),
+                             "--run-root", os.path.join(self.state_home, "gdd", "runs"),
+                             env={"GDD_REPO_ROOT": self.tmp})
+        self.assertEqual(show.returncode, 0, show.stderr)
+        latest, _, rest = show.stdout.partition("HISTORY")
+        live = rest.partition("LIVE")[2]
+        self.assertIn("stage: implement", latest)
+        self.assertIn(f"head: {self.head[:7]}", live)
+        state_line = show.stdout.split("state_md: ")[-1].strip()
+        self.assertIn("workrepo-0001", state_line)
+        self.assertNotIn("otherrepo-0001", show.stdout)
 
 
 if __name__ == "__main__":

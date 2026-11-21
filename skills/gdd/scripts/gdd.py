@@ -69,6 +69,7 @@ import json
 import math
 import os
 import re
+import secrets
 import shlex
 import sys
 import tempfile
@@ -326,19 +327,22 @@ def run_usage(state):
     """The launcher's normalized token count, or None when it reports none.
 
     `total_tokens` when the launcher records it; otherwise input + output only.
-    Cache reads are never added: some routes count them inside the total.
+    Cache reads are never added: some routes count them inside the total. An
+    all-zero accumulator is the bundled launcher's no-usage placeholder and is
+    unknown, never an explicit zero: no state field records a usage event.
     """
     usage = state.get("usage") if isinstance(state.get("usage"), dict) else {}
     total = usage.get("total_tokens")
     if total is not None:
-        return total if non_negative_int(total) else None
+        return total if non_negative_int(total) and total > 0 else None
     parts = []
     for key in ("input_tokens", "output_tokens"):
         value = usage.get(key)
         if not non_negative_int(value):
             return None
         parts.append(value)
-    return sum(parts) if parts else None
+    total = sum(parts)
+    return total if total > 0 else None
 
 
 def path_segment_problem(value):
@@ -355,34 +359,57 @@ def path_segment_problem(value):
 
 
 DURATION_RE = re.compile(r"(\d+(?:\.\d+)?)([smh]?)")
+DURATION_SCALES = {"": 1, "s": 1, "m": 60, "h": 3600}
 
 
-def valid_duration(value):
-    """The bundled launcher's --max-time grammar, mirrored from agent_run.max_time_seconds.
+def duration_seconds(value):
+    """Positive finite seconds for a plan duration, or None when the launcher would reject it.
 
-    That parser exits the launcher process on invalid input, so setup cannot reuse it.
+    Mirrors agent_run.max_time_seconds, which exits the launcher on invalid input, so setup
+    cannot reuse it. A string keeps the launcher's grammar and is forwarded verbatim; a numeric
+    value must be a whole number of seconds, because JSON floats such as 0.00001 stringify to
+    `1e-05`, a form the launcher's parser rejects.
     """
     if isinstance(value, bool):
-        return False
+        return None
     if isinstance(value, (int, float)):
-        return math.isfinite(value) and value > 0
+        try:
+            seconds = float(value)
+        except OverflowError:
+            return None
+        if not math.isfinite(seconds) or seconds <= 0 or seconds != int(seconds):
+            return None
+        return seconds
     if not isinstance(value, str):
-        return False
+        return None
     match = DURATION_RE.fullmatch(value.strip())
-    return bool(match) and float(match.group(1)) > 0
+    if not match:
+        return None
+    try:
+        seconds = float(match.group(1)) * DURATION_SCALES[match.group(2)]
+    except (OverflowError, ValueError):
+        return None
+    return seconds if math.isfinite(seconds) and seconds > 0 else None
 
 
-def run_plan_path(repo_name, goal):
-    """The goal's plan file under the resolved task root; refuse a segment or link escape."""
+def plan_path_problem(repo_name, goal):
+    """Why this repo+goal cannot name a plan path, or None when it can."""
     for value, label in ((repo_name, "repo"), (goal, "goal")):
         if problem := path_segment_problem(value):
-            fail(f"run plan: {label} {value!r} {problem}")
+            return f"run plan: {label} {value!r} {problem}"
     root = os.path.realpath(task_root())
     directory = os.path.join(root, f"{repo_name}-{goal}")
     resolved = os.path.realpath(directory)
     if resolved != directory and not resolved.startswith(root + os.sep):
-        fail(f"run plan directory {directory} resolves outside the task root {root}")
-    return os.path.join(directory, "run-plan.json")
+        return f"run plan directory {directory} resolves outside the task root {root}"
+    return None
+
+
+def run_plan_path(repo_name, goal):
+    """The goal's plan file under the resolved task root; refuse a segment or link escape."""
+    if problem := plan_path_problem(repo_name, goal):
+        fail(problem)
+    return os.path.join(os.path.realpath(task_root()), f"{repo_name}-{goal}", "run-plan.json")
 
 
 def plan_problem(plan):
@@ -405,7 +432,7 @@ def plan_problem(plan):
                 return f"run plan: unknown field 'roles.{stage}.{field}'"
             if not isinstance(value, str) or not value.strip():
                 return f"run plan: 'roles.{stage}.{field}' must be a non-empty string"
-            if field == "max_time" and not valid_duration(value):
+            if field == "max_time" and duration_seconds(value) is None:
                 return (f"run plan: 'roles.{stage}.max_time' must be a positive duration "
                         "like 30m")
             if field in ("agent", "model", "thinking") and (
@@ -436,7 +463,7 @@ def plan_problem(plan):
             if value is None or non_negative_int(value):
                 continue
             return f"run plan: 'budgets.token_cap' must be a non-negative integer or null"
-        if not valid_duration(value):
+        if duration_seconds(value) is None:
             return "run plan: 'budgets.max_time' must be a positive duration like 30m"
     notes = plan.get("notes", [])
     if not isinstance(notes, list):
@@ -492,7 +519,14 @@ def read_plan_source(path, label):
 
 
 def read_run_plan(repo_name, goal):
-    """The validated plan for one repo+goal; None when setup has not run, {} when empty."""
+    """The validated plan for one repo+goal; None when setup has not run or the selector is legacy.
+
+    A selector that cannot name a plan path (or whose directory redirects outside the task root)
+    is treated as "no plan": plan lookup must not change the failure text, exit status or bytes
+    of a command origin/main accepted. `setup` still refuses such a selector before writing.
+    """
+    if plan_path_problem(repo_name, goal):
+        return None
     path = run_plan_path(repo_name, goal)
     if not os.path.exists(path):
         return None
@@ -575,6 +609,12 @@ def ledger_rounds(state_path, repo_name, goal, stage, *, exact=False):
 
 RUN_NOTE_RE = re.compile(r"^run=(\S+)$")
 
+# agent_run.observed_state() may also answer "stale" for a dead `running` run; a stale attempt
+# is terminal for accounting.
+TERMINAL_RUN_STATES = tuple(
+    name for name in agent_run.STATES if name != "running"
+) + ("stale",)
+
 
 def dispatch_run_name(note):
     """The run name a dispatch row records, or None for a legacy row."""
@@ -616,7 +656,7 @@ def accounted_usage(state_path, repo_name, goal, stage=None, *, exact=True):
         value = None
         try:
             state, run_dir = run_state_for(dispatch_run_name(note))
-            if state and agent_run.observed_state(run_dir, state) != "running":
+            if state and agent_run.observed_state(run_dir, state) in TERMINAL_RUN_STATES:
                 value = run_usage(state)
         except (OSError, ValueError, TypeError):
             value = None
@@ -771,12 +811,33 @@ def write_lineage_sidecar(run_root, run_name, run_dir, goal, stage):
         print(f"gdd: warning: lineage sidecar not written: {reason}", file=sys.stderr)
 
 
+RUN_NAME_LIMIT = len(agent_run.sanitize("x" * 4096))
+
+
+def plan_run_name(prefix, attempt, ident):
+    """A plan-governed run name whose `-a<n>-<id>` suffix survives the launcher's sanitize.
+
+    The launcher lowercases, substitutes and truncates the requested slug itself, so the
+    prefix is shortened here — never the suffix — using the launcher's own limit, and the
+    result is verified through the same function.
+    """
+    suffix = f"-a{attempt}-{ident}"
+    base = agent_run.sanitize(prefix).rstrip("-")
+    keep = max(RUN_NAME_LIMIT - len(suffix), 1)
+    name = (base[:keep].rstrip("-") or "run") + suffix
+    final = agent_run.sanitize(name)
+    if not final.endswith(suffix):
+        raise LaunchError(f"launcher sanitize would drop the attempt suffix from {name!r}")
+    return final
+
+
 def launch(launcher, prompt_path, repo, goal, stage, agent, model, thinking, max_time,
            attempt=None):
     name = f"{os.path.basename(repo)}-{goal}-{stage}"
     if attempt is not None:
-        # A plan-governed re-dispatch must not alias the previous attempt's run dir.
-        name = f"{name}-a{attempt}"
+        # A plan-governed re-dispatch must not alias the previous attempt's run dir; the random
+        # id keeps two dispatches apart even if a ledger reset reuses the attempt number.
+        name = plan_run_name(name, attempt, secrets.token_hex(3))
     resolved_run_root = run_root()
     prefix = launcher_command(launcher)
     cmd = [
@@ -1018,6 +1079,10 @@ def cmd_stage(args):
         role.get("max_time") or budgets.get("max_time"),
         os.environ.get("GDD_MAX_TIME") or None,
     )
+    if isinstance(max_time, (int, float)) and not isinstance(max_time, bool):
+        # The plan validator admits only a whole positive second count; forward the integer
+        # form, since str(900.0) is fine but str(0.00001) would reach the launcher as `1e-05`.
+        max_time = str(int(max_time))
     try:
         run_name, run_dir, launch_run_root = launch(
             launcher,
@@ -1054,7 +1119,7 @@ def cmd_stage(args):
         head,
         gates,
         next_stage=args.stage,
-        note=f"run={run_name}",
+        note=f"run={run_name}" if plan is not None else None,
         rounds=rounds_seen + 1 if args.stage in ("simplify", "review") else None,
     )
     print(f"run: {run_name}")
@@ -1105,12 +1170,16 @@ def cmd_stage(args):
             f"exit={exit_code if exit_code is not None else '-'} "
             f"dur={duration if duration is not None else '-'} "
             f"head={post_head[:7]}"
-            + f" role={args.stage} route={reported_field(state, 'agent', agent)}"
-            f" model={reported_field(state, 'model', model)}"
-            f" thinking={reported_field(state, 'thinking', thinking)} wall={wall}"
-            f" tokens={tokens if tokens is not None else 'unknown'}"
-            + (f" verdict={verdict}" if verdict else "")
         )
+        if plan is not None:
+            note += (
+                f" role={args.stage} route={reported_field(state, 'agent', agent)}"
+                f" model={reported_field(state, 'model', model, observed=True)}"
+                f" thinking={reported_field(state, 'thinking', thinking, observed=True)}"
+                f" wall={wall} tokens={tokens if tokens is not None else 'unknown'}"
+            )
+        if verdict:
+            note += f" verdict={verdict}"
         ledger_append(
             repo,
             args.goal,
@@ -1211,9 +1280,16 @@ def repo_key(value):
     return value
 
 
-def reported_field(state, key, requested):
-    """The launcher-reported value, else the requested value marked `req:`, else `default`."""
+def reported_field(state, key, requested, *, observed=False):
+    """The launcher-observed value, else the requested value marked `req:`, else `default`.
+
+    The bundled launcher records its request arguments as model/thinking, not what the
+    provider actually resolved, so those fields are trusted only when the state marks them
+    observed (`<key>_observed`: true). The route is what the launcher ran, so it stands as-is.
+    """
     value = state.get(key)
+    if observed and state.get(f"{key}_observed") is not True:
+        value = None
     if isinstance(value, str) and value.strip():
         return value.strip()
     return f"req:{requested}" if requested else "default"

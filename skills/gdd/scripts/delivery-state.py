@@ -355,19 +355,20 @@ def cmd_show(args):
             continue
         matching.append(row)
 
-    if repo_filter:
-        repo = repo_filter
-    elif matching:
-        repo = matching[-1]["repo"]
-    else:
-        repo = None
-
     latest = matching[-1] if matching else None
     # A setup row is a record, not work: an earlier actionable row keeps LATEST so the
     # operator still sees the stage and next action to resume.
     actionable = [row for row in matching if row["stage"] != "setup"]
     if actionable:
         latest = actionable[-1]
+
+    # LIVE and the state snapshot path follow the row LATEST came from, so a later setup
+    # for another repo cannot mix a different repo's context into this view.
+    if repo_filter:
+        repo = repo_filter
+    else:
+        repo = latest["repo"] if latest else None
+
     lines = ["LATEST"]
     if latest:
         for column in COLUMNS:
