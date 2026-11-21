@@ -132,12 +132,12 @@ def check_skill(skill_md: Path) -> list[str]:
     return findings
 
 
-def _real_dir(path: Path) -> bool:
-    """A directory a discovery client cannot skip because it is a symlink/junction."""
-    if not path.is_dir() or path.is_symlink():
-        return False
+def _alias(path: Path) -> bool:
+    """A symlink or NTFS junction that a discovery client may follow."""
+    if path.is_symlink():
+        return True
     is_junction = getattr(path, "is_junction", None)
-    return not (is_junction is not None and is_junction())
+    return bool(is_junction is not None and is_junction())
 
 
 def layout_findings() -> tuple[list[str], list[Path]]:
@@ -145,22 +145,32 @@ def layout_findings() -> tuple[list[str], list[Path]]:
     findings: list[str] = []
     if not SKILLS.is_dir():
         return [f"{SKILLS}: missing skills directory"], []
+    if _alias(SKILLS):
+        return [f"{SKILLS}: skills directory must be a real directory, not a symlink"], []
     for entry in sorted(SKILLS.iterdir()):
+        if _alias(entry):
+            if entry.name in CATEGORIES:
+                findings.append(f"{entry}: category directory must be a real directory, "
+                                f"not a symlink")
+            else:
+                findings.append(f"{entry}: unknown skill category; "
+                                f"expected one of {', '.join(CATEGORIES)}")
+            continue
         if not entry.is_dir():
             continue
         if entry.name not in CATEGORIES:
             findings.append(f"{entry}: unknown skill category; "
                             f"expected one of {', '.join(CATEGORIES)}")
-        elif not _real_dir(entry):
-            findings.append(f"{entry}: category directory must be a real directory, "
-                            f"not a symlink")
+            continue
+        for package in sorted(entry.iterdir()):
+            if _alias(package):
+                findings.append(f"{package}: skill package must be a real directory, "
+                                f"not a symlink")
     packages = skill_paths.skill_dirs(SKILLS)
     if not packages:
         findings.append(f"{SKILLS}: no skill packages found")
     names: dict[str, list[Path]] = {}
     for package in packages:
-        if not _real_dir(package):
-            findings.append(f"{package}: skill package must be a real directory, not a symlink")
         names.setdefault(package.name, []).append(package)
     for name in sorted(names):
         if len(names[name]) > 1:
@@ -183,11 +193,11 @@ def main(argv=None) -> int:
     skills = 0
     for package in packages:
         skill_md = package / "SKILL.md"
+        if _alias(skill_md):
+            findings.append(f"{skill_md}: must be a regular file")
+            continue
         if not skill_md.is_file():
             findings.append(f"{skill_md}: missing")
-            continue
-        if skill_md.is_symlink():
-            findings.append(f"{skill_md}: must be a regular file")
             continue
         skills += 1
         findings.extend(check_skill(skill_md))

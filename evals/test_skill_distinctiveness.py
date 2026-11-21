@@ -174,6 +174,29 @@ def test_duplicate_skill_names_rejected(tmp_path, monkeypatch, capsys):
     assert "duplicate skill name 'alpha'" in capsys.readouterr().err
 
 
+def test_default_scan_ignores_flat_cards(tmp_path, monkeypatch):
+    monkeypatch.setattr(distinct, "build_opener", lambda *args: pytest.fail("network"))
+    skills = tmp_path / "repo" / "skills"
+    for folder, name, description in (
+        (skills / "category" / "alpha", "alpha", "red"),
+        (skills / "category" / "beta", "beta", "blue"),
+        (skills / "stray", "stray", "unrelated"),
+    ):
+        folder.mkdir(parents=True)
+        (folder / "SKILL.md").write_text(
+            f"---\nname: {name}\ndescription: {description}\n---\n", encoding="utf-8")
+    queries = tmp_path / "queries.jsonl"
+    queries.write_text(json.dumps(dict(id="q", text="red", skill="alpha", lang="en")) + "\n",
+                       encoding="utf-8")
+    monkeypatch.setattr(distinct, "HERE", tmp_path / "repo" / "evals")
+    output = tmp_path / "report"
+    assert distinct.main(["--queries", str(queries), "--output", str(output)]) == 0
+    assert set(report(output)["skills"]) == {"alpha", "beta"}
+    assert distinct.main(["--skills-dir", str(skills), "--queries", str(queries),
+                          "--output", str(output)]) == 0
+    assert "stray" in report(output)["skills"]
+
+
 def test_llm_http_failure_does_not_expose_provider_error(inputs, monkeypatch, capsys):
     run, output = inputs
     key = "test-key-not-for-output"

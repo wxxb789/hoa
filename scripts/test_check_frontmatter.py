@@ -151,6 +151,44 @@ class CheckFrontmatterTests(unittest.TestCase):
         self.assertIn("engineering/dup", out)
         self.assertIn("hermes/dup", out)
 
+    def symlink(self, source: Path, target: Path, *, directory: bool = False) -> None:
+        try:
+            source.symlink_to(target, target_is_directory=directory)
+        except OSError as error:
+            self.skipTest(f"cannot create symlink {source}: {error}")
+
+    def test_symlinked_root_is_rejected_with_a_valid_package(self):
+        self.skill("real")
+        catalog = self.tmp / "catalog"
+        shutil.move(self.skills, catalog)
+        self.symlink(self.skills, catalog, directory=True)
+        code, out, _ = self.run_main()
+        self.assertEqual(code, 1, out)
+        self.assertIn("skills directory must be a real directory", out)
+
+    def test_dangling_category_alias_is_rejected_with_a_valid_package(self):
+        self.skill("real")
+        self.symlink(self.skills / "hermes", self.tmp / "missing", directory=True)
+        code, out, _ = self.run_main()
+        self.assertEqual(code, 1, out)
+        self.assertIn("category directory must be a real directory", out)
+
+    def test_dangling_package_alias_is_rejected_with_a_valid_package(self):
+        self.skill("real")
+        self.symlink(self.skills / "engineering" / "alias", self.tmp / "missing", directory=True)
+        code, out, _ = self.run_main()
+        self.assertEqual(code, 1, out)
+        self.assertIn("skill package must be a real directory", out)
+
+    def test_symlinked_manifest_is_rejected_with_a_valid_package(self):
+        self.skill("real")
+        linked = self.skill("linked")
+        linked.unlink()
+        self.symlink(linked, self.skills / "engineering" / "real" / "SKILL.md")
+        code, out, _ = self.run_main()
+        self.assertEqual(code, 1, out)
+        self.assertIn("must be a regular file", out)
+
     def test_empty_catalog_fails(self):
         code, out, _ = self.run_main()
         self.assertEqual(code, 1)

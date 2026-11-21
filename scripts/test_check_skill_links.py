@@ -122,6 +122,32 @@ class CheckSkillLinksTests(unittest.TestCase):
         self.assertIn("../child/../../other/SKILL.md escapes skills/engineering/child/ through "
                       "'../../other/SKILL.md'", out)
 
+    def test_cross_category_target_reached_through_references_fails(self):
+        self.skill("child", category="hermes")
+        self.skill("parent", files={"references/x.md":
+                                    "See ../references/../../../hermes/child/SKILL.md."})
+        code, out, err = self.run_main()
+        self.assertEqual(code, 1, out + err)
+        self.assertIn("skills/engineering/parent/references/x.md:1: "
+                      "../references/../../../hermes/child/SKILL.md climbs above engineering/ "
+                      "and resolves to skills/hermes/child/SKILL.md", out)
+
+    def test_document_outside_the_curated_root_is_ignored(self):
+        self.skill("parent", "Read ../../engineering/../../docs/contributing.md.")
+        (self.tmp / "docs").mkdir()
+        (self.tmp / "docs" / "contributing.md").write_text("outside\n", encoding="utf-8")
+        code, out, err = self.run_main()
+        self.assertEqual(code, 0, out + err)
+        self.assertIn("sibling references OK", out)
+
+    def test_terminal_parent_segment_is_not_punctuation(self):
+        self.skill("peer")
+        self.skill("parent", "Read ../peer/..")
+        code, out, err = self.run_main()
+        self.assertEqual(code, 1, out + err)
+        self.assertIn("skills/engineering/parent/SKILL.md:4: ../peer/.. escapes "
+                      "skills/engineering/peer/ through '..'", out)
+
     PEP_723 = "# /// script\n# requires-python = \">=3.13\"\n# dependencies = []\n# ///\n"
 
     def test_script_commands_that_follow_the_uv_convention_pass(self):

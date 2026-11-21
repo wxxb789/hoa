@@ -32,17 +32,21 @@ SEED = 52026
 K1, B = 1.2, 0.75
 
 
-def skill_cards(root):
-    """SKILL.md paths for a flat (installed/scratch) or categorized checkout."""
-    cards = list(root.glob("*/SKILL.md"))
+def skill_cards(root, flat):
+    """SKILL.md paths for a flat (installed/scratch) or categorized checkout.
+
+    A flat card is only scanned when the caller passes an explicit skills
+    directory; the checkout default is categorized-only.
+    """
+    cards = list(root.glob("*/SKILL.md")) if flat else []
     cards += [path / "SKILL.md" for path in skill_paths.skill_dirs(root)
               if (path / "SKILL.md").is_file()]
     return sorted(set(cards))
 
 
-def load_catalog(root, overrides):
+def load_catalog(root, overrides, flat):
     skills = {}
-    for path in skill_cards(root):
+    for path in skill_cards(root, flat):
         # hoa uses a plain name, a folded description, and a top-level visibility flag.
         parts = re.split(r"^---\s*$", path.read_text(encoding="utf-8-sig"), maxsplit=2, flags=re.M)
         if len(parts) != 3 or parts[0]:
@@ -358,7 +362,7 @@ def positive_int(value):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--skills-dir", type=Path, default=HERE.parent / "skills")
+    parser.add_argument("--skills-dir", type=Path, default=None)
     parser.add_argument("--queries", type=Path, default=CORPUS / "holdout.jsonl")
     parser.add_argument("--descriptions", type=Path, help="JSON object mapping skill names to draft descriptions")
     parser.add_argument("--output", type=Path, required=True, help="output path prefix; writes .md and .json")
@@ -372,7 +376,8 @@ def main(argv=None):
     if bool(args.pi_models) != bool(args.pi_provider):
         parser.error("--pi-models and --pi-provider must be supplied together")
     try:
-        skills = load_catalog(args.skills_dir, args.descriptions)
+        skills = load_catalog(args.skills_dir or HERE.parent / "skills", args.descriptions,
+                              flat=args.skills_dir is not None)
         queries = load_queries(args.queries)
         for q in queries.values():
             name = q["expected"]

@@ -158,6 +158,22 @@ class FlatBaseMigrationTests(RepoFixture):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("0 changed skill(s) OK", result.stdout)
 
+    def test_staged_move_with_unstaged_edit_is_not_a_pure_move(self):
+        (self.root / "skills" / "engineering").mkdir()
+        self.git("mv", "skills/kept", "skills/engineering/kept")
+        self.write("skills/engineering/kept/notes.md", "edited\n")
+        result = self.run_cli("check-revisions")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('skills/engineering/kept/SKILL.md: changed since', result.stderr)
+
+    def test_staged_move_with_untracked_destination_file_is_not_a_pure_move(self):
+        (self.root / "skills" / "engineering").mkdir()
+        self.git("mv", "skills/kept", "skills/engineering/kept")
+        self.write("skills/engineering/kept/extra.txt", "untracked\n")
+        result = self.run_cli("check-revisions")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('skills/engineering/kept/SKILL.md: changed since', result.stderr)
+
     def test_move_plus_edit_fails_until_revision_is_bumped(self):
         (self.root / "skills" / "engineering").mkdir()
         self.git("mv", "skills/kept", "skills/engineering/kept")

@@ -96,6 +96,7 @@ class Reference:
     name: str      # sibling skill name
     rest: str      # path inside the sibling, anchor stripped
     ups: int = 0   # number of `../` climbs in the reference
+    target: Path | None = None  # the lexically normalized target
 
 
 def skill_files(skill_dir: Path) -> list[Path]:
@@ -105,6 +106,17 @@ def skill_files(skill_dir: Path) -> list[Path]:
     if references.is_dir():
         files.extend(sorted(path for path in references.rglob("*.md") if path.is_file()))
     return files
+
+
+def _clean(token: str) -> str:
+    """Strip trailing Markdown punctuation, keeping a whole `..` path segment."""
+    if token.endswith("..."):
+        return token[:-3]
+    while token and token[-1] in ".,;:":
+        if token.endswith("..") and (len(token) == 2 or token[-3] == "/"):
+            break
+        token = token[:-1]
+    return token
 
 
 def references(skill_dir: Path) -> list[Reference]:
@@ -118,23 +130,22 @@ def references(skill_dir: Path) -> list[Reference]:
             for match in REFERENCE.finditer(line):
                 ups = match.group(1).count("../")
                 name = match.group(2)
-                token = match.group(0).rstrip(".,;:")
-                rest = match.group(3).rstrip(".,;:")
-                if ups <= depth:
-                    if (not (path.parents[ups] / name).exists()
+                token = _clean(match.group(0))
+                rest = _clean(match.group(3))
+                target = Path(os.path.normpath(path.parent / token))
+                if target.is_relative_to(skill_dir):
+                    if (not target.exists()
                             and (skill_dir.parent / name / "SKILL.md").is_file()):
                         found.append(Reference(path, number, token, "skill-relative", name,
                                                rest, ups))
                     continue
+                if not target.is_relative_to(curated):
+                    continue
                 if ups == depth + 1:
                     found.append(Reference(path, number, token, "sibling", name, rest, ups))
                     continue
-                if ups >= len(path.parents):
-                    continue
-                resolved = path.parents[ups] / name
-                if resolved.is_relative_to(curated):
-                    found.append(Reference(path, number, token, "category-traversal", name,
-                                           rest, ups))
+                found.append(Reference(path, number, token, "category-traversal", name, rest,
+                                       ups, target))
     return found
 
 
@@ -275,10 +286,9 @@ def check(skills_root: Path) -> list[str]:
                               f"{'../' * (len(ref.source.relative_to(skill_dir).parts))}{ref.name}/")
                 continue
             if ref.scope == "category-traversal":
-                base = ref.source.parents[ref.ups] / ref.name
-                target = base.joinpath(*PurePosixPath(ref.rest).parts) if ref.rest else base
+                target = ref.target.relative_to(skills_root.parent).as_posix()
                 errors.append(f"{where}: {ref.text} climbs above {category.name}/ and resolves "
-                              f"to {target.relative_to(skills_root.parent).as_posix()}; "
+                              f"to {target}; "
                               f"chained skills must be named from the same category")
                 continue
             sibling = category / ref.name
