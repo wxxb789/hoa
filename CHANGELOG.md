@@ -6,6 +6,8 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 ## 2026-11-21
 
+- gdd-route-pi: paste a spec pre-review's replacement text into the brief verbatim, test every prose
+  invariant on each output path, and check new files' line endings on Windows.
 - Bind `worktree-scope.py` to the shipped commit: `seal --index` stores the staged index as a
   separate `commit_seal` of per-path Git mode and full OID without touching the legacy `diff`/`seal`
   receipts, `verify --commit <rev>` checks one resolved commit and every path its history touches

@@ -41,3 +41,10 @@ the brief asked for, not the design behind it: two green batches still had revie
 gaps that came from the spec itself. Review the spec's failure modes before the first brief, such as detached,
 failed or resumed runs, untrusted path segments, shell shims, and key collisions. When a file has a hard size cap,
 say where overflow text goes; under a cap it otherwise rewraps unrelated lines to fit.
+
+Have the spec pre-review return replacement text that a literal implementer can follow without making its own
+design decisions, and paste that text into the brief verbatim. Two specs handled this way drew 0 and 1 P1 in code
+review, against 4 for a spec that was not pre-reviewed. The one P1 was an invariant the spec stated only in prose
+("never echo the matched value"). For each such invariant, the brief asks for a test that checks it on every output
+path. On Windows, also list `git ls-files --eol <new files>` among the gates: a new file can be committed with CRLF
+line endings and still pass the other checks.
