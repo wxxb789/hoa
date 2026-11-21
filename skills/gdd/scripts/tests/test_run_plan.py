@@ -13,7 +13,7 @@ SCRIPTS = os.path.dirname(HERE)
 sys.path.insert(0, SCRIPTS)
 import gdd_process
 import agent_run
-from gdd_test_support import finalized, route_fixture, wait_for_json
+from gdd_test_support import finalized, route_fixture, run_python_cli, wait_for_json
 from test_gdd import DELIVERY, GddCase, dead_pid, read, write
 
 GDD = os.path.join(SCRIPTS, "gdd.py")
@@ -71,6 +71,10 @@ class RunPlanCase(GddCase):
         self.assertEqual(done.returncode, 0, done.stderr)
         return done.stdout
 
+    def wait_finalized(self, run_dir):
+        return wait_for_json(os.path.join(run_dir, "state.json"),
+                             lambda value: finalized(run_dir, value), time.monotonic() + 30)
+
     def run_state(self, stage="implement"):
         candidates = [d for d in self.run_dirs()
                       if ".prev-" not in os.path.basename(d)
@@ -121,7 +125,12 @@ class SetupTests(RunPlanCase):
         })
 
 
-class PrecedenceTests(RunPlanCase):
+class InProcessRunPlanCase(RunPlanCase):
+    def run_tool(self, script, *args, env=None):
+        return run_python_cli(script, *args, env={**self.env, **(env or {})})
+
+
+class DispatchCLITests(RunPlanCase):
     def test_plan_beats_environment_per_field(self):
         self.setup({"roles": {"implement": {"agent": "claude", "model": "plan-model",
                                             "thinking": "plan-think", "max_time": "7m"}}})
@@ -132,7 +141,26 @@ class PrecedenceTests(RunPlanCase):
         state = self.run_state()
         self.assertEqual((state["agent"], state["model"], state["thinking"], state["max_time"]),
                          ("claude", "plan-model", "plan-think", "7m"))
+        if os.name == "nt":
+            self.assertTrue(state["spawn"]["creationflags"] & gdd_process.NO_WINDOW, state["spawn"])
 
+    def test_detached_run_usage_over_cap_refuses_the_next_stage(self):
+        self.setup({"budgets": {"token_cap": 1}})
+        dispatched = self.stage("implement")
+        self.assertEqual(dispatched.returncode, 0, dispatched.stdout + dispatched.stderr)
+        [run_dir] = self.run_dirs()
+        state = self.wait_finalized(run_dir)
+        self.assertGreater(state["usage"]["total_tokens"], 1)
+        refused = self.stage("review")
+        self.assertEqual(refused.returncode, 3, refused.stdout)
+        self.assertIn("token cap 1", refused.stderr)
+        self.assertIn(f"{state['usage']['total_tokens']} used", refused.stderr)
+        self.assertIn("--over-budget", refused.stderr)
+        forced = self.stage("review", "--dry-run", "--over-budget")
+        self.assertEqual(forced.returncode, 0, forced.stderr)
+
+
+class PrecedenceTests(InProcessRunPlanCase):
     def test_flag_beats_plan_then_no_plan_falls_back_to_defaults(self):
         self.setup({"roles": {"implement": {"agent": "dsh", "model": "plan-model",
                                             "thinking": "plan-think", "max_time": "7m"}}})
@@ -239,7 +267,7 @@ class RoundCapTests(RunPlanCase):
         self.assertIn("cap 2", refused.stderr)
 
 
-class UsageNoteTests(RunPlanCase):
+class UsageNoteTests(InProcessRunPlanCase):
     def reported_launcher(self, name, *, state=None):
         launcher = os.path.join(self.tmp, name)
         payload = {"name": "workrepo-0001-implement", "state": "done", "exit": 0,
@@ -326,26 +354,7 @@ class UsageNoteTests(RunPlanCase):
         self.assertIn("thinking=req:requested-thinking", note)
 
 
-class UsageAccountingTests(RunPlanCase):
-    def wait_finalized(self, run_dir):
-        return wait_for_json(os.path.join(run_dir, "state.json"),
-                             lambda value: finalized(run_dir, value), time.monotonic() + 30)
-
-    def test_detached_run_usage_over_cap_refuses_the_next_stage(self):
-        self.setup({"budgets": {"token_cap": 1}})
-        dispatched = self.stage("implement")
-        self.assertEqual(dispatched.returncode, 0, dispatched.stdout + dispatched.stderr)
-        [run_dir] = self.run_dirs()
-        state = self.wait_finalized(run_dir)
-        self.assertGreater(state["usage"]["total_tokens"], 1)
-        refused = self.stage("review")
-        self.assertEqual(refused.returncode, 3, refused.stdout)
-        self.assertIn("token cap 1", refused.stderr)
-        self.assertIn(f"{state['usage']['total_tokens']} used", refused.stderr)
-        self.assertIn("--over-budget", refused.stderr)
-        forced = self.stage("review", "--dry-run", "--over-budget")
-        self.assertEqual(forced.returncode, 0, forced.stderr)
-
+class UsageAccountingTests(InProcessRunPlanCase):
     def test_failed_attempt_usage_counts_toward_the_cap(self):
         self.setup({"budgets": {"token_cap": 1}})
         dispatched = self.stage("implement", env={"STUB_EXIT": "1"})
@@ -393,7 +402,7 @@ class UsageAccountingTests(RunPlanCase):
         self.assertEqual(allowed.returncode, 0, allowed.stderr)
 
 
-class AttemptNameTests(RunPlanCase):
+class AttemptNameTests(InProcessRunPlanCase):
     ATTEMPT_NAME = re.compile(r"^(?P<stem>.+)-a(?P<attempt>\d+)-(?P<ident>[0-9a-f]{6})$")
 
     def dispatched(self, output):
@@ -820,7 +829,7 @@ class NoPlanByteTests(RunPlanCase):
         self.assertIn(" tokens=", completion)
 
 
-class UsageTruthTests(RunPlanCase):
+class UsageTruthTests(InProcessRunPlanCase):
     def test_an_all_zero_accumulator_is_unknown(self):
         self.setup({"budgets": {"token_cap": 10}})
         self.craft_usage_run("zero-a", usage={"total_tokens": 0})

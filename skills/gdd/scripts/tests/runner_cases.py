@@ -20,7 +20,8 @@ IS_WINDOWS = os.name == "nt"
 sys.path.insert(0, os.path.dirname(RUNNER))
 import agent_run
 import gdd_process
-from gdd_test_support import check_locks, cleanup_child, finalized, remove_tree, route_fixture, stop_headless, wait_for_json
+from gdd_test_support import (check_locks, cleanup_child, finalized, remove_tree, route_fixture, run_python_cli,
+                              stop_headless, wait_for_json)
 
 PROMPT = "Do the task.\nReply with the word done.\n"
 REPORT = "## Findings\nnothing material"
@@ -69,11 +70,15 @@ class RunnerCase(unittest.TestCase):
         return gdd_process.run([sys.executable, "-B", RUNNER, *args], capture_output=True, encoding="utf-8",
                               env={**self.env, **(env or {})}, cwd=self.work, timeout=90)
 
-    def start(self, name, agent="omp", fixture="ok", *args, env=None, expect=0):
+    def in_process_cli(self, *args, env=None):
+        return run_python_cli(RUNNER, *args, env={**self.env, **(env or {})}, cwd=self.work, main=agent_run.main)
+
+    def start(self, name, agent="omp", fixture="ok", *args, env=None, expect=0, in_process=False):
         self.record = os.path.join(self.tmp, f"record-{uuid.uuid4().hex}.json")
         env = {"STUB_FIXTURE": route_fixture(agent, fixture),
                "STUB_RECORD": self.record, **(env or {})}
-        proc = self.cli("start", "--name", name, "--prompt", self.prompt, "--cwd", self.work, "--agent", agent,
+        dispatch = self.in_process_cli if in_process else self.cli
+        proc = dispatch("start", "--name", name, "--prompt", self.prompt, "--cwd", self.work, "--agent", agent,
                         *args, env=env)
         self.assertEqual(proc.returncode, expect, proc.stdout + proc.stderr)
         return proc

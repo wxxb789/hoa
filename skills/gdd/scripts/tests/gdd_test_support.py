@@ -11,8 +11,32 @@ import sys
 import threading
 import time
 import uuid
-from contextlib import contextmanager
+from contextlib import chdir, contextmanager, nullcontext, redirect_stderr, redirect_stdout
 from pathlib import Path
+
+
+def run_python_cli(script, *args, env, cwd=None, main=None):
+    """Run the script's real CLI wrapper without another interpreter startup."""
+    import io
+    import runpy
+    from unittest.mock import patch
+
+    argv = [os.fspath(script), *args]
+    stdout, stderr = io.StringIO(), io.StringIO()
+    with (patch.dict(os.environ, env, clear=True), patch.object(sys, "argv", argv),
+          patch.object(sys, "path", [os.path.dirname(argv[0]), *sys.path]),
+          patch.object(sys, "dont_write_bytecode", True),
+          chdir(cwd) if cwd is not None else nullcontext(),
+          redirect_stdout(stdout), redirect_stderr(stderr)):
+        try:
+            if main is None:
+                runpy.run_path(argv[0], run_name="__main__")
+                code = 0
+            else:
+                code = main() or 0
+        except SystemExit as exc:
+            code = exc.code or 0
+    return subprocess.CompletedProcess(argv, code, stdout.getvalue(), stderr.getvalue())
 
 
 def route_fixture(agent, case="ok"):

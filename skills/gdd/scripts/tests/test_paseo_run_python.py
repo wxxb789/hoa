@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import agent_run
 import gdd_process
 from gdd_test_support import (check_locks, check_processes, claim, cleanup_child, exited, finalized, publish_json, ready,
-                              remove_tree, retry_windows, wait_for_json)
+                              remove_tree, retry_windows, run_python_cli, wait_for_json)
 
 ADAPTER = Path(__file__).resolve().parents[1] / "adapters" / "paseo-run.py"
 STUB = '''import json, os, sys, time
@@ -119,10 +119,13 @@ class PaseoLauncherTests(unittest.TestCase):
         self.fixture.update(fields)
         publish_json(self.home / "fixture.json", self.fixture)
 
-    def run_adapter(self, *args, env=None):
+    def run_adapter(self, *args, env=None, external=False):
+        environment = self.env if env is None else env
         try:
-            return gdd_process.run([sys.executable, "-B", str(ADAPTER), *args], env=env or self.env,
-                                   capture_output=True, text=True, timeout=30)
+            if external:
+                return gdd_process.run([sys.executable, "-B", str(ADAPTER), *args], env=environment,
+                                       capture_output=True, text=True, timeout=30)
+            return run_python_cli(ADAPTER, *args, env=environment)
         finally:
             if args[0] == "start":
                 issues = []
@@ -136,9 +139,9 @@ class PaseoLauncherTests(unittest.TestCase):
                 if issues:
                     self.fail("\n".join(issues))
 
-    def start(self, *flags, name="stage", env=None, expect=0):
+    def start(self, *flags, name="stage", env=None, expect=0, external=False):
         result = self.run_adapter("start", "--name", name, "--prompt", str(self.prompt),
-                                  "--cwd", str(self.home), *flags, env=env)
+                                  "--cwd", str(self.home), *flags, env=env, external=external)
         self.assertEqual(result.returncode, expect, result.stdout + result.stderr)
         return result
 
@@ -153,8 +156,8 @@ class PaseoLauncherTests(unittest.TestCase):
         text = retry_windows(lambda: path.read_text(encoding="utf-8"), time.monotonic() + 2)
         return [json.loads(line) for line in text.splitlines()]
 
-    def status(self, name="stage"):
-        result = self.run_adapter("status", name)
+    def status(self, name="stage", *, external=False):
+        result = self.run_adapter("status", name, external=external)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return json.loads(result.stdout)
 
@@ -188,16 +191,18 @@ class PaseoLauncherTests(unittest.TestCase):
         env = dict(self.env, GDD_MODEL="environment-provider", GDD_THINKING="deliberate",
                    PASEO_AGENT_ID="caller", PASEO_WORKSPACE_ID="caller-workspace",
                    PASEO_AGENT_CWD=str(self.home / "not-the-stage"))
-        result = self.start("--model", "stub-provider", name="Stage V1", env=env)
+        result = self.start("--model", "stub-provider", name="Stage V1", env=env, external=True)
         self.assertIn("started: stage-v1", result.stdout.splitlines())
         expected = ["run", "--no-wait", "--title", "stage-v1", "--cwd", str(self.home),
                     "--provider", "stub-provider", "--thinking", "deliberate", "--json",
                     "--", self.prompt.read_text(encoding="utf-8")]
         self.assertEqual(next(row for row in self.calls() if row[0] == "run"), expected)
-        state = self.status("stage-v1")
+        state = self.status("stage-v1", external=True)
         self.assertEqual((state["agent_id"], state["session_id"], state["backend"]),
                          (self.fixture["id"], self.fixture["id"], "paseo"))
         self.assertIsInstance(state["pid"], int)
+        if os.name == "nt":
+            self.assertTrue(state["spawn"]["creationflags"] & gdd_process.NO_WINDOW, state["spawn"])
         for filename in ("prompt.md", "run.json", "stderr.log", "events.ndjson"):
             self.assertTrue((self.run_dir("stage-v1") / filename).exists(), filename)
 
@@ -235,7 +240,7 @@ class PaseoLauncherTests(unittest.TestCase):
         text = 'Reply "exactly" with Unicode \u03bb.\nNo tools; keep a & b | c < d > e unchanged.\n'
         self.prompt.write_text(text, encoding="utf-8")
         env = dict(self.env, PASEO_BIN=json.dumps([sys.executable, str(self.bin / "paseo.py")]))
-        self.start(env=env)
+        self.start(env=env, external=True)
         argv = next(row for row in self.calls() if row[0] == "run")
         self.assertEqual(argv[-1], text)
         self.assertFalse({"--provider", "--thinking"} & set(argv))
@@ -471,15 +476,18 @@ raise SystemExit(int(overlap))
                 publish_json(path, state)
 
     def test_monitor_finalizes_without_status_and_answer_is_last_assistant(self):
-        self.start()
+        self.start(external=True)
         self.save_fixture(status="idle", answer="Final assistant answer\nsecond line")
         state = self.wait_state("done")
         self.assertEqual(state["exit"], 0)
-        answer = self.run_adapter("answer", "stage")
+        answer = self.run_adapter("answer", "stage", external=True)
         self.assertEqual(answer.returncode, 0, answer.stderr)
         self.assertEqual(answer.stdout, "Final assistant answer\nsecond line\n")
         self.assertIn(["logs", self.fixture["id"], "--filter", "assistant_message", "--tail", "1"],
                       self.calls())
+        tail = self.run_adapter("tail", "stage", "1", external=True)
+        self.assertEqual(tail.returncode, 0, tail.stderr)
+        self.assertEqual(json.loads(tail.stdout)["state"], "done")
 
     def test_stage_result_in_the_answer_is_checked_against_the_schema(self):
         schema = ADAPTER.parent.parent.parent / "references" / "stage-result.schema.json"
@@ -497,8 +505,8 @@ raise SystemExit(int(overlap))
         self.assertEqual(list(self.run_dir().parent.glob("noschema*")), [])
 
     def test_kill_records_confirmed_agent_deletion(self):
-        self.start()
-        result = self.run_adapter("kill", "stage")
+        self.start(external=True)
+        result = self.run_adapter("kill", "stage", external=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         state = self.status()
         self.assertEqual(state["state"], "killed")
@@ -557,7 +565,7 @@ raise SystemExit(int(overlap))
         worktree = self.home / "worktree"
         worktree.mkdir()
         self.save_fixture(status="idle")
-        self.start("--cwd", str(worktree))
+        self.start("--cwd", str(worktree), external=True)
         before = self.wait_state("done")
         self.assertTrue(agent_run.wait_until(lambda: exited(before["pid"], before["pid_identity"]), 10))
         self.assertEqual(before["state"], "done")
@@ -566,7 +574,7 @@ raise SystemExit(int(overlap))
         # Normal worktree cleanup removes the recorded dispatch directory; the
         # already-finalized agent must still be deletable afterwards.
         shutil.rmtree(worktree)
-        result = self.run_adapter("kill", "stage")
+        result = self.run_adapter("kill", "stage", external=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn(["delete", self.fixture["id"], "--json"], self.calls())
         state = self.status()
@@ -578,11 +586,11 @@ raise SystemExit(int(overlap))
 
     def test_list_and_result_show_agent_identity(self):
         self.start()
-        result = self.run_adapter("list")
+        result = self.run_adapter("list", external=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("stage", result.stdout)
         self.assertIn(self.fixture["id"], result.stdout)
-        result = self.run_adapter("result", "stage")
+        result = self.run_adapter("result", "stage", external=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(json.loads(result.stdout)["agent_id"], self.fixture["id"])
 

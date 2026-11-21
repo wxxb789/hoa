@@ -1,5 +1,11 @@
+import io
 import json
+import os
+import subprocess
 import sys
+from contextlib import chdir, redirect_stderr, redirect_stdout
+from copy import deepcopy
+from unittest.mock import patch
 
 import pytest
 
@@ -27,6 +33,7 @@ if os.name == "nt":
 assert "ARBITRARY_PARENT_SECRET" not in os.environ
 assert "AUDIT_STATE_DIR" not in os.environ
 assert "GIT_DIR" not in os.environ
+assert "HERMES_HOME" not in os.environ
 prompt = sys.stdin.read()
 assert prompt.startswith("same prompt for every arm: report-claim-audit")
 assert ("First read" in prompt) == (MODE == "forced" and HAS_SKILL)
@@ -64,6 +71,8 @@ if RUNTIME == "pi":
     assert ("bash" in tools) == SHELL
     assert ("write" in tools) == (RESPONSE is not None)
 elif RUNTIME == "claude":
+    assert os.environ["ANTHROPIC_AUTH_TOKEN"] == "not-for-codex"
+    assert "EVAL_STUB_TOKEN" not in os.environ
     tools = sys.argv[sys.argv.index("--tools") + 1].split(",")
     assert ("Bash" in tools) == SHELL
 else:
@@ -215,6 +224,28 @@ print(json.dumps({"type": "result", "subtype": "success", "num_turns": 2,
 """
 
 
+STUB_CODE = compile(STUB, "<necessity-runtime-stub>", "exec")
+STUB_NAMES = (
+    "RUNTIME", "MODE", "HAS_SKILL", "IS_TERSE", "SHELL", "LOAD", "LEAK_BASELINE", "FAKE_LOAD", "SCORE",
+    "CONTROL_PATH", "CATALOG", "RESPONSE", "PI_CONFIG", "PI_AUTH", "PI_MODEL", "PI_THINKING", "FAILURE",
+)
+
+
+def run_stub(argv, constants, *, cwd, env, input_text):
+    # Keep the caller's launch inputs and a fresh namespace; only the code object is shared.
+    scope = deepcopy(dict(zip(STUB_NAMES, constants, strict=True)))
+    stdout, stderr = io.StringIO(), io.StringIO()
+    with (patch.dict(os.environ, env, clear=True), chdir(cwd), patch.object(sys, "argv", argv),
+          patch.object(sys, "stdin", io.StringIO(input_text)), redirect_stdout(stdout), redirect_stderr(stderr)):
+        try:
+            exec(STUB_CODE, scope)
+        except SystemExit as exc:
+            code = exc.code or 0
+        else:
+            code = 0
+    return subprocess.CompletedProcess(argv, code, stdout.getvalue(), stderr.getvalue())
+
+
 PI_CONFIG = {"baseUrl": "https://pi.invalid/v1", "apiKey": "private-pi-model-key",
              "headers": {"X-Stub": "${PI_STUB_HEADER}"}, "api": "openai-completions",
              "models": [{"id": "deepseek-v4.1-flash-fast"}, {"id": "stub-model"}]}
@@ -223,7 +254,7 @@ PI_AUTH = {"type": "api_key", "key": "private-pi-auth-key"}
 
 def setup_trial(tmp_path, monkeypatch, *, runtime="claude", mode="forced", leak=False,
                 load=True, shell=False, fake_load=False, scores=None, thresholds=None,
-                control_path=None, response=None, repeats=2, pi_override=False, failure=None):
+                control_path=None, response=None, repeats=2, pi_override=False, failure=None, real_process=False):
     outside = tmp_path / "outside"
     outside.mkdir()
     (outside / "sentinel").write_bytes(b"untouched")
@@ -243,7 +274,7 @@ command = "do-not-run"
 """
     (outside / "config.toml").write_text(config, encoding="utf-8")
     (outside / "auth.json").write_text("do not copy", encoding="utf-8")
-    for key in (*runner.PROFILE, "AUDIT_STATE_DIR", "GIT_DIR", "ARBITRARY_PARENT_SECRET"):
+    for key in (*runner.PROFILE, "AUDIT_STATE_DIR", "GIT_DIR", "ARBITRARY_PARENT_SECRET", "HERMES_HOME"):
         monkeypatch.setenv(key, str(outside))
     if sys.platform == "win32":
         monkeypatch.setenv("HOMEDRIVE", outside.drive)
@@ -301,11 +332,12 @@ command = "do-not-run"
                      score, control_path, str(runner.SKILLS), response, PI_CONFIG, PI_AUTH,
                      f"tencent-litellm/{'stub-model' if pi_override else 'deepseek-v4.1-flash-fast'}",
                      "high" if pi_override == "thinking" else "max", failure)
-        header = ("RUNTIME, MODE, HAS_SKILL, IS_TERSE, SHELL, LOAD, LEAK_BASELINE, FAKE_LOAD, SCORE, "
-                  "CONTROL_PATH, CATALOG, RESPONSE, PI_CONFIG, PI_AUTH, PI_MODEL, PI_THINKING, FAILURE")
         if arm and failure == "timeout":
             raise runner.subprocess.TimeoutExpired(argv, kwargs["timeout"])
-        return process([sys.executable, "-c", f"{header} = {constants!r}\n" + STUB, *argv[1:]], **kwargs)
+        if real_process:
+            header = ", ".join(STUB_NAMES)
+            return process([sys.executable, "-c", f"{header} = {constants!r}\n" + STUB, *argv[1:]], **kwargs)
+        return run_stub(argv, constants, cwd=cwd, env=kwargs["env"], input_text=kwargs.get("input", ""))
 
     monkeypatch.setattr(runner, "run_process", launch)
     results = tmp_path / "results"
@@ -325,10 +357,18 @@ command = "do-not-run"
 
 @pytest.mark.parametrize(("runtime", "shell"), [("claude", False), ("codex", True), ("pi", False)])
 def test_three_arm_results_and_process_isolation(tmp_path, monkeypatch, runtime, shell):
-    results, seen = setup_trial(tmp_path, monkeypatch, runtime=runtime, shell=shell)
+    results, seen = setup_trial(tmp_path, monkeypatch, runtime=runtime, shell=shell, real_process=True)
     outside = tmp_path / "outside"
     before = {path: path.read_bytes() for path in outside.rglob("*") if path.is_file()}
-    assert runner.main() == 0
+    with patch.object(subprocess, "Popen", wraps=subprocess.Popen) as spawn:
+        assert runner.main() == 0
+    assert spawn.call_count == len(seen)
+    if os.name == "nt":
+        for call in spawn.call_args_list:
+            assert call.kwargs["creationflags"] & subprocess.CREATE_NO_WINDOW
+            startup = call.kwargs["startupinfo"]
+            assert startup.dwFlags & subprocess.STARTF_USESHOWWINDOW
+            assert startup.wShowWindow == subprocess.SW_HIDE
     assert len(set(seen)) == len(seen) == 7
     assert all(not path.parent.exists() for path in seen[1:])
     assert not seen[0].exists()
