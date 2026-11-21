@@ -6,7 +6,7 @@ description: >-
   command under the reporter's PATH and cwd, route it to the maintainer who owns the fix, and
   escalate one scoped landing decision. Not for dispatch.
 metadata:
-  revision: "15"
+  revision: "16"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
   summary: "verify delegated work against artifacts and write scope; route rejected or out-of-scope fixes to their owner"
@@ -116,6 +116,11 @@ Order matters; each step decides whether the next one is worth doing.
    - a deleted comment that carried a constraint;
    - a "simplification" that adds branches, parameters or indirection.
    Send each back with the line and the input that exposes it.
+10. **Size the independent review to the change.** A small mechanical or text-only diff (moves, a scoped
+   one-defect fix, docs) is accepted on steps 1-9 and your own gate run; a second reviewer adds little.
+   New gate, policy or validation logic, or a large diff, gets an independent reviewer asked which guard
+   can be deleted with the suite still green. A green report that even flagged its own spec gaps still
+   carried four such defects in one ~900-line gate change.
 
 ## 2. Re-derive every number that the deliverable depends on
 

@@ -4,6 +4,10 @@ Entries are dated and optional; no CI gate requires one. There is no project ver
 counts its own iterations in `metadata.revision`. Earlier entries retain the retired project
 `VERSION` numbers and historical per-skill versions.
 
+## 2026-11-22
+
+- delegated-work-acceptance: size the independent review to the change; new gate or policy logic gets a reviewer who asks which guard can be deleted with the suite still green.
+
 ## 2026-11-21
 
 - Move all 45 curated skills into five source-only category directories (`skills/<category>/<name>/`); installs and names stay flat, the frontmatter gate owns the layout, the link gate enforces same-category `../` references, and `check-revisions` recognizes an exact package move.
