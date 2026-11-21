@@ -1,6 +1,7 @@
-"""Run-plan tests for gdd.py: setup, field precedence, notes and round caps (offline)."""
+"""Run-plan tests for gdd.py: setup, precedence, notes, caps, usage and status (offline)."""
 import json
 import os
+import re
 import sys
 import unittest
 
@@ -30,13 +31,20 @@ class RunPlanCase(GddCase):
     def setup_without_file(self, *args, env=None):
         return self.run_tool(GDD, "setup", "--repo", self.repo, "--goal", "0001", *args, env=env)
 
-    def append_implement(self):
-        done = self.run_tool(DELIVERY, "append", "--repo", self.repo, "--goal", "0001",
-                             "--stage", "implement", "--base", self.base, "--head", self.head)
+    def append_row(self, stage, note=None):
+        args = [DELIVERY, "append", "--repo", self.repo, "--goal", "0001",
+                "--stage", stage, "--base", self.base, "--head", self.head]
+        if note is not None:
+            args += ["--note", note]
+        done = self.run_tool(*args)
         self.assertEqual(done.returncode, 0, done.stderr)
 
-    def run_state(self):
-        [run_dir] = [d for d in self.run_dirs() if ".prev-" not in os.path.basename(d)]
+    def append_implement(self):
+        self.append_row("implement")
+
+    def run_state(self, stage="implement"):
+        [run_dir] = [d for d in self.run_dirs()
+                     if ".prev-" not in os.path.basename(d) and d.endswith(f"-{stage}")]
         return json.loads(read(os.path.join(run_dir, "state.json")))
 
 
@@ -113,6 +121,16 @@ class PrecedenceTests(RunPlanCase):
                          ("omp", None, None, None))
         self.assertNotIn("--model", json.loads(read(self.record))["argv"])
 
+    def test_budget_max_time_falls_back_below_the_role_and_above_env(self):
+        self.setup({"budgets": {"max_time": 900}, "roles": {"review": {"max_time": "7m"}}})
+        done = self.stage("implement", "--wait", env={"GDD_MAX_TIME": "9m"})
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertEqual(self.run_state()["max_time"], "900")
+
+        done = self.stage("review", "--base", self.base, "--wait", env={"GDD_MAX_TIME": "9m"})
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertEqual(self.run_state("review")["max_time"], "7m")
+
 
 class NotesTests(RunPlanCase):
     def prompt_of(self, env=None):
@@ -167,6 +185,91 @@ class RoundCapTests(RunPlanCase):
         self.assertIn("--over-budget", refused.stderr)
         allowed = self.stage("implement", "--dry-run", "--over-budget")
         self.assertEqual(allowed.returncode, 0, allowed.stderr)
+
+
+class UsageNoteTests(RunPlanCase):
+    def test_completion_note_records_usage_fields(self):
+        done = self.stage("implement", "--wait")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        note = self.ledger()[-1]["note"]
+        self.assertTrue(note.startswith("exit=0 "), note)
+        self.assertIn("role=implement", note)
+        self.assertIn("route=omp", note)
+        self.assertIn("model=default", note)
+        self.assertIn("thinking=default", note)
+        match = re.search(r"wall=([0-9.]+)s tokens=([0-9]+)", note)
+        self.assertIsNotNone(match, note)
+        self.assertEqual(int(match.group(2)), self.run_state()["usage"]["total_tokens"])
+
+    def test_completion_note_reports_unknown_without_usage(self):
+        launcher = os.path.join(self.tmp, "no-usage-launcher.py")
+        write(launcher, (
+            "import json, os\n"
+            "from datetime import datetime\n"
+            "root = os.environ['GDD_RUN_ROOT']\n"
+            "name = 'workrepo-0001-implement'\n"
+            "run_dir = os.path.join(root, datetime.now().strftime('%Y-%m-%d'), name)\n"
+            "os.makedirs(run_dir, exist_ok=True)\n"
+            "with open(os.path.join(run_dir, 'state.json'), 'w', encoding='utf-8') as handle:\n"
+            "    json.dump({'name': name, 'state': 'done', 'exit': 0, 'cwd': " + repr(self.repo) + ",\n"
+            "               'started': datetime.now().isoformat(), 'ended': datetime.now().isoformat(),\n"
+            "               'duration_s': 3.5}, handle)\n"
+            "print('started:', name)\n"
+            "print('run dir:', run_dir)\n"
+        ))
+        done = self.stage("implement", "--wait", env={"GDD_LAUNCHER": launcher})
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        note = self.ledger()[-1]["note"]
+        self.assertIn("wall=3.5s tokens=unknown", note)
+        self.assertNotIn("tokens=0", note)
+
+
+class TokenCapTests(RunPlanCase):
+    def append_completion(self, stage, tokens):
+        self.append_row(stage, f"exit=0 dur=1.2 head=0000000 role={stage} route=omp "
+                               f"model=default thinking=default wall=1.2s tokens={tokens}")
+
+    def test_token_cap_refuses_unknown_rows_not_counted_and_over_budget(self):
+        self.setup({"budgets": {"token_cap": 100}})
+        self.append_completion("implement", "60")
+        self.append_completion("implement", "unknown")
+        self.append_completion("review", "30")
+        allowed = self.stage("implement", "--dry-run")
+        self.assertEqual(allowed.returncode, 0, allowed.stderr)  # 90 reported + 1 unknown < 100
+        self.append_completion("implement", "10")
+        refused = self.stage("implement", "--dry-run")
+        self.assertEqual(refused.returncode, 3, refused.stdout)
+        self.assertIn("token cap 100", refused.stderr)
+        self.assertIn("100 used", refused.stderr)
+        self.assertIn("1 unknown", refused.stderr)
+        self.assertIn("--over-budget", refused.stderr)
+        forced = self.stage("implement", "--dry-run", "--over-budget")
+        self.assertEqual(forced.returncode, 0, forced.stderr)
+
+
+class StatusTests(RunPlanCase):
+    def status(self):
+        done = self.run_tool(GDD, "status", "--repo", self.repo, "--goal", "0001")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        return done.stdout
+
+    def test_status_without_a_plan_says_no_run_plan(self):
+        self.append_implement()
+        out = self.status()
+        self.assertIn("no run plan", out)
+        self.assertIn("implement: rounds=1/2 tokens=0 unknown=0", out)
+
+    def test_status_prints_the_plan_and_per_role_usage(self):
+        self.setup({"roles": {"implement": {"model": "m1"}},
+                    "budgets": {"rounds": {"implement": 3}, "token_cap": 100}})
+        self.append_implement()
+        self.append_row("implement", "exit=0 dur=1.2 head=0000000 tokens=60")
+        self.append_row("review", "exit=0 dur=1.2 head=0000000 tokens=unknown")
+        out = self.status()
+        self.assertIn(self.plan_path(), out)
+        self.assertIn('"token_cap": 100', out)
+        self.assertIn("implement: rounds=1/3 tokens=60 unknown=0", out)
+        self.assertIn("review: rounds=0/2 tokens=0 unknown=1", out)
 
 
 class InvalidPlanTests(RunPlanCase):

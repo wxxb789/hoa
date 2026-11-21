@@ -321,6 +321,20 @@ def non_negative_int(value):
     return isinstance(value, int) and not isinstance(value, bool) and value >= 0
 
 
+def run_tokens(state):
+    """Launcher-reported token total, or None when the run recorded no usage (never 0)."""
+    usage = state.get("usage") if isinstance(state.get("usage"), dict) else {}
+    total = usage.get("total_tokens")
+    if not isinstance(total, (int, float)) or isinstance(total, bool):
+        total = 0
+    if not total:
+        for key in ("input_tokens", "output_tokens", "cache_read_tokens"):
+            value = usage.get(key)
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                total += value
+    return int(total) if total else None
+
+
 def run_plan_path(repo_name, goal):
     """The goal's plan file: the same <repo>-<goal> key the prompt and state dirs use."""
     return os.path.join(task_root(), f"{repo_name}-{goal}", "run-plan.json")
@@ -445,38 +459,62 @@ def resolve_field(flag, plan_value, env_value):
     return env_value
 
 
-def ledger_rounds(state_path, repo_name, goal, stage):
-    """How many runs of this stage the ledger already records for this repo+goal."""
+def ledger_rows(state_path, repo_name, goal):
+    """(stage, note) for this repo+goal's ledger rows, oldest first."""
     try:
         with open(os.path.expanduser(state_path), encoding="utf-8", errors="replace") as handle:
             lines = handle.read().splitlines()
     except OSError:
-        return 0
+        return []
     if not lines:
-        return 0
+        return []
     header = lines[0].split("\t")
     try:
         i_repo = header.index("repo")
         i_goal = header.index("goal")
         i_stage = header.index("stage")
     except ValueError:
-        return 0
+        return []
     i_note = header.index("note") if "note" in header else None
-    count = 0
+    rows = []
     for line in lines[1:]:
         cells = line.split("\t")
         if len(cells) <= max(i_repo, i_goal, i_stage):
             continue
-        if cells[i_stage] != stage or cells[i_goal] != goal:
+        if cells[i_goal] != goal:
             continue
         if repo_name and repo_name not in cells[i_repo]:
             continue
-        # `--wait` writes a dispatch row and then a completion row for the same stage (its note
-        # starts with `exit=`). The cap counts dispatches, so a completion must not spend a round.
-        if i_note is not None and len(cells) > i_note and cells[i_note].startswith("exit="):
+        note = cells[i_note] if i_note is not None and len(cells) > i_note else ""
+        rows.append((cells[i_stage], note))
+    return rows
+
+
+def ledger_rounds(state_path, repo_name, goal, stage):
+    """How many runs of this stage the ledger already records for this repo+goal."""
+    # `--wait` writes a dispatch row and then a completion row for the same stage (its note
+    # starts with `exit=`). The cap counts dispatches, so a completion must not spend a round.
+    return sum(
+        1 for row_stage, note in ledger_rows(state_path, repo_name, goal)
+        if row_stage == stage and not note.startswith("exit=")
+    )
+
+
+def ledger_tokens(state_path, repo_name, goal, stage=None):
+    """(reported token sum, unknown count) over completion rows, optionally one stage."""
+    total = unknown = 0
+    for row_stage, note in ledger_rows(state_path, repo_name, goal):
+        if stage is not None and row_stage != stage:
             continue
-        count += 1
-    return count
+        if not note.startswith("exit="):
+            continue
+        found = re.search(r"(?:^|\s)tokens=(\S+)", note)
+        value = found.group(1) if found else ""
+        if value.isdigit():
+            total += int(value)
+        else:
+            unknown += 1
+    return total, unknown
 
 
 def ledger_append(repo, goal, stage, base, head, gates, next_stage=None, note=None, pr=None, rounds=None):
@@ -769,7 +807,8 @@ def cmd_stage(args):
 
     rounds_state = os.path.expanduser(state_file())
     rounds_seen = ledger_rounds(rounds_state, repo_name, args.goal, args.stage)
-    cap = (plan.get("budgets") or {}).get("rounds", {}).get(args.stage)
+    budgets = plan.get("budgets") or {}
+    cap = budgets.get("rounds", {}).get(args.stage)
     if cap is None:
         cap = STAGE_BUDGETS.get(args.stage)
     budget_message = budget_problem(
@@ -778,6 +817,18 @@ def cmd_stage(args):
     if budget_message:
         print(f"gdd: {budget_message}", file=sys.stderr)
         return 3
+
+    token_cap = budgets.get("token_cap")
+    if token_cap is not None and not args.over_budget:
+        used, unknown = ledger_tokens(rounds_state, repo_name, args.goal)
+        if used >= token_cap:
+            print(
+                f"gdd: {args.stage}: goal {args.goal} token cap {token_cap} reached "
+                f"({used} used, {unknown} unknown) — pass --over-budget only if a "
+                "different attempt is worth the tokens",
+                file=sys.stderr,
+            )
+            return 3
 
     gates = args.gates or os.environ.get("GDD_GATES") or "-"
     findings = os.path.abspath(os.path.expanduser(args.findings)) if args.findings else "-"
@@ -842,7 +893,11 @@ def cmd_stage(args):
     agent = resolve_field(args.agent, role.get("agent"), config("GDD_AGENT"))
     model = resolve_field(args.model, role.get("model"), os.environ.get("GDD_MODEL") or None)
     thinking = resolve_field(args.thinking, role.get("thinking"), os.environ.get("GDD_THINKING") or None)
-    max_time = resolve_field(args.max_time, role.get("max_time"), os.environ.get("GDD_MAX_TIME") or None)
+    max_time = resolve_field(
+        args.max_time,
+        role.get("max_time") or budgets.get("max_time"),
+        os.environ.get("GDD_MAX_TIME") or None,
+    )
     try:
         run_name, run_dir, launch_run_root = launch(
             launcher,
@@ -910,10 +965,15 @@ def cmd_stage(args):
         final_head = final_head_for(args.stage, bool(args.head), head, post_head)
         result = agent_run.read_json(os.path.join(run_dir, "result.json"), {})
         verdict = result.get("verdict") if state.get("result") == "valid" else None
+        tokens = run_tokens(state)
+        wall = f"{duration}s" if duration is not None else "unknown"
         note = (
             f"exit={exit_code if exit_code is not None else '-'} "
             f"dur={duration if duration is not None else '-'} "
             f"head={post_head[:7]}"
+            + f" role={args.stage} route={state.get('agent') or agent or 'default'}"
+            f" model={model or 'default'} thinking={thinking or 'default'} wall={wall}"
+            f" tokens={tokens if tokens is not None else 'unknown'}"
             + (f" verdict={verdict}" if verdict else "")
         )
         ledger_append(
@@ -991,6 +1051,18 @@ def cmd_close(args):
     return 0
 
 
+def status_repo_name(path):
+    """The repo key setup and stage use; --repo itself when it is not a checkout path."""
+    if os.path.isdir(path):
+        proc = gdd_process.run(
+            ["git", "-C", path, "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True,
+        )
+        root = (proc.stdout or "").strip() if proc.returncode == 0 else ""
+        return os.path.basename(os.path.realpath(root or path))
+    return path
+
+
 def cmd_status(args):
     cmd = [
         agent_run.interpreter(),
@@ -1011,7 +1083,33 @@ def cmd_status(args):
                              env={**os.environ, "PYTHONIOENCODING": "utf-8"})
     sys.stdout.write(result.stdout)
     sys.stderr.write(result.stderr)
-    return result.returncode
+    if result.returncode != 0:
+        return result.returncode
+
+    repo_name = status_repo_name(args.repo)
+    plan = read_run_plan(repo_name, args.goal)
+    state_path = os.path.expanduser(state_file())
+    print()
+    print("RUN PLAN")
+    if plan:
+        print(f"plan: {run_plan_path(repo_name, args.goal)}")
+        print(json.dumps(plan, ensure_ascii=False, sort_keys=True))
+    else:
+        print("no run plan")
+    for stage in [name for name in STAGES if name in AGENT_STAGES]:
+        role = (plan.get("roles") or {}).get(stage)
+        cap = (plan.get("budgets") or {}).get("rounds", {}).get(stage)
+        if cap is None:
+            cap = STAGE_BUDGETS.get(stage)
+        used = ledger_rounds(state_path, repo_name, args.goal, stage)
+        if role is None and cap is None and not used:
+            continue
+        total, unknown = ledger_tokens(state_path, repo_name, args.goal, stage)
+        print(
+            f"{stage}: rounds={used}/{cap if cap is not None else '-'} "
+            f"tokens={total} unknown={unknown}"
+        )
+    return 0
 
 
 EPILOG = """\

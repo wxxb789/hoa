@@ -5,7 +5,7 @@ description: >-
   resume from a saved stage ledger. Hand a bounded patch or review to a CLI agent with a written brief and isolated
   checkout; compare independent coding assistants in separate worktrees and check changes before integration.
 metadata:
-  revision: "21"
+  revision: "22"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "deliver a goal through staged authoring, gates and authorized merge, or verify one isolated CLI handoff without shipping"
@@ -63,7 +63,7 @@ stop and report — do not burn budget in silence.
 | Phase | Produces | Rules that must not be missed | Detail |
 |---|---|---|---|
 | 0 contract | a dispatchable goal contract | all six clauses: observable pass condition, judging artifact, failure control, out of scope, evidence plan, mergeable alone; one goal ≈ one run ≈ one PR; fix the contract, never dispatch and hope | [`references/phases/00-contract.md`](references/phases/00-contract.md) |
-| 1 branch + dispatch | baseline snapshot and one implementation run | branch from `origin/main` and report the base SHA; report pre-existing dirty paths; `gdd.py stage` renders prompt, run name and ledger row from one template | [`references/phases/01-branch-dispatch.md`](references/phases/01-branch-dispatch.md) |
+| 1 branch + dispatch | baseline snapshot and one implementation run | branch from `origin/main` and report the base SHA; report pre-existing dirty paths; settle the run plan once with `gdd.py setup` (ask the owner once, only for missing fields; never re-ask mid-run); `gdd.py stage` renders prompt, run name and ledger row from one template and enforces the plan | [`references/phases/01-branch-dispatch.md`](references/phases/01-branch-dispatch.md) |
 | 2 verify | gate evidence and a clause→test map | exit 0 means the process ended, not the phase finished; re-run gates on the FINAL tree; a proof test must fail when the feature is deleted; a weak proof test is its own increment | [`references/phases/02-verify.md`](references/phases/02-verify.md) |
 | 3 simplify → apply | accepted fixes, or a recorded skip | conditional: skip a documentation-only, mechanical, or sub-threshold diff and record the reason in the ledger; report only, never silent apply; name rejected numbers in the apply prompt; a dead-code finding needs mechanical evidence; re-derive changed counts from the tree | [`references/phases/03-simplify-apply.md`](references/phases/03-simplify-apply.md) |
 | 4 review → fix | per-finding fixes | commit stage output before the next stage; reproduce every finding; classify regression vs pre-existing; a third same-class dispatch changes the mechanism | [`references/phases/04-review-fix.md`](references/phases/04-review-fix.md) |
@@ -106,7 +106,7 @@ the wrong reason, and an exit code can disagree with the artifact it produced.
 | `GDD_RUN_DETACH` | detach mode: `auto`, `systemd`, `launchd`, `setsid`, `windows`, or environment-only `tmux` / `herdr` | `auto` (Linux user unit, macOS LaunchAgent, POSIX double fork, or native Windows) |
 | `GDD_TEMPLATES` | stage-template root | the bundled `references/stage-templates` |
 | `GDD_GOAL_GLOB` | goal-contract glob | `docs/goals/*<goal>*.md` |
-| round caps | `implement` / `simplify` / `review` run at most **2x** — enforced by `gdd.py stage`, override with `--over-budget` | `scripts/gdd.py` |
+| `GDD_RUN_PLAN_DEFAULTS` | JSON run-plan defaults that `gdd.py setup` merges under `--plan-file` ([phase 1](references/phases/01-branch-dispatch.md#run-plan)); round caps `implement` / `simplify` / `review` default to **2x**, override with `--over-budget` | none |
 | `GDD_WORKTREE_SCOPE` | `worktree-scope.py` path | `../delegated-work-acceptance/scripts/worktree-scope.py` |
 
 See [references/configuration.md](references/configuration.md) for lookup order and the config path.

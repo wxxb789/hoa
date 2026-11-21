@@ -24,7 +24,23 @@
    check stops the stage with the state and the original snapshot left for the operator — no inline
    retry, resume or fallback. Neither the delegation nor its simplification decides phase 3: the
    simplify preflight still runs on the whole increment. Use `uv run scripts/gdd.py stage` so prompt,
-   run name and ledger row come from one template.
+   run name and ledger row come from one template, and settle the goal's run plan once before the
+   first dispatch (`gdd.py setup`; roles, budgets and owner notes — see [Run plan](#run-plan)).
+
+## Run plan
+
+Before the first dispatch, run `uv run scripts/gdd.py setup --repo <path> --goal <id> [--plan-file <json>]`.
+Ask the owner once, in one round, only for what `GDD_RUN_PLAN_DEFAULTS` does not give:
+- the role map per agent stage: route (`agent`), `model`, `thinking`, `max_time`;
+- budgets: `rounds` per stage, plan-wide `max_time`, optional `token_cap`;
+- `notes`.
+
+Do not re-ask mid-run. Change the plan only on the owner's request, by re-running setup.
+
+`gdd.py stage` resolves each field in this order: flag, role, `budgets.max_time` (for max time only), environment,
+default. It appends the notes to every prompt under `## Owner notes (run plan)`. It refuses past a round cap or the
+token cap; `--over-budget` overrides. The token cap counts only launcher-reported tokens; `unknown` rows are listed,
+not summed. `gdd.py status` prints the plan and per-role usage.
 
 ## Dispatch tooling
 
