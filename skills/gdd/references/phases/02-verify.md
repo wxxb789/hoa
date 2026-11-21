@@ -16,7 +16,9 @@ The agent's report is a claim, never evidence:
 - Run the repo's gates yourself and read real exit codes.
 - **Exit 0 means the process ended, not that the phase finished.** Read the run's final assistant text
   (`answer.md`): a report ending with "the gate is running, waiting for its result" ended mid-gate.
-  Resume it, or run the remaining gates yourself — never accept the exit code as completion.
+  Resume it, or run the remaining gates yourself — never accept the exit code as completion. A
+  delegated ce-work stage is the exception: it is not resumed; stop and preserve state as the
+  implement template says.
 - **A non-zero gate that names a missing build output is a prerequisite failure, not a regression.**
   Read the message before calling it a delta; produce the artifacts and re-run.
 - Map every contract clause to a test name or evidence row; a clause with no test is unfinished work.
@@ -32,7 +34,9 @@ The agent's report is a claim, never evidence:
   `assert(checks > 0)` stays green after the entire section it guards is deleted — read the
   assertion's substance, not its existence. Raise a weak proof test as its own increment and tell the
   operator; do not let it be absorbed silently into the current apply round.
-- Diff the plan's file list against `git status`; missing tests or docs are the usual gap.
+- Diff the plan's file list against every path changed since the recorded base — committed
+  (`git diff --name-status <base>`) and untracked (`git status --short`); missing tests or docs are
+  the usual gap.
 - **The worker's exit codes are claims.** Re-run the gates yourself on the settled implementation
   tree, even if they passed earlier — gdd's own author does not commit (a delegated ce-work run may), so
   test the working tree, not a commit object that can miss uncommitted output. Phase 5 repeats the gates on the shipping commit. A
