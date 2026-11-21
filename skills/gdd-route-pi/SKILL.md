@@ -6,7 +6,7 @@ description: >-
   the overall delivery protocol.
 disable-model-invocation: true
 metadata:
-  revision: "2"
+  revision: "3"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "Pi stdin and JSON event route with session resume"
@@ -36,5 +36,5 @@ skips unapproved project-local files and is not a sandbox.
 See [gdd transport](../gdd/references/transport.md) for detach, logs and
 recovery. Check the stage result and run the repository's gates independently.
 
-For timeouts, isolation and gates when the model is DeepSeek, read
+For timeouts, isolation, gates and brief shape when the model is DeepSeek, read
 [DeepSeek workers](references/deepseek-workers.md).

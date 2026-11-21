@@ -6,6 +6,7 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 ## 2026-11-21
 
+- Add brief-shaping guidance for bounded DeepSeek jobs to `gdd-route-pi`.
 - Record the first sandboxed Pi natural-mode screen in `evals/results/2026-11-21-pi-sandbox-natural.md`.
 - Record the offending path (`contamination_paths`) for catalog and host-skill reads in necessity trial traces.
 - Add confirmed notes on directing DeepSeek workers to `gdd-route-pi`: time budget, filesystem isolation, runnable gate.

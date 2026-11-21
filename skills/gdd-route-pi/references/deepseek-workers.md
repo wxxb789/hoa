@@ -23,3 +23,12 @@ Audit session logs afterwards in either case.
 Give the worker one command that runs the acceptance gate end to end, and state that it must pass. With that, Pi
 workers iterated on their own failures to a passing gate without operator intervention in both arms of a
 multi-hour .NET change. Without it, prose acceptance criteria are easy to claim and hard to check.
+
+## Shape the brief for a bounded job
+
+DeepSeek on Pi delivered reviewed, gate-passing work on bounded jobs: authoring an eval task with a fixture, and
+fixing one reviewed defect in a build harness. Briefs that worked named the exact files to create or change, pointed
+at real examples to copy, asked for a test that fails before the change and passes after, gave the runnable checks
+that must pass, listed what not to touch, and fixed the report format. It follows a brief literally, including the
+brief's mistakes: check every path and convention in the brief against the repository before sending, and ask it to
+report conflicts instead of working around them. Keep open-ended design and judgment calls for a stronger model.
