@@ -14,6 +14,42 @@ contract is satisfied and the gates have actually run.
 3. The shape reference: the most recently merged increment of the same kind (its commit, source,
    docs, evidence record, tests, measurement harness). Match its structure rather than inventing one.
 
+## Optional delegation — `ce-work mode:return-to-caller`
+
+Decide eligibility before invoking, and delegate only when all of these hold: your runtime's own
+skill discovery offers `ce-work` with `mode:return-to-caller`; it accepts an explicit plan path or
+bounded work statement as the invocation argument; the verbatim `${GATES}` command and its working
+directory can travel in separate caller context — in statement mode, written into the statement;
+`${GATES}` is a real command, not `-` (no gate supplied); and the runtime will run the loop natively
+or on a route the operator already authorized. `mode:return-to-caller` bounds the shipping tail, not
+onward routing — a standing cross-model engine can still send the work packet elsewhere, so never
+inherit routing authority from this dispatch. If any of these fails, skip this section and run the
+loop below yourself. Never install or fetch the skill.
+
+Hand over the loop in the current worktree, recording the expected goal branch first
+(`git rev-parse --abbrev-ref HEAD`). Accept its unit commits on this branch and a mid-loop
+simplification; it must not push or open a PR. After it returns and before you report, check and show:
+
+- the checkout is still on the recorded goal branch (no switch or detached HEAD), and
+  `git merge-base --is-ancestor ${BASE_SHA} HEAD` holds;
+- every path touched by every commit in `${BASE_SHA}..HEAD`, enumerated per commit —
+  `git log --no-renames --name-status --format=%H ${BASE_SHA}..HEAD` — and every path in a fully
+  expanded `git status --porcelain -z -uall --no-renames` inventory is inside the goal's scope, so a
+  path added and later removed outside it is still caught;
+- it ran the exact `${GATES}` command to completion on the settled final output, and its evidence
+  shows the command, working directory and exit status; a complete delegate status never waives
+  gdd's gate;
+- its run id or archived summary as a recovery pointer, in the report and in the stage `summary` — a
+  paraphrase in the stage summary alone is not a recovery artifact.
+
+After the invocation, any failed check above stops the stage: preserve the original scope snapshot,
+leave the tree and its commits as they are, report `BLOCKED` with the reason, and do not fall back to
+the loop below, retry inline, resume, or advance. A capability decided absent before invoking is the
+only reason to fall back.
+
+The delegation contract above adapts Compound Engineering (MIT, Copyright 2025 Every), paraphrased
+rather than copied.
+
 ## Deliver
 
 1. **Reuse the accepted plan.** Execute the accepted plan by path (the goal file, the design doc it
@@ -41,7 +77,9 @@ contract is satisfied and the gates have actually run.
 
 ## Rules
 
-- Do **not** commit, do **not** push, do **not** rewrite history. Leave the tree for verification.
+- Do **not** push and do **not** rewrite history. Do not commit your own edit — leave the tree for
+  verification; only unit commits from a `ce-work` delegation you accepted above are allowed on this
+  branch.
 - Do not weaken, delete or rename a test that pins a contract clause to make a gate pass.
 - If a contract-preserving decision is genuinely ambiguous, state the options and your
   recommendation in the plan instead of guessing silently.
@@ -51,10 +89,11 @@ contract is satisfied and the gates have actually run.
 
 ## Finish with a report
 
-Files written (grouped); gate results with counts and exit codes; and per contract clause the green
-command, its exit code, the evidence row that proves it, and the expected failure or baseline you
-observed first (or the replacement proof you used). Residual risks and known limits. No adjectives
-in place of numbers.
+Files written (grouped, committed and uncommitted); gate results with counts and exit codes; and per
+contract clause the green command, its exit code, the evidence row that proves it, and the expected
+failure or baseline you observed first (or the replacement proof you used). When the loop was
+delegated, name the `ce-work` run id or summary and the branch, base, scope and status checks above.
+Residual risks and known limits. No adjectives in place of numbers.
 
 ## Stage result
 

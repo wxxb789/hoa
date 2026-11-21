@@ -30,6 +30,15 @@ A run whose runner and agent died is finalized as failed (`stale_recovered`) by 
 a `state.json` stuck at `running` is not evidence of a live run — read the `finalized` marker or the
 `stale_recovered` flag.
 
+A run that did not finish cleanly is reconciled by the operator, not resumed on the runner's advice:
+record one `blocked` row carrying the archived result, the outer handle, the delegate run id or saved
+summary, the recorded base and observed HEAD, and the recovery path when one exists. Inspect both
+layers and inventory partial writes before any recovery, and keep the original pre-dispatch scope
+snapshot as the baseline. Do not auto-resume, force-dispatch, run the template's fallback or advance
+to verify from such a row. Read-only reconciliation does not spend a round; any authorized new
+implementation dispatch counts against the existing cap. A provider's documented same-run recovery is
+a separate, explicitly selected action — never an implementation retry.
+
 ## Phase 8 — reset before the next increment
 
 Fresh run (never resume a previous increment's session); verify the agent build is current;
