@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Offline tests for skills/session-history-mining/scripts/mine_sessions.py."""
+"""Offline tests for skills/productivity/session-history-mining/scripts/mine_sessions.py."""
 from __future__ import annotations
 
 import json

@@ -56,7 +56,7 @@ information-theoretic contracts and residual formulas.
 ### 1. Extract redacted L0 skeletons and L1 causal spans
 
 ```bash
-S=skills/session-history-mining/scripts/mine_sessions.py
+S=skills/productivity/session-history-mining/scripts/mine_sessions.py
 OUT=/tmp/session-mining-run   # or a gitignored scratch directory
 
 uv run "$S" extract \
