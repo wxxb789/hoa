@@ -1,11 +1,11 @@
 {
-  "case_count": 35,
+  "case_count": 37,
   "model": "gemini-4-carbon",
   "effort": "low",
-  "passed": 35,
-  "total": 35,
+  "passed": 37,
+  "total": 37,
   "judge_endpoint_host": "127.0.0.1:4141",
-  "generated_at": "2026-11-20T16:44:06Z",
+  "generated_at": "2026-11-21T02:20:01Z",
   "per_case": [
     {
       "id": "route-to-search",
@@ -179,6 +179,16 @@
     },
     {
       "id": "no-trigger-translation",
+      "pick": "none",
+      "passed": true
+    },
+    {
+      "id": "route-to-privileged-host-handoff",
+      "pick": "privileged-host-handoff",
+      "passed": true
+    },
+    {
+      "id": "no-handoff-for-local-command",
       "pick": "none",
       "passed": true
     }

@@ -65,6 +65,7 @@ targets:  runtime-agnostic | repo-only |
 | measurement-campaign-evidence | skill | software-development,work-management | runtime-agnostic | `skills/measurement-campaign-evidence/` | 测量运动：先钉候选身份、串行跑、一致报告集，不让基线伪造延迟对比 |
 | official-document-verification | skill | work-management | runtime-agnostic | `skills/official-document-verification/` | 用文档的确切版本核验结论，含只能用真浏览器取到的被封来源 |
 | package-release-verification | skill | software-development | runtime-agnostic | `skills/package-release-verification/` | 发版：先补 changelog、同一 commit 的门禁、分派、按版本号核 registry、单独获批的清理 |
+| privileged-host-handoff | skill | software-development,work-management | runtime-agnostic | `skills/privileged-host-handoff/` | 人工代跑特权主机：先探测能力、钉住要跑的文件、交付自包含带闸门的命令块、先 dry run 再执行、把贴回的输出当证据核对 |
 | report-claim-audit | skill | work-management,software-development | runtime-agnostic | `skills/report-claim-audit/` | 审计报告声明和遗漏，或用任务清单、实际发布与部署锁定版本核查阶段收尾 |
 | research-stream-consolidation | skill | work-management | runtime-agnostic | `skills/research-stream-consolidation/` | 把重复的研究流并成一个项目，并修好绑定旧路径的记录 |
 | review-revision-candidates | skill | work-management | runtime-agnostic | `skills/review-revision-candidates/` | 被驳回候选的返修轮：编号清单就是全部变更集，交的是字节不是辩解 |
@@ -112,7 +113,7 @@ targets:  runtime-agnostic | repo-only |
 安装其余全部 skill：
 
 ```bash
-npx skills add wxxb789/hoa -g -s agent-harness-settings-parity -s agent-operating-contract-evolution -s contract-bound-deliverables -s define-goal -s delegated-work-acceptance -s dotnet-repo-workflow -s evidence-backed-analytical-writing -s evidence-boundary-discipline -s gdd -s gdd-route-cc -s gdd-route-codex -s gdd-route-copilot -s gdd-route-dsh -s gdd-route-omo -s gdd-route-omp -s gdd-route-opencode -s gdd-route-pi -s ghc-decisions -s ghc-search -s git-auto-sync-pipelines -s harness-engineering -s hoa-practice-retro -s hoa-repo-reckoning -s hoa-skill-create -s hoa-skill-curate -s hoa-skill-port -s hoa-skill-review -s hoa-skill-set-audit -s measurement-campaign-evidence -s official-document-verification -s package-release-verification -s report-claim-audit -s research-stream-consolidation -s review-revision-candidates -s spec-convergence -s tmux-agent-control -s writing -y
+npx skills add wxxb789/hoa -g -s agent-harness-settings-parity -s agent-operating-contract-evolution -s contract-bound-deliverables -s define-goal -s delegated-work-acceptance -s dotnet-repo-workflow -s evidence-backed-analytical-writing -s evidence-boundary-discipline -s gdd -s gdd-route-cc -s gdd-route-codex -s gdd-route-copilot -s gdd-route-dsh -s gdd-route-omo -s gdd-route-omp -s gdd-route-opencode -s gdd-route-pi -s ghc-decisions -s ghc-search -s git-auto-sync-pipelines -s harness-engineering -s hoa-practice-retro -s hoa-repo-reckoning -s hoa-skill-create -s hoa-skill-curate -s hoa-skill-port -s hoa-skill-review -s hoa-skill-set-audit -s measurement-campaign-evidence -s official-document-verification -s package-release-verification -s privileged-host-handoff -s report-claim-audit -s research-stream-consolidation -s review-revision-candidates -s spec-convergence -s tmux-agent-control -s writing -y
 ```
 
 某次发布改名或退役了 skill 时：移除本仓库已不再提供的名称（由 `scripts/retired_skills.toml`

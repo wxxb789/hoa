@@ -217,6 +217,18 @@
       "request": "Translate 'See you tomorrow' into Spanish.",
       "must_pick": ["none"],
       "distractors": ["ghc-search", "spec-convergence"]
+    },
+    {
+      "id": "route-to-privileged-host-handoff",
+      "request": "The cluster bootstrap script has to run on our locked-down admin workstation, which you can't access. Give me the commands to paste there, and I'll send you the output so you can check it before we apply anything.",
+      "must_pick": ["privileged-host-handoff"],
+      "distractors": ["delegated-work-acceptance", "gdd", "spec-convergence"]
+    },
+    {
+      "id": "no-handoff-for-local-command",
+      "request": "Run the unit tests in this repository and tell me which ones fail.",
+      "must_pick": ["none"],
+      "distractors": ["privileged-host-handoff", "delegated-work-acceptance"]
     }
   ]
 }
