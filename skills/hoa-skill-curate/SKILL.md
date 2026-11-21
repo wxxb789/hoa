@@ -6,7 +6,7 @@ description: >-
   reuse, recommend library changes and execute only an owner-confirmed retirement, merge or
   deletion. Not for hoa-skill-set-audit.
 metadata:
-  revision: "6"
+  revision: "7"
   areas: "software-development,self-management"
   targets: "runtime-agnostic"
   summary: "trace installer provenance, separate content drift from upstream activity, and execute only owner-confirmed library changes"

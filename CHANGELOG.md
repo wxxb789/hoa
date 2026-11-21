@@ -6,6 +6,7 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 ## 2026-11-21
 
+- Gate `scripts/`, `evals/`, and `skills/` with pinned Ruff (`uvx ruff@0.17.5`) on correctness and cleanup rules, and fix all 20 baseline findings.
 - Run the Python suite in parallel and reduce repeated interpreter and Git startup in GDD and necessity eval tests.
 - gdd-route-pi: paste a spec pre-review's replacement text into the brief verbatim, test every prose
   invariant on each output path, and check new files' line endings on Windows.

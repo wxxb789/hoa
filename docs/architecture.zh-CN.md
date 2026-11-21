@@ -111,6 +111,7 @@ CI 固定用 3.13，安装测试依赖与 uv，并在 job 内直接调用 Python
 | Catalog drift | `uv run --script scripts/generate_index.py --check` | 两份索引与源 metadata 一致 |
 | Vendoring drift | `uv run --script scripts/vendor_shared.py --check` | Vendored 文件与权威来源一致 |
 | Revisions（PR） | `uv run --script scripts/version.py check-revisions` | 发生变更的 skill 目录提高各自的 revision |
+| Ruff | `uvx ruff@0.17.5 check --config ruff.toml --force-exclude scripts evals skills` | `scripts/`、`evals/`、`skills/` 下的 Python 正确性与清理发现；Windows 上在现有终端直接运行 |
 | pytest | `uv run --no-project --python 3.13 --with-requirements scripts/requirements.txt python -m pytest -n auto --dist load` | 收集 `scripts/`、`evals/` 和 `skills/` 中的 `test_*.py`；单项超时 120 秒 |
 | 独立检查 | 分别用 `uv run --script` 运行：触发案例、define-goal fixture、Hermes 路由清单与 provider metadata、GDD verdict matrix 与 merge-gate mutation harness | 每个命名步骤以退出码为契约；具体路径见 workflow |
 | `gdd-runner` | Runner、detach supervisor、dispatch、no-window、Paseo adapter 和 PR watcher 测试 | 跨平台原生行为，按平台跳过不适用案例；Linux 有私有 tmux 集成测试 |

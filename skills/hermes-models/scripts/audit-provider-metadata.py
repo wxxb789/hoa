@@ -19,7 +19,6 @@ Nothing is written; no credentials are printed.
 from __future__ import annotations
 
 import argparse
-import glob
 import json
 import os
 import sqlite3
@@ -32,16 +31,15 @@ import yaml
 def load_configs(home: str) -> dict[str, dict]:
     paths = {"default": f"{home}/config.yaml"}
     profiles = f"{home}/profiles"
-    if not os.path.isdir(profiles):
-        # a single-home install has no profiles/ directory at all
-        return {name: (yaml.safe_load(open(path)) or {}) for name, path in paths.items()}
-    for p in sorted(os.listdir(profiles)):
-        f = f"{profiles}/{p}/config.yaml"
-        if os.path.exists(f):
-            paths[p] = f
+    if os.path.isdir(profiles):
+        for p in sorted(os.listdir(profiles)):
+            f = f"{profiles}/{p}/config.yaml"
+            if os.path.exists(f):
+                paths[p] = f
     out = {}
     for name, path in paths.items():
-        out[name] = yaml.safe_load(open(path)) or {}
+        with open(path) as fh:
+            out[name] = yaml.safe_load(fh) or {}
     return out
 
 
@@ -108,7 +106,8 @@ def default_catalog_provider(hermes_home: str) -> tuple[str, str]:
         return "", ""
     path = os.path.join(hermes_home, "config.yaml")
     try:
-        cfg = yaml.safe_load(open(path, encoding="utf-8")) or {}
+        with open(path, encoding="utf-8") as fh:
+            cfg = yaml.safe_load(fh) or {}
     except OSError:
         return "", ""
     key = str((cfg.get("model") or {}).get("provider") or "").removeprefix("custom:")
@@ -133,7 +132,8 @@ def default_catalog_url(hermes_home: str) -> str:
         except ImportError:
             break
         try:
-            cfg = yaml.safe_load(open(path, encoding="utf-8")) or {}
+            with open(path, encoding="utf-8") as fh:
+                cfg = yaml.safe_load(fh) or {}
         except OSError:
             continue
         provider = (cfg.get("model") or {}).get("provider") or ""

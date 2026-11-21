@@ -28,12 +28,10 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 import time
 import urllib.error
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from urllib.parse import urlsplit
 
