@@ -2,6 +2,7 @@
 import glob
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -22,6 +23,8 @@ GDD = os.path.join(SCRIPTS, "gdd.py")
 DELIVERY = os.path.join(SCRIPTS, "delivery-state.py")
 STUB = os.path.join(HERE, "stub_agent.py")
 OK_FIXTURE = route_fixture("omp")
+GIT_IDENTITY = dict(GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@example.invalid",
+                    GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@example.invalid")
 
 
 def read(path):
@@ -47,7 +50,30 @@ def dead_pid(children):
     return proc.pid, recorded
 
 
+def git(repo, env, *args):
+    return gdd_process.run(["git", "-C", repo, *args], env=env, capture_output=True, text=True,
+                           check=True).stdout.strip()
+
+
+def commit(repo, env, message):
+    git(repo, env, "add", "-A")
+    git(repo, env, "commit", "-q", "-m", message)
+    return git(repo, env, "rev-parse", "HEAD")
+
+
 class GddCase(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.seed = tempfile.mkdtemp(prefix="gdd-seed-")
+        cls.addClassCleanup(remove_tree, cls.seed)
+        env = {**os.environ, **GIT_IDENTITY}
+        git(cls.seed, env, "init", "-q", "-b", "main", "--template=")
+        write(os.path.join(cls.seed, "docs", "goals", "0001-first.md"), "# Goal 0001\nState: active\n")
+        cls.base = commit(cls.seed, env, "contract")
+        git(cls.seed, env, "update-ref", "refs/remotes/origin/main", cls.base)
+        write(os.path.join(cls.seed, "a.txt"), "a\n")
+        cls.head = commit(cls.seed, env, "work")
+
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="gdd-test-")
         self.addCleanup(remove_tree, self.tmp)
@@ -62,26 +88,12 @@ class GddCase(unittest.TestCase):
         self.env.update(XDG_STATE_HOME=self.state_home, XDG_CONFIG_HOME=os.path.join(self.tmp, "config"),
                         GDD_RUN_DETACH="windows" if os.name == "nt" else "setsid",
                         OMP_BIN=STUB, DSH_BIN=STUB, CLAUDE_BIN=STUB, STUB_FIXTURE=OK_FIXTURE, STUB_RECORD=self.record,
-                        PYTHONDONTWRITEBYTECODE="1", GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@example.invalid",
-                        GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@example.invalid")
+                        PYTHONDONTWRITEBYTECODE="1", **GIT_IDENTITY)
         self.repo = os.path.realpath(os.path.join(self.tmp, "workrepo"))
-        os.makedirs(self.repo)
-        self.git("init", "-q", "-b", "main")
-        write(os.path.join(self.repo, "docs", "goals", "0001-first.md"), "# Goal 0001\nState: active\n")
-        self.commit("contract")
-        self.base = self.git("rev-parse", "HEAD")
-        self.git("update-ref", "refs/remotes/origin/main", self.base)
-        write(os.path.join(self.repo, "a.txt"), "a\n")
-        self.head = self.commit("work")
-
-    def git(self, *args):
-        return gdd_process.run(["git", "-C", self.repo, *args], env=self.env, capture_output=True, text=True,
-                              check=True).stdout.strip()
+        shutil.copytree(self.seed, self.repo)
 
     def commit(self, message):
-        self.git("add", "-A")
-        self.git("commit", "-q", "-m", message)
-        return self.git("rev-parse", "HEAD")
+        return commit(self.repo, self.env, message)
 
     def run_tool(self, script, *args, env=None):
         return gdd_process.run([sys.executable, "-B", script, *args], capture_output=True, text=True,
