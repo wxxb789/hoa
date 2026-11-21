@@ -485,8 +485,10 @@ def test_control_skill_probes_and_contamination(tmp_path, monkeypatch, runtime, 
         assert run["skill_probe_count"] == probes
         assert sum(event["skill_probe"] for event in run["trace"]) == probes
         assert run["contamination_reasons"] == ([reason] if reason else [])
-        assert all(set(event) == {"tool", "skill_probe", "skill_loaded", "contamination_reasons"}
-                   for event in run["trace"])
+        base = {"tool", "skill_probe", "skill_loaded", "contamination_reasons"}
+        assert all(set(event) in (base, base | {"contamination_paths"}) for event in run["trace"])
+        flagged = [p for event in run["trace"] for p in event.get("contamination_paths", [])]
+        assert bool(flagged) is (reason in {"catalog-read", "host-skill-read"})
         assert record["summary"][arm]["pass^k"] is (None if contaminated else False)
     assert record["verdict"] == ("inconclusive" if contaminated else "skill-wins")
 
