@@ -6,6 +6,12 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 ## 2026-11-21
 
+- Bind `worktree-scope.py` to the shipped commit: `seal --index` stores the staged index as a
+  separate `commit_seal` of per-path Git mode and full OID without touching the legacy `diff`/`seal`
+  receipts, `verify --commit <rev>` checks one resolved commit and every path its history touches
+  with no disk reads, and gdd phase 5 verifies and pushes that exact SHA instead of enumerating
+  committed history by hand.
+
 - gdd-route-pi: pair DeepSeek with an independent reviewer for multi-brief features, review the spec's
   failure modes before the first brief, and name where overflow goes under a size cap.
 - Delegate gdd's fresh `implement` stage to a runtime-offered `ce-work mode:return-to-caller` only
