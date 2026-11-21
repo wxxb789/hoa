@@ -4,7 +4,7 @@ Repo: ${REPO_NAME} at `${REPO_PATH}`
 Range: `${BASE_SHA}..${HEAD_SHA}` (whole increment)
 Goal: ${GOAL} — contract file: `${GOAL_FILE}`
 
-Start only after the simplify findings were applied, so you review the tree that will actually ship.
+Start only after the simplify findings were applied or the pass was recorded as skipped, so you review the tree that will actually ship.
 
 ## Prefer the runtime's read-only reviewer
 

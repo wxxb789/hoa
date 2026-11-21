@@ -1,6 +1,6 @@
 # Phase 4 — review, then fix
 
-1. Dispatch `review` (report only) only after the simplify fixes are applied, so the reviewer reads
+1. Dispatch `review` (report only) only after the simplify fixes are applied (or the pass was recorded as skipped), so the reviewer reads
    the tree that will ship. The stage range is `origin/main..HEAD`, so **commit the agent's stage
    output before dispatching the next stage**: `gdd.py` does not refuse a dirty worktree, and
    uncommitted apply fixes are invisible to the reviewer's diff and one stray `git checkout` from
