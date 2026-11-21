@@ -13,6 +13,7 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
   committed history by hand.
 
 - Land the `unfettered-skills/` landing-zone checker (`scripts/check_unfettered.py`): the path-isolation write rule, the snapshot sensitive scan, candidate shape and name-collision checks, a CI event-mode step before the static gates, and its CLI tests.
+- Document the two-tier landing-zone policy: AGENTS.md scopes portability, composition, naming and retirement to the curated `skills/` catalog and states the discovery limit; `prompts/hermes-skill-naming.md` sends candidates to `unfettered-skills/` after `check_unfettered.py` passes and routes promotions to the operator; `hoa-skill-port` gains the landing-zone promotion procedure.
 - gdd-route-pi: pair DeepSeek with an independent reviewer for multi-brief features, review the spec's
   failure modes before the first brief, and name where overflow goes under a size cap.
 - Delegate gdd's fresh `implement` stage to a runtime-offered `ce-work mode:return-to-caller` only
