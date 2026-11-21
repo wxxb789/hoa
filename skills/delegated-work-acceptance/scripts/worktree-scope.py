@@ -68,6 +68,7 @@ def _git(repo: Path, *args: str) -> bytes:
         ["git", "-C", os.fspath(repo), *args],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
     )
     if proc.returncode != 0:
         detail = proc.stderr.decode("utf-8", "replace").strip()

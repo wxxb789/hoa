@@ -6,7 +6,7 @@ description: >-
   publishing boundaries stick across handoffs; measure prompt compression without dropping rules.
   Not for agent-harness-settings-parity.
 metadata:
-  revision: "8"
+  revision: "9"
   areas: "software-development,work-management,self-management"
   targets: "runtime-agnostic"
   summary: "evolve an agent's identity file and operating protocol by layer, with coverage markers, behavioral evals, and load-scope probes"

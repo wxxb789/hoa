@@ -67,7 +67,8 @@ def run_case(case: dict, timeout: int, cwd: str, base: list[str],
     cmd = build_cmd(base, case["prompt"], model)
     started = time.time()
     try:
-        proc = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout)
+        proc = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout,
+                              creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
         raw = ANSI.sub("", proc.stdout + proc.stderr).strip()
         err = "" if proc.returncode == 0 else f"exit={proc.returncode}"
     except subprocess.TimeoutExpired:

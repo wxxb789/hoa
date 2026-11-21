@@ -58,7 +58,8 @@ def _has_git_marker(directory: Path) -> bool:
 def _run_git(args: list[str]) -> subprocess.CompletedProcess[str] | None:
     try:
         return subprocess.run(args, capture_output=True, encoding="utf-8", errors="replace",
-                              check=False, env=_git_env())
+                              check=False, env=_git_env(),
+                              creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
     except (OSError, ValueError):
         return None
 

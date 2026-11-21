@@ -21,6 +21,8 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
   `pr-body.md` as the fallback. Branch, remote and PR probes run fresh, one argv call each, and a
   probe error means unknown, never "no PR"; commits stay explicit-path, the seal is verified
   before push, and gdd owns publication and its own CI watcher.
+- Hide console windows on Windows for git and agent subprocesses in delegated-work-acceptance,
+  agent-operating-contract-evolution and hoa-practice-retro.
 - Add brief-shaping guidance for bounded DeepSeek jobs to `gdd-route-pi`.
 - Record the first sandboxed Pi natural-mode screen in `evals/results/2026-11-21-pi-sandbox-natural.md`.
 - Record the offending path (`contamination_paths`) for catalog and host-skill reads in necessity trial traces.

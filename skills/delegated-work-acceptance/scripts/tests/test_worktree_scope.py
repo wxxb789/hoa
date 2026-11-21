@@ -20,6 +20,7 @@ ROOT = Path(__file__).resolve().parents[4]
 SCRIPT = Path(__file__).resolve().parents[1] / "worktree-scope.py"
 ARTIFACTS = ROOT / ".tmp-artifacts" / "worktree-scope-tests"
 _DEFAULT = object()
+CREATIONFLAGS = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 
 
 class ScopeTests(unittest.TestCase):
@@ -45,8 +46,8 @@ class ScopeTests(unittest.TestCase):
         return repo
 
     def git(self, repo: Path, *args: str) -> str:
-        proc = subprocess.run(["git", "-C", str(repo), *args],
-                              capture_output=True, text=True, env=self.env)
+        proc = subprocess.run(["git", "-C", str(repo), *args], capture_output=True,
+                              text=True, env=self.env, creationflags=CREATIONFLAGS)
         self.assertEqual(proc.returncode, 0, proc.stderr)
         return proc.stdout
 
@@ -68,7 +69,7 @@ class ScopeTests(unittest.TestCase):
             command += ["--state-file", str(state)]
         command += list(args[1:])
         proc = subprocess.run(command, capture_output=True, text=True,
-                              env=env or self.env)
+                              env=env or self.env, creationflags=CREATIONFLAGS)
         if expect is not None:
             self.assertEqual(proc.returncode, expect,
                              f"stdout={proc.stdout!r} stderr={proc.stderr!r}")
@@ -225,7 +226,8 @@ class ScopeTests(unittest.TestCase):
         subprocess.run([sys.executable, str(SCRIPT), "snapshot",
                         "--repo", str(second), "--label", "t",
                         "--state-file", str(self.state)],
-                       check=True, capture_output=True, env=self.env)
+                       check=True, capture_output=True, env=self.env,
+                       creationflags=CREATIONFLAGS)
 
         keys = sorted(path.name for path in self.state.iterdir() if path.is_dir())
         self.assertEqual(len(keys), 2, keys)

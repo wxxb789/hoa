@@ -7,7 +7,7 @@ description: >-
   repo's machinery (suggest the user run hoa-repo-reckoning).
 disable-model-invocation: true
 metadata:
-  revision: "3"
+  revision: "4"
   areas: "self-management,work-management"
   targets: "runtime-agnostic"
   summary: "periodic retro on the owner's own engineering practice across repos, sessions and memory: habits to stop, decisions never executed, unknown unknowns, each with two independent origins"
