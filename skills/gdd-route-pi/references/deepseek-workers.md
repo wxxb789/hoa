@@ -32,3 +32,12 @@ at real examples to copy, asked for a test that fails before the change and pass
 that must pass, listed what not to touch, and fixed the report format. It follows a brief literally, including the
 brief's mistakes: check every path and convention in the brief against the repository before sending, and ask it to
 report conflicts instead of working around them. Keep open-ended design and judgment calls for a stronger model.
+
+## Pair it with an independent reviewer
+
+For a feature larger than one defect, split the work into one-change briefs. Have a stronger model review the
+combined diff read-only, then give DeepSeek one more brief that applies the review findings. Its own tests prove what
+the brief asked for, not the design behind it: two green batches still had review findings, including correctness
+gaps that came from the spec itself. Review the spec's failure modes before the first brief, such as detached,
+failed or resumed runs, untrusted path segments, shell shims, and key collisions. When a file has a hard size cap,
+say where overflow text goes; under a cap it otherwise rewraps unrelated lines to fit.
