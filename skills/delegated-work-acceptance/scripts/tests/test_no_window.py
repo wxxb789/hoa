@@ -32,7 +32,9 @@ class NoWindowTests(unittest.TestCase):
             with (patch.object(subprocess, "run", fake_run),
                   patch.object(os, "name", platform),
                   patch.object(subprocess, "CREATE_NO_WINDOW", WINDOW_FLAG, create=True)):
-                worktree_scope.repo_root(str(SCRIPT.parent))
+                # Call the spawn helper directly: Path() picks WindowsPath from os.name, so
+                # repo_root() cannot run on POSIX with os.name patched to "nt".
+                worktree_scope._git(SCRIPT.parent, "rev-parse", "--show-toplevel")
             self.assertEqual([kwargs.get("creationflags", 0) for kwargs in calls],
                              [expected], platform)
 
