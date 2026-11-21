@@ -13,6 +13,7 @@ Usage:
     gdd.py stage --repo PATH --goal 0041 --stage implement
     gdd.py stage --repo PATH --goal 0041 --stage simplify --dry-run
     gdd.py stage --repo PATH --goal 0041 --stage apply --findings FILE --wait
+    gdd.py setup --repo PATH --goal 0041 [--plan-file FILE]
     gdd.py status --repo PATH --goal 0041
 
 Agent stages: implement, simplify, apply, review, fix. Every other stage is
@@ -31,10 +32,12 @@ Environment or operator config file:
     GDD_TEMPLATES   template root
                     (default <script dir>/../references/stage-templates)
     GDD_GOAL_GLOB   goal-contract glob (default docs/goals/*<goal>*.md)
+    GDD_RUN_PLAN_DEFAULTS
+                    JSON defaults `setup` merges under --plan-file
     GDD_MODEL, GDD_THINKING, GDD_MAX_TIME
                     passed to the launcher only when set; never defaulted here
 
-The seven keys above GDD_MODEL resolve through the shared resolver: flag, then environment,
+The eight keys above GDD_MODEL resolve through the shared resolver: flag, then environment,
 then $XDG_CONFIG_HOME/gdd/config.yaml (fallback ~/.config/...),
 then the default. The rule is owned by hoa-skill-port.
 
@@ -82,6 +85,7 @@ import skill_config
 import stage_result
 
 STAGES = [
+    "setup",
     "contract",
     "implement",
     "verify",
@@ -296,21 +300,149 @@ def final_head_for(stage, head_supplied, head, post_head):
 
 
 STAGE_BUDGETS = {"implement": 2, "simplify": 2, "review": 2}
+RUN_PLAN_ROLE_FIELDS = ("agent", "model", "thinking", "max_time")
 LEDGER_COLUMNS = (
     "ts repo goal stage base_sha head_sha pr gates rounds_simplify rounds_review "
     "findings next_action note"
 ).split()
 
 
-def budget_problem(stage, rounds, over_budget=False):
+def budget_problem(stage, rounds, cap, over_budget=False):
     """The message that refuses one dispatch too many, or None."""
-    cap = STAGE_BUDGETS.get(stage)
     if over_budget or not cap or rounds < cap:
         return None
     return (
         f"{stage} has already run {rounds}x for this goal (cap {cap}) — read the ledger, "
         "decide what changes the outcome, and pass --over-budget only if it does"
     )
+
+
+def non_negative_int(value):
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def run_plan_path(repo_name, goal):
+    """The goal's plan file: the same <repo>-<goal> key the prompt and state dirs use."""
+    return os.path.join(task_root(), f"{repo_name}-{goal}", "run-plan.json")
+
+
+def plan_problem(plan):
+    """The validation message for a run plan, or None when it is well-formed."""
+    if not isinstance(plan, dict):
+        return "run plan: top level must be a JSON object"
+    for key in plan:
+        if key not in ("roles", "budgets", "notes"):
+            return f"run plan: unknown key '{key}'"
+    roles = plan.get("roles", {})
+    if not isinstance(roles, dict):
+        return "run plan: 'roles' must be an object"
+    for stage, role in roles.items():
+        if stage not in AGENT_STAGES:
+            return f"run plan: unknown role 'roles.{stage}'"
+        if not isinstance(role, dict):
+            return f"run plan: 'roles.{stage}' must be an object"
+        for field, value in role.items():
+            if field not in RUN_PLAN_ROLE_FIELDS:
+                return f"run plan: unknown field 'roles.{stage}.{field}'"
+            if not isinstance(value, str) or not value.strip():
+                return f"run plan: 'roles.{stage}.{field}' must be a non-empty string"
+    budgets = plan.get("budgets", {})
+    if not isinstance(budgets, dict):
+        return "run plan: 'budgets' must be an object"
+    for key in budgets:
+        if key not in ("rounds", "max_time", "token_cap"):
+            return f"run plan: unknown key 'budgets.{key}'"
+    rounds = budgets.get("rounds", {})
+    if not isinstance(rounds, dict):
+        return "run plan: 'budgets.rounds' must be an object"
+    for stage, cap in rounds.items():
+        if stage not in AGENT_STAGES:
+            return f"run plan: unknown stage 'budgets.rounds.{stage}'"
+        if not non_negative_int(cap):
+            return f"run plan: 'budgets.rounds.{stage}' must be a non-negative integer"
+    for key in ("max_time", "token_cap"):
+        if key not in budgets:
+            continue
+        value = budgets[key]
+        if key == "token_cap" and value is None:
+            continue
+        if not non_negative_int(value):
+            return f"run plan: 'budgets.{key}' must be a non-negative integer"
+    notes = plan.get("notes", [])
+    if not isinstance(notes, list):
+        return "run plan: 'notes' must be a list of strings"
+    for index, note in enumerate(notes):
+        if not isinstance(note, str):
+            return f"run plan: 'notes[{index}]' must be a string"
+    return None
+
+
+def merge_plans(defaults, override):
+    """The plan file wins field by field over the defaults file; notes are replaced whole."""
+    merged = {}
+    roles = {stage: dict(role) for stage, role in (defaults.get("roles") or {}).items()}
+    for stage, role in (override.get("roles") or {}).items():
+        roles[stage] = {**(roles.get(stage) or {}), **role}
+    if roles:
+        merged["roles"] = roles
+    default_budgets = defaults.get("budgets") or {}
+    override_budgets = override.get("budgets") or {}
+    budgets = {}
+    rounds = {**(default_budgets.get("rounds") or {}), **(override_budgets.get("rounds") or {})}
+    if rounds:
+        budgets["rounds"] = rounds
+    for key in ("max_time", "token_cap"):
+        if key in override_budgets:
+            budgets[key] = override_budgets[key]
+        elif key in default_budgets:
+            budgets[key] = default_budgets[key]
+    if budgets:
+        merged["budgets"] = budgets
+    if "notes" in override:
+        merged["notes"] = override["notes"]
+    elif "notes" in defaults:
+        merged["notes"] = defaults["notes"]
+    return merged
+
+
+def read_plan_source(path, label):
+    """Load and validate one JSON plan source; fail naming the file and the offending key."""
+    expanded = os.path.expanduser(path)
+    try:
+        with open(expanded, encoding="utf-8") as handle:
+            plan = json.load(handle)
+    except OSError as exc:
+        fail(f"{label}: cannot read {expanded}: {exc}")
+    except ValueError as exc:
+        fail(f"{label}: invalid JSON in {expanded}: {exc}")
+    problem = plan_problem(plan)
+    if problem:
+        fail(f"{problem} (in {expanded})")
+    return plan
+
+
+def read_run_plan(repo_name, goal):
+    """The validated plan for one repo+goal; {} when setup has not run."""
+    path = run_plan_path(repo_name, goal)
+    if not os.path.exists(path):
+        return {}
+    return read_plan_source(path, "run plan")
+
+
+def write_run_plan(path, plan):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="\n") as handle:
+        json.dump(plan, handle, ensure_ascii=False, indent=2)
+        handle.write("\n")
+
+
+def resolve_field(flag, plan_value, env_value):
+    """One field's resolution: explicit flag, then the run plan, then the environment."""
+    if flag is not None:
+        return flag
+    if plan_value:
+        return plan_value
+    return env_value
 
 
 def ledger_rounds(state_path, repo_name, goal, stage):
@@ -491,7 +623,7 @@ def write_lineage_sidecar(run_root, run_name, run_dir, goal, stage):
         print(f"gdd: warning: lineage sidecar not written: {reason}", file=sys.stderr)
 
 
-def launch(launcher, prompt_path, repo, goal, stage, model, thinking, max_time):
+def launch(launcher, prompt_path, repo, goal, stage, agent, model, thinking, max_time):
     name = f"{os.path.basename(repo)}-{goal}-{stage}"
     resolved_run_root = run_root()
     prefix = launcher_command(launcher)
@@ -521,7 +653,6 @@ def launch(launcher, prompt_path, repo, goal, stage, model, thinking, max_time):
     child_env = dict(os.environ)
     child_env["GDD_RUN_ROOT"] = resolved_run_root
     child_env["PYTHONIOENCODING"] = "utf-8"
-    agent = config("GDD_AGENT")
     if agent:
         child_env["GDD_AGENT"] = agent
     try:
@@ -582,6 +713,8 @@ def cmd_stage(args):
         fail(f"--repo is not a directory: {args.repo}")
     repo = os.path.realpath(git(args.repo, "rev-parse", "--show-toplevel"))
     repo_name = os.path.basename(repo)
+    plan = read_run_plan(repo_name, args.goal)
+    role = (plan.get("roles") or {}).get(args.stage) or {}
 
     templates = os.path.expanduser(
         config("GDD_TEMPLATES", flag=args.templates, default=DEFAULT_TEMPLATES)
@@ -636,8 +769,11 @@ def cmd_stage(args):
 
     rounds_state = os.path.expanduser(state_file())
     rounds_seen = ledger_rounds(rounds_state, repo_name, args.goal, args.stage)
+    cap = (plan.get("budgets") or {}).get("rounds", {}).get(args.stage)
+    if cap is None:
+        cap = STAGE_BUDGETS.get(args.stage)
     budget_message = budget_problem(
-        args.stage, rounds_seen, over_budget=args.over_budget
+        args.stage, rounds_seen, cap, over_budget=args.over_budget
     )
     if budget_message:
         print(f"gdd: {budget_message}", file=sys.stderr)
@@ -659,6 +795,14 @@ def cmd_stage(args):
         "RESULT_SCHEMA": stage_result.SCHEMA,
     }
     rendered = render(template_text, variables)
+    notes = plan.get("notes") or []
+    if notes:
+        rendered = (
+            rendered.rstrip("\n")
+            + "\n\n## Owner notes (run plan)\n\n"
+            + "\n".join(f"- {note}" for note in notes)
+            + "\n"
+        )
 
     stamp = datetime.now().strftime("%H%M%S")
     prompt_dir = os.path.join(
@@ -695,6 +839,10 @@ def cmd_stage(args):
             3,
         )
 
+    agent = resolve_field(args.agent, role.get("agent"), config("GDD_AGENT"))
+    model = resolve_field(args.model, role.get("model"), os.environ.get("GDD_MODEL") or None)
+    thinking = resolve_field(args.thinking, role.get("thinking"), os.environ.get("GDD_THINKING") or None)
+    max_time = resolve_field(args.max_time, role.get("max_time"), os.environ.get("GDD_MAX_TIME") or None)
     try:
         run_name, run_dir, launch_run_root = launch(
             launcher,
@@ -702,9 +850,10 @@ def cmd_stage(args):
             repo,
             args.goal,
             args.stage,
-            args.model,
-            args.thinking,
-            args.max_time,
+            agent,
+            model,
+            thinking,
+            max_time,
         )
     except (LaunchError, OSError) as exc:
         message = str(exc).strip() or exc.__class__.__name__
@@ -788,6 +937,24 @@ def cmd_stage(args):
     return 0
 
 
+def cmd_setup(args):
+    """Write the goal's run plan and record one setup row; never invent a field."""
+    if not os.path.isdir(args.repo):
+        fail(f"--repo is not a directory: {args.repo}")
+    repo = os.path.realpath(git(args.repo, "rev-parse", "--show-toplevel"))
+    repo_name = os.path.basename(repo)
+    defaults = {}
+    defaults_path = config("GDD_RUN_PLAN_DEFAULTS")
+    if defaults_path:
+        defaults = read_plan_source(defaults_path, "GDD_RUN_PLAN_DEFAULTS")
+    override = read_plan_source(args.plan_file, "--plan-file") if args.plan_file else {}
+    path = run_plan_path(repo_name, args.goal)
+    write_run_plan(path, merge_plans(defaults, override))
+    ledger_append(repo, args.goal, "setup", "-", "-", "-", note=f"plan={path}")
+    print(f"run plan: {path}")
+    return 0
+
+
 def cmd_scope(args):
     """Print the resolved worktree-scope.py path (config file, not just env)."""
     resolved = os.path.expanduser(
@@ -861,10 +1028,12 @@ Environment or operator config file:
                   (agent_run.py: an installed route; default omp, claude uses gdd-route-cc)
   GDD_TEMPLATES   template root (default <script dir>/../references/stage-templates)
   GDD_GOAL_GLOB   goal-contract glob (default docs/goals/*<goal>*.md)
+  GDD_RUN_PLAN_DEFAULTS
+                  JSON defaults `setup` merges under --plan-file
   GDD_MODEL, GDD_THINKING, GDD_MAX_TIME
                   passed to the launcher only when set; never defaulted here
 
-The seven keys above GDD_MODEL also resolve from
+The eight keys above GDD_MODEL also resolve from
 $XDG_CONFIG_HOME/gdd/config.yaml (fallback ~/.config/...).
 Order: CLI flag, then environment variable, then that file, then the default.
 The shared rule is documented in hoa-skill-port.
@@ -904,14 +1073,13 @@ def build_parser():
         help="launcher command (default: $GDD_LAUNCHER, config file, or the bundled adapter)",
     )
     stage.add_argument(
-        "--model", default=os.environ.get("GDD_MODEL") or None, help="passed through only when set"
+        "--agent", default=None,
+        help="agent route exported to the launcher (default: $GDD_AGENT, config file, "
+             "or the launcher's own default)",
     )
-    stage.add_argument(
-        "--thinking", default=os.environ.get("GDD_THINKING") or None, help="passed through only when set"
-    )
-    stage.add_argument(
-        "--max-time", default=os.environ.get("GDD_MAX_TIME") or None, help="passed through only when set"
-    )
+    stage.add_argument("--model", default=None, help="passed through only when set")
+    stage.add_argument("--thinking", default=None, help="passed through only when set")
+    stage.add_argument("--max-time", default=None, help="passed through only when set")
     stage.add_argument("--templates", default=None, help="template directory")
     stage.add_argument("--dry-run", action="store_true", help="render only")
     stage.add_argument("--wait", action="store_true", help="poll until the run ends")
@@ -922,6 +1090,14 @@ def build_parser():
         help="dispatch past the stage's round cap (implement/simplify/review: 2)",
     )
     stage.set_defaults(func=cmd_stage)
+
+    setup = sub.add_parser("setup", help="write the goal's run plan and record a setup row")
+    setup.add_argument("--repo", required=True, help="repo path")
+    setup.add_argument("--goal", required=True, help="goal / increment id")
+    setup.add_argument(
+        "--plan-file", default=None, help="plan JSON merged over $GDD_RUN_PLAN_DEFAULTS"
+    )
+    setup.set_defaults(func=cmd_setup)
 
     scope = sub.add_parser(
         "scope", help="print the resolved worktree-scope.py path (GDD_WORKTREE_SCOPE)"

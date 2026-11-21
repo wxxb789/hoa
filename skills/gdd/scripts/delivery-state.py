@@ -49,6 +49,7 @@ import agent_run
 import gdd_process
 
 STAGES = [
+    "setup",
     "contract",
     "implement",
     "verify",
