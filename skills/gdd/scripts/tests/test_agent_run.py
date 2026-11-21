@@ -12,7 +12,6 @@ import sys
 import tempfile
 import time
 import unittest
-import uuid
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -23,7 +22,7 @@ from runner_cases import (HERE, IS_WINDOWS, PROMPT, RESULT_SCHEMA, RUNNER, STAGE
 import agent_run
 import gdd_process
 import stage_result
-from gdd_test_support import (check_processes, cleanup_child, exited, finalized, own_identity, ready, remove_tree,
+from gdd_test_support import (check_processes, exited, finalized, own_identity, ready,
                               route_fixture, wait_for_json)
 
 

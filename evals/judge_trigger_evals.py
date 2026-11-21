@@ -298,7 +298,7 @@ def unconfigured_message(base_url, model, effort, env=None) -> str:
         "judge_trigger_evals: judge endpoint and model are not configured.",
         *(
             f"  {key:<9} {flag} / {variable}"
-            + (f"  (missing)" if key in missing else
+            + ("  (missing)" if key in missing else
                f"  default: {default}" if default is not None else "")
             for key, flag, variable, default in rows
         ),

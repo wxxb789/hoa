@@ -60,7 +60,8 @@ def config_path(explicit: str | None) -> str:
 def load_disabled(path: str) -> set[str]:
     try:
         import yaml
-        cfg = yaml.safe_load(open(path)) or {}
+        with open(path) as fh:
+            cfg = yaml.safe_load(fh) or {}
         return set((cfg.get("skills") or {}).get("disabled") or [])
     except Exception:
         return set()
@@ -98,7 +99,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"no SKILL.md under {roots}", file=sys.stderr)
         return 2
 
-    agents_lock = json.load(open(lock_path)).get("skills", {})
+    with open(lock_path) as fh:
+        agents_lock = json.load(fh).get("skills", {})
     targets = [n for n in skills
                if n in agents_lock and "github.com" in (agents_lock[n].get("sourceUrl") or "")]
     if args.enabled:
@@ -113,7 +115,8 @@ def main(argv: list[str] | None = None) -> int:
             up = urllib.request.urlopen(raw, timeout=20).read().decode("utf-8", "ignore")
         except Exception as e:
             return (n, "ERR", str(e)[:60], status)
-        local = open(skills[n], encoding="utf-8", errors="ignore").read()
+        with open(skills[n], encoding="utf-8", errors="ignore") as fh:
+            local = fh.read()
         same = (up.replace("\r\n", "\n").strip()
                 == local.replace("\r\n", "\n").strip())
         return (n, "SAME" if same else "DIFF", f"local={len(local)}c up={len(up)}c", status)

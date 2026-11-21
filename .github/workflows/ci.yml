@@ -56,6 +56,9 @@ jobs:
         if: github.event_name == 'pull_request'
         run: python scripts/version.py check-revisions
 
+      - name: Ruff
+        run: uvx ruff@0.17.5 check --config ruff.toml --force-exclude scripts evals skills
+
       # Python tests: every test_*.py under scripts/ evals/ skills/ (pytest.ini)
       - name: pytest
         timeout-minutes: 12

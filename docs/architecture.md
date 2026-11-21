@@ -120,6 +120,7 @@ Python directly inside the job. The commands below are the local equivalents.
 | Catalog drift | `uv run --script scripts/generate_index.py --check` | Both indexes match the source metadata |
 | Vendoring drift | `uv run --script scripts/vendor_shared.py --check` | Vendored files match their canonical sources |
 | Revisions (PRs) | `uv run --script scripts/version.py check-revisions` | Changed skill directories raise their own revisions |
+| Ruff | `uvx ruff@0.17.5 check --config ruff.toml --force-exclude scripts evals skills` | Python correctness and cleanup findings under `scripts/`, `evals/`, and `skills/`; run directly in an existing terminal on Windows |
 | pytest | `uv run --no-project --python 3.13 --with-requirements scripts/requirements.txt python -m pytest -n auto --dist load` | Collects `test_*.py` under `scripts/`, `evals/`, and `skills/`; 120-second per-test timeout |
 | Standalone checks | Run each with `uv run --script`: trigger cases, define-goal fixtures, Hermes routing inventory and provider metadata, GDD verdict matrix and merge-gate mutation harness | Each named step has its own exit-code contract; see the workflow for exact paths |
 | `gdd-runner` | Runner, detach supervisors, dispatch, no-window, Paseo adapter, and PR watcher test suites | Native cross-platform behavior, with platform-specific skips and a private tmux integration test on Linux |

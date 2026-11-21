@@ -1,0 +1,5 @@
+target-version = "py313"
+extend-exclude = ["ref", "unfettered-skills"]
+
+[lint]
+select = ["F", "E9", "B006", "B008", "SIM115"]

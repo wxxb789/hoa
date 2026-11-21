@@ -986,7 +986,7 @@ class EventLog:
     def __init__(self, run_dir):
         self.path, self.old = (os.path.join(run_dir, n) for n in ("events.ndjson", "events.1.ndjson"))
         self.half = max(int(knob("GDD_RUN_EVENTS_MAX_BYTES", 8388608)) // 2, 1)
-        self.dropped, self.handle, self.size = 0, open(self.path, "ab"), 0
+        self.dropped, self.handle, self.size = 0, open(self.path, "ab"), 0  # noqa: SIM115 - one handle is owned across writes and closed by close()
 
     def write(self, raw):
         raw = raw if raw.endswith(b"\n") else raw + b"\n"
@@ -998,7 +998,7 @@ class EventLog:
                 self.dropped, self.size = self.dropped + dropped, 0
             except OSError:
                 pass
-            self.handle = open(self.path, "ab")
+            self.handle = open(self.path, "ab")  # noqa: SIM115 - the same owned handle reopened after rotation
             if not self.size and self.dropped:
                 self.write(json.dumps({"type": "truncated", "dropped_bytes": self.dropped}).encode())
         self.handle.write(raw)

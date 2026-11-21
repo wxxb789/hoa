@@ -25,7 +25,7 @@ sys.path.insert(0, str(SCRIPTS))
 import gdd_process
 from machine_review import (  # noqa: E402
     DEFAULT_MARKER, EvidenceError, evidence_comment, make_evidence, parse_marker,
-    report_digest, review_facts, validate_runtime_receipt, RESPONSES_APIS,
+    report_digest, validate_runtime_receipt, RESPONSES_APIS,
 )
 
 spec = importlib.util.spec_from_file_location("pr_merge_check", SCRIPTS / "pr-merge-check.py")

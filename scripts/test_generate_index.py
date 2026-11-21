@@ -94,7 +94,7 @@ class ParseMetadataTests(unittest.TestCase):
         for number, key in enumerate(("summary", "summary_zh")):
             bad = make_skill(self.tmp, f"typed-{key}") / "SKILL.md"
             bad.write_bytes(bad.read_bytes().replace(
-                f"  targets: runtime-agnostic\n".encode(),
+                "  targets: runtime-agnostic\n".encode(),
                 f"  targets: runtime-agnostic\n  {key}: [not, a, string]\n".encode()))
             with self.assertRaisesRegex(ValueError, rf"metadata\.{key} must be a YAML string"):
                 gi.parse_skill_metadata(bad)

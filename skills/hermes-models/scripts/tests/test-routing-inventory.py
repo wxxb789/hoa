@@ -8,7 +8,6 @@ Run: python3 skills/hermes-models/scripts/tests/test-routing-inventory.py
 """
 import importlib.util
 import json
-import os
 import sys
 import tempfile
 from pathlib import Path

@@ -468,7 +468,7 @@ def plan_problem(plan):
         if key == "token_cap":
             if value is None or non_negative_int(value):
                 continue
-            return f"run plan: 'budgets.token_cap' must be a non-negative integer or null"
+            return "run plan: 'budgets.token_cap' must be a non-negative integer or null"
         if duration_seconds(value) is None:
             return "run plan: 'budgets.max_time' must be a positive duration like 30m"
     notes = plan.get("notes", [])
