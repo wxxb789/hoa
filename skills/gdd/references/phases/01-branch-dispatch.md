@@ -12,9 +12,16 @@
    increment. Refuse to dispatch on a dirty submodule or nested repository; resolve it first.
 3. Dispatch one implementation run carrying the goal file, the repo's contract docs, the most recent
    comparable increment as the shape reference, the gates as one runnable command with an explicit
-   working directory when the repo supports it, and "do not commit/push". The contract's accepted
-   plan is reused by path, not replanned. Use `uv run scripts/gdd.py stage` so prompt, run name and
-   ledger row come from one template.
+   working directory when the repo supports it, and no push. The contract's accepted plan is reused
+   by path, not replanned. The `implement` template may delegate its loop to a runtime-offered
+   `ce-work mode:return-to-caller` with an explicit plan path or bounded statement and the exact
+   gate command; its unit commits and a mid-loop simplification on this branch are accepted, and the
+   stage verifies descent from the recorded base, scope across committed and uncommitted paths, and
+   a complete summary before it reports. A missing or mismatched mode falls back to the template's
+   own loop; never install the skill. A moved base, an out-of-scope path or a non-complete summary
+   stops the stage with the state left for the operator — no inline retry. Neither the delegation
+   nor its simplification decides phase 3: the simplify preflight still runs on the whole increment.
+   Use `uv run scripts/gdd.py stage` so prompt, run name and ledger row come from one template.
 
 ## Dispatch tooling
 

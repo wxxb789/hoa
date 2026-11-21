@@ -14,6 +14,31 @@ contract is satisfied and the gates have actually run.
 3. The shape reference: the most recently merged increment of the same kind (its commit, source,
    docs, evidence record, tests, measurement harness). Match its structure rather than inventing one.
 
+## Optional delegation — `ce-work mode:return-to-caller`
+
+If your runtime's own skill discovery offers `ce-work` with `mode:return-to-caller`, you may hand it
+this loop in the current worktree: pass an explicit plan path or a bounded work statement plus the
+exact `${GATES}` command — never blank input, never a "latest plan" lookup — and never install or
+fetch the skill.
+
+Accept its unit commits on this branch and a mid-loop simplification; it must not push or open a PR.
+After it returns and before you report, check and show:
+
+- the checkout is still on the goal branch (no switch or detached HEAD), and
+  `git merge-base --is-ancestor ${BASE_SHA} HEAD` holds;
+- every path in `git diff --name-only ${BASE_SHA}..HEAD` and in `git status --porcelain` is inside
+  the goal's scope;
+- its summary status is complete and its verification evidence covers `${GATES}`;
+- its run id or summary, in the report and in the stage `summary`.
+
+A moved base, an out-of-scope path or a non-complete status stops the stage: leave the tree and its
+commits as they are, report `BLOCKED` with the reason, and do not retry it inline. If discovery does
+not offer the skill, it does not accept `mode:return-to-caller`, or the summary is incomplete or
+mismatched, skip this section and run the loop below yourself.
+
+The delegation contract above adapts Compound Engineering (MIT, Copyright 2025 Every), paraphrased
+rather than copied.
+
 ## Deliver
 
 1. **Reuse the accepted plan.** Execute the accepted plan by path (the goal file, the design doc it
@@ -41,7 +66,9 @@ contract is satisfied and the gates have actually run.
 
 ## Rules
 
-- Do **not** commit, do **not** push, do **not** rewrite history. Leave the tree for verification.
+- Do **not** push and do **not** rewrite history. Do not commit your own edit — leave the tree for
+  verification; only unit commits from a `ce-work` delegation you accepted above are allowed on this
+  branch.
 - Do not weaken, delete or rename a test that pins a contract clause to make a gate pass.
 - If a contract-preserving decision is genuinely ambiguous, state the options and your
   recommendation in the plan instead of guessing silently.
@@ -51,10 +78,11 @@ contract is satisfied and the gates have actually run.
 
 ## Finish with a report
 
-Files written (grouped); gate results with counts and exit codes; and per contract clause the green
-command, its exit code, the evidence row that proves it, and the expected failure or baseline you
-observed first (or the replacement proof you used). Residual risks and known limits. No adjectives
-in place of numbers.
+Files written (grouped, committed and uncommitted); gate results with counts and exit codes; and per
+contract clause the green command, its exit code, the evidence row that proves it, and the expected
+failure or baseline you observed first (or the replacement proof you used). When the loop was
+delegated, name the `ce-work` run id or summary and the branch, base, scope and status checks above.
+Residual risks and known limits. No adjectives in place of numbers.
 
 ## Stage result
 
