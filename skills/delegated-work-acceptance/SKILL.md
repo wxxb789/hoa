@@ -6,7 +6,7 @@ description: >-
   command under the reporter's PATH and cwd, route it to the maintainer who owns the fix, and
   escalate one scoped landing decision. Not for dispatch.
 metadata:
-  revision: "10"
+  revision: "11"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
   summary: "verify delegated work against artifacts and write scope; route rejected or out-of-scope fixes to their owner"
@@ -39,7 +39,9 @@ sender works from a fixed scope and the acceptance criteria exist before the wor
 - Request file in the owning task dir (`<task>/<batch>-request.md`): Context (exact files to read) →
   Scope (explicit write surface, named exclusions, "no scheduled-job / config / profile / repo write"
   clauses, rollback expectations) → Deliver (numbered, each item with its gate and the real baseline
-  numbers) → output artifact requirements (`result.md`, backups, diffs, ledger).
+  numbers) → output artifact requirements (`result.md`, backups, diffs, ledger). Add the stop rule:
+  when an approved value (an ID, a threshold, a target) is missing, the sender stops and reports it
+  instead of choosing one, and it makes no live or production calls.
 - Dispatch it headless and in the background — it runs for minutes; use the transport your harness
   provides (see `gdd-route-omp` for the OMP path) and keep the log plus the produced
   artifacts in the task dir.
@@ -95,6 +97,16 @@ Order matters; each step decides whether the next one is worth doing.
    the path you will actually use (launch/act, the failure path, the flag you rely on) to have a case,
    and require a mutation check — revert each fix and confirm the suite goes red. A suite that still
    passes with the fix reverted is decoration, not evidence.
+9. **Read the diff for meaning.** A green suite and an in-scope path set still pass these defects, so
+   look for each class in the changed lines:
+   - a default that fails open: a policy that allows when a field is absent, or an allow list a later
+     field can widen;
+   - a state the code cannot leave: an unknown or blocked result that neither retries within a
+     budget nor stops loudly;
+   - a check that rejects every normal input, such as a smoke gate that fails on every real pack;
+   - a deleted comment that carried a constraint;
+   - a "simplification" that adds branches, parameters or indirection.
+   Send each back with the line and the input that exposes it.
 
 ## 2. Re-derive every number that the deliverable depends on
 
