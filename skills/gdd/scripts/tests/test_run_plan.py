@@ -69,9 +69,11 @@ class RunPlanCase(GddCase):
         return done.stdout
 
     def run_state(self, stage="implement"):
-        [run_dir] = [d for d in self.run_dirs()
-                     if ".prev-" not in os.path.basename(d) and d.endswith(f"-{stage}")]
-        return json.loads(read(os.path.join(run_dir, "state.json")))
+        candidates = [d for d in self.run_dirs()
+                      if ".prev-" not in os.path.basename(d)
+                      and re.search(rf"-{re.escape(stage)}(-a\d+)?$", os.path.basename(d))]
+        latest = max(candidates, key=lambda d: os.path.getmtime(os.path.join(d, "state.json")))
+        return json.loads(read(os.path.join(latest, "state.json")))
 
 
 class SetupTests(RunPlanCase):
@@ -364,6 +366,73 @@ class UsageAccountingTests(RunPlanCase):
         self.assertIn("tokens: 7 used, 4 unknown (cap 10)", out)
         allowed = self.stage("review", "--dry-run")
         self.assertEqual(allowed.returncode, 0, allowed.stderr)
+
+
+class AttemptNameTests(RunPlanCase):
+    def dispatched(self, output):
+        name = re.search(r"(?m)^run: (\S+)$", output)
+        run_dir = re.search(r"(?m)^run_dir: (.+)$", output)
+        self.assertIsNotNone(name, output)
+        self.assertIsNotNone(run_dir, output)
+        return name.group(1), run_dir.group(1).strip()
+
+    def patch_usage(self, run_dir, tokens):
+        state_path = os.path.join(run_dir, "state.json")
+        state = json.loads(read(state_path))
+        state["usage"] = {"total_tokens": tokens}
+        write(state_path, json.dumps(state))
+
+    def test_two_dispatches_of_a_stage_use_their_own_names_and_state(self):
+        self.setup({"budgets": {"rounds": {"implement": 10}, "token_cap": 100000}})
+        first = self.stage("implement", "--wait")
+        self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+        first_name, first_dir = self.dispatched(first.stdout)
+        second = self.stage("implement", "--wait")
+        self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
+        second_name, second_dir = self.dispatched(second.stdout)
+        self.assertEqual(first_name, "workrepo-0001-implement-a1")
+        self.assertEqual(second_name, "workrepo-0001-implement-a2")
+        dispatch_notes = [row["note"] for row in self.ledger()
+                          if row["stage"] == "implement" and row["note"].startswith("run=")]
+        self.assertEqual(dispatch_notes, [f"run={first_name}", f"run={second_name}"])
+        self.assertTrue(os.path.isdir(first_dir), first_dir)
+        self.assertTrue(os.path.isdir(second_dir), second_dir)
+
+        self.patch_usage(first_dir, 11)
+        self.patch_usage(second_dir, 22)
+        out = self.status()
+        self.assertIn("implement: rounds=2/10 tokens=33 unknown=0", out)
+        self.assertIn("tokens: 33 used, 0 unknown (cap 100000)", out)
+
+    def test_the_token_cap_counts_both_attempts(self):
+        self.setup({"budgets": {"rounds": {"implement": 10}, "token_cap": 100000}})
+        first = self.stage("implement", "--wait")
+        self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+        first_name, first_dir = self.dispatched(first.stdout)
+        second = self.stage("implement", "--wait")
+        self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
+        second_name, second_dir = self.dispatched(second.stdout)
+        self.assertNotEqual(first_name, second_name)
+
+        self.patch_usage(first_dir, 11)
+        self.patch_usage(second_dir, 22)
+        self.setup({"budgets": {"rounds": {"implement": 10}, "token_cap": 30}})
+        refused = self.stage("implement", "--dry-run")
+        self.assertEqual(refused.returncode, 3, refused.stdout)
+        self.assertIn("token cap 30 reached (33 used, 0 unknown)", refused.stderr)
+
+    def test_without_a_plan_the_run_name_is_unchanged(self):
+        for _ in range(2):
+            done = self.stage("implement", "--wait")
+            self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+            name, _ = self.dispatched(done.stdout)
+            self.assertEqual(name, "workrepo-0001-implement")
+        names = [row["note"] for row in self.ledger()
+                 if row["stage"] == "implement" and row["note"].startswith("run=")]
+        self.assertEqual(names, ["run=workrepo-0001-implement"] * 2)
+        # The second launch still archives the first run dir instead of aliasing it.
+        self.assertTrue(any(".prev-" in os.path.basename(d) for d in self.run_dirs()))
+        self.assertNotIn("RUN PLAN", self.status())
 
 
 class ResumeAdviceTests(RunPlanCase):

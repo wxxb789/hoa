@@ -583,17 +583,21 @@ def dispatch_run_name(note):
 
 
 def run_state_for(run_name):
-    """(state, run_dir) for one recorded run name; ({}, None) when it is missing or unusable."""
+    """(state, run_dir) for one recorded run name; ({}, None) when it is missing or ambiguous.
+
+    A plan-governed dispatch names its run `<repo>-<goal>-<stage>-a<n>`, so the name
+    identifies exactly one `<run_root>/<date>/<run_name>/state.json`; zero or several
+    matches stay unknown instead of a newest-mtime guess.
+    """
     if not run_name or path_segment_problem(run_name):
         return {}, None
     try:
         matches = glob.glob(os.path.join(run_root(), "*", glob.escape(run_name), "state.json"))
-        if not matches:
-            return {}, None
-        state_path = max(matches, key=os.path.getmtime)
     except (OSError, ValueError):
         return {}, None
-    run_dir = os.path.dirname(state_path)
+    if len(matches) != 1:
+        return {}, None
+    run_dir = os.path.dirname(matches[0])
     return agent_run.read_state(run_dir), run_dir
 
 
@@ -767,8 +771,12 @@ def write_lineage_sidecar(run_root, run_name, run_dir, goal, stage):
         print(f"gdd: warning: lineage sidecar not written: {reason}", file=sys.stderr)
 
 
-def launch(launcher, prompt_path, repo, goal, stage, agent, model, thinking, max_time):
+def launch(launcher, prompt_path, repo, goal, stage, agent, model, thinking, max_time,
+           attempt=None):
     name = f"{os.path.basename(repo)}-{goal}-{stage}"
+    if attempt is not None:
+        # A plan-governed re-dispatch must not alias the previous attempt's run dir.
+        name = f"{name}-a{attempt}"
     resolved_run_root = run_root()
     prefix = launcher_command(launcher)
     cmd = [
@@ -1021,6 +1029,7 @@ def cmd_stage(args):
             model,
             thinking,
             max_time,
+            attempt=rounds_seen + 1 if plan is not None else None,
         )
     except (LaunchError, OSError) as exc:
         message = str(exc).strip() or exc.__class__.__name__

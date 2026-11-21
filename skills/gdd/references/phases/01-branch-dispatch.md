@@ -46,9 +46,11 @@ flag, `roles.<stage>.max_time`, `budgets.max_time`, `GDD_MAX_TIME`, default. It 
 under `## Owner notes (run plan)`. It refuses past a stage's round cap or the plan's `token_cap`; `--over-budget`
 overrides for one dispatch.
 
-Token accounting reads each dispatched run's launcher `state.json` by the `run=<name>` its dispatch row records,
-so detached, failed and interrupted attempts count too; a running, missing or malformed run state and a pre-plan
-legacy row are listed as `unknown` and never summed. A completion note records the launcher-reported
+Token accounting reads exactly the run's launcher `state.json` by the `run=<name>` its dispatch row records:
+under a plan each dispatch names its run `<repo>-<goal>-<stage>-a<n>` for that stage's 1-based dispatch
+number, so a re-dispatch never aliases the previous attempt and detached, failed and interrupted attempts
+count too; a running, missing or malformed run state and a pre-plan legacy row are listed as `unknown` and
+never summed. A completion note records the launcher-reported
 route/model/thinking when the state carries them, else the requested value as `req:<value>`, else `default`.
 `gdd.py status` prints the plan, the goal-wide known/unknown total beside the cap, and per-stage usage; with no
 plan file it prints the legacy ledger view unchanged.
