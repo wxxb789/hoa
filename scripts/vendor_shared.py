@@ -35,7 +35,8 @@ SOURCES: dict[str, Path] = {
 # shared file name → destination skill dirs
 CONSUMERS: dict[str, list[str]] = {
     "skill_config.py": ["skills/engineering/gdd/scripts",
-                        "skills/productivity/ghc-decisions/scripts"],
+                        "skills/productivity/ghc-decisions/scripts",
+                        "skills/productivity/session-history-mining/scripts"],
     "rubrics.json": ["skills/productivity/ghc-decisions/scripts"],
     "findings.py": ["skills/skill-authoring/hoa-practice-retro/scripts"],
     "panel.md": ["skills/skill-authoring/hoa-practice-retro/references"],
@@ -50,6 +51,7 @@ CONSUMERS: dict[str, list[str]] = {
         "skills/engineering/git-auto-sync-pipelines/references",
         "skills/skill-authoring/hoa-skill-curate/references",
         "skills/skill-authoring/hoa-skill-port/references",
+        "skills/productivity/session-history-mining/references",
         "skills/productivity/spec-convergence/references",
     ],
     # Read on failure only; skills whose docs run their own scripts with `uv run`.
@@ -62,6 +64,7 @@ CONSUMERS: dict[str, list[str]] = {
         "skills/skill-authoring/hoa-practice-retro/references",
         "skills/skill-authoring/hoa-skill-curate/references",
         "skills/skill-authoring/hoa-skill-set-audit/references",
+        "skills/productivity/session-history-mining/references",
         "skills/research-writing/writing/references",
     ],
 }

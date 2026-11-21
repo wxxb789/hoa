@@ -1,0 +1,240 @@
+{
+  "stages": {
+    "l0": {
+      "routine_labels": ["routine_clean", "one_off_code_bug"],
+      "novel_label": "unclassified_novel_friction",
+      "mech_question": "primary_axis",
+      "score_question": "durability",
+      "questions": [
+        {
+          "name": "anomaly_probe",
+          "type": "predicate",
+          "instructions": "Does this session skeleton show ANY non-trivial operational friction, user correction/pushback, violated assumption, silent failure, environment/OS/shell surprise, workflow/CI/git pitfall, or explicit durable rule/lesson?"
+        },
+        {
+          "name": "user_correction_probe",
+          "type": "predicate",
+          "instructions": "Did the human user explicitly correct a mistake, reject an assumption/behavior, state a standing preference/policy, or ask to codify/distill a workflow rule?"
+        },
+        {
+          "name": "primary_axis",
+          "type": "choice",
+          "instructions": "Classify the highest-signal operational lesson or friction in this session skeleton.",
+          "choices": [
+            {"value": "routine_clean", "description": "Routine coding, Q&A, or exploration with clean progress and no reusable operational friction."},
+            {"value": "one_off_code_bug", "description": "Ordinary repo-local syntax, type, test, or business-logic bug fixed locally with no cross-repo lesson."},
+            {"value": "delivery_ci_git_worktree", "description": "PR merge gating, CI runner/check behavior, branch/worktree cleanup, git identity, or release verification."},
+            {"value": "env_os_shell_hooks", "description": "Cross-OS differences, non-interactive shell PATH, hooks, console window flash, sandbox/junction/filesystem isolation, or CLI binary drift."},
+            {"value": "delegation_memory_contract", "description": "Subagent/worker delegation, acceptance verification, skill authoring/installation, memory behavior, or operating contracts."},
+            {"value": "config_ownership_drift", "description": "Dotfiles/template source-vs-target drift, cross-device bootstrap, or repository boundary/ownership rules."},
+            {"value": "unclassified_novel_friction", "description": "ESCAPE HATCH: Real operational friction, hidden failure mode, or reusable engineering lesson that does NOT fit the specific categories above."}
+          ]
+        },
+        {
+          "name": "durability",
+          "type": "score",
+          "instructions": "Rate whether this session likely contains a durable lesson worth auditing for cross-repo playbooks, reusable skills/evals, or device/hook configuration rather than single-app feature work.",
+          "levels": [
+            {"label": "none", "description": "Pure single-app feature/bug work or empty/trivial session."},
+            {"label": "repo_local", "description": "Useful within one specific tool/repo, moderate reuse."},
+            {"label": "cross_repo_systemic", "description": "High-leverage cross-repo, cross-OS, or agent-harness rule/guardrail."}
+          ]
+        }
+      ]
+    },
+    "l1-v1": {
+      "routine_labels": ["routine_or_local_code"],
+      "novel_label": "unclassified_novel_lesson",
+      "mech_question": "mechanism_v1",
+      "score_question": "reusable_guardrail",
+      "questions": [
+        {
+          "name": "anomaly_probe",
+          "type": "predicate",
+          "instructions": "Did an operational surprise, workflow/tooling pitfall, silent failure, environment mismatch, or user workflow/policy correction occur in this span?"
+        },
+        {
+          "name": "mechanism_v1",
+          "type": "choice",
+          "instructions": "Classify the underlying mechanism of this span.",
+          "choices": [
+            {"value": "routine_or_local_code", "description": "Clean progress, UI/business-logic tweak, or ordinary repo-local code/type/test/CLI-typo fix."},
+            {"value": "delivery_ci_git_worktree", "description": "PR merge gating, CI checks/billing/runners, branch/worktree safety, git identity, or release verification."},
+            {"value": "env_os_shell_isolation", "description": "Cross-OS differences, non-interactive shell PATH/hooks, console window spawn, filesystem/sandbox/junction isolation, or binary/config root mismatch."},
+            {"value": "agent_delegation_skills_memory", "description": "Subagent delegation/acceptance, skill authoring/naming/installers, memory behavior, or agent operating rules."},
+            {"value": "config_ownership_drift", "description": "Template source-vs-generated target drift, cross-device onboarding, or repo boundary/ownership."},
+            {"value": "unclassified_novel_lesson", "description": "ESCAPE HATCH: A genuine operational failure mode or reusable engineering rule that does NOT fit the specific buckets above."}
+          ]
+        },
+        {
+          "name": "reusable_guardrail",
+          "type": "score",
+          "instructions": "Rate whether this span reveals a reusable engineering guardrail/rule across repositories, skills, or device configuration versus single-project work.",
+          "levels": [
+            {"label": "ephemeral_or_app_local", "description": "No lesson, transient glitch, or single-app code/UI/domain detail."},
+            {"label": "candidate_pattern", "description": "Plausible tooling/workflow friction worth inspecting with surrounding context."},
+            {"label": "high_value_guardrail", "description": "Clear, reusable operational guardrail, silent-harm trap, or explicit standing workflow rule."}
+          ]
+        }
+      ]
+    },
+    "l1-v2": {
+      "routine_labels": ["routine_or_app_local"],
+      "novel_label": "novel_systemic_lesson",
+      "mech_question": "taxonomy_v2",
+      "score_question": "systemic_score",
+      "questions": [
+        {
+          "name": "anomaly_probe",
+          "type": "predicate",
+          "instructions": "Does this span contain concrete evidence of an operational pitfall, silent failure mode, or explicit human workflow/policy directive (excluding slash commands, routine status notifications, and single-app feature work)?"
+        },
+        {
+          "name": "evidence_backing",
+          "type": "choice",
+          "instructions": "Verify whether this span contains CONCRETE EVIDENCE of an operational lesson/rule (directly observed tool/hook/CI/env failure + diagnosis, OR an explicit human workflow/policy directive), versus routine progress or boilerplate.",
+          "choices": [
+            {"value": "no_lesson_evidence", "description": "Slash commands (/clear, /plugin), task-notification plumbing, routine green checks, or unverified speculation without a concrete pitfall or user directive."},
+            {"value": "single_app_only", "description": "Concrete bug/requirement, but strictly specific to one app's UI, CSS, domain math, cloud deployment config, or local syntax/type error."},
+            {"value": "proven_operational_lesson", "description": "Directly evidenced cross-session operational trap, silent failure mode, or explicit human workflow/governance rule."}
+          ]
+        },
+        {
+          "name": "taxonomy_v2",
+          "type": "choice",
+          "instructions": "Classify into the refined operational taxonomy. Choose routine_or_app_local whenever the span is slash-command noise, single-app feature/bug work, or pure task-notification status.",
+          "choices": [
+            {"value": "routine_or_app_local", "description": "Routine coding/tests, slash commands (/clear, /plugin), background task notifications, local syntax/type/CLI-flag fixes, or single-app domain/UI/deploy details."},
+            {"value": "pr_ci_merge_worktree", "description": "PR merge gates, auto-merge races, CI runner/billing blocks, branch/worktree cleanup safety, or git identity routing."},
+            {"value": "os_shell_hook_subprocess", "description": "Cross-OS differences, non-interactive shell PATH/hooks, console window spawning (CREATE_NO_WINDOW vs DETACHED_PROCESS), sandbox/junction/HOME isolation, or CLI version/config-root drift."},
+            {"value": "shared_tree_cli_hygiene", "description": "Preserving concurrent user/agent uncommitted edits during staging/commits, or stripping ANSI color/TTY escape codes when scraping CLI output."},
+            {"value": "delegation_skills_memory", "description": "Subagent/worker delegation & independent verification, skill naming/packaging/installers, or agent memory / consolidation behavior."},
+            {"value": "idempotent_config_ownership", "description": "Dotfiles/template source-vs-target drift, run_once partial-failure wedging, or cross-repo canonical ownership boundaries."},
+            {"value": "novel_systemic_lesson", "description": "ESCAPE HATCH: A proven, cross-repo reusable engineering guardrail that genuinely does not fit any category above."}
+          ]
+        },
+        {
+          "name": "systemic_score",
+          "type": "score",
+          "instructions": "Score cross-repository operational leverage. Penalize single-app fixes, transient network blips, and mid-flight status updates to 0.",
+          "levels": [
+            {"label": "discard", "description": "Noise, boilerplate, transient error, or single-app detail."},
+            {"label": "narrow_pattern", "description": "Repo/tool-specific operational friction."},
+            {"label": "high_leverage_rule", "description": "High-impact cross-repo guardrail preventing silent data loss, premature merge, config clobbering, or recurring multi-OS friction."}
+          ]
+        }
+      ]
+    },
+    "l3-novelty": {
+      "routine_labels": ["false_alarm_or_local_detail", "already_covered"],
+      "novel_label": "cockpit_or_target_gap",
+      "mech_question": "novelty_status",
+      "score_question": "actionability",
+      "questions": [
+        {
+          "name": "novelty_status",
+          "type": "choice",
+          "instructions": "Compare the operational lesson in the SPAN against the CURRENT CODIFIED BASELINE prepended above. Classify whether it is already covered, an uncovered target gap, owned by a sibling repository, or local noise.",
+          "choices": [
+            {"value": "already_covered", "description": "The core rule or fix in this span is ALREADY explicitly covered by the baseline documents, scripts, or tests."},
+            {"value": "cockpit_or_target_gap", "description": "A concrete cross-repo playbook, onboarding diagnostic, or harness check gap that belongs in the target repository and is NOT yet covered in the baseline."},
+            {"value": "route_to_sibling_repo", "description": "Real reusable operational trap/lesson, but canonical ownership belongs to a sibling skill or dotfiles repository rather than the target repository."},
+            {"value": "false_alarm_or_local_detail", "description": "Upon closer inspection against the baseline, this span is single-project implementation work, mid-flight status, or lacks a durable rule."}
+          ]
+        },
+        {
+          "name": "actionability",
+          "type": "score",
+          "instructions": "Rate how directly actionable and high-leverage this span is for a NEW improvement to the target repository today.",
+          "levels": [
+            {"label": "none", "description": "Already covered, owned by another repo, or local noise."},
+            {"label": "supporting_evidence", "description": "Useful recurrence evidence for a cross-repo pattern or routing boundary."},
+            {"label": "direct_gap", "description": "Directly proves an uncovered failure mode that target docs or harness checks should guard against."}
+          ]
+        }
+      ]
+    }
+  },
+  "anchors": [
+    {
+      "id": "pos_1_premature_automerge",
+      "expected": true,
+      "text": "SPAN anchor:pos_1\n[L10 USER] Enable auto-merge so it merges once CI passes.\n[L14 TOOL_OK Bash(gh pr merge 123 --auto --squash)] Merged immediately at 13:10:42Z before GitHub Actions check runs even registered (13:10:43Z), because main branch had no enforced status check protection rules."
+    },
+    {
+      "id": "pos_2_sandbox_junction_escape",
+      "expected": true,
+      "text": "SPAN anchor:pos_2\n[L30 ASST] Running installer smoke test with HOME=$TMPDIR/fake_home.\n[L38 TOOL_OK Bash(python scripts/install.py)]\n[L45 USER] Why did my live skills directory get overwritten?!\n[L49 ASST] Even though HOME was overridden, LOCALAPPDATA fell back to the real user profile and rewrote live directory junctions."
+    },
+    {
+      "id": "pos_3_noninteractive_hook_path",
+      "expected": true,
+      "text": "SPAN anchor:pos_3\n[L12 HOOK_ERROR] /bin/sh: 1: node: not found in stop-review-gate-hook.mjs\n[L18 ASST] `which node` works in interactive zsh because `.zshrc` loads fnm/mise, but hooks run under non-interactive `/bin/sh` where shims are absent from PATH."
+    },
+    {
+      "id": "pos_4_windows_console_flash",
+      "expected": true,
+      "text": "SPAN anchor:pos_4\n[L20 USER] Every time the background check runs on Windows, black cmd windows flash on my screen and steal focus. Never let subprocesses pop console windows.\n[L25 ASST] Python `subprocess.run` on Windows spawns a console window when invoked from a GUI/daemon host unless `creationflags=subprocess.CREATE_NO_WINDOW` is passed."
+    },
+    {
+      "id": "pos_5_template_target_drift",
+      "expected": true,
+      "text": "SPAN anchor:pos_5\n[L8 ASST] Edited `~/.claude/settings.json` directly to add workspace hook.\n[L19 USER] Running template apply wiped out the hooks we configured yesterday.\n[L22 ASST] Edited generated target file instead of source template in dotfiles, causing silent overwrite on next apply."
+    },
+    {
+      "id": "pos_6_worker_unverified_claim",
+      "expected": true,
+      "text": "SPAN anchor:pos_6\n[L40 ASST] Subagent reported all tests passed and migration is complete.\n[L46 USER] Did you actually check git status and run the test yourself? Two files weren't even saved.\n[L50 ASST] Accepted delegated worker's summary at face value without independent artifact/diff verification."
+    },
+    {
+      "id": "pos_7_worktree_dirty_cleanup",
+      "expected": true,
+      "text": "SPAN anchor:pos_7\n[L70 TOOL_ERR Bash(git worktree remove --force ../wt-feature)] Deleted worktree after PR merge, losing untracked local scratch notes and an uncommitted config tweak that wasn't part of the PR."
+    },
+    {
+      "id": "pos_8_implicit_identity_fallback",
+      "expected": true,
+      "text": "SPAN anchor:pos_8\n[L15 TOOL_OK Bash(git commit -m 'fix')]\n[L19 USER] Wait, stop! Check `git log -1 --format='%ae'` — this repo was outside the personal root so it committed with the wrong email fallback!"
+    },
+    {
+      "id": "neg_1_routine_feature_clean",
+      "expected": false,
+      "text": "SPAN anchor:neg_1\n[L5 USER] Add pagination support to the `/users` endpoint.\n[L6-L18: 12 clean local Read/Edit/Grep calls]\n[L20 ASST] Added cursor pagination and unit tests; all 14 tests pass."
+    },
+    {
+      "id": "neg_2_local_typescript_type_err",
+      "expected": false,
+      "text": "SPAN anchor:neg_2\n[L30 TOOL_ERR Bash(npm run typecheck)] src/components/Card.tsx(42,9): error TS2322: Type 'string | undefined' is not assignable to type 'string'.\n[L34 ASST] Fixed optional prop fallback in Card.tsx; typecheck now passes."
+    },
+    {
+      "id": "neg_3_edit_string_not_found",
+      "expected": false,
+      "text": "SPAN anchor:neg_3\n[L14 TOOL_ERR Edit(app/router.py)] Error: String to replace not found in file.\n[L16 TOOL_OK Read(app/router.py)]\n[L18 ASST] Re-read router.py and applied the edit with exact indentation."
+    },
+    {
+      "id": "neg_4_single_app_css_tweak",
+      "expected": false,
+      "text": "SPAN anchor:neg_4\n[L22 USER] No, make the header border warmer and increase card padding from 12px to 16px in the dashboard.\n[L26 ASST] Updated dashboard CSS variables to warm gray border and 16px padding."
+    },
+    {
+      "id": "neg_5_missing_test_flag_typo",
+      "expected": false,
+      "text": "SPAN anchor:neg_5\n[L11 TOOL_ERR Bash(pytest --max-fail=1)] error: unrecognized arguments: --max-fail=1\n[L13 TOOL_OK Bash(pytest --maxfail=1)] 28 passed in 1.4s."
+    },
+    {
+      "id": "neg_6_slash_clear_session",
+      "expected": false,
+      "text": "SPAN anchor:neg_6\n[L4 USER] /clear\n[L8 USER] Commit the current staged README typo fix.\n[L12 ASST] Committed README typo fix on branch docs/typo."
+    },
+    {
+      "id": "neg_7_transient_network_502",
+      "expected": false,
+      "text": "SPAN anchor:neg_7\n[L50 SYS:api_error] 502 Bad Gateway from upstream proxy; retrying in 2s.\n[L52 ASST] Finished generating unit test fixture for parser module."
+    },
+    {
+      "id": "neg_8_domain_business_formula",
+      "expected": false,
+      "text": "SPAN anchor:neg_8\n[L18 USER] The Sharpe ratio calculation in portfolio_metrics.py should annualize with sqrt(252), not sqrt(365), because this dataset only has US equity trading days.\n[L24 ASST] Updated annualization factor in portfolio_metrics.py to sqrt(252)."
+    }
+  ]
+}
