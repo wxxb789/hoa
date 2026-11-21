@@ -222,7 +222,7 @@
       "id": "route-to-privileged-host-handoff",
       "request": "The cluster bootstrap script has to run on our locked-down admin workstation, which you can't access. Give me the commands to paste there, and I'll send you the output so you can check it before we apply anything.",
       "must_pick": ["privileged-host-handoff"],
-      "distractors": ["delegated-work-acceptance", "ai-coding-agent-delegation", "spec-convergence"]
+      "distractors": ["delegated-work-acceptance", "gdd", "spec-convergence"]
     },
     {
       "id": "no-handoff-for-local-command",
