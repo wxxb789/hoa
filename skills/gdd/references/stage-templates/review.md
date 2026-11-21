@@ -4,8 +4,26 @@ Repo: ${REPO_NAME} at `${REPO_PATH}`
 Range: `${BASE_SHA}..${HEAD_SHA}` (whole increment)
 Goal: ${GOAL} — contract file: `${GOAL_FILE}`
 
-Use the repo's code-review skill on that range. Start only after the simplify findings were applied,
-so you review the tree that will actually ship.
+Start only after the simplify findings were applied, so you review the tree that will actually ship.
+
+## Prefer the runtime's read-only reviewer
+
+If your runtime's own skill discovery offers a `ce-code-review` skill that accepts a read-only
+`mode:agent`, invoke it through that runtime's skill mechanism — never install it. Verify
+the checkout is at `${HEAD_SHA}`, then pass `mode:agent` and `base:${BASE_SHA}` so the review covers
+exactly this increment; never pass an apply token. **Local-only:** state in the invocation that no
+external or peer model receives the diff. Only a project profile that names a peer and grants that
+call its own authority may override that.
+
+Accept the result only when it reports `status: complete`, carries an artifact path or run id, and
+its receipt names head `${HEAD_SHA}` and base `${BASE_SHA}`. Anything else — skill absent, failed or
+degraded run, no receipt, different range — is **unavailable**: name which one in your report and run
+the report-only review below yourself. A degraded receipt is not a clean review. Carry the receipt
+(status, verdict, run id or artifact path, reviewed range) into your report and the result `summary`,
+and map every retained finding into `findings` below: `location` = `file:line`, `claim` = what is
+wrong and why it matters, `fix` = suggested fix or null. Judge those findings under the rules below;
+the receipt does not set the stage verdict, and it never replaces the head-bound machine-review
+marker the operator runs at merge.
 
 MODE: **report only**. Do not edit files, do not commit, do not push.
 

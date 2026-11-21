@@ -6,28 +6,38 @@
    uncommitted apply fixes are invisible to the reviewer's diff and one stray `git checkout` from
    gone. Commit, rebase onto `origin/main` when the branch has fallen behind, then confirm the
    `--dry-run` range covers exactly the whole increment.
-2. Grade by what is FALSE, not by the reviewer's severity label: a P2 that makes documentation state
+2. **Reuse the runtime's read-only reviewer first where it is installed.** The `review` stage
+   template has the worker try `ce-code-review mode:agent` first, through its own runtime's skill
+   discovery, on `${BASE_SHA}..${HEAD_SHA}`, local-only, with gdd's own report-only review as the
+   fallback. Accept the receipt only if it reports `status: complete` with an artifact path or run id
+   and its reported base and head match the dispatched range; retain the receipt with the run and
+   re-read every finding it produced. A missing skill, a failed or degraded run, a missing receipt,
+   or a mismatched range is disclosed — a degraded receipt is not a clean review. No external or
+   peer model receives the diff unless the project profile names that peer and carries its own
+   authority. This authoring-stage receipt never replaces the head-bound machine-review marker in
+   Phase 6.
+3. Grade by what is FALSE, not by the reviewer's severity label: a P2 that makes documentation state
    something untrue outranks every tidy-up. Gaps that pin a documented promise are real; gaps that
    mirror an internal shape are not.
-3. Dispatch `fix` with a per-finding table requirement and an explicit reason for anything judged
+4. Dispatch `fix` with a per-finding table requirement and an explicit reason for anything judged
    invalid. A silent skip reopens next round — that is why the table is mandatory.
-4. **Reproduce every finding yourself before dispatching it**, inside the repo, and give the fixer the
+5. **Reproduce every finding yourself before dispatching it**, inside the repo, and give the fixer the
    measured before/after rather than a description. A finding that is merely consistent with documented
    semantics is still unverified, and a plausible false positive costs a 20–40 minute agent round.
-5. **Classify before dispatching: regression or pre-existing.** If this goal added one of two paths that
+6. **Classify before dispatching: regression or pre-existing.** If this goal added one of two paths that
    now disagree about the same input (producer vs renderer, writer vs reader, resolver vs sanitiser), it
    is in scope. If the divergence is decided in the predecessor's completion record, it is not a defect —
    say why in the reply instead of dispatching it.
-6. **When two rounds hit the same class, the third dispatch changes the mechanism** — collapse to one
+7. **When two rounds hit the same class, the third dispatch changes the mechanism** — collapse to one
    function, one uniform rule, or drop the path that re-derives the value. Demand a property test over a
    generated matrix instead of hand-picked rows, and require the prompt to prove no second copy of the
    rule remains (`grep` plus `file:line`). Cover every field and every authored shape the new function
    touches in that same dispatch, not just the one the finding named.
-7. **A residual limit already recorded does not discharge a finding.** When the reviewer names exactly
+8. **A residual limit already recorded does not discharge a finding.** When the reviewer names exactly
    the case the goal record lists as a known limit, that limit is unpaid debt: implement the resolution
    or make the omission explicit in code, then rewrite the limit. "Documented, therefore out of scope"
    keeps a known-wrong value shipping.
-8. **Review for semantic widening, not style.** Before merging two byte-identical call sites, write down
+9. **Review for semantic widening, not style.** Before merging two byte-identical call sites, write down
    per call site the grant it consumes, what it may touch, and its destination; if any differs, share
    only the mechanics (parsing, query) and keep two decisions. After splitting a predicate, re-assign a
    rule to every caller — any caller left on the old helper silently inherits whichever rule remained.

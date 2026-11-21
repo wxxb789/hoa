@@ -6,6 +6,10 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 ## 2026-11-21
 
+- Reuse the runtime's read-only `ce-code-review mode:agent` in gdd's fresh review stage when the
+  runtime offers it: gdd's exact base/head, local-only, a complete receipt with a matching range or
+  gdd's own report-only fallback, findings mapped into the existing review result. The receipt does
+  not replace the head-bound machine-review marker at merge.
 - Make the gdd `implement` and `fix` stage prompts proof-first: reuse the accepted plan by path,
   observe the expected failure or baseline before changing behaviour, record the green command, exit
   code and clause it proves in the existing report, and hand gates as one runnable command.
