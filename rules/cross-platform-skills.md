@@ -11,7 +11,7 @@ root, whether installed by link or by copy. Chaining rules live in
 The same `../<child>/SKILL.md` string reaches different directories depending on OS and tool.
 Measured on 2026-11-17 (Windows 11, WSL Ubuntu 24.04) for
 `<host-root>/<parent-link>/../<child>/SKILL.md`, where `<parent-link>` points at the repo's
-`skills/<parent>`:
+`skills/<category>/<parent>`:
 
 | Platform | Link type | OS open (Python `open`, Node `fs`, `cat`) | Normalize-first (`os.path.normpath`, Node `path.resolve`, many harness Read tools) |
 |---|---|---|---|
@@ -20,7 +20,8 @@ Measured on 2026-11-17 (Windows 11, WSL Ubuntu 24.04) for
 | Linux | symlink | physical | lexical |
 | macOS | symlink | physical (POSIX kernel; not measured here) | lexical |
 
-**Lexical** = `<host-root>/<child>`; **physical** = next to the link target, `<repo>/skills/<child>`.
+**Lexical** = `<host-root>/<child>`; **physical** = next to the link target,
+`<repo>/skills/<category>/<child>`.
 On POSIX one string can therefore hit two directories. Harnesses also differ in the base directory
 they show the model (link path or realpath; OMP dedups by realpath).
 
@@ -56,7 +57,9 @@ Paths in SKILL.md and `references/` use forward slashes and resolve relative to 
 them, as Markdown links do; in SKILL.md that is the skill directory. A sibling link is therefore
 `../<sibling>/` from SKILL.md and `../../<sibling>/` from `references/x.md`; the composition shape
 "Read `../<child>/SKILL.md` (relative to this skill's directory)" belongs in SKILL.md only, where
-both bases agree. `scripts/check_skill_links.py` and
+both bases agree. In the hoa checkout the physical sibling is
+`<repo>/skills/<category>/<sibling>/`, so a chained sibling must live in the same category as its
+parent; the installed lexical sibling is `<host-root>/<sibling>/`. `scripts/check_skill_links.py` and
 hoa-skill-set-audit's `inventory.py` both resolve this way. No drive letters, no backslashes, no `~` or
 `$HOME` expansion assumptions. `../` appears only in a sibling-skill link.
 

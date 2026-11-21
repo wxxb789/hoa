@@ -6,7 +6,7 @@ labels: bug
 
 **Which artifact?**
 
-<!-- e.g. skills/ghc-search/, scripts/generate_index.py, agents/skill-scout.md, rules/generated-means-generated.md, workflows/adopt-a-pattern.md -->
+<!-- e.g. skills/research-writing/ghc-search/, scripts/generate_index.py, agents/skill-scout.md, rules/generated-means-generated.md, workflows/adopt-a-pattern.md -->
 
 **What did you expect, and what happened instead?**
 

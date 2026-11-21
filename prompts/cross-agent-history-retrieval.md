@@ -60,7 +60,7 @@ Safety
   response.
 
 If the output will feed hoa-practice-retro, write the bundle described in
-skills/hoa-practice-retro/references/bundle-schema.md: JSONL whose first line is
+skills/skill-authoring/hoa-practice-retro/references/bundle-schema.md: JSONL whose first line is
 the coverage manifest ({"kind": "coverage_manifest", ...}) followed by one
 normalized record per line with origin_fingerprint and locator. Usage fields
 (skills, mcp, agent_types, friction_events) only when the source lists them

@@ -38,6 +38,7 @@ sys.dont_write_bytecode = True
 import yaml
 import check_skill_links as links
 import skill_metadata as sm
+import skill_paths
 
 ROOT = Path(__file__).resolve().parent.parent
 SKILLS = ROOT / "skills"
@@ -226,8 +227,7 @@ def retired_names(path: Path, current: set[str]) -> list[str]:
 
 def collect() -> list[dict]:
     rows = []
-    skill_dirs = sorted(p for p in SKILLS.iterdir() if p.is_dir())
-    for skill_dir in skill_dirs:
+    for skill_dir in skill_paths.skill_dirs(SKILLS):
         skill_md = skill_dir / "SKILL.md"
         if not skill_md.is_file():
             raise ValueError(f"skill directory without SKILL.md: {skill_dir}")
@@ -236,7 +236,8 @@ def collect() -> list[dict]:
         note_en, note_zh = _resolve_notes(meta, skill_md, "skill", name)
         for key in ("summary", "summary_zh"):
             meta.pop(key, None)
-        rows.append({"name": name, "type": "skill", "path": f"skills/{name}/",
+        path = "skills/" + skill_dir.relative_to(SKILLS).as_posix() + "/"
+        rows.append({"name": name, "type": "skill", "path": path,
                      "note_en": note_en, "note_zh": note_zh, "closure": closure(skill_dir),
                      **meta})
     rows.extend(_collect_library())

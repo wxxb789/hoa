@@ -21,7 +21,9 @@ npm 依赖，每日更新跟踪上游默认分支的子模块。只有后者会�
 仓库没有自带安装器。请用生成的[安装一节](../index.zh-CN.md#安装)：有同级依赖的
 skill 会有一条将整个闭包装入同一个 skills 根目录的命令。没有此类安装行的 skill
 没有同级依赖。除非要运维 Hermes，否则请用**不使用 Hermes 时**；非 Hermes skill
-不链接 Hermes 家族。若要安装全部 skill、列举或更新：
+不链接 Hermes 家族。源码树中每个 skill 位于 `skills/<category>/<name>/`；分类只属于
+源码树——安装仍为扁平的 `<skills-root>/<name>/`，所有命令都按名称执行。
+若要安装全部 skill、列举或更新：
 
 ```sh
 npx skills add wxxb789/hoa -g -s '*' -y
@@ -40,12 +42,12 @@ npx skills update -g -y
   `npx skills ls -g`，再使用生成的移除命令，去掉从其他来源安装的同名 skill。
   移除按名称匹配，未安装的名称不受影响。复装时使用当前生成的命令，不用旧副本。
   替代项记录在[退役 skill 注册表](../scripts/retired_skills.toml)。
-- 用 [hoa-skill-set-audit](../skills/hoa-skill-set-audit/SKILL.md) 诊断同级依赖闭包
+- 用 [hoa-skill-set-audit](../skills/skill-authoring/hoa-skill-set-audit/SKILL.md) 诊断同级依赖闭包
   缺失或分裂、重复和遮蔽。根目录与链接细节见[跨平台规则](../rules/cross-platform-skills.md)。
 
 对于 Hermes 模型路由，用父 skill 生成的命令一起安装
-[hermes-models](../skills/hermes-models/SKILL.md) 和
-[hermes-models-cutover](../skills/hermes-models-cutover/SKILL.md)。
+[hermes-models](../skills/hermes/hermes-models/SKILL.md) 和
+[hermes-models-cutover](../skills/hermes/hermes-models-cutover/SKILL.md)。
 子 skill 支持可回滚的全量切换和同 provider 的 ID 替换，并逐一提供受影响运行面的在线证据。
 Hermes 不识别 `disable-model-invocation`，仍会列出子 skill。
 在其他 runtime 手动调用时，按[各 host 的调用语法](../rules/skill-composition.md#visibility)操作。
@@ -54,12 +56,12 @@ Hermes 不识别 `disable-model-invocation`，仍会列出子 skill。
 
 | 需求 | Skill | 结果 |
 |---|---|---|
-| 评审行为或拟议改动 | [hoa-skill-review](../skills/hoa-skill-review/SKILL.md) | 带证据的发现，不修改被评审的 skill |
-| 创建、演进或组合一项已定义的能力 | [hoa-skill-create](../skills/hoa-skill-create/SKILL.md) | 改动、验证结果及未验证路径 |
-| 复盘跨仓库和 agent 会话的实践 | [hoa-practice-retro](../skills/hoa-practice-retro/SKILL.md)（仅显式调用） | 带证据的发现和重复工作候选，不自动创建 |
-| 审查单个仓库的实践与运作机制 | [hoa-repo-reckoning](../skills/hoa-repo-reckoning/SKILL.md)（仅显式调用的提示词） | 自由格式报告，按严重程度排列发现并附证据 |
-| 审计会话实际可用的 skill 集合 | [hoa-skill-set-audit](../skills/hoa-skill-set-audit/SKILL.md)（仅显式调用） | 集合级发现和必要性结论，不做改动 |
-| 根据近期工作推荐 skill | [hoa-skill-curate](../skills/hoa-skill-curate/SKILL.md) | 带证据的建议，不做改动 |
+| 评审行为或拟议改动 | [hoa-skill-review](../skills/skill-authoring/hoa-skill-review/SKILL.md) | 带证据的发现，不修改被评审的 skill |
+| 创建、演进或组合一项已定义的能力 | [hoa-skill-create](../skills/skill-authoring/hoa-skill-create/SKILL.md) | 改动、验证结果及未验证路径 |
+| 复盘跨仓库和 agent 会话的实践 | [hoa-practice-retro](../skills/skill-authoring/hoa-practice-retro/SKILL.md)（仅显式调用） | 带证据的发现和重复工作候选，不自动创建 |
+| 审查单个仓库的实践与运作机制 | [hoa-repo-reckoning](../skills/skill-authoring/hoa-repo-reckoning/SKILL.md)（仅显式调用的提示词） | 自由格式报告，按严重程度排列发现并附证据 |
+| 审计会话实际可用的 skill 集合 | [hoa-skill-set-audit](../skills/skill-authoring/hoa-skill-set-audit/SKILL.md)（仅显式调用） | 集合级发现和必要性结论，不做改动 |
+| 根据近期工作推荐 skill | [hoa-skill-curate](../skills/skill-authoring/hoa-skill-curate/SKILL.md) | 带证据的建议，不做改动 |
 
 先做聚焦的行为检查；覆盖范围、风险或证据冲突有需要时，再扩展到多个变体、model
 或 runtime。复盘候选须经负责人逐项批准后才能创建；直接请求明确定义的 skill 不用走
@@ -76,7 +78,8 @@ Claude Code 原生的 `plugin eval` 测试 plugin 形态的包；Anthropic 的 `
 没有项目版本或发布包：`npx skills` 直接从 GitHub 默认分支安装。每个 skill 用
 整数字符串 `metadata.revision` 记录自己的迭代；PR 改了哪个 skill 目录，就将其加一。
 新名称（包括改名）从 `"1"` 开始，改名须登记到
-[退役 skill 注册表](../scripts/retired_skills.toml)。
+[退役 skill 注册表](../scripts/retired_skills.toml)。纯分类平移不算变更：保留原 revision，
+也不需要退役登记；平移并改动包内任何文件则必须加一。
 运行 `uv run --script scripts/version.py check-revisions`。
 [变更日志](../CHANGELOG.md)按日期编排，可选；早期条目保留历史项目和单 skill 版本。
 

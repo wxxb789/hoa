@@ -2,14 +2,14 @@
 
 > **English** · [简体中文](gdd.zh-CN.md) · [Repository home](../README.md)
 
-Use the [gdd protocol](../skills/gdd/SKILL.md) when a written goal defines one
+Use the [gdd protocol](../skills/engineering/gdd/SKILL.md) when a written goal defines one
 machine-checkable repository increment. It coordinates fresh authoring runs per
 stage, operator-run gates, a scripted merge check, and a resumable ledger.
 The [goal contracts directory](goals/README.md) shows where this repo keeps its
 active contracts.
 
 For a written, bounded task handed to one external coding CLI, use
-[lightweight delegation](../skills/gdd/SKILL.md#lightweight-delegation).
+[lightweight delegation](../skills/engineering/gdd/SKILL.md#lightweight-delegation).
 Run it in an isolated worktree and verify the result independently; it needs
 no stage ledger, PR, merge gate, or merge.
 
@@ -37,7 +37,7 @@ This table describes the separate-route design. Use the
 [generated install guide](../index.md#install) to see which packages are
 available in the checked-out revision. Hidden routes are not advertised for
 model routing; hiding does not grant authorization. See the
-[transport contract](../skills/gdd/references/transport.md) for configuration,
+[transport contract](../skills/engineering/gdd/references/transport.md) for configuration,
 answer retrieval, completion rules, and platform evidence.
 
 ## Native Paseo transport

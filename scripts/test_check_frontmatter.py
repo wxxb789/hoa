@@ -43,9 +43,10 @@ class CheckFrontmatterTests(unittest.TestCase):
         self.skills = self.tmp / "skills"
         self.skills.mkdir()
 
-    def skill(self, name: str, text: str | None = None) -> Path:
-        directory = self.skills / name
-        directory.mkdir()
+    def skill(self, name: str, text: str | None = None,
+              category: str = "engineering") -> Path:
+        directory = self.skills / category / name
+        directory.mkdir(parents=True)
         (directory / "SKILL.md").write_text(
             valid_frontmatter(name) if text is None else text, encoding="utf-8")
         return directory / "SKILL.md"
@@ -57,20 +58,22 @@ class CheckFrontmatterTests(unittest.TestCase):
             code = frontmatter.main()
         return code, out.getvalue(), err.getvalue()
 
-    def test_valid_skill_passes(self):
-        self.skill("alpha")
-        self.assertEqual(frontmatter.check_skill(self.skills / "alpha" / "SKILL.md"), [])
+    def test_valid_skills_in_two_categories_pass(self):
+        alpha = self.skill("alpha")
+        self.skill("beta", category="research-writing")
+        self.assertEqual(frontmatter.check_skill(alpha), [])
         code, out, _ = self.run_main()
         self.assertEqual(code, 0)
-        self.assertIn("1 skills OK", out)
+        self.assertIn("2 skills OK", out)
 
     def test_missing_or_unclosed_frontmatter_fails(self):
         self.skill("no-open", "# no frontmatter\n")
         self.skill("no-close", "---\nname: no-close\n")
         self.assertEqual(len(frontmatter.check_skill(
-            self.skills / "no-open" / "SKILL.md")), 1)
+            self.skills / "engineering" / "no-open" / "SKILL.md")), 1)
         self.assertIn("missing frontmatter closing",
-                      frontmatter.check_skill(self.skills / "no-close" / "SKILL.md")[0])
+                      frontmatter.check_skill(
+                          self.skills / "engineering" / "no-close" / "SKILL.md")[0])
 
     def test_name_must_match_directory(self):
         path = self.skill("wrong-name", valid_frontmatter("other"))
@@ -107,11 +110,89 @@ class CheckFrontmatterTests(unittest.TestCase):
                 self.assertTrue(any(message in finding
                                     for finding in frontmatter.check_skill(path)))
 
-    def test_missing_skill_md_fails(self):
-        (self.skills / "empty").mkdir()
+    def test_missing_skill_md_fails_beside_a_valid_skill(self):
+        self.skill("good")
+        (self.skills / "engineering" / "empty").mkdir()
         code, out, _ = self.run_main()
         self.assertEqual(code, 1)
+        self.assertIn("empty", out)
         self.assertIn("missing", out)
+
+    def test_flat_skill_and_unknown_category_fail(self):
+        self.skill("good")
+        flat = self.skills / "flat"
+        flat.mkdir()
+        (flat / "SKILL.md").write_text(valid_frontmatter("flat"), encoding="utf-8")
+        unknown = self.skills / "misc" / "other"
+        unknown.mkdir(parents=True)
+        (unknown / "SKILL.md").write_text(valid_frontmatter("other"), encoding="utf-8")
+        code, out, _ = self.run_main()
+        self.assertEqual(code, 1)
+        self.assertIn("unknown skill category", out)
+        self.assertIn("misc", out)
+        self.assertIn("misplaced SKILL.md", out)
+
+    def test_too_deep_skill_fails(self):
+        self.skill("good")
+        deep = self.skills / "engineering" / "deep" / "nested"
+        deep.mkdir(parents=True)
+        (deep / "SKILL.md").write_text(valid_frontmatter("nested"), encoding="utf-8")
+        code, out, _ = self.run_main()
+        self.assertEqual(code, 1)
+        self.assertIn("misplaced SKILL.md", out)
+        self.assertIn("nested", out)
+
+    def test_duplicate_skill_name_fails_and_names_both_paths(self):
+        self.skill("dup")
+        self.skill("dup", category="hermes")
+        code, out, _ = self.run_main()
+        self.assertEqual(code, 1)
+        self.assertIn("duplicate skill directory name 'dup'", out)
+        self.assertIn("engineering/dup", out)
+        self.assertIn("hermes/dup", out)
+
+    def symlink(self, source: Path, target: Path, *, directory: bool = False) -> None:
+        try:
+            source.symlink_to(target, target_is_directory=directory)
+        except OSError as error:
+            self.skipTest(f"cannot create symlink {source}: {error}")
+
+    def test_symlinked_root_is_rejected_with_a_valid_package(self):
+        self.skill("real")
+        catalog = self.tmp / "catalog"
+        shutil.move(self.skills, catalog)
+        self.symlink(self.skills, catalog, directory=True)
+        code, out, _ = self.run_main()
+        self.assertEqual(code, 1, out)
+        self.assertIn("skills directory must be a real directory", out)
+
+    def test_dangling_category_alias_is_rejected_with_a_valid_package(self):
+        self.skill("real")
+        self.symlink(self.skills / "hermes", self.tmp / "missing", directory=True)
+        code, out, _ = self.run_main()
+        self.assertEqual(code, 1, out)
+        self.assertIn("category directory must be a real directory", out)
+
+    def test_dangling_package_alias_is_rejected_with_a_valid_package(self):
+        self.skill("real")
+        self.symlink(self.skills / "engineering" / "alias", self.tmp / "missing", directory=True)
+        code, out, _ = self.run_main()
+        self.assertEqual(code, 1, out)
+        self.assertIn("skill package must be a real directory", out)
+
+    def test_symlinked_manifest_is_rejected_with_a_valid_package(self):
+        self.skill("real")
+        linked = self.skill("linked")
+        linked.unlink()
+        self.symlink(linked, self.skills / "engineering" / "real" / "SKILL.md")
+        code, out, _ = self.run_main()
+        self.assertEqual(code, 1, out)
+        self.assertIn("must be a regular file", out)
+
+    def test_empty_catalog_fails(self):
+        code, out, _ = self.run_main()
+        self.assertEqual(code, 1)
+        self.assertIn("no skill packages found", out)
 
     def test_hidden_flag_and_codex_policy_must_agree(self):
         for name, key, flag, policy, message in (

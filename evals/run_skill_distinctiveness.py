@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 import random
 import re
+import sys
 from statistics import mean
 from urllib.error import HTTPError
 from urllib.parse import urlsplit
@@ -22,14 +23,30 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 HERE = Path(__file__).resolve().parent
 CORPUS = HERE / "distinctiveness"
+sys.path.insert(0, str(HERE.parent / "scripts"))
+
+import skill_paths  # noqa: E402
+
 NAME = r"[a-z0-9]+(?:-[a-z0-9]+)*"
 SEED = 52026
 K1, B = 1.2, 0.75
 
 
-def load_catalog(root, overrides):
+def skill_cards(root, flat):
+    """SKILL.md paths for a flat (installed/scratch) or categorized checkout.
+
+    A flat card is only scanned when the caller passes an explicit skills
+    directory; the checkout default is categorized-only.
+    """
+    cards = list(root.glob("*/SKILL.md")) if flat else []
+    cards += [path / "SKILL.md" for path in skill_paths.skill_dirs(root)
+              if (path / "SKILL.md").is_file()]
+    return sorted(set(cards))
+
+
+def load_catalog(root, overrides, flat):
     skills = {}
-    for path in sorted(root.glob("*/SKILL.md")):
+    for path in skill_cards(root, flat):
         # hoa uses a plain name, a folded description, and a top-level visibility flag.
         parts = re.split(r"^---\s*$", path.read_text(encoding="utf-8-sig"), maxsplit=2, flags=re.M)
         if len(parts) != 3 or parts[0]:
@@ -47,7 +64,10 @@ def load_catalog(root, overrides):
         elif continuation or desc.startswith((">", "|", '"', "'")) or not desc.strip():
             raise ValueError(f"{path}: description must be plain text or use hoa's >- format")
         hidden = bool(re.search(r"^disable-model-invocation: true[ \t]*(?:#.*)?$", front, re.M))
-        skills[name] = dict(description=desc, hidden=hidden)
+        if name in skills:
+            raise ValueError(f"{root}: duplicate skill name {name!r}: "
+                             f"{skills[name]['path']} and {path}")
+        skills[name] = dict(description=desc, hidden=hidden, path=path.as_posix())
     if not skills:
         raise ValueError(f"{root}: no skill cards found")
     if overrides:
@@ -342,7 +362,7 @@ def positive_int(value):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--skills-dir", type=Path, default=HERE.parent / "skills")
+    parser.add_argument("--skills-dir", type=Path, default=None)
     parser.add_argument("--queries", type=Path, default=CORPUS / "holdout.jsonl")
     parser.add_argument("--descriptions", type=Path, help="JSON object mapping skill names to draft descriptions")
     parser.add_argument("--output", type=Path, required=True, help="output path prefix; writes .md and .json")
@@ -356,7 +376,8 @@ def main(argv=None):
     if bool(args.pi_models) != bool(args.pi_provider):
         parser.error("--pi-models and --pi-provider must be supplied together")
     try:
-        skills = load_catalog(args.skills_dir, args.descriptions)
+        skills = load_catalog(args.skills_dir or HERE.parent / "skills", args.descriptions,
+                              flat=args.skills_dir is not None)
         queries = load_queries(args.queries)
         for q in queries.values():
             name = q["expected"]

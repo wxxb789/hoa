@@ -8,8 +8,8 @@ import pytest
 from evals import run_skill_distinctiveness as distinct
 
 
-@pytest.fixture
-def inputs(tmp_path, monkeypatch):
+@pytest.fixture(params=["flat", "categorized"])
+def inputs(tmp_path, monkeypatch, request):
     def no_network(*args):
         pytest.fail("unexpected network access")
 
@@ -20,7 +20,7 @@ def inputs(tmp_path, monkeypatch):
         ("beta", ">-\n  shared\n  blue", ""),
         ("hidden", "private amber", "disable-model-invocation: true\n"),
     ]:
-        folder = skills / name
+        folder = skills / name if request.param == "flat" else skills / "category" / name
         folder.mkdir(parents=True)
         (folder / "SKILL.md").write_text(
             f"---\nname: {name}\ndescription: {description}\n{visibility}---\n# Body is not indexed\n",
@@ -155,6 +155,46 @@ def test_llm_orders_parsing_and_no_credential_leak(inputs, tmp_path, monkeypatch
     captured = capsys.readouterr()
     for text in (captured.out, captured.err, *(output.with_suffix(s).read_text(encoding="utf-8") for s in (".md", ".json"))):
         assert key not in text
+
+
+def test_duplicate_skill_names_rejected(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(distinct, "build_opener", lambda *args: pytest.fail("network"))
+    skills = tmp_path / "skills"
+    for folder in (skills / "alpha", skills / "category" / "alpha"):
+        folder.mkdir(parents=True)
+        (folder / "SKILL.md").write_text(
+            "---\nname: alpha\ndescription: duplicate red\n---\n", encoding="utf-8")
+    queries = tmp_path / "queries.jsonl"
+    queries.write_text(json.dumps(dict(id="q", text="red", skill="alpha", lang="en")) + "\n",
+                       encoding="utf-8")
+    with pytest.raises(SystemExit) as error:
+        distinct.main(["--skills-dir", str(skills), "--queries", str(queries),
+                       "--output", str(tmp_path / "report")])
+    assert error.value.code == 2
+    assert "duplicate skill name 'alpha'" in capsys.readouterr().err
+
+
+def test_default_scan_ignores_flat_cards(tmp_path, monkeypatch):
+    monkeypatch.setattr(distinct, "build_opener", lambda *args: pytest.fail("network"))
+    skills = tmp_path / "repo" / "skills"
+    for folder, name, description in (
+        (skills / "category" / "alpha", "alpha", "red"),
+        (skills / "category" / "beta", "beta", "blue"),
+        (skills / "stray", "stray", "unrelated"),
+    ):
+        folder.mkdir(parents=True)
+        (folder / "SKILL.md").write_text(
+            f"---\nname: {name}\ndescription: {description}\n---\n", encoding="utf-8")
+    queries = tmp_path / "queries.jsonl"
+    queries.write_text(json.dumps(dict(id="q", text="red", skill="alpha", lang="en")) + "\n",
+                       encoding="utf-8")
+    monkeypatch.setattr(distinct, "HERE", tmp_path / "repo" / "evals")
+    output = tmp_path / "report"
+    assert distinct.main(["--queries", str(queries), "--output", str(output)]) == 0
+    assert set(report(output)["skills"]) == {"alpha", "beta"}
+    assert distinct.main(["--skills-dir", str(skills), "--queries", str(queries),
+                          "--output", str(output)]) == 0
+    assert "stray" in report(output)["skills"]
 
 
 def test_llm_http_failure_does_not_expose_provider_error(inputs, monkeypatch, capsys):

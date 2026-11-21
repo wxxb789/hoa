@@ -687,11 +687,19 @@ class TestCollisions:
     def test_curated_name_collision_fails(self, tmp_path):
         root = init_repo(tmp_path)
         write(root, "unfettered-skills/foo/SKILL.md", valid_skill("foo"))
-        write(root, "skills/foo/SKILL.md", valid_skill("foo"))
+        write(root, "skills/engineering/foo/SKILL.md", valid_skill("foo"))
         commit_all(root)
         result = run_checker(root)
         assert result.returncode == 1
-        assert "name collides with curated skills/foo" in result.stdout
+        assert "name collides with curated skills/engineering/foo" in result.stdout
+
+    def test_candidate_named_for_a_category_does_not_collide(self, tmp_path):
+        root = init_repo(tmp_path)
+        write(root, "unfettered-skills/engineering/SKILL.md", valid_skill("engineering"))
+        write(root, "skills/engineering/foo/SKILL.md", valid_skill("foo"))
+        commit_all(root)
+        result = run_checker(root)
+        assert result.returncode == 0, result.stdout + result.stderr
 
     def test_retired_name_collision_fails(self, tmp_path):
         root = init_repo(tmp_path)
@@ -707,22 +715,22 @@ class TestCollisions:
         root = init_repo(tmp_path)
         write(root, "unfettered-skills/foo/SKILL.md", valid_skill("foo"))
         base = commit_all(root)
-        write(root, "skills/foo/SKILL.md", valid_skill("foo"))
+        write(root, "skills/engineering/foo/SKILL.md", valid_skill("foo"))
         commit_all(root)
         result = run_checker(root, "--base", base)
         assert result.returncode == 1
         assert "landing-zone write mixed" not in result.stdout
-        assert "name collides with curated skills/foo" in result.stdout
+        assert "name collides with curated skills/engineering/foo" in result.stdout
 
     def test_empty_curated_tree_still_collides(self, tmp_path):
         root = init_repo(tmp_path)
         plumb_commit(root, {
             "unfettered-skills/foo/SKILL.md": valid_skill("foo").encode(),
-            "skills/foo": {},
+            "skills/engineering/foo": {},
         })
         result = run_checker(root)
         assert result.returncode == 1
-        assert "name collides with curated skills/foo" in result.stdout
+        assert "name collides with curated skills/engineering/foo" in result.stdout
 
     def test_curated_gitlink_is_not_a_curated_directory(self, tmp_path):
         root = init_repo(tmp_path)
@@ -730,7 +738,7 @@ class TestCollisions:
         seed = commit_all(root)
         plumb_commit(root, {
             "unfettered-skills/foo/SKILL.md": valid_skill("foo").encode(),
-            "skills/foo": ("160000", seed.encode()),
+            "skills/engineering/foo": ("160000", seed.encode()),
         })
         result = run_checker(root)
         assert result.returncode == 0, result.stdout + result.stderr
@@ -968,7 +976,7 @@ class TestSensitiveScan:
         root = init_repo(tmp_path)
         write(root, "unfettered-skills/" + EMAIL_SAMPLE + "/SKILL.md",
               valid_skill(EMAIL_SAMPLE))
-        write(root, "skills/" + EMAIL_SAMPLE + "/SKILL.md",
+        write(root, "skills/engineering/" + EMAIL_SAMPLE + "/SKILL.md",
               valid_skill(EMAIL_SAMPLE))
         commit_all(root)
         result = run_checker(root)

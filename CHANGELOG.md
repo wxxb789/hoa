@@ -6,6 +6,7 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 ## 2026-11-21
 
+- Move all 45 curated skills into five source-only category directories (`skills/<category>/<name>/`); installs and names stay flat, the frontmatter gate owns the layout, the link gate enforces same-category `../` references, and `check-revisions` recognizes an exact package move.
 - Gate `scripts/`, `evals/`, and `skills/` with pinned Ruff (`uvx ruff@0.17.5`) on correctness and cleanup rules, and fix all 20 baseline findings.
 - Stop `gdd.py stage --wait` advising a raw launcher resume: a terminal non-`done` outcome records the
   attempt, points at operator reconciliation (phase 7) and a new capped `gdd.py stage` dispatch, prints

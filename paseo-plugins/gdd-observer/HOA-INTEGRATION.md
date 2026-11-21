@@ -14,7 +14,7 @@ this document describes its boundary with HOA.
 | Observe existing GDD launcher runs in Paseo | The launcher selected by HOA, by default the shared headless runner `agent_run.py`, creates and finalizes each run. | Read the shared run root and show state, liveness, counters, event tails, and answer tails. No Paseo-native agent is needed just to observe these artifacts. |
 | Execute GDD stages through native Paseo | An explicitly selected native Paseo launcher adapter owns daemon-backed execution and publishes the launcher artifacts. | Optionally display those artifacts through the same file contract. Installing the observer neither selects nor implements this launcher route. |
 
-See the [HOA launcher transport contract](../../skills/gdd/references/transport.md) for launcher
+See the [HOA launcher transport contract](../../skills/engineering/gdd/references/transport.md) for launcher
 selection, configuration, lifecycle, artifacts, and execution evidence. HOA's `--launcher` /
 `GDD_LAUNCHER` selection is independent of plugin installation. The existing default launcher does
 not change when the observer is present or enabled.

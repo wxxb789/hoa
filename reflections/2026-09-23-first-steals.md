@@ -21,7 +21,7 @@ folders were `.gitkeep`.
   - `prompts/fresh-context-grader.md` — the judge shape behind define-goal's
     fixtures
   - `workflows/adopt-a-pattern.md` — the recipe, distilled from doing it
-  - ghc-proxy — originally a separate catalog entry; the [search skill](../skills/ghc-search/SKILL.md)
+  - ghc-proxy — originally a separate catalog entry; the [search skill](../skills/research-writing/ghc-search/SKILL.md)
     documents the API setup, and runtime registration stays with chezmoi
 - **The taxonomy took real content, and held.** The classification table
   resolved every one of the six placements without strain. The one soft spot:

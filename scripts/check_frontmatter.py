@@ -11,6 +11,12 @@ frontmatter, `name` is a non-empty string equal to the skill directory, and
 optional summaries) go through the shared parser, so this command and the
 index generator agree on what a valid skill is.
 
+Layout: every curated skill lives at `skills/<category>/<name>/SKILL.md`; the
+category allowlist is exact, category and package directories must be real
+directories, every package candidate needs a regular `SKILL.md`, names must be
+unique across categories, and a misplaced `SKILL.md` (root, flat, or deeper)
+is an error even when valid packages exist.
+
 Visibility: `disable-model-invocation` (kebab-case only) must be a YAML boolean,
 and it must agree with `agents/openai.yaml` `policy.allow_implicit_invocation`:
 a hidden skill ships that key as `false`, and a `false` key needs the flag.
@@ -34,9 +40,11 @@ import yaml
 # Keep the check read-only, including helper import caches.
 sys.dont_write_bytecode = True
 import generate_index as gi
+import skill_paths
 
 ROOT = Path(__file__).resolve().parent.parent
 SKILLS = ROOT / "skills"
+CATEGORIES = ("engineering", "productivity", "research-writing", "skill-authoring", "hermes")
 HIDDEN = "disable-model-invocation"
 DESCRIPTION_MAX = 1024
 VISIBLE_DESCRIPTION_MAX = 350
@@ -124,24 +132,81 @@ def check_skill(skill_md: Path) -> list[str]:
     return findings
 
 
+def _alias(path: Path) -> bool:
+    """A symlink or NTFS junction that a discovery client may follow."""
+    if path.is_symlink():
+        return True
+    is_junction = getattr(path, "is_junction", None)
+    return bool(is_junction is not None and is_junction())
+
+
+def layout_findings() -> tuple[list[str], list[Path]]:
+    """Curated-layout diagnostics plus the package directories to inspect."""
+    findings: list[str] = []
+    if not SKILLS.is_dir():
+        return [f"{SKILLS}: missing skills directory"], []
+    if _alias(SKILLS):
+        return [f"{SKILLS}: skills directory must be a real directory, not a symlink"], []
+    for entry in sorted(SKILLS.iterdir()):
+        if _alias(entry):
+            if entry.name in CATEGORIES:
+                findings.append(f"{entry}: category directory must be a real directory, "
+                                f"not a symlink")
+            else:
+                findings.append(f"{entry}: unknown skill category; "
+                                f"expected one of {', '.join(CATEGORIES)}")
+            continue
+        if not entry.is_dir():
+            continue
+        if entry.name not in CATEGORIES:
+            findings.append(f"{entry}: unknown skill category; "
+                            f"expected one of {', '.join(CATEGORIES)}")
+            continue
+        for package in sorted(entry.iterdir()):
+            if _alias(package):
+                findings.append(f"{package}: skill package must be a real directory, "
+                                f"not a symlink")
+    packages = skill_paths.skill_dirs(SKILLS)
+    if not packages:
+        findings.append(f"{SKILLS}: no skill packages found")
+    names: dict[str, list[Path]] = {}
+    for package in packages:
+        names.setdefault(package.name, []).append(package)
+    for name in sorted(names):
+        if len(names[name]) > 1:
+            paths = ", ".join(path.as_posix() for path in names[name])
+            findings.append(f"duplicate skill directory name {name!r}: {paths}")
+    for skill_md in sorted(SKILLS.rglob("SKILL.md")):
+        parts = skill_md.relative_to(SKILLS).parts
+        if len(parts) == 3 and parts[0] in CATEGORIES:
+            continue
+        findings.append(f"{skill_md}: misplaced SKILL.md; a skill lives at "
+                        f"skills/<category>/<name>/SKILL.md")
+    return findings, packages
+
+
 def main(argv=None) -> int:
-    skills = sorted(path for path in SKILLS.iterdir() if path.is_dir())
-    if not skills:
-        print(f"check_frontmatter: no skills found in {SKILLS}", file=sys.stderr)
+    if not SKILLS.is_dir():
+        print(f"check_frontmatter: no skills directory at {SKILLS}", file=sys.stderr)
         return 1
-    findings = []
-    for skill in skills:
-        skill_md = skill / "SKILL.md"
+    findings, packages = layout_findings()
+    skills = 0
+    for package in packages:
+        skill_md = package / "SKILL.md"
+        if _alias(skill_md):
+            findings.append(f"{skill_md}: must be a regular file")
+            continue
         if not skill_md.is_file():
             findings.append(f"{skill_md}: missing")
             continue
+        skills += 1
         findings.extend(check_skill(skill_md))
     for finding in findings:
         print(finding)
     if findings:
         print(f"check_frontmatter: {len(findings)} finding(s)", file=sys.stderr)
         return 1
-    print(f"check_frontmatter: {len(skills)} skills OK")
+    print(f"check_frontmatter: {skills} skills OK")
     return 0
 
 

@@ -89,7 +89,7 @@ def test_linux_trace_paths_classify_installed_and_external_reads():
     installed = PurePosixPath("/trial/home/.pi/agent/skills/ghc-search/SKILL.md")
     for path, expected in {
         "~/.pi/agent/skills/ghc-search/SKILL.md": "installed-copy-read",
-        "/mnt/q/repos/hoa/skills/ghc-search/SKILL.md": "host-skill-read",
+        "/mnt/q/repos/hoa/skills/research-writing/ghc-search/SKILL.md": "host-skill-read",
         "C:/Users/operator/.agents/skills/ghc-search/SKILL.md": "host-skill-read",
         "/trial/work/fixture.md": None,
     }.items():

@@ -28,6 +28,10 @@ else:
 
 EVALS = Path(__file__).resolve().parent
 SKILLS = EVALS.parent / "skills"
+sys.path.insert(0, str(EVALS.parent / "scripts"))
+
+import skill_paths  # noqa: E402
+
 NAME = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 ARMS = ("none", "terse", "skill")
 RUNTIMES = ("claude", "codex", "pi")
@@ -334,6 +338,16 @@ def pi_provider(model=None):
             else:
                 secrets.add(PI_ENV_REFERENCE.sub(credential, value))
     return files, credentials, (*secrets, *map(os.getenv, credentials))
+
+
+def catalog_skill(name: str) -> Path:
+    """The one source package named `name` under the curated catalog."""
+    matches = [path for path in skill_paths.skill_dirs(SKILLS)
+               if path.name == name and (path / "SKILL.md").is_file()]
+    if len(matches) != 1:
+        raise ValueError(f"expected exactly one skill {name!r} under {SKILLS}; "
+                         f"found {len(matches)}")
+    return matches[0]
 
 
 def codex_host_skill_rules():
@@ -704,7 +718,7 @@ def pi_trace(route, acc, events, skill_file, workspace, skill_text):
     return result, trace
 
 
-def trial(args, task, fixture, root, arm, skill_text):
+def trial(args, task, fixture, root, arm, skill_text, source):
     runtime = args.runtime
     config, extra_env, secrets = args.provider
     env = isolated_env(root, runtime, CLAUDE_AUTH if runtime == "claude" else extra_env)
@@ -726,7 +740,7 @@ def trial(args, task, fixture, root, arm, skill_text):
     skill_file = installed / task["skill"] / "SKILL.md"
     prompt = task["prompt"]
     if arm == "skill":
-        snapshot(SKILLS / task["skill"], skill_file.parent)
+        snapshot(source, skill_file.parent)
         if args.mode == "forced":
             read_path = wsl_pi.TRIAL / skill_file.relative_to(root).as_posix() if sandbox else skill_file
             prompt += f'\n\nUse the {task["skill"]} skill. First read "{read_path.as_posix()}", then follow it.'
@@ -814,7 +828,8 @@ def run_eval(args):
             or any(type(value) not in (int, float) or not 0 <= value <= 1 for value in thresholds.values())
             or thresholds["min_mean_gain"] == 0):
         raise ValueError(f"{args.thresholds.name}: expected {sorted(THRESHOLD_KEYS)} in [0, 1], with positive min_mean_gain")
-    skill_text = (SKILLS / task["skill"] / "SKILL.md").read_text(encoding="utf-8")
+    source = catalog_skill(task["skill"])
+    skill_text = (source / "SKILL.md").read_text(encoding="utf-8")
     revision = re.search(r'^\s+revision:\s*["\']?(\d+)', skill_text, re.M)
     stamp = datetime.now().astimezone()
     destination = args.results / f"{stamp.date()}-{task['id']}-{args.runtime}-{args.mode}"
@@ -830,10 +845,11 @@ def run_eval(args):
             args.provider = ({}, (), sorted({value for value in secrets if value}))
         else:
             args.provider = pi_provider()
-        sys.path.insert(0, str(SKILLS / "gdd" / "scripts"))
+        gdd = catalog_skill("gdd")
+        sys.path.insert(0, str(gdd / "scripts"))
         from agent_run import load_route, new_acc
 
-        args.pi_route, args.pi_acc, args.resume = load_route("pi", SKILLS), new_acc, None
+        args.pi_route, args.pi_acc, args.resume = load_route("pi", gdd.parent), new_acc, None
     else:
         args.provider = codex_provider() if args.runtime == "codex" else ("", (), ())
     args.host_skill_rules = codex_host_skill_rules() if args.runtime == "codex" else []
@@ -855,7 +871,7 @@ def run_eval(args):
                 skipped_trials.append({"arm": arm, "repeat": repeat + 1})
                 continue
             with tempfile.TemporaryDirectory(prefix=f"hoa-eval-{arm}-") as temp:
-                run = trial(args, task, fixture, Path(temp).resolve(), arm, skill_text)
+                run = trial(args, task, fixture, Path(temp).resolve(), arm, skill_text, source)
             runs[arm].append(run)
             total_tokens += run["tokens"] or 0
             order.append(arm)

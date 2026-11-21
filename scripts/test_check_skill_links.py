@@ -20,6 +20,7 @@ from unittest.mock import patch
 sys.dont_write_bytecode = True
 SCRIPT = Path(__file__).resolve().parent / "check_skill_links.py"
 ARTIFACTS = SCRIPT.parent.parent / ".tmp-artifacts" / "skill-links-tests"
+sys.path.insert(0, str(SCRIPT.parent))
 spec = importlib.util.spec_from_file_location("check_skill_links", SCRIPT)
 links = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = links  # dataclass field resolution needs the module registered
@@ -38,9 +39,10 @@ class CheckSkillLinksTests(unittest.TestCase):
         self.skills = self.tmp / "skills"
         self.skills.mkdir()
 
-    def skill(self, name: str, body: str = "", files: dict[str, str] | None = None) -> Path:
-        directory = self.skills / name
-        directory.mkdir()
+    def skill(self, name: str, body: str = "", files: dict[str, str] | None = None,
+              category: str = "engineering") -> Path:
+        directory = self.skills / category / name
+        directory.mkdir(parents=True)
         (directory / "SKILL.md").write_text(f"---\nname: {name}\n---\n{body}\n",
                                             encoding="utf-8")
         for relative, text in (files or {}).items():
@@ -61,7 +63,7 @@ class CheckSkillLinksTests(unittest.TestCase):
         self.skill("parent", "Read ../child/SKILL.md (relative to this skill's directory), "
                              "see [rows](../child/references/table.md#a) and "
                              "../child/references/<kind>/; not links: gh api .../contents/, "
-                             "skills/x/../y/z, ../name and ../../scripts/tool.py.",
+                             "skills/x/../y/z, ../name and ../../../scripts/tool.py.",
                    files={"references/phases/one.md": "See ../../../child/SKILL.md.",
                           "references/transport.md": "Also ../../child/SKILL.md."})
         code, out, err = self.run_main()
@@ -77,15 +79,74 @@ class CheckSkillLinksTests(unittest.TestCase):
         code, out, err = self.run_main()
         self.assertEqual(code, 1)
         self.assertEqual(len(out.splitlines()), 4, out)
-        self.assertIn("skills/parent/SKILL.md:4: ../gone/SKILL.md names no sibling skill", out)
-        self.assertIn("../child/references/old.md does not exist in skills/child/", out)
-        self.assertIn("skills/parent/references/x.md:1: ../child/SKILL.md resolves inside "
+        self.assertIn("skills/engineering/parent/SKILL.md:4: ../gone/SKILL.md names no sibling skill", out)
+        self.assertIn("../child/references/old.md does not exist in skills/engineering/child/", out)
+        self.assertIn("skills/engineering/parent/references/x.md:1: ../child/SKILL.md resolves inside "
                       "the skill; paths are relative to the file holding them, so the "
                       "sibling is ../../child/", out)
-        self.assertIn("skills/parent/references/phases/one.md:1: ../child/SKILL.md resolves "
+        self.assertIn("skills/engineering/parent/references/phases/one.md:1: ../child/SKILL.md resolves "
                       "inside the skill; paths are relative to the file holding them, so the "
                       "sibling is ../../../child/", out)
         self.assertIn("4 error(s)", err)
+
+    def test_cross_category_reference_fails_after_a_move(self):
+        self.skill("child")
+        self.skill("parent", "Read ../child/SKILL.md.")
+        code, out, err = self.run_main()
+        self.assertEqual(code, 0, out + err)
+        (self.skills / "hermes").mkdir()
+        shutil.move(self.skills / "engineering" / "child", self.skills / "hermes" / "child")
+        code, out, err = self.run_main()
+        self.assertEqual(code, 1, out + err)
+        self.assertIn("skills/engineering/parent/SKILL.md:4: ../child/SKILL.md is a "
+                      "cross-category reference to skills/hermes/child/SKILL.md", out)
+
+    def test_explicit_category_traversal_fails(self):
+        self.skill("child")
+        self.skill("moved", category="hermes")
+        self.skill("parent", "Read ../child/SKILL.md and ../../engineering/child/SKILL.md "
+                             "and ../../hermes/moved/SKILL.md.")
+        code, out, err = self.run_main()
+        self.assertEqual(code, 1, out + err)
+        self.assertIn("../../engineering/child/SKILL.md climbs above engineering/ and resolves "
+                      "to skills/engineering/child/SKILL.md", out)
+        self.assertIn("../../hermes/moved/SKILL.md climbs above engineering/ and resolves "
+                      "to skills/hermes/moved/SKILL.md", out)
+
+    def test_sibling_suffix_that_escapes_the_sibling_fails(self):
+        self.skill("child")
+        self.skill("other")
+        self.skill("parent", "Read ../child/../../other/SKILL.md.")
+        code, out, err = self.run_main()
+        self.assertEqual(code, 1, out + err)
+        self.assertIn("../child/../../other/SKILL.md escapes skills/engineering/child/ through "
+                      "'../../other/SKILL.md'", out)
+
+    def test_cross_category_target_reached_through_references_fails(self):
+        self.skill("child", category="hermes")
+        self.skill("parent", files={"references/x.md":
+                                    "See ../references/../../../hermes/child/SKILL.md."})
+        code, out, err = self.run_main()
+        self.assertEqual(code, 1, out + err)
+        self.assertIn("skills/engineering/parent/references/x.md:1: "
+                      "../references/../../../hermes/child/SKILL.md climbs above engineering/ "
+                      "and resolves to skills/hermes/child/SKILL.md", out)
+
+    def test_document_outside_the_curated_root_is_ignored(self):
+        self.skill("parent", "Read ../../engineering/../../docs/contributing.md.")
+        (self.tmp / "docs").mkdir()
+        (self.tmp / "docs" / "contributing.md").write_text("outside\n", encoding="utf-8")
+        code, out, err = self.run_main()
+        self.assertEqual(code, 0, out + err)
+        self.assertIn("sibling references OK", out)
+
+    def test_terminal_parent_segment_is_not_punctuation(self):
+        self.skill("peer")
+        self.skill("parent", "Read ../peer/..")
+        code, out, err = self.run_main()
+        self.assertEqual(code, 1, out + err)
+        self.assertIn("skills/engineering/parent/SKILL.md:4: ../peer/.. escapes "
+                      "skills/engineering/peer/ through '..'", out)
 
     PEP_723 = "# /// script\n# requires-python = \">=3.13\"\n# dependencies = []\n# ///\n"
 
@@ -94,6 +155,7 @@ class CheckSkillLinksTests(unittest.TestCase):
         self.skill("tool", "Without uv: run the script with `python3` (`python` on Windows).\n"
                            "```bash\nuv run scripts/run.py --flag\n"
                            "uv run \"$TOOL_DIR/scripts/run.py\" x\n"
+                           "uv run tool/scripts/run.py\n"
                            "uv run --no-project --with pyyaml python - <<'PY'\n"
                            "uv run --no-project python scripts/plain.py\n"
                            "python3 -c 'import sys'\npython3 scripts/test_run.py\n"
@@ -122,22 +184,22 @@ class CheckSkillLinksTests(unittest.TestCase):
         code, out, err = self.run_main()
         self.assertEqual(code, 1)
         self.assertEqual(out.splitlines(), [
-            "skills/tool/SKILL.md:5: uv run target skills/tool/scripts/plain.py has no PEP 723 "
-            "'# /// script' block",
-            "skills/tool/SKILL.md:6: uv run target scripts/gone.py does not resolve to a file "
-            "under skills/",
-            "skills/tool/SKILL.md:7: bare python runs skills/tool/scripts/run.py; "
+            "skills/engineering/tool/SKILL.md:5: uv run target skills/engineering/tool/scripts/plain.py "
+            "has no PEP 723 '# /// script' block",
+            "skills/engineering/tool/SKILL.md:6: uv run target scripts/gone.py does not resolve to a "
+            "file under skills/",
+            "skills/engineering/tool/SKILL.md:7: bare python runs skills/engineering/tool/scripts/run.py; "
             "write uv run scripts/run.py",
-            "skills/tool/SKILL.md:8: uv run target skills/tool/scripts/plain.py has no PEP 723 "
-            "'# /// script' block",
-            "skills/tool/SKILL.md:9: uv run python without --no-project syncs the user's project; "
-            "write uv run --no-project python",
-            "skills/tool/SKILL.md:11: bare python runs skills/tool/scripts/run.py; "
+            "skills/engineering/tool/SKILL.md:8: uv run target skills/engineering/tool/scripts/plain.py "
+            "has no PEP 723 '# /// script' block",
+            "skills/engineering/tool/SKILL.md:9: uv run python without --no-project syncs the user's "
+            "project; write uv run --no-project python",
+            "skills/engineering/tool/SKILL.md:11: bare python runs skills/engineering/tool/scripts/run.py; "
             "write uv run scripts/run.py",
-            "skills/tool/scripts/legacy.py:1: shebang '#!/usr/bin/env python3' bypasses uv; "
+            "skills/engineering/tool/scripts/legacy.py:1: shebang '#!/usr/bin/env python3' bypasses uv; "
             "write #!/usr/bin/env -S uv run --script",
-            "skills/tool/scripts/probe.sh:2: bare python in a launcher; write uv run <script> or "
-            "uv run --no-project python",
+            "skills/engineering/tool/scripts/probe.sh:2: bare python in a launcher; write uv run "
+            "<script> or uv run --no-project python",
         ])
         self.assertIn("8 error(s)", err)
 

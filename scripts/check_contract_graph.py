@@ -33,6 +33,7 @@ from yaml.nodes import ScalarNode
 # A read-only check must not create an import cache beside the parser.
 sys.dont_write_bytecode = True
 import skill_metadata as sm
+import skill_paths
 
 ROOT = Path(__file__).resolve().parent.parent
 KINDS = ("controller", "stage", "mechanism", "entry")
@@ -91,9 +92,9 @@ def _load_skills(root: Path) -> tuple[Skill, ...]:
     if not skills_dir.is_dir():
         return ()
     skills = []
-    for entry in sorted(skills_dir.iterdir()):
+    for entry in skill_paths.skill_dirs(skills_dir):
         skill_md = entry / "SKILL.md"
-        if not entry.is_dir() or entry.name.startswith(".") or not skill_md.is_file():
+        if not skill_md.is_file():
             continue
         text = skill_md.read_text(encoding="utf-8")
         sm.catalog_metadata(text, skill_md)  # required catalog fields and validation

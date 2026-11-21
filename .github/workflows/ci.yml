@@ -68,16 +68,16 @@ jobs:
       - name: Trigger cases
         run: python evals/run_trigger_evals.py
       - name: define-goal fixtures
-        run: python skills/define-goal/evals/validate_fixtures.py
+        run: python skills/productivity/define-goal/evals/validate_fixtures.py
       - name: hermes-models routing inventory
-        run: python skills/hermes-models/scripts/tests/test-routing-inventory.py
+        run: python skills/hermes/hermes-models/scripts/tests/test-routing-inventory.py
       - name: hermes-models provider metadata
-        run: python skills/hermes-models/scripts/tests/test-provider-metadata.py
+        run: python skills/hermes/hermes-models/scripts/tests/test-provider-metadata.py
       - name: gdd verdict matrix
-        run: python skills/gdd/scripts/tests/test_verdict_matrix.py
+        run: python skills/engineering/gdd/scripts/tests/test_verdict_matrix.py
       - name: gdd merge-gate mutation harness
         timeout-minutes: 5
-        run: python skills/gdd/scripts/tests/mutate_verdict_matrix.py
+        run: python skills/engineering/gdd/scripts/tests/mutate_verdict_matrix.py
 
   # Paseo gdd-observer plugin: every OS the plugin ships to runs the same checks
   # in parallel, and one platform failing must not cancel the others.
@@ -126,21 +126,21 @@ jobs:
           tmux -V
       - name: Shared gdd runner, dispatch, and watcher contracts
         env:
-          PYTHONPATH: ${{ runner.os == 'Windows' && format('{0}/skills/gdd/scripts/tests/nowindow', github.workspace) || '' }}
+          PYTHONPATH: ${{ runner.os == 'Windows' && format('{0}/skills/engineering/gdd/scripts/tests/nowindow', github.workspace) || '' }}
         run: >-
           python -m pytest -q
-          skills/gdd/scripts/tests/test_agent_run.py
-          skills/gdd/scripts/tests/test_detach_supervisors.py
-          skills/gdd/scripts/tests/test_gdd.py
-          skills/gdd/scripts/tests/test_no_window.py
-          skills/gdd/scripts/tests/test_paseo_run_python.py
-          skills/gdd/scripts/tests/test_watch_pr_checks.py
-          skills/gdd/scripts/tests/test_route_loading.py
-          skills/gdd-route-cc/scripts/tests
-          skills/gdd-route-codex/scripts/tests
-          skills/gdd-route-copilot/scripts/tests
-          skills/gdd-route-dsh/scripts/tests
-          skills/gdd-route-omo/scripts/tests
-          skills/gdd-route-omp/scripts/tests
-          skills/gdd-route-opencode/scripts/tests
-          skills/gdd-route-pi/scripts/tests
+          skills/engineering/gdd/scripts/tests/test_agent_run.py
+          skills/engineering/gdd/scripts/tests/test_detach_supervisors.py
+          skills/engineering/gdd/scripts/tests/test_gdd.py
+          skills/engineering/gdd/scripts/tests/test_no_window.py
+          skills/engineering/gdd/scripts/tests/test_paseo_run_python.py
+          skills/engineering/gdd/scripts/tests/test_watch_pr_checks.py
+          skills/engineering/gdd/scripts/tests/test_route_loading.py
+          skills/engineering/gdd-route-cc/scripts/tests
+          skills/engineering/gdd-route-codex/scripts/tests
+          skills/engineering/gdd-route-copilot/scripts/tests
+          skills/engineering/gdd-route-dsh/scripts/tests
+          skills/engineering/gdd-route-omo/scripts/tests
+          skills/engineering/gdd-route-omp/scripts/tests
+          skills/engineering/gdd-route-opencode/scripts/tests
+          skills/engineering/gdd-route-pi/scripts/tests
