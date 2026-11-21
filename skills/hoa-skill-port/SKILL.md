@@ -5,7 +5,7 @@ description: >-
   paths, personal identifiers, model IDs or a vendor CLI prevent reuse, externalize them into
   configuration or adapter contracts and validate before publication. Not for hoa-skill-curate.
 metadata:
-  revision: "7"
+  revision: "8"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "make a shared repo canonical for a private skill: externalize environment values, verify destination gates, and separate live swap from publication"
@@ -34,6 +34,19 @@ Use hoa-skill-create to change behavior and hoa-skill-curate to trace installed 
 4. **Report the port.** For each artifact record source and target, line counts, copied files,
    sections merged or removed and why, and every demoted literal with its replacement and
    default or required input. Include verification and known limits.
+
+## Promote from a landing zone
+
+When uncurated skills accumulate in a landing zone that the destination's own policy defines,
+promotion is a port like any other; that policy owns the paths and the write rules. The
+procedure is always:
+
+- one PR moves the skill: the raw copy in the landing zone is deleted and the normalized
+  package added under the curated root;
+- the new package starts at `metadata.revision: "1"`;
+- the full port review and the curated gates run before it lands;
+- no retired entry is created for a candidate-only name; only curated names retire;
+- no runtime swap is needed; promotion is a publication, not a cutover.
 
 **Optional operations require separate authority.** Use
 [runtime swap](references/runtime-swap.md) only for an authorized live cutover or drift probe:

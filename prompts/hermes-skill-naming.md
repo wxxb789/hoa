@@ -1,10 +1,10 @@
-<!-- index: areas=software-development,self-management; targets=hermes; summary="brief for Hermes when it creates or evolves a skill: decide coupling, prefix coupled skills hermes-, never fork a built-in, hand portable skills to hoa's port review"; summary_zh="交给 Hermes 的创建/演化 skill 须知：判定耦合、耦合 skill 加 hermes- 前缀、不分叉内置 skill、可移植 skill 走 hoa 的移植评审" -->
+<!-- index: areas=software-development,self-management; targets=hermes; summary="brief for Hermes when it creates or evolves a skill: decide coupling, prefix coupled skills hermes-, never fork a built-in, check candidates into hoa's unfettered-skills/ after check_unfettered passes, and send promotions through hoa's port review"; summary_zh="交给 Hermes 的创建/演化 skill 须知：判定耦合、耦合 skill 加 hermes- 前缀、不分叉内置 skill、候选写入 hoa 的 unfettered-skills/ 并通过 check_unfettered、可移植化走 hoa 的移植评审" -->
 
 # Hermes skill naming and hand-off
 
 A standing brief to give Hermes whenever it creates a skill or evolves an existing one. It
-decides the name before the content, keeps Hermes-only detail out of portable skills, and
-routes anything worth keeping to hoa through a review instead of a copy.
+decides the name before the content, keeps Hermes-only detail out of promoted skills, and
+routes anything worth keeping through hoa's landing zone and port review instead of a copy.
 
 ## Template
 
@@ -38,22 +38,38 @@ You are about to create or change a skill. Before writing its content, settle th
    holds the Hermes-specific steps.
 
 3. Name it.
-   - Coupled skills are named `hermes-<topic>` (for example `hermes-updates`). Renaming an
-     existing coupled skill to add the prefix is part of the change.
-   - Portable skills never carry the prefix and never mention Hermes paths, config keys,
-     profile names, gateway ids, or memory locations. Every environment-specific value is
-     read from configuration (flag -> env var -> config file -> documented default) with the
-     default stated in the skill.
+   - Coupled skills are named `hermes-<topic>` (for example `hermes-updates`) in both tiers.
+     Renaming an existing coupled skill to add the prefix is part of the change.
+   - A portable skill never carries the prefix. Portability otherwise binds at promotion: the
+     promoted package must have no Hermes paths, config keys, profile names, gateway ids or
+     memory locations, and every environment-specific value must be read from configuration
+     (flag -> env var -> config file -> documented default) with the default stated in the
+     skill. Raw candidates stay unconstrained; the promotion edit supplies this.
 
 Hand-off to hoa (the operator's skill library):
 - hoa does not track Hermes built-in skills; do not propose them.
-- A portable skill, or a hermes- skill worth keeping, is proposed to hoa as a port, never
-  synced or copied. Give the operator: the skill directory, what changed and why (the
-  failure or improvement that drove it), every literal path/id/model you introduced, and
-  the commands that show the skill works.
-- The operator runs hoa's port review: each literal is demoted to configuration, the
-  skill's own acceptance commands are re-run, and only then does it land. Expect edits; a
-  skill that only works on this install is not ready.
+- Check in, don't fork. Write every non-built-in skill as a candidate to
+  `unfettered-skills/<name>/SKILL.md` in hoa (required), with any support files under
+  `unfettered-skills/<name>/`; that is the landing zone for this runtime's skills:
+  unconstrained, not shown in normal root discovery while standard locations yield valid
+  skills, and reachable by explicit path, recursive fallback, `--full-depth` or a
+  specific-name retry. Never a replacement for a curated skill, and never edit `skills/`
+  directly.
+- Preflight the exact candidate, committed. Make the candidate-only local commit first
+  (only paths under `unfettered-skills/`), then run
+  `uv run --script scripts/check_unfettered.py --base <publication base>` in the checkout
+  against committed HEAD, using the base the change will actually be compared against
+  (`origin/main`, or the branch's merge base), and fix every finding: sensitive content, a
+  missing or mismatched candidate shape, or a name collision with `skills/` or the retired
+  list. A staged or uncommitted candidate is invisible to the checker, and a mixed change
+  that also touches another path must fail the base comparison. CI runs the same scan only
+  after the push, and neither the preflight nor CI can see content that an intermediate
+  commit added and a later commit removed.
+- Promotion is the operator's move, never a sync or a copy. One authorized PR deletes the raw
+  copy and lands the normalized package in `skills/<name>/` at `metadata.revision: "1"`
+  through hoa's port review and curated gates. Send the operator what changed and why (the
+  failure or improvement that drove it), every literal path/id/model you introduced, and the
+  commands that show the skill works.
 ```
 
 ## Usage notes
@@ -62,8 +78,8 @@ Hand-off to hoa (the operator's skill library):
   run starts; it is short enough to sit in the system prompt of that run.
 - The coupling test is about what following the skill requires, not where it was born. A
   skill evolved on Hermes can be fully portable.
-- The prefix rule and the review gate are defined in hoa's `AGENTS.md` ("Hermes-evolved
-  skills" and "Portability"); this prompt is the Hermes-facing copy of those rules.
+- This prompt is the Hermes-facing copy of the two-tier rule, the prefix requirement and
+  the promotion gate in hoa's `AGENTS.md` ("Hermes-evolved skills" and "Portability").
 - The general naming rules (form, one meaning per verb, banned vague words, renames through the
   retired registry) are in hoa's [`rules/skill-naming.md`](../rules/skill-naming.md); `hermes-` is
   the domain prefix those rules reserve for Hermes-coupled skills.

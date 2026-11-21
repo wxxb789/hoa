@@ -77,7 +77,7 @@ targets:  runtime-agnostic | repo-only |
 | ado-commit-push-pr | prompt | software-development | repo-only | `prompts/ado-commit-push-pr.md` | 一次性 commit → push → PR 请求模板（Azure DevOps 或 GitHub），附提交约定与 az/gh 易错点 |
 | cross-agent-history-retrieval | prompt | self-management,software-development | repo-only | `prompts/cross-agent-history-retrieval.md` | 一次性检索/导出本机各 agent 历史，按来源报告覆盖、去重并打码 |
 | fresh-context-grader | prompt | software-development,work-management | repo-only | `prompts/fresh-context-grader.md` | 一次性评审 prompt：用先于回答写好的 rubric 在全新上下文里评分 |
-| hermes-skill-naming | prompt | software-development,self-management | hermes | `prompts/hermes-skill-naming.md` | 交给 Hermes 的创建/演化 skill 须知：判定耦合、耦合 skill 加 hermes- 前缀、不分叉内置 skill、可移植 skill 走 hoa 的移植评审 |
+| hermes-skill-naming | prompt | software-development,self-management | hermes | `prompts/hermes-skill-naming.md` | 交给 Hermes 的创建/演化 skill 须知：判定耦合、耦合 skill 加 hermes- 前缀、不分叉内置 skill、候选写入 hoa 的 unfettered-skills/ 并通过 check_unfettered、可移植化走 hoa 的移植评审 |
 | parallel-agent-worktrees | prompt | software-development,work-management | repo-only | `prompts/parallel-agent-worktrees.md` | 一次性为每个 agent CLI 建独立 git worktree：布局、env/端口隔离、fail-closed 初始化、安全清理 |
 | cross-platform-skills | rule | software-development | repo-only | `rules/cross-platform-skills.md` | 技能在 Windows、Linux、macOS 上原样可跑：安装完整 ../ 依赖闭包、正斜杠相对路径、标准库 Python 显式 UTF-8、技能脚本用 uv run 且带 PEP 723 块 |
 | generalization-rubric | rule | software-development,work-management | repo-only | `rules/generalization-rubric.md` | 技能进入公开目录的唯一标准：陌生人在全新机器上能跑通——六道门槛、硬性失败项、回灌不变量 |

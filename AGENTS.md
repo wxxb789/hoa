@@ -2,8 +2,9 @@
 
 ## Portability — configuration, not hard-coding
 
-Every skill here runs on someone else's machine. A change born in one working environment is portable
-only when each environment-specific value can be supplied from outside it.
+Every skill in the curated `skills/` catalog runs on someone else's machine. A change born in one
+working environment is portable only when each environment-specific value can be supplied from
+outside it; candidates in `unfettered-skills/` are unconstrained until promoted.
 
 - **No literals for environment.** No home paths, personal or assistant names, repository/bot/channel
   ids, model ids, hostnames or host sizing in a skill's behaviour. Resolution order: CLI flag → env
@@ -17,20 +18,41 @@ only when each environment-specific value can be supplied from outside it.
   state the contract it must satisfy and ship one reference adapter; another install substitutes its
   own.
 - **Per-project or per-install detail goes in a profile or overlay file**, never in the protocol body.
-- **Merging a self-evolved skill is a review gate, not a copy.** Take the method, then walk every new
-  literal path, id and model: demote each to configuration, keep the defaults honest, and re-run the
-  skill's own acceptance commands before opening the PR. A skill that only works here is not ready.
+- **Promotion is a review gate, not a copy.** Take the method, then walk every new literal path, id
+  and model: demote each to configuration, keep the defaults honest, and re-run the skill's own
+  acceptance commands before opening the PR. A skill that only works here is not ready.
 
 ## Hermes-evolved skills
 
-Many skills here were first evolved on Hermes, a self-evolving assistant runtime. Its edits are
-unreviewed and accumulate install-specific detail, so a Hermes-born change enters hoa only through
-the port review gate above — never as a sync or a copy.
+`skills/` is the curated catalog; every rule in this file binds what is promoted into it.
+`unfettered-skills/` is its landing zone: Hermes, or a similar self-evolving system, checks
+candidates in there automatically and unconstrained. It is a sibling of `skills/`, never an install
+source or a manifest search path.
 
-- **Coupled skills carry a `hermes-` prefix.** A skill is coupled when it depends on Hermes runtime
-  paths, config, tools, gateway, or memory. Everything else stays portable and free of Hermes paths.
-- **Hermes built-in skills are not tracked here.** They are tracked upstream on the Hermes instance;
-  never fork or re-create one in hoa. `prompts/hermes-skill-naming.md` is the brief to hand Hermes.
+- **Only that writer lands candidates**, by automatic check-in. A candidate is
+  `unfettered-skills/<name>/SKILL.md` (required) with any support files under
+  `unfettered-skills/<name>/`; the landing root holds at most one `unfettered-skills/README.md`.
+  Humans and regular agents only promote or delete them. A change set that adds or modifies
+  anything there may touch no other path; a deletion there may ship beside an outside change,
+  because promotion moves a skill out.
+- **CI stays loose.** It checks sensitive content (keys, tokens, e-mail addresses, home paths,
+  private-range IPs), the candidate shape (`SKILL.md` under its own directory; non-empty `name`
+  equal to that directory, and `description`), and name collisions with `skills/` or
+  `scripts/retired_skills.toml` — nothing else, no line caps, links, revisions, index or tests.
+- **Promote through the port review.** One PR moves a candidate into `skills/<name>/`, normalized
+  to the full bar: every rule in this file, the curated gates, and the raw copy gone. Raw renames
+  and deletions never create retired entries; only previously curated names retire through the
+  usual curated workflow. `hoa-skill-port` owns the procedure.
+- **Never depend on the landing zone.** A curated skill must not require anything from
+  `unfettered-skills/`; do not reference it from manifests, curated dependencies or install docs.
+- **Discovery stays limited.** While standard locations yield valid skills, normal `npx skills`
+  discovery does not list `unfettered-skills/`; an explicit path, recursive fallback,
+  `--full-depth` or a specific-name retry can still reach it. Install commands point only at
+  `skills/`.
+- **Coupled skills carry `hermes-`** in both tiers: coupled means a dependency on Hermes runtime
+  paths, config, tools, gateway or memory. Everything else stays portable and free of Hermes paths.
+- **Never fork a Hermes built-in**, in either tier; they are tracked upstream. Propose the change
+  upstream instead. `prompts/hermes-skill-naming.md` is the brief to hand Hermes.
 
 ## Engineering restraint
 
@@ -47,6 +69,9 @@ removing it risks real, irreversible harm, or after the same pain has hit three 
   registration. A standalone check that is not a test file gets its own named step in `ci.yml`.
 
 ## Composition contracts
+
+These contracts bind the curated catalog in `skills/`; a landing-zone candidate is exempt until
+promotion.
 
 Skills declare their role and artifacts in `metadata` as comma-separated strings:
 
