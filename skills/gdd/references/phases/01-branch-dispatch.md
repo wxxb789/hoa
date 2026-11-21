@@ -31,16 +31,32 @@
 
 Before the first dispatch, run `uv run scripts/gdd.py setup --repo <path> --goal <id> [--plan-file <json>]`.
 Ask the owner once, in one round, only for what `GDD_RUN_PLAN_DEFAULTS` does not give:
-- the role map per agent stage: route (`agent`), `model`, `thinking`, `max_time`;
+- the role map per agent stage: route (`agent`), `model`, `thinking`, `max_time` — ask only for fields the chosen
+  route carries (list below);
 - budgets: `rounds` per stage, plan-wide `max_time`, optional `token_cap`;
 - `notes`.
 
-Do not re-ask mid-run. Change the plan only on the owner's request, by re-running setup.
+Do not re-ask mid-run. Change the plan only on the owner's request, by re-running setup. Setup validates the plan
+and names the offending key: `max_time` accepts the launcher's duration grammar (`90`, `90s`, `0.5h`), rounds must
+be a positive integer or null (null means the default 2x), `token_cap` a non-negative integer or null, and
+`agent`/`model`/`thinking` must not contain whitespace or `=` so the completion note stays parseable.
 
-`gdd.py stage` resolves each field in this order: flag, role, `budgets.max_time` (for max time only), environment,
-default. It appends the notes to every prompt under `## Owner notes (run plan)`. It refuses past a round cap or the
-token cap; `--over-budget` overrides. The token cap counts only launcher-reported tokens; `unknown` rows are listed,
-not summed. `gdd.py status` prints the plan and per-role usage.
+`gdd.py stage` resolves each field in this order: flag, role, environment, default; for max time the order is
+flag, `roles.<stage>.max_time`, `budgets.max_time`, `GDD_MAX_TIME`, default. It appends the notes to every prompt
+under `## Owner notes (run plan)`. It refuses past a stage's round cap or the plan's `token_cap`; `--over-budget`
+overrides for one dispatch.
+
+Token accounting reads each dispatched run's launcher `state.json` by the `run=<name>` its dispatch row records,
+so detached, failed and interrupted attempts count too; a running, missing or malformed run state and a pre-plan
+legacy row are listed as `unknown` and never summed. A completion note records the launcher-reported
+route/model/thinking when the state carries them, else the requested value as `req:<value>`, else `default`.
+`gdd.py status` prints the plan, the goal-wide known/unknown total beside the cap, and per-stage usage; with no
+plan file it prints the legacy ledger view unchanged.
+
+Roles fields per route: `agent` (the route selector) and `max_time` are accepted by every bundled route;
+`model` and `thinking` by claude, codex, copilot, omo, omp and pi; opencode takes `thinking` only together with
+`model`; dsh rejects both. Setup does not resolve the route, so a field the route cannot carry is refused by the
+launcher at dispatch.
 
 ## Dispatch tooling
 

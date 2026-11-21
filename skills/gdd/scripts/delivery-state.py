@@ -363,6 +363,11 @@ def cmd_show(args):
         repo = None
 
     latest = matching[-1] if matching else None
+    # A setup row is a record, not work: an earlier actionable row keeps LATEST so the
+    # operator still sees the stage and next action to resume.
+    actionable = [row for row in matching if row["stage"] != "setup"]
+    if actionable:
+        latest = actionable[-1]
     lines = ["LATEST"]
     if latest:
         for column in COLUMNS:
@@ -433,7 +438,11 @@ def cmd_list(args):
     rows = read_rows(args.state_file)
     newest = {}
     for row in rows:
-        newest[(row["repo"], row["goal"])] = row
+        key = (row["repo"], row["goal"])
+        current = newest.get(key)
+        # A later setup row never replaces a current stage/next action in the list view.
+        if current is None or row["stage"] != "setup" or current["stage"] == "setup":
+            newest[key] = row
     for (repo, goal), row in sorted(newest.items()):
         print(
             f"{repo} {goal} {row['stage']} {human_age(row['ts'])} {row['next_action']}"

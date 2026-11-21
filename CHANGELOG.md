@@ -22,7 +22,13 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
   no auto-resume, force-dispatch, fallback or phase advance, and any authorized new dispatch still
   counts against the cap. Phase 5 seals and verifies the whole branch, so `ce-work`'s commits are
   covered like every other path.
-- Add a per-goal gdd run plan: `setup` merges `GDD_RUN_PLAN_DEFAULTS` under the goal's plan once, `stage` resolves flag > plan > env and enforces round and token caps, completion rows record role/route/model/thinking/wall and launcher-reported tokens (else `unknown`), and `status` prints the plan with per-role usage.
+- Add a per-goal gdd run plan: `setup` merges `GDD_RUN_PLAN_DEFAULTS` under the goal's plan once, `stage`
+  resolves flag > plan role > environment (max time also checks `budgets.max_time`) and enforces round and
+  token caps, and `status` prints the plan with per-role usage. Token use is summed from each dispatched run's
+  launcher `state.json` (dispatch rows record `run=<name>`), so detached, failed and interrupted attempts count
+  and running, missing, malformed or legacy rows stay `unknown`; completion notes record the launcher-reported
+  route/model/thinking, else the requested value as `req:<value>`, else `default`. The dsh route accepts
+  neither `model` nor `thinking`; opencode takes `thinking` only with `model`.
 - Reuse the runtime's read-only `ce-code-review mode:agent` in gdd's fresh review stage when the
   runtime offers it: gdd's exact base/head, local-only, a complete receipt with a matching range or
   gdd's own report-only fallback, findings mapped into the existing review result. The receipt does

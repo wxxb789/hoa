@@ -66,6 +66,7 @@ warns on stderr and never affects the run or the ledger.
 import argparse
 import glob
 import json
+import math
 import os
 import re
 import shlex
@@ -321,23 +322,67 @@ def non_negative_int(value):
     return isinstance(value, int) and not isinstance(value, bool) and value >= 0
 
 
-def run_tokens(state):
-    """Launcher-reported token total, or None when the run recorded no usage (never 0)."""
+def run_usage(state):
+    """The launcher's normalized token count, or None when it reports none.
+
+    `total_tokens` when the launcher records it; otherwise input + output only.
+    Cache reads are never added: some routes count them inside the total.
+    """
     usage = state.get("usage") if isinstance(state.get("usage"), dict) else {}
     total = usage.get("total_tokens")
-    if not isinstance(total, (int, float)) or isinstance(total, bool):
-        total = 0
-    if not total:
-        for key in ("input_tokens", "output_tokens", "cache_read_tokens"):
-            value = usage.get(key)
-            if isinstance(value, (int, float)) and not isinstance(value, bool):
-                total += value
-    return int(total) if total else None
+    if total is not None:
+        return total if non_negative_int(total) else None
+    parts = []
+    for key in ("input_tokens", "output_tokens"):
+        value = usage.get(key)
+        if not non_negative_int(value):
+            return None
+        parts.append(value)
+    return sum(parts) if parts else None
+
+
+def path_segment_problem(value):
+    """Why `value` cannot stand as one portable path segment, or None."""
+    if not isinstance(value, str) or not value.strip():
+        return "is empty"
+    if "/" in value or "\\" in value:
+        return "contains a path separator"
+    if os.path.splitdrive(value)[0]:
+        return "contains a drive prefix"
+    if value in (".", ".."):
+        return "is a relative path component"
+    return None
+
+
+DURATION_RE = re.compile(r"(\d+(?:\.\d+)?)([smh]?)")
+
+
+def valid_duration(value):
+    """The bundled launcher's --max-time grammar, mirrored from agent_run.max_time_seconds.
+
+    That parser exits the launcher process on invalid input, so setup cannot reuse it.
+    """
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, (int, float)):
+        return math.isfinite(value) and value > 0
+    if not isinstance(value, str):
+        return False
+    match = DURATION_RE.fullmatch(value.strip())
+    return bool(match) and float(match.group(1)) > 0
 
 
 def run_plan_path(repo_name, goal):
-    """The goal's plan file: the same <repo>-<goal> key the prompt and state dirs use."""
-    return os.path.join(task_root(), f"{repo_name}-{goal}", "run-plan.json")
+    """The goal's plan file under the resolved task root; refuse a segment or link escape."""
+    for value, label in ((repo_name, "repo"), (goal, "goal")):
+        if problem := path_segment_problem(value):
+            fail(f"run plan: {label} {value!r} {problem}")
+    root = os.path.realpath(task_root())
+    directory = os.path.join(root, f"{repo_name}-{goal}")
+    resolved = os.path.realpath(directory)
+    if resolved != directory and not resolved.startswith(root + os.sep):
+        fail(f"run plan directory {directory} resolves outside the task root {root}")
+    return os.path.join(directory, "run-plan.json")
 
 
 def plan_problem(plan):
@@ -360,6 +405,13 @@ def plan_problem(plan):
                 return f"run plan: unknown field 'roles.{stage}.{field}'"
             if not isinstance(value, str) or not value.strip():
                 return f"run plan: 'roles.{stage}.{field}' must be a non-empty string"
+            if field == "max_time" and not valid_duration(value):
+                return (f"run plan: 'roles.{stage}.max_time' must be a positive duration "
+                        "like 30m")
+            if field in ("agent", "model", "thinking") and (
+                    re.search(r"\s", value) or "=" in value):
+                return (f"run plan: 'roles.{stage}.{field}' must not contain whitespace "
+                        "or '='")
     budgets = plan.get("budgets", {})
     if not isinstance(budgets, dict):
         return "run plan: 'budgets' must be an object"
@@ -372,16 +424,20 @@ def plan_problem(plan):
     for stage, cap in rounds.items():
         if stage not in AGENT_STAGES:
             return f"run plan: unknown stage 'budgets.rounds.{stage}'"
-        if not non_negative_int(cap):
-            return f"run plan: 'budgets.rounds.{stage}' must be a non-negative integer"
+        if cap is None:
+            continue  # null means the default cap
+        if not (isinstance(cap, int) and not isinstance(cap, bool) and cap > 0):
+            return f"run plan: 'budgets.rounds.{stage}' must be a positive integer or null"
     for key in ("max_time", "token_cap"):
         if key not in budgets:
             continue
         value = budgets[key]
-        if key == "token_cap" and value is None:
-            continue
-        if not non_negative_int(value):
-            return f"run plan: 'budgets.{key}' must be a non-negative integer"
+        if key == "token_cap":
+            if value is None or non_negative_int(value):
+                continue
+            return f"run plan: 'budgets.token_cap' must be a non-negative integer or null"
+        if not valid_duration(value):
+            return "run plan: 'budgets.max_time' must be a positive duration like 30m"
     notes = plan.get("notes", [])
     if not isinstance(notes, list):
         return "run plan: 'notes' must be a list of strings"
@@ -436,18 +492,29 @@ def read_plan_source(path, label):
 
 
 def read_run_plan(repo_name, goal):
-    """The validated plan for one repo+goal; {} when setup has not run."""
+    """The validated plan for one repo+goal; None when setup has not run, {} when empty."""
     path = run_plan_path(repo_name, goal)
     if not os.path.exists(path):
-        return {}
+        return None
     return read_plan_source(path, "run plan")
 
 
 def write_run_plan(path, plan):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8", newline="\n") as handle:
-        json.dump(plan, handle, ensure_ascii=False, indent=2)
-        handle.write("\n")
+    """Replace the plan atomically: a temp sibling keeps an interrupted write from truncating it."""
+    directory = os.path.dirname(path)
+    os.makedirs(directory, exist_ok=True)
+    fd, temp_path = tempfile.mkstemp(dir=directory, prefix=".run-plan.json.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
+            json.dump(plan, handle, ensure_ascii=False, indent=2)
+            handle.write("\n")
+        os.replace(temp_path, path)
+    except BaseException:
+        try:
+            os.remove(temp_path)
+        except OSError:
+            pass
+        raise
 
 
 def resolve_field(flag, plan_value, env_value):
@@ -459,8 +526,12 @@ def resolve_field(flag, plan_value, env_value):
     return env_value
 
 
-def ledger_rows(state_path, repo_name, goal):
-    """(stage, note) for this repo+goal's ledger rows, oldest first."""
+def ledger_rows(state_path, repo_name, goal, *, exact=False):
+    """(stage, note) for this repo+goal's ledger rows, oldest first.
+
+    A plan-governed reader matches the canonical repo key exactly; without a plan the
+    legacy substring match is kept.
+    """
     try:
         with open(os.path.expanduser(state_path), encoding="utf-8", errors="replace") as handle:
             lines = handle.read().splitlines()
@@ -483,38 +554,73 @@ def ledger_rows(state_path, repo_name, goal):
             continue
         if cells[i_goal] != goal:
             continue
-        if repo_name and repo_name not in cells[i_repo]:
-            continue
+        if repo_name:
+            same_repo = cells[i_repo] == repo_name if exact else repo_name in cells[i_repo]
+            if not same_repo:
+                continue
         note = cells[i_note] if i_note is not None and len(cells) > i_note else ""
         rows.append((cells[i_stage], note))
     return rows
 
 
-def ledger_rounds(state_path, repo_name, goal, stage):
+def ledger_rounds(state_path, repo_name, goal, stage, *, exact=False):
     """How many runs of this stage the ledger already records for this repo+goal."""
     # `--wait` writes a dispatch row and then a completion row for the same stage (its note
     # starts with `exit=`). The cap counts dispatches, so a completion must not spend a round.
     return sum(
-        1 for row_stage, note in ledger_rows(state_path, repo_name, goal)
+        1 for row_stage, note in ledger_rows(state_path, repo_name, goal, exact=exact)
         if row_stage == stage and not note.startswith("exit=")
     )
 
 
-def ledger_tokens(state_path, repo_name, goal, stage=None):
-    """(reported token sum, unknown count) over completion rows, optionally one stage."""
-    total = unknown = 0
-    for row_stage, note in ledger_rows(state_path, repo_name, goal):
+RUN_NOTE_RE = re.compile(r"^run=(\S+)$")
+
+
+def dispatch_run_name(note):
+    """The run name a dispatch row records, or None for a legacy row."""
+    match = RUN_NOTE_RE.match(note.strip())
+    return match.group(1) if match else None
+
+
+def run_state_for(run_name):
+    """(state, run_dir) for one recorded run name; ({}, None) when it is missing or unusable."""
+    if not run_name or path_segment_problem(run_name):
+        return {}, None
+    try:
+        matches = glob.glob(os.path.join(run_root(), "*", glob.escape(run_name), "state.json"))
+        if not matches:
+            return {}, None
+        state_path = max(matches, key=os.path.getmtime)
+    except (OSError, ValueError):
+        return {}, None
+    run_dir = os.path.dirname(state_path)
+    return agent_run.read_state(run_dir), run_dir
+
+
+def accounted_usage(state_path, repo_name, goal, stage=None, *, exact=True):
+    """(tokens known from launcher state, unknown attempts) over agent dispatch rows.
+
+    Reading is best effort: a running, missing or malformed run state is unknown and is
+    never summed, and accounting never fails the stage.
+    """
+    known = unknown = 0
+    for row_stage, note in ledger_rows(state_path, repo_name, goal, exact=exact):
+        if row_stage not in AGENT_STAGES or note.startswith("exit="):
+            continue
         if stage is not None and row_stage != stage:
             continue
-        if not note.startswith("exit="):
-            continue
-        found = re.search(r"(?:^|\s)tokens=(\S+)", note)
-        value = found.group(1) if found else ""
-        if value.isdigit():
-            total += int(value)
-        else:
+        value = None
+        try:
+            state, run_dir = run_state_for(dispatch_run_name(note))
+            if state and agent_run.observed_state(run_dir, state) != "running":
+                value = run_usage(state)
+        except (OSError, ValueError, TypeError):
+            value = None
+        if value is None:
             unknown += 1
-    return total, unknown
+        else:
+            known += value
+    return known, unknown
 
 
 def ledger_append(repo, goal, stage, base, head, gates, next_stage=None, note=None, pr=None, rounds=None):
@@ -677,8 +783,6 @@ def launch(launcher, prompt_path, repo, goal, stage, agent, model, thinking, max
         "--schema",
         stage_result.SCHEMA,
     ]
-    if prefix[1:2] == ["/c"] and (problem := agent_run.shim_hazard(prefix[-1], cmd[len(prefix):])):
-        raise LaunchError(f"{problem}; configure a native executable or Python launcher")
     for flag, value in (
         ("--model", model),
         ("--thinking", thinking),
@@ -686,6 +790,10 @@ def launch(launcher, prompt_path, repo, goal, stage, agent, model, thinking, max
     ):
         if value:
             cmd += [flag, str(value)]
+    # The final vector is what a Windows .cmd shim receives through cmd.exe; guard it after
+    # every plan/flag/env value is in, immediately before the spawn.
+    if prefix[1:2] == ["/c"] and (problem := agent_run.shim_hazard(prefix[-1], cmd[len(prefix):])):
+        raise LaunchError(f"{problem}; configure a native executable or Python launcher")
     # The launcher resolves its run root and agent from GDD_RUN_ROOT / GDD_AGENT; export
     # what this process resolved so a config-file value reaches it too.
     child_env = dict(os.environ)
@@ -750,9 +858,9 @@ def cmd_stage(args):
     if not os.path.isdir(args.repo):
         fail(f"--repo is not a directory: {args.repo}")
     repo = os.path.realpath(git(args.repo, "rev-parse", "--show-toplevel"))
-    repo_name = os.path.basename(repo)
+    repo_name = repo_key(args.repo)
     plan = read_run_plan(repo_name, args.goal)
-    role = (plan.get("roles") or {}).get(args.stage) or {}
+    role = ((plan or {}).get("roles") or {}).get(args.stage) or {}
 
     templates = os.path.expanduser(
         config("GDD_TEMPLATES", flag=args.templates, default=DEFAULT_TEMPLATES)
@@ -806,8 +914,10 @@ def cmd_stage(args):
         return 3
 
     rounds_state = os.path.expanduser(state_file())
-    rounds_seen = ledger_rounds(rounds_state, repo_name, args.goal, args.stage)
-    budgets = plan.get("budgets") or {}
+    # A plan governs accounting with the exact repo key; without one, keep the legacy match.
+    rounds_seen = ledger_rounds(rounds_state, repo_name, args.goal, args.stage,
+                                exact=plan is not None)
+    budgets = (plan or {}).get("budgets") or {}
     cap = budgets.get("rounds", {}).get(args.stage)
     if cap is None:
         cap = STAGE_BUDGETS.get(args.stage)
@@ -820,7 +930,7 @@ def cmd_stage(args):
 
     token_cap = budgets.get("token_cap")
     if token_cap is not None and not args.over_budget:
-        used, unknown = ledger_tokens(rounds_state, repo_name, args.goal)
+        used, unknown = accounted_usage(rounds_state, repo_name, args.goal, exact=True)
         if used >= token_cap:
             print(
                 f"gdd: {args.stage}: goal {args.goal} token cap {token_cap} reached "
@@ -846,14 +956,7 @@ def cmd_stage(args):
         "RESULT_SCHEMA": stage_result.SCHEMA,
     }
     rendered = render(template_text, variables)
-    notes = plan.get("notes") or []
-    if notes:
-        rendered = (
-            rendered.rstrip("\n")
-            + "\n\n## Owner notes (run plan)\n\n"
-            + "\n".join(f"- {note}" for note in notes)
-            + "\n"
-        )
+    notes = (plan or {}).get("notes") or []
 
     stamp = datetime.now().strftime("%H%M%S")
     prompt_dir = os.path.join(
@@ -869,7 +972,16 @@ def cmd_stage(args):
         counter += 1
     os.makedirs(prompt_dir, exist_ok=True)
     with open(prompt_path, "w", encoding="utf-8") as handle:
-        handle.write(rendered)
+        handle.write(rendered.rstrip("\n") if notes else rendered)
+    if notes:
+        # The notes suffix is written without newline translation, so a CRLF inside one
+        # note reaches the prompt byte for byte.
+        with open(prompt_path, "a", encoding="utf-8", newline="") as handle:
+            handle.write(
+                "\n\n## Owner notes (run plan)\n\n"
+                + "\n".join(f"- {note}" for note in notes)
+                + "\n"
+            )
     print(f"prompt: {prompt_path}")
 
     if args.dry_run:
@@ -933,6 +1045,7 @@ def cmd_stage(args):
         head,
         gates,
         next_stage=args.stage,
+        note=f"run={run_name}",
         rounds=rounds_seen + 1 if args.stage in ("simplify", "review") else None,
     )
     print(f"run: {run_name}")
@@ -954,10 +1067,22 @@ def cmd_stage(args):
         exit_code = state.get("exit")
         duration = state.get("duration_s")
         if final_state != "done":
+            ended = (
+                f"wait: run ended in {final_state} "
+                f"(exit={exit_code if exit_code is not None else '-'}) instead of done"
+            )
+            if plan is not None:
+                # A plan-governed attempt is already a ledger row; a raw launcher resume would
+                # spend no round and skip the plan's routing and budgets.
+                fail(
+                    f"{ended} — the attempt is recorded; a further attempt goes through "
+                    "gdd.py stage (it spends a round), or --over-budget with the owner's "
+                    "approval",
+                    1,
+                )
             resume = state.get("session_id") or "?"
             fail(
-                f"wait: run ended in {final_state} (exit={exit_code if exit_code is not None else '-'}) "
-                f"instead of done — resume with: {launcher} start --name {run_name}-r2 "
+                f"{ended} — resume with: {launcher} start --name {run_name}-r2 "
                 f"--prompt <same prompt> --resume {resume}",
                 1,
             )
@@ -965,14 +1090,15 @@ def cmd_stage(args):
         final_head = final_head_for(args.stage, bool(args.head), head, post_head)
         result = agent_run.read_json(os.path.join(run_dir, "result.json"), {})
         verdict = result.get("verdict") if state.get("result") == "valid" else None
-        tokens = run_tokens(state)
+        tokens = run_usage(state)
         wall = f"{duration}s" if duration is not None else "unknown"
         note = (
             f"exit={exit_code if exit_code is not None else '-'} "
             f"dur={duration if duration is not None else '-'} "
             f"head={post_head[:7]}"
-            + f" role={args.stage} route={state.get('agent') or agent or 'default'}"
-            f" model={model or 'default'} thinking={thinking or 'default'} wall={wall}"
+            + f" role={args.stage} route={reported_field(state, 'agent', agent)}"
+            f" model={reported_field(state, 'model', model)}"
+            f" thinking={reported_field(state, 'thinking', thinking)} wall={wall}"
             f" tokens={tokens if tokens is not None else 'unknown'}"
             + (f" verdict={verdict}" if verdict else "")
         )
@@ -1002,7 +1128,7 @@ def cmd_setup(args):
     if not os.path.isdir(args.repo):
         fail(f"--repo is not a directory: {args.repo}")
     repo = os.path.realpath(git(args.repo, "rev-parse", "--show-toplevel"))
-    repo_name = os.path.basename(repo)
+    repo_name = repo_key(args.repo)
     defaults = {}
     defaults_path = config("GDD_RUN_PLAN_DEFAULTS")
     if defaults_path:
@@ -1051,16 +1177,37 @@ def cmd_close(args):
     return 0
 
 
-def status_repo_name(path):
-    """The repo key setup and stage use; --repo itself when it is not a checkout path."""
+def repo_key(value):
+    """The repo key delivery-state.py writes for --repo: git toplevel basename, else the value.
+
+    Kept identical to delivery-state.py's normalize_repo so the ledger reader and the plan
+    reader agree, including tilde expansion.
+    """
+    path = os.path.expanduser(value)
     if os.path.isdir(path):
-        proc = gdd_process.run(
-            ["git", "-C", path, "rev-parse", "--show-toplevel"],
-            capture_output=True, text=True,
-        )
-        root = (proc.stdout or "").strip() if proc.returncode == 0 else ""
-        return os.path.basename(os.path.realpath(root or path))
-    return path
+        try:
+            proc = gdd_process.run(
+                ["git", "-C", path, "rev-parse", "--show-toplevel"],
+                capture_output=True, text=True,
+            )
+        except OSError:
+            proc = None
+        root = (proc.stdout or "").strip() if proc is not None and proc.returncode == 0 else ""
+        return os.path.basename(root) if root else os.path.basename(os.path.abspath(path))
+    default_root = os.environ.get("GDD_REPO_ROOT") or ""
+    if default_root:
+        candidate = os.path.join(os.path.expanduser(default_root), value)
+        if os.path.isdir(candidate):
+            return os.path.basename(os.path.abspath(candidate))
+    return value
+
+
+def reported_field(state, key, requested):
+    """The launcher-reported value, else the requested value marked `req:`, else `default`."""
+    value = state.get(key)
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return f"req:{requested}" if requested else "default"
 
 
 def cmd_status(args):
@@ -1086,25 +1233,29 @@ def cmd_status(args):
     if result.returncode != 0:
         return result.returncode
 
-    repo_name = status_repo_name(args.repo)
+    repo_name = repo_key(args.repo)
     plan = read_run_plan(repo_name, args.goal)
+    if plan is None:
+        return 0  # no plan file: exactly the legacy show output
     state_path = os.path.expanduser(state_file())
     print()
     print("RUN PLAN")
-    if plan:
-        print(f"plan: {run_plan_path(repo_name, args.goal)}")
-        print(json.dumps(plan, ensure_ascii=False, sort_keys=True))
-    else:
-        print("no run plan")
+    print(f"plan: {run_plan_path(repo_name, args.goal)}")
+    print(json.dumps(plan, ensure_ascii=False, sort_keys=True))
+    budgets = plan.get("budgets") or {}
+    token_cap = budgets.get("token_cap")
+    if token_cap is not None:
+        total, unknown = accounted_usage(state_path, repo_name, args.goal, exact=True)
+        print(f"tokens: {total} used, {unknown} unknown (cap {token_cap})")
     for stage in [name for name in STAGES if name in AGENT_STAGES]:
         role = (plan.get("roles") or {}).get(stage)
-        cap = (plan.get("budgets") or {}).get("rounds", {}).get(stage)
+        cap = budgets.get("rounds", {}).get(stage)
         if cap is None:
             cap = STAGE_BUDGETS.get(stage)
-        used = ledger_rounds(state_path, repo_name, args.goal, stage)
+        used = ledger_rounds(state_path, repo_name, args.goal, stage, exact=True)
         if role is None and cap is None and not used:
             continue
-        total, unknown = ledger_tokens(state_path, repo_name, args.goal, stage)
+        total, unknown = accounted_usage(state_path, repo_name, args.goal, stage, exact=True)
         print(
             f"{stage}: rounds={used}/{cap if cap is not None else '-'} "
             f"tokens={total} unknown={unknown}"
