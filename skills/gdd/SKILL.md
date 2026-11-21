@@ -5,7 +5,7 @@ description: >-
   resume from a saved stage ledger. Hand a bounded patch or review to a CLI agent with a written brief and isolated
   checkout; compare independent coding assistants in separate worktrees and check changes before integration.
 metadata:
-  revision: "22"
+  revision: "23"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "deliver a goal through staged authoring, gates and authorized merge, or verify one isolated CLI handoff without shipping"
@@ -67,7 +67,7 @@ stop and report — do not burn budget in silence.
 | 2 verify | gate evidence and a clause→test map | exit 0 means the process ended, not the phase finished; re-run gates on the FINAL tree; a proof test must fail when the feature is deleted; a weak proof test is its own increment | [`references/phases/02-verify.md`](references/phases/02-verify.md) |
 | 3 simplify → apply | accepted fixes, or a recorded skip | conditional: skip a documentation-only, mechanical, or sub-threshold diff and record the reason in the ledger; report only, never silent apply; name rejected numbers in the apply prompt; a dead-code finding needs mechanical evidence; re-derive changed counts from the tree | [`references/phases/03-simplify-apply.md`](references/phases/03-simplify-apply.md) |
 | 4 review → fix | per-finding fixes | commit stage output before the next stage; reproduce every finding; classify regression vs pre-existing; a third same-class dispatch changes the mechanism | [`references/phases/04-review-fix.md`](references/phases/04-review-fix.md) |
-| 5 gates → commit → PR | a sealed increment and its PR | `overlapping_paths` stops the commit; `worktree-scope.py verify` after committing; prove the branch is not behind main; every number is re-derived on the final tree | [`references/phases/05-gates-pr.md`](references/phases/05-gates-pr.md) |
+| 5 gates → commit → PR | a sealed increment and its PR | `overlapping_paths` stops the commit; `seal --index` then `verify --commit` on the exact shipping SHA; prove the branch is not behind main; every number is re-derived on the final tree | [`references/phases/05-gates-pr.md`](references/phases/05-gates-pr.md) |
 | 6 merge | a merge verdict, then the next branch | `--verified-head` is the SHA the gates ran on; bot marker `status: completed` with `commit_sha` matching the SAME head; no merge without the script's verdict | [`references/phases/06-merge.md`](references/phases/06-merge.md) |
 | 7 ledger | one ledger row per stage | the operator writes it, never the agent; resume with `show` + `git status` + `git log origin/main..HEAD`; mid-flight status comes from live state | [`references/phases/07-ledger.md`](references/phases/07-ledger.md) |
 | 8 reset | a fresh base for the next goal | fresh run, never a resumed session; delete merged branches; fork from freshly fetched `origin/main`; report the base SHA | [`references/phases/07-ledger.md`](references/phases/07-ledger.md) |
