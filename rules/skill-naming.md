@@ -28,8 +28,11 @@ A standing constraint for naming a new skill and for renaming one. Visibility an
 1. **Form.** `^[a-z0-9]+(-[a-z0-9]+)*$`, ASCII, at most 64 characters, identical to the directory
    name (agentskills spec; DSH skips an invalid name, OpenCode invokes by directory name). Aim for at
    most four segments.
-2. **Flat.** Every skill lives at `skills/<name>/`; a family is expressed by prefix, never by nesting
-   (DSH scans one level, OpenCode grouping drops the prefix).
+2. **Categorized source, flat install.** Every skill lives in exactly one source category at
+   `skills/<category>/<name>/`; the name is the global identity across categories and stays equal
+   to its directory. A family is expressed by prefix, never by nesting (DSH scans one level,
+   OpenCode grouping drops the prefix), and installs always land flat at
+   `<skills-root>/<name>/`.
 3. **Families use `<family>-<object>-<verb>`.** A family is skills that chain to each other through
    `../` or that a user chooses between for the same object (`hoa-skill-create`,
    `hoa-skill-review`). A standalone skill may keep a noun or gerund phrase.
@@ -60,6 +63,9 @@ A standing constraint for naming a new skill and for renaming one. Visibility an
    routes to siblings ("Use X for …").
 
 ## Renaming
+
+A category move (same name, different `skills/<category>/` parent) is not a rename: it keeps the
+name, creates no retired entry, and does not reset the revision unless the package is also edited.
 
 Rename only for: a banned or misleading word, a single-word name, a break in a chained family's
 pattern, an exact clash with an installed skill, or a Hermes-coupled skill missing its `hermes-`

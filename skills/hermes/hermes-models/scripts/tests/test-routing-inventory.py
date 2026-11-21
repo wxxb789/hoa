@@ -4,7 +4,7 @@
 Each profile store must be attributed to its own home: a `<home>/profiles/<name>/cron/jobs.json`
 whose rows all say `profiles` loses the one field that makes the row actionable.
 
-Run: python3 skills/hermes-models/scripts/tests/test-routing-inventory.py
+Run: python3 skills/hermes/hermes-models/scripts/tests/test-routing-inventory.py
 """
 import importlib.util
 import json

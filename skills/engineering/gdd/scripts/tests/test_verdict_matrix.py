@@ -357,7 +357,7 @@ COMMENT_PAGES_WITH_MARKER = [
     [dict(CLEAN_COMMENT, id=100 + index) for index in range(100)],
     [{"id": 200, "body": FINDINGS_MARKER_BODY}],
 ]
-UNRESOLVED_THREAD = {"isResolved": False, "path": "skills/gdd/SKILL.md", "line": 3}
+UNRESOLVED_THREAD = {"isResolved": False, "path": "skills/engineering/gdd/SKILL.md", "line": 3}
 THREAD_PAGES_WITH_UNRESOLVED = [([], True, "THREAD-CURSOR-2"),
                                 ([UNRESOLVED_THREAD], False, None)]
 

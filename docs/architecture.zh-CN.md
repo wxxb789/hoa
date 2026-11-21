@@ -62,8 +62,10 @@ Read 链接，见[组合规则](../rules/skill-composition.md)。
 
 ## 目录 metadata 与标签
 
-Skill 位于 `skills/<name>/SKILL.md`。hoa 使用扁平布局，虽然 `npx skills` 也识别
-分类布局，包括 `skills/.curated/`、`skills/.experimental/` 和 `skills/.system/`。
+Skill 位于 `skills/<category>/<name>/SKILL.md`，属于五个仅存在于源码树的分类之一：
+`engineering`、`productivity`、`research-writing`、`skill-authoring`、`hermes`；
+安装后的包仍保持扁平 `<skills-root>/<name>/`。`npx skills` 也识别带点号的布局，
+如 `skills/.curated/`、`skills/.experimental/` 和 `skills/.system/`。
 Skill frontmatter 存放 `revision`、`kind`、可选的
 `consumes` 和 `produces`，以及目录字段：
 
@@ -105,12 +107,12 @@ CI 固定用 3.13，安装测试依赖与 uv，并在 job 内直接调用 Python
 
 | Job 或 step | 本地命令或范围 | 检查内容 |
 |---|---|---|
-| Frontmatter | `uv run --script scripts/check_frontmatter.py` | Skill metadata；可见 description 最长 350 字符，隐藏的最长 1024；可见性标记与 Codex sidecar 一致 |
+| Frontmatter | `uv run --script scripts/check_frontmatter.py` | Skill metadata 与布局（分类白名单、名称唯一）；可见 description 最长 350 字符，隐藏的最长 1024；可见性标记与 Codex sidecar 一致 |
 | Contract graph | `uv run --script scripts/check_contract_graph.py` | R1 至 R11 |
-| Skill links | `uv run --script scripts/check_skill_links.py` | 同级引用可解析；skill 脚本命令使用 uv 和 PEP 723，内联 Python 使用 `--no-project` |
+| Skill links | `uv run --script scripts/check_skill_links.py` | 同级引用解析且不跨分类；skill 脚本命令使用 uv 和 PEP 723，内联 Python 使用 `--no-project` |
 | Catalog drift | `uv run --script scripts/generate_index.py --check` | 两份索引与源 metadata 一致 |
 | Vendoring drift | `uv run --script scripts/vendor_shared.py --check` | Vendored 文件与权威来源一致 |
-| Revisions（PR） | `uv run --script scripts/version.py check-revisions` | 发生变更的 skill 目录提高各自的 revision |
+| Revisions（PR） | `uv run --script scripts/version.py check-revisions` | 发生变更的 skill 目录提高各自的 revision；仅分类平移不计变更 |
 | Ruff | `uvx ruff@0.17.5 check --config ruff.toml --force-exclude scripts evals skills` | `scripts/`、`evals/`、`skills/` 下的 Python 正确性与清理发现；Windows 上在现有终端直接运行 |
 | pytest | `uv run --no-project --python 3.13 --with-requirements scripts/requirements.txt python -m pytest -n auto --dist load` | 收集 `scripts/`、`evals/` 和 `skills/` 中的 `test_*.py`；单项超时 120 秒 |
 | 独立检查 | 分别用 `uv run --script` 运行：触发案例、define-goal fixture、Hermes 路由清单与 provider metadata、GDD verdict matrix 与 merge-gate mutation harness | 每个命名步骤以退出码为契约；具体路径见 workflow |

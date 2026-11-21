@@ -9,7 +9,7 @@ description: >-
   a substitute for deterministic gates, artifact inspection, or primary agent sign-off.
 disable-model-invocation: true
 metadata:
-  revision: "2"
+  revision: "3"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "opt-in `/v1/decisions` and `/v1/chat/completions` rubric classifier with 9 bundled presets"
@@ -44,7 +44,7 @@ Run `scripts/ghc_decisions.py` via `uv run`. Only if a script command fails (for
 example `uv` is not found), read [references/troubleshooting.md](references/troubleshooting.md).
 
 ```bash
-S=skills/ghc-decisions/scripts/ghc_decisions.py   # or ~/.agents/skills/ghc-decisions/scripts/ghc_decisions.py
+S=skills/productivity/ghc-decisions/scripts/ghc_decisions.py   # or ~/.agents/skills/ghc-decisions/scripts/ghc_decisions.py
 
 # List bundled presets
 uv run "$S" --list-presets

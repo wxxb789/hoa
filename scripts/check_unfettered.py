@@ -507,13 +507,14 @@ def _collision_findings(root: Path, entries: list[Entry],
             candidates.add(suffix)
     if not candidates:
         return findings
-    curated: set[str] = set()
+    curated: dict[str, str] = {}
     for entry in entries:
         if entry.kind != "tree" or not entry.path.startswith(CURATED + "/"):
             continue
-        suffix = entry.path[len(CURATED) + 1:]
-        if "/" not in suffix:
-            curated.add(suffix)
+        parts = entry.path[len(CURATED) + 1:].split("/")
+        if len(parts) != 2:
+            continue
+        curated[parts[1]] = entry.path
     retired: set[str] = set()
     registry = next((entry for entry in entries if entry.path == RETIRED), None)
     if registry is not None:
@@ -529,7 +530,7 @@ def _collision_findings(root: Path, entries: list[Entry],
         if name in curated:
             findings.append(
                 f"{_safe_path(f'{INSIDE}/{name}')}: name collides with curated "
-                f"{_safe_path(f'{CURATED}/{name}')}")
+                f"{_safe_path(curated[name])}")
         if name in retired:
             findings.append(
                 f"{_safe_path(f'{INSIDE}/{name}')}: name collides with a retired name")

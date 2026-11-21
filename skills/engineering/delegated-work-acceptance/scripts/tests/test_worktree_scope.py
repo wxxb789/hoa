@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """End-to-end tests for worktree-scope.py against real temporary git repos.
 
-Run: python skills/delegated-work-acceptance/scripts/tests/test_worktree_scope.py
+Run: python skills/engineering/delegated-work-acceptance/scripts/tests/test_worktree_scope.py
 Repositories live under .tmp-artifacts/worktree-scope-tests/.
 """
 from __future__ import annotations
@@ -16,7 +16,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[4]
+ROOT = Path(__file__).resolve().parents[5]
 SCRIPT = Path(__file__).resolve().parents[1] / "worktree-scope.py"
 ARTIFACTS = ROOT / ".tmp-artifacts" / "worktree-scope-tests"
 _DEFAULT = object()

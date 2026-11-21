@@ -6,17 +6,25 @@
 """Check every `../<name>/` reference that leaves a skill directory.
 
 A parent chains to a sibling skill with a path relative to its own file, e.g.
-`Read ../<child>/SKILL.md`. Each such reference in a skill's `SKILL.md` or
-`references/**/*.md` is resolved lexically against the file that holds it:
+`Read ../<child>/SKILL.md`, and the sibling must sit in the parent's own
+category. Each such reference in a skill's `SKILL.md` or `references/**/*.md`
+is resolved lexically against the file that holds it:
 
 - a path that stays inside the skill is ignored, unless it lands on a missing
-  `<name>/` while `skills/<name>` is a skill: that sibling link was written
+  `<name>/` while `<category>/<name>` is a skill: that sibling link was written
   with too few `../` for its own file's depth (`../../<name>/` from
   `references/`, `../../../<name>/` from `references/phases/`) -- an error;
-- a path that lands in `skills/<name>/` must name an existing sibling skill and,
-  unless it carries a `<placeholder>` or glob, an existing file or directory
-  there (`#anchor` stripped) — otherwise an error;
-- a path that climbs above `skills/` is not a sibling link and is ignored.
+- a canonical sibling path climbs exactly to the source package's parent and
+  must resolve to that parent's `<name>/SKILL.md` and, unless it carries a
+  `<placeholder>` or glob, the named file or directory there (`#anchor`
+  stripped, and no `..` inside the suffix) -- otherwise an error;
+- a sibling name that is unresolved in the category but exists in another
+  category is a cross-category error; a name that exists nowhere is a missing
+  sibling;
+- a path that climbs above the category and resolves inside the curated root is a
+  cross-category error even when the written path names the source's own
+  category; a path that resolves outside the curated root is not a sibling link
+  and is ignored.
 
 It also checks how skill Markdown runs a skill's own Python scripts, in fenced
 code blocks and inline code:
@@ -35,9 +43,9 @@ code blocks and inline code:
 - a skill's `.sh`/`.bash`/`.ps1` launcher outside `tests/` must not call a bare
   `python`/`python3`: it goes through `uv run` too.
 
-Script paths resolve against the skill directory, the file holding them,
-`skills/` and the repository root, after dropping a leading `$VAR/`, `${...}/`,
-`<placeholder>/` or `~/`.
+Script paths resolve against the skill directory, the file holding them, the
+skill's category (the checkout-shaped host root), `skills/` and the repository
+root, after dropping a leading `$VAR/`, `${...}/`, `<placeholder>/` or `~/`.
 
 Usage:
     uv run scripts/check_skill_links.py
@@ -51,6 +59,8 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
+
+import skill_paths
 
 ROOT = Path(__file__).resolve().parent.parent
 SKILLS = ROOT / "skills"
@@ -82,9 +92,10 @@ class Reference:
     source: Path   # file holding the reference
     line: int
     text: str      # the reference as written
-    scope: str     # "sibling" or "skill-relative" (sibling written from the skill dir)
+    scope: str     # "sibling", "skill-relative" or "category-traversal"
     name: str      # sibling skill name
     rest: str      # path inside the sibling, anchor stripped
+    ups: int = 0   # number of `../` climbs in the reference
 
 
 def skill_files(skill_dir: Path) -> list[Path]:
@@ -98,6 +109,7 @@ def skill_files(skill_dir: Path) -> list[Path]:
 
 def references(skill_dir: Path) -> list[Reference]:
     """Every `../` reference that leaves `skill_dir`, resolved lexically."""
+    curated = skill_dir.parent.parent
     found = []
     for path in skill_files(skill_dir):
         depth = len(path.relative_to(skill_dir).parts) - 1
@@ -106,17 +118,23 @@ def references(skill_dir: Path) -> list[Reference]:
             for match in REFERENCE.finditer(line):
                 ups = match.group(1).count("../")
                 name = match.group(2)
+                token = match.group(0).rstrip(".,;:")
+                rest = match.group(3).rstrip(".,;:")
                 if ups <= depth:
                     if (not (path.parents[ups] / name).exists()
                             and (skill_dir.parent / name / "SKILL.md").is_file()):
-                        found.append(Reference(
-                            source=path, line=number, text=match.group(0).rstrip(".,;:"),
-                            scope="skill-relative", name=name, rest=match.group(3).rstrip(".,;:")))
+                        found.append(Reference(path, number, token, "skill-relative", name,
+                                               rest, ups))
                     continue
                 if ups == depth + 1:
-                    found.append(Reference(
-                        source=path, line=number, text=match.group(0).rstrip(".,;:"),
-                        scope="sibling", name=name, rest=match.group(3).rstrip(".,;:")))
+                    found.append(Reference(path, number, token, "sibling", name, rest, ups))
+                    continue
+                if ups >= len(path.parents):
+                    continue
+                resolved = path.parents[ups] / name
+                if resolved.is_relative_to(curated):
+                    found.append(Reference(path, number, token, "category-traversal", name,
+                                           rest, ups))
     return found
 
 
@@ -163,7 +181,7 @@ def resolve_script(token: str, source: Path, skill_dir: Path, skills_root: Path)
     if not rest or "$" in rest or "<" in rest:
         return None
     root = skills_root.resolve()
-    for base in (skill_dir, source.parent, skills_root, skills_root.parent):
+    for base in (skill_dir, source.parent, skill_dir.parent, skills_root, skills_root.parent):
         candidate = Path(os.path.normpath(base / rest)).resolve()
         if candidate.is_file() and candidate.is_relative_to(root):
             return candidate
@@ -243,10 +261,12 @@ def shebang_errors(skill_dir: Path, skills_root: Path) -> list[str]:
 def check(skills_root: Path) -> list[str]:
     """Return the errors for every skill under skills_root."""
     errors = []
-    for skill_dir in sorted(path for path in skills_root.iterdir()
-                            if path.is_dir() and not path.name.startswith(".")):
+    for skill_dir in skill_paths.skill_dirs(skills_root):
+        if not (skill_dir / "SKILL.md").is_file():
+            continue
         errors.extend(script_errors(skill_dir, skills_root))
         errors.extend(shebang_errors(skill_dir, skills_root))
+        category = skill_dir.parent
         for ref in references(skill_dir):
             where = f"{ref.source.relative_to(skills_root.parent).as_posix()}:{ref.line}"
             if ref.scope == "skill-relative":
@@ -254,16 +274,38 @@ def check(skills_root: Path) -> list[str]:
                               f"to the file holding them, so the sibling is "
                               f"{'../' * (len(ref.source.relative_to(skill_dir).parts))}{ref.name}/")
                 continue
-            sibling = skills_root / ref.name
-            if not (sibling / "SKILL.md").is_file():
-                errors.append(f"{where}: {ref.text} names no sibling skill "
-                              f"(expected skills/{ref.name}/SKILL.md)")
+            if ref.scope == "category-traversal":
+                base = ref.source.parents[ref.ups] / ref.name
+                target = base.joinpath(*PurePosixPath(ref.rest).parts) if ref.rest else base
+                errors.append(f"{where}: {ref.text} climbs above {category.name}/ and resolves "
+                              f"to {target.relative_to(skills_root.parent).as_posix()}; "
+                              f"chained skills must be named from the same category")
                 continue
-            if ref.rest and not PLACEHOLDER.search(ref.rest):
-                target = sibling.joinpath(*PurePosixPath(ref.rest).parts)
-                if not target.exists():
-                    errors.append(f"{where}: {ref.text} does not exist in skills/{ref.name}/ "
-                                  f"(got {ref.rest!r})")
+            sibling = category / ref.name
+            if not (sibling / "SKILL.md").is_file():
+                elsewhere = [path for path in skill_paths.skill_dirs(skills_root)
+                             if path.name == ref.name and (path / "SKILL.md").is_file()]
+                if elsewhere:
+                    target = elsewhere[0].relative_to(skills_root.parent).as_posix()
+                    errors.append(f"{where}: {ref.text} is a cross-category reference to "
+                                  f"{target}/SKILL.md; keep chained skills in the same category")
+                else:
+                    errors.append(f"{where}: {ref.text} names no sibling skill "
+                                  f"(expected {sibling.relative_to(skills_root.parent).as_posix()}/"
+                                  f"SKILL.md)")
+                continue
+            if ref.rest:
+                if ".." in PurePosixPath(ref.rest).parts:
+                    errors.append(f"{where}: {ref.text} escapes "
+                                  f"{sibling.relative_to(skills_root.parent).as_posix()}/ through "
+                                  f"{ref.rest!r}")
+                    continue
+                if not PLACEHOLDER.search(ref.rest):
+                    target = sibling.joinpath(*PurePosixPath(ref.rest).parts)
+                    if not target.exists():
+                        errors.append(f"{where}: {ref.text} does not exist in "
+                                      f"{sibling.relative_to(skills_root.parent).as_posix()}/ "
+                                      f"(got {ref.rest!r})")
     return errors
 
 

@@ -44,10 +44,11 @@ Install and path mechanics live in [cross-platform-skills.md](cross-platform-ski
 
 ## Chaining
 
-1. **Flat siblings.** A child is `skills/<child>/`, never nested under its parent. Discovery depth
-   differs (Claude and OMP scan one level, Pi stops at the first SKILL.md, OpenCode does not search
-   inside a skill directory, Codex recurses), so a nested child is top-level on some hosts and
-   invisible on others.
+1. **Same-category, flat install.** A child sits in the same source category as its parent,
+   `skills/<category>/<child>/`, never nested under it; after install both are flat siblings in the
+   host root. Discovery depth differs (Claude and OMP scan one level, Pi stops at the first
+   SKILL.md, OpenCode does not search inside a skill directory, Codex recurses), so a nested child
+   is top-level on some hosts and invisible on others.
 2. **Exact link shape.** The parent writes:
 
    > Read `../<child>/SKILL.md` (relative to this skill's directory) and follow it. Do not call the
@@ -84,7 +85,7 @@ CI (`.github/workflows/ci.yml`) fails on:
 |---|---|---|
 | A model-visible description over 350 characters; a hidden one over 1024 (agentskills spec, Codex) | `scripts/check_frontmatter.py` | listing budget; hosts truncate long descriptions |
 | `disable-model-invocation` not a kebab-case YAML boolean, or `true` without `agents/openai.yaml` `policy.allow_implicit_invocation: false`, or the reverse | `scripts/check_frontmatter.py` | Visibility 1–2 |
-| A `../<sibling>/` reference in `SKILL.md` or `references/**/*.md` that names no sibling skill or no existing path; one that leaves `skills/` only warns | `scripts/check_skill_links.py` | Chaining 1–2 |
+| A `../<sibling>/` reference in `SKILL.md` or `references/**/*.md` that names no sibling skill, no existing path, a sibling in another category, or a checkout-only path that climbs above the category | `scripts/check_skill_links.py` | Chaining 1–2 |
 | A hidden skill in `must_pick` (`R10`) | `scripts/check_contract_graph.py` | Visibility 5 |
 | A visible mechanism that no other skill names or links in its `SKILL.md` or `references/**/*.md` (`R11`) | `scripts/check_contract_graph.py` | visible mechanisms have a caller |
 | A generated `npx skills add` row that does not name a skill's whole `../` closure, or an `npx skills remove` line that does not match `scripts/retired_skills.toml` (a registry entry that is a current skill or lacks `replacement`/`reason` fails too) | `scripts/generate_index.py --check` | install-closure invariant ([cross-platform-skills.md](cross-platform-skills.md)); stale names after a rename or split |

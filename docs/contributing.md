@@ -23,7 +23,10 @@ The repo has no custom installer. Use the generated [Install section](../index.m
 each command for a skill with sibling dependencies installs its whole closure
 into one skills root. Skills without such a row have no sibling dependencies.
 Use **Without Hermes** unless you want to operate Hermes; non-Hermes skills do
-not link to the Hermes family. To include every skill, or to list or update:
+not link to the Hermes family. In the source tree each skill lives at
+`skills/<category>/<name>/`; categories are source-only — installs stay flat at
+`<skills-root>/<name>/` and every command is name-based. To include every skill,
+or to list or update:
 
 ```sh
 npx skills add wxxb789/hoa -g -s '*' -y
@@ -46,12 +49,12 @@ npx skills update -g -y
   sources. Removal is by name and a no-op for names not installed. Reinstall
   using the current generated commands, not saved ones. Replacements are
   recorded in the [retired skill registry](../scripts/retired_skills.toml).
-- Use [hoa-skill-set-audit](../skills/hoa-skill-set-audit/SKILL.md) to diagnose
+- Use [hoa-skill-set-audit](../skills/skill-authoring/hoa-skill-set-audit/SKILL.md) to diagnose
   missing or split sibling closures, duplicates, and shadowing. See the
   [cross-platform rules](../rules/cross-platform-skills.md) for root and link details.
 
-For Hermes model routing, install [hermes-models](../skills/hermes-models/SKILL.md)
-and [hermes-models-cutover](../skills/hermes-models-cutover/SKILL.md) together
+For Hermes model routing, install [hermes-models](../skills/hermes/hermes-models/SKILL.md)
+and [hermes-models-cutover](../skills/hermes/hermes-models-cutover/SKILL.md) together
 using the parent's generated command. The child covers reversible fleet
 cutovers and same-provider ID swaps, with live proof per affected surface.
 Hermes does not honor `disable-model-invocation` and still lists the child.
@@ -62,12 +65,12 @@ For manual invocation on other runtimes, follow the
 
 | Need | Skill | Result |
 |---|---|---|
-| Review behavior or a proposed change | [hoa-skill-review](../skills/hoa-skill-review/SKILL.md) | Evidence-backed findings, no edits to the reviewed skill |
-| Create, evolve, or compose a defined capability | [hoa-skill-create](../skills/hoa-skill-create/SKILL.md) | A change, validation results, and any unverified paths |
-| Review practice across repos and agent sessions | [hoa-practice-retro](../skills/hoa-practice-retro/SKILL.md) (explicit only) | Evidence-backed findings and recurring-work candidates, no automatic creation |
-| Review one repo's practices and machinery | [hoa-repo-reckoning](../skills/hoa-repo-reckoning/SKILL.md) (explicit prompt shortcut) | Free-form report with ranked, evidence-backed findings |
-| Audit the set of skills offered to a session | [hoa-skill-set-audit](../skills/hoa-skill-set-audit/SKILL.md) (explicit only) | Set-level findings and necessity verdicts, no changes |
-| Recommend skills based on recent work | [hoa-skill-curate](../skills/hoa-skill-curate/SKILL.md) | Evidence-backed recommendations, no changes |
+| Review behavior or a proposed change | [hoa-skill-review](../skills/skill-authoring/hoa-skill-review/SKILL.md) | Evidence-backed findings, no edits to the reviewed skill |
+| Create, evolve, or compose a defined capability | [hoa-skill-create](../skills/skill-authoring/hoa-skill-create/SKILL.md) | A change, validation results, and any unverified paths |
+| Review practice across repos and agent sessions | [hoa-practice-retro](../skills/skill-authoring/hoa-practice-retro/SKILL.md) (explicit only) | Evidence-backed findings and recurring-work candidates, no automatic creation |
+| Review one repo's practices and machinery | [hoa-repo-reckoning](../skills/skill-authoring/hoa-repo-reckoning/SKILL.md) (explicit prompt shortcut) | Free-form report with ranked, evidence-backed findings |
+| Audit the set of skills offered to a session | [hoa-skill-set-audit](../skills/skill-authoring/hoa-skill-set-audit/SKILL.md) (explicit only) | Set-level findings and necessity verdicts, no changes |
+| Recommend skills based on recent work | [hoa-skill-curate](../skills/skill-authoring/hoa-skill-curate/SKILL.md) | Evidence-backed recommendations, no changes |
 
 Start with focused behavior checks and expand to variants, models, or runtimes
 as reach, risk, or conflicting evidence warrants. Retro candidates need owner
@@ -87,7 +90,9 @@ There is no project version or release bundle: `npx skills` installs directly
 from the GitHub default branch. Each skill tracks its own integer-string
 `metadata.revision`. Raise it by one for each skill directory the PR changes.
 New skill names, including renames, start at `"1"`; register a rename in the
-[retired skill registry](../scripts/retired_skills.toml).
+[retired skill registry](../scripts/retired_skills.toml). A pure category move
+is not a change: it keeps the old revision and needs no retired entry, while a
+move plus any package edit must bump that skill.
 Run `uv run --script scripts/version.py check-revisions`. The
 [changelog](../CHANGELOG.md) is dated and optional; earlier entries preserve
 historical project and per-skill versions.

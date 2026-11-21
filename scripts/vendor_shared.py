@@ -34,33 +34,35 @@ SOURCES: dict[str, Path] = {
 
 # shared file name → destination skill dirs
 CONSUMERS: dict[str, list[str]] = {
-    "skill_config.py": ["skills/gdd/scripts", "skills/ghc-decisions/scripts"],
-    "rubrics.json": ["skills/ghc-decisions/scripts"],
-    "findings.py": ["skills/hoa-practice-retro/scripts"],
-    "panel.md": ["skills/hoa-practice-retro/references"],
-    "usage-based-recommendations.md": ["skills/hoa-skill-curate/references"],
+    "skill_config.py": ["skills/engineering/gdd/scripts",
+                        "skills/productivity/ghc-decisions/scripts"],
+    "rubrics.json": ["skills/productivity/ghc-decisions/scripts"],
+    "findings.py": ["skills/skill-authoring/hoa-practice-retro/scripts"],
+    "panel.md": ["skills/skill-authoring/hoa-practice-retro/references"],
+    "usage-based-recommendations.md": [
+        "skills/skill-authoring/hoa-skill-curate/references"],
     # The configuration resolution order; skills that document configuration keys.
     "configuration.md": [
-        "skills/contract-bound-deliverables/references",
-        "skills/evidence-boundary-discipline/references",
-        "skills/gdd/references",
-        "skills/ghc-decisions/references",
-        "skills/git-auto-sync-pipelines/references",
-        "skills/hoa-skill-curate/references",
-        "skills/hoa-skill-port/references",
-        "skills/spec-convergence/references",
+        "skills/productivity/contract-bound-deliverables/references",
+        "skills/research-writing/evidence-boundary-discipline/references",
+        "skills/engineering/gdd/references",
+        "skills/productivity/ghc-decisions/references",
+        "skills/engineering/git-auto-sync-pipelines/references",
+        "skills/skill-authoring/hoa-skill-curate/references",
+        "skills/skill-authoring/hoa-skill-port/references",
+        "skills/productivity/spec-convergence/references",
     ],
     # Read on failure only; skills whose docs run their own scripts with `uv run`.
     "troubleshooting.md": [
-        "skills/agent-operating-contract-evolution/references",
-        "skills/gdd/references",
-        "skills/ghc-decisions/references",
-        "skills/ghc-search/references",
-        "skills/hermes-models/references",
-        "skills/hoa-practice-retro/references",
-        "skills/hoa-skill-curate/references",
-        "skills/hoa-skill-set-audit/references",
-        "skills/writing/references",
+        "skills/productivity/agent-operating-contract-evolution/references",
+        "skills/engineering/gdd/references",
+        "skills/productivity/ghc-decisions/references",
+        "skills/research-writing/ghc-search/references",
+        "skills/hermes/hermes-models/references",
+        "skills/skill-authoring/hoa-practice-retro/references",
+        "skills/skill-authoring/hoa-skill-curate/references",
+        "skills/skill-authoring/hoa-skill-set-audit/references",
+        "skills/research-writing/writing/references",
     ],
 }
 

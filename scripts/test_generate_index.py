@@ -21,6 +21,7 @@ from unittest.mock import patch
 sys.dont_write_bytecode = True
 SCRIPT = Path(__file__).resolve().parent / "generate_index.py"
 ARTIFACTS = SCRIPT.parent.parent / ".tmp-artifacts" / "index-tests"
+sys.path.insert(0, str(SCRIPT.parent))
 spec = importlib.util.spec_from_file_location("skill_metadata", SCRIPT.parent / "skill_metadata.py")
 sm = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(sm)
@@ -35,10 +36,10 @@ def make_temp_root() -> Path:
 
 
 
-def make_skill(root: Path, name: str, *, index=None, frontmatter=True, quoted=False,
-               areas="software-development", targets="runtime-agnostic",
+def make_skill(root: Path, name: str, *, category="engineering", index=None, frontmatter=True,
+               quoted=False, areas="software-development", targets="runtime-agnostic",
                summary=None, summary_zh=None):
-    d = root / "skills" / name
+    d = root / "skills" / category / name
     d.mkdir(parents=True)
     quote = '"' if quoted else ""
     parts = []
@@ -211,7 +212,7 @@ class CollectTests(unittest.TestCase):
 
     def test_dir_without_skill_md_rejected(self):
         make_skill(self.tmp, "good")
-        (self.tmp / "skills" / "broken-pkg").mkdir()
+        (self.tmp / "skills" / "engineering" / "broken-pkg").mkdir()
         with patch.object(gi, "SKILLS", self.tmp / "skills"), \
              patch.object(gi, "LIBRARY_FOLDERS", {}):
             with self.assertRaises(ValueError) as cm:
@@ -224,7 +225,8 @@ class CollectTests(unittest.TestCase):
              patch.object(gi, "LIBRARY_FOLDERS", {}):
             rows = gi.collect()
         self.assertEqual(rows, [{
-            "name": "unlisted-skill", "type": "skill", "path": "skills/unlisted-skill/",
+            "name": "unlisted-skill", "type": "skill",
+            "path": "skills/engineering/unlisted-skill/",
             "note_en": "unlisted-skill does one thing.",
             "note_zh": "unlisted-skill does one thing.", "closure": [],
             "areas": "software-development", "targets": "runtime-agnostic", "revision": "1"}])
@@ -291,9 +293,10 @@ class CheckDriftTests(unittest.TestCase):
         make_skill(self.tmp, "b")
         make_skill(self.tmp, "c")
         make_skill(self.tmp, "solo")
-        append(self.tmp / "skills" / "a" / "SKILL.md", "Read ../b/SKILL.md and follow it.\n")
-        (self.tmp / "skills" / "b" / "references").mkdir()
-        (self.tmp / "skills" / "b" / "references" / "x.md").write_text(
+        append(self.tmp / "skills" / "engineering" / "a" / "SKILL.md",
+               "Read ../b/SKILL.md and follow it.\n")
+        (self.tmp / "skills" / "engineering" / "b" / "references").mkdir()
+        (self.tmp / "skills" / "engineering" / "b" / "references" / "x.md").write_text(
             "Run ../../c/scripts/ and ../../a/SKILL.md.\n", encoding="utf-8")
         self.assertEqual(self._run(check=False), 0)
         index = (self.tmp / "index.md").read_text(encoding="utf-8").split("## Install")[1]
@@ -302,7 +305,8 @@ class CheckDriftTests(unittest.TestCase):
         self.assertNotIn("| c |", index)
         self.assertNotIn("| solo |", index)
 
-        append(self.tmp / "skills" / "solo" / "SKILL.md", "Read ../c/SKILL.md.\n")
+        append(self.tmp / "skills" / "engineering" / "solo" / "SKILL.md",
+               "Read ../c/SKILL.md.\n")
         self.assertEqual(self._run(check=True), 1)
 
     def test_install_without_hermes_lists_every_other_skill_and_stays_complete(self):
@@ -314,7 +318,8 @@ class CheckDriftTests(unittest.TestCase):
             self.assertIn(marker, text)
             self.assertIn("```bash\nnpx skills add wxxb789/hoa -g -s a -y\n```", text)
 
-        append(self.tmp / "skills" / "a" / "SKILL.md", "Read ../hermes-x/SKILL.md.\n")
+        append(self.tmp / "skills" / "engineering" / "a" / "SKILL.md",
+               "Read ../hermes-x/SKILL.md.\n")
         self.assertEqual(self._run(check=False), 1)
 
     def test_retired_registry_becomes_one_remove_command_and_is_validated(self):

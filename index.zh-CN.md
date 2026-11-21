@@ -27,51 +27,51 @@ targets:  runtime-agnostic | repo-only |
 
 | Artifact | Type | Areas | Targets | Path | Notes |
 |---|---|---|---|---|---|
-| agent-harness-settings-parity | skill | software-development | runtime-agnostic | `skills/agent-harness-settings-parity/` | 让同一条策略在每个 coding harness 上生效，尽管配置文件、键名与单位各不相同 |
-| agent-operating-contract-evolution | skill | software-development,work-management,self-management | runtime-agnostic | `skills/agent-operating-contract-evolution/` | 按分层演进 agent 身份文件与操作协议：覆盖标记、行为评测、加载范围探测 |
-| contract-bound-deliverables | skill | work-management,software-development | runtime-agnostic | `skills/contract-bound-deliverables/` | 满足可度量契约：冻结证据包、并行起草、按字数装配、用契约自身的度量脚本验收 |
-| define-goal | skill | self-management,software-development,work-management | runtime-agnostic | `skills/define-goal/` | 把雄心转化为编号 goal 文件，近期清晰、远期可细化，不制定实现步骤 |
-| delegated-work-acceptance | skill | work-management,software-development | runtime-agnostic | `skills/delegated-work-acceptance/` | 按 artifact 和写入边界验收委派成果，将退回或越界的修复交还给负责人 |
-| dotnet-repo-workflow | skill | software-development | runtime-agnostic | `skills/dotnet-repo-workflow/` | 运行仓库自带的 .NET 门禁，验证 NuGet 锁定还原，诊断 Roslyn 编译引用缺失 |
-| evidence-backed-analytical-writing | skill | work-management | runtime-agnostic | `skills/evidence-backed-analytical-writing/` | 中文分析报告：证据地图与「主张 → 证据 → 机制 → 局限」骨架；时效边界、状态阶梯、否定性结论 |
-| evidence-boundary-discipline | skill | work-management | runtime-agnostic | `skills/evidence-boundary-discipline/` | 只陈述有日期的来源所能支持的事实：时态对齐日期、来源标签全链路一致、缺失不升级为不存在 |
-| gdd | skill | software-development,work-management | runtime-agnostic | `skills/gdd/` | 用分阶段产出、门禁和授权合并交付目标，或单次委派给隔离的 CLI 并独立验收，不发布 |
-| gdd-route-cc | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-cc/` | Claude Code stream-JSON 路由，支持会话恢复和原生 JSON schema |
-| gdd-route-codex | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-codex/` | Codex exec 与 resume 路由，支持原生 JSON schema，默认关闭集成 |
-| gdd-route-copilot | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-copilot/` | GitHub Copilot CLI prompt 与 JSONL 结果路由，支持会话恢复 |
-| gdd-route-dsh | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-dsh/` | gdd 的隐藏 DeepSeek Harness headless route：配置、会话管理和恢复 |
-| gdd-route-omo | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-omo/` | Omo stdin 与 Senpi JSON 事件路由，支持会话恢复 |
-| gdd-route-omp | skill | software-development,work-management | pi | `skills/gdd-route-omp/` | 脱离会话的 runner 跑 `omp -p` 长任务；轮询完成、按 session id 恢复（需要 skill `gdd`） |
-| gdd-route-opencode | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-opencode/` | OpenCode 独立服务器路由，支持会话恢复和模型变体选择 |
-| gdd-route-pi | skill | software-development,work-management | runtime-agnostic | `skills/gdd-route-pi/` | Pi stdin 与 JSON 事件路由，支持会话恢复 |
-| ghc-decisions | skill | software-development,work-management | runtime-agnostic | `skills/ghc-decisions/` | 按需启用（opt-in）的 `/v1/decisions` 与 `/v1/chat/completions` 结构化 Rubric 分类器，内置 9 大日常预设 |
-| ghc-search | skill | software-development | runtime-agnostic | `skills/ghc-search/` | 经本机 `ghc-proxy` Responses API 做 web 与 X/Twitter 搜索；返回答案加去重来源 |
-| git-auto-sync-pipelines | skill | software-development,work-management | runtime-agnostic | `skills/git-auto-sync-pipelines/` | 手改仓库的定时提交推送：固定门序、白名单与体积上限、暂存区密钥扫描、心跳与去重告警 |
-| harness-engineering | skill | software-development | runtime-agnostic | `skills/harness-engineering/` | 重构与设计 harness 脚本：自包含、检查绑定 owner 决策、纯函数检查加薄 runner、净减行数 |
-| hermes-context-file-loading | skill | software-development | hermes | `skills/hermes-context-file-loading/` | Hermes 指令文件各自从何处加载、哪个项目文件生效，以及规则该放进哪个 prompt 层 |
-| hermes-kanban | skill | work-management,software-development | hermes | `skills/hermes-kanban/` | 多卡片看板工作：拆解、并行派发、评审门禁、卡住任务恢复 |
-| hermes-models | skill | software-development | hermes | `skills/hermes-models/` | 配置 Hermes provider、传输与路由；用实时信号证明路由，而非 `config get` |
-| hermes-models-cutover | skill | software-development | hermes | `skills/hermes-models-cutover/` | 跨 Hermes home 与 harness 切换供应商路由，实时验证并保留回滚 |
-| hermes-ops-claim-verification | skill | software-development,work-management | hermes | `skills/hermes-ops-claim-verification/` | 验证 Hermes 定时任务、修复或部署的说法：找准记录面、区分手动与调度运行、审查审计者 |
-| hermes-runtime-repairs | skill | software-development,work-management | hermes | `skills/hermes-runtime-repairs/` | 修模板/生成器、验证暂存产物，再部署并回读线上运行时 |
-| hermes-updates | skill | software-development | hermes | `skills/hermes-updates/` | 升级运行中的 Hermes 并诊断漂移：快照、官方更新器、更新后检查、故障索引 |
-| hoa-practice-retro | skill | self-management,work-management | runtime-agnostic | `skills/hoa-practice-retro/` | 定期复盘负责人跨仓库、会话与记忆的工程实践：应停止的习惯、未执行的决定、未知的未知，每条都有两个独立来源 |
-| hoa-repo-reckoning | skill | software-development,work-management | runtime-agnostic | `skills/hoa-repo-reckoning/` | 仅显式调用的只读仓库审查提示词：哪些事该停止，哪些未知会改变工作 |
-| hoa-skill-create | skill | software-development,work-management,self-management | runtime-agnostic | `skills/hoa-skill-create/` | 直接创建、演进或组合已定义的 skill，并按风险聚焦验证 |
-| hoa-skill-curate | skill | software-development,self-management | runtime-agnostic | `skills/hoa-skill-curate/` | 追溯安装来源，区分内容漂移与上游活动，仅执行所有者确认的技能库变更 |
-| hoa-skill-port | skill | software-development,work-management | runtime-agnostic | `skills/hoa-skill-port/` | 将私有技能移入共享仓库作为权威副本：外置环境参数、通过目标仓库门禁，并区分运行时切换与发布 |
-| hoa-skill-review | skill | software-development,work-management,self-management | runtime-agnostic | `skills/hoa-skill-review/` | 依据消费者证据审计 skill 行为与修改，不改动被审查对象 |
-| hoa-skill-set-audit | skill | software-development,self-management | runtime-agnostic | `skills/hoa-skill-set-audit/` | 审计会话实际提供的整套技能：单项质量、重叠、遮蔽、指令冲突、同名漂移、可见性、../ 闭包、清单预算；只出报告 |
-| measurement-campaign-evidence | skill | software-development,work-management | runtime-agnostic | `skills/measurement-campaign-evidence/` | 测量运动：先钉候选身份、串行跑、一致报告集，不让基线伪造延迟对比 |
-| official-document-verification | skill | work-management | runtime-agnostic | `skills/official-document-verification/` | 用文档的确切版本核验结论，含只能用真浏览器取到的被封来源 |
-| package-release-verification | skill | software-development | runtime-agnostic | `skills/package-release-verification/` | 发版：先补 changelog、同一 commit 的门禁、分派、按版本号核 registry、单独获批的清理 |
-| privileged-host-handoff | skill | software-development,work-management | runtime-agnostic | `skills/privileged-host-handoff/` | 人工代跑特权主机：先探测能力、钉住要跑的文件、交付自包含带闸门的命令块、先 dry run 再执行、把贴回的输出当证据核对 |
-| report-claim-audit | skill | work-management,software-development | runtime-agnostic | `skills/report-claim-audit/` | 审计报告声明和遗漏，或用任务清单、实际发布与部署锁定版本核查阶段收尾 |
-| research-stream-consolidation | skill | work-management | runtime-agnostic | `skills/research-stream-consolidation/` | 把重复的研究流并成一个项目，并修好绑定旧路径的记录 |
-| review-revision-candidates | skill | work-management | runtime-agnostic | `skills/review-revision-candidates/` | 被驳回候选的返修轮：编号清单就是全部变更集，交的是字节不是辩解 |
-| spec-convergence | skill | software-development | runtime-agnostic | `skills/spec-convergence/` | 把模糊需求收敛为已确认 spec：每轮一个根问题、每轮问题数有上限、每问附事实、写前显式确认共同理解 |
-| tmux-agent-control | skill | software-development,work-management | runtime-agnostic | `skills/tmux-agent-control/` | 在 tmux 中驱动运行中的 TUI agent：定位 pane、证明空闲、一次发出完整指令 |
-| writing | skill | work-management,self-management | runtime-agnostic | `skills/writing/` | 按读者与渠道撰写和核验可发布文章；风格指标用于诊断，不作统一配额 |
+| agent-harness-settings-parity | skill | software-development | runtime-agnostic | `skills/productivity/agent-harness-settings-parity/` | 让同一条策略在每个 coding harness 上生效，尽管配置文件、键名与单位各不相同 |
+| agent-operating-contract-evolution | skill | software-development,work-management,self-management | runtime-agnostic | `skills/productivity/agent-operating-contract-evolution/` | 按分层演进 agent 身份文件与操作协议：覆盖标记、行为评测、加载范围探测 |
+| contract-bound-deliverables | skill | work-management,software-development | runtime-agnostic | `skills/productivity/contract-bound-deliverables/` | 满足可度量契约：冻结证据包、并行起草、按字数装配、用契约自身的度量脚本验收 |
+| define-goal | skill | self-management,software-development,work-management | runtime-agnostic | `skills/productivity/define-goal/` | 把雄心转化为编号 goal 文件，近期清晰、远期可细化，不制定实现步骤 |
+| delegated-work-acceptance | skill | work-management,software-development | runtime-agnostic | `skills/engineering/delegated-work-acceptance/` | 按 artifact 和写入边界验收委派成果，将退回或越界的修复交还给负责人 |
+| dotnet-repo-workflow | skill | software-development | runtime-agnostic | `skills/engineering/dotnet-repo-workflow/` | 运行仓库自带的 .NET 门禁，验证 NuGet 锁定还原，诊断 Roslyn 编译引用缺失 |
+| evidence-backed-analytical-writing | skill | work-management | runtime-agnostic | `skills/research-writing/evidence-backed-analytical-writing/` | 中文分析报告：证据地图与「主张 → 证据 → 机制 → 局限」骨架；时效边界、状态阶梯、否定性结论 |
+| evidence-boundary-discipline | skill | work-management | runtime-agnostic | `skills/research-writing/evidence-boundary-discipline/` | 只陈述有日期的来源所能支持的事实：时态对齐日期、来源标签全链路一致、缺失不升级为不存在 |
+| gdd | skill | software-development,work-management | runtime-agnostic | `skills/engineering/gdd/` | 用分阶段产出、门禁和授权合并交付目标，或单次委派给隔离的 CLI 并独立验收，不发布 |
+| gdd-route-cc | skill | software-development,work-management | runtime-agnostic | `skills/engineering/gdd-route-cc/` | Claude Code stream-JSON 路由，支持会话恢复和原生 JSON schema |
+| gdd-route-codex | skill | software-development,work-management | runtime-agnostic | `skills/engineering/gdd-route-codex/` | Codex exec 与 resume 路由，支持原生 JSON schema，默认关闭集成 |
+| gdd-route-copilot | skill | software-development,work-management | runtime-agnostic | `skills/engineering/gdd-route-copilot/` | GitHub Copilot CLI prompt 与 JSONL 结果路由，支持会话恢复 |
+| gdd-route-dsh | skill | software-development,work-management | runtime-agnostic | `skills/engineering/gdd-route-dsh/` | gdd 的隐藏 DeepSeek Harness headless route：配置、会话管理和恢复 |
+| gdd-route-omo | skill | software-development,work-management | runtime-agnostic | `skills/engineering/gdd-route-omo/` | Omo stdin 与 Senpi JSON 事件路由，支持会话恢复 |
+| gdd-route-omp | skill | software-development,work-management | pi | `skills/engineering/gdd-route-omp/` | 脱离会话的 runner 跑 `omp -p` 长任务；轮询完成、按 session id 恢复（需要 skill `gdd`） |
+| gdd-route-opencode | skill | software-development,work-management | runtime-agnostic | `skills/engineering/gdd-route-opencode/` | OpenCode 独立服务器路由，支持会话恢复和模型变体选择 |
+| gdd-route-pi | skill | software-development,work-management | runtime-agnostic | `skills/engineering/gdd-route-pi/` | Pi stdin 与 JSON 事件路由，支持会话恢复 |
+| ghc-decisions | skill | software-development,work-management | runtime-agnostic | `skills/productivity/ghc-decisions/` | 按需启用（opt-in）的 `/v1/decisions` 与 `/v1/chat/completions` 结构化 Rubric 分类器，内置 9 大日常预设 |
+| ghc-search | skill | software-development | runtime-agnostic | `skills/research-writing/ghc-search/` | 经本机 `ghc-proxy` Responses API 做 web 与 X/Twitter 搜索；返回答案加去重来源 |
+| git-auto-sync-pipelines | skill | software-development,work-management | runtime-agnostic | `skills/engineering/git-auto-sync-pipelines/` | 手改仓库的定时提交推送：固定门序、白名单与体积上限、暂存区密钥扫描、心跳与去重告警 |
+| harness-engineering | skill | software-development | runtime-agnostic | `skills/engineering/harness-engineering/` | 重构与设计 harness 脚本：自包含、检查绑定 owner 决策、纯函数检查加薄 runner、净减行数 |
+| hermes-context-file-loading | skill | software-development | hermes | `skills/hermes/hermes-context-file-loading/` | Hermes 指令文件各自从何处加载、哪个项目文件生效，以及规则该放进哪个 prompt 层 |
+| hermes-kanban | skill | work-management,software-development | hermes | `skills/hermes/hermes-kanban/` | 多卡片看板工作：拆解、并行派发、评审门禁、卡住任务恢复 |
+| hermes-models | skill | software-development | hermes | `skills/hermes/hermes-models/` | 配置 Hermes provider、传输与路由；用实时信号证明路由，而非 `config get` |
+| hermes-models-cutover | skill | software-development | hermes | `skills/hermes/hermes-models-cutover/` | 跨 Hermes home 与 harness 切换供应商路由，实时验证并保留回滚 |
+| hermes-ops-claim-verification | skill | software-development,work-management | hermes | `skills/hermes/hermes-ops-claim-verification/` | 验证 Hermes 定时任务、修复或部署的说法：找准记录面、区分手动与调度运行、审查审计者 |
+| hermes-runtime-repairs | skill | software-development,work-management | hermes | `skills/hermes/hermes-runtime-repairs/` | 修模板/生成器、验证暂存产物，再部署并回读线上运行时 |
+| hermes-updates | skill | software-development | hermes | `skills/hermes/hermes-updates/` | 升级运行中的 Hermes 并诊断漂移：快照、官方更新器、更新后检查、故障索引 |
+| hoa-practice-retro | skill | self-management,work-management | runtime-agnostic | `skills/skill-authoring/hoa-practice-retro/` | 定期复盘负责人跨仓库、会话与记忆的工程实践：应停止的习惯、未执行的决定、未知的未知，每条都有两个独立来源 |
+| hoa-repo-reckoning | skill | software-development,work-management | runtime-agnostic | `skills/skill-authoring/hoa-repo-reckoning/` | 仅显式调用的只读仓库审查提示词：哪些事该停止，哪些未知会改变工作 |
+| hoa-skill-create | skill | software-development,work-management,self-management | runtime-agnostic | `skills/skill-authoring/hoa-skill-create/` | 直接创建、演进或组合已定义的 skill，并按风险聚焦验证 |
+| hoa-skill-curate | skill | software-development,self-management | runtime-agnostic | `skills/skill-authoring/hoa-skill-curate/` | 追溯安装来源，区分内容漂移与上游活动，仅执行所有者确认的技能库变更 |
+| hoa-skill-port | skill | software-development,work-management | runtime-agnostic | `skills/skill-authoring/hoa-skill-port/` | 将私有技能移入共享仓库作为权威副本：外置环境参数、通过目标仓库门禁，并区分运行时切换与发布 |
+| hoa-skill-review | skill | software-development,work-management,self-management | runtime-agnostic | `skills/skill-authoring/hoa-skill-review/` | 依据消费者证据审计 skill 行为与修改，不改动被审查对象 |
+| hoa-skill-set-audit | skill | software-development,self-management | runtime-agnostic | `skills/skill-authoring/hoa-skill-set-audit/` | 审计会话实际提供的整套技能：单项质量、重叠、遮蔽、指令冲突、同名漂移、可见性、../ 闭包、清单预算；只出报告 |
+| measurement-campaign-evidence | skill | software-development,work-management | runtime-agnostic | `skills/engineering/measurement-campaign-evidence/` | 测量运动：先钉候选身份、串行跑、一致报告集，不让基线伪造延迟对比 |
+| official-document-verification | skill | work-management | runtime-agnostic | `skills/research-writing/official-document-verification/` | 用文档的确切版本核验结论，含只能用真浏览器取到的被封来源 |
+| package-release-verification | skill | software-development | runtime-agnostic | `skills/engineering/package-release-verification/` | 发版：先补 changelog、同一 commit 的门禁、分派、按版本号核 registry、单独获批的清理 |
+| privileged-host-handoff | skill | software-development,work-management | runtime-agnostic | `skills/engineering/privileged-host-handoff/` | 人工代跑特权主机：先探测能力、钉住要跑的文件、交付自包含带闸门的命令块、先 dry run 再执行、把贴回的输出当证据核对 |
+| report-claim-audit | skill | work-management,software-development | runtime-agnostic | `skills/research-writing/report-claim-audit/` | 审计报告声明和遗漏，或用任务清单、实际发布与部署锁定版本核查阶段收尾 |
+| research-stream-consolidation | skill | work-management | runtime-agnostic | `skills/research-writing/research-stream-consolidation/` | 把重复的研究流并成一个项目，并修好绑定旧路径的记录 |
+| review-revision-candidates | skill | work-management | runtime-agnostic | `skills/productivity/review-revision-candidates/` | 被驳回候选的返修轮：编号清单就是全部变更集，交的是字节不是辩解 |
+| spec-convergence | skill | software-development | runtime-agnostic | `skills/productivity/spec-convergence/` | 把模糊需求收敛为已确认 spec：每轮一个根问题、每轮问题数有上限、每问附事实、写前显式确认共同理解 |
+| tmux-agent-control | skill | software-development,work-management | runtime-agnostic | `skills/engineering/tmux-agent-control/` | 在 tmux 中驱动运行中的 TUI agent：定位 pane、证明空闲、一次发出完整指令 |
+| writing | skill | work-management,self-management | runtime-agnostic | `skills/research-writing/writing/` | 按读者与渠道撰写和核验可发布文章；风格指标用于诊断，不作统一配额 |
 | skill-scout | agent | software-development,work-management | repo-only | `agents/skill-scout.md` | 按请求先搜索已有 skill，再决定是否编写；只报告，不代写 |
 | typed-verification-gates | orchestration | software-development | repo-only | `orchestration/typed-verification-gates.md` | 循环每次迭代止于一道事先定型的验证门：programmatic / judge / human |
 | ado-commit-push-pr | prompt | software-development | repo-only | `prompts/ado-commit-push-pr.md` | 一次性 commit → push → PR 请求模板（Azure DevOps 或 GitHub），附提交约定与 az/gh 易错点 |

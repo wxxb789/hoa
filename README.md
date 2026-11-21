@@ -25,6 +25,10 @@ land in the same skills root: `npx skills` does not install dependencies
 automatically. To install the collection, use the generated **Without Hermes**
 command unless you also want the Hermes-only skills.
 
+In the source tree each skill lives at `skills/<category>/<name>/`; the
+categories are a checkout convenience only — installs keep the flat
+`<skills-root>/<name>/` layout and every command stays name-based.
+
 ## What's inside
 
 This is a monorepo of separate parts, not a harness you have to install as a
@@ -52,7 +56,7 @@ self-management. Start with the [generated skill catalog](index.md#catalog).
 ### gdd: Goal-driven delivery
 
 For repository owners handing off a written, machine-checkable increment,
-[`gdd`](skills/gdd/SKILL.md) defines the delivery protocol: goal, staged agent
+[`gdd`](skills/engineering/gdd/SKILL.md) defines the delivery protocol: goal, staged agent
 runs, operator-run gates, and a scripted merge check. For a single external
 CLI handoff, lightweight delegation stops at independent acceptance without
 a stage ledger or merge. Install the agent route

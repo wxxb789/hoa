@@ -125,7 +125,7 @@ def main():
                     # pytest child. Keep it as a stack dump, with the round bounded separately.
                     result = gdd_process.run(
                         [sys.executable, "-m", "pytest", "-vv", "-x", "--durations=0",
-                         "-c", str(HERE.parents[3] / "pytest.ini"), *(str(source / case) for case in CASES)],
+                         "-c", str(HERE.parents[4] / "pytest.ini"), *(str(source / case) for case in CASES)],
                         env={**env, "TEMP": str(tmp), "TMP": str(tmp), "PYTHONDONTWRITEBYTECODE": "1"},
                         stdout=stream, stderr=stream, timeout=timeout)
                     code, outcome = result.returncode, f"pytest exit {result.returncode}"

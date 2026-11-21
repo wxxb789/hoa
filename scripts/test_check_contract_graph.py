@@ -25,6 +25,7 @@ from unittest.mock import patch
 sys.dont_write_bytecode = True
 SCRIPT = Path(__file__).resolve().parent / "check_contract_graph.py"
 ARTIFACTS = SCRIPT.parent.parent / ".tmp-artifacts" / "contract-graph-tests"
+sys.path.insert(0, str(SCRIPT.parent))
 spec = importlib.util.spec_from_file_location("skill_metadata",
                                               SCRIPT.parent / "skill_metadata.py")
 sm = importlib.util.module_from_spec(spec)
@@ -40,9 +41,9 @@ def make_temp_root() -> Path:
     return Path(tempfile.mkdtemp(dir=ARTIFACTS))
 
 
-def make_skill(root: Path, name: str, *, kind=None, consumes=None, produces=None,
-               hidden=False):
-    d = root / "skills" / name
+def make_skill(root: Path, name: str, *, category="engineering", kind=None, consumes=None,
+               produces=None, hidden=False):
+    d = root / "skills" / category / name
     d.mkdir(parents=True)
     parts = ["---", f"name: {name}",
              f"description: {name} performs one bounded step.",
@@ -130,14 +131,14 @@ class ContractGraphTests(unittest.TestCase):
     def test_r1_invalid_kind(self):
         make_skill(self.tmp, "bad-kind", kind="widget")
         line = self.assert_rule("R1")
-        self.assertIn("skills/bad-kind/SKILL.md", line)
+        self.assertIn("skills/engineering/bad-kind/SKILL.md", line)
         self.assertIn("'widget'", line)
 
     def test_r2_consumes_without_kind(self):
         make_skill(self.tmp, "decorated", consumes="work-report", produces="result")
         write_registry(self.tmp, external=["work-report"])
         line = self.assert_rule("R2")
-        self.assertIn("skills/decorated/SKILL.md", line)
+        self.assertIn("skills/engineering/decorated/SKILL.md", line)
 
     def test_r3_dangling_consume_and_registry_external(self):
         make_skill(self.tmp, "consumer", kind="stage",
@@ -170,7 +171,7 @@ class ContractGraphTests(unittest.TestCase):
             {"id": "route-to-loud", "must_pick": ["loud"], "distractors": ["quiet"]},
         ])
         line = self.assert_rule("R10")
-        self.assertIn("skills/quiet/SKILL.md", line)
+        self.assertIn("skills/engineering/quiet/SKILL.md", line)
         self.assertIn("route-to-quiet", line)
         write_trigger_cases(self.tmp, [
             {"id": "route-to-loud", "must_pick": ["loud"], "distractors": ["quiet"]},
@@ -191,7 +192,7 @@ class ContractGraphTests(unittest.TestCase):
         make_skill(self.tmp, "hidden-runner", kind="mechanism", hidden=True)
         parent = make_skill(self.tmp, "gate-runner-extra", kind="entry")
         line = self.assert_rule("R11")
-        self.assertIn("skills/gate-runner/SKILL.md", line)
+        self.assertIn("skills/engineering/gate-runner/SKILL.md", line)
 
         reference = parent / "references" / "runner.md"
         reference.parent.mkdir()
@@ -215,7 +216,7 @@ class ContractGraphTests(unittest.TestCase):
     def test_r7_skill_missing_kind(self):
         make_skill(self.tmp, "bare")
         line = self.assert_rule("R7")
-        self.assertIn("skills/bare/SKILL.md", line)
+        self.assertIn("skills/engineering/bare/SKILL.md", line)
         self.assertIn("does not declare kind", line)
 
     def test_r7_entry_without_artifacts_passes(self):

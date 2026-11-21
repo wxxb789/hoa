@@ -109,12 +109,12 @@ if not HAS_SKILL and CONTROL_PATH:
     paths = {
         "fixture": (Path.cwd() / "skills" / "report-claim-audit" / "input.txt").as_posix(),
         "relative-fixture": "skills/report-claim-audit/input.txt",
-        "catalog": catalog / "report-claim-audit" / "SKILL.md",
-        "other-catalog": catalog / "not-the-task-skill" / "SKILL.md",
-        "catalog-probe": catalog / "report-claim-audit",
+        "catalog": catalog / "research-writing" / "report-claim-audit" / "SKILL.md",
+        "other-catalog": catalog / "research-writing" / "not-the-task-skill" / "SKILL.md",
+        "catalog-probe": catalog / "research-writing" / "report-claim-audit",
         "workspace-probe": Path.cwd() / "skills" / "report-claim-audit",
-        "catalog-failed": catalog / "report-claim-audit" / "SKILL.md",
-        "catalog-pending": catalog / "report-claim-audit" / "SKILL.md",
+        "catalog-failed": catalog / "research-writing" / "report-claim-audit" / "SKILL.md",
+        "catalog-pending": catalog / "research-writing" / "report-claim-audit" / "SKILL.md",
         "host-reference": root.parent / "host/.agents/skills/another/references/guide.md",
         "host-root-file": root.parent / "host/.agents/skills/catalog.txt",
         "standalone": root.parent / "host/SKILL.md",
@@ -123,7 +123,7 @@ if not HAS_SKILL and CONTROL_PATH:
         "skill-failed": "skills/report-claim-audit/input.txt",
         "skill-not-found": "skills/report-claim-audit/input.txt",
         "mcp-fixture": "skills/report-claim-audit/input.txt",
-        "mcp-catalog": catalog / "report-claim-audit" / "SKILL.md",
+        "mcp-catalog": catalog / "research-writing" / "report-claim-audit" / "SKILL.md",
     }
     read_path = str(paths[CONTROL_PATH])
     assert CONTROL_PATH not in {"fixture", "relative-fixture"} or Path(read_path).is_file()

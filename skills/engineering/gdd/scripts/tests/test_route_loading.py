@@ -15,7 +15,7 @@ import gdd_process
 from gdd_test_support import finalized, stop_headless, wait_for_json
 
 
-@pytest.mark.skipif(not (agent_run.SKILLS_ROOT.parent / "scripts" / "check_contract_graph.py").is_file(),
+@pytest.mark.skipif(not (agent_run.SKILLS_ROOT.parent.parent / "scripts" / "check_contract_graph.py").is_file(),
                     reason="hoa source checkout only")
 def test_checkout_has_all_eight_routes():
     installed = agent_run.discover_routes()

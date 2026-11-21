@@ -2,12 +2,12 @@
 
 > [English](gdd.md) · **简体中文** · [仓库首页](../README.zh-CN.md)
 
-当书面目标定义了一项可机器检查的仓库增量时，使用 [gdd 协议](../skills/gdd/SKILL.md)。
+当书面目标定义了一项可机器检查的仓库增量时，使用 [gdd 协议](../skills/engineering/gdd/SKILL.md)。
 它协调每阶段独立的 authoring run、由操作者运行的 gate、脚本化的合并检查和可恢复的
 ledger。[目标契约目录](goals/README.md)是本仓库存放活跃契约的地方。
 
 将范围明确的书面任务交给一个外部编码 CLI 时，使用
-[轻量委派](../skills/gdd/SKILL.md#lightweight-delegation)。
+[轻量委派](../skills/engineering/gdd/SKILL.md#lightweight-delegation)。
 在隔离的 worktree 中运行，再独立验收结果；无需阶段 ledger、PR、合并门禁或合并。
 
 ## Headless route
@@ -30,7 +30,7 @@ ledger。[目标契约目录](goals/README.md)是本仓库存放活跃契约的�
 
 上表描述独立 route 的设计。请从[生成的安装指南](../index.zh-CN.md#安装)
 查看当前 checkout 可用的包。隐藏 route 不向模型公布以供路由；隐藏不授予权限。
-配置、答案读取、完成规则和平台证据见 [transport 契约](../skills/gdd/references/transport.md)。
+配置、答案读取、完成规则和平台证据见 [transport 契约](../skills/engineering/gdd/references/transport.md)。
 
 ## 原生 Paseo transport
 

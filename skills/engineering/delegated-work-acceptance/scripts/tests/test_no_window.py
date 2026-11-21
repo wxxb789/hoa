@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """worktree-scope.py must never spawn a visible console on Windows.
 
-Run: python -m pytest skills/delegated-work-acceptance/scripts/tests/test_no_window.py
+Run: python -m pytest skills/engineering/delegated-work-acceptance/scripts/tests/test_no_window.py
 """
 from __future__ import annotations
 

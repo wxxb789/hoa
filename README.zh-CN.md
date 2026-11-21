@@ -23,6 +23,9 @@ npx skills add wxxb789/hoa -g -s official-document-verification
 `npx skills` 不会自动安装依赖。想安装整个集合时，除非也需要 Hermes 专用 skill，
 否则请用生成的**不使用 Hermes 时**命令。
 
+源码树中每个 skill 位于 `skills/<category>/<name>/`；分类只是 checkout 的组织方式，
+安装仍保持扁平的 `<skills-root>/<name>/` 布局，所有命令都按名称执行。
+
 ## 仓库内容
 
 这是一个由独立部分组成的 monorepo，不需要把整套内容作为一个 harness 安装。
@@ -44,7 +47,7 @@ npx skills add wxxb789/hoa -g -s official-document-verification
 
 ### gdd：Goal-driven delivery
 
-面向需要交接一项书面、可机器检查的增量工作的仓库负责人，[`gdd`](skills/gdd/SKILL.md)
+面向需要交接一项书面、可机器检查的增量工作的仓库负责人，[`gdd`](skills/engineering/gdd/SKILL.md)
 定义交付协议：目标、分阶段 agent run、由操作者运行的 gate，以及脚本化的合并检查。
 单次外部 CLI 交接可用轻量委派，在独立验收后停止，无需阶段 ledger 或合并。
 Agent route 单独安装。只有 OMP（`gdd-route-omp`）对模型可见；DeepSeek Harness、

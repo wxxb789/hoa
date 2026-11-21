@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Offline tests for skills/ghc-decisions/scripts/ghc_decisions.py."""
+"""Offline tests for skills/productivity/ghc-decisions/scripts/ghc_decisions.py."""
 from __future__ import annotations
 
 import json

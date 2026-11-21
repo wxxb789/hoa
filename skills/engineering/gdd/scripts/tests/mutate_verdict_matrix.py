@@ -8,7 +8,7 @@
 Anchored mutations exercise fail-open paths and subprocess forwarding.
 Generated mutations reclassify each declared bucket into the other classes.
 
-Run: uv run skills/gdd/scripts/tests/mutate_verdict_matrix.py
+Run: uv run skills/engineering/gdd/scripts/tests/mutate_verdict_matrix.py
 """
 
 from __future__ import annotations

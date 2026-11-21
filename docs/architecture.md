@@ -66,9 +66,11 @@ do not need a consumer. The checker rejects:
 
 ## Catalog metadata and labels
 
-Skills live at `skills/<name>/SKILL.md`. hoa uses a flat layout even though
-`npx skills` also recognizes categorized layouts, including `skills/.curated/`,
-`skills/.experimental/`, and `skills/.system/`. Skill frontmatter holds
+Skills live at `skills/<category>/<name>/SKILL.md` in one of the five source-only
+categories — `engineering`, `productivity`, `research-writing`, `skill-authoring`, and
+`hermes`; installed packages stay flat at `<skills-root>/<name>/`. `npx skills` also
+recognizes dot-prefixed layouts such as `skills/.curated/`, `skills/.experimental/`,
+and `skills/.system/`. Skill frontmatter holds
 `revision`, `kind`, optional `consumes` and `produces`, and the catalog fields:
 
 ```yaml
@@ -114,12 +116,12 @@ Python directly inside the job. The commands below are the local equivalents.
 
 | Job or step | Local command or scope | Protects |
 |---|---|---|
-| Frontmatter | `uv run --script scripts/check_frontmatter.py` | Skill metadata; descriptions at most 350 characters when visible or 1024 when hidden; visibility flag and Codex sidecar agree |
+| Frontmatter | `uv run --script scripts/check_frontmatter.py` | Skill metadata and layout (category allowlist, unique names); descriptions at most 350 characters when visible or 1024 when hidden; visibility flag and Codex sidecar agree |
 | Contract graph | `uv run --script scripts/check_contract_graph.py` | R1 through R11 |
-| Skill links | `uv run --script scripts/check_skill_links.py` | Sibling references resolve; skill script commands use uv and PEP 723, and inline Python uses `--no-project` |
+| Skill links | `uv run --script scripts/check_skill_links.py` | Sibling references resolve inside their own category; skill script commands use uv and PEP 723, and inline Python uses `--no-project` |
 | Catalog drift | `uv run --script scripts/generate_index.py --check` | Both indexes match the source metadata |
 | Vendoring drift | `uv run --script scripts/vendor_shared.py --check` | Vendored files match their canonical sources |
-| Revisions (PRs) | `uv run --script scripts/version.py check-revisions` | Changed skill directories raise their own revisions |
+| Revisions (PRs) | `uv run --script scripts/version.py check-revisions` | Changed skill directories raise their own revisions; an exact category move alone does not count |
 | Ruff | `uvx ruff@0.17.5 check --config ruff.toml --force-exclude scripts evals skills` | Python correctness and cleanup findings under `scripts/`, `evals/`, and `skills/`; run directly in an existing terminal on Windows |
 | pytest | `uv run --no-project --python 3.13 --with-requirements scripts/requirements.txt python -m pytest -n auto --dist load` | Collects `test_*.py` under `scripts/`, `evals/`, and `skills/`; 120-second per-test timeout |
 | Standalone checks | Run each with `uv run --script`: trigger cases, define-goal fixtures, Hermes routing inventory and provider metadata, GDD verdict matrix and merge-gate mutation harness | Each named step has its own exit-code contract; see the workflow for exact paths |

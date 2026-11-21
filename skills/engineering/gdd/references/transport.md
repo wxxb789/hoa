@@ -9,9 +9,9 @@ are relative to the installed gdd skill. Both launchers use uv and stdlib
 Python 3.13 or newer. A reachable daemon does not opt in; an unreachable
 daemon does not fall back to a headless CLI.
 
-The optional [GDD run observer plugin](../../../paseo-plugins/gdd-observer/README.md)
+The optional [GDD run observer plugin](https://github.com/wxxb789/hoa/blob/main/paseo-plugins/gdd-observer/README.md)
 only reads artifacts; it runs trusted, unsandboxed daemon/client code when
-installed. See its [integration notes](../../../paseo-plugins/gdd-observer/HOA-INTEGRATION.md).
+installed. See its [integration notes](https://github.com/wxxb789/hoa/blob/main/paseo-plugins/gdd-observer/HOA-INTEGRATION.md).
 After dispatch into the canonical run root, `gdd.py stage` adds a bounded
 `lineage.json` with `goal`, `stage`, and `parentAgentId` when `PASEO_AGENT_ID`
 is set. That is the initiating session, not the launched agent. A sidecar
@@ -110,14 +110,14 @@ global install. The generated index has the complete command for each route.
 
 Route documentation (configuration, input, and exit-0 success marker):
 
-- [gdd-route-omp](https://github.com/wxxb789/hoa/blob/main/skills/gdd-route-omp/SKILL.md)
-- [gdd-route-dsh](https://github.com/wxxb789/hoa/blob/main/skills/gdd-route-dsh/SKILL.md)
-- [gdd-route-codex](https://github.com/wxxb789/hoa/blob/main/skills/gdd-route-codex/SKILL.md)
-- [gdd-route-cc](https://github.com/wxxb789/hoa/blob/main/skills/gdd-route-cc/SKILL.md)
-- [gdd-route-pi](https://github.com/wxxb789/hoa/blob/main/skills/gdd-route-pi/SKILL.md)
-- [gdd-route-opencode](https://github.com/wxxb789/hoa/blob/main/skills/gdd-route-opencode/SKILL.md)
-- [gdd-route-omo](https://github.com/wxxb789/hoa/blob/main/skills/gdd-route-omo/SKILL.md)
-- [gdd-route-copilot](https://github.com/wxxb789/hoa/blob/main/skills/gdd-route-copilot/SKILL.md)
+- [gdd-route-omp](https://github.com/wxxb789/hoa/blob/main/skills/engineering/gdd-route-omp/SKILL.md)
+- [gdd-route-dsh](https://github.com/wxxb789/hoa/blob/main/skills/engineering/gdd-route-dsh/SKILL.md)
+- [gdd-route-codex](https://github.com/wxxb789/hoa/blob/main/skills/engineering/gdd-route-codex/SKILL.md)
+- [gdd-route-cc](https://github.com/wxxb789/hoa/blob/main/skills/engineering/gdd-route-cc/SKILL.md)
+- [gdd-route-pi](https://github.com/wxxb789/hoa/blob/main/skills/engineering/gdd-route-pi/SKILL.md)
+- [gdd-route-opencode](https://github.com/wxxb789/hoa/blob/main/skills/engineering/gdd-route-opencode/SKILL.md)
+- [gdd-route-omo](https://github.com/wxxb789/hoa/blob/main/skills/engineering/gdd-route-omo/SKILL.md)
+- [gdd-route-copilot](https://github.com/wxxb789/hoa/blob/main/skills/engineering/gdd-route-copilot/SKILL.md)
 
 - **End states:** stop is killed/143; signal exit codes are kept
   (`130/137/143/-2/-9/-15`). Max time ends the run as failed/124 with a

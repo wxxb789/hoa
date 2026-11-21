@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 import random
 import re
+import sys
 from statistics import mean
 from urllib.error import HTTPError
 from urllib.parse import urlsplit
@@ -22,14 +23,26 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 HERE = Path(__file__).resolve().parent
 CORPUS = HERE / "distinctiveness"
+sys.path.insert(0, str(HERE.parent / "scripts"))
+
+import skill_paths  # noqa: E402
+
 NAME = r"[a-z0-9]+(?:-[a-z0-9]+)*"
 SEED = 52026
 K1, B = 1.2, 0.75
 
 
+def skill_cards(root):
+    """SKILL.md paths for a flat (installed/scratch) or categorized checkout."""
+    cards = list(root.glob("*/SKILL.md"))
+    cards += [path / "SKILL.md" for path in skill_paths.skill_dirs(root)
+              if (path / "SKILL.md").is_file()]
+    return sorted(set(cards))
+
+
 def load_catalog(root, overrides):
     skills = {}
-    for path in sorted(root.glob("*/SKILL.md")):
+    for path in skill_cards(root):
         # hoa uses a plain name, a folded description, and a top-level visibility flag.
         parts = re.split(r"^---\s*$", path.read_text(encoding="utf-8-sig"), maxsplit=2, flags=re.M)
         if len(parts) != 3 or parts[0]:
@@ -47,7 +60,10 @@ def load_catalog(root, overrides):
         elif continuation or desc.startswith((">", "|", '"', "'")) or not desc.strip():
             raise ValueError(f"{path}: description must be plain text or use hoa's >- format")
         hidden = bool(re.search(r"^disable-model-invocation: true[ \t]*(?:#.*)?$", front, re.M))
-        skills[name] = dict(description=desc, hidden=hidden)
+        if name in skills:
+            raise ValueError(f"{root}: duplicate skill name {name!r}: "
+                             f"{skills[name]['path']} and {path}")
+        skills[name] = dict(description=desc, hidden=hidden, path=path.as_posix())
     if not skills:
         raise ValueError(f"{root}: no skill cards found")
     if overrides:

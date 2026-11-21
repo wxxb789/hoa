@@ -66,7 +66,7 @@ Hand-off to hoa (the operator's skill library):
   after the push, and neither the preflight nor CI can see content that an intermediate
   commit added and a later commit removed.
 - Promotion is the operator's move, never a sync or a copy. One authorized PR deletes the raw
-  copy and lands the normalized package in `skills/<name>/` at `metadata.revision: "1"`
+  copy and lands the normalized package in `skills/<category>/<name>/` at `metadata.revision: "1"`
   through hoa's port review and curated gates. Send the operator what changed and why (the
   failure or improvement that drove it), every literal path/id/model you introduced, and the
   commands that show the skill works.

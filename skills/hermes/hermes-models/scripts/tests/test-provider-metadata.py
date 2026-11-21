@@ -4,7 +4,7 @@
 Two payload shapes reach this script: a metadata catalog (`models[].upstream.capabilities`) and an
 OpenAI-compatible id list (`data[]`). Both must index; neither may be silently dropped.
 
-Run: python3 skills/hermes-models/scripts/tests/test-provider-metadata.py
+Run: python3 skills/hermes/hermes-models/scripts/tests/test-provider-metadata.py
 """
 import importlib.util
 import sys

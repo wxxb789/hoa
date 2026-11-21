@@ -33,11 +33,11 @@ knowledge: put it in an always-on index, not a skill (see
 
 ## Layout
 
-- Children are flat sibling directories under the same `skills/` root as the
-  parent. Hosts disagree on discovery depth: Claude Code and OMP scan one level,
-  Pi stops at the first `SKILL.md`, OpenCode does not search inside a skill
-  directory, Codex recursive mode turns nested `SKILL.md` files into separate
-  skills. Nesting a child inside its parent is never portable.
+- Children sit in the same source container as the parent (in this repo, the parent's category
+  directory), and installed packages are flat siblings in one host root. Hosts disagree on
+  discovery depth: Claude Code and OMP scan one level, Pi stops at the first `SKILL.md`, OpenCode
+  does not search inside a skill directory, Codex recursive mode turns nested `SKILL.md` files
+  into separate skills. Nesting a child inside its parent is never portable.
 - One level of chaining: parent -> child. A child's own references stay inside
   the child, one level deep from its `SKILL.md`; a child never chains to a
   grandchild.

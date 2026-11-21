@@ -39,8 +39,8 @@ source or a manifest search path.
   private-range IPs), the candidate shape (`SKILL.md` under its own directory; non-empty `name`
   equal to that directory, and `description`), and name collisions with `skills/` or
   `scripts/retired_skills.toml` — nothing else, no line caps, links, revisions, index or tests.
-- **Promote through the port review.** One PR moves a candidate into `skills/<name>/`, normalized
-  to the full bar: every rule in this file, the curated gates, and the raw copy gone. Raw renames
+- **Promote through the port review.** One PR moves a candidate into `skills/<category>/<name>/`,
+  normalized to the full bar: every rule in this file, the curated gates, and the raw copy gone. Raw renames
   and deletions never create retired entries; only previously curated names retire through the
   usual curated workflow. `hoa-skill-port` owns the procedure.
 - **Never depend on the landing zone.** A curated skill must not require anything from
@@ -70,8 +70,11 @@ removing it risks real, irreversible harm, or after the same pain has hit three 
 
 ## Composition contracts
 
-These contracts bind the curated catalog in `skills/`; a landing-zone candidate is exempt until
-promotion.
+These contracts bind the curated catalog in `skills/`. The catalog is grouped into five
+source-only categories — `engineering`, `productivity`, `research-writing`, `skill-authoring`,
+`hermes` — so a package lives at `skills/<category>/<name>/`; installation stays flat at
+`<skills-root>/<name>/` and a skill's name is its global identity across categories. A landing-zone
+candidate is exempt until promotion.
 
 Skills declare their role and artifacts in `metadata` as comma-separated strings:
 
@@ -92,9 +95,10 @@ enforces the graph with `python scripts/check_contract_graph.py`.
 **Visibility.** A hidden skill (not advertised to the model, still user-invocable) sets
 `disable-model-invocation: true` and ships `agents/openai.yaml` with
 `allow_implicit_invocation: false` for Codex; hiding is a per-skill choice, never implied by `kind`,
-and never an authorization gate. A hidden skill must not appear in `must_pick`. A parent chains to a
-flat sibling child only with `Read ../<child>/SKILL.md`, one level deep, and keeps must-hold rules
-itself; installing it installs its whole `../` closure. CI enforces the flag/sidecar pair
+and never an authorization gate. A hidden skill must not appear in `must_pick`. A parent chains to
+a sibling child in its own category only with `Read ../<child>/SKILL.md`, one level deep, and keeps
+must-hold rules itself; installing it installs its whole `../` closure (installed packages are flat
+siblings). CI enforces the flag/sidecar pair
 (`check_frontmatter.py`), hidden-not-`must_pick` (`R10`), and sibling links
 (`check_skill_links.py`). `npx skills` has no dependency concept, so closure is delivered by the
 generated `npx skills add` commands in `index.md` and retired names by its generated
@@ -103,9 +107,12 @@ diagnoses an installed set on a machine. Binding detail:
 [`rules/skill-composition.md`](rules/skill-composition.md) and
 [`rules/cross-platform-skills.md`](rules/cross-platform-skills.md).
 
-**Naming.** A name is kebab-case and equal to its directory; a family uses
+**Naming.** A name is a global kebab-case identity, equal to its directory in any category, and
+categories are source-only: they never appear in an install name. A family uses
 `<family>-<object>-<verb>` with one meaning per verb; `hoa-` is only for the skill-library family.
-A rename goes through `scripts/retired_skills.toml` in the same change. Binding detail:
+A rename goes through `scripts/retired_skills.toml` in the same change; a category move keeps the
+name, creates no retired entry, and leaves the revision alone unless the package is also edited.
+Binding detail:
 [`rules/skill-naming.md`](rules/skill-naming.md).
 
 ## Generated Artifacts Output
