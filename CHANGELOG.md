@@ -6,6 +6,7 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 ## 2026-11-21
 
+- Run the Python suite in parallel in CI and document the matching local command.
 - gdd-route-pi: paste a spec pre-review's replacement text into the brief verbatim, test every prose
   invariant on each output path, and check new files' line endings on Windows.
 - Bind `worktree-scope.py` to the shipped commit: `seal --index` stores the staged index as a
