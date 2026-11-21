@@ -20,6 +20,10 @@ The agent's report is a claim, never evidence:
 - **A non-zero gate that names a missing build output is a prerequisite failure, not a regression.**
   Read the message before calling it a delta; produce the artifacts and re-run.
 - Map every contract clause to a test name or evidence row; a clause with no test is unfinished work.
+- **Check proof order.** For each clause, the report must show the pre-change expected failure or
+  characterization baseline that was observed and then the green command with its exit code; where
+  that was not practical, the report names the replacement proof. A clause without that record is
+  unfinished work.
 - **A proof test is only proof if it fails when the feature is deleted.** A loop over a collection
   that is empty without the feature, an input that already declares the value the assertion demands,
   and an assertion that reads the same source the code reads all stay green with the change reverted.
@@ -29,8 +33,8 @@ The agent's report is a claim, never evidence:
   assertion's substance, not its existence. Raise a weak proof test as its own increment and tell the
   operator; do not let it be absorbed silently into the current apply round.
 - Diff the plan's file list against `git status`; missing tests or docs are the usual gap.
-- Re-run gates on the FINAL tree, even if they passed earlier — a resumed run keeps adding code and
-  the counts move.
+- **The worker's exit codes are claims.** Re-run the gates yourself on the final HEAD, even if they
+  passed earlier — a resumed run keeps adding code and the counts move.
 - Research-outcome increment: the deliverable is a decision, not a feature →
   [`references/evidence-fairness.md`](../evidence-fairness.md) before accepting any
   "faster/cheaper" claim.

@@ -11,8 +11,10 @@
    Report the count of pre-existing dirty paths in the dispatch line — they are not part of this
    increment. Refuse to dispatch on a dirty submodule or nested repository; resolve it first.
 3. Dispatch one implementation run carrying the goal file, the repo's contract docs, the most recent
-   comparable increment as the shape reference, the exact gate commands, and "do not commit/push".
-   Use `uv run scripts/gdd.py stage` so prompt, run name and ledger row come from one template.
+   comparable increment as the shape reference, the gates as one runnable command with an explicit
+   working directory when the repo supports it, and "do not commit/push". The contract's accepted
+   plan is reused by path, not replanned. Use `uv run scripts/gdd.py stage` so prompt, run name and
+   ledger row come from one template.
 
 ## Dispatch tooling
 
