@@ -32,7 +32,7 @@ Before pushing, the writer commits locally and runs
 ## Promotion
 
 `hoa-skill-port` describes the full procedure. In short:
-- One PR moves a candidate into `skills/<name>/` and deletes it from here.
+- One PR moves a candidate into `skills/<category>/<name>/` and deletes it from here.
 - The promoted skill is normalized to the full bar: the port review and every curated gate.
 - It starts at `metadata.revision: "1"`. A candidate-only name never gets a retired entry.
 - Curated skills never depend on anything in this folder.
