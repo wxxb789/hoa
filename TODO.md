@@ -18,7 +18,5 @@
   and [gdd-route-dsh](skills/gdd-route-dsh/SKILL.md#configuration). Update the default version
   in `SUPERVISOR` and the cases in `test_tmux_version_floor` in
   [test_detach_supervisors.py](skills/gdd/scripts/tests/test_detach_supervisors.py).
-- **gdd delegated-stage enforcement (script follow-up to the ce-work delegation docs):**
-  `wait` in [gdd.py](skills/gdd/scripts/gdd.py) prints a `--resume` suggestion for any non-`done` run,
-  which bypasses round caps and the "delegated ce-work stage is not resumed" rule; `delivery-state.py`
-  shows only the outer status.
+- **Managed resume deferred:** `gdd.py stage --resume-run` is not implemented; the design is in the
+  2026-11-21 GDD resume-cap pre-review.

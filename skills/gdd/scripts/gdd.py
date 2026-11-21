@@ -1163,21 +1163,16 @@ def cmd_stage(args):
                 f"wait: run ended in {final_state} "
                 f"(exit={exit_code if exit_code is not None else '-'}) instead of done"
             )
-            if plan is not None:
-                # A plan-governed attempt is already a ledger row; a raw launcher resume would
-                # spend no round and skip the plan's routing and budgets.
-                fail(
-                    f"{ended} — the attempt is recorded; a further attempt goes through "
-                    "gdd.py stage (it spends a round), or --over-budget with the owner's "
-                    "approval",
-                    1,
-                )
-            resume = state.get("session_id") or "?"
-            fail(
-                f"{ended} — resume with: {launcher} start --name {run_name}-r2 "
-                f"--prompt <same prompt> --resume {resume}",
-                1,
+            # Reconciliation is phase 7's job; the attempt is already recorded, and a raw
+            # launcher resume would spend no round and skip the plan's routing and budgets.
+            remedy = (
+                "the attempt is recorded; the operator reconciles the run's partial work "
+                "first (phase 7); a further attempt is a new gdd.py stage dispatch that "
+                "spends a round (or --over-budget with the owner's approval)"
             )
+            if args.stage == "implement":
+                remedy += "; a delegated ce-work run is never resumed"
+            fail(f"{ended} — {remedy}", 1)
         post_head = git(repo, "rev-parse", "HEAD")
         final_head = final_head_for(args.stage, bool(args.head), head, post_head)
         result = agent_run.read_json(os.path.join(run_dir, "result.json"), {})
