@@ -38,8 +38,8 @@ Ask the owner once, in one round, only for what `GDD_RUN_PLAN_DEFAULTS` does not
 
 Do not re-ask mid-run. Change the plan only on the owner's request, by re-running setup. Setup validates the plan
 and names the offending key: `max_time` accepts the launcher's duration grammar (`90`, `90s`, `0.5h`); a numeric
-value must be a whole positive second count, so `0.00001` is refused rather than forwarded as `1e-05`; overflow and
-non-finite values are refused. Rounds must be a positive integer or null (null means the default 2x), `token_cap` a
+value is forwarded in plain decimal (`30.5`, never `1e-05`) and judged in that form; zero, overflow and non-finite
+values are refused. Rounds must be a positive integer or null (null means the default 2x), `token_cap` a
 non-negative integer or null, and `agent`/`model`/`thinking` must not contain whitespace or `=` so the completion
 note stays parseable.
 
@@ -49,9 +49,9 @@ under `## Owner notes (run plan)`. It refuses past a stage's round cap or the pl
 overrides for one dispatch.
 
 Token accounting reads exactly the run's launcher `state.json` by the `run=<name>` its dispatch row records: under a
-plan each dispatch names its run `<repo>-<goal>-<stage>-a<n>-<6 lowercase hex chars>`; a long prefix is shortened so
-the `-a<n>-<id>` suffix always survives the launcher's 48-character sanitize, and the random id means an attempt
-number reused after a ledger reset cannot alias an older run dir. Only a run in a recognized terminal state
+plan each dispatch names its run `<repo>-<goal>-<stage>-a<n>-<6 lowercase hex chars>`; only the repo part is shortened
+to fit the launcher's 48-character sanitize, and a name any retained run dir (live or archived) already uses is
+never handed out, so an attempt number reused after a ledger reset cannot alias an older run dir. Only a run in a recognized terminal state
 (`done`, `failed`, `killed`, or a stale `running`) is summed; a running, missing, unknown-state, malformed or
 all-zero-usage state is listed as `unknown` and never summed — the bundled launcher writes an all-zero accumulator
 even when it saw no usage event, and no state field distinguishes that placeholder from a reported zero. A

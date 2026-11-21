@@ -414,19 +414,31 @@ class AttemptNameTests(RunPlanCase):
         state["usage"] = {"total_tokens": tokens}
         write(state_path, json.dumps(state))
 
-    def test_plan_run_name_shortens_the_prefix_and_keeps_the_suffix(self):
+    def test_plan_run_name_shortens_the_repo_and_keeps_goal_and_suffix(self):
         import gdd
 
-        long_prefix = "r" * 34 + "-0001-implement"
-        first = gdd.plan_run_name(long_prefix, 1, "aaaaaa")
-        second = gdd.plan_run_name(long_prefix, 2, "bbbbbb")
+        long_repo = "r" * 34
+        first = gdd.plan_run_name(long_repo, "0001", "implement", 1, "aaaaaa")
+        second = gdd.plan_run_name(long_repo, "0002", "implement", 2, "bbbbbb")
         limit = len(agent_run.sanitize("x" * 4096))
         self.assertEqual(first, agent_run.sanitize(first), first)
         self.assertEqual(second, agent_run.sanitize(second), second)
         self.assertLessEqual(len(first), limit)
-        self.assertTrue(first.endswith("-a1-aaaaaa"), first)
-        self.assertTrue(second.endswith("-a2-bbbbbb"), second)
-        self.assertNotEqual(first, second)
+        # delivery-state.py show finds a goal's runs by name, so the goal must survive whole.
+        self.assertTrue(first.endswith("-0001-implement-a1-aaaaaa"), first)
+        self.assertTrue(second.endswith("-0002-implement-a2-bbbbbb"), second)
+
+    def test_a_run_name_already_on_disk_is_never_handed_out(self):
+        import gdd
+
+        root = os.path.join(self.tmp, "runs-probe")
+        taken = gdd.plan_run_name("workrepo", "0001", "implement", 1, "aaaaaa")
+        # A live run on one day and an archived one on another both block the name.
+        os.makedirs(os.path.join(root, "2026-11-20", taken + ".prev-1"))
+        os.makedirs(os.path.join(root, "2026-11-21", gdd.plan_run_name("workrepo", "0001", "implement", 1, "bbbbbb")))
+        ids = iter(["aaaaaa", "bbbbbb", "cccccc"])
+        name = gdd.unused_plan_run_name(root, "workrepo", "0001", "implement", 1, new_id=lambda: next(ids))
+        self.assertTrue(name.endswith("-a1-cccccc"), name)
 
     def test_two_dispatches_of_a_stage_use_their_own_names_and_state(self):
         self.setup({"budgets": {"rounds": {"implement": 10}, "token_cap": 100000}})
@@ -846,14 +858,19 @@ class DurationTests(RunPlanCase):
             with self.subTest(value=value):
                 self.assertEqual(gdd.duration_seconds(value), agent_run.max_time_seconds(value))
         self.assertEqual(gdd.duration_seconds(900), 900.0)
-        for value in (0, -1, True, 0.5, 0.00001, float("inf"), float("nan"), 10**400,
+        # A number is judged in the plain decimal form it is forwarded as, which the launcher accepts.
+        for value, forwarded in ((0.5, "0.5"), (0.00001, "0.00001"), (30.5, "30.5"), (900.0, "900")):
+            with self.subTest(value=value):
+                self.assertEqual(gdd.forwarded_duration(value), forwarded)
+                self.assertEqual(gdd.duration_seconds(value), agent_run.max_time_seconds(forwarded))
+        for value in (0, -1, True, 0.0, 1e-400, float("inf"), float("nan"), 10**400,
                       "0m", "soon", "1e3", "9" * 320 + "h"):
             with self.subTest(value=value):
                 self.assertIsNone(gdd.duration_seconds(value))
 
     def test_setup_rejects_unforwardable_or_overflowing_durations_by_key(self):
         cases = [
-            ({"roles": {"review": {"max_time": 0.00001}}}, "roles.review.max_time"),
+            ({"roles": {"review": {"max_time": 0.0}}}, "roles.review.max_time"),
             ({"roles": {"implement": {"max_time": float("nan")}}}, "roles.implement.max_time"),
             ({"budgets": {"max_time": 10**400}}, "budgets.max_time"),
             ({"budgets": {"max_time": float("inf")}}, "budgets.max_time"),
@@ -874,6 +891,14 @@ class DurationTests(RunPlanCase):
         state = json.loads(read(os.path.join(run_dir, "state.json")))
         # The launcher records the forwarded --max-time: the integer form, not "900.0".
         self.assertEqual(state["max_time"], "900")
+
+    def test_a_fractional_number_of_seconds_is_forwarded_in_plain_decimal(self):
+        self.setup({"budgets": {"max_time": 30.5}})
+        done = self.stage("implement", "--wait")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        [run_dir] = [d for d in self.run_dirs() if ".prev-" not in os.path.basename(d)]
+        state = json.loads(read(os.path.join(run_dir, "state.json")))
+        self.assertEqual(state["max_time"], "30.5")
 
 
 class GoalOnlyShowTests(RunPlanCase):

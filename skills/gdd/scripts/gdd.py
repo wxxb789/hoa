@@ -366,21 +366,11 @@ def duration_seconds(value):
     """Positive finite seconds for a plan duration, or None when the launcher would reject it.
 
     Mirrors agent_run.max_time_seconds, which exits the launcher on invalid input, so setup
-    cannot reuse it. A string keeps the launcher's grammar and is forwarded verbatim; a numeric
-    value must be a whole number of seconds, because JSON floats such as 0.00001 stringify to
-    `1e-05`, a form the launcher's parser rejects.
+    cannot reuse it. A string keeps the launcher's grammar and is forwarded verbatim; a number is
+    checked in the plain decimal form `forwarded_duration` sends.
     """
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, (int, float)):
-        try:
-            seconds = float(value)
-        except OverflowError:
-            return None
-        if not math.isfinite(seconds) or seconds <= 0 or seconds != int(seconds):
-            return None
-        return seconds
-    if not isinstance(value, str):
+    value = forwarded_duration(value)
+    if value is None:
         return None
     match = DURATION_RE.fullmatch(value.strip())
     if not match:
@@ -390,6 +380,22 @@ def duration_seconds(value):
     except (OverflowError, ValueError):
         return None
     return seconds if math.isfinite(seconds) and seconds > 0 else None
+
+
+def forwarded_duration(value):
+    """The string a plan duration reaches the launcher as, or None for a non-duration type.
+
+    Numbers use plain decimal notation: `str(0.00001)` is `1e-05`, which the launcher rejects.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            return None
+        return format(value, "f").rstrip("0").rstrip(".") or "0"
+    return value if isinstance(value, str) else None
 
 
 def plan_path_problem(repo_name, goal):
@@ -814,30 +820,44 @@ def write_lineage_sidecar(run_root, run_name, run_dir, goal, stage):
 RUN_NAME_LIMIT = len(agent_run.sanitize("x" * 4096))
 
 
-def plan_run_name(prefix, attempt, ident):
-    """A plan-governed run name whose `-a<n>-<id>` suffix survives the launcher's sanitize.
+def plan_run_name(repo_name, goal, stage, attempt, ident):
+    """A plan-governed run name whose `-<goal>-<stage>-a<n>-<id>` tail survives the launcher's sanitize.
 
-    The launcher lowercases, substitutes and truncates the requested slug itself, so the
-    prefix is shortened here — never the suffix — using the launcher's own limit, and the
-    result is verified through the same function.
+    The launcher lowercases, substitutes and truncates the requested slug itself, so only the
+    repo part is shortened here, using the launcher's own limit; the goal stays whole because
+    `delivery-state.py show` finds a goal's runs by name. The result is verified through the
+    same function.
     """
     suffix = f"-a{attempt}-{ident}"
-    base = agent_run.sanitize(prefix).rstrip("-")
-    keep = max(RUN_NAME_LIMIT - len(suffix), 1)
-    name = (base[:keep].rstrip("-") or "run") + suffix
+    tail = "-" + agent_run.sanitize(f"{goal}-{stage}").strip("-") + suffix
+    keep = RUN_NAME_LIMIT - len(tail)
+    repo_part = agent_run.sanitize(repo_name).strip("-")[:max(keep, 0)].rstrip("-")
+    name = (repo_part or "run") + tail
     final = agent_run.sanitize(name)
     if not final.endswith(suffix):
         raise LaunchError(f"launcher sanitize would drop the attempt suffix from {name!r}")
     return final
 
 
+def unused_plan_run_name(root, repo_name, goal, stage, attempt, new_id=None):
+    """A plan run name no retained run dir under `root` uses, live or archived.
+
+    The random id alone can repeat, and a ledger reset reuses attempt numbers, so the
+    name is checked against every date directory before it is handed out.
+    """
+    new_id = new_id or (lambda: secrets.token_hex(3))
+    while True:
+        name = plan_run_name(repo_name, goal, stage, attempt, new_id())
+        if not glob.glob(os.path.join(glob.escape(root), "*", glob.escape(name) + "*")):
+            return name
+
+
 def launch(launcher, prompt_path, repo, goal, stage, agent, model, thinking, max_time,
            attempt=None):
     name = f"{os.path.basename(repo)}-{goal}-{stage}"
     if attempt is not None:
-        # A plan-governed re-dispatch must not alias the previous attempt's run dir; the random
-        # id keeps two dispatches apart even if a ledger reset reuses the attempt number.
-        name = plan_run_name(name, attempt, secrets.token_hex(3))
+        # A plan-governed re-dispatch must not alias the previous attempt's run dir.
+        name = unused_plan_run_name(run_root(), os.path.basename(repo), goal, stage, attempt)
     resolved_run_root = run_root()
     prefix = launcher_command(launcher)
     cmd = [
@@ -1080,9 +1100,7 @@ def cmd_stage(args):
         os.environ.get("GDD_MAX_TIME") or None,
     )
     if isinstance(max_time, (int, float)) and not isinstance(max_time, bool):
-        # The plan validator admits only a whole positive second count; forward the integer
-        # form, since str(900.0) is fine but str(0.00001) would reach the launcher as `1e-05`.
-        max_time = str(int(max_time))
+        max_time = forwarded_duration(max_time)
     try:
         run_name, run_dir, launch_run_root = launch(
             launcher,
