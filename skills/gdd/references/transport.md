@@ -211,11 +211,11 @@ $env:GDD_LAUNCHER = Join-Path (Get-Location) 'skills\gdd\scripts\adapters\paseo-
 
 ## Rules that come from delivery, not transport
 
-One fresh run per stage; resume only an unfinished turn in the same stage
-and restate remaining work and constraints. Poll at turn boundaries. Never
-attach a second writer to a live turn. Use a separate worktree for concurrent
-increments; serialize heavy gates on constrained hosts and build artifacts
-before checking them.
+One fresh run per stage; an interrupted turn is not resumed through the launcher. Reconcile the
+run's partial work first (phase 7), and a further attempt is a new `gdd.py stage` dispatch that
+spends a round; a delegated ce-work run is never resumed. Poll at turn boundaries. Never attach a
+second writer to a live turn. Use a separate worktree for concurrent increments; serialize heavy
+gates on constrained hosts and build artifacts before checking them.
 
 ## What to read from a finished run
 

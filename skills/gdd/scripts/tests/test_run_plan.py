@@ -13,7 +13,7 @@ SCRIPTS = os.path.dirname(HERE)
 sys.path.insert(0, SCRIPTS)
 import gdd_process
 import agent_run
-from gdd_test_support import finalized, route_fixture, run_python_cli, wait_for_json
+from gdd_test_support import finalized, remove_tree, route_fixture, run_python_cli, wait_for_json
 from test_gdd import DELIVERY, GddCase, dead_pid, read, write
 
 GDD = os.path.join(SCRIPTS, "gdd.py")
@@ -524,19 +524,120 @@ class AttemptNameTests(InProcessRunPlanCase):
 
 
 class ResumeAdviceTests(RunPlanCase):
-    def test_wait_failure_with_a_plan_points_at_gdd_stage_not_a_raw_resume(self):
-        self.setup({})
-        failed = self.stage("implement", "--wait", env={"STUB_EXIT": "1"})
-        self.assertEqual(failed.returncode, 1, failed.stdout)
-        self.assertNotIn("--resume", failed.stderr)
-        self.assertIn("attempt is recorded", failed.stderr)
-        self.assertIn("gdd.py stage", failed.stderr)
-        self.assertIn("--over-budget", failed.stderr)
+    """Every terminal non-done `wait` outcome is reconciled, never resumed raw."""
+    OMP_SESSION = "00000000-0000-7000-8000-000000000001"  # the session id in omp.ok.ndjson
 
-    def test_wait_failure_without_a_plan_keeps_the_raw_resume_hint(self):
-        failed = self.stage("implement", "--wait", env={"STUB_EXIT": "1"})
-        self.assertEqual(failed.returncode, 1, failed.stdout)
-        self.assertIn("--resume", failed.stderr)
+    def assert_policy(self, ended, session_id):
+        self.assertIn("attempt is recorded", ended.stderr)
+        self.assertIn("reconciles the run's partial work first (phase 7)", ended.stderr)
+        self.assertIn("a further attempt is a new gdd.py stage dispatch that spends a round", ended.stderr)
+        self.assertIn("--over-budget with the owner's approval", ended.stderr)
+        for stream in (ended.stdout, ended.stderr):
+            self.assertNotIn("--resume", stream)
+            self.assertNotIn("start --name", stream)
+            self.assertNotIn(session_id, stream)
+
+    def wait_stub(self, exit_code, observed, *, plan):
+        if plan:
+            self.setup({})
+        done = self.stage("implement", "--wait", env={"STUB_EXIT": str(exit_code)})
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn(f"wait: run ended in {observed} (exit={exit_code}) instead of done", done.stderr)
+        self.assertEqual(done.stderr.count("a delegated ce-work run is never resumed"), 1)
+        state = self.run_state()
+        self.assertEqual(state["session_id"], self.OMP_SESSION)
+        self.assert_policy(done, self.OMP_SESSION)
+
+    def test_wait_failed_with_and_without_a_plan_uses_one_policy(self):
+        self.wait_stub(1, "failed", plan=False)
+        self.wait_stub(1, "failed", plan=True)
+
+    def test_wait_killed_with_and_without_a_plan_uses_one_policy(self):
+        self.wait_stub(143, "killed", plan=False)
+        self.wait_stub(143, "killed", plan=True)
+
+    def test_wait_failure_for_a_review_stage_omits_the_ce_work_rule(self):
+        done = self.stage("review", "--base", self.base, "--wait", env={"STUB_EXIT": "1"})
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("wait: run ended in failed (exit=1) instead of done", done.stderr)
+        self.assertNotIn("ce-work", done.stderr)
+        self.assert_policy(done, self.OMP_SESSION)
+
+    def static_launcher(self):
+        """A launcher double that materializes STATIC_RUN_STATE as the run's state.json."""
+        path = os.path.join(self.tmp, "static-run.py")
+        write(path, "\n".join([
+            "import json, os, sys",
+            "name = sys.argv[sys.argv.index('--name') + 1]",
+            "run_dir = os.path.join(os.environ['GDD_RUN_ROOT'], '2026-03-01', name)",
+            "os.makedirs(run_dir, exist_ok=True)",
+            "state = json.loads(os.environ['STATIC_RUN_STATE'])",
+            "state.update(name=name, cwd=os.environ['STATIC_RUN_CWD'])",
+            "with open(os.path.join(run_dir, 'state.json'), 'w', encoding='utf-8') as handle:",
+            "    json.dump(state, handle)",
+            "print('started:', name)",
+            "print('run dir:', run_dir)",
+        ]) + "\n")
+        return path
+
+    def wait_static(self, payload, observed, *, plan):
+        if plan:
+            self.setup({})
+        done = self.stage("implement", "--wait", env={
+            "GDD_LAUNCHER": self.static_launcher(),
+            "STATIC_RUN_STATE": json.dumps(payload),
+            "STATIC_RUN_CWD": self.repo,
+        })
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn(f"wait: run ended in {observed} (exit=-) instead of done", done.stderr)
+        self.assertEqual(done.stderr.count("a delegated ce-work run is never resumed"), 1)
+        self.assert_policy(done, payload["session_id"])
+
+    def test_wait_stale_with_and_without_a_plan_uses_one_policy(self):
+        pid, recorded = dead_pid(self.children)
+        payload = {"agent": "omp", "state": "running", "exit": None,
+                   "started": "2026-03-01T00:00:00+00:00", "ended": None, "duration_s": None,
+                   "session_id": "static-stale-session", "pid": pid, "pid_identity": recorded}
+        self.wait_static(payload, "stale", plan=False)
+        self.wait_static(payload, "stale", plan=True)
+
+    def test_wait_unknown_with_and_without_a_plan_uses_one_policy(self):
+        payload = {"agent": "omp", "state": "unknown", "exit": None,
+                   "started": "2026-03-01T00:00:00+00:00", "ended": None, "duration_s": None,
+                   "session_id": "static-unknown-session"}
+        self.wait_static(payload, "unknown", plan=False)
+        self.wait_static(payload, "unknown", plan=True)
+
+    def test_wait_timeout_never_prints_a_raw_resume(self):
+        import gdd
+
+        for plan in (False, True):
+            with self.subTest(plan=plan):
+                if plan:
+                    self.setup({})
+                remove_tree(os.path.join(self.state_home, "gdd", "runs"))
+                payload = {"agent": "omp", "state": "running", "exit": None,
+                           "started": "2026-03-01T00:00:00+00:00", "ended": None,
+                           "duration_s": None, "session_id": "static-timeout-session",
+                           "pid": os.getpid(), "pid_identity": agent_run.identity(os.getpid())}
+                ticks = iter([0.0, 21601.0])
+                with mock.patch.object(gdd.time, "time",
+                                       side_effect=lambda: next(ticks, 21601.0)), \
+                     mock.patch.object(gdd.time, "sleep"):
+                    done = run_python_cli(
+                        GDD, "stage", "--repo", self.repo, "--goal", "0001",
+                        "--stage", "implement", "--wait",
+                        env={**self.env, "GDD_LAUNCHER": self.static_launcher(),
+                             "STATIC_RUN_STATE": json.dumps(payload),
+                             "STATIC_RUN_CWD": self.repo},
+                        main=gdd.main,
+                    )
+                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                self.assertIn("wait: run still not finished after 6h:", done.stderr)
+                for stream in (done.stdout, done.stderr):
+                    self.assertNotIn("--resume", stream)
+                    self.assertNotIn("start --name", stream)
+                    self.assertNotIn(payload["session_id"], stream)
 
 
 class ExactRepoMatchTests(RunPlanCase):

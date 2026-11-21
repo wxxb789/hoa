@@ -16,8 +16,9 @@ The agent's report is a claim, never evidence:
 - Run the repo's gates yourself and read real exit codes.
 - **Exit 0 means the process ended, not that the phase finished.** Read the run's final assistant text
   (`answer.md`): a report ending with "the gate is running, waiting for its result" ended mid-gate.
-  Resume it, or run the remaining gates yourself — never accept the exit code as completion. A
-  delegated ce-work stage is the exception: it is not resumed; stop and preserve state as the
+  Reconcile the run's partial work first (phase 7) and run the remaining gates yourself — never
+  accept the exit code as completion; a further attempt is a new `gdd.py stage` dispatch that
+  spends a round. A delegated ce-work stage is never resumed; stop and preserve state as the
   implement template says.
 - **A non-zero gate that names a missing build output is a prerequisite failure, not a regression.**
   Read the message before calling it a delta; produce the artifacts and re-run.

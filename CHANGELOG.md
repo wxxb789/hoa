@@ -7,6 +7,12 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 ## 2026-11-21
 
 - Gate `scripts/`, `evals/`, and `skills/` with pinned Ruff (`uvx ruff@0.17.5`) on correctness and cleanup rules, and fix all 20 baseline findings.
+- Stop `gdd.py stage --wait` advising a raw launcher resume: a terminal non-`done` outcome records the
+  attempt, points at operator reconciliation (phase 7) and a new capped `gdd.py stage` dispatch, prints
+  no launcher command, `--resume` or session id on any path, and names the delegated ce-work no-resume
+  rule for `implement`; attribute the LIVE `last_run:` line by exact goal lineage, cwd and start instant,
+  with explicit `none`/`unknown` lines, instead of name substring and state mtime.
+
 - Run the Python suite in parallel and reduce repeated interpreter and Git startup in GDD and necessity eval tests.
 - gdd-route-pi: paste a spec pre-review's replacement text into the brief verbatim, test every prose
   invariant on each output path, and check new files' line endings on Windows.

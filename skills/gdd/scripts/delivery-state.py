@@ -40,8 +40,9 @@ import argparse
 import glob
 import json
 import os
+import re
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.dont_write_bytecode = True  # no __pycache__ inside an installed skill
@@ -64,6 +65,8 @@ STAGES = [
     "done",
     "blocked",
 ]
+
+AGENT_STAGES = {"implement", "simplify", "apply", "review", "fix"}
 
 COLUMNS = [
     "ts",
@@ -216,6 +219,37 @@ def unknown(reason):
     return f"unknown ({reason})"
 
 
+def resolved_path(value):
+    """realpath of one recorded path, or None when the value is unusable."""
+    if not isinstance(value, str):
+        return None
+    try:
+        return os.path.realpath(os.path.expanduser(value))
+    except (OSError, ValueError):
+        return None
+
+
+def aware_start(value):
+    """The UTC instant a run's `started` names, or None when it is not aware ISO-8601."""
+    if not isinstance(value, str):
+        return None
+    try:
+        moment = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    if moment.tzinfo is None or moment.utcoffset() is None:
+        return None
+    return moment.astimezone(timezone.utc)
+
+
+def attributable_lineage(run_dir, goal):
+    """True when lineage.json names exactly this goal for an agent stage."""
+    lineage = agent_run.read_json(os.path.join(run_dir, "lineage.json"), None)
+    if not isinstance(lineage, dict):
+        return False
+    return lineage.get("goal") == goal and lineage.get("stage") in AGENT_STAGES
+
+
 def live_facts(repo, goal, run_root, path_hint=None):
     facts = []
     path = None
@@ -235,9 +269,9 @@ def live_facts(repo, goal, run_root, path_hint=None):
             "base_is_origin_main",
             "dirty_files",
             "open_pr",
-            "last_run",
         ):
             facts.append(f"{key}: {unknown(reason)}")
+        facts.append("last_run: unknown (repo path unavailable)")
         return facts
 
     ok, branch, why = run(["git", "-C", path, "rev-parse", "--abbrev-ref", "HEAD"])
@@ -310,32 +344,40 @@ def live_facts(repo, goal, run_root, path_hint=None):
 
     candidates = []
     try:
-        for state_path in glob.glob(os.path.join(run_root, "*", "*", "state.json")):
-            run_dir = os.path.dirname(state_path)
-            state = agent_run.read_state(run_dir)
-            cwd = state.get("cwd")
-            if not cwd or os.path.realpath(os.path.expanduser(cwd)) != path:
-                continue
-            name = str(state.get("name") or os.path.basename(run_dir))
-            try:
-                mtime = os.path.getmtime(state_path)
-            except OSError:
-                mtime = 0
-            candidates.append((mtime, name, state, run_dir))
+        state_paths = glob.glob(os.path.join(run_root, "*", "*", "state.json"))
     except OSError as exc:
         facts.append(f"last_run: {unknown(exc)}")
     else:
+        for state_path in state_paths:
+            run_dir = os.path.dirname(state_path)
+            name = os.path.basename(run_dir)
+            date_dir = os.path.basename(os.path.dirname(run_dir))
+            if ".prev-" in name or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", date_dir):
+                continue
+            state = agent_run.read_state(run_dir)
+            if not state or state.get("name") != name:
+                continue
+            if resolved_path(state.get("cwd")) != path:
+                continue
+            if not attributable_lineage(run_dir, goal):
+                continue
+            started = aware_start(state.get("started"))
+            if started is None:
+                continue
+            candidates.append((started, date_dir, name, state, run_dir))
         if not candidates:
-            facts.append("last_run: none (no runs for this repo)")
+            facts.append("last_run: none (no attributable runs for this repo and goal)")
         else:
-            goal_matches = [c for c in candidates if goal.lower() in c[1].lower()]
-            _, name, state, run_dir = max(goal_matches or candidates, key=lambda c: c[0])
+            _, _, name, state, run_dir = max(candidates, key=lambda c: (c[0], c[1], c[2]))
             exit_code = state.get("exit")
             duration = state.get("duration_s")
+            observed = agent_run.observed_state(run_dir, state)
+            if observed not in agent_run.STATES + ("stale",):
+                observed = "unknown"
             facts.append(
                 "last_run: {} {} exit={} dur={}".format(
                     name,
-                    agent_run.observed_state(run_dir, state),
+                    observed,
                     "-" if exit_code is None else exit_code,
                     "-" if duration is None else duration,
                 )
@@ -393,6 +435,7 @@ def cmd_show(args):
         )
     else:
         lines.append("repo: unknown (no rows and no --repo)")
+        lines.append("last_run: unknown (repo path unavailable)")
 
     block = "\n".join(lines)
     print(block)

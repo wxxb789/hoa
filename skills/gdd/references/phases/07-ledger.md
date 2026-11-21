@@ -35,9 +35,9 @@ record one `blocked` row carrying the archived result, the outer handle, the del
 summary, the recorded base and observed HEAD, and the recovery path when one exists. Inspect both
 layers and inventory partial writes before any recovery, and keep the original pre-dispatch scope
 snapshot as the baseline. Do not auto-resume, force-dispatch, run the template's fallback or advance
-to verify from such a row. Read-only reconciliation does not spend a round; any authorized new
-implementation dispatch counts against the existing cap. A provider's documented same-run recovery is
-a separate, explicitly selected action — never an implementation retry.
+to verify from such a row. Read-only reconciliation does not spend a round; a further attempt is a new
+`gdd.py stage` dispatch that spends a round (or `--over-budget` with the owner's approval), and a
+delegated ce-work run is never resumed.
 
 ## Phase 8 — reset before the next increment
 
