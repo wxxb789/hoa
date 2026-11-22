@@ -183,8 +183,8 @@ survive unchanged. Quote paths that contain spaces. For direct executables
 (`uv`, Python, native binaries) there is no shell expansion and the item text
 cannot inject a command. The formatted item text replaces a `{text}`
 placeholder inside one argument when the placeholder is present; otherwise it
-is piped to the adapter's stdin. On Windows, `.cmd` and `.bat` wrappers are
-executed through `cmd.exe` by the OS, so give those adapters the text via
-stdin instead of a `{text}` argument.
+is piped to the adapter's stdin. On Windows, `.cmd` and `.bat` adapters must
+receive the entry via stdin: a `{text}` argument is rejected for them (exit 2)
+because `cmd.exe` interprets the argument text.
 
 Only if a script command fails (for example `uv` is not found), read [references/troubleshooting.md](references/troubleshooting.md).

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -118,7 +119,7 @@ class SpinBreakerCliTests(unittest.TestCase):
                          ["spin-breaker"])
         self.assertEqual(
             sorted(p.name for p in (self.repo / ".tmp-artifacts" / "spin-breaker").iterdir()),
-            ["parked-items.md"])
+            [".gitignore", "parked-items.md"])
         self.assertEqual([p.name for p in self.repo.iterdir()], [".tmp-artifacts"])
 
         missing_title = self._run("park", "--repo-root", str(self.repo), "--kind", "side-quest")
@@ -253,7 +254,7 @@ class SpinBreakerCliTests(unittest.TestCase):
         self.assertEqual(sorted(p.name for p in (self.repo / ".tmp-artifacts").iterdir()),
                          ["board-1"])
         self.assertEqual(sorted(p.name for p in bundle_dir.iterdir()),
-                         ["_map_data.json", "board-1.html"])
+                         [".gitignore", "_map_data.json", "board-1.html"])
 
         raw_html = (bundle_dir / "board-1.html").read_bytes()
         self.assertNotIn(b"\r", raw_html)
@@ -523,6 +524,65 @@ class SpinBreakerCliTests(unittest.TestCase):
         recorded = probe.read_text(encoding="utf-8")
         self.assertEqual(recorded,
                          "ARGS=" + "|".join([unc, unquoted, quoted_quote]) + "|STDIN|" + entry)
+
+
+    def test_external_text_placeholder_rejected_for_cmd_and_bat_adapters(self) -> None:
+        for script in ("adapter.cmd", r'"C:\Tools\my adapter.bat"'):
+            with self.subTest(script=script):
+                refused = self._run("park", "--repo-root", str(self.repo), "--kind",
+                                    "side-quest", "--title", "cmd adapter",
+                                    "--external-cmd", f"{script} {{text}}",
+                                    "--confirm-external")
+                self.assertEqual(refused.returncode, 2)
+                self.assertIn(".cmd/.bat", refused.stderr)
+                self.assertIn("stdin", refused.stderr)
+        self.assertFalse((self.repo / ".tmp-artifacts").exists())
+
+        allowed = self._run("park", "--repo-root", str(self.repo), "--kind", "side-quest",
+                            "--title", "stdin mode", "--external-cmd", "adapter.cmd")
+        self.assertEqual(allowed.returncode, 0, allowed.stderr)
+        self.assertEqual(json.loads(allowed.stdout)["external_status"], "skipped_unconfirmed")
+
+    def test_park_refuses_hardlinked_leaf_file(self) -> None:
+        store = self.repo / ".tmp-artifacts" / "spin-breaker"
+        store.mkdir(parents=True)
+        source = self.tmp / "README.md"
+        source.write_text("shared content\n", encoding="utf-8")
+        leaf = store / "parked-items.md"
+        try:
+            os.link(source, leaf)
+        except OSError:
+            self.skipTest("cannot create a hard link here")
+        result = self._run("park", "--repo-root", str(self.repo), "--kind", "side-quest",
+                           "--title", "through hard link")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("hard link", result.stderr)
+        self.assertEqual(source.read_text(encoding="utf-8"), "shared content\n")
+        self.assertEqual(leaf.read_text(encoding="utf-8"), "shared content\n")
+
+    def test_bundles_stay_git_ignored_in_a_fresh_repository(self) -> None:
+        if shutil.which("git") is None:
+            self.skipTest("git is not available")
+        git_repo = self.tmp / "git-repo"
+        git_repo.mkdir()
+        git = ["git", "-C", str(git_repo)]
+        init = subprocess.run([*git, "init", "-q"], capture_output=True, creationflags=NO_WINDOW)
+        self.assertEqual(init.returncode, 0, init.stderr)
+        parked = self._run("park", "--repo-root", str(git_repo), "--kind", "side-quest",
+                           "--title", "ignored")
+        self.assertEqual(parked.returncode, 0, parked.stderr)
+        mapped = self._run("map", "--repo-root", str(git_repo), "--input", "-",
+                           "--bundle", "board-1", stdin=json.dumps({"outcome": "ignored"}))
+        self.assertEqual(mapped.returncode, 0, mapped.stderr)
+        status = subprocess.run([*git, "status", "--porcelain", "--untracked-files=all"],
+                                capture_output=True, text=True, encoding="utf-8",
+                                creationflags=NO_WINDOW)
+        self.assertEqual(status.stdout, "")
+        for relative in (".tmp-artifacts/spin-breaker/parked-items.md",
+                         ".tmp-artifacts/board-1/board-1.html"):
+            ignored = subprocess.run([*git, "check-ignore", "-q", relative],
+                                     capture_output=True, creationflags=NO_WINDOW)
+            self.assertEqual(ignored.returncode, 0, relative)
 
 
 if __name__ == "__main__":

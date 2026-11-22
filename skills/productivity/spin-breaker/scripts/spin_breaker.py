@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import shutil
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -36,6 +37,8 @@ DEFAULT_PARKING_BUNDLE = "spin-breaker"
 DEFAULT_EXTERNAL_TIMEOUT = "15"
 ARTIFACT_DIR = ".tmp-artifacts"
 PARKING_FILE = "parked-items.md"
+GITIGNORE_FILE = ".gitignore"
+GITIGNORE_CONTENT = "*\n"
 PLACEHOLDER = "{text}"
 EXIT_EXTERNAL_FAILED = 1
 EXIT_USAGE = 2
@@ -189,6 +192,27 @@ def _is_link(path: Path) -> bool:
         return True
     is_junction = getattr(path, "is_junction", None)
     return bool(is_junction is not None and is_junction())
+
+
+def _is_windows_script(executable: str) -> bool:
+    candidates = [executable]
+    if sys.platform == "win32":
+        resolved = shutil.which(executable)
+        if resolved:
+            candidates.append(resolved)
+    return any(Path(candidate).suffix.lower() in (".cmd", ".bat") for candidate in candidates)
+
+
+def _ensure_gitignore(bundle_dir: Path) -> None:
+    """Keep a bundle's contents out of the surrounding git repository."""
+    marker = bundle_dir / GITIGNORE_FILE
+    if _is_link(marker):
+        raise ValueError(f"{marker} is a symlink; refusing to write through it")
+    if marker.exists():
+        if marker.lstat().st_nlink > 1:
+            raise ValueError(f"{marker} has multiple hard links; refusing to modify it")
+        return
+    marker.write_text(GITIGNORE_CONTENT, encoding="utf-8", newline="\n")
 
 
 def _resolve_bundle_dir(repo_root: Path, bundle: str) -> Path:
@@ -348,6 +372,9 @@ def run_park(args: argparse.Namespace) -> int:
             return _fail(f"cannot parse external_cmd: {error}")
         if not tokens:
             return _fail("external_cmd is empty after parsing")
+        if any(PLACEHOLDER in token for token in tokens) and _is_windows_script(tokens[0]):
+            return _fail("Windows .cmd/.bat adapters cannot take {text} in argv; omit {text} "
+                         "so the entry is piped via stdin")
     timeout = 0
     if tokens is not None and args.confirm_external:
         raw_timeout = sc.resolve(SKILL, KEY_EXTERNAL_TIMEOUT, flag=args.external_timeout,
@@ -361,10 +388,16 @@ def run_park(args: argparse.Namespace) -> int:
     markdown_path = store / PARKING_FILE
     if _is_link(markdown_path):
         return _fail(f"{markdown_path} is a symlink; refusing to write through it")
+    if markdown_path.exists() and markdown_path.lstat().st_nlink > 1:
+        return _fail(f"{markdown_path} has multiple hard links; refusing to modify it")
     if markdown_path.exists() and not markdown_path.resolve(strict=False).is_relative_to(
             store.resolve(strict=False)):
         return _fail(f"{markdown_path} escapes {store}; refusing to write")
     store.mkdir(parents=True, exist_ok=True)
+    try:
+        _ensure_gitignore(store)
+    except ValueError as error:
+        return _fail(str(error))
     _append_entry(markdown_path, entry)
     receipt = {
         "status": "parked",
@@ -615,6 +648,10 @@ def run_map(args: argparse.Namespace) -> int:
                 continue
             break
     generated = _utc_stamp()
+    try:
+        _ensure_gitignore(target)
+    except ValueError as error:
+        return _fail(str(error))
     html_path = target / f"{bundle}.html"
     data_path = target / "_map_data.json"
     if _is_link(html_path) or _is_link(data_path):
