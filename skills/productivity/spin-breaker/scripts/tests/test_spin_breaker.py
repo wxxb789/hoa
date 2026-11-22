@@ -268,6 +268,7 @@ class SpinBreakerCliTests(unittest.TestCase):
         self.assertNotIn("https://", page)
         self.assertIn("grid-template-columns: repeat(3", page)
         self.assertIn("prefers-color-scheme", page)
+        self.assertIn("code { white-space: pre-wrap; overflow-wrap: anywhere; }", page)
         for heading in ("Target outcome", "live hypotheses", "Single discriminating probe",
                         "Eliminated", "Parked side quests"):
             self.assertIn(heading, page)
@@ -321,6 +322,8 @@ class SpinBreakerCliTests(unittest.TestCase):
                                stdin=bad_input)
             self.assertEqual(failed.returncode, 2, bad_input)
             self.assertTrue(failed.stderr.startswith("spin_breaker:"), bad_input)
+        self.assertEqual(sorted(p.name for p in (self.repo / ".tmp-artifacts").iterdir()),
+                         [receipt["bundle"]])
 
 
     def test_bundle_guard_rejects_unsafe_names(self) -> None:
@@ -462,12 +465,18 @@ class SpinBreakerCliTests(unittest.TestCase):
         self.assertIn("already exists", duplicate.stderr)
         self.assertEqual(html.read_bytes(), before)
 
+        processes = [subprocess.Popen(
+            [sys.executable, str(SCRIPT), "map", "--repo-root", str(self.repo),
+             "--input", "-"],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True, encoding="utf-8", env=dict(self.env), creationflags=NO_WINDOW)
+            for _ in range(4)]
         bundles = []
-        for _ in range(3):
-            run = self._run("map", "--repo-root", str(self.repo), "--input", "-", stdin=feed)
-            self.assertEqual(run.returncode, 0, run.stderr)
-            bundles.append(json.loads(run.stdout)["bundle"])
-        self.assertEqual(len(set(bundles)), 3)
+        for process in processes:
+            stdout, stderr = process.communicate(feed)
+            self.assertEqual(process.returncode, 0, stderr)
+            bundles.append(json.loads(stdout)["bundle"])
+        self.assertEqual(len(set(bundles)), 4)
         groups: dict[str, list[int]] = {}
         for bundle in bundles:
             match = re.match(r"^(spin-map-\d{8}-\d{6})(?:-(\d+))?$", bundle)
@@ -477,6 +486,43 @@ class SpinBreakerCliTests(unittest.TestCase):
             self.assertEqual(sorted(suffixes), list(range(1, len(suffixes) + 1)))
         for bundle in bundles:
             self.assertTrue((self.repo / ".tmp-artifacts" / bundle / f"{bundle}.html").is_file())
+
+
+    def test_park_refuses_symlinked_leaf_file(self) -> None:
+        store = self.repo / ".tmp-artifacts" / "spin-breaker"
+        store.mkdir(parents=True)
+        outside = self.tmp / "outside.md"
+        outside.write_text("original\n", encoding="utf-8")
+        leaf = store / "parked-items.md"
+        try:
+            leaf.symlink_to(outside)
+        except OSError:
+            self.skipTest("cannot create a file symlink here")
+        self.addCleanup(lambda: leaf.unlink() if leaf.is_symlink() else None)
+        result = self._run("park", "--repo-root", str(self.repo), "--kind", "side-quest",
+                           "--title", "through link")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("symlink", result.stderr.lower())
+        self.assertEqual(outside.read_text(encoding="utf-8"), "original\n")
+        self.assertTrue(leaf.is_symlink())
+
+    def test_external_command_split_preserves_windows_paths(self) -> None:
+        probe = self.tmp / "probe.txt"
+        unc = r"\\server\share\adapter.exe"
+        unquoted = r"C:\dir\new\tool.exe"
+        quoted_quote = 'a"b'
+        template = (f'"{sys.executable}" -c "{STUB}" "{probe}" '
+                    f'"{unc}" {unquoted} "a\\"b"')
+        result = self._run("park", "--repo-root", str(self.repo), "--kind", "side-quest",
+                           "--title", "windows paths", "--parking-bundle", "b-paths",
+                           "--external-cmd", template, "--confirm-external")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        receipt = json.loads(result.stdout)
+        self.assertEqual(receipt["external_status"], "ok")
+        entry = Path(receipt["local_path"]).read_text(encoding="utf-8")
+        recorded = probe.read_text(encoding="utf-8")
+        self.assertEqual(recorded,
+                         "ARGS=" + "|".join([unc, unquoted, quoted_quote]) + "|STDIN|" + entry)
 
 
 if __name__ == "__main__":

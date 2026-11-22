@@ -174,12 +174,17 @@ variable, then `$XDG_CONFIG_HOME/spin-breaker/config.yaml` (falling back to
 | `external_cmd` | `--external-cmd` | `SPIN_BREAKER_EXTERNAL_CMD` | none (empty; local markdown only) |
 | `external_timeout` | `--external-timeout` | `SPIN_BREAKER_EXTERNAL_TIMEOUT` | `15` (seconds) |
 
-`external_cmd` is split with `shlex` and run with `shell=False`, so for direct
-executables (`uv`, Python, native binaries) there is no shell expansion and the
-item text cannot inject a command. The formatted item text replaces a `{text}`
+`external_cmd` is split by a deterministic quote-aware tokenizer and run with
+`shell=False`. One pair of outer quotes per token is removed, and inside double
+quotes only `\"` unescapes to `"`; every other backslash stays verbatim, so
+quoted Windows paths (`"C:\Tools\my-adapter.exe"`), UNC paths
+(`"\\server\share\my-adapter.exe"`), and `C:\Tools\my-adapter.exe` unquoted all
+survive unchanged. Quote paths that contain spaces. For direct executables
+(`uv`, Python, native binaries) there is no shell expansion and the item text
+cannot inject a command. The formatted item text replaces a `{text}`
 placeholder inside one argument when the placeholder is present; otherwise it
 is piped to the adapter's stdin. On Windows, `.cmd` and `.bat` wrappers are
 executed through `cmd.exe` by the OS, so give those adapters the text via
-stdin instead of a `{text}` argument. Quote paths that contain backslashes.
+stdin instead of a `{text}` argument.
 
 Only if a script command fails (for example `uv` is not found), read [references/troubleshooting.md](references/troubleshooting.md).

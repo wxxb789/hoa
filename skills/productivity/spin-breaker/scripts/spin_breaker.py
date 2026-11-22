@@ -17,7 +17,6 @@ from __future__ import annotations
 import argparse
 import html
 import json
-import shlex
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -124,7 +123,7 @@ li.dead::marker { color: var(--bad); }
   padding: .6rem .7rem;
   margin: .4rem 0;
 }
-.probe code { overflow-wrap: anywhere; }
+code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .actions { margin: .3rem 0 0; padding-left: 1.2rem; }
 .actions li { margin: .3rem 0; }
 @media (max-width: 900px) {
@@ -234,6 +233,57 @@ def _append_entry(path: Path, entry: str) -> None:
         handle.write(separator + entry)
 
 
+def _split_command(command: str) -> list[str]:
+    """Split one command template, preserving Windows and UNC backslashes.
+
+    Tokens split on whitespace; one pair of outer quotes per token is removed
+    (single or double), and inside double quotes only backslash-quote unescapes
+    to a quote. Every other backslash stays verbatim, so `C:\\Tools\\app.exe`
+    and `\\\\server\\share\\x.exe` survive unchanged. An unclosed quote raises
+    ValueError.
+    """
+    tokens: list[str] = []
+    token: list[str] = []
+    quote = ""
+    in_token = False
+    index = 0
+    while index < len(command):
+        character = command[index]
+        if quote:
+            if character == quote:
+                quote = ""
+                index += 1
+                continue
+            if (quote == '"' and character == "\\"
+                    and index + 1 < len(command) and command[index + 1] == '"'):
+                token.append('"')
+                index += 2
+                continue
+            token.append(character)
+            index += 1
+            continue
+        if character in "'\"":
+            quote = character
+            in_token = True
+            index += 1
+            continue
+        if character.isspace():
+            if in_token:
+                tokens.append("".join(token))
+                token = []
+                in_token = False
+            index += 1
+            continue
+        token.append(character)
+        in_token = True
+        index += 1
+    if quote:
+        raise ValueError("unterminated quote")
+    if in_token:
+        tokens.append("".join(token))
+    return tokens
+
+
 def _run_external(tokens: list[str], timeout: int, payload: str) -> tuple[str, dict]:
     """Run the parsed adapter with the payload substituted into `{text}` or piped to stdin."""
     if any(PLACEHOLDER in token for token in tokens):
@@ -293,7 +343,7 @@ def run_park(args: argparse.Namespace) -> int:
         if not external_cmd.strip():
             return _fail("external_cmd must not be blank")
         try:
-            tokens = shlex.split(external_cmd)
+            tokens = _split_command(external_cmd)
         except ValueError as error:
             return _fail(f"cannot parse external_cmd: {error}")
         if not tokens:
@@ -308,8 +358,13 @@ def run_park(args: argparse.Namespace) -> int:
             return _fail(f"external_timeout {raw_timeout!r} is not an integer number of seconds")
         if timeout <= 0:
             return _fail(f"external_timeout must be positive, got {timeout}")
-    store.mkdir(parents=True, exist_ok=True)
     markdown_path = store / PARKING_FILE
+    if _is_link(markdown_path):
+        return _fail(f"{markdown_path} is a symlink; refusing to write through it")
+    if markdown_path.exists() and not markdown_path.resolve(strict=False).is_relative_to(
+            store.resolve(strict=False)):
+        return _fail(f"{markdown_path} escapes {store}; refusing to write")
+    store.mkdir(parents=True, exist_ok=True)
     _append_entry(markdown_path, entry)
     receipt = {
         "status": "parked",
@@ -508,25 +563,9 @@ def _dump_json(payload: dict) -> str:
 def run_map(args: argparse.Namespace) -> int:
     repo_root = Path(str(sc.resolve(SKILL, KEY_REPO_ROOT, flag=args.repo_root, default=".")))
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-    try:
-        if args.bundle is None:
-            bundle = f"spin-map-{stamp}"
-            target = _resolve_bundle_dir(repo_root, bundle)
-            counter = 1
-            while target.exists():
-                counter += 1
-                bundle = f"spin-map-{stamp}-{counter}"
-                target = _resolve_bundle_dir(repo_root, bundle)
-        else:
-            bundle = args.bundle
-            if not _safe_bundle(bundle):
-                return _fail(f"invalid bundle {bundle!r}: use one directory name without "
-                             f"'/', '\\', ':', '..', trailing dots, or a reserved device name")
-            target = _resolve_bundle_dir(repo_root, bundle)
-            if target.exists():
-                return _fail(f"bundle {bundle!r} already exists; choose a new --bundle name")
-    except ValueError as error:
-        return _fail(str(error))
+    if args.bundle is not None and not _safe_bundle(args.bundle):
+        return _fail(f"invalid bundle {args.bundle!r}: use one directory name without "
+                     f"'/', '\\', ':', '..', trailing dots, or a reserved device name")
     if args.input == "-":
         try:
             raw = sys.stdin.buffer.read().decode("utf-8-sig")
@@ -547,10 +586,39 @@ def run_map(args: argparse.Namespace) -> int:
         board = _validate_board(data)
     except ValueError as error:
         return _fail(f"{args.input}: {error}")
+    artifacts = repo_root / ARTIFACT_DIR
+    if _is_link(artifacts):
+        return _fail(f"{artifacts} is a symlink or junction; refusing to write through it")
+    artifacts.mkdir(parents=True, exist_ok=True)
+    if args.bundle is not None:
+        bundle = args.bundle
+        try:
+            target = _resolve_bundle_dir(repo_root, bundle)
+        except ValueError as error:
+            return _fail(str(error))
+        try:
+            target.mkdir(parents=False, exist_ok=False)
+        except FileExistsError:
+            return _fail(f"bundle {bundle!r} already exists; choose a new --bundle name")
+    else:
+        counter = 0
+        while True:
+            counter += 1
+            bundle = f"spin-map-{stamp}" if counter == 1 else f"spin-map-{stamp}-{counter}"
+            try:
+                target = _resolve_bundle_dir(repo_root, bundle)
+            except ValueError as error:
+                return _fail(str(error))
+            try:
+                target.mkdir(parents=False, exist_ok=False)
+            except FileExistsError:
+                continue
+            break
     generated = _utc_stamp()
-    target.mkdir(parents=True, exist_ok=True)
     html_path = target / f"{bundle}.html"
     data_path = target / "_map_data.json"
+    if _is_link(html_path) or _is_link(data_path):
+        return _fail(f"{target} holds a symlinked output file; refusing to write")
     html_path.write_text(_render_html(bundle, generated, board), encoding="utf-8", newline="\n")
     data_path.write_text(_dump_json({"bundle": bundle, "generated_at": generated, **board}),
                          encoding="utf-8", newline="\n")
