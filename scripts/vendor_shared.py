@@ -36,7 +36,8 @@ SOURCES: dict[str, Path] = {
 CONSUMERS: dict[str, list[str]] = {
     "skill_config.py": ["skills/engineering/gdd/scripts",
                         "skills/productivity/ghc-decisions/scripts",
-                        "skills/productivity/session-history-mining/scripts"],
+                        "skills/productivity/session-history-mining/scripts",
+                        "skills/productivity/spin-breaker/scripts"],
     "rubrics.json": ["skills/productivity/ghc-decisions/scripts"],
     "findings.py": ["skills/skill-authoring/hoa-practice-retro/scripts"],
     "panel.md": ["skills/skill-authoring/hoa-practice-retro/references"],
@@ -53,6 +54,7 @@ CONSUMERS: dict[str, list[str]] = {
         "skills/skill-authoring/hoa-skill-port/references",
         "skills/productivity/session-history-mining/references",
         "skills/productivity/spec-convergence/references",
+        "skills/productivity/spin-breaker/references",
     ],
     # Read on failure only; skills whose docs run their own scripts with `uv run`.
     "troubleshooting.md": [
@@ -65,6 +67,7 @@ CONSUMERS: dict[str, list[str]] = {
         "skills/skill-authoring/hoa-skill-curate/references",
         "skills/skill-authoring/hoa-skill-set-audit/references",
         "skills/productivity/session-history-mining/references",
+        "skills/productivity/spin-breaker/references",
         "skills/research-writing/writing/references",
     ],
 }
