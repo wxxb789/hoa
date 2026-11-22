@@ -6,6 +6,7 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 ## 2026-11-22
 
+- Install the Windows no-window guard from a root `conftest.py`, so the whole test suite and its Python children run guarded without setting `PYTHONPATH`.
 - delegated-work-acceptance: size the independent review to the change; new gate or policy logic gets a reviewer who asks which guard can be deleted with the suite still green.
 
 ## 2026-11-21
