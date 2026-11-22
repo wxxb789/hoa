@@ -98,7 +98,7 @@ Read the recent turns plus read-only `git status --short` and `git diff --stat`.
 When 3+ entangled hypotheses, surfaces, or environments make linear chat
 illegible, gather structured JSON of the outcome, verified facts,
 live/eliminated hypotheses, next probe, and parked side quests, then run
-`uv run scripts/spin_breaker.py map --input <file>`:
+`uv run "$S" map --input -` (with `S` as defined under Commands):
 
 ```json
 {
@@ -185,6 +185,10 @@ cannot inject a command. The formatted item text replaces a `{text}`
 placeholder inside one argument when the placeholder is present; otherwise it
 is piped to the adapter's stdin. On Windows, `.cmd` and `.bat` adapters must
 receive the entry via stdin: a `{text}` argument is rejected for them (exit 2)
-because `cmd.exe` interprets the argument text.
+because `cmd.exe` interprets the argument text. An empty `--external-cmd ""`
+or empty `SPIN_BREAKER_EXTERNAL_CMD` counts as *not supplied* and falls through
+to `config.yaml`; to disable a configured adapter permanently, remove (or
+comment out) `external_cmd` in `config.yaml`, and to skip it for a single run,
+omit `--confirm-external`.
 
 Only if a script command fails (for example `uv` is not found), read [references/troubleshooting.md](references/troubleshooting.md).

@@ -211,6 +211,12 @@ def _ensure_gitignore(bundle_dir: Path) -> None:
     if marker.exists():
         if marker.lstat().st_nlink > 1:
             raise ValueError(f"{marker} has multiple hard links; refusing to modify it")
+        text = marker.read_text(encoding="utf-8", errors="replace")
+        if any(line.strip() == "*" for line in text.splitlines()):
+            return
+        separator = "\n" if text and not text.endswith("\n") else ""
+        with marker.open("a", encoding="utf-8", newline="\n") as handle:
+            handle.write(separator + GITIGNORE_CONTENT)
         return
     marker.write_text(GITIGNORE_CONTENT, encoding="utf-8", newline="\n")
 

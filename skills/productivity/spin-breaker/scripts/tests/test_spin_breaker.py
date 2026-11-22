@@ -585,5 +585,27 @@ class SpinBreakerCliTests(unittest.TestCase):
             self.assertEqual(ignored.returncode, 0, relative)
 
 
+    def test_bundles_stay_git_ignored_with_comment_only_marker(self) -> None:
+        if shutil.which("git") is None:
+            self.skipTest("git is not available")
+        git_repo = self.tmp / "git-repo"
+        store = git_repo / ".tmp-artifacts" / "spin-breaker"
+        store.mkdir(parents=True)
+        marker = store / ".gitignore"
+        marker.write_text("# comment only\n", encoding="utf-8")
+        init = subprocess.run(["git", "-C", str(git_repo), "init", "-q"],
+                              capture_output=True, creationflags=NO_WINDOW)
+        self.assertEqual(init.returncode, 0, init.stderr)
+        parked = self._run("park", "--repo-root", str(git_repo), "--kind", "side-quest",
+                           "--title", "comment marker")
+        self.assertEqual(parked.returncode, 0, parked.stderr)
+        self.assertEqual(marker.read_text(encoding="utf-8"), "# comment only\n*\n")
+        status = subprocess.run(["git", "-C", str(git_repo), "status", "--porcelain",
+                                 "--untracked-files=all"],
+                                capture_output=True, text=True, encoding="utf-8",
+                                creationflags=NO_WINDOW)
+        self.assertEqual(status.stdout, "")
+
+
 if __name__ == "__main__":
     unittest.main()
