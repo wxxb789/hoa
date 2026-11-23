@@ -16,7 +16,7 @@ jobs:
       PYTHONPATH: ${{ github.workspace }}/skills/engineering/gdd/scripts/tests/nowindow
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.3.3
+      - uses: astral-sh/setup-uv@v10.4.0
       - name: Run ten serial lifecycle passes
         timeout-minutes: 20
         run: uv run --python 3.13 --with-requirements scripts/requirements.txt --script skills/engineering/gdd/scripts/tests/stress_windows.py "${{ runner.temp }}/gdd-stress"
