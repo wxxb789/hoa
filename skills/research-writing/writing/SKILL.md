@@ -6,7 +6,7 @@ description: >-
   point worth publishing, follow the channel's conventions and remove stock AI phrasing. Not for
   contract-bound-deliverables.
 metadata:
-  revision: "6"
+  revision: "7"
   areas: "work-management,self-management"
   targets: "runtime-agnostic"
   summary: "draft and verify publishable prose for its audience and channel; use style measurements as diagnostics, not quotas"
@@ -49,6 +49,8 @@ requirements and the user's editorial brief take precedence over these defaults.
    the genre's necessary structure. When style intent is unclear, ask what the author wants the
    passage to do before rewriting it. Sentence length, repetition, and reuse are diagnostics,
    not universal limits; obey only limits in the brief or verified platform requirements.
+   When revising an existing draft or checking it for AI phrasing, use
+   [AI tells](references/ai-tells.md) for false positives, protected spans and edit scope.
 5. **Deliver.** Use the requested language and publication format. For long pieces, put the
    draft in the task workspace and give its path. Publication is a separate authorized action.
 

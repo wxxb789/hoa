@@ -25,6 +25,28 @@ main path, but only a fresh host asked the task without naming or injecting the
 activation. Test direct invocation separately when the target host exposes that
 path.
 
+Use the strongest cheap baseline. When a skill claims a style, brevity or savings effect, the
+control is the one-line instruction a user would otherwise type (for example "Answer
+concisely."), not an empty prompt; otherwise the generic ask is credited to the skill. For a
+savings claim, include the input the skill adds on every turn and compare billed totals on the
+same task, not output alone. Pair any length or cost metric with deterministic fidelity checks
+(required and forbidden patterns for numbers, negations, verbatim errors and safety wording), and
+confirm each check accepts a known-good and rejects a known-bad example before scoring. Isolate
+host settings, plugins and context files from every arm, the baseline included
+([caveman evals](https://github.com/juliusbrussee/caveman/blob/main/evals/README.md),
+[honest numbers](https://github.com/juliusbrussee/caveman/blob/main/docs/HONEST-NUMBERS.md),
+Apache-2.0).
+
+An independent judge is not independent evidence. When a skill encodes facts about a subject,
+grade against held-out material the skill never saw, or against primary sources the judge finds
+itself, never against the skill's own text. Run the baseline on candidate questions first and
+replace those it already answers fully. Before blind grading, remove only the giveaways (the
+skill's self-introduction, internal case ids, remarks about "the material"). Have the judge list
+each answer's subject-specific claims before it sees any reference file. A confirmed fabricated
+case or quote fails the answer
+([nuwa-skill validation](https://github.com/alchaincyf/nuwa-skill/blob/main/references/validation-playbook.md),
+MIT).
+
 Have an independent judge in a separate fresh context grade anonymized outputs
 against the predeclared rubric. Give it the task, needed inputs, and rubric,
 not the author's diagnosis or run history. Grade resulting decisions, files,

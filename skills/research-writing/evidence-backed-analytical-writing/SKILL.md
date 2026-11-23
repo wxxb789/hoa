@@ -5,7 +5,7 @@ description: >-
   sources. When figures carry the argument, map claims to dated evidence, distinguish inventory from
   orders or estimates, and explain mechanisms and limitations. Not for evidence-boundary-discipline.
 metadata:
-  revision: "5"
+  revision: "6"
   areas: "work-management"
   targets: "runtime-agnostic"
   summary: "evidence map plus a claim → evidence → mechanism → limitation spine for Chinese analytical reports; recency window, status ladder, negative findings"
@@ -34,9 +34,11 @@ to verify, not a fact to preserve.
 4. **Draft from the map.** For each point, write claim, evidence, mechanism, limitation, and
    implication. Explain what changes and why, with conditions and scope. Separate observation
    from inference and judgment; never promote an order, goal, or demonstration into actual use
-   or effectiveness. For the dated-tense, provenance-label, and absence audit, read
-   `../evidence-boundary-discipline/SKILL.md` (relative to this skill's directory) and follow its
-   evidence checks. Do not call the Skill tool for it.
+   or effectiveness. For each forward-looking judgment, name the dated observable that would
+   prove it wrong and give the strongest opposing reading at equal strength; a judgment with no
+   falsifier is opinion and is labelled as such. For the dated-tense, provenance-label, and
+   absence audit, read `../evidence-boundary-discipline/SKILL.md` (relative to this skill's
+   directory) and follow its evidence checks. Do not call the Skill tool for it.
 5. **Verify and deliver.** Cite as you draft, then reread every load-bearing citation against the
    edited sentence. An existing citation ID is not proof of support. Deliver the requested prose
    first, with a short coverage caveat when material; put long source lists after it.

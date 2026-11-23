@@ -29,13 +29,3 @@ updates:
       gdd-observer:
         patterns:
           - "*"
-  - package-ecosystem: gitsubmodule
-    directory: /
-    schedule:
-      interval: daily
-    groups:
-      git-submodules:
-        patterns:
-          - "*"
-    commit-message:
-      prefix: "chore(deps)"

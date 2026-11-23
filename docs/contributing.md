@@ -10,12 +10,18 @@ git clone https://github.com/wxxb789/hoa
 
 A plain clone is enough for skills and repo tests. The
 [external reference map](../ref/README.md) is for studying upstream projects
-and reusing attributed patterns. To fetch the shallow references on demand,
-run `git submodule update --init --remote --depth 1`. The
+and reusing attributed patterns. Every submodule sets `update = none`, so plain
+clones and `npx skills add` skip them. Fetch one on demand at depth 1 (omit the
+path for all):
+
+```sh
+git submodule update --init --checkout --depth 1 ref/<name>
+```
+
+The [ref sync workflow](../.github/workflows/ref-sync.yml) pushes every pointer
+to its upstream default-branch head daily, straight to `main`. The
 [Dependabot config](../.github/dependabot.yml) groups weekly Actions and GDD
-Observer npm updates and daily upstream-default-branch submodule updates.
-Only the latter get [automatic squash merge](../.github/workflows/dependabot-auto-merge.yml)
-after required checks pass. Dependabot alerts and security updates are enabled.
+Observer npm updates. Dependabot alerts and security updates are enabled.
 
 ## Install, update, and develop skills
 

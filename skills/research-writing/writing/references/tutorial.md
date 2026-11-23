@@ -14,6 +14,13 @@ For how-tos, setup guides, runbooks, API docs, READMEs.
 - Imperative, second person: "Run…", "你会看到…". Zero ambiguity.
 - Exact commands, exact paths, exact expected output. No "configure as appropriate".
 - Call out OS/version/shell differences explicitly when they matter.
+- Put a precondition or destructive-effect warning immediately before the command it governs,
+  never after it or in a trailing parenthesis.
+- Separate what the reader does from what the system does in response ("Click Save. The
+  server reloads the config.").
+- One term per concept for the whole guide; do not rotate synonyms for variety.
+- Chinese copy translates API states by meaning: `Unauthorized` is 未登录 or 认证未通过, not
+  未授权; `Invalid` is 格式有误 or 无效, not 非法.
 
 ## Formatting
 - Numbered lists for sequences; code blocks for **every** command (copy-pasteable).
@@ -37,3 +44,6 @@ For how-tos, setup guides, runbooks, API docs, READMEs.
 - [ ] Verification command + expected output included
 - [ ] Troubleshooting for the obvious failure modes
 - [ ] Commands are real/tested (or marked UNVERIFIED)
+
+The warning-placement, actor and API-state rules adapt
+[say-it-human's archived Tech-Doc-Style-Chinese](https://github.com/taxueseek/say-it-human) (MIT).
