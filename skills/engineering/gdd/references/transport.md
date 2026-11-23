@@ -153,7 +153,18 @@ Route documentation (configuration, input, and exit-0 success marker):
 | `GDD_RUN_START_GRACE_SECONDS` | 60 |
 | `GDD_RUN_STOP_WAIT_SECONDS` | 20 |
 | `GDD_RUN_DRAIN_TIMEOUT_SECONDS` | 30 (at most 5 on stop); expiry marks `stream_incomplete` |
+| `GDD_RUN_MAX_MB` | 512 MiB; `off` or a nonpositive value disables automatic cleanup |
+| `GDD_RUN_RETENTION_DAYS` | 7 days |
+| `GDD_RUN_GC_MIN_INTERVAL_SECONDS` | 60 seconds between scans; `0` disables cooldown |
 Retired runner environment keys warn.
+
+After a successful headless or native Paseo start, a detached worker checks the run root.
+The cleanup settings resolve from the environment, then `gdd/config.yaml`, then the defaults above.
+Only when the total regular-file size exceeds the budget does it remove finalized runs, oldest first,
+until the root fits or no eligible runs remain. Both the `finalized` marker and the recorded `ended`
+time (or `started` when `ended` is unavailable) must be strictly older than retention. Unfinalized,
+live, and ledger-referenced runs are retained, and symlinks are not followed. The worker serializes
+scans with `.gc.lock` and skips busy `.start.lock` or Paseo `refresh` claims.
 
 ## Native Paseo adapter
 

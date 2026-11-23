@@ -76,6 +76,13 @@ def claim(path):
             if time.monotonic() >= deadline:
                 raise ClaimTimeout(f"cannot acquire claim: {path}")
             time.sleep(0.05)
+        # A waiter can still hold the old inode after the collector has moved the run.
+        try:
+            current = os.stat(path, follow_symlinks=False)
+        except OSError as exc:
+            raise ClaimTimeout(f"claim moved: {path}") from exc
+        if not os.path.samestat(os.fstat(handle.fileno()), current):
+            raise ClaimTimeout(f"claim moved: {path}")
         yield
 
 
@@ -236,13 +243,14 @@ def start(args):
             support.warn_wsl(arg, run_dir=None)
     mode, launcher = support.select_detach(support.detach_config())
     with support.slug_start_lock(root, slug):
-        return start_locked(args, slug, prefix, cwd, prompt, schema, run_dir, mode, launcher)
+        result = start_locked(args, slug, prefix, cwd, prompt, schema, run_dir, mode, launcher)
+    support.spawn_auto_gc(root)
+    return result
 
 
 def start_locked(args, slug, prefix, cwd, prompt, schema, run_dir, mode, launcher):
-    os.makedirs(os.path.dirname(run_dir), exist_ok=True)
     try:
-        os.mkdir(run_dir)  # the slug claim
+        support.make_run_directory(run_dir)
     except FileExistsError:
         raise RuntimeError(f"run already recorded: {slug}; choose a fresh stage name")
     with claim(os.path.join(run_dir, "refresh")):
