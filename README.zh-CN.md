@@ -85,8 +85,8 @@ Codex、Claude Code、Pi、OpenCode、Omo 和 GitHub Copilot route 均隐藏。
 ### 外部参考子模块
 
 面向研究上游 agent、skill 和 harness 项目的读者：[`ref/`](ref/README.zh-CN.md)
-将外部仓库与值得学习的模式对应起来。浅克隆子模块通过 Dependabot 每日更新跟踪上游默认分支。
-它们从不部署，安装 skill 或运行仓库测试也不需要它们。
+将外部仓库与值得学习的模式对应起来。所有子模块设为 `update = none`，任何克隆和安装都不会拉取它们；
+每日 workflow 把指针推进到上游默认分支最新提交。只在研究时以 depth 1 检出。
 
 ### 复盘、目标与计划
 

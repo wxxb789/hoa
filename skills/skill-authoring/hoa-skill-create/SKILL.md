@@ -5,7 +5,7 @@ description: >-
   packaging a checklist as SKILL.md, correcting a behavior failure or deciding to split, hide or
   chain entrypoints, validate the package with realistic tasks. Not for hoa-skill-review.
 metadata:
-  revision: "6"
+  revision: "7"
   areas: "software-development,work-management,self-management"
   targets: "runtime-agnostic"
   summary: "directly create, evolve or compose a defined skill with focused, risk-scaled validation"
@@ -34,6 +34,9 @@ limits summary.
 - For a user-defined capability with a direct request to create a skill or
   justified set of skills, read [the creation protocol](references/create.md)
   before writing.
+- When the skill's content is distilled from a body of material (a domain's or a
+  person's documented work, transcripts, upstream repositories), also read
+  [distilling from material](references/distill-material.md).
 - For an existing skill with a concrete failure or improvement target, read
   [the evolution protocol](references/evolve.md) before editing; a protocol
   repeated across a skill family also needs
@@ -99,3 +102,6 @@ and its authoritative
 [`portable-agent-skill-authoring.md`](https://github.com/EveryInc/compound-engineering-plugin/blob/main/docs/solutions/skill-design/portable-agent-skill-authoring.md).
 Those CE principles are repository-maintained guidance. The creation and
 evolution methods here are not presented as work observed in a prior audit.
+The material-distillation method adapts [nuwa-skill](https://github.com/alchaincyf/nuwa-skill)
+(MIT); the control-arm and fidelity checks in the evaluation protocol adapt
+[caveman's evals](https://github.com/juliusbrussee/caveman/tree/main/evals) (Apache-2.0).

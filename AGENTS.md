@@ -115,6 +115,14 @@ name, creates no retired entry, and leaves the revision alone unless the package
 Binding detail:
 [`rules/skill-naming.md`](rules/skill-naming.md).
 
+## External references
+
+`ref/` submodules set `update = none`, so clones and `npx skills add` skip them. Before
+brainstorming, researching, or porting a pattern from an upstream in [ref/README.md](ref/README.md),
+check out the ones in scope and read their source rather than recalling it:
+`git submodule update --init --checkout --remote --depth 1 ref/<name>`. Leave pointer moves out of
+commits; the daily [ref sync workflow](.github/workflows/ref-sync.yml) owns them.
+
 ## Generated Artifacts Output
 
 All HTML artifacts and their related assets **MUST** be written to `./.tmp-artifacts/`.

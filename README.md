@@ -98,9 +98,9 @@ Start with the [library guide](docs/library.md).
 
 For people studying upstream agent, skill, and harness projects:
 [`ref/`](ref/README.md) maps external repos to patterns worth studying.
-The shallow submodules track upstream default branches via daily Dependabot
-updates. They are never deployed and are not needed to install skills or run
-repo tests.
+The submodules are skipped by every clone (`update = none`), so installs never
+fetch them; a daily workflow pushes their pointers to upstream default-branch
+heads. Check one out with depth 1 only when you study it.
 
 ### Reflections, goals, and plans
 

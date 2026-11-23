@@ -9,12 +9,17 @@ git clone https://github.com/wxxb789/hoa
 ```
 
 使用 skill 和运行仓库测试只需普通克隆。[外部参考地图](../ref/README.zh-CN.md)供研究
-上游项目、复用模式并保留归属。按需获取浅克隆参考时，运行
-`git submodule update --init --remote --depth 1`。
+上游项目、复用模式并保留归属。所有子模块设为 `update = none`，普通克隆和
+`npx skills add` 都会跳过它们。按需以 depth 1 获取（省略路径则获取全部）：
+
+```sh
+git submodule update --init --checkout --depth 1 ref/<name>
+```
+
+[ref 同步 workflow](../.github/workflows/ref-sync.yml) 每日把所有指针推进到上游
+默认分支最新提交，直接推送到 `main`。
 [Dependabot 配置](../.github/dependabot.yml)按组每周更新 Actions 和 GDD Observer 的
-npm 依赖，每日更新跟踪上游默认分支的子模块。只有后者会在必要检查通过后
-[自动 squash merge](../.github/workflows/dependabot-auto-merge.yml)。
-仓库已启用 Dependabot alerts 和 security updates。
+npm 依赖。仓库已启用 Dependabot alerts 和 security updates。
 
 ## 安装、更新和开发 skill
 

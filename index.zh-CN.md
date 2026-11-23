@@ -76,6 +76,7 @@ targets:  runtime-agnostic | repo-only |
 | writing | skill | work-management,self-management | runtime-agnostic | `skills/research-writing/writing/` | 按读者与渠道撰写和核验可发布文章；风格指标用于诊断，不作统一配额 |
 | skill-scout | agent | software-development,work-management | repo-only | `agents/skill-scout.md` | 按请求先搜索已有 skill，再决定是否编写；只报告，不代写 |
 | typed-verification-gates | orchestration | software-development | repo-only | `orchestration/typed-verification-gates.md` | 循环每次迭代止于一道事先定型的验证门：programmatic / judge / human |
+| adhd-operator-standing-rules | prompt | self-management,software-development | runtime-agnostic | `prompts/adhd-operator-standing-rules.md` | 面向 ADHD 操作者的常驻规则：行动先行、状态与重入卡、单一下一步、停放支线、压缩不丢事实 |
 | ado-commit-push-pr | prompt | software-development | repo-only | `prompts/ado-commit-push-pr.md` | 一次性 commit → push → PR 请求模板（Azure DevOps 或 GitHub），附提交约定与 az/gh 易错点 |
 | cross-agent-history-retrieval | prompt | self-management,software-development | repo-only | `prompts/cross-agent-history-retrieval.md` | 一次性检索/导出本机各 agent 历史，按来源报告覆盖、去重并打码 |
 | fresh-context-grader | prompt | software-development,work-management | repo-only | `prompts/fresh-context-grader.md` | 一次性评审 prompt：用先于回答写好的 rubric 在全新上下文里评分 |
