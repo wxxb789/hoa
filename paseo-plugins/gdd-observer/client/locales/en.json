@@ -4,6 +4,9 @@
     "run": "GDD run {{name}}: {{state}}, {{liveness}}, model {{model}}"
   },
   "list": {
+    "agentFilter": "Initiating agent: {{agent}}",
+    "clearAgentFilter": "Show all runs",
+    "emptyAgent": "No runs are attributed to this agent.",
     "runs": "Runs",
     "count_one": "{{count}} run",
     "count_other": "{{count}} runs",
@@ -72,6 +75,18 @@
     "partial": "partial",
     "none": "waiting for counters"
   },
+  "composer": {
+    "title": "GDD workers ({{count}})",
+    "running": "GDD · {{active}} running",
+    "runningStale": "GDD · {{active}} running · {{stale}} stale",
+    "runningFailed": "GDD · {{active}} running · {{failed}} failed",
+    "stale": "GDD · {{stale}} stale",
+    "failed": "GDD · {{failed}} failed",
+    "failedDone": "GDD · {{failed}} failed · {{done}} done",
+    "done": "GDD · {{done}} done",
+    "total": "GDD · {{count}}",
+    "openRuns": "Open in GDD runs"
+  },
   "detail": {
     "started": "Started",
     "ended": "Ended",
@@ -89,6 +104,7 @@
     "lineageStage": "Stage",
     "lineageAgent": "Initiating Paseo agent",
     "lineageAgentMissing": "Not recorded",
+    "openInitiatingAgent": "Open initiating agent",
     "lineageMissing": "No lineage recorded for this run. Previous runs and direct adapter starts have none.",
     "events": "Events",
     "answer": "Answer",
@@ -97,15 +113,19 @@
     "noAnswer": "answer.md appears when the run finalizes.",
     "answerFragment": "Tail of the answer; the plugin reads the last part of the file.",
     "gone": "This run is no longer on disk.",
-    "eventTail": "Recent events",
-    "noEvents": "No events yet",
+    "eventTail": "Recent activity",
+    "noEvents": "No activity yet",
+    "activityAssistant": "Assistant",
+    "activityError": "Error",
+    "activityAborted": "Aborted",
+    "activityTruncated": "Log truncated",
     "copyPath": "Copy path",
     "copied": "Path copied",
     "copyFailed": "Could not copy the path.",
     "truncated": "{{bytes}} dropped from the log",
     "maxTime": "Max time",
     "updated": "Updated {{time}}",
-    "tailLines": "last {{count}} lines",
+    "tailLines": "up to {{count}} items",
     "loadError": "Could not read this run: {{error}}"
   },
   "warning": {
@@ -137,7 +157,7 @@
     "clear": "Use default",
     "saved": "Saved",
     "poll": "Poll interval",
-    "tail": "Event tail length",
+    "tail": "Activity and answer tail limit",
     "resolved": "Resolved root",
     "resolvedFrom": "Resolved from",
     "exists": "On disk",
@@ -149,6 +169,6 @@
     "loading": "Reading settings…",
     "saveFailed": "Could not save settings.",
     "pollOption": "{{seconds}} s",
-    "tailOption": "{{count}} lines"
+    "tailOption": "{{count}}"
   }
 }

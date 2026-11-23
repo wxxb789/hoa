@@ -3,8 +3,8 @@
 A Paseo plugin that shows **gdd launcher runs** as a first-class Paseo surface. The gdd delivery
 loop dispatches every stage as a detached headless agent run that outlives the session that started
 it; each run writes its own run directory, so without this plugin that progress is invisible in the
-app. This plugin scans the run root and renders every run, live, on a global `runs` screen opened
-from its only entry point — a **GDD runs** row in the sidebar footer.
+app. This plugin opens a live `runs` screen from the **GDD runs** sidebar footer and shows an
+agent-scoped **GDD** pill in chats that launched recorded GDD runs.
 
 It is a **read-only observer**: it never writes into a run directory, never finalizes a run, and
 never signals a process.
@@ -13,9 +13,10 @@ never signals a process.
 
 | Surface                     | What it does                                                                                       |
 | --------------------------- | -------------------------------------------------------------------------------------------------- |
-| Sidebar footer **GDD runs** | The plugin's only entry point: a sidebar footer row, active while the `runs` screen is open, that opens it on any host. |
+| Sidebar footer **GDD runs** | Opens the unfiltered run list on the selected host. |
+| Composer **GDD** pill       | Visible only for agents with matching recorded parent lineage. Shows worker counts and opens a popover; a row opens that run, and the footer opens the agent's filtered list, both on the originating host. |
 | Screen `runs`               | Status summary over the whole scan (a proportional state bar, per-state counts, live/stale/flagged, turns/tools/cost), then a newest-first run list with state and liveness badges, the model each run used, elapsed time, turns/tools/cost, current tool, stale warnings; selecting a run opens its live tail, answer tail, and file paths. |
-| Settings screen             | Run root override, poll interval, event tail length, the resolved root with its source, and the status summary the screen shows. |
+| Settings screen             | Run root override, poll interval, activity and answer tail limit, and the resolved root with its status summary. |
 
 Both layouts are supported: on compact widths the list and the detail stack with a back row, on wide
 windows the list sits beside the detail. Every color comes from the host theme, and all text is
@@ -48,11 +49,13 @@ Each run is `<root>/<YYYY-MM-DD>/<slug>/`:
 | `answer.md`          | Final assistant text, written when the run finalizes.                                                   |
 | `lock`               | Legacy `{pid, agent_pid, backend, started_at}` fallback for liveness.                                     |
 | `finalized`          | Present once the run ended; holds the exit code.                                                        |
-| `lineage.json`       | Optional GDD-dispatch metadata: `goal`, `stage`, and `parentAgentId` if the dispatch originated in a Paseo agent. Read only for the selected run (4 KiB maximum). |
+| `lineage.json`       | Optional GDD-dispatch metadata: `goal`, `stage`, and `parentAgentId` if the dispatch originated in a Paseo agent. Validated and included in both list and follow summaries (4 KiB maximum). |
 
 The **Run lineage** section shows the recorded goal and stage, and the initiating Paseo agent ID
-when available. Old runs and direct adapter starts may have no lineage. The plugin does not infer a
-parent from the run's own session ID, process IDs, or filename.
+when available, with a link back to that agent on the same host when Paseo supports it. Old runs and
+direct adapter starts may have no lineage. The plugin never infers a parent from a workspace, the
+run's own session ID, process IDs, or filename. Filtered lists show the host label and stats for the
+matching runs; **Show all runs** clears the filter.
 
 Derived per run:
 
@@ -68,18 +71,20 @@ Derived per run:
   and for other headless routes. The UI labels the source. Event-derived counters are partial if
   the log rotated, was spliced, or contains an unusable line; launcher counters follow the
   launcher's partial flags.
-- **current tool**: the last `tool_execution_start` without a matching `tool_execution_end`.
+- **current tool**: the last `tool_execution_start` without a matching `tool_execution_end` in
+  a run that has not finalized.
 - **model attribution**: `requested` is `state.json`'s `model` verbatim, with a concrete
   `provider/model` split at the first `/` and a link (`@flash_max`) kept whole. `observed` is every
   model the retained assistant events name, with the number of messages each answered, in first-seen
-  order. A run that requested nothing shows a tool default next to the model that default resolved
-  to, which is how a link default such as `@sol_high` becomes visible after the fact.
+  order. Finalized runs with launcher counters show the requested model on a cold list; observed
+  models become available after following the run or from a fold already cached at the same log
+  revision. A run that requested nothing shows a tool default next to the observed model, when known.
 - **status summary**: the whole scan folded into counts per state and per liveness verdict, plus the
   totals of turns, tool calls, and cost over the runs that report them. It also reports how many
   runs supplied counters, how many are partial, and how many carry a warning, so a total is never
   read as complete when it is only what was reported.
 - **loss accounting**: `eventsTruncated` and `eventsDroppedBytes` take the largest value reported by
-  `state.json`, `events.stats.json`, and the splice marker.
+  `state.json`, `events.stats.json`, and the splice marker when the event log has been folded.
 
 ### Liveness details
 
@@ -107,7 +112,7 @@ never turn uncertainty into `stale`.
 | ---------------- | ------- | ------------- | ---------------------------------------------------- |
 | `runRoot`        | `""`    | 32,767 UTF-16 code units | Absolute path on the daemon host; empty resolves the order above. |
 | `pollIntervalMs` | `2000`  | 500–60000     | Scan interval for the list and the selected run's tail. |
-| `tailLines`      | `80`    | 10–500        | Event lines kept in the tail view.                   |
+| `tailLines`      | `80`    | 10–500        | Maximum activity items and answer lines shown from their respective byte windows. |
 
 Each plugin installation stores one bounded settings document on its daemon. Observation does not
 append history or persist run data; per-poll diagnostics are not forwarded to the daemon log.
@@ -115,15 +120,29 @@ Paseo controls retention for its own logs, and the launcher owns its run artifac
 selected detail (including lineage), and the file-path listing use `runs.list`, `runs.follow`, and
 `runs.paths` respectively.
 
-The mounted screen and settings surfaces share one list-query polling owner per host query cache.
+The mounted list, settings screen, and Composer popover share one list-query polling owner per host.
 The fastest requested interval wins; settings still requests 10 seconds. Owner unmount transfers
-polling to the remaining surfaces, and unmounting all surfaces stops it. A root-setting save refreshes
+polling to the remaining surfaces. A root-setting save refreshes
 the shared scan. A joining surface waits for the active owner's next scheduled refresh, at most
 the elected interval (at most 10 seconds when settings is mounted); reopening as the sole observer
 still refetches stale data and retries an initial error immediately, including a one-commit surface
 replacement. Selected-run following keeps its own configured cadence.
 In compact mode the hidden list stops observing while the selected run is open. An open settings
 screen still polls at its own cadence, and returning to the list resumes observation.
+
+Each host installation has one agent-directory subscription and one revisioned scan in flight at
+most. With no mounted list observer, the pill controller scans once at installation and refreshes
+in response to agent updates or while a worker is still active; confirmed stale workers alone do
+not keep it polling. Detached refreshes are throttled to at least 3 seconds (5 seconds until a
+mounted surface reads the host setting). Idle, settled hosts
+hold no scan timer. Paseo presents the popover above the Composer on desktop and as a sheet on
+mobile; row and footer links stay on the installation's host. The sidebar remains available on
+hosts that do not expose Composer pill registration.
+
+**Recent activity** shows assistant progress, tool actions, failures and aborts, and log splice
+markers from OMP/Pi, Codex, and Claude logs. It omits protocol bookkeeping, successful duplicate
+tool ends, private reasoning, and missing timestamp placeholders. Counters still fold silent
+frames; displayed activity does not change the retained byte window or the answer tail.
 
 Overlapping list requests share one archive walk. The first request returns all summaries; later
 requests can send their revision to receive only changed and removed rows, plus the full ID order
@@ -230,10 +249,11 @@ measurements) and its archived goal contracts are not part of this checkout; the
   discovery, sorting and cold full responses still scale with total runs. Scans reuse finalized
   summaries while directory metadata is unchanged, and recheck file revisions at least every
   30 seconds on the next poll. In-place edits may take that long to appear in the list if the
-  detail isn't open. Cold counter/model discovery and
-  recounts after replacement/splicing still scale with retained log bytes; no displayed aggregate
-  or observed model is dropped to reduce that work. Filesystem metadata is not an atomic multi-file
-  snapshot, so concurrent launcher writes can still span scan observations.
+  detail isn't open. For finalized runs with launcher counters, list scans check the event log's
+  presence and size without opening it. Event-only fields are populated by `runs.follow` or reused
+  from a matching cached fold. Other runs still fold their event logs during list scans; that work
+  scales with retained log bytes. Filesystem metadata is not an atomic multi-file snapshot, so
+  concurrent launcher writes can still span scan observations.
 - **Writer and filesystem signals.** Incremental tails follow the launcher's append-between-replacement
   or splice protocol. Arbitrary in-place growing rewrites are not that protocol. Revision caches
   depend on file identity, size, mtime and ctime; a same-size rewrite hidden within a coarse filesystem

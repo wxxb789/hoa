@@ -6,6 +6,25 @@ function line(event: unknown): string {
 }
 
 describe("applyEventLine", () => {
+  it("folds silent protocol frames while emitting only assistant progress", () => {
+    const counters = createCounters();
+    const apply = (value: unknown) => applyEventLine(counters, line(value));
+    const assistant = { role: "assistant", model: "model", usage: { cost: 0.25 } };
+    for (const value of [
+      { type: "session" }, { type: "turn_start" }, { type: "turn_end" },
+      { type: "message_start", message: assistant },
+      { type: "message_end", message: { ...assistant, content: [{ type: "toolCall" }] } },
+      { type: "tool_execution_end" }, { type: "turn.started" }, { type: "turn.completed" },
+      { type: "item.completed", item: { type: "reasoning", text: "private" } },
+    ]) expect(apply(value)).toBeNull();
+    expect(apply({ type: "message_end", message: {
+      ...assistant, content: [{ type: "text", text: "  Running\n checks. " }],
+    } })).toMatchObject({ role: "assistant", detail: "Running checks." });
+    expect(snapshotCounters(counters)).toMatchObject({
+      lines: 10, turns: 2, costUsd: 0.5, models: [{ model: "model", messages: 2 }],
+    });
+  });
+
   it("counts turns, tool calls, and assistant cost the way the launcher finalizer does", () => {
     const counters = createCounters();
     applyEventLine(counters, line({ type: "session", id: "s1", timestamp: "2026-11-14T00:00:00.000Z" }));
@@ -37,6 +56,74 @@ describe("applyEventLine", () => {
     applyEventLine(counters, line({ type: "tool_execution_end", toolCallId: "b", toolName: "bash" }));
     expect(snapshotCounters(counters).currentTool).toBeNull();
     expect(snapshotCounters(counters).toolCalls).toBe(2);
+  });
+
+  it("shows Codex actions and failures without repeating successful completions", () => {
+    const counters = createCounters();
+    const apply = (value: unknown) => applyEventLine(counters, line(value));
+    const command = {
+      id: "command-1", type: "command_execution",
+      command: '"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command npm test',
+    };
+    expect(apply({ type: "item.started", item: command })).toMatchObject({ tool: "command", detail: "npm test" });
+    expect(snapshotCounters(counters).currentTool).toEqual({ name: "command", intent: "npm test" });
+    expect(apply({ type: "item.completed", item: { ...command, exit_code: 0 } })).toBeNull();
+    expect(snapshotCounters(counters).currentTool).toBeNull();
+
+    expect(apply({ type: "item.started", item: { ...command, id: "command-2" } })?.tool).toBe("command");
+    expect(apply({ type: "item.completed", item: { ...command, id: "command-2", exit_code: 2 } })).toMatchObject({
+      type: "command_execution_failed", tool: "command", detail: "Exit 2 · npm test",
+    });
+    const change = { id: "edit", type: "file_change", changes: [{ path: "client/observer.ts", kind: "update" }] };
+    expect(apply({ type: "item.started", item: change })).toBeNull();
+    expect(apply({ type: "item.completed", item: change })).toMatchObject({ tool: "file_change", detail: "update client/observer.ts" });
+    expect(apply({ type: "item.started", item: { id: "search", type: "web_search", query: "Paseo plugins" } }))
+      .toMatchObject({ tool: "web_search", detail: "Paseo plugins" });
+    expect(apply({ type: "item.started", item: {
+      id: "mcp", type: "mcp_tool_call", server: "docs", tool: "search", arguments: { query: "settings" },
+    } })).toMatchObject({ tool: "docs/search", detail: '{"query":"settings"}' });
+    expect(apply({ type: "item.completed", item: { type: "agent_message", text: "Progress\n update" } }))
+      .toMatchObject({ type: "agent_message", role: "assistant", detail: "Progress update" });
+    expect(apply({ type: "turn.failed", error: { message: "Network unavailable" } }))
+      .toMatchObject({ detail: "Network unavailable" });
+    expect(snapshotCounters(counters)).toMatchObject({ toolCalls: 5, errorCount: 2, lastError: "Network unavailable" });
+  });
+
+  it("extracts Claude progress, suppresses structured output, and records result errors", () => {
+    const counters = createCounters();
+    const apply = (value: unknown) => applyEventLine(counters, line(value));
+    const tool = { type: "tool_use", id: "cmd", name: "Bash", input: { command: "npm test" } };
+    expect(apply({ type: "assistant", message: { model: "claude", content: [
+      { type: "tool_use", id: "format", name: "StructuredOutput" },
+    ] } })).toBeNull();
+    expect(apply({ type: "assistant", message: { model: "claude", content: [tool] } }))
+      .toMatchObject({ tool: "Bash", detail: '{"command":"npm test"}' });
+    expect(snapshotCounters(counters).currentTool?.name).toBe("Bash");
+    expect(apply({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "cmd" }] } })).toBeNull();
+    expect(snapshotCounters(counters).currentTool).toBeNull();
+    expect(apply({ type: "assistant", message: { model: "claude", content: [
+      { type: "thinking", thinking: "private" }, { type: "text", text: "Running checks" },
+      { type: "text", text: "on the changes" }, { ...tool, id: "cmd-2" },
+    ] } })).toMatchObject({ role: "assistant", detail: "Running checks on the changes" });
+    expect(apply({ type: "result", subtype: "error_during_execution", is_error: true, errors: ["Timed out"] }))
+      .toMatchObject({ type: "result_error", detail: expect.stringContaining("Timed out") });
+    expect(apply({ type: "result", subtype: "success", result: "Routine completion" })).toBeNull();
+    expect(snapshotCounters(counters)).toMatchObject({
+      toolCalls: 2, errorCount: 1, currentTool: null, models: [{ model: "claude", messages: 3 }],
+    });
+  });
+
+  it("surfaces OMP tool failure, message failure, and abort but skips routine ends", () => {
+    const counters = createCounters();
+    expect(applyEventLine(counters, line({ type: "tool_execution_end", toolName: "bash", isError: true,
+      result: { content: [{ type: "text", text: "Command failed" }] },
+    }))).toMatchObject({ type: "tool_execution_error", tool: "bash", detail: "Command failed" });
+    expect(applyEventLine(counters, line({ type: "message_end", message: {
+      role: "assistant", stopReason: "length", errorMessage: "Token limit",
+    } }))).toMatchObject({ type: "message_error", detail: "Token limit" });
+    expect(applyEventLine(counters, line({ type: "agent_settled", aborted: false }))).toBeNull();
+    expect(applyEventLine(counters, line({ type: "agent_settled", aborted: true, reason: "Interrupted" })))
+      .toMatchObject({ type: "agent_aborted", detail: "Interrupted" });
   });
 
   it("counts every tool error and reports the newest", () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RunSummary } from "../../shared/runs";
-import { summarizeRuns } from "../stats";
+import { summarizeRuns } from "../../shared/stats";
 
 function run(overrides: Partial<RunSummary> = {}): RunSummary {
   return {

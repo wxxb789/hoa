@@ -23,10 +23,11 @@ import {
 import type { CounterSnapshot, RunCounters } from "./events";
 import type { LivenessProbe, PidVerdict } from "./liveness";
 import { resolveRunRoot, type RunRootResolution } from "./run-root";
-import { summarizeRuns } from "./stats";
+import { summarizeRuns } from "../shared/stats";
 import {
   mapRun,
   pidsOf,
+  stateCountersTakePrecedence,
   type RunAnswer,
   type RunEventLog,
   type RunFiles,
@@ -237,6 +238,20 @@ export function createRunStore(deps: StoreDeps): RunStore {
   function countersFor(dir: string): Promise<Counted> {
     // One pass per run at a time: an overlapping scan joins it rather than folding the same bytes twice.
     return singleFlight(passes, dir, () => countAppended(dir));
+  }
+
+  async function inspectFinalizedEvents(dir: string): Promise<Counted> {
+    let info: Stats;
+    try {
+      info = await stat(join(dir, RUN_FILES.events));
+    } catch {
+      return { counters: null, unreadable: false, events: { exists: false, bytes: 0 } };
+    }
+    // A follow may be mutating the counters before it records the new revision.
+    const tailer = passes.has(dir) ? undefined : tailers.get(dir);
+    const counters = tailer && tailer.offset === info.size && tailer.revision === revisionOf(info) &&
+      tailer.counters.lines > 0 ? snapshotCounters(tailer.counters) : null;
+    return { counters, unreadable: false, events: { exists: true, bytes: info.size } };
   }
 
   /**
@@ -465,7 +480,7 @@ export function createRunStore(deps: StoreDeps): RunStore {
   }
 
   /**
-   * Validate one run's optional lineage sidecar for a follow window. Every way the sidecar can
+   * Validate one run's optional lineage sidecar. Every way the sidecar can
    * disappoint — absent, unreadable, larger than the cap, malformed JSON or a value the schema
    * rejects — answers the same way: no lineage. The file annotates the run, so it may never change
    * the run's own state, processes or tails; and a file past the cap is refused rather than parsed,
@@ -493,7 +508,7 @@ export function createRunStore(deps: StoreDeps): RunStore {
   }
 
   async function readFiles(dir: string, date: string, slug: string, dirStat: Stats): Promise<RunFiles> {
-    const [state, lockJson, finalizedText, statsJson, answerFile, sessionIdRead, previousEvents] =
+    const [state, lockJson, finalizedText, statsJson, answerFile, sessionIdRead, previousEvents, lineage] =
       await Promise.all([
         readJson(join(dir, RUN_FILES.state)),
         readJson(join(dir, RUN_FILES.lock)),
@@ -502,6 +517,7 @@ export function createRunStore(deps: StoreDeps): RunStore {
         fileBytes(join(dir, RUN_FILES.answer)),
         readBody(join(dir, SESSION_FILE), SESSION_READ_BYTES),
         fileBytes(join(dir, RUN_FILES.previousEvents)),
+        readLineage(dir),
       ]);
     const values = asRecord(state.value) ?? {};
     const stateFile: RunStateFile = { present: state.present, readable: state.readable, values };
@@ -538,6 +554,7 @@ export function createRunStore(deps: StoreDeps): RunStore {
       stats,
       answer,
       events: { exists: false, bytes: 0, rotated: previousEvents.exists },
+      lineage,
       sessionIdFromFile: sessionId ? sessionId.split(/\r?\n/)[0] : null,
       dirModifiedAt: dirStat.mtime.toISOString(),
     };
@@ -565,7 +582,9 @@ export function createRunStore(deps: StoreDeps): RunStore {
 
   async function findRun(id: string): Promise<{ dir: string; date: string; slug: string; info: Stats } | null> {
     const parts = id.split("/");
-    if (parts.length !== 2 || !DATE_DIR.test(parts[0])) return null;
+    if (parts.length !== 2 || !DATE_DIR.test(parts[0]) || parts[1].startsWith(".") || parts[1].startsWith("~gc-")) {
+      return null;
+    }
     const dir = join(resolution().root, parts[0], parts[1]);
     const dirStat = await stat(dir).catch(() => null);
     if (!dirStat?.isDirectory()) return null;
@@ -844,7 +863,6 @@ export function createRunStore(deps: StoreDeps): RunStore {
     if (started === generation && cachedSummary && !isDeepStrictEqual(summary, cachedSummary.run)) {
       finalized.delete(found.dir);
     }
-    const lineage = await readLineage(found.dir);
     // Both tails come from a revision-checked cache: a warmed poll of an unchanged run reads no log
     // bytes, and an append costs only the bytes it added. Each is materialized once per run at a
     // time, so overlapping polls share the pass and neither can extend a state the other replaces.
@@ -859,7 +877,7 @@ export function createRunStore(deps: StoreDeps): RunStore {
     return {
       found: true,
       summary,
-      lineage,
+      lineage: files.lineage,
       events: tailEventsOf(eventTail, tailLines),
       answerTail: answerTail === null ? null : answerTextOf(answerTail, tailLines),
     };
@@ -902,7 +920,7 @@ export function createRunStore(deps: StoreDeps): RunStore {
         const dateDir = join(resolved.root, date);
         try {
           const slugs = (await readdir(dateDir, { withFileTypes: true }))
-            .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."));
+            .filter((entry) => entry.isDirectory() && !entry.name.startsWith(".") && !entry.name.startsWith("~gc-"));
           return slugs.map(({ name: slug }) => ({ dir: join(dateDir, slug), date, slug }));
         } catch (error) {
           unavailableDates.add(dateDir);
@@ -921,7 +939,11 @@ export function createRunStore(deps: StoreDeps): RunStore {
           if (cached?.directoryRevision === directoryRevision && scanTime - cached.checkedAt < FINALIZED_RECHECK_MS) {
             return cached.run;
           }
-          const [files, counted] = await Promise.all([readFiles(dir, date, slug, info), countersFor(dir)]);
+          const files = await readFiles(dir, date, slug, info);
+          if (started !== generation) return null;
+          const counted = files.finalized.present && stateCountersTakePrecedence(files)
+            ? await inspectFinalizedEvents(dir)
+            : await countersFor(dir);
           const run = summarize(files, counted);
           if (started === generation) {
             if (run.finalized && files.state.readable && !counted.unreadable) {

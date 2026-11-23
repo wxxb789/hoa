@@ -9,11 +9,6 @@ export type ModelUsage = {
   messages: number;
 };
 
-/**
- * Running counters for one `events.ndjson`, derived with the same rules the launcher's finalizer
- * uses: `turns` counts `turn_end`, `tool_calls` counts every `*tool*start*` event, `cost` sums
- * assistant `message_end` usage, and a `truncated` line is the writer's splice marker.
- */
 export type RunCounters = {
   turns: number;
   toolCalls: number;
@@ -47,6 +42,7 @@ export type CounterSnapshot = {
 
 const DETAIL_LIMIT = 160;
 const ERROR_LIMIT = 300;
+const MESSAGE_LIMIT = 240;
 const KEPT_ERRORS = 5;
 const SUPPRESSED_KEYS: Record<string, true> = {
   content: true,
@@ -128,41 +124,54 @@ export function applyEventLine(counters: RunCounters, line: string): RunEvent | 
   if (type === "truncated") {
     counters.splices += 1;
     counters.truncated = true;
-    counters.droppedBytes = Math.max(counters.droppedBytes, asNumber(event.dropped_bytes) ?? 0);
-  } else if (type === "turn_end") {
-    counters.turns += 1;
+    const dropped = asNumber(event.dropped_bytes) ?? 0;
+    counters.droppedBytes = Math.max(counters.droppedBytes, dropped);
+    return activity(type, at, dropped ? `${dropped} bytes dropped` : "log spliced");
   }
-
-  const tool = asString(event.toolName);
-  if (type.includes("tool")) {
-    const id = asString(event.toolCallId) ?? `${type}#${counters.lines}`;
-    if (type.includes("start")) {
-      counters.toolCalls += 1;
-      counters.open.set(id, { name: tool ?? "tool", intent: asString(event.intent) });
-    } else if (type.includes("end")) {
-      counters.open.delete(id);
-    } else if (type.includes("error")) {
-      counters.errorCount += 1;
-      counters.errors.push(clip(JSON.stringify(event), ERROR_LIMIT));
-      if (counters.errors.length > KEPT_ERRORS) {
-        counters.errors.splice(0, counters.errors.length - KEPT_ERRORS);
-      }
-    }
+  if (type === "turn_end" || type === "turn.completed") {
+    counters.turns += 1;
+    return null;
+  }
+  if (type === "item.started" || type === "item.completed") {
+    const item = asRecord(event.item);
+    return item ? codexItem(counters, item, at, type === "item.started") : null;
+  }
+  if (type === "turn.failed" || type === "error") {
+    return recordError(counters, type, at, errorDetail(event.error ?? event.message) ?? summarizeValue(event));
+  }
+  if (type === "result") {
+    counters.open.clear();
+    const subtype = asString(event.subtype);
+    return event.is_error === true || (subtype && subtype !== "success")
+      ? recordError(counters, "result_error", at, errorDetail(event.errors ?? event.error ?? event.result) ?? subtype)
+      : null;
+  }
+  if (type === "agent_settled" && event.aborted === true) {
+    return recordError(counters, "agent_aborted", at, errorDetail(event.error ?? event.reason));
+  }
+  if (type.includes("tool")) return foldOmpTool(counters, event, type, at);
+  if (type.includes("error") || type.includes("failed") || type.includes("aborted")) {
+    return recordError(counters, type, at, errorDetail(event.error ?? event.message ?? event.reason));
   }
 
   const message = asRecord(event.message);
-  const role = message ? asString(message.role) : null;
-  if (message && role === "assistant" && (type === "message_start" || type === "message_end")) {
-    // Both events carry the provider/model that produced the message; only `message_end` is
-    // counted, so one message is counted once while a streaming message still names its model.
-    attributeModel(counters, message, type === "message_end");
+  if (!message) return null;
+  if (type === "assistant" || type === "user") return claudeMessage(counters, message, type, at);
+  if (message.role !== "assistant") return null;
+  if (type === "message_start") {
+    attributeModel(counters, message, false);
+    return null;
   }
-  if (type === "message_end" && role === "assistant") {
-    const usage = message ? asRecord(message.usage) : null;
-    counters.costUsd += costOf(usage?.cost);
+  if (type !== "message_end") return null;
+  attributeModel(counters, message, true);
+  counters.costUsd += costOf(asRecord(message.usage)?.cost);
+  const reason = message.stopReason;
+  const failure = asString(message.errorMessage);
+  if (failure && (reason === "error" || reason === "aborted" || reason === "length")) {
+    return recordError(counters, reason === "aborted" ? "message_aborted" : "message_error", at, failure);
   }
-
-  return { type, at, tool, intent: asString(event.intent), detail: detailOf(type, event), role };
+  const text = messageText(message.content);
+  return text === null ? null : activity(type, at, text, null, null, "assistant");
 }
 
 export function summarizeValue(value: unknown, limit = DETAIL_LIMIT): string | null {
@@ -180,20 +189,178 @@ export function summarizeValue(value: unknown, limit = DETAIL_LIMIT): string | n
   }
 }
 
-function detailOf(type: string, event: Record<string, unknown>): string | null {
-  if (type === "truncated") {
-    const dropped = asNumber(event.dropped_bytes);
-    return dropped ? `${dropped} bytes dropped` : "log spliced";
+function foldOmpTool(
+  counters: RunCounters, event: Record<string, unknown>, type: string, at: string | null,
+): RunEvent | null {
+  const tool = asString(event.toolName) ?? "tool";
+  const id = asString(event.toolCallId);
+  if (type.includes("start")) {
+    const intent = asString(event.intent);
+    counters.toolCalls += 1;
+    counters.open.set(id ?? `${type}#${counters.lines}`, { name: tool, intent });
+    return activity(type, at, summarizeValue(event.args), tool, intent);
   }
-  if (type.includes("tool")) {
-    return (
-      summarizeValue(event.args) ??
-      summarizeValue(event.partialResult) ??
-      summarizeValue(event.error) ??
-      null
-    );
+  const failed = type.includes("error") || type.includes("failed");
+  if (type.includes("end") || failed) {
+    if (id !== null) counters.open.delete(id);
+    if (failed || event.isError === true || (event.error !== undefined && event.error !== null)) {
+      return recordError(counters, failed ? type : "tool_execution_error", at,
+        errorDetail(event.error) ?? messageText(asRecord(event.result)?.content) ?? summarizeValue(event), tool);
+    }
   }
   return null;
+}
+
+function codexItem(
+  counters: RunCounters, item: Record<string, unknown>, at: string | null, started: boolean,
+): RunEvent | null {
+  const type = asString(item.type);
+  if (type === "agent_message" && !started) {
+    const text = compactText(item.text, MESSAGE_LIMIT);
+    return text === null ? null : activity(type, at, text, null, null, "assistant");
+  }
+  if (type === "error") return started ? null : recordError(counters, type, at, errorDetail(item.message));
+  if (type !== "command_execution" && type !== "mcp_tool_call" && type !== "web_search" && type !== "file_change") return null;
+
+  const id = asString(item.id);
+  const exit = asNumber(item.exit_code);
+  const failed = (exit !== null && exit !== 0) || item.status === "failed";
+  if (!started) {
+    const wasOpen = id !== null && counters.open.delete(id);
+    if (type === "file_change" && !wasOpen) counters.toolCalls += 1;
+    if (type !== "file_change" && !failed) return null;
+  }
+  let tool: string;
+  let detail: string | null;
+  switch (type) {
+    case "command_execution":
+      tool = "command";
+      detail = compactCommand(item.command);
+      break;
+    case "mcp_tool_call": {
+      const server = asString(item.server);
+      const name = asString(item.tool);
+      tool = name === null ? type : server === null ? name : `${server}/${name}`;
+      detail = summarizeValue(item.arguments);
+      break;
+    }
+    case "web_search":
+      tool = type;
+      detail = compactText(item.query, DETAIL_LIMIT) ?? summarizeValue(item.action);
+      break;
+    case "file_change":
+      tool = type;
+      detail = fileChanges(item.changes);
+      break;
+  }
+  if (started) {
+    counters.toolCalls += 1;
+    if (id !== null) counters.open.set(id, { name: tool, intent: detail });
+    return type === "file_change" ? null : activity(type, at, detail, tool);
+  }
+  if (failed) {
+    const failure = exit !== null && exit !== 0 ? `Exit ${exit}` : errorDetail(item.error);
+    return recordError(counters, `${type}_failed`, at,
+      failure && detail ? `${failure} · ${detail}` : failure ?? detail, tool);
+  }
+  return activity(type, at, detail, tool);
+}
+
+function claudeMessage(
+  counters: RunCounters, message: Record<string, unknown>, type: "assistant" | "user", at: string | null,
+): RunEvent | null {
+  if (type === "assistant") attributeModel(counters, message, true);
+  const blocks = message.content;
+  if (!Array.isArray(blocks)) return null;
+  let toolEvent: RunEvent | null = null;
+  for (const value of blocks) {
+    const block = asRecord(value);
+    if (!block) continue;
+    if (type === "assistant" && block.type === "tool_use") {
+      const name = asString(block.name);
+      if (name === null || name === "StructuredOutput") continue;
+      const id = asString(block.id);
+      const detail = summarizeValue(block.input);
+      counters.toolCalls += 1;
+      if (id !== null) counters.open.set(id, { name, intent: detail });
+      toolEvent ??= activity("tool_use", at, detail, name);
+    } else if (type === "user" && block.type === "tool_result") {
+      const id = asString(block.tool_use_id);
+      if (id !== null) counters.open.delete(id);
+      if (block.is_error === true) {
+        const error = recordError(counters, "tool_result_error", at,
+          messageText(block.content) ?? errorDetail(block.content));
+        toolEvent ??= error;
+      }
+    }
+  }
+  const text = type === "assistant" ? messageText(blocks) : null;
+  return text === null ? toolEvent : activity(type, at, text, null, null, "assistant");
+}
+
+function activity(
+  type: string, at: string | null, detail: string | null,
+  tool: string | null = null, intent: string | null = null, role: string | null = null,
+): RunEvent {
+  return { type, at, tool, intent, detail, role };
+}
+
+function recordError(
+  counters: RunCounters, type: string, at: string | null, detail: string | null, tool: string | null = null,
+): RunEvent {
+  const error = compactText(detail, ERROR_LIMIT) ?? type;
+  counters.errorCount += 1;
+  if (counters.errors.length === KEPT_ERRORS) counters.errors.shift();
+  counters.errors.push(error);
+  return activity(type, at, error, tool);
+}
+
+function errorDetail(value: unknown): string | null {
+  return compactText(value, ERROR_LIMIT) ?? compactText(asRecord(value)?.message, ERROR_LIMIT) ??
+    summarizeValue(value, ERROR_LIMIT);
+}
+
+function messageText(content: unknown): string | null {
+  if (!Array.isArray(content)) return compactText(content, MESSAGE_LIMIT);
+  let text = "";
+  for (const value of content) {
+    const block = asRecord(value);
+    if (block?.type !== "text") continue;
+    const part = compactText(block.text, MESSAGE_LIMIT);
+    if (part === null) continue;
+    text = text ? `${text} ${part}` : part;
+    if (text.length > MESSAGE_LIMIT) return clip(text, MESSAGE_LIMIT);
+  }
+  return text || null;
+}
+
+function compactText(value: unknown, limit: number): string | null {
+  if (typeof value !== "string") return null;
+  const text = value.trim().replace(/\s+/gu, " ");
+  return text ? clip(text, limit) : null;
+}
+
+function compactCommand(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const command = value.trim().replace(
+    /^(?:"[^"\n]*[\\/](?:pwsh|powershell|bash|sh)(?:\.exe)?"|(?:\S*[\\/])?(?:pwsh|powershell|bash|sh)(?:\.exe)?)\s+(?:-Command|-lc|-c)\s+/iu,
+    "",
+  );
+  return compactText(command, 200);
+}
+
+function fileChanges(value: unknown): string | null {
+  if (!Array.isArray(value)) return null;
+  let text = "";
+  for (const change of value) {
+    const record = asRecord(change);
+    const path = asString(record?.path);
+    if (path === null) continue;
+    const kind = asString(record?.kind);
+    text += `${text ? ", " : ""}${kind ? `${kind} ` : ""}${path}`;
+    if (text.length > DETAIL_LIMIT) return clip(text, DETAIL_LIMIT);
+  }
+  return text || null;
 }
 
 function costOf(cost: unknown): number {

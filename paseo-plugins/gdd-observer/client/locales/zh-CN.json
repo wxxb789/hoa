@@ -4,6 +4,9 @@
     "run": "GDD 运行 {{name}}：{{state}}，{{liveness}}，模型 {{model}}"
   },
   "list": {
+    "agentFilter": "发起 agent：{{agent}}",
+    "clearAgentFilter": "显示全部运行",
+    "emptyAgent": "没有归属于此 agent 的运行。",
     "runs": "运行",
     "count_other": "{{count}} 个运行",
     "root": "运行根目录",
@@ -71,6 +74,18 @@
     "partial": "不完整",
     "none": "等待计数"
   },
+  "composer": {
+    "title": "GDD 运行（{{count}}）",
+    "running": "GDD · {{active}} 运行中",
+    "runningStale": "GDD · {{active}} 运行中 · {{stale}} 疑似失联",
+    "runningFailed": "GDD · {{active}} 运行中 · {{failed}} 失败",
+    "stale": "GDD · {{stale}} 疑似失联",
+    "failed": "GDD · {{failed}} 失败",
+    "failedDone": "GDD · {{failed}} 失败 · {{done}} 完成",
+    "done": "GDD · {{done}} 完成",
+    "total": "GDD · {{count}}",
+    "openRuns": "在 GDD 运行中打开"
+  },
   "detail": {
     "started": "开始",
     "ended": "结束",
@@ -88,6 +103,7 @@
     "lineageStage": "阶段",
     "lineageAgent": "发起 Paseo agent",
     "lineageAgentMissing": "未记录",
+    "openInitiatingAgent": "打开发起 agent",
     "lineageMissing": "该运行未记录血缘信息。此前的运行和直接通过适配器启动的运行均无记录。",
     "events": "事件",
     "answer": "回答",
@@ -96,15 +112,19 @@
     "noAnswer": "运行收尾时会写入 answer.md。",
     "answerFragment": "回答的末尾片段；该插件只读取文件最后一部分。",
     "gone": "该运行已不在磁盘上。",
-    "eventTail": "最近事件",
-    "noEvents": "还没有事件",
+    "eventTail": "最近活动",
+    "noEvents": "尚无活动记录",
+    "activityAssistant": "助手",
+    "activityError": "错误",
+    "activityAborted": "已中止",
+    "activityTruncated": "日志已截断",
     "copyPath": "复制路径",
     "copied": "已复制路径",
     "copyFailed": "无法复制路径。",
     "truncated": "日志中丢弃了 {{bytes}}",
     "maxTime": "时间上限",
     "updated": "更新于 {{time}}",
-    "tailLines": "最近 {{count}} 行",
+    "tailLines": "最多 {{count}} 条",
     "loadError": "无法读取该运行：{{error}}"
   },
   "warning": {
@@ -136,7 +156,7 @@
     "clear": "使用默认值",
     "saved": "已保存",
     "poll": "轮询间隔",
-    "tail": "事件末尾长度",
+    "tail": "活动与回答的末尾显示上限",
     "resolved": "解析后的根目录",
     "resolvedFrom": "解析来源",
     "exists": "磁盘上存在",
@@ -148,6 +168,6 @@
     "loading": "正在读取设置…",
     "saveFailed": "无法保存设置。",
     "pollOption": "{{seconds}} 秒",
-    "tailOption": "{{count}} 行"
+    "tailOption": "{{count}}"
   }
 }

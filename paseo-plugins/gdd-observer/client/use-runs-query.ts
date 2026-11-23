@@ -5,7 +5,7 @@ import {
   type QueryClient,
   type UseQueryResult,
 } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import {
   listRuns,
   type ListRunsDelta,
@@ -25,7 +25,14 @@ export const RUNS_LIST_QUERY_KEY = ["gddRuns", "list"] as const;
  * Cached with the data it describes so a canceled or failed poll cannot relabel an older scan.
  * A snapshot seeded without a revision (e.g. by a test) asks for a full response.
  */
-type CachedList = ListRunsOutput & { revision?: string };
+export type CachedList = ListRunsOutput & { revision?: string };
+
+export const RunsListControllerContext = createContext<{
+  refresh(): Promise<CachedList>;
+  reload(): Promise<CachedList>;
+  observe(intervalMs: number): () => void;
+  bindQueryClient?(queryClient: QueryClient): () => void;
+} | null>(null);
 
 /** The full variant; `runs` is the union's only discriminator. */
 type FullListRunsUpdate = Extract<ListRunsUpdate, { runs: RunSummary[] }>;
@@ -40,7 +47,7 @@ function isFullListRunsUpdate(update: ListRunsUpdate): update is FullListRunsUpd
  * Unchanged rows keep their summary objects, and a delta with no row change keeps the run array
  * itself, so a poll that changed nothing leaves the list's data and its mounted window alone.
  */
-function applyListDelta(base: ListRunsOutput, delta: ListRunsDelta): CachedList {
+export function applyListDelta(base: ListRunsOutput, delta: ListRunsDelta): CachedList {
   const { changes, removed, order, ...facts } = delta;
   if (changes.length === 0 && removed.length === 0 && order === undefined) {
     return { ...facts, runs: base.runs };
@@ -178,9 +185,13 @@ function pollingFor(client: QueryClient): RunsListPolling {
  */
 export function useRunsListQuery(
   requestedIntervalMs: number,
+  backgroundIntervalMs = requestedIntervalMs,
 ): UseQueryResult<ListRunsOutput, Error> {
   const client = useQueryClient();
   const list = useRpc(listRuns);
+  const controller = useContext(RunsListControllerContext);
+  useEffect(() => controller?.observe(backgroundIntervalMs), [controller, backgroundIntervalMs]);
+  useEffect(() => controller?.bindQueryClient?.(client), [controller, client]);
   const polling = useMemo(() => pollingFor(client), [client]);
   const registrationId = useRef<symbol | null>(null);
   if (registrationId.current === null) registrationId.current = Symbol("runs-list-surface");
@@ -210,9 +221,7 @@ export function useRunsListQuery(
   // `<= 1` means "no other active observer", including a sole-surface replacement in one commit.
   return useQuery({
     queryKey: RUNS_LIST_QUERY_KEY,
-    // Reading the context signal opts this step into React Query's cancellation: a newer scan
-    // aborts it, and the aborted step then leaves the revision and the cache to the newer one.
-    queryFn: ({ signal }) => fetchRunsList(client, list, signal),
+    queryFn: (context) => controller?.refresh() ?? fetchRunsList(client, list, context.signal),
     // Only the elected surface holds a timer; every other surface passes `false` so a previous
     // ownership does not keep ticking.
     refetchInterval: pollInterval,

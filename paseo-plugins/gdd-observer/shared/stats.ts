@@ -1,4 +1,4 @@
-import type { RunStats, RunSummary } from "../shared/runs";
+import type { RunStats, RunSummary } from "./runs";
 
 export function summarizeRuns(runs: readonly RunSummary[]): RunStats {
   const byState: RunStats["byState"] = { running: 0, done: 0, killed: 0, failed: 0, unknown: 0 };

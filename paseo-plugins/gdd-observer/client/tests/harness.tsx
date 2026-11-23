@@ -79,7 +79,7 @@ export function makeScanFacts(
 export const LIST_SCAN_REVISION = "scan-revision-1";
 
 export function makeEvent(overrides: Partial<RunEvent> = {}): RunEvent {
-  return { type: "turn_end", at: null, tool: null, intent: null, detail: null, role: null, ...overrides };
+  return { type: "message_end", at: null, tool: null, intent: null, detail: null, role: "assistant", ...overrides };
 }
 
 export function textOf(node: ReactTestInstance | string | number): string {

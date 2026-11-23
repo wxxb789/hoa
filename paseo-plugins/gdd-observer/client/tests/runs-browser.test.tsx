@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ReactTestInstance } from "react-test-renderer";
 import type { FollowRunOutput, ListRunsUpdate, RunEvent, RunSummary } from "../../shared/runs";
 import { RunsScreen } from "../runs-browser";
@@ -50,8 +50,8 @@ async function detailView(run: RunSummary, options: {
 }
 
 function eventRows(root: ReactTestInstance): ReactTestInstance[] {
-  // Event clocks are the row's first text cell, including the missing-time placeholder.
-  return nodes(root, "Text").filter((node) => textOf(node) === "--:--:--").map((node) => node.parent!);
+  return nodes(root, "Text").filter((node) => ["Assistant", "read"].includes(textOf(node)))
+    .map((node) => node.parent!.parent!);
 }
 
 function factValue(root: ReactTestInstance, label: string): string {
@@ -70,6 +70,43 @@ async function replaceEvents(view: RenderedClient, run: RunSummary, events: RunE
 }
 
 describe("run browser surfaces", () => {
+  it("opens a linked run on compact, returns to the host's filtered list, and can clear it", async () => {
+    const lineage = { goal: "ship observer", stage: "implement", parentAgentId: "parent" };
+    const run = makeRun({ id: "linked", name: "Linked worker", lineage });
+    const peer = makeRun({ id: "peer", name: "Sibling worker", lineage: { ...lineage, parentAgentId: "sibling" } });
+    const untracked = makeRun({ id: "untracked", name: "Untracked worker", sessionId: "parent" });
+    const openAgent = vi.fn();
+    const navigation = { openAgent, openWorkspace: vi.fn() };
+    const view = await renderClient(
+      <RunsScreen {...compactProps} navigation={navigation} params={{ parentAgentId: "parent", runId: run.id }} />,
+      { scan: makeScan({ runs: [run, peer, untracked] }), follow: { found: true, summary: run, events: [], answerTail: null } },
+    );
+    expect(view.texts()).toContain("Linked worker");
+    const jump = nodes(view.root, "Pressable").find((node) => textOf(node) === "Open initiating agent")!;
+    await view.change(() => jump.props.onPress());
+    expect(openAgent).toHaveBeenCalledWith({ agentId: "parent", serverId: hostProps.host.id });
+
+    const back = nodes(view.root, "Pressable").find((node) => node.props.accessibilityLabel === "All runs")!;
+    await view.change(() => back.props.onPress());
+    expect(view.texts()).toEqual(expect.arrayContaining([hostProps.host.label, "Initiating agent: parent", "1 run"]));
+    expect(mountedListRows(view)).toHaveLength(1);
+    expect(view.texts()).not.toContain(peer.name);
+    expect(view.texts()).not.toContain(untracked.name);
+    const clear = nodes(view.root, "Pressable").find((node) => textOf(node) === "Show all runs")!;
+    await view.change(() => clear.props.onPress());
+    expect(mountedListRows(view)).toHaveLength(3);
+
+    await view.update(<RunsScreen {...compactProps} params={{ parentAgentId: "sibling" }} />);
+    expect(view.texts()).toContain(peer.name);
+    expect(view.texts()).not.toContain(run.name);
+    await view.change(() => {
+      view.query.setQueryData(["gddRuns", "follow", peer.id, 80], { found: true, summary: peer, events: [], answerTail: null });
+    });
+    await view.update(<RunsScreen {...compactProps} params={{ parentAgentId: "sibling", runId: peer.id }} />);
+    expect(view.texts()).toContain(peer.name);
+    expect(view.texts()).not.toContain("Show all runs");
+  });
+
   it("shows the global screen's empty scan and wide no-selection guidance without a host", async () => {
     const view = await renderClient(<RunsScreen {...hostProps} params={{}} />);
     expect(view.texts()).toContain("No runs yet");
@@ -275,22 +312,24 @@ describe("run browser surfaces", () => {
     expect(view.texts()).not.toContain(notRecorded);
   });
 
-  it("shows event content, fallback clocks, tool names, intent precedence and the answer fragment", async () => {
+  it("shows meaningful activity without placeholder clocks or raw protocol labels", async () => {
     const view = await detailView(makeRun(), {
-      events: [makeEvent({ type: "tool_execution_start", tool: "bash", intent: "Running test", detail: "not the intent" }),
-        makeEvent({ type: "error", at: "2026-11-14T12:34:56Z", detail: "fixture failed" })],
+      events: [makeEvent({ type: "tool_execution_start", role: null, tool: "bash", intent: "Running test", detail: "not the intent" }),
+        makeEvent({ detail: "Checking the output" }),
+        makeEvent({ type: "command_execution_failed", role: null, tool: "command", at: "2026-11-14T12:34:56Z", detail: "Exit 1" })],
       answerTail: "# Fixture answer",
     });
-    expect(view.texts()).toEqual(expect.arrayContaining(["Recent events · last 80 lines", "--:--:--", "bash", "tool_execution_start · Running test", "12:34:56 PM", "error · fixture failed", "Tail of the answer; the plugin reads the last part of the file."]));
+    expect(view.texts()).toEqual(expect.arrayContaining(["Recent activity · up to 80 items", "bash", "Running test", "Assistant", "Checking the output", "12:34:56 PM", "command · Error", "Exit 1"]));
     expect(nodes(view.root, "Markdown")[0].props.children).toBe("# Fixture answer");
     expect(view.texts().join("\n")).not.toContain("not the intent");
+    expect(view.texts().join("\n")).not.toMatch(/--:--:--|tool_execution_start|command_execution_failed/);
   });
 
   it.each(["en", "zh-CN"] as const)("shows pending, gone and failed detail states without inventing success in %s", async (locale) => {
     const run = makeRun();
     const view = await selectRun(run, { locale, pending: true });
     expect(view.texts()).toContain(locale === "en" ? "Scanning…" : "扫描中…");
-    expect(view.texts()).toContain(locale === "en" ? "No events yet" : "还没有事件");
+    expect(view.texts()).toContain(locale === "en" ? "No activity yet" : "尚无活动记录");
     expect(view.texts()).toContain(locale === "en" ? "answer.md appears when the run finalizes." : "运行收尾时会写入 answer.md。");
     await view.change(() => {
       view.query.setQueryData(["gddRuns", "follow", run.id, 80], { found: false, summary: null, events: [], answerTail: null });
@@ -333,19 +372,19 @@ describe("run browser surfaces", () => {
     const d = makeEvent({ detail: "D" });
     const view = await detailView(run, { events: [a, b, c] });
     const before = eventRows(view.root);
-    expect(before.map(textOf)).toEqual(["--:--:--turn_endturn_end · A", "--:--:--turn_endturn_end · B", "--:--:--turn_endturn_end · C"]);
+    expect(before.map(textOf)).toEqual(["AssistantA", "AssistantB", "AssistantC"]);
     await replaceEvents(view, run, [b, c, d]);
     const after = eventRows(view.root);
     expect(after[0] === before[1], "retained B row stays mounted").toBe(true);
     expect(after[1] === before[2], "retained C row stays mounted").toBe(true);
     expect(after[2] === before[2], "new D row is not the former C row").toBe(false);
-    expect(after.map(textOf)).toEqual(["--:--:--turn_endturn_end · B", "--:--:--turn_endturn_end · C", "--:--:--turn_endturn_end · D"]);
+    expect(after.map(textOf)).toEqual(["AssistantB", "AssistantC", "AssistantD"]);
   });
 
   it("keeps identical event occurrences distinct and stable across append and unrelated head eviction", async () => {
     const run = makeRun();
     const head = makeEvent({ detail: "head" });
-    const repeat = makeEvent({ type: "tool_execution_start", tool: "read", intent: "same" });
+    const repeat = makeEvent({ type: "tool_execution_start", role: null, tool: "read", intent: "same" });
     const view = await detailView(run, { events: [head, repeat, { ...repeat }] });
     const before = eventRows(view.root);
     expect(before[1] === before[2], "identical occurrences occupy distinct rows").toBe(false);
