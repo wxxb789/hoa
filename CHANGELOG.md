@@ -6,6 +6,7 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 ## 2026-11-23
 
+- Absorb three more ref patterns: colleague-skill's work-playbook variant (hoa-skill-create `distill-material.md`), yao-open-prompts' caller-literal protection list (`evolve.md`), and knowledge-work-plugins' comparison traps (evidence-backed-analytical-writing step 3).
 - Stop `npx skills add` from cloning `ref/`: the skills CLI runs `git submodule update --init --recursive --depth 1` after every clone, so every submodule now sets `update = none`; check one out with `git submodule update --init --checkout --depth 1 ref/<name>`.
 - Replace the daily Dependabot submodule PRs and their auto-merge workflow with `ref-sync.yml`, which pushes upstream-head pointers straight to `main` through a ruleset-bypassing deploy key.
 - Absorb and remove twelve `ref/` submodules (38 → 26): humanizer, Humanizer-zh, say-it-human and shuorenhua become writing's `references/ai-tells.md` plus four tech-doc rules in `tutorial.md`; i-have-adhd becomes `prompts/adhd-operator-standing-rules.md`; nuwa-skill and caveman's eval design become hoa-skill-create's `references/distill-material.md` and two `evaluate.md` paragraphs; dexter's falsifier rule joins evidence-backed-analytical-writing; yao-open-prompts, colleague-skill, zhengxi-views, knowledge-work-plugins and baoyu-design drop to link-only rows. Add the missing rows for pstack and academic-research-skills.

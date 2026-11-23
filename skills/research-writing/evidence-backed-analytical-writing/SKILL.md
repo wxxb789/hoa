@@ -5,7 +5,7 @@ description: >-
   sources. When figures carry the argument, map claims to dated evidence, distinguish inventory from
   orders or estimates, and explain mechanisms and limitations. Not for evidence-boundary-discipline.
 metadata:
-  revision: "6"
+  revision: "7"
   areas: "work-management"
   targets: "runtime-agnostic"
   summary: "evidence map plus a claim → evidence → mechanism → limitation spine for Chinese analytical reports; recency window, status ladder, negative findings"
@@ -28,7 +28,10 @@ to verify, not a fact to preserve.
    only as a labelled baseline. Prefer representative summary evidence to anecdotes; label
    secondary sourcing and treat unsourced search output only as a lead.
 3. **Map each claim.** Record source and exact locator, date, measure and unit, denominator,
-   status, and safe interpretation. Compare or combine only compatible measures. Replace an
+   status, and safe interpretation. Compare or combine only compatible measures; first rule out
+   a changed denominator or eligibility definition, a partial period set against a full one,
+   an average of group averages with unequal sizes, a population of survivors only, and
+   segments defined by the outcome being measured. Replace an
    unsupported statistic with a sourced alternative or mark the gap. A negative finding needs
    the actual search scope, inclusion criteria, and exclusions, not an assertion of nonexistence.
 4. **Draft from the map.** For each point, write claim, evidence, mechanism, limitation, and

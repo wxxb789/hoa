@@ -5,7 +5,7 @@ description: >-
   packaging a checklist as SKILL.md, correcting a behavior failure or deciding to split, hide or
   chain entrypoints, validate the package with realistic tasks. Not for hoa-skill-review.
 metadata:
-  revision: "7"
+  revision: "8"
   areas: "software-development,work-management,self-management"
   targets: "runtime-agnostic"
   summary: "directly create, evolve or compose a defined skill with focused, risk-scaled validation"
