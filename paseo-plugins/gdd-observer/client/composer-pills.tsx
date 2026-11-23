@@ -4,24 +4,16 @@ import type {
   PluginClientContext,
   PluginText,
 } from "@getpaseo/plugin/client";
-import { useSettings, useTranslation } from "@getpaseo/plugin/client";
 import type { QueryClient } from "@tanstack/react-query";
-import { useCallback, useMemo } from "react";
-import { Pressable, Text, View } from "react-native";
 import { listRuns, type RunSummary } from "../shared/runs";
-import { OBSERVER_DEFAULTS, observerSettings } from "../shared/settings";
-import { summarizeRuns } from "../shared/stats";
-import { errorText } from "./format";
+import { AgentRunsPopover } from "./agent-runs-popover";
+import { composerPresentation, idleStatusIcon, isActive } from "./composer-presentation";
 import { messages } from "./messages";
-import { RunRow } from "./runs-browser";
-import { StatusStrip } from "./status-strip";
-import { useObserverStyles } from "./styles";
 import {
   applyListDelta,
   type CachedList,
   RUNS_LIST_QUERY_KEY,
   RunsListControllerContext,
-  useRunsListQuery,
 } from "./use-runs-query";
 
 const MIN_BACKGROUND_INTERVAL_MS = 3000;
@@ -263,8 +255,8 @@ export class ComposerPillManager {
     const registration = client.addComposerPill({
       id: "gdd-workers", workspaceId, agentId: id,
       button: {
-        title: messages.message("composer.title", { count: 0 }),
-        icon: "Activity", visible: false, behavior: { kind: "popover", Content },
+        title: messages.message("composer.sheetTitle"),
+        icon: idleStatusIcon, visible: false, behavior: { kind: "popover", Content },
       },
     });
     const pill = { workspaceId, registration, presentation: "" };
@@ -284,69 +276,9 @@ export class ComposerPillManager {
       pill.presentation = "";
       return;
     }
-    const count = runs.length;
-    let active = 0;
-    let stale = 0;
-    let failed = 0;
-    let done = 0;
-    for (const run of runs) {
-      if (isActive(run)) active += 1;
-      if (run.liveness === "stale") stale += 1;
-      if (run.state === "failed") failed += 1;
-      if (run.state === "done") done += 1;
-    }
-    const presentation = `${count}/${active}/${stale}/${failed}/${done}`;
-    if (pill.presentation === presentation) return;
-    pill.presentation = presentation;
-    const key = active > 0
-      ? stale > 0 ? "runningStale" : failed > 0 ? "runningFailed" : "running"
-      : stale > 0 ? "stale" : failed > 0 ? done > 0 ? "failedDone" : "failed"
-        : done === count ? "done" : "total";
-    pill.registration.update({
-      visible: true,
-      title: messages.message("composer.title", { count }),
-      label: messages.message(`composer.${key}`, { count, active, stale, failed, done }),
-    });
+    const { label, icon, key } = composerPresentation(runs);
+    if (pill.presentation === key) return;
+    pill.presentation = key;
+    pill.registration.update({ visible: true, icon, label });
   }
-}
-
-function isActive(run: RunSummary): boolean {
-  return !run.finalized && (run.liveness === "running" || (run.state === "running" && run.liveness === "unknown"));
-}
-
-type PopoverProps = Extract<PluginButtonContentProps, { context: "agent" }> & {
-  openScreen: PluginClientContext["openScreen"];
-};
-
-function AgentRunsPopover({ agentId, host, layout, theme, close, openScreen }: PopoverProps) {
-  const styles = useObserverStyles(theme, layout);
-  const { t } = useTranslation(messages);
-  const settings = useSettings(observerSettings);
-  const values = settings.status === "ready" ? settings.values : OBSERVER_DEFAULTS;
-  const query = useRunsListQuery(values.pollIntervalMs);
-  const population = query.data?.runs;
-  const { runs, stats } = useMemo(() => {
-    const runs = population?.filter((run) => run.lineage?.parentAgentId === agentId) ?? [];
-    return { runs, stats: summarizeRuns(runs) };
-  }, [population, agentId]);
-  const open = useCallback((runId?: string) => {
-    close();
-    openScreen({ screenId: "runs", params: { parentAgentId: agentId, ...(runId ? { runId } : {}) } });
-  }, [agentId, close, openScreen]);
-
-  return (
-    <View style={styles.listContent}>
-      <Text style={styles.cardTitle}>{host.label} · {t("composer.title", { count: runs.length })}</Text>
-      <StatusStrip stats={stats} theme={theme} layout={layout} />
-      {query.error ? <Text style={styles.error}>{t("error.list", { error: errorText(query.error) })}</Text> : null}
-      {query.isPending ? <Text style={styles.muted}>{t("list.scanning")}</Text> : null}
-      {population && runs.length === 0 ? <Text style={styles.muted}>{t("list.emptyAgent")}</Text> : null}
-      {runs.map((run) => (
-        <RunRow key={run.id} run={run} theme={theme} layout={layout} selected={false} onSelect={open} showLineage />
-      ))}
-      <Pressable accessibilityRole="button" onPress={() => open()} style={styles.backRow}>
-        <Text style={styles.backLabel}>{t("composer.openRuns")}</Text>
-      </Pressable>
-    </View>
-  );
 }

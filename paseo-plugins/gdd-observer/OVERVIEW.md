@@ -4,11 +4,15 @@ directory, so progress is normally invisible in the app. This plugin finds those
 renders them live.
 
 The **GDD runs** sidebar footer opens the full list on the selected host. A **GDD** Composer pill
-appears when the agent has workers identified by recorded `parentAgentId` lineage. Its popover shows
-those workers and opens the filtered list or a run's detail on that same host. The list identifies
-the host and summarizes the visible runs with a proportional bar, state, live, stale, and flagged counts, and
-the totals of turns, tool calls, and cost. Below it,
-runs are listed newest first with their state, whether the recorded process is still alive, the model
+appears when the agent has workers identified by recorded `parentAgentId` lineage. It shows the
+active stage and goal, concurrent worker counts, or the latest goal when quiet. The popover shows
+up to four running or stale workers and six recent goals with consecutive retries grouped.
+Select a row to follow activity, preview the answer, or switch recent stage attempts without
+leaving the chat. The popover also links to the filtered list or full run on the same host.
+
+The full list identifies the host and summarizes the visible runs with a proportional bar, state,
+live, stale, and flagged counts, and totals for turns, tool calls, and cost. Below it, runs are listed
+newest first with their state, whether the recorded process is still alive, the model
 (observed when available, otherwise requested), elapsed time, turns, tool calls, cost, and the tool
 that is currently running. A cold list does not read event logs for finalized runs with launcher
 counters. Selecting a run shows recent assistant progress, tools, failures, and splice markers,

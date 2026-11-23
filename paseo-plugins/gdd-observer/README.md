@@ -14,7 +14,7 @@ never signals a process.
 | Surface                     | What it does                                                                                       |
 | --------------------------- | -------------------------------------------------------------------------------------------------- |
 | Sidebar footer **GDD runs** | Opens the unfiltered run list on the selected host. |
-| Composer **GDD** pill       | Visible only for agents with matching recorded parent lineage. Shows worker counts and opens a popover; a row opens that run, and the footer opens the agent's filtered list, both on the originating host. |
+| Composer **GDD** pill       | Shows the active stage and goal, concurrent workers, or the latest goal when quiet. Remains visible after workers settle. Open it to inspect recent goals and follow a run without leaving the chat. |
 | Screen `runs`               | Status summary over the whole scan (a proportional state bar, per-state counts, live/stale/flagged, turns/tools/cost), then a newest-first run list with state and liveness badges, the model each run used, elapsed time, turns/tools/cost, current tool, stale warnings; selecting a run opens its live tail, answer tail, and file paths. |
 | Settings screen             | Run root override, poll interval, activity and answer tail limit, and the resolved root with its status summary. |
 
@@ -135,9 +135,12 @@ most. With no mounted list observer, the pill controller scans once at installat
 in response to agent updates or while a worker is still active; confirmed stale workers alone do
 not keep it polling. Detached refreshes are throttled to at least 3 seconds (5 seconds until a
 mounted surface reads the host setting). Idle, settled hosts
-hold no scan timer. Paseo presents the popover above the Composer on desktop and as a sheet on
-mobile; row and footer links stay on the installation's host. The sidebar remains available on
-hosts that do not expose Composer pill registration.
+hold no scan timer. Only runs whose recorded `parentAgentId` matches the chat's agent appear in
+its pill and popover. Paseo presents the popover above the Composer on desktop and as a sheet on
+mobile. It shows at most four running or stale workers and six recent goals, grouping consecutive
+retries in each goal's stage trail. Select a row to see live activity, the answer preview, and recent
+stage attempts inline. **All runs** and **Full view** open the agent's filtered list or selected run
+on the same host. The sidebar remains available on hosts without Composer pill registration.
 
 **Recent activity** shows assistant progress, tool actions, failures and aborts, and log splice
 markers from OMP/Pi, Codex, and Claude logs. It omits protocol bookkeeping, successful duplicate
