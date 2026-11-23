@@ -2,10 +2,9 @@
 
 The optional `gdd-observer` plugin displays launcher-owned GDD run artifacts in Paseo. It is a
 read-only observer, not a launcher, controller, completion gate, or proof that a stage succeeded.
-Its runtime source is the standalone plugin, imported with one UI adaptation: HOA keeps a single
-entry point — the **GDD runs** row in the sidebar footer, which opens the global `runs` screen —
-plus the plugin's separate settings screen. The standalone source had no `HOA-INTEGRATION.md`;
-this document describes its boundary with HOA.
+The **GDD runs** sidebar footer opens the whole host's run list. The **GDD** Composer pill appears
+only for agents with matching recorded lineage and opens a worker popover with same-host links to
+the filtered list or a specific run. The separate settings screen configures observation, not dispatch.
 
 ## Two separate routes
 
@@ -57,7 +56,7 @@ The store scans `<run-root>/<YYYY-MM-DD>/<slug>/`. The contract is defined by
 | Artifact | Observation |
 | --- | --- |
 | `state.json` | Declared state, timing, exit code, PIDs, `session_id`, counters, and runner-owned `events_*` statistics. Missing state is `unknown` unless a `finalized` marker supplies a usable exit code. |
-| `events.ndjson`, `events.1.ndjson` | Current and previous event segments. The observer tails only the current segment for live OMP/Pi counters and current tool; the runner writes counters to `state.json` for every headless route. |
+| `events.ndjson`, `events.1.ndjson` | Current and previous event segments. The observer tails only the current segment for recent activity and live counters/current tool; the runner writes counters to `state.json` for every headless route. |
 | `answer.md` | Answer presence and a bounded tail for display, not an accepted delivery result. |
 | `finalized` | Settled-run marker and exit code; if declared state is absent or still `running`, the exit code determines the displayed terminal state. |
 | `run.json`, `runner.log` | Launcher invocation and runner diagnostics. These are inspection artifacts, not parsed by the observer. |
@@ -67,9 +66,11 @@ The detail view lists paths and sizes for `prompt.md` and `stderr.log` without r
 `events.stats.json`, `lock`, `session.id`, and `runner.out` are legacy adapter artifacts; the shared
 runner does not create them. Three read-only RPCs are registered: `runs.list` returns the resolved root
 with its candidates, the scan stats, and a full list or changes relative to the caller's known
-revision; `runs.paths` lists one run's files for the detail view; and `runs.follow` polls the
-selected run's summary, bounded event and answer
-tails, and optional lineage. Missing or invalid lineage does not hide the rest of the run.
+revision, including validated optional lineage on each summary; `runs.paths` lists one run's files
+for the detail view; and `runs.follow` polls the selected run's summary, activity, answer tail, and
+lineage. Missing or invalid lineage does not hide the run, but it does not contribute to any
+agent's pill. Attribution is an exact `parentAgentId` match within the daemon host; the observer
+does not match by workspace or session ID.
 The observer persists only one bounded settings document per plugin installation on a daemon.
 It does not copy, archive, or delete launcher artifacts.
 
@@ -81,10 +82,11 @@ launcher's stale recovery or writes its own finalization marker.
 State counters take precedence for finalized runs, non-OMP/Pi headless routes and rotated logs.
 Without state counters, counts derived from events are marked partial once the previous segment
 exists or a legacy truncation marker reports loss. The observer does not invent missing turns,
-tools, or cost. Event tails read at most 256 KiB and answer tails at
-most 64 KiB before the line limit is applied. The observer keeps bounded in-memory tail and PID
-caches; compact detail stops polling its hidden list. See [README](README.md#known-limits) for cache
-budgets, freshness, and liveness limits.
+tools, or cost. The feed extracts assistant progress, tool actions, failures, aborts, and log splice
+markers from OMP/Pi, Codex, and Claude without displaying routine protocol frames. Activity reads
+at most 256 KiB and the answer tail at most 64 KiB before their item and line limits are applied.
+Compact detail stops polling its hidden list; idle hosts without mounted list observers or active
+workers do not poll. See [README](README.md#known-limits) for cache budgets, freshness, and liveness limits.
 
 ## Optional installation and trust removal
 

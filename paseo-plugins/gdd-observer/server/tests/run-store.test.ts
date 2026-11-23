@@ -462,7 +462,12 @@ describe("run store", () => {
   });
 
   it("bounds the event tail and the answer tail to the requested line count", async () => {
-    const events = Array.from({ length: 40 }, (_, index) => event({ type: "turn_end", timestamp: `2026-11-14T00:00:${String(index).padStart(2, "0")}.000Z` })).join("");
+    const events = Array.from({ length: 40 }, (_, index) =>
+      event({ type: "turn_end" }) + event({
+        type: "message_end", timestamp: `2026-11-14T00:00:${String(index).padStart(2, "0")}.000Z`,
+        message: { role: "assistant", content: [{ type: "text", text: `Progress ${index}` }] },
+      }),
+    ).join("");
     await writeRun("stage-implement", {
       "state.json": STATE_RUNNING,
       "events.ndjson": events,
@@ -478,6 +483,7 @@ describe("run store", () => {
     expect(follow.answerTail?.split("\n")).toHaveLength(5);
     expect(follow.answerTail?.endsWith("line 29")).toBe(true);
     expect(follow.summary?.turns).toBe(40);
+    expect(follow.summary?.eventLines).toBe(80);
 
     const paths = await runs.paths(id);
     expect(paths.found).toBe(true);
@@ -582,7 +588,7 @@ describe("run store lineage", () => {
     parentAgentId: "Paseo.Main-1",
   });
 
-  it("carries a validated sidecar on follow and nothing else", async () => {
+  it("carries validated lineage on list and follow but not in paths", async () => {
     await writeRun("stage-implement", { ...BASE_FILES, "lineage.json": LINEAGE });
     await writeRun("stage-no-parent", {
       ...BASE_FILES,
@@ -599,7 +605,7 @@ describe("run store lineage", () => {
     });
     // The sidecar annotates the run; the standard summary and tails are untouched.
     expect(follow.summary?.turns).toBe(1);
-    expect(follow.events).toHaveLength(1);
+    expect(follow.events).toEqual([]);
     expect(follow.answerTail).toBeNull();
     expect(followRun.output.safeParse(follow).success).toBe(true);
     // A warmed poll answers from the revision-checked cache with the same lineage.
@@ -611,8 +617,8 @@ describe("run store lineage", () => {
       stage: "stage-fix",
     });
 
-    // The scan carries no lineage, and the path listing does not read the sidecar.
-    expect((await runs.listRuns()).runs[0]).not.toHaveProperty("lineage");
+    expect((await runs.listRuns()).runs.find((run) => run.id === id)?.lineage).toEqual(follow.lineage);
+    expect(follow.summary?.lineage).toEqual(follow.lineage);
     expect((await runs.paths(id)).paths.some((path) => path.label === "lineage.json")).toBe(false);
   });
 
@@ -621,8 +627,9 @@ describe("run store lineage", () => {
     const follow = await store([222]).follow(`${DATE}/stage-implement`);
     expect(follow.found).toBe(true);
     expect(follow.lineage).toBeUndefined();
+    expect((await store([222]).listRuns()).runs[0]).not.toHaveProperty("lineage");
     expect(follow.summary?.turns).toBe(1);
-    expect(follow.events).toHaveLength(1);
+    expect(follow.events).toEqual([]);
     expect(followRun.output.safeParse(follow).success).toBe(true);
   });
 
@@ -644,7 +651,8 @@ describe("run store lineage", () => {
       expect(follow.found, name).toBe(true);
       expect(follow.lineage, name).toBeUndefined();
       expect(follow.summary?.turns, name).toBe(1);
-      expect(follow.events, name).toHaveLength(1);
+      expect(follow.summary, name).not.toHaveProperty("lineage");
+      expect(follow.events, name).toEqual([]);
       expect(followRun.output.safeParse(follow).success, name).toBe(true);
     }
   });
@@ -655,7 +663,7 @@ describe("run store lineage", () => {
     const follow = await store([222]).follow(`${DATE}/stage-implement`);
     expect(follow.lineage).toBeUndefined();
     expect(follow.summary?.turns).toBe(1);
-    expect(follow.events).toHaveLength(1);
+    expect(follow.events).toEqual([]);
   });
 
   it("re-reads a replaced sidecar on the next follow", async () => {

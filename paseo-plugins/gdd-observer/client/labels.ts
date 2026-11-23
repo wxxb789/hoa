@@ -60,7 +60,13 @@ export function livenessColor(liveness: RunLiveness, theme: ObserverTheme): stri
 
 export function eventColor(event: RunEvent, theme: ObserverTheme): string {
   if (event.type === "truncated") return theme.colors.statusWarning;
-  if (event.type.includes("error")) return theme.colors.statusDanger;
-  if (event.type.includes("tool") && event.type.includes("start")) return theme.colors.accent;
+  if (eventFailureKey(event.type) !== null) return theme.colors.statusDanger;
+  if (event.role === "assistant") return theme.colors.statusSuccess;
+  if (event.tool) return theme.colors.accent;
   return theme.colors.foregroundMuted;
+}
+
+export function eventFailureKey(type: string): "detail.activityAborted" | "detail.activityError" | null {
+  if (type.includes("aborted")) return "detail.activityAborted";
+  return type.includes("error") || type.includes("failed") ? "detail.activityError" : null;
 }

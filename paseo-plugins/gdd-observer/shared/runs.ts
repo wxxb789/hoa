@@ -74,12 +74,19 @@ export const runStatsSchema = z.object({
   flagged: z.number(),
 });
 
+export const runLineageSchema = z.object({
+  goal: z.string().trim().min(1).max(256),
+  stage: z.string().trim().min(1).max(32),
+  parentAgentId: z.string().trim().regex(/^[A-Za-z0-9._-]{1,128}$/).optional(),
+});
+
 export const runSummarySchema = z.object({
   id: z.string(),
   date: z.string(),
   slug: z.string(),
   runDir: z.string(),
   name: z.string(),
+  lineage: runLineageSchema.optional(),
   state: z.enum(RUN_STATES),
   liveness: z.enum(RUN_LIVENESS),
   finalized: z.boolean(),
@@ -221,14 +228,8 @@ export const runPaths = defineRpc({
   }),
 });
 
-export const runLineageSchema = z.object({
-  goal: z.string().trim().min(1).max(256),
-  stage: z.string().trim().min(1).max(32),
-  parentAgentId: z.string().trim().regex(/^[A-Za-z0-9._-]{1,128}$/).optional(),
-});
-
 /**
- * Bounded live tail: the run's summary, its last `tailLines` events, and its answer tail. The
+ * Bounded live tail: the run's summary, up to `tailLines` activity items, and its answer tail. The
  * client polls this while a run is selected; the counters behind the summary reuse a per-run byte
  * offset, so the counting reads only what the launcher appended since the previous call. Revision
  * caches reuse unchanged bounded event/answer windows and extend them on append. Polling also

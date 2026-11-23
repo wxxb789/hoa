@@ -22,6 +22,7 @@ export type RunFiles = {
   dir: string;
   date: string;
   slug: string;
+  lineage?: RunSummary["lineage"];
   state: RunStateFile;
   lock: RunLock | null;
   finalized: RunFinalized;
@@ -71,9 +72,11 @@ export function mapRun(inputs: RunInputs, nowMs: number): RunSummary {
   if (truncated) warnings.push("log-truncated");
   if (liveness === "unknown" && !files.finalized.present) warnings.push("liveness-unknown");
   const stateErrorList = stateErrors(values);
+  const currentTool = files.finalized.present ? null : counters?.currentTool;
 
   return {
     id: `${files.date}/${files.slug}`,
+    ...(files.lineage ? { lineage: files.lineage } : {}),
     date: files.date,
     slug: files.slug,
     runDir: files.dir,
@@ -97,8 +100,8 @@ export function mapRun(inputs: RunInputs, nowMs: number): RunSummary {
     costUsd: fromState ? asNumber(values.cost_usd) : (counters?.costUsd ?? null),
     countersFrom,
     countersPartial,
-    currentTool: counters?.currentTool?.name ?? null,
-    currentToolIntent: counters?.currentTool?.intent ?? null,
+    currentTool: currentTool?.name ?? null,
+    currentToolIntent: currentTool?.intent ?? null,
     lastError: counters?.lastError ?? stateErrorList[stateErrorList.length - 1] ?? null,
     errorCount: Math.max(counters?.errorCount ?? 0, stateErrorList.length),
     answerChars: asNumber(values.answer_chars) ?? files.answer.bytes,
@@ -156,19 +159,24 @@ function stateFromExit(exitCode: number | null): RunState {
     : "failed";
 }
 
+export function stateCountersTakePrecedence(files: RunFiles, eventsHaveCounters = true): boolean {
+  const values = files.state.values;
+  const stateHasCounters = asNumber(values.turns) !== null ||
+    asNumber(values.tool_calls) !== null ||
+    asNumber(values.cost_usd) !== null;
+  if (!stateHasCounters) return false;
+  if (files.finalized.present || files.events.rotated || !eventsHaveCounters) return true;
+  const agent = asString(values.agent);
+  return agent !== null && agent !== "omp" && agent !== "pi";
+}
+
 function countersOf(
   files: RunFiles,
   counters: CounterSnapshot | null,
   truncated: boolean,
 ): { from: RunSummary["countersFrom"]; partial: boolean } {
-  const stateHasCounters =
-    asNumber(files.state.values.turns) !== null ||
-    asNumber(files.state.values.tool_calls) !== null ||
-    asNumber(files.state.values.cost_usd) !== null;
   const eventsHaveCounters = counters !== null && counters.lines > 0;
-  const agent = asString(files.state.values.agent);
-  if (stateHasCounters && (files.finalized.present || !eventsHaveCounters || files.events.rotated ||
-      (agent !== null && agent !== "omp" && agent !== "pi"))) {
+  if (stateCountersTakePrecedence(files, eventsHaveCounters)) {
     const values = files.state.values;
     return {
       from: "state",

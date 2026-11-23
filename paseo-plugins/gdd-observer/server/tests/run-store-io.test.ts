@@ -305,6 +305,65 @@ describe("run store file revisions", () => {
     });
   });
 
+  it("does not open finalized logs with launcher counters until followed", async () => {
+    const log = event({
+      type: "message_end",
+      message: { role: "assistant", provider: "ghc", model: "gpt-6.1-sol", content: [{ type: "text", text: "Starting tests" }] },
+    }) + event({ type: "turn_end" }) + event({
+      type: "tool_execution_start", toolName: "bash", intent: "Run tests",
+    });
+    const events = eventPath(await writeRun("done", {
+      "state.json": '{"turns":8,"tool_calls":15,"cost_usd":0.4}',
+      "events.ndjson": log,
+      finalized: "0",
+    }));
+    const missing = eventPath(await writeRun("missing", {
+      "state.json": '{"cost_usd":0}',
+      finalized: "0",
+    }));
+    const legacy = eventPath(await writeRun("legacy", {
+      "state.json": '{}',
+      "events.ndjson": event({ type: "turn_end" }),
+      finalized: "0",
+    }));
+    let clock = NOW;
+    const id = `${DATE}/done`;
+    const { store } = makeStore([], {}, () => clock);
+    const cold = await store.listRuns();
+    expect(io.opens.get(events)).toBeUndefined();
+    expect(readsOf(events)).toEqual([]);
+    expect(cold.runs.find((run) => run.id === id)).toMatchObject({
+      eventsBytes: Buffer.byteLength(log), eventLines: 0, model: { observed: [] },
+      turns: 8, toolCalls: 15, costUsd: 0.4, countersFrom: "state",
+    });
+    expect(io.opens.get(missing)).toBeUndefined();
+    expect(cold.runs.find((run) => run.slug === "missing")).toMatchObject({
+      eventsBytes: 0, costUsd: 0, countersFrom: "state",
+      warnings: expect.arrayContaining(["log-unreadable"]),
+    });
+    expect(bytesReadOf(legacy)).toBeGreaterThan(0);
+    expect(cold.runs.find((run) => run.slug === "legacy")).toMatchObject({
+      turns: 1, countersFrom: "events", eventLines: 1,
+    });
+
+    const followed = await store.follow(id);
+    expect(bytesReadOf(events)).toBeGreaterThan(0);
+    expect(typesOf(followed.events)).toEqual(["message_end", "tool_execution_start"]);
+    expect(followed.summary).toMatchObject({ eventLines: 3, currentTool: null, currentToolIntent: null });
+    expect(followed.summary?.model.observed.map((usage) => usage.model)).toEqual(["gpt-6.1-sol"]);
+    const opens = io.opens.get(events);
+    io.reads.length = 0;
+    expect((await store.listRuns()).runs.find((run) => run.id === id)).toEqual(followed.summary);
+
+    await appendFile(events, event({ type: "turn_end" }));
+    clock += 30_000;
+    expect((await store.listRuns()).runs.find((run) => run.id === id)).toMatchObject({
+      eventLines: 0, model: { observed: [] }, turns: 8,
+    });
+    expect(io.opens.get(events)).toBe(opens);
+    expect(readsOf(events)).toEqual([]);
+  });
+
   it("reuses finalized summaries but checks for in-place edits on a bounded cadence", async () => {
     const state = join(await writeRun("done", {
       "state.json": '{"name":"done","turns":1}',
@@ -346,11 +405,12 @@ describe("run store file revisions", () => {
 
   it("evicts visited tails without changing the followed output", { timeout: 20_000 }, async () => {
     const { store } = makeStore([]);
-    const hot = await writeRun("hot", { "events.ndjson": event({ type: "turn_end" }), "answer.md": "hot answer\n" });
-    const cold = await writeRun("cold", { "events.ndjson": event({ type: "turn_end" }), "answer.md": "cold answer\n" });
+    const activity = event({ type: "tool_execution_start", toolName: "read", args: { path: "work" } });
+    const hot = await writeRun("hot", { "events.ndjson": activity, "answer.md": "hot answer\n" });
+    const cold = await writeRun("cold", { "events.ndjson": activity, "answer.md": "cold answer\n" });
     const hotFollow = await store.follow(`${DATE}/hot`);
     const coldFollow = await store.follow(`${DATE}/cold`);
-    const largeLog = fixedLine("turn_end", 128).repeat(2048);
+    const largeLog = fixedLine("tool_execution_start", 128, { toolName: "read", args: { path: "work" } }).repeat(2048);
     const largeAnswer = "answer\n".repeat(10_000);
     await Promise.all(Array.from({ length: 28 }, (_, i) => writeRun(`visit-${i}`, {
       "events.ndjson": largeLog, "answer.md": largeAnswer,
@@ -395,10 +455,13 @@ describe("run store file revisions", () => {
       "events.ndjson": log,
       "answer.md": "partial answer\n",
       "session.id": "session-1\n",
+      "lineage.json": '{"goal":"ship","stage":"implement","parentAgentId":"owner"}',
     });
     const { store } = makeStore([222]);
     const id = `${DATE}/stage-implement`;
     const events = eventPath(dir);
+    const lineagePath = join(dir, "lineage.json");
+    await utimes(lineagePath, TIME_ONE, TIME_ONE);
 
     const cold = await store.listRuns();
     expect(cold.runs[0].turns).toBe(2);
@@ -407,14 +470,20 @@ describe("run store file revisions", () => {
     // The cold pass reads the log once, which is what makes the warm assertions below mean anything.
     expect(io.opens.get(events)).toBe(1);
     expect(bytesReadOf(events)).toBe(Buffer.byteLength(log));
+    expect(readsOf(lineagePath)).toHaveLength(1);
+    expect(cold.runs[0].lineage?.parentAgentId).toBe("owner");
 
+    const statsBefore = io.stats.length;
     const firstFollow = await store.follow(id);
-    expect(typesOf(firstFollow.events)).toEqual(["turn_end", "tool_execution_start", "turn_end"]);
+    expect(typesOf(firstFollow.events)).toEqual(["tool_execution_start"]);
+    expect(firstFollow.lineage).toEqual(cold.runs[0].lineage);
+    expect(io.stats.slice(statsBefore).filter((path) => path === lineagePath)).toEqual([lineagePath]);
     expect(firstFollow.answerTail).toBe("partial answer");
 
     const opensBefore = io.opens.get(events) ?? 0;
     const readsBefore = readsOf(events).length;
     const stateReadsBefore = readsOf(join(dir, "state.json")).length;
+    const lineageReadsBefore = readsOf(lineagePath).length;
 
     const warm = await store.listRuns();
     const secondFollow = await store.follow(id);
@@ -426,11 +495,12 @@ describe("run store file revisions", () => {
     expect(io.opens.get(events)).toBe(opensBefore);
     expect(readsOf(events).length).toBe(readsBefore);
     expect(readsOf(join(dir, "state.json")).length).toBe(stateReadsBefore);
+    expect(readsOf(lineagePath)).toHaveLength(lineageReadsBefore);
   });
 
   it("reads only appended bytes and shows the event a split line completes", async () => {
     const marker = "SECRET-MARKER-io-1";
-    const full = JSON.stringify({ type: "turn_end" });
+    const full = JSON.stringify({ type: "tool_execution_start", toolName: "read", args: { path: "work" } });
     const log = event({ type: "turn_end" }) + full.slice(0, 10);
     const dir = await writeRun("stage-implement", {
       "state.json": STATE_RUNNING,
@@ -447,7 +517,7 @@ describe("run store file revisions", () => {
     expect(cold.runs[0].eventLines).toBe(1);
     // An unfinished line that is not yet valid JSON is not shown, exactly as before the cache.
     const firstFollow = await store.follow(id);
-    expect(typesOf(firstFollow.events)).toEqual(["turn_end"]);
+    expect(firstFollow.events).toEqual([]);
 
     const seen = io.reads.length;
     const appended = `${full.slice(10)}\n` + event({ type: "turn_end" });
@@ -456,9 +526,9 @@ describe("run store file revisions", () => {
     const warm = await store.listRuns();
     const secondFollow = await store.follow(id);
 
-    expect(warm.runs[0].turns).toBe(3);
+    expect(warm.runs[0].turns).toBe(2);
     expect(warm.runs[0].eventLines).toBe(3);
-    expect(typesOf(secondFollow.events)).toEqual(["turn_end", "turn_end", "turn_end"]);
+    expect(secondFollow.events).toMatchObject([{ tool: "read", detail: '{"path":"work"}' }]);
     expect(logs.filter((message) => message.includes("recount"))).toEqual([]);
     expect(logs.join("\n")).not.toContain(marker);
 
@@ -486,8 +556,8 @@ describe("run store file revisions", () => {
 
     const cold = await store.follow(id);
     // The event is complete JSON without its newline, which is still an event the client shows.
-    expect(typesOf(cold.events)).toEqual(["turn_end", "tool_execution_start"]);
-    expect(cold.events[1].intent).toBe("Run the suite");
+    expect(typesOf(cold.events)).toEqual(["tool_execution_start"]);
+    expect(cold.events[0].intent).toBe("Run the suite");
 
     await appendFile(events, `\n${event({ type: "turn_end" })}`, "utf8");
     const warm = await store.listRuns();
@@ -496,8 +566,7 @@ describe("run store file revisions", () => {
     expect(warm.runs[0].turns).toBe(2);
     expect(warm.runs[0].toolCalls).toBe(1);
     expect(warm.runs[0].eventLines).toBe(3);
-    expect(typesOf(rest.events)).toEqual(["turn_end", "tool_execution_start", "turn_end"]);
-    expect(rest.events[1].intent).toBe("Run the suite");
+    expect(rest.events).toEqual(cold.events);
   });
 
   it("counts and displays an event whose character arrives in two writes", async () => {
@@ -523,7 +592,7 @@ describe("run store file revisions", () => {
     expect(cold.runs[0].turns).toBe(1);
     expect(cold.runs[0].toolCalls).toBe(0);
     const half = await store.follow(id);
-    expect(typesOf(half.events)).toEqual(["turn_end"]);
+    expect(half.events).toEqual([]);
 
     const seen = io.reads.length;
     await appendFile(events, full.subarray(cutoff));
@@ -532,8 +601,8 @@ describe("run store file revisions", () => {
 
     expect(warm.runs[0].toolCalls).toBe(1);
     expect(warm.runs[0].eventLines).toBe(2);
-    expect(typesOf(rest.events)).toEqual(["turn_end", "tool_execution_start"]);
-    expect(rest.events[1].intent).toBe("café ☕");
+    expect(typesOf(rest.events)).toEqual(["tool_execution_start"]);
+    expect(rest.events[0].intent).toBe("café ☕");
     // Everything up to and including the first line's newline was counted; the rest of the file is
     // the unfinished line, whose bytes arrive in this append.
     const consumed = full.indexOf(0x0a) + 1;
@@ -547,7 +616,7 @@ describe("run store file revisions", () => {
 
   it("serves a changed tail length immediately from the same held bytes", async () => {
     const log = Array.from({ length: 12 }, (_, index) =>
-      event({ type: "turn_end", timestamp: `2026-11-14T00:00:${String(index).padStart(2, "0")}.000Z` }),
+      event({ type: "tool_execution_start", toolName: "read", timestamp: `2026-11-14T00:00:${String(index).padStart(2, "0")}.000Z` }),
     ).join("");
     const answer = `${Array.from({ length: 12 }, (_, index) => `line ${index}`).join("\n")}\n`;
     const dir = await writeRun("stage-implement", {
@@ -596,12 +665,13 @@ describe("run store file revisions", () => {
   });
 
   it("recounts a same-size rewrite the metadata exposes instead of keeping stale numbers", async () => {
-    const width = 200;
+    const width = 260;
     const message = {
       role: "assistant",
       provider: "ghc",
       model: "gpt-6.1-sol",
       usage: { cost: { total: 0.5 } },
+      content: [{ type: "text", text: "Rewritten progress" }],
     };
     const before = fixedLine("turn_end", width).repeat(3);
     const after =
@@ -627,7 +697,7 @@ describe("run store file revisions", () => {
     expect(cold.runs[0].turns).toBe(3);
     expect(cold.runs[0].costUsd).toBe(0);
     const firstFollow = await store.follow(id);
-    expect(typesOf(firstFollow.events)).toEqual(["turn_end", "turn_end", "turn_end"]);
+    expect(firstFollow.events).toEqual([]);
 
     const seen = io.reads.length;
     await writeFile(events, after, "utf8");
@@ -640,7 +710,7 @@ describe("run store file revisions", () => {
     expect(warm.runs[0].costUsd).toBeCloseTo(0.5, 6);
     expect(warm.runs[0].eventLines).toBe(3);
     expect(warm.runs[0].model.observed.map((usage) => usage.model)).toEqual(["gpt-6.1-sol"]);
-    expect(typesOf(secondFollow.events)).toEqual(["turn_end", "message_end", "turn_end"]);
+    expect(secondFollow.events).toMatchObject([{ role: "assistant", detail: "Rewritten progress" }]);
 
     const recount = io.reads.slice(seen).filter((read) => read.path === events);
     expect(recount.some((read) => read.position === 0)).toBe(true);
@@ -713,14 +783,16 @@ describe("run store file revisions", () => {
     const events = eventPath(dir);
 
     const cold = await store.follow(id, 10);
-    expect(typesOf(cold.events)).toEqual(["tool_execution_start", "turn_end", "turn_end"]);
+    expect(typesOf(cold.events)).toEqual(["tool_execution_start"]);
     expect(cold.summary?.turns).toBe(2);
 
     // The launcher's splice, written in place and larger than what it replaces: only the boundary
     // the counters consumed — or a marker in the new bytes — says the retained prefix is gone.
     const spliced =
       event({ type: "truncated", dropped_bytes: 5000, retained_bytes: 120 }) +
-      fixedLine("turn_end", 200, { timestamp: "2026-11-14T00:30:00.000Z" });
+      event({ type: "turn_end" }) + fixedLine("tool_execution_start", 200, {
+        toolName: "read", timestamp: "2026-11-14T00:30:00.000Z",
+      });
     expect(Buffer.byteLength(spliced)).toBeGreaterThan(Buffer.byteLength(before));
     expect(spliced.charCodeAt(Buffer.byteLength(before) - 1)).not.toBe(0x0a);
     await writeFile(events, spliced, "utf8");
@@ -729,7 +801,7 @@ describe("run store file revisions", () => {
     expect(warm.summary?.turns).toBe(1);
     expect(warm.summary?.eventsTruncated).toBe(true);
     expect(warm.summary?.eventsDroppedBytes).toBe(5000);
-    expect(typesOf(warm.events)).toEqual(["truncated", "turn_end"]);
+    expect(typesOf(warm.events)).toEqual(["truncated", "tool_execution_start"]);
     expect(warm.events[1].at).toBe("2026-11-14T00:30:00.000Z");
     expect(warm.events.some((entry) => entry.intent === "stale intent")).toBe(false);
   });
@@ -755,7 +827,7 @@ describe("run store file revisions", () => {
 
     // The warm follow is what leaves the events a later splice removes in the tail cache.
     const warm = await store.follow(id, 10);
-    expect(typesOf(warm.events)).toEqual(["tool_execution_start", "turn_end", "turn_end"]);
+    expect(typesOf(warm.events)).toEqual(["tool_execution_start"]);
     expect(warm.summary?.turns).toBe(2);
 
     const appended = event({ type: "turn_end", timestamp: "2026-11-14T00:10:00.000Z" });
@@ -767,7 +839,9 @@ describe("run store file revisions", () => {
     // pass consumed: only the byte that prefix called a boundary can report the loss.
     const spliced =
       event({ type: "truncated", dropped_bytes: 5000, retained_bytes: 120 }) +
-      fixedLine("turn_end", 400, { timestamp: "2026-11-14T00:30:00.000Z" });
+      event({ type: "turn_end" }) + fixedLine("tool_execution_start", 400, {
+        toolName: "read", timestamp: "2026-11-14T00:30:00.000Z",
+      });
     expect(Buffer.byteLength(spliced)).toBeGreaterThan(consumed);
     expect(spliced.charCodeAt(consumed - 1)).not.toBe(0x0a);
     // No line boundary between the held size and the splice's last byte, so the held pass's
@@ -804,7 +878,7 @@ describe("run store file revisions", () => {
     expect(concurrentFollow.summary?.eventsDroppedBytes).toBe(5000);
 
     for (const follow of [olderFollow, concurrentFollow]) {
-      expect(typesOf(follow.events)).toEqual(["truncated", "turn_end"]);
+      expect(typesOf(follow.events)).toEqual(["truncated", "tool_execution_start"]);
       expect(follow.events[1].at).toBe("2026-11-14T00:30:00.000Z");
       expect(follow.events.some((entry) => entry.intent === "stale intent")).toBe(false);
       expect(follow.events.some((entry) => entry.at === "2026-11-14T00:10:00.000Z")).toBe(false);
@@ -815,10 +889,7 @@ describe("run store file revisions", () => {
     const later = await store.follow(id, 10);
     expect(later.events).toEqual(olderFollow.events);
     expect(later.events).toEqual(concurrentFollow.events);
-    expect(later.summary?.turns).toBe(1);
-    expect(later.events.filter((entry) => entry.type === "turn_end")).toHaveLength(
-      later.summary?.turns ?? 0,
-    );
+    expect(later.summary).toMatchObject({ turns: 1, toolCalls: 1, eventLines: 3 });
   });
 
   it("re-reads state, stats, answer and model files when their content changes", async () => {
@@ -947,10 +1018,11 @@ describe("run store file revisions", () => {
   it("keeps counters and tails exact when callers overlap", async () => {
     const lines = Array.from({ length: 200 }, (_, index) =>
       event({
-        type: "tool_execution_end",
+        type: "tool_execution_start",
         toolCallId: `t${index}`,
         toolName: "read",
-        result: "x".repeat(1000),
+        args: { path: `file-${index}` },
+        pad: "x".repeat(1000),
       }),
     );
     const log = lines.join("") + event({ type: "turn_end" });
@@ -979,24 +1051,26 @@ describe("run store file revisions", () => {
     expect(followB.events).toHaveLength(60);
     expect(followA.events.slice(-60)).toEqual(followB.events);
 
-    await appendFile(events, event({ type: "turn_end" }), "utf8");
+    await appendFile(events, event({ type: "turn_end" }) + event({
+      type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "Finished" }] },
+    }), "utf8");
     const [listC, followC, followD] = await Promise.all([
       store.listRuns(),
       store.follow(id, 120),
       store.follow(id, 60),
     ]);
     expect(listC.runs[0].turns).toBe(2);
-    expect(listC.runs[0].eventLines).toBe(202);
+    expect(listC.runs[0].eventLines).toBe(203);
     expect(followC.events).toHaveLength(120);
     expect(followD.events).toHaveLength(60);
     expect(followC.events.slice(-60)).toEqual(followD.events);
-    expect(followC.events[119].type).toBe("turn_end");
+    expect(followC.events[119]).toMatchObject({ role: "assistant", detail: "Finished" });
     expect(followC.events[119].at).toBeNull();
   });
 
   it("bounds both tails to their byte window and extends them with appended bytes", async () => {
-    const huge = fixedLine("turn_end", 400 * 1024);
-    const appendedEvent = event({ type: "turn_end", timestamp: "2026-11-14T00:00:01.000Z" });
+    const huge = fixedLine("tool_execution_start", 400 * 1024, { toolName: "read" });
+    const appendedEvent = event({ type: "tool_execution_start", toolName: "bash", timestamp: "2026-11-14T00:00:01.000Z" });
     const answer = `${Array.from({ length: 9000 }, (_, index) => `line ${String(index).padStart(4, "0")}`).join("\n")}\n`;
     const dir = await writeRun("stage-implement", {
       "state.json": STATE_RUNNING,
@@ -1024,7 +1098,7 @@ describe("run store file revisions", () => {
     await appendFile(join(dir, "answer.md"), "line 9000\n", "utf8");
 
     const warm = await store.follow(id, 2000);
-    expect(typesOf(warm.events)).toEqual(["turn_end"]);
+    expect(typesOf(warm.events)).toEqual(["tool_execution_start"]);
     expect(warm.events[0].at).toBe("2026-11-14T00:00:01.000Z");
     const extended = warm.answerTail ?? "";
     expect(extended.endsWith("line 9000")).toBe(true);

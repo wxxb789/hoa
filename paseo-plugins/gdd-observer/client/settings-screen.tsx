@@ -12,15 +12,15 @@ import {
   useToast,
 } from "@getpaseo/plugin/client/ui";
 import { useQueryClient } from "@tanstack/react-query";
-import { useMemo, useRef, useState } from "react";
+import { useContext, useMemo, useRef, useState } from "react";
 import { Text } from "react-native";
-import { observerSettings, type ObserverSettings } from "../shared/settings";
+import { OBSERVER_DEFAULTS, observerSettings, type ObserverSettings } from "../shared/settings";
 import { errorText } from "./format";
 import { sourceKey } from "./labels";
 import { messages } from "./messages";
 import { StatusStrip } from "./status-strip";
 import { useObserverStyles } from "./styles";
-import { RUNS_LIST_QUERY_KEY, useRunsListQuery } from "./use-runs-query";
+import { RUNS_LIST_QUERY_KEY, RunsListControllerContext, useRunsListQuery } from "./use-runs-query";
 
 const POLL_OPTIONS = [1000, 2000, 5000, 15000, 30000];
 const TAIL_OPTIONS = [40, 80, 200, 500];
@@ -30,14 +30,15 @@ export function ObserverSettingsScreen({ theme, layout }: PluginSurfaceProps) {
   const toast = useToast();
   const settings = useSettings(observerSettings);
   const queryClient = useQueryClient();
+  const controller = useContext(RunsListControllerContext);
   const [draftRevision, setDraftRevision] = useState<string | null>(null);
   const input = useRef<SettingsInputHandle | null>(null);
 
+  const values = settings.status === "ready" ? settings.values : null;
   // Observes the same scan as the panel and keeps this screen's fixed 10,000 ms request; when the
   // panel asks for a faster cadence the shared election polls at that cadence instead.
-  const scan = useRunsListQuery(10_000);
+  const scan = useRunsListQuery(10_000, values?.pollIntervalMs ?? OBSERVER_DEFAULTS.pollIntervalMs);
 
-  const values = settings.status === "ready" ? settings.values : null;
   const revision =
     settings.status === "ready" || settings.status === "invalid" ? settings.revision : null;
   const savedRoot = values?.runRoot ?? "";
@@ -75,7 +76,16 @@ export function ObserverSettingsScreen({ theme, layout }: PluginSurfaceProps) {
       setDraftRevision(null);
       // The scan resolves the run root on every call, so reload the shared observation right away
       // instead of leaving the panel on the previous root until its next polling tick.
-      void queryClient.invalidateQueries({ queryKey: RUNS_LIST_QUERY_KEY });
+      void queryClient.invalidateQueries({ queryKey: ["gddRuns", "follow"] });
+      void queryClient.invalidateQueries({ queryKey: ["gddRuns", "paths"] });
+      if (controller) {
+        void controller.reload().then(
+          (fresh) => queryClient.setQueryData(RUNS_LIST_QUERY_KEY, fresh),
+          () => queryClient.invalidateQueries({ queryKey: RUNS_LIST_QUERY_KEY }),
+        );
+      } else {
+        void queryClient.invalidateQueries({ queryKey: RUNS_LIST_QUERY_KEY });
+      }
     } else {
       toast.error(settings.saveError ?? t("settingsScreen.saveFailed"));
     }

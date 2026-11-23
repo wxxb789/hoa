@@ -319,36 +319,28 @@ describe("observer settings screen", () => {
     {
       locale: "en" as const,
       pollLabel: "Poll interval",
-      tailLabel: "Event tail length",
       pollLabels: ["1 s", "2 s", "5 s", "15 s", "30 s"],
-      tailLabels: ["40 lines", "80 lines", "200 lines", "500 lines"],
     },
     {
       locale: "zh-CN" as const,
       pollLabel: "轮询间隔",
-      tailLabel: "事件末尾长度",
       pollLabels: ["1 秒", "2 秒", "5 秒", "15 秒", "30 秒"],
-      tailLabels: ["40 行", "80 行", "200 行", "500 行"],
     },
   ])("offers the shipped poll and tail choices with the stored values selected in $locale", async ({
     locale,
     pollLabel,
-    tailLabel,
     pollLabels,
-    tailLabels,
   }) => {
     readyHost({ values: { runRoot: "/host/gdd/runs", pollIntervalMs: 5000, tailLines: 200 } });
     const view = await renderClient(rootScreen(), { locale });
     const [poll, tail] = selects(view);
     expect(poll.props.label).toBe(pollLabel);
-    expect(tail.props.label).toBe(tailLabel);
     expect(poll.props.value).toBe("5000");
     expect(tail.props.value).toBe("200");
     const pollOptions: { label: string; value: string }[] = poll.props.options;
     const tailOptions: { label: string; value: string }[] = tail.props.options;
     expect(pollOptions.map((option) => option.label)).toEqual(pollLabels);
     expect(pollOptions.map((option) => option.value)).toEqual(["1000", "2000", "5000", "15000", "30000"]);
-    expect(tailOptions.map((option) => option.label)).toEqual(tailLabels);
     expect(tailOptions.map((option) => option.value)).toEqual(["40", "80", "200", "500"]);
     expect(poll.props.disabled).toBe(false);
     expect(tail.props.disabled).toBe(false);

@@ -10,7 +10,7 @@ import {
   useToast,
 } from "@getpaseo/plugin/client/ui";
 import { useQuery } from "@tanstack/react-query";
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import {
   followRun,
@@ -18,10 +18,12 @@ import {
   type ListRunsOutput,
   type RunEvent,
   type RunPath,
+  type RunStats,
   type RunSummary,
   runPaths,
 } from "../shared/runs";
 import { OBSERVER_DEFAULTS, observerSettings } from "../shared/settings";
+import { summarizeRuns } from "../shared/stats";
 import {
   clockOf,
   counterLine,
@@ -37,6 +39,7 @@ import { FactsCard } from "./facts";
 import {
   counterSourceKey,
   eventColor,
+  eventFailureKey,
   livenessKey,
   sourceKey,
   stateKey,
@@ -49,8 +52,14 @@ import { useObserverStyles } from "./styles";
 import type { ObserverLayout, ObserverTheme } from "./types";
 import { useRunsListQuery } from "./use-runs-query";
 
-export function RunsScreen({ theme, layout, host }: PluginScreenProps) {
-  const [selected, onSelect] = useState<string | null>(null);
+export function RunsScreen({ theme, layout, host, params, navigation }: PluginScreenProps) {
+  const runId = params.runId || null;
+  const parentAgentId = params.parentAgentId || null;
+  const [selected, onSelect] = useState(runId);
+  const [agentFilter, setAgentFilter] = useState(parentAgentId);
+  useEffect(() => onSelect(runId), [runId]);
+  useEffect(() => setAgentFilter(parentAgentId), [parentAgentId]);
+  const clearAgentFilter = useCallback(() => setAgentFilter(null), []);
   const styles = useObserverStyles(theme, layout);
   const { t, locale } = useTranslation(messages);
   const toast = useToast();
@@ -74,6 +83,8 @@ export function RunsScreen({ theme, layout, host }: PluginScreenProps) {
   });
 
   const summary = followQuery.data?.summary ?? null;
+  const lineage = summary?.lineage ?? followQuery.data?.lineage;
+  const initiatingAgentId = lineage?.parentAgentId;
   const gone = followQuery.data !== undefined && !followQuery.data.found;
 
   const listPane = (
@@ -85,6 +96,9 @@ export function RunsScreen({ theme, layout, host }: PluginScreenProps) {
       theme={theme}
       layout={layout}
       locale={locale}
+      hostLabel={host.label}
+      agentFilter={agentFilter}
+      clearAgentFilter={clearAgentFilter}
       selected={selected}
       pollIntervalMs={values.pollIntervalMs}
       onSelect={onSelect}
@@ -118,7 +132,14 @@ export function RunsScreen({ theme, layout, host }: PluginScreenProps) {
           <Text style={styles.muted}>{t("list.scanning")}</Text>
         )}
         {summary ? (
-          <RunLineageCard lineage={followQuery.data?.lineage} theme={theme} layout={layout} />
+          <RunLineageCard
+            lineage={lineage}
+            theme={theme}
+            layout={layout}
+            openAgent={initiatingAgentId && navigation?.openAgent
+              ? () => navigation.openAgent({ agentId: initiatingAgentId, serverId: host.id })
+              : undefined}
+          />
         ) : null}
         <EventTail
           events={followQuery.data?.events ?? []}
@@ -181,6 +202,9 @@ const RunsListPane = memo(function RunsListPane({
   theme,
   layout,
   locale,
+  hostLabel,
+  agentFilter,
+  clearAgentFilter,
   selected,
   pollIntervalMs,
   onSelect,
@@ -188,6 +212,9 @@ const RunsListPane = memo(function RunsListPane({
   theme: ObserverTheme;
   layout: ObserverLayout;
   locale: string;
+  hostLabel: string;
+  agentFilter: string | null;
+  clearAgentFilter(): void;
   selected: string | null;
   pollIntervalMs: number;
   onSelect(id: string): void;
@@ -198,6 +225,12 @@ const RunsListPane = memo(function RunsListPane({
   // polling election uses whichever mounted surface asked for the fastest one.
   const listQuery = useRunsListQuery(pollIntervalMs);
   const scan = listQuery.data;
+  const population = scan?.runs;
+  const filtered = useMemo(() => {
+    if (population === undefined || agentFilter === null) return null;
+    const runs = population.filter((run) => run.lineage?.parentAgentId === agentFilter);
+    return { runs, stats: summarizeRuns(runs) };
+  }, [population, agentFilter]);
   const keyExtractor = useCallback((run: RunSummary) => run.id, []);
   // Stable row props let `RunRow`'s memo skip every run a delta did not touch.
   const renderItem = useCallback(
@@ -229,12 +262,21 @@ const RunsListPane = memo(function RunsListPane({
         // instead of every run in the scan. Run ids stay the row keys, and the header, warnings
         // and empty guidance ride in their list slots so their content and order do not change.
         <FlatList
-          data={scan.runs}
+          data={filtered?.runs ?? scan.runs}
           keyExtractor={keyExtractor}
           renderItem={renderItem}
           ListHeaderComponent={
             <>
-              <ListHeader scan={scan} theme={theme} layout={layout} locale={locale} />
+              <ListHeader
+                scan={scan}
+                stats={filtered?.stats ?? scan.stats}
+                theme={theme}
+                layout={layout}
+                locale={locale}
+                hostLabel={hostLabel}
+                agentFilter={agentFilter}
+                clearAgentFilter={clearAgentFilter}
+              />
               {!scan.rootExists ? (
                 <View style={styles.warningCard}>
                   <Text style={styles.warningRow}>{t("list.missing")}</Text>
@@ -250,8 +292,8 @@ const RunsListPane = memo(function RunsListPane({
           ListEmptyComponent={
             <EmptyBlock
               title={t("list.emptyTitle")}
-              body={t("list.empty", { root: scan.runRoot })}
-              hint={t("list.emptyHint")}
+              body={agentFilter === null ? t("list.empty", { root: scan.runRoot }) : t("list.emptyAgent")}
+              hint={agentFilter === null ? t("list.emptyHint") : null}
               theme={theme}
               layout={layout}
             />
@@ -268,14 +310,22 @@ const RunsListPane = memo(function RunsListPane({
 
 const ListHeader = memo(function ListHeader({
   scan,
+  stats,
   theme,
   layout,
   locale,
+  hostLabel,
+  agentFilter,
+  clearAgentFilter,
 }: {
   scan: ListRunsOutput;
+  stats: RunStats;
   theme: ObserverTheme;
   layout: ObserverLayout;
   locale: string;
+  hostLabel: string;
+  agentFilter: string | null;
+  clearAgentFilter(): void;
 }) {
   const styles = useObserverStyles(theme, layout);
   const { t } = useTranslation(messages);
@@ -287,7 +337,16 @@ const ListHeader = memo(function ListHeader({
           {t("list.scanned", { time: clockOf(scan.scannedAt, locale) ?? scan.scannedAt })}
         </Text>
       </View>
-      <StatusStrip stats={scan.stats} theme={theme} layout={layout} />
+      <Text style={styles.muted} numberOfLines={1}>{hostLabel}</Text>
+      {agentFilter === null ? null : (
+        <View style={styles.card}>
+          <Text style={styles.muted} numberOfLines={1}>{t("list.agentFilter", { agent: agentFilter })}</Text>
+          <Pressable accessibilityRole="button" onPress={clearAgentFilter} style={styles.backRow}>
+            <Text style={styles.backLabel}>{t("list.clearAgentFilter")}</Text>
+          </Pressable>
+        </View>
+      )}
+      <StatusStrip stats={stats} theme={theme} layout={layout} />
       <Text style={styles.faint} numberOfLines={2} selectable>
         {t("list.root")}: {scan.runRoot}
       </Text>
@@ -299,25 +358,27 @@ const ListHeader = memo(function ListHeader({
   );
 });
 
-const RunRow = memo(function RunRow({
+export const RunRow = memo(function RunRow({
   run,
   theme,
   layout,
   selected,
   onSelect,
+  showLineage = false,
 }: {
   run: RunSummary;
   theme: ObserverTheme;
   layout: ObserverLayout;
   selected: boolean;
   onSelect(id: string): void;
+  showLineage?: boolean;
 }) {
   const styles = useObserverStyles(theme, layout);
   const { t, locale } = useTranslation(messages);
   const running = run.liveness === "running";
-  const duration = formatDuration(run.elapsedS);
+  const duration = formatDuration(run.finalized ? run.durationS ?? run.elapsedS : run.elapsedS);
   const counters = countersLine(run, (key, value) => t(key, { value }), locale);
-  const disagreement = run.liveness === "stale" || run.liveness === "unknown" ? run.liveness : null;
+  const disagreement = run.liveness === "stale" || (!run.finalized && run.liveness === "unknown") ? run.liveness : null;
   return (
     <Pressable
       accessibilityRole="button"
@@ -339,6 +400,9 @@ const RunRow = memo(function RunRow({
           <LivenessBadge liveness={disagreement} theme={theme} layout={layout} />
         ) : null}
       </View>
+      {showLineage && run.lineage ? (
+        <Text style={styles.muted} numberOfLines={2}>{run.lineage.goal} · {run.lineage.stage}</Text>
+      ) : null}
       <View style={styles.rowMeta}>
         <ModelChip model={run.model} theme={theme} layout={layout} />
         {duration ? (
@@ -497,10 +561,12 @@ function RunLineageCard({
   lineage,
   theme,
   layout,
+  openAgent,
 }: {
   lineage: FollowRunOutput["lineage"];
   theme: ObserverTheme;
   layout: ObserverLayout;
+  openAgent?: () => void;
 }) {
   const styles = useObserverStyles(theme, layout);
   const { t } = useTranslation(messages);
@@ -526,7 +592,13 @@ function RunLineageCard({
         [t("detail.lineageStage"), lineage.stage],
         [t("detail.lineageAgent"), lineage.parentAgentId ?? t("detail.lineageAgentMissing")],
       ]}
-    />
+    >
+      {openAgent ? (
+        <Pressable accessibilityRole="button" onPress={openAgent} style={styles.backRow}>
+          <Text style={styles.backLabel}>{t("detail.openInitiatingAgent")}</Text>
+        </Pressable>
+      ) : null}
+    </FactsCard>
   );
 }
 
@@ -557,20 +629,32 @@ const EventTail = memo(function EventTail({
         {events.length === 0 ? (
           <Text style={styles.muted}>{t("detail.noEvents")}</Text>
         ) : (
-          events.map((event, index) => (
-            <View key={keys[index]} style={styles.eventRow}>
-              <View style={[styles.eventTrack, { backgroundColor: eventColor(event, theme) }]} />
-              <Text style={styles.eventClock}>{eventClockOf(event.at, locale) ?? "--:--:--"}</Text>
-              <View style={styles.eventBody}>
-                <Text style={[styles.eventType, { color: eventColor(event, theme) }]}>
-                  {event.tool ?? event.type}
-                </Text>
-                <Text style={styles.eventDetail} numberOfLines={2}>
-                  {counterLine([event.type, event.intent ?? event.detail])}
-                </Text>
+          events.map((event, index) => {
+            const color = eventColor(event, theme);
+            const clock = eventClockOf(event.at, locale);
+            const failure = eventFailureKey(event.type);
+            const title = failure ? counterLine([event.tool, t(failure)])
+              : event.role === "assistant" ? t("detail.activityAssistant")
+              : event.type === "truncated" ? t("detail.activityTruncated") : event.tool ?? event.type;
+            const detail = event.intent ?? event.detail;
+            return (
+              <View key={keys[index]} style={styles.eventRow}>
+                <View style={[styles.eventTrack, { backgroundColor: color }]} />
+                {clock ? <Text style={styles.eventClock}>{clock}</Text> : null}
+                <View style={styles.eventBody}>
+                  <Text style={[styles.eventType, { color }]}>{title}</Text>
+                  {detail ? (
+                    <Text
+                      style={[styles.eventDetail, event.role === "assistant" ? styles.body : null]}
+                      numberOfLines={event.role === "assistant" ? 4 : 3}
+                    >
+                      {detail}
+                    </Text>
+                  ) : null}
+                </View>
               </View>
-            </View>
-          ))
+            );
+          })
         )}
       </View>
       <Text style={styles.sectionTitle}>{t("detail.answerTail")}</Text>
