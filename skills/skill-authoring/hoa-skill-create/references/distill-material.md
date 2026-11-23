@@ -53,6 +53,12 @@ evidence would overturn the conclusions.
 - **A living private person**: use only material the user supplies, with no web search. Remind the
   user to get the person's consent, and keep the result unpublished. When the user distills
   themself, record where what they did differs from what they say they do.
+- **A colleague's or practitioner's working method**: build the work playbook first (scope
+  and boundaries, how they take on and structure tasks, review standards, output preferences,
+  and lessons in their own words); add a persona layer only on request. Weight their own
+  long-form writing (design docs, review comments) above decision replies, and those above
+  casual chat. Mark a dimension "insufficient material" instead of inferring it. Collectors
+  that need a login run in the user's terminal; only exported files enter the session.
 - Do not make imitation of a named person's voice the product.
 
 ## Cost and validation
@@ -64,4 +70,5 @@ does not cover.
 
 Adapted from [nuwa-skill](https://github.com/alchaincyf/nuwa-skill) (MIT, Huashu): `SKILL.md`,
 `references/extraction-framework.md`, `references/validation-playbook.md`,
-`references/special-cases.md`.
+`references/special-cases.md`. The working-method variant adapts
+[colleague-skill](https://github.com/titanwings/colleague-skill) (MIT): `prompts/shared/work_analyzer.md`.

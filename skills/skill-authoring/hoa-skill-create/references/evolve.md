@@ -35,7 +35,11 @@ changed handoff requires updating every in-scope caller and consumer together;
 do not leave an obsolete branch, alias, or contradictory instruction. When
 repeated case-specific patches have accumulated, replace them with the outcome
 and condition that explain all of the cases, then check each prior path against
-that rule. When the skill's protocol is repeated across its references,
+that rule. Before rewording a skill, prompt, or template, list the literals its
+callers depend on (variables and placeholders, tags, JSON keys, output
+headings, flags) and keep each verbatim or map it in the same change
+([yao-open-prompts](https://github.com/yaojingang/yao-open-prompts) protection
+list, CC-BY-4.0). When the skill's protocol is repeated across its references,
 profiles, or sibling skills (often behind "this skill should be general"),
 read [skill family integrity](skill-family-integrity.md) first.
 
