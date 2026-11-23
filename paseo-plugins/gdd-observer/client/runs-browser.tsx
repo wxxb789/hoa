@@ -358,20 +358,18 @@ const ListHeader = memo(function ListHeader({
   );
 });
 
-export const RunRow = memo(function RunRow({
+const RunRow = memo(function RunRow({
   run,
   theme,
   layout,
   selected,
   onSelect,
-  showLineage = false,
 }: {
   run: RunSummary;
   theme: ObserverTheme;
   layout: ObserverLayout;
   selected: boolean;
   onSelect(id: string): void;
-  showLineage?: boolean;
 }) {
   const styles = useObserverStyles(theme, layout);
   const { t, locale } = useTranslation(messages);
@@ -400,9 +398,6 @@ export const RunRow = memo(function RunRow({
           <LivenessBadge liveness={disagreement} theme={theme} layout={layout} />
         ) : null}
       </View>
-      {showLineage && run.lineage ? (
-        <Text style={styles.muted} numberOfLines={2}>{run.lineage.goal} · {run.lineage.stage}</Text>
-      ) : null}
       <View style={styles.rowMeta}>
         <ModelChip model={run.model} theme={theme} layout={layout} />
         {duration ? (
@@ -718,7 +713,7 @@ function FilePaths({
  * Keys for a sliding window: an event's own content plus how many identical events precede it, so
  * appending one event keeps the rows already on screen mounted instead of renumbering them all.
  */
-function eventKeys(events: RunEvent[]): string[] {
+export function eventKeys(events: readonly RunEvent[]): string[] {
   const seen = new Map<string, number>();
   return events.map((event) => {
     const content = [

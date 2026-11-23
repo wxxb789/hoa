@@ -3,8 +3,10 @@
 The optional `gdd-observer` plugin displays launcher-owned GDD run artifacts in Paseo. It is a
 read-only observer, not a launcher, controller, completion gate, or proof that a stage succeeded.
 The **GDD runs** sidebar footer opens the whole host's run list. The **GDD** Composer pill appears
-only for agents with matching recorded lineage and opens a worker popover with same-host links to
-the filtered list or a specific run. The separate settings screen configures observation, not dispatch.
+only for agents with matching recorded lineage. It shows active work or the latest goal after workers
+settle. Its popover groups recent goals and retries and lets you inspect activity, answer previews,
+and stage attempts without leaving the chat. Links to the filtered list and full run stay on the
+same host. The separate settings screen configures observation, not dispatch.
 
 ## Two separate routes
 
