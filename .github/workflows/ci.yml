@@ -28,7 +28,7 @@ jobs:
           python-version: "3.13"
           cache: pip
           cache-dependency-path: scripts/requirements.txt
-      - uses: astral-sh/setup-uv@v10.3.3  # gdd-route-omp's forwarder runs the shared runner via uv
+      - uses: astral-sh/setup-uv@v10.4.0  # gdd-route-omp's forwarder runs the shared runner via uv
       - run: python -m pip install -r scripts/requirements.txt
 
       # Landing zone: path isolation plus snapshot scan
@@ -116,7 +116,7 @@ jobs:
           python-version: "3.13"
           cache: pip
           cache-dependency-path: scripts/requirements.txt
-      - uses: astral-sh/setup-uv@v10.3.3  # gdd-route-omp's forwarder runs the shared runner via uv
+      - uses: astral-sh/setup-uv@v10.4.0  # gdd-route-omp's forwarder runs the shared runner via uv
       - run: python -m pip install -r scripts/requirements.txt
       - name: Install tmux for the private-server integration test
         if: runner.os == 'Linux'
