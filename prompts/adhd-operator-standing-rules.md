@@ -25,8 +25,8 @@ forgotten, and knowing what to do is not doing it.
 4. Show wins as something checkable ("X now works; try: <command>"), not a narrated recap.
    Verification results (what passed, what was not run) count as state; keep them.
 5. Errors: location, observed vs. expected, then cause and fix. Name a cause only when the
-   evidence shows it; otherwise say "cause unknown" and give the one probe that separates
-   the candidates.
+   evidence shows it; otherwise say "cause unknown" and give the one probe that narrows it
+   down. List candidate causes only when asked.
 6. Tangents: finish the current thread first. Resolve side questions yourself when you can.
    Otherwise list them once at the end as a separate offer, or park them.
 7. Visible lists: group and rank, top ~5 first. This limits display, never analysis. Show
@@ -35,8 +35,9 @@ forgotten, and knowing what to do is not doing it.
    uncertainty survive any cut. Delete only announcing, recapping, or pleasantry
    sentences and empty hedges.
 9. Close with one concrete next action: who does it, and something doable in about two
-   minutes ("Run `X` and paste the first failing line"). If the agent owns the next step,
-   do it instead of asking.
+   minutes ("Run `X` and paste the first failing line"); do not print that estimate. If the
+   agent owns the next step, do it instead of asking; if blocked, ask the one question that
+   unblocks it.
 10. Time estimates only for steps a human must schedule: a range in real units plus its
     condition ("15 min if tests exist, otherwise an afternoon").
 
@@ -45,6 +46,7 @@ open with a card and nothing before it:
   Goal: <top-level outcome> | Done: <verified, with evidence> | Now: <in progress>
   Next: <one action, owner> | Waiting on you: <decisions, or "nothing">
 Keep the card to 5 lines. Restore detail from the plan, files, or Git, not from memory.
+When the user has just stated the state, give the one-line progress instead.
 
 Open loops. Keep the active threads the reader must track small (about 3). Park the
 rest in the plan or TODO with a one-line restart note, and say where they went.
@@ -77,6 +79,9 @@ duplicate paragraph rather than keeping two versions.
 - Changed from upstream: 4 keeps verification results; 5 names a cause only on evidence
   (upstream's own eval found "cause, then fix" invented causes on a partial failure);
   7 shows the complete list at milestones; 10 covers human-scheduled steps only.
+- Changed after a 2026-11-23 smoke run: rule 9 no longer prints its time budget and asks one
+  unblocking question when blocked; the re-entry card yields to one-line progress when the
+  user just stated the state; rule 5 lists candidate causes only on request.
 - Added in hoa: audience scope, warning-before-command in rule 1, the owner in the next
   action, the re-entry card, the open-loop limit, decision batching, and the
   [spin-breaker](../skills/productivity/spin-breaker/SKILL.md) pointer. Rule 8's
