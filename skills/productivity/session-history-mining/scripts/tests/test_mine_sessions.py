@@ -385,6 +385,56 @@ class SessionHistoryMiningTests(unittest.TestCase):
             self.assertEqual({(sp["l_start"], sp["l_end"]) for sp in spans}, {(7, 7)})
             self.assertEqual({p.name: p.read_bytes() for p in root.iterdir()}, before)
 
+    def test_since_filters_by_activity_and_show_prints_raw_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_s:
+            tmp = Path(tmp_s)
+            old, new = 1_700_000_000, 1_800_000_000
+            since = "2025-01-01T00:00:00+00:00"
+            proj = tmp / "claude" / "Q--repos-demo"
+            proj.mkdir(parents=True)
+            raw_lines = [
+                json.dumps({"type": "user", "message": {"role": "user", "content": f"RAW_{name} {'x' * 50}"}})
+                for name in ("ONE", "TWO", "THREE")
+            ]
+            for name in ("old", "new"):
+                (proj / f"{name}.jsonl").write_text("\n".join(raw_lines) + "\n", encoding="utf-8")
+                os.utime(proj / f"{name}.jsonl", (old if name == "old" else new,) * 2)
+
+            codex = tmp / "codex"
+            codex.mkdir()
+            with closing(sqlite3.connect(codex / "state_5.sqlite")) as db, db:
+                db.execute("CREATE TABLE threads (id TEXT, cwd TEXT, rollout_path TEXT, thread_source TEXT, agent_role TEXT, updated_at INTEGER)")
+                db.executemany("INSERT INTO threads VALUES (?, ?, ?, ?, ?, ?)", [
+                    ("stale", r"Q:\repos\demo", None, "user", None, old),
+                    ("fresh", r"Q:\repos\demo", None, "user", None, new),
+                ])
+            with closing(sqlite3.connect(codex / "thread_history_1.sqlite")) as db, db:
+                db.execute("CREATE TABLE thread_items (thread_id TEXT, rollout_ordinal INTEGER, item_type TEXT, item_json TEXT)")
+                db.executemany("INSERT INTO thread_items VALUES (?, ?, ?, ?)", [
+                    (tid, ordinal, "userMessage", json.dumps({"content": [{"type": "text", "text": f"RAW_ORDINAL_{ordinal}"}]}))
+                    for tid in ("stale", "fresh") for ordinal in range(3)
+                ])
+
+            out = tmp / "out"
+            manifest, skeletons, spans = self._extract_codex(
+                out, "--claude-root", str(tmp / "claude"), "--codex-root", str(codex), "--since", since,
+            )
+            self.assertEqual(manifest["since"], since)
+            self.assertEqual({sk["id"] for sk in skeletons}, {"claude:Q--repos-demo:new", "codex:Q-repos-demo:fresh"})
+
+            claude_span = next(sp for sp in spans if sp["runtime"] == "claude-code")
+            codex_span = next(sp for sp in spans if sp["runtime"] == "codex")
+            shown = self._run(
+                "show", "--spans", str(out / "spans.jsonl"), "--max-line-chars", "80", claude_span["id"], codex_span["id"],
+            )
+            self.assertEqual(shown.returncode, 0, shown.stderr)
+            for marker in ("RAW_ONE", "RAW_THREE", "RAW_ORDINAL_0", "RAW_ORDINAL_2", "chars]"):
+                self.assertIn(marker, shown.stdout)
+
+            missing = self._run("show", "--spans", str(out / "spans.jsonl"), "nope@L1-2")
+            self.assertEqual(missing.returncode, 1)
+            self.assertIn("nope@L1-2", missing.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

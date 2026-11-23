@@ -11,10 +11,12 @@ Subcommands:
   filter-spans  Select L1 pivot spans belonging to L0-surviving sessions
   residuals     Extract OOD escape-hatch, gray-zone, and refusal pools for reflection
   anchor-check  Verify rubric monotonicity on the locked gold anchor set
+  show          Print the raw session lines or Codex SQLite items behind span ids
 """
 from __future__ import annotations
 
 import argparse
+import datetime
 import json
 import math
 import os
@@ -27,7 +29,7 @@ import urllib.request
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack, closing
-from itertools import batched, groupby
+from itertools import batched, groupby, islice
 from operator import itemgetter
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -691,6 +693,10 @@ def build_skeleton_and_spans(
     return skeleton, spans
 
 
+def _modified_since(path: Path, since: datetime.datetime | None) -> bool:
+    return since is None or path.stat().st_mtime >= since.timestamp()
+
+
 def _dir_allowed(name: str, allow_re: re.Pattern[str] | None, deny_re: re.Pattern[str] | None) -> bool:
     if deny_re and deny_re.search(name):
         return False
@@ -749,8 +755,10 @@ def _extract_codex_root(
             state = _open_codex_db(stack, state_path)
             history = _open_codex_db(stack, history_path)
             pending: dict[str, tuple[str, bool]] = {}
+            since_clause, since_params = ("WHERE updated_at >= ? ", (args.since.timestamp(),)) if args.since else ("", ())
             for tid, cwd, rollout_path, source, role in state.execute(
-                "SELECT id, cwd, rollout_path, thread_source, agent_role FROM threads ORDER BY id"
+                "SELECT id, cwd, rollout_path, thread_source, agent_role FROM threads "
+                f"{since_clause}ORDER BY id", since_params,
             ):
                 project = _codex_project(cwd, allow_re, deny_re)
                 if project is None:
@@ -778,7 +786,7 @@ def _extract_codex_root(
             coverage["skipped_threads"] += len(pending)
     else:
         for rollout in sorted(root.rglob("rollout-*.jsonl")):
-            if not rollout.is_file():
+            if not rollout.is_file() or not _modified_since(rollout, args.since):
                 continue
             meta, steps = _read_codex_rollout(rollout, extra_redact, scope=(allow_re, deny_re))
             emit(meta["tid"], meta["project"], str(rollout), "jsonl_backed", meta["include_clean"], meta, steps)
@@ -809,6 +817,8 @@ def cmd_extract(args: argparse.Namespace) -> int:
                 continue
             included_dirs += 1
             for jf in sorted(proj_dir.glob("*.jsonl")):
+                if not _modified_since(jf, args.since):
+                    continue
                 meta, steps = parse_claude_steps(jf, extra_redact)
                 if meta["raw_lines"] <= 2 or not steps:
                     continue
@@ -829,7 +839,7 @@ def cmd_extract(args: argparse.Namespace) -> int:
                         if not aid:
                             continue
                         ap = jpath.parent / f"agent-{aid}.jsonl"
-                        if ap.exists():
+                        if ap.exists() and _modified_since(ap, args.since):
                             meta, steps = parse_claude_steps(ap, extra_redact)
                             if steps:
                                 sid = f"claude-sub:{proj_dir.name}:{ap.stem}"
@@ -861,6 +871,8 @@ def cmd_extract(args: argparse.Namespace) -> int:
                 continue
             included_dirs += 1
             for jf in sorted(proj_dir.glob("*.jsonl")):
+                if not _modified_since(jf, args.since):
+                    continue
                 meta, steps = parse_omp_steps(jf, extra_redact)
                 if meta["raw_lines"] <= 2 or not steps:
                     continue
@@ -895,6 +907,7 @@ def cmd_extract(args: argparse.Namespace) -> int:
         encoding="utf-8",
     )
     summary = {
+        "since": args.since.isoformat() if args.since else None,
         "skeleton_count": len(dedup_sk),
         "span_count": len(dedup_sp),
         "pivot_span_count": sum(1 for x in dedup_sp if x["has_pivot"]),
@@ -1321,6 +1334,44 @@ def cmd_anchor_check(args: argparse.Namespace) -> int:
     return 0 if passed else 1
 
 
+def cmd_show(args: argparse.Namespace) -> int:
+    wanted = set(args.ids)
+    spans: dict[str, dict] = {}
+    with open(args.spans, encoding="utf-8") as stream:
+        for ln in stream:
+            if ln.strip():
+                sp = json.loads(ln)
+                if sp["id"] in wanted:
+                    spans[sp["id"]] = sp
+
+    def clip(text: str) -> str:
+        extra = len(text) - args.max_line_chars
+        return text if extra <= 0 else f"{text[: args.max_line_chars]} ... [+{extra} chars]"
+
+    for span_id in args.ids:
+        sp = spans.get(span_id)
+        if sp is None:
+            print(f"show: span id not found in {args.spans}: {span_id}", file=sys.stderr)
+            return 1
+        db_path, sep, thread_id = sp["path"].partition("#thread=")
+        start, end = max(0 if sep else 1, sp["l_start"] - args.context), sp["l_end"] + args.context
+        print(f"== {span_id} | {sp['path']} | {'ordinal' if sep else 'L'}{start}-{end}")
+        if sep:
+            with ExitStack() as stack:
+                rows = _open_codex_db(stack, Path(db_path)).execute(
+                    "SELECT rollout_ordinal, item_type, item_json FROM thread_items "
+                    "WHERE thread_id = ? AND rollout_ordinal BETWEEN ? AND ? ORDER BY rollout_ordinal",
+                    (thread_id, start, end),
+                )
+                for ordinal, item_type, item_json in rows:
+                    print(clip(f"{ordinal}\t{item_type}\t{item_json}"))
+        else:
+            with open(sp["path"], encoding="utf-8", errors="replace") as stream:
+                for line_no, raw in enumerate(islice(stream, start - 1, end), start=start):
+                    print(clip(f"L{line_no}\t{raw.rstrip()}"))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -1333,6 +1384,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_ext.add_argument("--allow-regex", default=None, help="include matching project names or Codex working directories")
     p_ext.add_argument("--deny-regex", default=None, help="exclude matching project names or Codex working directories")
     p_ext.add_argument("--redact-regex", action="append", default=[], help="extra regex to redact before output")
+    p_ext.add_argument(
+        "--since", type=datetime.datetime.fromisoformat, default=None,
+        help="ISO date or datetime (naive = local time); keep sessions last modified at or after it",
+    )
     p_ext.add_argument("--max-span-chars", type=int, default=4600, help="target max chars per L1 span")
     p_ext.add_argument("--out-dir", required=True, help="scratch output directory")
     p_ext.set_defaults(func=cmd_extract)
@@ -1373,6 +1428,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_anc.add_argument("--baseline-stage", default="l1-v1", help="baseline stage name")
     p_anc.add_argument("--candidate-stage", default="l1-v2", help="candidate stage name")
     p_anc.set_defaults(func=cmd_anchor_check)
+
+    p_show = sub.add_parser("show", help="print the raw session lines or Codex SQLite items behind span ids")
+    p_show.add_argument("--spans", required=True, help="spans JSONL containing the ids (spans.jsonl or l1-candidates)")
+    p_show.add_argument("--context", type=int, default=0, help="extra lines or ordinals on each side")
+    p_show.add_argument("--max-line-chars", type=int, default=2000, help="truncate each printed line")
+    p_show.add_argument("ids", nargs="+", help="span ids, as printed in residual pools and scored ledgers")
+    p_show.set_defaults(func=cmd_show)
 
     return p
 
