@@ -63,7 +63,7 @@ git submodule update --init --checkout --remote --depth 1 ref/<name>
 | [juliusbrussee/caveman](https://github.com/juliusbrussee/caveman) | 极简回复 skill 加省 token 代理生态；其 eval 显示相比一句 "Answer concisely." 中位数只多省约 3%。 | eval 设计：一句话对照臂、长度指标配正则保真检查、计入新增 input 的总成本（已吸收进 hoa-skill-create `evaluate.md`）。 |
 | [yaojingang/yao-open-prompts](https://github.com/yaojingang/yao-open-prompts) | 135 条按场景分类的中文 prompt，以营销和内容为主，附英文镜像与生成目录（CC-BY-4.0）。 | 改写已有 prompt 时的保护清单：变量、标签和 JSON 键原样保留（已吸收进 hoa-skill-create `evolve.md`）。 |
 | [titanwings/colleague-skill](https://github.com/titanwings/colleague-skill) | 把同事、关系对象、名人或用户本人蒸馏成人设与工作 skill，附聊天采集器。 | 工作手册层先于人设层，附素材优先级（已吸收进 hoa-skill-create `distill-material.md`）；`{scene, wrong, correct}` 纠错记录。 |
-| [alchaincyf/nuwa-skill](https://github.com/alchaincyf/nuwa-skill) | 调研一个人或主题，蒸馏成可运行的视角 skill。 | 先验快照、增量筛选、封存测试集、把边界写成行为（已吸收进 hoa-skill-create `distill-material.md` 与 `evaluate.md`）。 |
+| [alchaincyf/nuwa-skill](https://github.com/alchaincyf/nuwa-skill) | 调研一个人或主题，蒸馏成可运行的视角 skill。 | 先验快照、增量筛选、封存测试集、把边界写成行为（已吸收进 hoa-skill-create `distill-material.md`、`distilled-package.md` 与 `evaluate.md`）。 |
 | [lyra81604/zhengxi-views](https://github.com/lyra81604/zhengxi-views) | 基于可溯源语料和基金数据回答基金经理郑希相关问题的中文 skill。 | 言行对照只计任职期内的持仓；语料未覆盖时首句标明为方法推演。 |
 | [anthropics/knowledge-work-plugins](https://github.com/anthropics/knowledge-work-plugins) | Anthropic 的角色插件市场（金融、数据、法务、销售……），打包 skill、连接器与命令。 | `data/validate-data` 的分享前陷阱清单（分母漂移、不完整期间、幸存者偏差、平均数的平均）（已吸收进 evidence-backed-analytical-writing）和 `finance/variance-analysis` 的叙述反模式。 |
 

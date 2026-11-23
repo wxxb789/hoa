@@ -6,7 +6,7 @@ description: >-
   tense to the dateline, match provenance labels and cite factual paragraphs without inferring
   absence. Not for official-document-verification.
 metadata:
-  revision: "5"
+  revision: "6"
   areas: "work-management"
   targets: "runtime-agnostic"
   summary: "state only what a dated source supports: tense to dateline, provenance-label parity, absence never escalates"
@@ -68,6 +68,12 @@ rule is universal even when the words differ.
 | searched this version, nothing found | "not found in the version read on <date>" | "does not exist", "no channel" |
 | visible actions happened in forum A | "this round's visible action was in A" | "there is no pathway in B" |
 | no text obtained yet | "not obtained this round; status unknown" | "unobservable until <event>" |
+| field not queried, access blocked, or zero records searched | "not queried; value unknown" | `0`, "none", "never came up" |
+| only a search snippet or preview read | "preview shows the <date> entry; latest state unread" | "current status is …", "no reply was sent" |
+| item in an earlier export missing from a newer one, with no closing record | "absent from the <date> export; outcome not recorded" | "completed", "won", "retired" |
+
+The last three rows adapt [knowledge-work-plugins](https://github.com/anthropics/knowledge-work-plugins)
+(Apache-2.0) `small-business/shared/absent-is-not-zero.md` and the `sales/` skill rules.
 
 A monitoring window closes on its stated end date or an explicit retirement decision, never early because the
 evidence looks thin. When a later artifact might exist, say what you searched and when, not what cannot exist.

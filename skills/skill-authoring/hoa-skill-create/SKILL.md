@@ -5,7 +5,7 @@ description: >-
   packaging a checklist as SKILL.md, correcting a behavior failure or deciding to split, hide or
   chain entrypoints, validate the package with realistic tasks. Not for hoa-skill-review.
 metadata:
-  revision: "8"
+  revision: "9"
   areas: "software-development,work-management,self-management"
   targets: "runtime-agnostic"
   summary: "directly create, evolve or compose a defined skill with focused, risk-scaled validation"
@@ -36,7 +36,8 @@ limits summary.
   before writing.
 - When the skill's content is distilled from a body of material (a domain's or a
   person's documented work, transcripts, upstream repositories), also read
-  [distilling from material](references/distill-material.md).
+  [distilling from material](references/distill-material.md) when creating or evolving it, and
+  [the distilled package shape](references/distilled-package.md) before writing the package.
 - For an existing skill with a concrete failure or improvement target, read
   [the evolution protocol](references/evolve.md) before editing; a protocol
   repeated across a skill family also needs

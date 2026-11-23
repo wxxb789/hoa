@@ -12,6 +12,24 @@ are sure of, the ones you are not, and the common one-line impression. Save it w
 notes. If you have already read the material, label the prior "not blind". When the prior is
 nearly empty, say so; then every finding is new.
 
+## Collect by track
+
+- Give each research track one face of the subject: long-form writing, unscripted conversation,
+  short-form expression, others' views and criticism, decisions and actions, timeline and recent
+  changes. For a topic, first name its few schools or figures, then give each a track.
+- File user-supplied material into tracks first and search only the empty ones; label notes as user
+  material or web.
+- Criticism gets its own track; a portrait without critical material is a fan filter.
+- Each track reads the prior first and hunts for what differs, writes as it goes, records actions in
+  past tense (year, situation, options, action, outcome, own explanation), grades each item primary,
+  cross-corroborated secondary or single secondary, lists contradictions side by side, and ends
+  with its overturn, deepen and add items and the dimensions it could not cover. Stop at the planned
+  source budget or when consecutive searches add nothing.
+- Few overturn, deepen or add items means the notes still restate common knowledge: go to long
+  interviews, early writing, participants' recollections and critics before extracting.
+- Report the research summary (strongest overturns and additions, contradictions, thin dimensions,
+  planned direction) with the result; pause on it only when the user asked to steer.
+
 ## Keep the increment
 
 - Tag each finding: **overturn** (the prior or popular view is wrong), **deepen** (right direction,
@@ -30,6 +48,14 @@ nearly empty, say so; then every finding is new.
   original. A site root, search page or topic page is not a source.
 - When choosing sources, prefer long-form over quotes, controversy over consensus, changes of mind
   over fixed positions, actions over statements, and unscripted answers over prepared ones.
+- After drafting, scan the notes for recorded actions with no corresponding move; the commonest
+  loss is a finding flattened into a value.
+- Delete the subject's name from the models: if another expert could own them, they are not
+  distilled yet. A heuristic must fire on a new situation; one that fits only its origin is a case.
+- Sort contradictions into change over time (record the trajectory), domain-specific rules (keep
+  separate) and value conflicts (tensions, both sides). Do not pick a side, invent a
+  reconciliation, or hide one.
+- Prefer an honest skill with stated gaps over a complete-looking one that invents.
 
 ## Hold out a test set
 
@@ -37,6 +63,12 @@ Before extracting anything, set aside a few primary items, preferably decisions 
 alternative or reasoned answers, not slogans. Keep them out of the skill; they are the only ground
 truth independent of it. With too little material for a holdout, skip it and state "increment not
 tested".
+
+Avoid the subject's famous decisions; both arms already know them. Prefer small reasoned judgments
+from long interviews. Keep an item only if a close reader would likely answer it right and a smart
+outsider would likely answer it wrong or generically. Record source, a question that does not leak
+the answer, the three to five points they actually said or did, and why it was chosen. After
+validation an item may move into the casebook; record which.
 
 ## State the boundaries as behavior
 
@@ -61,6 +93,18 @@ evidence would overturn the conclusions.
   that need a login run in the user's terminal; only exported files enter the session.
 - Do not make imitation of a named person's voice the product.
 
+## Refresh or re-distill
+
+- **Refresh** for new events: start from the research date in the limits note and collect only
+  conversations, decisions and timeline since then. Evidence that supports a model adds a case;
+  evidence that contradicts it records a dated change and rewrites the model; a new recurring
+  action may add a move. Update the research date.
+- **Re-distill** an old shape without moves, cases or misreadings: while the notes survive, do not
+  re-research. Write the prior before rereading the old skill (or label it "not blind"), gather
+  scattered old notes into one dated legacy folder with an errata list, search only thin tracks,
+  and re-extract. Draw new holdout items mainly from newly found material, but do not seal all of
+  it: that material is the increment. Keep the old `SKILL.md` as a snapshot for the comparison arm.
+
 ## Cost and validation
 
 Long multi-search research can be expensive; state the expected scale before starting and save
@@ -70,5 +114,6 @@ does not cover.
 
 Adapted from [nuwa-skill](https://github.com/alchaincyf/nuwa-skill) (MIT, Huashu): `SKILL.md`,
 `references/extraction-framework.md`, `references/validation-playbook.md`,
-`references/special-cases.md`. The working-method variant adapts
+`references/special-cases.md`, `references/research-playbook.md`, and the update section of
+`SKILL.md`. The working-method variant adapts
 [colleague-skill](https://github.com/titanwings/colleague-skill) (MIT): `prompts/shared/work_analyzer.md`.

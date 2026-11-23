@@ -6,6 +6,8 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 ## 2026-11-23
 
+- hoa-skill-create: absorb more of nuwa-skill v2. New `references/distilled-package.md` (package layout with research notes and holdout kept out of the install, card and index fields, third-person runtime rules with first person as an opt-in for public or deceased subjects, a pre-delivery integrity check); `distill-material.md` gains collection tracks, increment and holdout tightening, and refresh or re-distill; `evaluate.md` gains distilled-skill scoring and a symptom-to-layer repair map.
+- evidence-boundary-discipline: three more absence rows (not queried, preview only, missing from a newer export). evidence-backed-analytical-writing: report conflicting authoritative figures side by side, and reconcile driver contributions to the total change (knowledge-work-plugins).
 - Absorb three more ref patterns: colleague-skill's work-playbook variant (hoa-skill-create `distill-material.md`), yao-open-prompts' caller-literal protection list (`evolve.md`), and knowledge-work-plugins' comparison traps (evidence-backed-analytical-writing step 3).
 - Stop `npx skills add` from cloning `ref/`: the skills CLI runs `git submodule update --init --recursive --depth 1` after every clone, so every submodule now sets `update = none`; check one out with `git submodule update --init --checkout --depth 1 ref/<name>`.
 - Replace the daily Dependabot submodule PRs and their auto-merge workflow with `ref-sync.yml`, which pushes upstream-head pointers straight to `main` through a ruleset-bypassing deploy key.

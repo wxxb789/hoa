@@ -47,6 +47,23 @@ case or quote fails the answer
 ([nuwa-skill validation](https://github.com/alchaincyf/nuwa-skill/blob/main/references/validation-playbook.md),
 MIT).
 
+For a distilled skill, give the answering agent only the runtime files copied to an isolated
+directory, never the research notes or holdout, and avoid questions that appear in the skill's own
+examples. Score each held-out question 0-2 against the recorded points; content the holdout does
+not mention neither adds nor subtracts. On a handful of questions, a gap of two points or less is a
+tie: judge the increment on a realistic task instead, where the judge marks each subject-specific
+claim sourced, unverified or fabricated, notes any case told only on its favorable side, and says
+whether a relevant blind spot was raised. A question with no independent evidence is unverifiable:
+replace it, never score it correct.
+
+Read failures by symptom: no task difference means cases and moves did not reach the answer (too
+few, too abstract, or an index "use when" column that does not match user problems); a lower
+with-skill holdout score means slogan or famous holdout items, or a skill that turns remembered
+history into "inferred" or "never said"; a failed boundary question means boundaries were written
+as disclaimers rather than behavior. Fix at most two rounds, then record what remains in the
+skill's limits. Without independent agents, use the written prior as the baseline arm, check facts
+only, and label the result "not independently validated".
+
 Have an independent judge in a separate fresh context grade anonymized outputs
 against the predeclared rubric. Give it the task, needed inputs, and rubric,
 not the author's diagnosis or run history. Grade resulting decisions, files,
