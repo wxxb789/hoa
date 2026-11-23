@@ -7,7 +7,7 @@ description: >-
   not for single-repo or periodic self-retros.
 disable-model-invocation: true
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "self-management,software-development"
   targets: "runtime-agnostic"
   summary: "mine Claude Code, OMP, and Codex history with two-level pruning, decision probes, residual active learning, and gold anchors"
@@ -68,7 +68,10 @@ uv run "$S" extract \
   --out-dir "$OUT"
 ```
 
-Supply only the roots you intend to mine. Codex prefers existing JSONL rollouts
+Supply only the roots you intend to mine. For a follow-up run over a backlog
+already mined, add `--since <ISO date>` to keep only sessions active since then
+(file modification time for JSONL; `threads.updated_at` for Codex SQLite); the
+manifest records the cutoff. Codex prefers existing JSONL rollouts
 and reconstructs pruned rollouts from `state_5.sqlite` and
 `thread_history_1.sqlite`. With no database pair, it scans rollout files under
 the supplied root, including `sessions/` and `archived_sessions/`. SQLite reads
@@ -136,10 +139,13 @@ spans when truncated):
 2. **High-anomaly gray-zone pool** (`P(anomaly) >= 0.85` with middling guardrail
    score or high Shannon entropy): single-app noise or slash-command plumbing ->
    add explicit negative exclusions.
-3. **Refusal pool**: inspect stripped framing if any safety refusal occurred.
+3. **Refusal pool**: `refusal_count` sums model refusals (`reason: model_refusal`)
+   and failed requests (any other `reason`, such as HTTP errors or timeouts).
+   Fix the endpoint for the latter; for the former, inspect the framing and strip
+   any new fixed injection shell with `--redact-regex`.
 
 Validate your refined rubric on the locked anchor set (`anchor-check`), confirm
-worst-case gap does not shrink, and run Round 2 (`--stage l1-v2` or `--rubrics-file`)
+worst-case gap does not shrink, and run Round 2 (`--stage l1-v2` or `--rubrics`)
 until the OOD escape-hatch rate drops near `0%` and scores turn bimodal.
 
 ### 4. Baseline novelty reconciliation and line-verified report
@@ -151,14 +157,24 @@ Round 2 survivors to separate:
 - `already_covered` (prevented by existing docs, hooks, or tests).
 
 Re-open the raw JSONL lines or the read-only SQLite items at the cited ordinals
-for every surviving gap. Verify current repository files before presenting
+for every surviving gap:
+
+```bash
+uv run "$S" show --spans "$OUT/spans.jsonl" --context 3 <span-id> [<span-id> ...]
+```
+
+`show` prints unredacted evidence for the primary agent; never forward it to a
+decision endpoint. Verify current repository files before presenting
 `evidence locator -> concrete harm -> live coverage -> minimal fix -> canonical owner`.
 
 ## Configuration
 
 Resolved through `scripts/skill_config.py` (see [references/configuration.md](references/configuration.md)),
 with fallback to `GHC_DECISIONS_*` and `EVALS_*` environment variables so an
-existing `ghc-decisions` setup works with zero duplicate configuration:
+existing `ghc-decisions` setup works with zero duplicate configuration. The
+config file is `$XDG_CONFIG_HOME/session-history-mining/config.yaml` (fallback
+`~/.config/session-history-mining/config.yaml`); the fallback reads environment
+variables only, never another skill's config file.
 
 | Key | Flag | Environment variable | Default |
 |---|---|---|---|
@@ -170,7 +186,7 @@ existing `ghc-decisions` setup works with zero duplicate configuration:
 
 ## Additional resources
 
-- `scripts/mine_sessions.py` — stdlib-only extractor, multi-head `/v1/decisions` batch runner, anchor verifier, and residual analyzer.
+- `scripts/mine_sessions.py` — stdlib-only extractor, multi-head `/v1/decisions` batch runner, anchor verifier, residual analyzer, and raw-evidence viewer.
 - `scripts/mining_rubrics.json` — bundled `l0`, `l1-v1`, `l1-v2`, `l3-novelty` rubrics and the 16-item locked gold anchor set.
 - `scripts/skill_config.py` — vendored configuration resolver.
 - `scripts/tests/test_mine_sessions.py` — offline extraction, redaction, OOD residual, and anchor-gating tests.
