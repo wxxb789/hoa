@@ -20,8 +20,8 @@
     "test:watch": "vitest"
   },
   "devDependencies": {
-    "@getpaseo/plugin": "0.16.1",
-    "@tanstack/react-query": "^5.90.11",
+    "@getpaseo/plugin": "0.16.2",
+    "@tanstack/react-query": "^5.108.1",
     "@types/node": "^20.19.0",
     "@types/react": "~19.2.0",
     "@types/react-test-renderer": "19.1.0",
