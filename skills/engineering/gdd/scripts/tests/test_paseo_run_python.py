@@ -12,7 +12,7 @@ import time
 import unittest
 import uuid
 from contextlib import ExitStack
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest import mock
 
@@ -147,6 +147,24 @@ class PaseoLauncherTests(unittest.TestCase):
 
     def run_dir(self, name="stage"):
         return Path(agent_run.newest_first([str(path) for path in self.root.glob(f"*/{name}")])[0])
+
+    def test_native_start_dispatches_background_gc(self):
+        old = self.root / "2020-01-01" / "old"
+        old.mkdir(parents=True)
+        ended = datetime.fromtimestamp(time.time() - 10 * 86400, timezone.utc).isoformat()
+        (old / "state.json").write_text(json.dumps({"state": "done", "ended": ended}), encoding="utf-8")
+        (old / "refresh").touch()
+        marker = old / "finalized"
+        marker.touch()
+        os.utime(marker, (time.time() - 10 * 86400,) * 2)
+        env = {**self.env, "GDD_RUN_MAX_MB": "0.000001", "GDD_RUN_RETENTION_DAYS": "7",
+               "GDD_RUN_GC_MIN_INTERVAL_SECONDS": "0", "GDD_STATE_FILE": str(self.home / "ledger.tsv")}
+        result = self.start(env=env, external=True)
+        self.assertEqual(result.stderr, "")
+        self.assertEqual(result.stdout.splitlines()[0], "started: stage")
+        self.assertTrue(agent_run.wait_until((self.root / ".gc.stamp").exists, 10))
+        self.assertFalse(old.exists())
+        self.assertTrue(self.run_dir().exists())
 
     def state(self, name="stage"):
         return wait_for_json(self.run_dir(name) / "state.json", bool, time.monotonic() + 5)

@@ -14,17 +14,20 @@ import argparse
 import glob
 import hashlib
 import json
+import math
 import os
 import plistlib
 import re
 import shlex
 import shutil
 import signal
+import stat
 import subprocess
 import threading
 import time
 import uuid
-from contextlib import contextmanager
+import warnings
+from contextlib import ExitStack, contextmanager, suppress
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -495,12 +498,46 @@ def warn_wsl(binary, run_dir):
 
 @contextmanager
 def slug_start_lock(root, slug):
-    Path(root).mkdir(parents=True, exist_ok=True)
+    root = Path(root)
+    root.mkdir(parents=True, exist_ok=True)
+    lock_slug = start_lock_slug(slug)
+    deadline = time.monotonic() + knob("GDD_RUN_STOP_WAIT_SECONDS", STOP_WAIT_SECONDS)
     # Keep the lock file: unlinking would allow another process to lock a different inode.
-    with (Path(root) / f"{slug}.start.lock").open("a+b") as handle:
-        if not gdd_process.try_file_lock(handle):
-            die(f"start: run '{slug}' is already starting")
+    with (root / f"{lock_slug}.start.lock").open("a+b") as handle:
+        while not gdd_process.try_file_lock(handle):
+            if time.monotonic() >= deadline or not gc_claiming(root, lock_slug):
+                if not gdd_process.try_file_lock(handle):
+                    die(f"start: run '{slug}' is already starting")
+                break
+            time.sleep(0.01)
         yield  # closing the file releases the kernel lock on both platforms
+
+
+def start_lock_slug(slug):
+    return slug.rstrip(".") if IS_WINDOWS else slug
+
+
+def gc_claiming(root, slug):
+    try:
+        if slug not in gc_regular_path(root / ".gc.claim").read_text(encoding="utf-8").splitlines():
+            return False
+        with gc_regular_path(root / ".gc.lock").open("r+b") as handle:
+            return not gdd_process.try_file_lock(handle)
+    except (OSError, ValueError):
+        return False
+
+
+def make_run_directory(run_dir):
+    parent = os.path.dirname(run_dir)
+    while True:
+        os.makedirs(parent, exist_ok=True)
+        try:
+            os.mkdir(run_dir)
+            return
+        except FileNotFoundError:
+            # Collector rmdir won the gap between creating the date and claiming the slug.
+            if not Path(parent).parent.is_dir():
+                raise
 
 
 def read_json(path, default=None):
@@ -735,6 +772,240 @@ def run_alive(run_dir, state=None):
     """The runner or the agent recorded in state.json is alive (public: gdd.py imports it)."""
     state = read_state(run_dir) if state is None else state
     return any(recorded_pid_alive(state, key) for key in PID_KEYS)
+
+
+def gc_setting(key, default):
+    value = skill_config.resolve("gdd", key, default=default)
+    if key == "GDD_RUN_MAX_MB" and str(value).strip().lower() == "off":
+        return 0
+    value = float(value)
+    if not math.isfinite(value) or (key != "GDD_RUN_MAX_MB" and value < 0):
+        raise ValueError(f"invalid {key}: {value}")
+    return value
+
+
+def gc_due(stamp, interval):
+    try:
+        return not interval or time.time() - stamp.lstat().st_mtime >= interval
+    except FileNotFoundError:
+        return True
+
+
+def spawn_auto_gc(root):
+    root = Path(root)
+    with suppress(OSError, ValueError):
+        if (gc_setting("GDD_RUN_MAX_MB", 512) <= 0 or
+                not gc_due(root / ".gc.stamp", gc_setting("GDD_RUN_GC_MIN_INTERVAL_SECONDS", 60))):
+            return
+        with gc_regular_path(root / ".gc.lock").open("a+b") as handle:
+            if not gdd_process.try_file_lock(handle):
+                return
+        argv = [runner_interpreter(), "-B", os.path.abspath(__file__), "_gc", "--run-root", str(root)]
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", ResourceWarning)
+            if IS_WINDOWS:
+                for flags in (WINDOWS_DETACH | gdd_process.BREAKAWAY, WINDOWS_DETACH):
+                    try:
+                        gdd_process.popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                          stderr=subprocess.DEVNULL, creationflags=flags)
+                        break
+                    except OSError as exc:
+                        if flags == WINDOWS_DETACH or getattr(exc, "winerror", None) != 5:
+                            raise
+            else:
+                gdd_process.popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                  stderr=subprocess.DEVNULL, start_new_session=True)
+
+
+def gc_stat(info, kind):
+    return kind(info.st_mode) and not getattr(info, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
+
+
+def gc_regular_path(path):
+    with suppress(FileNotFoundError):
+        if not gc_stat(path.lstat(), stat.S_ISREG):
+            raise OSError(f"not a regular file: {path}")
+    return path
+
+
+def gc_entries(folder):
+    try:
+        if not gc_stat(folder.lstat(), stat.S_ISDIR):
+            return
+        with os.scandir(folder) as entries:
+            for entry in entries:
+                with suppress(FileNotFoundError):
+                    yield Path(entry.path), entry.stat(follow_symlinks=False)
+    except FileNotFoundError:
+        pass
+
+
+def gc_size(run):
+    total, pending = 0, [run]
+    while pending:
+        for path, info in gc_entries(pending.pop()):
+            if gc_stat(info, stat.S_ISDIR):
+                pending.append(path)
+            elif gc_stat(info, stat.S_ISREG):
+                total += info.st_size
+    return total
+
+
+LEDGER_COLUMNS = (
+    "ts", "repo", "goal", "stage", "base_sha", "head_sha", "pr", "gates",
+    "rounds_simplify", "rounds_review", "findings", "next_action", "note",
+)
+
+
+def gc_ledger_names():
+    home = os.environ.get("XDG_STATE_HOME") or os.path.join(os.path.expanduser("~"), ".local", "state")
+    ledger = skill_config.resolve("gdd", "GDD_STATE_FILE", default=os.path.join(home, "gdd", "ledger.tsv"))
+    names = set()
+    try:
+        with Path(ledger).expanduser().open(encoding="utf-8-sig") as handle:
+            note = LEDGER_COLUMNS.index("note")
+            first = True
+            for raw in handle:
+                line = raw.rstrip("\r\n")
+                if not line:
+                    continue
+                cells = line.split("\t")
+                if first:
+                    first = False
+                    if "note" in cells:
+                        note = cells.index("note")
+                        continue
+                    if "stage" in cells and "goal" in cells:
+                        return None
+                if len(cells) > note and (value := cells[note].strip()).startswith("run="):
+                    names.add(start_lock_slug(value[4:]))
+    except FileNotFoundError:
+        pass
+    return names
+
+
+def gc_settled_at(run, cutoff):
+    marker = (run / "finalized").lstat()
+    if not gc_stat(marker, stat.S_ISREG) or marker.st_mtime >= cutoff:
+        return None
+    if not gc_stat((run / "state.json").lstat(), stat.S_ISREG):
+        return None
+    state = read_state(run)
+    if not state or state.get("state") in ("running", "unknown") or run_alive(run, state):
+        return None
+    settled = marker.st_mtime
+    recorded = False
+    for key in ("ended", "started"):
+        try:
+            timestamp = datetime.fromisoformat(state[key])
+            if timestamp.tzinfo is None:
+                timestamp = timestamp.replace(tzinfo=timezone.utc)
+            settled = max(settled, timestamp.timestamp())
+            recorded = True
+            break
+        except (KeyError, TypeError, ValueError, OverflowError, OSError):
+            continue
+    return settled if recorded and settled < cutoff else None
+
+
+def gc_retire(root, run, info, slugs, cutoff):
+    claim = gc_regular_path(root / ".gc.claim")
+    temp_claim = gc_regular_path(root / f".gc.claim.{os.getpid()}.tmp")
+    temp_claim.write_text("\n".join(slugs), encoding="utf-8", newline="\n")
+    os.replace(temp_claim, claim)
+    try:
+        with ExitStack() as locks:
+            for slug in slugs:
+                path = gc_regular_path(root / f"{slug}.start.lock")
+                handle = locks.enter_context(path.open("a+b"))
+                if not gdd_process.try_file_lock(handle):
+                    return None
+            current = run.lstat()
+            if (not gc_stat(run.parent.lstat(), stat.S_ISDIR) or not gc_stat(current, stat.S_ISDIR)
+                    or not os.path.samestat(info, current) or gc_settled_at(run, cutoff) is None):
+                return None
+            refresh = run / "refresh"
+            try:
+                existing = refresh.lstat()
+            except FileNotFoundError:
+                existing = None
+            if existing is not None and not gc_stat(existing, stat.S_ISREG):
+                return None
+            retired = run.with_name(f"~gc-{uuid.uuid4().hex}")
+            with refresh.open("a+b") as handle:
+                if not gdd_process.try_file_lock(handle) or gc_settled_at(run, cutoff) is None:
+                    return None
+                if not IS_WINDOWS:
+                    run.rename(retired)
+            if IS_WINDOWS:
+                # Windows rejects the rename while a CRT refresh handle is open, including a new claimant.
+                run.rename(retired)
+            return retired
+    finally:
+        with suppress(OSError):
+            temp_claim.unlink(missing_ok=True)
+            claim.unlink(missing_ok=True)
+
+
+def gc_prune(root, budget, cutoff):
+    total, runs = 0, []
+    for date, info in gc_entries(root):
+        if not DATE_RE.fullmatch(date.name) or not gc_stat(info, stat.S_ISDIR):
+            continue
+        for run, info in gc_entries(date):
+            if gc_stat(info, stat.S_ISDIR):
+                if run.name.startswith("~gc-"):
+                    with suppress(OSError):
+                        shutil.rmtree(run)
+                        if date.name != datetime.now().strftime("%Y-%m-%d"):
+                            date.rmdir()
+                    continue
+                with suppress(FileNotFoundError):
+                    info = run.lstat()
+                    if gc_stat(info, stat.S_ISDIR):
+                        size = gc_size(run)
+                        total += size
+                        runs.append((run, info, size))
+    if total <= budget:
+        return
+    protected = gc_ledger_names()
+    if protected is None:
+        return
+    candidates = []
+    for run, info, size in runs:
+        slugs = (run.name.rsplit(".prev-", 1)[0], run.name)
+        slugs = tuple(dict.fromkeys(start_lock_slug(slug) for slug in slugs if slug and slug == sanitize(slug)))
+        if not slugs or protected.intersection(slugs):
+            continue
+        with suppress(OSError):
+            if (settled := gc_settled_at(run, cutoff)) is not None:
+                candidates.append((settled, run, info, slugs, size))
+    for _, run, info, slugs, size in sorted(candidates):
+        with suppress(OSError):
+            if retired := gc_retire(root, run, info, slugs, cutoff):
+                shutil.rmtree(retired)
+                total -= size
+                if run.parent.name != datetime.now().strftime("%Y-%m-%d"):
+                    with suppress(OSError):
+                        run.parent.rmdir()
+                if total <= budget:
+                    break
+
+
+def cmd_gc(args):
+    with suppress(OSError, ValueError):
+        budget = gc_setting("GDD_RUN_MAX_MB", 512) * 1024**2
+        if budget > 0:
+            root = Path(args.run_root).resolve()
+            stamp = gc_regular_path(root / ".gc.stamp")
+            with gc_regular_path(root / ".gc.lock").open("a+b") as handle:
+                if gdd_process.try_file_lock(handle) and gc_due(
+                        stamp, gc_setting("GDD_RUN_GC_MIN_INTERVAL_SECONDS", 60)):
+                    now = time.time() if args.now is None else args.now
+                    if math.isfinite(now):
+                        gc_prune(root, budget, now - gc_setting("GDD_RUN_RETENTION_DAYS", 7) * 86400)
+                        stamp.touch()
+    return 0
 
 
 def is_starting(state):
@@ -1221,10 +1492,12 @@ def cmd_start(args):
     try:
         mode, launcher = select_detach(detach_config())
         with slug_start_lock(root, slug):
-            return start_locked(args, spec, slug, cwd, run_dir, command, prompt, max_time, mode, launcher,
-                                route_root, source)
+            result = start_locked(args, spec, slug, cwd, run_dir, command, prompt, max_time, mode, launcher,
+                                  route_root, source)
     except (OSError, ValueError) as exc:
         die(f"start: {exc}")
+    spawn_auto_gc(root)
+    return result
 
 
 def start_locked(args, spec, slug, cwd, run_dir, command, prompt, max_time, mode, launcher, route_root, source):
@@ -1254,8 +1527,7 @@ def start_locked(args, spec, slug, cwd, run_dir, command, prompt, max_time, mode
                     time.sleep(0.1)
                     if not os.path.samestat(before, os.stat(run_dir)):
                         raise
-        os.makedirs(os.path.dirname(run_dir), exist_ok=True)
-        os.mkdir(run_dir)  # the slug claim
+        make_run_directory(run_dir)
     except OSError as exc:
         die(f"start: cannot claim {run_dir}: {exc}")
     with open(os.path.join(run_dir, "prompt.md"), "wb") as handle:
@@ -1518,6 +1790,10 @@ def main(argv=None):
     internal.add_argument("--run-dir", required=True)
     add_detach_arguments(internal)
     internal.set_defaults(func=runner_main)
+    gc = sub.add_parser("_gc")
+    gc.add_argument("--run-root", required=True)
+    gc.add_argument("--now", type=float)
+    gc.set_defaults(func=cmd_gc)
     sub.add_parser("list").set_defaults(func=cmd_list)
     for name, func in (("status", cmd_status), ("result", cmd_status), ("answer", cmd_answer),
                        ("kill", cmd_kill), ("tail", cmd_tail)):

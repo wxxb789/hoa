@@ -43,6 +43,204 @@ def different_identity(recorded):
     return f"{source}:{int(timestamp) + 1}"
 
 
+class AutoGCTests(RunnerCase):
+    def setUp(self):
+        super().setUp()
+        self.ledger = Path(self.tmp, "ledger.tsv")
+        self.env.update(GDD_RUN_MAX_MB="0.0009765625", GDD_RUN_RETENTION_DAYS="7",
+                        GDD_RUN_GC_MIN_INTERVAL_SECONDS="0", GDD_STATE_FILE=str(self.ledger))
+        self.now = 1_800_000_000
+
+    def old_run(self, slug, *, day="2020-01-01", age=10, ended_age=None, state="done", pid=None,
+                marker=True, size=610):
+        run = Path(self.root, day, slug)
+        run.mkdir(parents=True)
+        ended = datetime.fromtimestamp(self.now - (age if ended_age is None else ended_age) * 86400,
+                                       timezone.utc).isoformat()
+        write(run / "state.json", json.dumps({"state": state, "ended": ended, "pid": pid}))
+        with (run / "data").open("wb") as handle:
+            handle.truncate(size - (run / "state.json").stat().st_size)
+        if marker:
+            path = run / "finalized"
+            path.touch()
+            os.utime(path, (self.now - age * 86400,) * 2)
+        return run
+
+    def gc(self, **env):
+        proc = gdd_process.run([sys.executable, "-B", RUNNER, "_gc", "--run-root", self.root,
+                                "--now", str(self.now)], capture_output=True, encoding="utf-8",
+                               env={**self.env, **env}, cwd=self.work, timeout=10)
+        self.assertEqual((proc.returncode, proc.stdout, proc.stderr), (0, "", ""), proc)
+
+    def test_exact_budget_and_disable_keep_old_runs(self):
+        first = self.old_run("first", age=30, size=512)
+        second = self.old_run("second", age=30, size=512)
+        self.gc()
+        self.assertTrue(first.exists() and second.exists())
+        (first / "extra").write_bytes(b"x")
+        self.gc(GDD_RUN_MAX_MB="off")
+        self.assertTrue(first.exists() and second.exists())
+        self.gc()
+        self.assertEqual(sum(run.exists() for run in (first, second)), 1)
+
+    def test_prunes_oldest_to_budget_and_preserves_retention(self):
+        near = self.old_run("near", age=8, size=400)
+        old = self.old_run("old", day="2020-01-02", age=10, size=400)
+        recent = self.old_run("recent", age=2, size=600)
+        self.gc()
+        self.assertFalse(old.parent.exists())
+        self.assertTrue(near.exists() and recent.exists())
+        self.gc(GDD_RUN_MAX_MB="0.0001")
+        self.assertFalse(near.exists())
+        self.assertTrue(recent.exists())
+
+    def test_preserves_live_unfinalized_ledger_and_each_age_guard(self):
+        protected = [self.old_run("live", pid=os.getpid()), self.old_run("stale", state="running", marker=False),
+                     self.old_run("recent-end", ended_age=1), self.old_run("recent-marker", age=1, ended_age=30),
+                     self.old_run("boundary", age=7), self.old_run("ledger")]
+        no_time = self.old_run("no-time")
+        write(no_time / "state.json", json.dumps({"state": "done"}))
+        protected.append(no_time)
+        write(self.ledger, "repo\tgoal\tstage\tnote\nrepo\tgoal\timplement\t run=ledger \n")
+        eligible = self.old_run("eligible")
+        self.gc()
+        self.assertFalse(eligible.exists())
+        self.assertTrue(all(run.exists() for run in protected))
+
+    def test_recovers_orphan_tombstones_and_headerless_ledger_and_waits_for_claim(self):
+        orphan = Path(self.root, "2020-01-01", "~gc-deadbeef")
+        orphan.mkdir(parents=True)
+        (orphan / "data").write_bytes(b"x" * 2000)
+        kept = self.old_run("kept")
+        write(self.ledger, "2020-01-01T00:00:00Z\trepo\tgoal\timplement\tb\th\t-\t-\t-\t-\t-\t-\trun=kept\n")
+        self.gc()
+        self.assertFalse(orphan.exists())
+        self.assertTrue(kept.exists())
+
+        root = Path(self.root)
+        (root / ".gc.claim").write_text("claimed\n", encoding="utf-8", newline="\n")
+        released = []
+        gc_lock = (root / ".gc.lock").open("a+b")
+        slug_lock = (root / "claimed.start.lock").open("a+b")
+        try:
+            self.assertTrue(gdd_process.try_file_lock(gc_lock))
+            self.assertTrue(gdd_process.try_file_lock(slug_lock))
+
+            def release_soon():
+                time.sleep(0.08)
+                (root / ".gc.claim").unlink(missing_ok=True)
+                slug_lock.close()
+                gc_lock.close()
+                released.append(True)
+
+            import threading
+            worker = threading.Thread(target=release_soon)
+            worker.start()
+            try:
+                with agent_run.slug_start_lock(root, "claimed"):
+                    self.assertEqual(released, [True])
+            finally:
+                worker.join(timeout=5)
+        finally:
+            if not slug_lock.closed:
+                slug_lock.close()
+            if not gc_lock.closed:
+                gc_lock.close()
+
+    def test_does_not_count_or_follow_directory_symlinks(self):
+        outside = Path(self.tmp, "outside")
+        outside.mkdir()
+        (outside / "data").write_bytes(b"x" * 2000)
+        (outside / "finalized").touch()
+        first = self.old_run("first")
+        for link in (first / "linked", first.parent / "linked", Path(self.root, "2020-01-02")):
+            try:
+                link.symlink_to(outside, target_is_directory=True)
+            except OSError as exc:
+                if not IS_WINDOWS or exc.winerror != 1314:
+                    raise
+                self.skipTest(f"Symlink privilege unavailable: {exc}")
+        self.gc()
+        self.assertTrue(first.exists())
+        self.old_run("second")
+        self.gc()
+        self.assertTrue((outside / "data").exists())
+        self.assertTrue((first.parent / "linked").is_symlink())
+
+    def test_gc_skips_contended_global_slug_and_refresh_locks(self):
+        slug = self.old_run("busy.prev-123456", age=30)
+        refresh = self.old_run("native", age=20)
+        free = self.old_run("free")
+        root = Path(self.root)
+        with (root / ".gc.lock").open("a+b") as lock:
+            self.assertTrue(gdd_process.try_file_lock(lock))
+            self.gc()
+            self.assertTrue(free.exists())
+        with (root / "busy.start.lock").open("a+b") as start, (refresh / "refresh").open("a+b") as claim:
+            self.assertTrue(gdd_process.try_file_lock(start))
+            self.assertTrue(gdd_process.try_file_lock(claim))
+            if IS_WINDOWS:
+                self.assertIn("already starting", self.start("busy.", expect=1).stderr)
+            self.gc()
+            self.assertFalse(free.exists())
+            self.assertTrue(slug.exists() and refresh.exists())
+        self.gc(GDD_RUN_MAX_MB="0.0001")
+        self.assertFalse(slug.exists() or refresh.exists())
+        self.assertTrue((root / "busy.start.lock").is_file() and (root / ".gc.lock").is_file())
+
+    def test_config_settings_and_cooldown(self):
+        config = Path(self.env["XDG_CONFIG_HOME"], "gdd", "config.yaml")
+        config.parent.mkdir(parents=True)
+        write(config, "GDD_RUN_MAX_MB: 0.0001\nGDD_RUN_RETENTION_DAYS: 1\nGDD_RUN_GC_MIN_INTERVAL_SECONDS: 60\n")
+        first = self.old_run("first", age=2)
+        self.gc(GDD_RUN_MAX_MB="", GDD_RUN_RETENTION_DAYS="", GDD_RUN_GC_MIN_INTERVAL_SECONDS="")
+        self.assertFalse(first.exists())
+        second = self.old_run("second", age=2)
+        self.gc(GDD_RUN_MAX_MB="", GDD_RUN_RETENTION_DAYS="", GDD_RUN_GC_MIN_INTERVAL_SECONDS="")
+        self.assertTrue(second.exists())
+        self.gc(GDD_RUN_MAX_MB="", GDD_RUN_RETENTION_DAYS="", GDD_RUN_GC_MIN_INTERVAL_SECONDS="0")
+        self.assertFalse(second.exists())
+
+    def test_start_dispatches_background_gc_and_keeps_stdout_contract(self):
+        self.now = time.time()
+        old = self.old_run("old", size=2048)
+        release = Path(self.tmp, "release-gc")
+        wrapper = """
+import runpy, sys, time
+from pathlib import Path
+release = Path(sys.argv.pop(1))
+deadline = time.monotonic() + 10
+while not release.exists() and time.monotonic() < deadline:
+    time.sleep(0.01)
+if not release.exists():
+    raise SystemExit(2)
+sys.argv.pop(0)
+runpy.run_path(sys.argv[0], run_name='__main__')
+"""
+        popen = gdd_process.popen
+
+        def delayed_gc(argv, **kwargs):
+            if argv[3:4] != ["_gc"]:
+                return popen(argv, **kwargs)
+            child = popen([*argv[:2], "-c", wrapper, str(release), *argv[2:]], **kwargs)
+            self.children.append(child)
+            return child
+
+        try:
+            with mock.patch.object(gdd_process, "popen", side_effect=delayed_gc):
+                proc = self.start("gc-launch", in_process=True)
+            self.assertEqual(proc.stderr, "")
+            self.assertEqual(proc.stdout.splitlines()[0], "started: gc-launch")
+            self.assertIn(f"run dir   : {self.run_dir('gc-launch')}", proc.stdout)
+            self.assertTrue(old.exists())
+        finally:
+            release.touch()
+            for child in self.children:
+                self.assertEqual(child.wait(timeout=10), 0)
+        self.assertFalse(old.exists())
+        self.finished("gc-launch")
+
+
 class ContractTests(RunnerCase):
     def test_concurrent_starts_cannot_move_a_starting_run(self):
         wrapper = """
