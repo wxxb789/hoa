@@ -99,5 +99,7 @@ Residual risks and known limits. No adjectives in place of numbers.
 
 After the report, end your final message with one fenced ```json block matching the schema at
 `${RESULT_SCHEMA}`: `"stage": "implement"`, `"verdict": "DONE"` (or `"BLOCKED"` with the reason in
-`summary`). Gate exit codes are integers. If your runtime enforces that schema itself, send the
+`summary`). In `changed_files`, report every changed path, including committed paths, with a
+repo-relative `path` and one plain sentence in `purpose` explaining why it changed. List both sides
+of a rename. Gate exit codes are integers. If your runtime enforces that schema itself, send the
 report as its own message first; the final message is then that JSON object alone.

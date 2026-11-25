@@ -41,6 +41,8 @@ named replacement proof). Plus the gate table with exit codes and the count of t
 
 After the report, end your final message with one fenced ```json block matching the schema at
 `${RESULT_SCHEMA}`: `"stage": "fix"`, `"verdict": "DONE"` (or `"BLOCKED"` with the reason in
-`summary`); each finding you judged invalid goes in `findings` with its reason as `claim`. Gate exit
-codes are integers. If your runtime enforces that schema itself, send the report as its own message
+`summary`); each finding you judged invalid goes in `findings` with its reason as `claim`. In
+`changed_files`, report every changed path with a repo-relative `path` and one plain sentence in
+`purpose` explaining why it changed. List both sides of a rename. Gate exit codes are integers.
+If your runtime enforces that schema itself, send the report as its own message
 first; the final message is then that JSON object alone.

@@ -611,9 +611,13 @@ sys.exit(agent_run.main())
 
     def test_t14_structured_result(self):
         bad = {**STAGE_RESULT, "gates": [{"command": "make test", "exit_code": "0", "counts": None}]}
-        cases = (("fenced", f"Report.\n```json\n{json.dumps(STAGE_RESULT)}\n```\n", "valid", None),
+        explained = {**STAGE_RESULT, "changed_files": [{"path": "app.py", "purpose": "Implement the goal."}]}
+        legacy = {**STAGE_RESULT, "changed_files": ["app.py"]}
+        cases = (("fenced", f"Report.\n```json\n{json.dumps(explained)}\n```\n", "valid", None),
                  ("invalid", f"```json\n{json.dumps(bad)}\n```", "invalid",
                   '$.gates[0].exit_code: expected integer, got "0"'),
+                 ("legacy-path", json.dumps(legacy), "invalid",
+                  '$.changed_files[0]: expected object, got "app.py"'),
                  ("missing", "done", "missing", None))
         for name, answer, verdict, error in cases:
             with self.subTest(case=name):
@@ -627,6 +631,7 @@ sys.exit(agent_run.main())
                     self.assertEqual(result.returncode, 0, result.stderr)
                     reported, end = json.JSONDecoder().raw_decode(result.stdout)
                     self.assertEqual(reported["result"], "valid")
+                    self.assertEqual(json.loads(read(os.path.join(self.run_dir(name), "result.json"))), explained)
                     self.assertIn(answer, result.stdout[end:])
         refused = self.cli("start", "--name", "noschema", "--prompt", self.prompt, "--schema", os.path.join(self.tmp, "nope"))
         self.assertEqual(refused.returncode, 1)

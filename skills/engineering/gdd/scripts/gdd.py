@@ -71,11 +71,13 @@ import os
 import re
 import secrets
 import shlex
+import shutil
 import sys
 import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
+from subprocess import CalledProcessError
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 if SCRIPT_DIR not in sys.path:
@@ -123,6 +125,17 @@ class LaunchError(Exception):
     """The launcher could not start the run; the ledger must not claim otherwise."""
 
 
+class LedgerError(Exception):
+    pass
+
+
+class CommitRefusal(Exception):
+    def __init__(self, code, detail, exit_code=3):
+        super().__init__(detail)
+        self.code = code
+        self.exit_code = exit_code
+
+
 def xdg_state_home():
     return os.environ.get("XDG_STATE_HOME") or os.path.join(
         os.path.expanduser("~"), ".local", "state"
@@ -132,6 +145,16 @@ def xdg_state_home():
 def config(key, *, flag=None, default=None):
     """Resolve one documented GDD key through the shared resolver."""
     return skill_config.resolve(SKILL, key, flag=flag, default=default)
+
+
+def configured_gates():
+    try:
+        gates = json.loads(config("GDD_GATES", default="[]"))
+        if not isinstance(gates, list) or not all(isinstance(gate, str) and gate.strip() for gate in gates):
+            raise ValueError("expected an array of non-empty command strings")
+    except ValueError as exc:
+        raise ValueError(f"GDD_GATES: {exc}") from exc
+    return gates
 
 
 def state_file():
@@ -160,6 +183,58 @@ def git(repo, *args):
         reason = (proc.stderr or proc.stdout or f"exit {proc.returncode}").strip()
         fail(f"git {' '.join(args)} failed: {reason.splitlines()[0]}")
     return proc.stdout.strip()
+
+
+def git_inventory(repo):
+    data = gdd_process.run(
+        ["git", "--no-optional-locks", "-C", repo, "status", "--porcelain=v1", "-z", "-uall",
+         "--no-renames", "--ignore-submodules=none"],
+        capture_output=True, check=True,
+    ).stdout.decode("utf-8")
+    return [(entry[:2], entry[3:]) for entry in data.split("\0") if entry]
+
+
+def pending_paths(inventory, excluded=()):
+    return {path for _, path in inventory} - set(excluded)
+
+
+def process_detail(proc):
+    detail = proc.stderr or proc.stdout
+    if isinstance(detail, bytes):
+        detail = detail.decode("utf-8", "replace")
+    return (detail or f"exit {proc.returncode}").strip()
+
+
+def scope_run(tool, repo, goal, verb, *options, env=None):
+    return gdd_process.run(
+        [agent_run.interpreter(), tool, verb, "--repo", repo, "--label", goal, "--json", *options],
+        capture_output=True, text=True, env=env,
+    )
+
+
+def scope_status(tool, repo, goal):
+    proc = scope_run(tool, repo, goal, "status")
+    if proc.returncode == 2 and proc.stderr.startswith("worktree-scope: no state for "):
+        return None
+    proc.check_returncode()
+    status = json.loads(proc.stdout)
+    return status if status["baseline"] else None
+
+
+def scope_diff(tool, repo, goal, *, preview_state=None):
+    if preview_state is None:
+        proc = scope_run(tool, repo, goal, "diff")
+    else:
+        # The scope tool saves its diff; a preview must leave the real state unchanged.
+        source = Path(preview_state)
+        with tempfile.TemporaryDirectory(prefix="gdd-scope-preview-") as directory:
+            copy = Path(directory, source.parent.name, source.name)
+            copy.parent.mkdir()
+            shutil.copyfile(source, copy)
+            proc = scope_run(tool, repo, goal, "diff", "--state-file", directory,
+                             env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"})
+    proc.check_returncode()
+    return json.loads(proc.stdout)
 
 
 def validate_stage(stage):
@@ -248,7 +323,7 @@ def goal_state_header(goal_file):
     return found.group(1).lower() if found else ""
 
 
-def dispatch_problems(stage, goal_file, dirty_paths, base, head, force=False):
+def dispatch_problems(stage, goal_file, goal_state, dirty_paths, base, head, has_baseline, force=False):
     """Why this dispatch must not start. Pure: the caller supplies the facts."""
     if force:
         return []
@@ -263,19 +338,17 @@ def dispatch_problems(stage, goal_file, dirty_paths, base, head, force=False):
             problems.append(
                 f"contract {goal_file} is archived — an increment starts from an active goal"
             )
-        else:
-            state = goal_state_header(goal_file)
-            if state in NOT_READY_STATES:
-                problems.append(
-                    f"contract {goal_file} declares state {state!r}; refine and activate it "
-                    "in its own commit before implementing"
-                )
-        if dirty_paths:
-            shown = ", ".join(dirty_paths[:5])
+        elif goal_state in NOT_READY_STATES:
             problems.append(
-                f"worktree is dirty before implement ({len(dirty_paths)} path(s): {shown}) — "
-                "commit or stash it, so the increment stays attributable"
+                f"contract {goal_file} declares state {goal_state!r}; refine and activate it "
+                "in its own commit before implementing"
             )
+    if stage in ("implement", *DIFF_STAGES) and dirty_paths:
+        hint = "commit stage output first with gdd.py commit --no-push"
+        if not has_baseline:
+            hint = ("review the dirt and run worktree-scope.py snapshot --label <goal> explicitly"
+                    if stage == "implement" else "resolve the dirt before dispatching without a baseline")
+        problems.append(f"worktree is dirty before {stage}: {', '.join(dirty_paths)} — {hint}")
     if stage in DIFF_STAGES and base and head and base == head:
         problems.append(
             f"base == head ({head[:7]}): there is no committed range to read — commit the "
@@ -707,7 +780,7 @@ def ledger_append(repo, goal, stage, base, head, gates, next_stage=None, note=No
     proc = gdd_process.run(cmd, capture_output=True, text=True)
     if proc.returncode != 0:
         reason = (proc.stderr or proc.stdout or f"exit {proc.returncode}").strip()
-        fail(f"ledger append failed: {reason}", 1)
+        raise LedgerError(f"ledger append failed: {reason}")
 
 
 def launcher_command(launcher):
@@ -980,11 +1053,6 @@ def cmd_stage(args):
     base = resolve_ref(repo, base)
     head = resolve_ref(repo, head)
 
-    dirty = [
-        line[3:]
-        for line in git(repo, "status", "--porcelain").splitlines()
-        if line.strip()
-    ]
     # `GDD_DISPATCH_GUARDS=off` exists for harness fixtures that dispatch synthetic
     # goals on purpose; a real run leaves it unset.
     guard_off = os.environ.get("GDD_DISPATCH_GUARDS", "on").lower() in (
@@ -993,9 +1061,23 @@ def cmd_stage(args):
         "false",
         "no",
     )
-    problems = [] if guard_off else dispatch_problems(
-        args.stage, goal_file, dirty, base, head, force=args.force
-    )
+    snapshot_tool = None
+    problems = []
+    if not guard_off and args.stage in ("implement", *DIFF_STAGES):
+        tool = scope_tool()
+        status = scope_status(tool, repo, args.goal)
+        inventory = git_inventory(repo)
+        if status:
+            scope = scope_diff(tool, repo, args.goal, preview_state=status["state_file"] if args.dry_run else None)
+            dirty = pending_paths(inventory, scope["excluded_preexisting_paths"]) | set(scope["overlapping_paths"])
+        else:
+            dirty = pending_paths(inventory)
+            if args.stage == "implement" and not inventory:
+                snapshot_tool = tool
+        problems = dispatch_problems(
+            args.stage, goal_file, goal_state_header(goal_file), sorted(dirty), base, head,
+            bool(status), force=args.force,
+        )
     if problems:
         for problem in problems:
             print(f"gdd: {problem}", file=sys.stderr)
@@ -1029,7 +1111,10 @@ def cmd_stage(args):
             )
             return 3
 
-    gates = args.gates or os.environ.get("GDD_GATES") or "-"
+    gates = args.gates
+    if not gates:
+        legacy = os.environ.get("GDD_GATES", "").strip()
+        gates = legacy if legacy and not legacy.startswith("[") else "\n".join(configured_gates()) or "-"
     findings = os.path.abspath(os.path.expanduser(args.findings)) if args.findings else "-"
 
     variables = {
@@ -1073,6 +1158,24 @@ def cmd_stage(args):
             )
     print(f"prompt: {prompt_path}")
 
+    running = [] if args.dry_run else active_runs(repo)
+    if running and not args.force:
+        names = ", ".join(name for name, _ in running)
+        fail(
+            f"refusing to start: run(s) still active in {repo}: {names} "
+            f"(use --force to override)",
+            3,
+        )
+
+    if snapshot_tool and args.dry_run:
+        print("scope snapshot: would record a clean baseline before launching")
+    elif snapshot_tool:
+        if git_inventory(repo):
+            fail("worktree changed before the automatic snapshot; review the dirt and run snapshot explicitly", 3)
+        snapshot = scope_run(snapshot_tool, repo, args.goal, "snapshot")
+        snapshot.check_returncode()
+        print(f"scope snapshot: {json.loads(snapshot.stdout)['state_file']}")
+
     if args.dry_run:
         print("----- first 5 lines -----")
         with open(prompt_path, encoding="utf-8") as handle:
@@ -1081,15 +1184,6 @@ def cmd_stage(args):
                     break
                 print(line.rstrip("\n"))
         return 0
-
-    running = active_runs(repo)
-    if running and not args.force:
-        names = ", ".join(name for name, _ in running)
-        fail(
-            f"refusing to start: run(s) still active in {repo}: {names} "
-            f"(use --force to override)",
-            3,
-        )
 
     agent = resolve_field(args.agent, role.get("agent"), config("GDD_AGENT"))
     model = resolve_field(args.model, role.get("model"), os.environ.get("GDD_MODEL") or None)
@@ -1232,8 +1326,7 @@ def cmd_setup(args):
     return 0
 
 
-def cmd_scope(args):
-    """Print the resolved worktree-scope.py path (config file, not just env)."""
+def scope_tool():
     resolved = os.path.expanduser(
         config(
             "GDD_WORKTREE_SCOPE",
@@ -1243,9 +1336,228 @@ def cmd_scope(args):
     if not os.path.isabs(resolved):
         resolved = os.path.normpath(os.path.join(os.path.dirname(SCRIPT_DIR), resolved))
     if not os.path.isfile(resolved):
-        fail(f"GDD_WORKTREE_SCOPE does not resolve to a file: {resolved}", 2)
-    print(resolved)
+        raise skill_config.ConfigError(f"GDD_WORKTREE_SCOPE does not resolve to a file: {resolved}")
+    return resolved
+
+
+def cmd_scope(args):
+    print(scope_tool())
     return 0
+
+
+def run_commit(args, repo, report):
+    def run_git(*argv, check=True, **options):
+        return gdd_process.run(["git", "-C", repo, *argv], capture_output=True, check=check, **options)
+
+    def git_text(*argv):
+        return run_git(*argv).stdout.decode("utf-8").strip()
+
+    def diff_paths(*argv):
+        return set(run_git("diff", "--name-only", "-z", "--no-renames", *argv, "--").stdout
+                   .decode("utf-8").split("\0")) - {""}
+
+    def refuse_paths(code, paths):
+        raise CommitRefusal(code, ", ".join(sorted(paths)))
+
+    if running := active_runs(repo):
+        raise CommitRefusal("ACTIVE_RUN", ", ".join(name for name, _ in running))
+    fetched = run_git("fetch", "--", args.remote, check=False)
+    if fetched.returncode:
+        raise CommitRefusal("FETCH_FAILED", process_detail(fetched))
+    main_ref = f"refs/remotes/{args.remote}/main"
+    main = git_text("rev-parse", "--verify", main_ref)
+    report["oid"] = git_text("rev-parse", "HEAD")
+    merged = run_git("merge-base", report["oid"], main, check=False)
+    if merged.returncode != 1:
+        merged.check_returncode()
+    report["base"] = merged.stdout.decode("ascii").strip() or None
+    if report["base"] != main:
+        raise CommitRefusal("BEHIND_MAIN", f"merge base {report['base']} != {main_ref} ({main})")
+    report["branch"] = git_text("branch", "--show-current") or None
+    if not report["branch"]:
+        raise CommitRefusal("DETACHED_HEAD", "HEAD is not on a branch")
+
+    tool = scope_tool()
+    status = scope_status(tool, repo, args.goal)
+    if not status:
+        raise CommitRefusal("NO_BASELINE", f"no scope snapshot for label {args.goal!r}")
+    baseline = status["baseline"]
+    if baseline["head"] != main:
+        raise CommitRefusal("BASELINE_MISMATCH", f"snapshot {baseline['head']} != merge base {main}")
+    scope = scope_diff(tool, repo, args.goal)
+    if scope["overlapping_paths"] and not args.accept_overlap:
+        refuse_paths("OVERLAP", scope["overlapping_paths"])
+
+    inventory = git_inventory(repo)
+    pending = pending_paths(inventory, scope["excluded_preexisting_paths"])
+    purposes = {}
+    if args.result:
+        schema = json.loads(Path(stage_result.SCHEMA).read_text(encoding="utf-8"))
+        for result in args.result:
+            try:
+                changes = json.loads(Path(result).read_text(encoding="utf-8"))["changed_files"]
+            except (OSError, ValueError, TypeError, KeyError) as exc:
+                raise CommitRefusal("INVALID_INPUT", f"{result}: {exc}", 2) from exc
+            problem = stage_result.error(changes, schema["properties"]["changed_files"], "changed_files")
+            if problem:
+                raise CommitRefusal("INVALID_INPUT", f"{result}: {problem}", 2)
+            for change in changes:
+                purpose = " ".join(change["purpose"].splitlines()).strip()
+                if purpose or change["path"] not in purposes:
+                    purposes[change["path"]] = purpose
+    if unexplained := {path for path in pending if not purposes.get(path)}:
+        refuse_paths("UNEXPLAINED_CHANGE", unexplained)
+    if extra := purposes.keys() - pending:
+        committed = diff_paths(main, report["oid"])
+        if phantom := extra - committed:
+            refuse_paths("PHANTOM_CHANGE", phantom)
+
+    staged = {path for code, path in inventory if code[0] != " " and code != "??"}
+    unresolved = {path for code, path in inventory if code in {"DD", "AU", "UD", "UA", "DU", "AA", "UU"}}
+    if mismatch := (staged - pending) | unresolved:
+        refuse_paths("INDEX_MISMATCH", mismatch)
+    unstaged = {path for code, path in inventory if path in pending and code[1] != " "}
+    partial = staged & unstaged
+    if partial and (vanishing := partial - diff_paths("HEAD")):
+        refuse_paths("INDEX_MISMATCH", vanishing)
+    gates = []
+    if not args.no_push:
+        gates = args.gate or configured_gates()
+        if not gates:
+            raise CommitRefusal("NO_GATES", "supply --gate or configure GDD_GATES before pushing")
+        baseline_paths = {entry["path"] for entry in baseline["entries"]}
+        if baseline_dirt := (pending_paths(inventory) & baseline_paths) - pending:
+            refuse_paths("BASELINE_DIRT", baseline_dirt)
+    paths =[{"path": path, "purpose": purposes[path]} for path in sorted(pending)]
+    if pending:
+        try:
+            subject = args.message if args.message is not None else Path(args.message_file).read_text(encoding="utf-8")
+        except (OSError, UnicodeError) as exc:
+            raise CommitRefusal("INVALID_INPUT", str(exc), 2) from exc
+        subject = subject.strip()
+        if not subject or len(subject.splitlines()) != 1:
+            raise CommitRefusal("INVALID_INPUT", "commit subject must be one non-empty line", 2)
+        if unstaged:
+            added = run_git(
+                "--literal-pathspecs", "add", "--pathspec-from-file=-", "--pathspec-file-nul",
+                input=("\0".join(sorted(unstaged)) + "\0").encode("utf-8"), check=False,
+            )
+            if added.returncode and partial:
+                raise CommitRefusal("INDEX_MISMATCH", f"{', '.join(sorted(partial))}: {process_detail(added)}")
+            added.check_returncode()
+        if mismatch := diff_paths("--cached") ^ pending:
+            refuse_paths("INDEX_MISMATCH", mismatch)
+
+    seal = scope_run(tool, repo, args.goal, "seal", "--index",
+                     *(["--accept-overlap"] if args.accept_overlap else []))
+    if seal.returncode:
+        raise CommitRefusal("SEAL_FAILED", process_detail(seal))
+    report["scope_sha"] = json.loads(seal.stdout)["commit_seal"]["scope_sha"]
+    if pending:
+        with tempfile.TemporaryDirectory(prefix="gdd-commit-") as directory:
+            message = Path(directory) / "message.txt"
+            body = "\n".join(f"- {row['path']}: {row['purpose']}" for row in paths)
+            message.write_text(f"{subject}\n\n{body}\n", encoding="utf-8")
+            run_git("commit", "-F", str(message))
+        report["committed"] = True
+        report["paths"] = paths
+        report["oid"] = git_text("rev-parse", "HEAD")
+
+    oid = report["oid"]
+    verified = scope_run(tool, repo, args.goal, "verify", "--commit", oid)
+    if verified.returncode == 1:
+        drift = json.loads(verified.stdout)["drift"]
+        raise CommitRefusal("SCOPE_DRIFT", ", ".join(f"{row['kind']} {row['path']}" for row in drift), 1)
+    verified.check_returncode()
+    report["scope_sha"] = json.loads(verified.stdout)["scope_sha"]
+
+    remaining = git_inventory(repo)
+    if args.no_push:
+        if remaining:
+            scope = scope_diff(tool, repo, args.goal)
+            if leftovers := pending_paths(remaining, scope["excluded_preexisting_paths"]):
+                refuse_paths("LEFTOVERS", leftovers)
+        return
+
+    if leftovers := pending_paths(remaining):
+        refuse_paths("LEFTOVERS", leftovers)
+
+    env = agent_run.child_env(())
+    for command in gates:
+        start = time.monotonic()
+        try:
+            argv = shlex.split(command, posix=True)
+            if not argv:
+                raise ValueError("empty command")
+            name = os.path.expanduser(argv[0])
+            binary = os.path.join(repo, name) if os.path.dirname(name) else shutil.which(name, path=env.get("PATH"))
+            if not binary or not os.path.isfile(binary):
+                raise FileNotFoundError(f"gate executable not found: {name}")
+            if problem := agent_run.shim_hazard(binary, argv[1:]):
+                raise ValueError(problem)
+            gate = gdd_process.run(agent_run.command_prefix(binary) + argv[1:], cwd=repo, env=env,
+                                   capture_output=True, text=True)
+            rc, detail = gate.returncode, process_detail(gate)
+        except OSError as exc:
+            rc, detail = 127, str(exc)
+        except ValueError as exc:
+            rc, detail = 2, str(exc)
+        report["gates"].append(dict(command=command, exit_code=rc, duration_s=time.monotonic() - start))
+        if rc:
+            raise CommitRefusal("GATE_FAILED", f"{command} rc={rc}: {detail}", 4)
+    if (head := git_text("rev-parse", "HEAD")) != oid:
+        raise CommitRefusal("HEAD_MOVED", f"verified {oid}, found {head} after gates")
+    if leftovers := pending_paths(git_inventory(repo)):
+        refuse_paths("LEFTOVERS", leftovers)
+    pushed = run_git("push", "--", args.remote, f"{oid}:refs/heads/{report['branch']}", check=False)
+    if pushed.returncode:
+        raise CommitRefusal("PUSH_FAILED", process_detail(pushed), 5)
+    report["pushed"] = True
+
+
+def cmd_commit(args):
+    report = dict(ok=False, error_code=None, exit=0, detail="", branch=None, base=None, oid=None,
+                  scope_sha=None, committed=False, paths=[], gates=[], pushed=False)
+    repo = None
+    try:
+        root = gdd_process.run(["git", "-C", args.repo, "rev-parse", "--show-toplevel"],
+                               capture_output=True, text=True, check=True)
+        repo = os.path.realpath(root.stdout.strip())
+        run_commit(args, repo, report)
+    except CommitRefusal as exc:
+        report.update(error_code=exc.code, exit=exc.exit_code, detail=str(exc))
+    except CalledProcessError as exc:
+        code = "GIT_ERROR" if exc.cmd[0] == "git" else "SCOPE_FAILED"
+        report.update(error_code=code, exit=2, detail=f"{' '.join(exc.cmd)}: {process_detail(exc)}")
+    except (OSError, ValueError, KeyError, TypeError, skill_config.ConfigError) as exc:
+        report.update(error_code="INVALID_INPUT", exit=2, detail=str(exc))
+    if repo is not None:
+        base, oid, scope = (report[key] or "-" for key in ("base", "oid", "scope_sha"))
+        pushed = "yes" if report["pushed"] else "no"
+        note = (f"exit={report['exit']} code={report['error_code'] or 'ok'} "
+                f"head={oid[:7]} scope={scope[:12]} pushed={pushed}")
+        gates = ";".join(f"{gate['command']} rc={gate['exit_code']}" for gate in report["gates"])
+        try:
+            ledger_append(repo, args.goal, "commit", base, oid, gates, note=note)
+        except (LedgerError, OSError, skill_config.ConfigError) as exc:
+            if report["exit"]:
+                report["detail"] += f"\n{exc}"
+            else:
+                report.update(error_code="LEDGER_FAILED", exit=5, detail=str(exc))
+    report["ok"] = report["exit"] == 0
+    if args.json:
+        print(json.dumps(report))
+    else:
+        print(f"commit: {report['error_code'] or 'ok'} (exit={report['exit']})")
+        for key in ("branch", "base", "oid", "scope_sha", "committed", "pushed"):
+            print(f"{key}: {report[key] if report[key] is not None else '-'}")
+        for row in report["paths"]:
+            print(f"- {row['path']}: {row['purpose']}")
+        for gate in report["gates"]:
+            print(f"gate: {gate['command']} rc={gate['exit_code']} ({gate['duration_s']:.3f}s)")
+        if report["detail"]:
+            print(report["detail"])
+    return report["exit"]
 
 
 def cmd_close(args):
@@ -1451,6 +1763,20 @@ def build_parser():
     )
     scope.set_defaults(func=cmd_scope)
 
+    commit = sub.add_parser("commit", help="seal, verify and optionally push a goal's increment")
+    commit.add_argument("--repo", required=True)
+    commit.add_argument("--goal", required=True)
+    message = commit.add_mutually_exclusive_group(required=True)
+    message.add_argument("-m", dest="message", metavar="SUBJECT")
+    message.add_argument("-F", dest="message_file", metavar="MSGFILE")
+    commit.add_argument("--result", action="append", default=[])
+    commit.add_argument("--gate", action="append")
+    commit.add_argument("--accept-overlap", action="store_true")
+    commit.add_argument("--no-push", action="store_true")
+    commit.add_argument("--remote", default="origin")
+    commit.add_argument("--json", action="store_true")
+    commit.set_defaults(func=cmd_commit)
+
     close = sub.add_parser(
         "close", help="record the landing row for a goal (stage=done, pr, merged head)"
     )
@@ -1474,8 +1800,12 @@ def main():
     args = build_parser().parse_args()
     try:
         return args.func(args)
-    except skill_config.ConfigError as error:
+    except (skill_config.ConfigError, OSError, ValueError) as error:
         fail(str(error))
+    except CalledProcessError as error:
+        fail(process_detail(error))
+    except LedgerError as error:
+        fail(str(error), 1)
 
 
 if __name__ == "__main__":

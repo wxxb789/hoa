@@ -42,6 +42,7 @@ import json
 import os
 import re
 import sys
+import time
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -58,6 +59,7 @@ STAGES = [
     "apply",
     "review",
     "fix",
+    "commit",
     "gates",
     "pr",
     "babysit",
@@ -67,6 +69,7 @@ STAGES = [
 ]
 
 AGENT_STAGES = {"implement", "simplify", "apply", "review", "fix"}
+RECORD_STAGES = {"setup", "commit"}
 
 COLUMNS = [
     "ts",
@@ -183,15 +186,6 @@ def read_rows(state_file):
     return rows
 
 
-def write_header_if_missing(state_file):
-    if os.path.exists(state_file) and os.path.getsize(state_file) > 0:
-        return
-    parent = os.path.dirname(os.path.abspath(state_file))
-    os.makedirs(parent, exist_ok=True)
-    with open(state_file, "a", encoding="utf-8") as handle:
-        handle.write("\t".join(COLUMNS) + "\n")
-
-
 def cmd_append(args):
     values = {
         "ts": datetime.now().astimezone().isoformat(timespec="seconds"),
@@ -208,9 +202,22 @@ def cmd_append(args):
         "next_action": args.next,
         "note": args.note,
     }
-    write_header_if_missing(args.state_file)
-    with open(args.state_file, "a", encoding="utf-8") as handle:
-        handle.write("\t".join(clean(values[column]) for column in COLUMNS) + "\n")
+    try:
+        os.makedirs(os.path.dirname(os.path.abspath(args.state_file)), exist_ok=True)
+        with open(args.state_file + ".lock", "a+b") as lock:
+            deadline = time.monotonic() + 2
+            while not gdd_process.try_file_lock(lock):
+                if time.monotonic() >= deadline:
+                    print(f"delivery-state: timed out locking ledger {args.state_file}", file=sys.stderr)
+                    return 1
+                time.sleep(0.05)
+            with open(args.state_file, "a", encoding="utf-8") as handle:
+                if not handle.tell():
+                    handle.write("\t".join(COLUMNS) + "\n")
+                handle.write("\t".join(clean(values[column]) for column in COLUMNS) + "\n")
+    except OSError as exc:
+        print(f"delivery-state: could not append to {args.state_file}: {exc}", file=sys.stderr)
+        return 1
     print(f"appended: {args.state_file}")
     return 0
 
@@ -398,13 +405,13 @@ def cmd_show(args):
         matching.append(row)
 
     latest = matching[-1] if matching else None
-    # A setup row is a record, not work: an earlier actionable row keeps LATEST so the
+    # A setup or commit row is a record, not work: an earlier actionable row keeps LATEST so the
     # operator still sees the stage and next action to resume.
-    actionable = [row for row in matching if row["stage"] != "setup"]
+    actionable = [row for row in matching if row["stage"] not in RECORD_STAGES]
     if actionable:
         latest = actionable[-1]
 
-    # LIVE and the state snapshot path follow the row LATEST came from, so a later setup
+    # LIVE and the state snapshot path follow the row LATEST came from, so a later record
     # for another repo cannot mix a different repo's context into this view.
     if repo_filter:
         repo = repo_filter
@@ -484,8 +491,7 @@ def cmd_list(args):
     for row in rows:
         key = (row["repo"], row["goal"])
         current = newest.get(key)
-        # A later setup row never replaces a current stage/next action in the list view.
-        if current is None or row["stage"] != "setup" or current["stage"] == "setup":
+        if current is None or row["stage"] not in RECORD_STAGES or current["stage"] in RECORD_STAGES:
             newest[key] = row
     for (repo, goal), row in sorted(newest.items()):
         print(

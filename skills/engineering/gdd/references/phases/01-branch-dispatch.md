@@ -6,8 +6,11 @@
    and which behaviours are deliberate non-goals.
 1. `git fetch origin --prune`, fast-forward `main`, branch `feat/<kebab-outcome>` **from
    `origin/main`**, never from a stale local main. Report the base SHA every time.
-2. Resolve the scope tool with `uv run scripts/gdd.py scope`. Record the baseline before dispatching
-   with `uv run "<scope-tool>" snapshot --repo <path> --label <goal>`.
+2. Before launching `implement`, `gdd.py stage` snapshots a clean tree when no baseline exists;
+   `--dry-run` only reports that it would.
+   On a dirty tree without a baseline it refuses. Review the dirt, resolve the scope tool with
+   `uv run scripts/gdd.py scope`, then explicitly run
+   `uv run "<scope-tool>" snapshot --repo <path> --label <goal>` to record the approved baseline.
    Report the count of pre-existing dirty paths in the dispatch line — they are not part of this
    increment. Refuse to dispatch on a dirty submodule or nested repository; resolve it first.
 3. Dispatch one implementation run carrying the goal file, the repo's contract docs, the most recent

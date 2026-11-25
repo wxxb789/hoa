@@ -12,6 +12,11 @@ A stage that was deliberately skipped still gets a completion row — same `--ba
 increment, `--next review`, and a note starting `exit=not-run skipped: <reason>`. Set all three:
 `append` defaults them to missing and `show` can only print what was stored.
 
+`gdd.py commit` appends one `commit` row for each attempt after resolving the repository, including
+`--no-push` stage commits. The note starts with `exit=<n> code=<ERROR_CODE|ok>` and records the head,
+scope hash and push outcome. The gates column records the commands run and their exit codes. The
+`exit=` prefix marks a completion, not a dispatch round.
+
 `gdd.py stage` counts the rows for this repo+goal+stage before dispatching and refuses the third
 `implement`, `simplify` or `review` run; `--over-budget` is the explicit override, and every dispatch
 writes its `rounds_simplify` / `rounds_review` value so the next session can read the count instead of

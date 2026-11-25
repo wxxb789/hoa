@@ -5,7 +5,7 @@ description: >-
   resume from a saved stage ledger. Hand a bounded patch or review to a CLI agent with a written brief and isolated
   checkout; compare independent coding assistants in separate worktrees and check changes before integration.
 metadata:
-  revision: "30"
+  revision: "31"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "deliver a goal through staged authoring, gates and authorized merge, or verify one isolated CLI handoff without shipping"
@@ -66,8 +66,8 @@ stop and report — do not burn budget in silence.
 | 1 branch + dispatch | baseline snapshot and one implementation run | branch from `origin/main` and report the base SHA; report pre-existing dirty paths; settle the run plan once with `gdd.py setup` (ask the owner once, only for missing fields; never re-ask mid-run); `gdd.py stage` renders prompt, run name and ledger row from one template and refuses past a per-stage round cap or the plan's token cap, counting every dispatched run's launcher-reported usage (unknown when unreported) | [`references/phases/01-branch-dispatch.md`](references/phases/01-branch-dispatch.md) |
 | 2 verify | gate evidence and a clause→test map | exit 0 means the process ended, not the phase finished; re-run gates on the FINAL tree; a proof test must fail when the feature is deleted; a weak proof test is its own increment | [`references/phases/02-verify.md`](references/phases/02-verify.md) |
 | 3 simplify → apply | accepted fixes, or a recorded skip | conditional: skip a documentation-only, mechanical, or sub-threshold diff and record the reason in the ledger; report only, never silent apply; name rejected numbers in the apply prompt; a dead-code finding needs mechanical evidence; re-derive changed counts from the tree | [`references/phases/03-simplify-apply.md`](references/phases/03-simplify-apply.md) |
-| 4 review → fix | per-finding fixes | commit stage output before the next stage; reproduce every finding; classify regression vs pre-existing; a third same-class dispatch changes the mechanism | [`references/phases/04-review-fix.md`](references/phases/04-review-fix.md) |
-| 5 gates → commit → PR | a sealed increment and its PR | `overlapping_paths` stops the commit; `seal --index` then `verify --commit` on the exact shipping SHA; prove the branch is not behind main; every number is re-derived on the final tree | [`references/phases/05-gates-pr.md`](references/phases/05-gates-pr.md) |
+| 4 review → fix | per-finding fixes | run `gdd.py commit --no-push` before the next stage; reproduce every finding; classify regression vs pre-existing; a third same-class dispatch changes the mechanism | [`references/phases/04-review-fix.md`](references/phases/04-review-fix.md) |
+| 5 commit → gates → PR | a sealed increment and its PR | run `gdd.py commit` to check the base and overlap, seal the index, verify the exact shipping SHA, run gates and push; re-derive every number on the final tree | [`references/phases/05-gates-pr.md`](references/phases/05-gates-pr.md) |
 | 6 merge | a merge verdict, then the next branch | `--verified-head` is the SHA the gates ran on; bot marker `status: completed` with `commit_sha` matching the SAME head; no merge without the script's verdict | [`references/phases/06-merge.md`](references/phases/06-merge.md) |
 | 7 ledger | one ledger row per stage | the operator writes it, never the agent; resume with `show` + `git status` + `git log origin/main..HEAD`; mid-flight status comes from live state | [`references/phases/07-ledger.md`](references/phases/07-ledger.md) |
 | 8 reset | a fresh base for the next goal | fresh run, never a resumed session; delete merged branches; fork from freshly fetched `origin/main`; report the base SHA | [`references/phases/07-ledger.md`](references/phases/07-ledger.md) |
@@ -106,11 +106,11 @@ the wrong reason, and an exit code can disagree with the artifact it produced.
 | `GDD_RUN_DETACH` | detach mode: `auto`, `systemd`, `launchd`, `setsid`, `windows`, or environment-only `tmux` / `herdr` | `auto` (Linux user unit, macOS LaunchAgent, POSIX double fork, or native Windows) |
 | `GDD_TEMPLATES` | stage-template root | the bundled `references/stage-templates` |
 | `GDD_GOAL_GLOB` | goal-contract glob | `docs/goals/*<goal>*.md` |
+| `GDD_GATES` | JSON array of gate commands for `gdd.py commit`, overridden by repeated `--gate`. Use POSIX quoting and forward slashes on every OS. Commands run in the repo root without a shell except for Windows batch shims. Quote the array as a scalar in the config file; stage prompts still accept a legacy plain-text environment value. | none (push refused without gates) |
 | `GDD_RUN_PLAN_DEFAULTS` | JSON run-plan defaults that `gdd.py setup` merges under `--plan-file` ([phase 1](references/phases/01-branch-dispatch.md#run-plan)); per-stage round caps default to **2x**, `token_cap` to none; `--over-budget` overrides one dispatch | none |
 | `GDD_WORKTREE_SCOPE` | `worktree-scope.py` path | `../delegated-work-acceptance/scripts/worktree-scope.py` |
 
-See [references/configuration.md](references/configuration.md) for lookup order and the config path.
-`gdd.py` resolves the table's `GDD_*` keys through `scripts/skill_config.py`.
+`gdd.py` resolves these keys through `scripts/skill_config.py`; lookup order and the config path are in [references/configuration.md](references/configuration.md).
 Run bundled scripts with `uv run <path>`. Only if a script command fails (for example `uv` is not
 found), read [references/troubleshooting.md](references/troubleshooting.md).
 

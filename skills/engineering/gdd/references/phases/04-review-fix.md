@@ -2,10 +2,11 @@
 
 1. Dispatch `review` (report only) only after the simplify fixes are applied (or the pass was recorded as skipped), so the reviewer reads
    the tree that will ship. The stage range is `origin/main..HEAD`, so **commit the agent's stage
-   output before dispatching the next stage**: `gdd.py` does not refuse a dirty worktree, and
-   uncommitted apply fixes are invisible to the reviewer's diff and one stray `git checkout` from
-   gone. Commit, rebase onto `origin/main` when the branch has fallen behind, then confirm the
-   `--dry-run` range covers exactly the whole increment.
+   output before dispatching the next stage** with
+   `gdd.py commit --repo <path> --goal <id> -m "<subject>" --result <result.json> --no-push`.
+   Uncommitted fixes are invisible to the reviewer's diff. Dispatch refuses pending output but
+   allows unchanged baseline dirt. If main moved, reconcile and replay against a new baseline as
+   described in [Phase 5](05-gates-pr.md). Confirm the `--dry-run` range covers the whole increment.
 2. **Reuse the runtime's read-only reviewer first where it is installed.** The `review` stage
    template has the worker try `ce-code-review mode:agent` first, through its own runtime's skill
    discovery, on `${BASE_SHA}..${HEAD_SHA}` from a checkout clean at that head, with gdd's own
