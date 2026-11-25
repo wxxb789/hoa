@@ -67,8 +67,6 @@ jobs:
       # Script checks: the exit code is the contract
       - name: Trigger cases
         run: python evals/run_trigger_evals.py
-      - name: define-goal fixtures
-        run: python skills/productivity/define-goal/evals/validate_fixtures.py
       - name: hermes-models routing inventory
         run: python skills/hermes/hermes-models/scripts/tests/test-routing-inventory.py
       - name: hermes-models provider metadata

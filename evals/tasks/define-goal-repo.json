@@ -1,0 +1,32 @@
+{
+  "id": "define-goal-repo",
+  "skill": "define-goal",
+  "fixture": "fixtures/define-goal-repo",
+  "shell": ["codex"],
+  "prompt": "Read README.md and docs/specs/2026-11-22-pulse.md in this greenfield software repository. Turn the initiative into anti-drift project artifacts on disk without implementing any product code. Write the shared Core Design document at its standard docs path (preserving the invariant IDs INV-CLIENT-AOT, INV-MEM-EMIT, and non-goal ID NON-HTTP) and write the numbered goal files in this repository's standard software-repo goal directory, using exact filenames 0001-vertical-slice.md, 0002-session-pool.md, 0003-security-signoff.md, and 0004-plugin-distribution.md so downstream tooling can inspect them. Also return one bare JSON object with goal_dir (relative directory holding active goals), archive_dir (relative directory where accepted goals move), core_design (relative path of the Core Design file), and statuses (object mapping \"0001\", \"0002\", \"0003\", \"0004\" to the exact first lowercase status word declared on each file's standalone Status: header line).",
+  "terse": "Break the specification into numbered, verifiable goal files sized to the feedback window, preserve user-committed constraints, and leave undecided or externally gated milestones appropriately marked without implementing product code.",
+  "rubric": {
+    "repo-goal-dir": {"field": "goal_dir", "equals": "docs/goals"},
+    "repo-archive-dir": {"field": "archive_dir", "equals": "docs/goals/archive"},
+    "core-design-file": {"file": "docs/core-design.md", "contains": "INV-MEM-EMIT"},
+    "core-design-nongoal": {"file": "docs/core-design.md", "contains": "NON-HTTP"},
+    "goal-1-links-core-design": {"file": "docs/goals/0001-vertical-slice.md", "contains": "core-design.md"},
+    "goal-1-keeps-validator": {"file": "docs/goals/0001-vertical-slice.md", "contains": "./bench/run-interleaved.sh"},
+    "status-headers": {"field": "statuses", "equals": {
+      "0001": "ready",
+      "0002": "ready",
+      "0003": "draft",
+      "0004": "provisional"
+    }},
+    "goal-1-status-file": {"file": "docs/goals/0001-vertical-slice.md", "contains": "Status: ready"},
+    "goal-2-status-file": {"file": "docs/goals/0002-session-pool.md", "contains": "Status: ready"},
+    "goal-3-status-file": {"file": "docs/goals/0003-security-signoff.md", "contains": "Status: draft"},
+    "goal-4-status-file": {"file": "docs/goals/0004-plugin-distribution.md", "contains": "Status: provisional"}
+  },
+  "notes": {
+    "repo-goal-dir": "SKILL.md#write-goal-files: inside a software repository with no prior goal directory, resolve to docs/goals/ with archive docs/goals/archive/ and 4-digit prefixes matching gdd's default glob.",
+    "core-design-file": "SKILL.md#boundary: multi-goal series sharing enduring invariants anchors them in a concise Core Design document (docs/core-design.md) and links it from each goal file.",
+    "status-headers": "SKILL.md#write-goal-files: standalone Status: header uses ready, draft (external acceptance), and provisional so gdd.py's goal_state_header blocks non-runnable goals.",
+    "goal-1-status-file": "status-headers only checks the returned JSON; the *-status-file checks require the header in each goal file on disk."
+  }
+}
