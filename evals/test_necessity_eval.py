@@ -641,3 +641,16 @@ def test_fixture_must_not_include_answer_key(tmp_path, monkeypatch):
     assert runner.main() == 2
     assert not seen
     assert not results.exists()
+
+
+def test_all_committed_necessity_tasks_validate():
+    tasks_dir = runner.EVALS / "tasks"
+    for suite in (tasks_dir, tasks_dir / "set-b"):
+        seen_ids = set()
+        files = sorted(suite.glob("*.json"))
+        assert files
+        for path in files:
+            task, fixture = runner.load_task(path)
+            assert task["id"] not in seen_ids, f"duplicate task id {task['id']!r} in {path}"
+            seen_ids.add(task["id"])
+            assert fixture.is_dir()
