@@ -6,6 +6,24 @@ A skill ships here only if a stranger, on a freshly provisioned machine, can run
 knowing anything about our host. This file is the gate, not advice: run it at nomination time,
 not on a schedule.
 
+## Privacy red line — the whole repository, not only the catalog
+
+This repository is public, so no personal data may sit anywhere in it: host user names, absolute
+home paths, personal handles or account IDs, e-mail addresses, phone numbers, channel or bot
+snowflakes, model IDs, private repository names, employer or work-project identifiers.
+`unfettered-skills/` is unconstrained in shape, never in this.
+
+- **Desensitize every arrival, new or edited.** A skill that enters or is updated here gets the same
+  review as a port: each environment-specific or personal value becomes configuration (flag →
+  environment variable → config file → documented default), with the default stated inside the
+  skill. An edit to an existing skill is the easiest way for a literal to slip back in.
+- **Fixtures and worked examples may use invented identities** — the reserved `example.*` domains,
+  invented user names, documented-reserved paths. Finding those is not a leak: sharpen the scan,
+  never rewrite the fixture.
+- **Know what CI covers.** `scripts/check_unfettered.py` enforces this mechanically for
+  `unfettered-skills/` only. For `skills/`, `prompts/`, `docs/` and `rules/` nothing fails on it, so
+  run the literal scan yourself and put the result in the report.
+
 ## Who may enter `skills/` (public catalog)
 
 Any portable capability that fits one of the four composition layers and keeps an
