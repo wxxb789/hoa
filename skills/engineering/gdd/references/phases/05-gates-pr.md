@@ -22,7 +22,8 @@
    | 3 | `ACTIVE_RUN`, `FETCH_FAILED`, `DETACHED_HEAD`, `BEHIND_MAIN` | No concurrent author and no stale or detached base. Ahead-count alone cannot say whether main moved; the fetched main must equal the merge base. |
    | 3 | `NO_BASELINE`, `BASELINE_MISMATCH`, `OVERLAP` | Ancestry does not tell whether a rebase changed the approved baseline. Preserve or resolve original dirt, snapshot the new approved base **before** replaying, then repeat review and gates. Never snapshot the shipping tip. For overlap the operator must decide who owns each path before passing `--accept-overlap`. |
    | 3 | `UNEXPLAINED_CHANGE`, `PHANTOM_CHANGE`, `INDEX_MISMATCH`, `SEAL_FAILED` | Per-path purposes tie pending output to its authoring results. Only pending paths are staged; `seal --index` binds the whole shipping increment, including earlier stage commits and accepted delegate unit commits. Already committed work is not committed again. |
-   | 3 | `LEFTOVERS`, `NO_GATES` | Git objects cannot account for local leftovers; reconcile everything except unchanged baseline dirt. Never push without gates on the verified commit. Honor any profile requirement for a clean checkout. |
+   | 3 | `LEFTOVERS`, `BASELINE_DIRT` | Git objects cannot account for local leftovers. Only `--no-push` permits unchanged baseline dirt. Publication gates require a clean checkout before and after they run; honor any additional profile requirements. |
+   | 3 | `NO_GATES`, `HEAD_MOVED` | Resolve gates before staging or committing. Never push without gates on the verified commit, or if HEAD moved while they ran. |
    | 4 | `GATE_FAILED` | Phase 2 checked a working tree; the gates here must succeed on the shipping candidate before it is pushed. |
    | 5 | `PUSH_FAILED`, `LEDGER_FAILED` | The push names the exact verified OID, never a moving ref or a force update. Check `oid` and `pushed` before retrying, especially when a push succeeded but the ledger append failed. |
 

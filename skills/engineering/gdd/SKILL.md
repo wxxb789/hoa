@@ -106,7 +106,7 @@ the wrong reason, and an exit code can disagree with the artifact it produced.
 | `GDD_RUN_DETACH` | detach mode: `auto`, `systemd`, `launchd`, `setsid`, `windows`, or environment-only `tmux` / `herdr` | `auto` (Linux user unit, macOS LaunchAgent, POSIX double fork, or native Windows) |
 | `GDD_TEMPLATES` | stage-template root | the bundled `references/stage-templates` |
 | `GDD_GOAL_GLOB` | goal-contract glob | `docs/goals/*<goal>*.md` |
-| `GDD_GATES` | JSON array of gate commands for `gdd.py commit` (run in the repo root without a shell; quote the array as a scalar in the config file), overridden by repeated `--gate`; stage prompts still accept a legacy plain-text environment value | none (push refused without gates) |
+| `GDD_GATES` | JSON array of gate commands for `gdd.py commit`, overridden by repeated `--gate`. Use POSIX quoting and forward slashes on every OS. Commands run in the repo root without a shell except for Windows batch shims. Quote the array as a scalar in the config file; stage prompts still accept a legacy plain-text environment value. | none (push refused without gates) |
 | `GDD_RUN_PLAN_DEFAULTS` | JSON run-plan defaults that `gdd.py setup` merges under `--plan-file` ([phase 1](references/phases/01-branch-dispatch.md#run-plan)); per-stage round caps default to **2x**, `token_cap` to none; `--over-budget` overrides one dispatch | none |
 | `GDD_WORKTREE_SCOPE` | `worktree-scope.py` path | `../delegated-work-acceptance/scripts/worktree-scope.py` |
 

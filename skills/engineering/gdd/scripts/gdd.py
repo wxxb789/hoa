@@ -71,6 +71,7 @@ import os
 import re
 import secrets
 import shlex
+import shutil
 import sys
 import tempfile
 import time
@@ -186,7 +187,8 @@ def git(repo, *args):
 
 def git_inventory(repo):
     data = gdd_process.run(
-        ["git", "-C", repo, "status", "--porcelain=v1", "-z", "-uall", "--no-renames"],
+        ["git", "--no-optional-locks", "-C", repo, "status", "--porcelain=v1", "-z", "-uall",
+         "--no-renames", "--ignore-submodules=none"],
         capture_output=True, check=True,
     ).stdout.decode("utf-8")
     return [(entry[:2], entry[3:]) for entry in data.split("\0") if entry]
@@ -203,19 +205,36 @@ def process_detail(proc):
     return (detail or f"exit {proc.returncode}").strip()
 
 
-def scope_run(tool, repo, goal, verb, *options):
+def scope_run(tool, repo, goal, verb, *options, env=None):
     return gdd_process.run(
         [agent_run.interpreter(), tool, verb, "--repo", repo, "--label", goal, "--json", *options],
-        capture_output=True, text=True,
+        capture_output=True, text=True, env=env,
     )
 
 
-def scope_baseline(tool, repo, goal):
+def scope_status(tool, repo, goal):
     proc = scope_run(tool, repo, goal, "status")
     if proc.returncode == 2 and proc.stderr.startswith("worktree-scope: no state for "):
         return None
     proc.check_returncode()
-    return json.loads(proc.stdout)["baseline"] or None
+    status = json.loads(proc.stdout)
+    return status if status["baseline"] else None
+
+
+def scope_diff(tool, repo, goal, *, preview_state=None):
+    if preview_state is None:
+        proc = scope_run(tool, repo, goal, "diff")
+    else:
+        # The scope tool saves its diff; a preview must leave the real state unchanged.
+        source = Path(preview_state)
+        with tempfile.TemporaryDirectory(prefix="gdd-scope-preview-") as directory:
+            copy = Path(directory, source.parent.name, source.name)
+            copy.parent.mkdir()
+            shutil.copyfile(source, copy)
+            proc = scope_run(tool, repo, goal, "diff", "--state-file", directory,
+                             env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"})
+    proc.check_returncode()
+    return json.loads(proc.stdout)
 
 
 def validate_stage(stage):
@@ -1045,21 +1064,19 @@ def cmd_stage(args):
     snapshot_tool = None
     problems = []
     if not guard_off and args.stage in ("implement", *DIFF_STAGES):
+        tool = scope_tool()
+        status = scope_status(tool, repo, args.goal)
         inventory = git_inventory(repo)
-        dirty = pending_paths(inventory)
-        baseline = None
-        if inventory or args.stage == "implement":
-            tool = scope_tool()
-            baseline = scope_baseline(tool, repo, args.goal)
-            if baseline and inventory:
-                diff = scope_run(tool, repo, args.goal, "diff")
-                diff.check_returncode()
-                dirty = pending_paths(inventory, json.loads(diff.stdout)["excluded_preexisting_paths"])
-            elif args.stage == "implement" and not baseline and not inventory:
+        if status:
+            scope = scope_diff(tool, repo, args.goal, preview_state=status["state_file"] if args.dry_run else None)
+            dirty = pending_paths(inventory, scope["excluded_preexisting_paths"]) | set(scope["overlapping_paths"])
+        else:
+            dirty = pending_paths(inventory)
+            if args.stage == "implement" and not inventory:
                 snapshot_tool = tool
         problems = dispatch_problems(
             args.stage, goal_file, goal_state_header(goal_file), sorted(dirty), base, head,
-            bool(baseline), force=args.force,
+            bool(status), force=args.force,
         )
     if problems:
         for problem in problems:
@@ -1361,14 +1378,13 @@ def run_commit(args, repo, report):
         raise CommitRefusal("DETACHED_HEAD", "HEAD is not on a branch")
 
     tool = scope_tool()
-    baseline = scope_baseline(tool, repo, args.goal)
-    if not baseline:
+    status = scope_status(tool, repo, args.goal)
+    if not status:
         raise CommitRefusal("NO_BASELINE", f"no scope snapshot for label {args.goal!r}")
+    baseline = status["baseline"]
     if baseline["head"] != main:
         raise CommitRefusal("BASELINE_MISMATCH", f"snapshot {baseline['head']} != merge base {main}")
-    diff = scope_run(tool, repo, args.goal, "diff")
-    diff.check_returncode()
-    scope = json.loads(diff.stdout)
+    scope = scope_diff(tool, repo, args.goal)
     if scope["overlapping_paths"] and not args.accept_overlap:
         refuse_paths("OVERLAP", scope["overlapping_paths"])
 
@@ -1404,7 +1420,15 @@ def run_commit(args, repo, report):
     partial = staged & unstaged
     if partial and (vanishing := partial - diff_paths("HEAD")):
         refuse_paths("INDEX_MISMATCH", vanishing)
-    paths = [{"path": path, "purpose": purposes[path]} for path in sorted(pending)]
+    gates = []
+    if not args.no_push:
+        gates = args.gate or configured_gates()
+        if not gates:
+            raise CommitRefusal("NO_GATES", "supply --gate or configure GDD_GATES before pushing")
+        baseline_paths = {entry["path"] for entry in baseline["entries"]}
+        if baseline_dirt := (pending_paths(inventory) & baseline_paths) - pending:
+            refuse_paths("BASELINE_DIRT", baseline_dirt)
+    paths =[{"path": path, "purpose": purposes[path]} for path in sorted(pending)]
     if pending:
         try:
             subject = args.message if args.message is not None else Path(args.message_file).read_text(encoding="utf-8")
@@ -1448,27 +1472,31 @@ def run_commit(args, repo, report):
     report["scope_sha"] = json.loads(verified.stdout)["scope_sha"]
 
     remaining = git_inventory(repo)
-    if remaining:
-        diff = scope_run(tool, repo, args.goal, "diff")
-        diff.check_returncode()
-        if leftovers := pending_paths(remaining, json.loads(diff.stdout)["excluded_preexisting_paths"]):
-            refuse_paths("LEFTOVERS", leftovers)
     if args.no_push:
+        if remaining:
+            scope = scope_diff(tool, repo, args.goal)
+            if leftovers := pending_paths(remaining, scope["excluded_preexisting_paths"]):
+                refuse_paths("LEFTOVERS", leftovers)
         return
 
-    gates = args.gate or configured_gates()
-    if not gates:
-        raise CommitRefusal("NO_GATES", "supply --gate or configure GDD_GATES before pushing")
+    if leftovers := pending_paths(remaining):
+        refuse_paths("LEFTOVERS", leftovers)
+
+    env = agent_run.child_env(())
     for command in gates:
         start = time.monotonic()
         try:
-            argv = shlex.split(command, posix=os.name != "nt")
-            # Non-POSIX shlex retains surrounding quotes; subprocess expects raw arguments.
-            if os.name == "nt":
-                argv = [arg[1:-1] if arg[:1] == arg[-1:] and arg.startswith(('"', "'")) else arg for arg in argv]
+            argv = shlex.split(command, posix=True)
             if not argv:
                 raise ValueError("empty command")
-            gate = gdd_process.run(argv, cwd=repo, capture_output=True, text=True)
+            name = os.path.expanduser(argv[0])
+            binary = os.path.join(repo, name) if os.path.dirname(name) else shutil.which(name, path=env.get("PATH"))
+            if not binary or not os.path.isfile(binary):
+                raise FileNotFoundError(f"gate executable not found: {name}")
+            if problem := agent_run.shim_hazard(binary, argv[1:]):
+                raise ValueError(problem)
+            gate = gdd_process.run(agent_run.command_prefix(binary) + argv[1:], cwd=repo, env=env,
+                                   capture_output=True, text=True)
             rc, detail = gate.returncode, process_detail(gate)
         except OSError as exc:
             rc, detail = 127, str(exc)
@@ -1477,6 +1505,10 @@ def run_commit(args, repo, report):
         report["gates"].append(dict(command=command, exit_code=rc, duration_s=time.monotonic() - start))
         if rc:
             raise CommitRefusal("GATE_FAILED", f"{command} rc={rc}: {detail}", 4)
+    if (head := git_text("rev-parse", "HEAD")) != oid:
+        raise CommitRefusal("HEAD_MOVED", f"verified {oid}, found {head} after gates")
+    if leftovers := pending_paths(git_inventory(repo)):
+        refuse_paths("LEFTOVERS", leftovers)
     pushed = run_git("push", "--", args.remote, f"{oid}:refs/heads/{report['branch']}", check=False)
     if pushed.returncode:
         raise CommitRefusal("PUSH_FAILED", process_detail(pushed), 5)

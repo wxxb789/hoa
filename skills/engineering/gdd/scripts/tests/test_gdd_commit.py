@@ -2,6 +2,7 @@
 import csv
 import json
 import os
+import shlex
 import sys
 import tempfile
 import unittest
@@ -43,7 +44,10 @@ class CommitTests(unittest.TestCase):
         self.git("remote", "add", "origin", self.origin)
         self.git("push", "origin", "main")
         self.git("switch", "-c", "topic")
-        self.gate = f'"{sys.executable}" -c "raise SystemExit(0)"'
+        self.gate = self.python_gate("raise SystemExit(0)")
+
+    def python_gate(self, source, *args):
+        return shlex.join([Path(sys.executable).as_posix(), "-c", source, *args])
 
     def run_cmd(self, *argv, check=False):
         return gdd_process.run(list(map(str, argv)), env=self.env, check=check,
@@ -98,7 +102,9 @@ class CommitTests(unittest.TestCase):
         changes = self.purposes("new caf\u00e9.txt", "notes.txt")
         previous = self.result.rename(self.result.with_name("previous.json"))
         changes += self.purposes("old name.txt", "removed.txt", "renamed name.txt")
-        output = self.commit("--result", previous, "--result", self.result, "--gate", self.gate)
+        quoted = 'argument with "inner quotes"'
+        gate = self.python_gate("import sys; assert sys.argv[1:] == ['argument with \"inner quotes\"']", quoted)
+        output = self.commit("--result", previous, "--result", self.result, "--gate", gate)
         oid = self.git("rev-parse", "HEAD")
         self.assertEqual((output["oid"], output["committed"], output["pushed"]), (oid, True, True))
         self.assertEqual(output["paths"], changes)
@@ -121,6 +127,11 @@ class CommitTests(unittest.TestCase):
         self.snapshot()
         self.write("new.txt", "increment\n")
         self.purposes("new.txt")
+        denied = self.commit("--result", self.result, "--gate", self.gate, code=3, error="BASELINE_DIRT")
+        self.assertIn("notes.txt", denied["detail"])
+        self.assertEqual((denied["committed"], denied["gates"]), (False, []))
+        self.assertEqual(self.git("rev-parse", "HEAD"), self.base)
+        self.assertNotEqual(self.remote_topic().returncode, 0)
         output = self.commit("--result", self.result, "--no-push", "--gate", 'missing-gate')
         self.assertEqual((output["pushed"], output["gates"]), (False, []))
         self.assertNotEqual(self.remote_topic().returncode, 0)
@@ -178,17 +189,52 @@ class CommitTests(unittest.TestCase):
         self.write("new.txt", "increment\n")
         self.purposes("new.txt")
         stopped = self.commit("--result", self.result, code=3, error="NO_GATES")
-        self.assertTrue(stopped["committed"])
-        failed = self.commit("--gate", self.gate.replace("(0)", "(7)"), "--gate", self.gate,
+        self.assertFalse(stopped["committed"])
+        self.assertEqual(self.git("rev-parse", "HEAD"), self.base)
+        self.env["GDD_GATES"] = "not json"
+        invalid = self.commit("--result", self.result, code=2, error="INVALID_INPUT")
+        self.assertFalse(invalid["committed"])
+        self.assertEqual(self.git("rev-parse", "HEAD"), self.base)
+        self.assertEqual(self.git("diff", "--cached", "--name-only"), "")
+        del self.env["GDD_GATES"]
+        failed = self.commit("--result", self.result, "--gate", self.python_gate("raise SystemExit(7)"),
+                             "--gate", self.gate,
                              code=4, error="GATE_FAILED")
         self.assertEqual([gate["exit_code"] for gate in failed["gates"]], [7])
         self.assertNotEqual(self.remote_topic().returncode, 0)
         config = Path(self.env["XDG_CONFIG_HOME"]) / "gdd" / "config.yaml"
         config.parent.mkdir(parents=True)
-        config.write_text("GDD_GATES: '" + json.dumps([self.gate]) + "'\n", encoding="utf-8")
+        config.write_text("GDD_GATES: '" + json.dumps([self.gate]).replace("'", "''") + "'\n", encoding="utf-8")
         pushed = self.commit()
         self.assertEqual(self.remote_topic().stdout.strip(), pushed["oid"])
         self.assertFalse(pushed["committed"])
+
+    def test_gate_mutations_prevent_push(self):
+        self.snapshot()
+        write_dirt = self.python_gate("from pathlib import Path; Path('gate-output.txt').touch()")
+        dirty = self.commit("--gate", write_dirt, code=3, error="LEFTOVERS")
+        self.assertIn("gate-output.txt", dirty["detail"])
+        self.assertEqual([gate["exit_code"] for gate in dirty["gates"]], [0])
+        self.assertNotEqual(self.remote_topic().returncode, 0)
+        (self.repo / "gate-output.txt").unlink()
+        moved = self.commit("--gate", "git commit --allow-empty -m 'gate moved HEAD'",
+                            code=3, error="HEAD_MOVED")
+        self.assertEqual(moved["oid"], self.base)
+        self.assertNotEqual(self.git("rev-parse", "HEAD"), self.base)
+        self.assertNotEqual(self.remote_topic().returncode, 0)
+
+    def test_stage_commit_preserves_resume_action(self):
+        self.snapshot()
+        self.run_cmd(sys.executable, SCRIPTS / "delivery-state.py", "append", "--repo", self.repo,
+                     "--goal", "173", "--stage", "simplify", "--next", "review", check=True)
+        self.write("new.txt", "increment\n")
+        self.purposes("new.txt")
+        self.commit("--result", self.result, "--no-push")
+        shown = self.gdd("status")
+        self.assertEqual(shown.returncode, 0, shown.stderr)
+        self.assertIn("next_action: review", shown.stdout.splitlines())
+        listed = self.run_cmd(sys.executable, SCRIPTS / "delivery-state.py", "list", check=True)
+        self.assertEqual(listed.stdout.split()[2::2], ["simplify", "review"])
 
     def test_stage_guards_use_baseline_and_require_a_committed_range(self):
         self.write("notes.txt", "pre-existing\n")
@@ -203,8 +249,17 @@ class CommitTests(unittest.TestCase):
         self.assertEqual(blocked.returncode, 3, blocked.stdout)
         self.assertIn("new caf\u00e9.txt", blocked.stderr)
         self.commit("--no-push", "--result", self.result)
+        state = Path(json.loads(self.scope("status").stdout)["state_file"])
+        before = state.read_bytes()
         allowed = self.gdd("stage", "--stage", "review", "--dry-run")
         self.assertEqual(allowed.returncode, 0, allowed.stderr)
+        self.assertEqual(state.read_bytes(), before)
+        self.git("restore", "notes.txt")
+        self.assertEqual(self.git("status", "--porcelain"), "")
+        overlap = self.gdd("stage", "--stage", "review", "--dry-run")
+        self.assertEqual(overlap.returncode, 3, overlap.stdout + overlap.stderr)
+        self.assertIn("notes.txt", overlap.stderr)
+        self.assertEqual(state.read_bytes(), before)
 
     def test_clean_implement_auto_snapshots_only_when_launching(self):
         rendered = self.gdd("stage", "--stage", "implement", "--dry-run")
