@@ -17,11 +17,16 @@
       "0002": "ready",
       "0003": "draft",
       "0004": "provisional"
-    }}
+    }},
+    "goal-1-status-file": {"file": "docs/goals/0001-vertical-slice.md", "contains": "Status: ready"},
+    "goal-2-status-file": {"file": "docs/goals/0002-session-pool.md", "contains": "Status: ready"},
+    "goal-3-status-file": {"file": "docs/goals/0003-security-signoff.md", "contains": "Status: draft"},
+    "goal-4-status-file": {"file": "docs/goals/0004-plugin-distribution.md", "contains": "Status: provisional"}
   },
   "notes": {
     "repo-goal-dir": "SKILL.md#write-goal-files: inside a software repository with no prior goal directory, resolve to docs/goals/ with archive docs/goals/archive/ and 4-digit prefixes matching gdd's default glob.",
     "core-design-file": "SKILL.md#boundary: multi-goal series sharing enduring invariants anchors them in a concise Core Design document (docs/core-design.md) and links it from each goal file.",
-    "status-headers": "SKILL.md#write-goal-files: standalone Status: header uses ready, draft (external acceptance), and provisional so gdd.py's goal_state_header blocks non-runnable goals."
+    "status-headers": "SKILL.md#write-goal-files: standalone Status: header uses ready, draft (external acceptance), and provisional so gdd.py's goal_state_header blocks non-runnable goals.",
+    "goal-1-status-file": "status-headers only checks the returned JSON; the *-status-file checks require the header in each goal file on disk."
   }
 }
