@@ -577,7 +577,7 @@ def cmd_diff(args) -> int:
     state_path = _state_path(repo, args.label, args.state_file)
     state = _load(state_path)
     _require_baseline(state, repo, args.label, "diff")
-    result = _diff(repo, state)
+    result = _diff(repo, state, no_renames=True, no_replace=True)
     state["diff"] = result
     _save(state_path, state)
     overlap = result["overlapping_paths"]
@@ -606,7 +606,7 @@ def cmd_seal(args) -> int:
             f"no prior diff for {repo} [{args.label}]; run diff before seal")
     if args.index:
         return _seal_index(args, repo, state_path, state)
-    result = _diff(repo, state)
+    result = _diff(repo, state, no_renames=True, no_replace=True)
     state["diff"] = result
     overlap = result["overlapping_paths"]
     if overlap and not args.accept_overlap:
@@ -757,7 +757,7 @@ def cmd_verify(args) -> int:
     _require_baseline(state, repo, args.label, "verify")
     seal = state["seal"]
     sealed = {entry["path"]: entry.get("sha256") for entry in seal.get("paths", [])}
-    result = _diff(repo, state)
+    result = _diff(repo, state, no_renames=True, no_replace=True)
     current = {path: _digest(repo, path) for path in result["changed_paths"]}
 
     drift: list[tuple[str, str]] = []

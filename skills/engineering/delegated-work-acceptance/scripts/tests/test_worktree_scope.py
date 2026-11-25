@@ -864,6 +864,57 @@ class ScopeTests(unittest.TestCase):
         self.assertIsNone(records["old.txt"][0])
         self.assertIsNotNone(records["new.txt"][0])
 
+    def test_legacy_diff_and_verify_keep_committed_rename_source_in_scope(self):
+        self.write(self.repo, "old.txt", "one\ntwo\nthree\n")
+        self.commit(self.repo, "base")
+        self.invoke("snapshot", expect=0)
+        self.git(self.repo, "config", "diff.renames", "true")
+        self.git(self.repo, "config", "status.renames", "true")
+        self.git(self.repo, "mv", "old.txt", "new.txt")
+        self.commit(self.repo, "rename")
+
+        result = self.invoke_json("diff")
+        self.assertEqual(result["changed_paths"], ["new.txt", "old.txt"])
+        seal = self.invoke_json("seal")["seal"]
+        self.assertEqual([entry["path"] for entry in seal["paths"]],
+                         ["new.txt", "old.txt"])
+        proc = self.invoke("verify", expect=0)
+        self.assertIn("scope ok: 2 paths", proc.stdout)
+
+    def test_legacy_verify_accepts_rename_committed_after_seal(self):
+        self.write(self.repo, "old.txt", "one\ntwo\nthree\n")
+        self.commit(self.repo, "base")
+        self.invoke("snapshot", expect=0)
+        self.git(self.repo, "config", "diff.renames", "true")
+        self.git(self.repo, "config", "status.renames", "true")
+        self.git(self.repo, "mv", "old.txt", "new.txt")
+        result = self.invoke_json("diff")
+        self.assertEqual(result["changed_paths"], ["new.txt", "old.txt"])
+        self.invoke("seal", expect=0)
+        self.commit(self.repo, "rename")
+
+        proc = self.invoke("verify", expect=0)
+        self.assertNotIn("removed old.txt", proc.stdout)
+        self.assertIn("scope ok: 2 paths", proc.stdout)
+
+    def test_legacy_verify_still_reports_out_of_scope_deletion(self):
+        self.write(self.repo, "sealed.txt", "sealed\n")
+        self.write(self.repo, "other.txt", "other\n")
+        self.commit(self.repo, "base")
+        self.invoke("snapshot", expect=0)
+        self.git(self.repo, "config", "diff.renames", "true")
+        self.git(self.repo, "config", "status.renames", "true")
+        self.write(self.repo, "sealed.txt", "sealed\nmore\n")
+        self.invoke("diff", expect=0)
+        self.invoke("seal", expect=0)
+        self.commit(self.repo, "work")
+        self.invoke("verify", expect=0)
+
+        (self.repo / "other.txt").unlink()
+        proc = self.invoke("verify", expect=1)
+        self.assertIn("SCOPE_DRIFT: 1 paths", proc.stdout)
+        self.assertIn("other.txt", proc.stdout)
+
     def test_index_seal_quotes_flagged_diagnostic_paths(self):
         self.write(self.repo, "base.txt", "base\n")
         self.commit(self.repo, "base")

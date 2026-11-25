@@ -4,6 +4,10 @@ Entries are dated and optional; no CI gate requires one. There is no project ver
 counts its own iterations in `metadata.revision`. Earlier entries retain the retired project
 `VERSION` numbers and historical per-skill versions.
 
+## 2026-11-25
+
+- delegated-work-acceptance: `worktree-scope.py` `diff`, `seal` and `verify` now pass `--no-renames` (and `--no-replace-objects`) like the index seal, so a committed rename or merge-delete no longer reports a false `SCOPE_DRIFT removed <source>`.
+
 ## 2026-11-23
 
 - hoa-skill-create: absorb more of nuwa-skill v2. New `references/distilled-package.md` (package layout with research notes and holdout kept out of the install, card and index fields, third-person runtime rules with first person as an opt-in for public or deceased subjects, a pre-delivery integrity check); `distill-material.md` gains collection tracks, increment and holdout tightening, and refresh or re-distill; `evaluate.md` gains distilled-skill scoring and a symptom-to-layer repair map.
