@@ -42,6 +42,7 @@ import json
 import os
 import re
 import sys
+import time
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -58,6 +59,7 @@ STAGES = [
     "apply",
     "review",
     "fix",
+    "commit",
     "gates",
     "pr",
     "babysit",
@@ -183,15 +185,6 @@ def read_rows(state_file):
     return rows
 
 
-def write_header_if_missing(state_file):
-    if os.path.exists(state_file) and os.path.getsize(state_file) > 0:
-        return
-    parent = os.path.dirname(os.path.abspath(state_file))
-    os.makedirs(parent, exist_ok=True)
-    with open(state_file, "a", encoding="utf-8") as handle:
-        handle.write("\t".join(COLUMNS) + "\n")
-
-
 def cmd_append(args):
     values = {
         "ts": datetime.now().astimezone().isoformat(timespec="seconds"),
@@ -208,9 +201,22 @@ def cmd_append(args):
         "next_action": args.next,
         "note": args.note,
     }
-    write_header_if_missing(args.state_file)
-    with open(args.state_file, "a", encoding="utf-8") as handle:
-        handle.write("\t".join(clean(values[column]) for column in COLUMNS) + "\n")
+    try:
+        os.makedirs(os.path.dirname(os.path.abspath(args.state_file)), exist_ok=True)
+        with open(args.state_file + ".lock", "a+b") as lock:
+            deadline = time.monotonic() + 2
+            while not gdd_process.try_file_lock(lock):
+                if time.monotonic() >= deadline:
+                    print(f"delivery-state: timed out locking ledger {args.state_file}", file=sys.stderr)
+                    return 1
+                time.sleep(0.05)
+            with open(args.state_file, "a", encoding="utf-8") as handle:
+                if not handle.tell():
+                    handle.write("\t".join(COLUMNS) + "\n")
+                handle.write("\t".join(clean(values[column]) for column in COLUMNS) + "\n")
+    except OSError as exc:
+        print(f"delivery-state: could not append to {args.state_file}: {exc}", file=sys.stderr)
+        return 1
     print(f"appended: {args.state_file}")
     return 0
 

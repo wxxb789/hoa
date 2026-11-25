@@ -7,7 +7,18 @@
     "stage": {"type": "string", "enum": ["implement", "verify", "simplify", "apply", "review", "fix"]},
     "verdict": {"type": "string", "enum": ["DONE", "APPROVE", "MUST_FIX", "DECISION_NEEDED", "BLOCKED"]},
     "summary": {"type": "string"},
-    "changed_files": {"type": "array", "items": {"type": "string"}},
+    "changed_files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "purpose"],
+        "properties": {
+          "path": {"type": "string"},
+          "purpose": {"type": "string"}
+        }
+      }
+    },
     "gates": {
       "type": "array",
       "items": {

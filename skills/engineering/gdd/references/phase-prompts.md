@@ -28,7 +28,7 @@ last generation of prompts drifted from the transport it was written for.
 | `${GOAL_FILE}` | `--goal-file`, else the profile's contract glob (`GDD_GOAL_GLOB`, default `docs/goals/*<goal>*.md`), else `-` |
 | `${BASE_SHA}` | `--base`, default `git merge-base origin/main HEAD` |
 | `${HEAD_SHA}` | `--head`, default `git rev-parse HEAD` |
-| `${GATES}` | `--gates`, else `$GDD_GATES`, else `-` |
+| `${GATES}` | `--gates`, else commands from `GDD_GATES` (legacy plain-text environment value accepted for stage prompts), else `-` |
 | `${FINDINGS_FILE}` | `--findings` (absolute path) |
 | `${DATE}` | local date of dispatch |
 

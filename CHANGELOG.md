@@ -6,6 +6,7 @@ counts its own iterations in `metadata.revision`. Earlier entries retain the ret
 
 ## 2026-11-25
 
+- gdd (#173): add a scope-sealed `gdd.py commit` command with per-path purposes, gates and exact-OID push; guard stage dispatch against pending changes relative to the baseline and serialize ledger appends.
 - delegated-work-acceptance: `worktree-scope.py` `diff`, `seal` and `verify` now pass `--no-renames` (and `--no-replace-objects`) like the index seal, so a committed rename or merge-delete no longer reports a false `SCOPE_DRIFT removed <source>`.
 
 ## 2026-11-23
