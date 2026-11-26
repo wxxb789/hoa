@@ -110,7 +110,8 @@ class PaseoLauncherTests(unittest.TestCase):
         self.env = dict(os.environ)
         for key in ("PASEO_BIN", "GDD_MODEL", "GDD_THINKING"):
             self.env.pop(key, None)
-        self.env.update(GDD_RUN_ROOT=str(self.root), STUB_HOME=str(self.home),
+        # A detached auto-GC child cannot be joined, and it writes into the root while teardown deletes it.
+        self.env.update(GDD_RUN_MAX_MB="off", GDD_RUN_ROOT=str(self.root), STUB_HOME=str(self.home),
                         STUB_TESTS=str(Path(__file__).resolve().parent), STUB_SCRIPTS=str(ADAPTER.parents[1]),
                         GDD_RUN_DETACH="windows" if os.name == "nt" else "setsid",
                         PATH=str(self.bin) + os.pathsep + os.environ.get("PATH", ""))

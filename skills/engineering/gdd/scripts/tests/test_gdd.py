@@ -85,7 +85,9 @@ class GddCase(unittest.TestCase):
         self.record = os.path.join(self.tmp, "record.json")
         drop = ("GDD_", "STUB_", "DSH_", "OMP_", "PASEO_", "XDG_")
         self.env = {k: v for k, v in os.environ.items() if not k.startswith(drop)}
-        self.env.update(XDG_STATE_HOME=self.state_home, XDG_CONFIG_HOME=os.path.join(self.tmp, "config"),
+        # A detached auto-GC child cannot be joined, and it writes into the root while teardown deletes it.
+        self.env.update(GDD_RUN_MAX_MB="off", XDG_STATE_HOME=self.state_home,
+                        XDG_CONFIG_HOME=os.path.join(self.tmp, "config"),
                         GDD_RUN_DETACH="windows" if os.name == "nt" else "setsid",
                         OMP_BIN=STUB, DSH_BIN=STUB, CLAUDE_BIN=STUB, STUB_FIXTURE=OK_FIXTURE, STUB_RECORD=self.record,
                         PYTHONDONTWRITEBYTECODE="1", **GIT_IDENTITY)
