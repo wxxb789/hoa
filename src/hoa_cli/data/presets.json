@@ -1,7 +1,7 @@
 {
   "presets": {
     "claim-audit": {
-      "description": "Audit a reported claim against independent artifact or receipt evidence (delegated-work-acceptance, report-claim-audit, hermes-ops-claim-verification).",
+      "description": "Audit a reported claim against independent artifact or receipt evidence.",
       "questions": [
         {
           "name": "verdict",

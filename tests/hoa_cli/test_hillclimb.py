@@ -1,25 +1,22 @@
-#!/usr/bin/env -S uv run --script
-# /// script
-# requires-python = ">=3.13"
-# dependencies = []
-# ///
 """Offline CLI contract tests using an OpenAI-compatible local HTTP stub."""
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import os
-import subprocess
-import sys
 import tempfile
 import threading
 import unittest
 from collections import Counter
+from contextlib import redirect_stderr, redirect_stdout
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from unittest.mock import patch
+
+from hoa_cli.cli import main
 
 
-SCRIPT = Path(__file__).resolve().parents[1] / "hillclimb.py"
 LABELS = ("routine", "alpha", "beta", "novel")
 METRICS = {"precision", "recall", "f_beta", "worst_case_gap", "false_negatives",
            "false_positives", "confusion_pairs", "refusal_count"}
@@ -50,9 +47,13 @@ class Stub(BaseHTTPRequestHandler):
             self.send_error(404)
             return
         if chat:
-            body = json.loads(body["messages"][-1]["content"])
-        text, questions = body["input"], body["questions"]
-        variant = next(q["instructions"] for q in questions if q["name"] == "mechanism")
+            state_and_questions = body["messages"][0]["content"].partition("\n\nState:\n")[2]
+            text, _, questions_text = state_and_questions.partition("\n\nQuestions:\n")
+            variant = next(line.rsplit("): ", 1)[1] for line in questions_text.splitlines()
+                           if line.startswith('- "mechanism" ('))
+        else:
+            text, questions = body["input"], body["questions"]
+            variant = next(q["instructions"] for q in questions if q["name"] == "mechanism")
         self.server.requests.append((self.path, variant, text))
         if text.startswith("endpoint-error"):
             result = {"error": {"message": text}}
@@ -130,22 +131,24 @@ class HillclimbTests(unittest.TestCase):
         return self.write_rows(name, [{"id": f"record-{i}", "text": text, "expected": want}
                                       for i, (text, want) in enumerate(examples)])
 
-    def command(self, name: str, *args: Path | str, api: str | None = "decisions", status: int = 0):
+    def command(self, name: str, *args: Path | str, api: str | None = "decisions", status: int = 0) -> tuple[str, str]:
         flags = [] if api is None or name == "split" else [
             "--base-url", self.url, "--model", "fixture", "--api", api, "--workers", "2",
         ]
-        proc = subprocess.run([sys.executable, str(SCRIPT), name, *map(str, args), *flags],
-                              cwd=self.root, env=self.env, capture_output=True, encoding="utf-8", timeout=8)
-        self.assertEqual(proc.returncode, status, proc.stderr)
+        out, err = io.StringIO(), io.StringIO()
+        with patch.dict(os.environ, self.env, clear=True), redirect_stdout(out), redirect_stderr(err):
+            result = main(["hillclimb", name, *map(str, args), *flags])
+        stderr = err.getvalue()
+        self.assertEqual(result, status, stderr)
         if status != 2:
-            self.assertEqual(proc.stderr, "")
-        return proc
+            self.assertEqual(stderr, "")
+        return out.getvalue(), stderr
 
     def evaluate(self, path: Path, *args: Path | str, rubric_path: Path | None = None,
                  command: str = "eval", api: str | None = "decisions", status: int = 0) -> dict:
-        result = self.command(command, "--rubric", rubric_path or self.baseline, "--dataset", path,
-                              *args, api=api, status=status)
-        return json.loads(result.stdout)
+        stdout, _ = self.command(command, "--rubric", rubric_path or self.baseline, "--dataset", path,
+                                 *args, api=api, status=status)
+        return json.loads(stdout)
 
     def test_split_is_deterministic_and_stratified(self) -> None:
         rows = [{"id": f"{label}-{i}", "text": "Example", "expected": label}
@@ -153,9 +156,9 @@ class HillclimbTests(unittest.TestCase):
         inputs = [self.write_rows("ordered.jsonl", rows), self.write_rows("reversed.jsonl", rows[::-1])]
         for source in inputs:
             tag = source.stem
-            result = self.command("split", "--input", source, "--train-out", f"{tag}-train.jsonl",
-                                  "--holdout-out", f"{tag}-holdout.jsonl", "--out-dir", self.root)
-            self.assertEqual(json.loads(result.stdout), {"train_count": 10, "holdout_count": 3})
+            stdout, _ = self.command("split", "--input", source, "--train-out", f"{tag}-train.jsonl",
+                                     "--holdout-out", f"{tag}-holdout.jsonl", "--out-dir", self.root)
+            self.assertEqual(json.loads(stdout), {"train_count": 10, "holdout_count": 3})
         train, holdout = ([(json.loads(line)) for line in (self.root / f"ordered-{kind}.jsonl")
                            .read_text(encoding="utf-8").splitlines()] for kind in ("train", "holdout"))
         self.assertEqual(Counter(row["expected"] for row in train), {"alpha": 6, "beta": 3, "novel": 1})
@@ -183,10 +186,10 @@ class HillclimbTests(unittest.TestCase):
         ])
         outputs = []
         for command, args in (("eval", ("--mode", "holdout", "--max-errors", "5")), ("eval-holdout", ())):
-            proc = self.command(command, "--rubric", self.baseline, "--dataset", holdout, *args)
+            stdout, stderr = self.command(command, "--rubric", self.baseline, "--dataset", holdout, *args)
             for private in ("secret-holdout", "secret-label", "blind-id", "error_samples"):
-                self.assertNotIn(private, proc.stdout + proc.stderr)
-            outputs.append(json.loads(proc.stdout))
+                self.assertNotIn(private, stdout + stderr)
+            outputs.append(json.loads(stdout))
         self.assertEqual(set(outputs[0]), METRICS)
         self.assertEqual(outputs[0], outputs[1])
         self.assertEqual(outputs[0]["confusion_pairs"], [{"labels": ["alpha", "beta"], "count": 1}])
@@ -214,19 +217,20 @@ class HillclimbTests(unittest.TestCase):
         regression = self.write_json("regression.json", rubric("break-anchors"))
         best, ledger = self.root / "best.json", self.root / "rubric-ledger.jsonl"
         shared = ("--train", train, "--anchors", anchors, "--best-out", best, "--ledger", ledger)
-        first = json.loads(self.command("step", "--baseline", self.baseline, "--candidate", self.candidate,
-                                        *shared, "--note", "tighten the category").stdout)
+        stdout, _ = self.command("step", "--baseline", self.baseline, "--candidate", self.candidate,
+                                 *shared, "--note", "tighten the category")
+        first = json.loads(stdout)
         self.assertTrue(first["accepted"])
         self.assertEqual(first["candidate"]["f_beta"], 1.0)
         self.assertEqual(best.read_bytes(), self.candidate.read_bytes())
         self.assertEqual(first["sha256"], hashlib.sha256(best.read_bytes()).hexdigest())
-        second = json.loads(self.command("step", "--baseline", self.candidate, "--candidate", self.baseline,
-                                         *shared).stdout)
+        stdout, _ = self.command("step", "--baseline", self.candidate, "--candidate", self.baseline, *shared)
+        second = json.loads(stdout)
         self.assertFalse(second["accepted"])
         self.assertEqual(second["status"], "reverted")
         self.assertLess(second["candidate"]["f_beta"], second["baseline"]["f_beta"])
-        third = json.loads(self.command("step", "--baseline", self.baseline, "--candidate", regression,
-                                        *shared).stdout)
+        stdout, _ = self.command("step", "--baseline", self.baseline, "--candidate", regression, *shared)
+        third = json.loads(stdout)
         self.assertFalse(third["accepted"])
         self.assertGreater(third["candidate"]["f_beta"], third["baseline"]["f_beta"])
         self.assertEqual(third["candidate"]["anchors"]["false_negatives"], 1)
@@ -245,8 +249,9 @@ class HillclimbTests(unittest.TestCase):
             {"id": "unchanged", "text": "ordinary"},
         ]
         pool = self.write_rows("pool.jsonl", items)
-        result = json.loads(self.command("sample", "--baseline", self.baseline, "--candidate", self.candidate,
-                                         "--pool", pool, "--max-items", "1").stdout)
+        stdout, _ = self.command("sample", "--baseline", self.baseline, "--candidate", self.candidate,
+                                 "--pool", pool, "--max-items", "1")
+        result = json.loads(stdout)
         for name, item in (("disagreement_pool", "different"), ("confusion_pool", "ambiguous"), ("ood_pool", "outside")):
             self.assertEqual([entry["id"] for entry in result[name]], [item])
             self.assertNotIn("expected", result[name][0])
@@ -266,14 +271,11 @@ class HillclimbTests(unittest.TestCase):
 
     def test_bad_wire_responses_fail_without_leaking_holdout(self) -> None:
         short = self.labeled("short.jsonl", ("short-answer", True))
-        fail = self.command("eval", "--rubric", self.baseline, "--dataset", short, status=2)
-        self.assertIn("expected 3 answers, got 0", fail.stderr)
+        _, stderr = self.command("eval", "--rubric", self.baseline, "--dataset", short, status=2)
+        self.assertIn("expected 3 answers, got 0", stderr)
         holdout = self.labeled("holdout.jsonl", ("endpoint-error secret-echo", True))
-        fail = self.command("eval-holdout", "--rubric", self.baseline, "--dataset", holdout, status=2)
-        self.assertEqual(fail.stdout, "")
-        self.assertNotIn("secret-echo", fail.stderr)
-        self.assertNotIn("Traceback", fail.stderr)
+        stdout, stderr = self.command("eval-holdout", "--rubric", self.baseline, "--dataset", holdout, status=2)
+        self.assertEqual(stdout, "")
+        self.assertNotIn("secret-echo", stderr)
+        self.assertNotIn("Traceback", stderr)
 
-
-if __name__ == "__main__":
-    unittest.main()

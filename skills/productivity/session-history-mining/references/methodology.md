@@ -9,8 +9,12 @@
    (epistemic uncertainty masquerading as high confidence). Entropy only peaks
    when an input straddles two *known* buckets (aleatoric ambiguity).
    **Fix:** Pair an unbiased, category-free `anomaly_probe` (`predicate`) with an
-   explicit `unclassified_novel_*` escape-hatch choice. Epistemic OOD is isolated
-   by `ood_residual = P(anomaly_probe) * P(unclassified_novel)`.
+   explicit `unclassified_novel_*` escape-hatch choice. Rank OOD with
+   `ood_residual = p_anom * (p_novel + 0.5 * max(0.0, 1.0 - p_routine - max_known))`,
+   where `max_known` is the largest probability of a known non-routine bucket.
+   For aleatoric ambiguity, inspect `confusion_pairs`: recurring high-overlap
+   pairs of known positive buckets are merge candidates when both call for the
+   same action.
 2. **Repeated KV-cache prefill waste.** On `/v1/decisions`, encoding the state
    window dominates latency and cost (~95%+), whereas evaluating 3–4 independent
    orthogonal questions on the same encoded state is nearly free. Splitting
@@ -59,6 +63,22 @@
     contains `text` and `toolCall` (`id`, `name`, `arguments`).
   - `type == "message"` with `message.role == "toolResult"`: `toolCallId`,
     `toolName`, `isError`, and `content[].text`.
+
+### Codex (`~/.codex/`)
+
+- Prefer existing rollout JSONL. Completed items take precedence over duplicate
+  raw response records; older rollouts can use `response_item` records directly.
+  Without both databases, scan `rollout-*.jsonl`, including under `sessions/` and
+  `archived_sessions/`.
+- If a rollout is missing, look up its thread in `state_5.sqlite` and reconstruct
+  its records from `thread_history_1.sqlite` in `rollout_ordinal` order. SQLite
+  locators use those ordinals; JSONL locators use physical file lines.
+- Open SQLite read-only. When WAL sidecars are missing or a lock blocks reads,
+  use an immutable view to avoid creating or touching sidecars. The warning
+  means recent WAL changes may be unavailable.
+- Within the selected directory scope, retain user threads, clean `worker` or
+  `default` subagents, and subagent threads with tool errors. Omit other clean
+  internal roles unless `--include-codex-subagents` is passed.
 
 ## Stopping Criterion
 

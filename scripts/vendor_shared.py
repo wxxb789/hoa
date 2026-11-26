@@ -29,17 +29,12 @@ SHARED = ROOT / "scripts" / "shared"
 # A root-level script that must be vendored like a shared one.
 SOURCES: dict[str, Path] = {
     "skill_config.py": ROOT / "scripts" / "skill_config.py",
-    "rubrics.json": ROOT / "evals" / "decision-rubrics.json",
 }
 
 # shared file name → destination skill dirs
 CONSUMERS: dict[str, list[str]] = {
     "skill_config.py": ["skills/engineering/gdd/scripts",
-                        "skills/productivity/ghc-decisions/scripts",
-                        "skills/productivity/rubric-hillclimb/scripts",
-                        "skills/productivity/session-history-mining/scripts",
                         "skills/productivity/spin-breaker/scripts"],
-    "rubrics.json": ["skills/productivity/ghc-decisions/scripts"],
     "findings.py": ["skills/skill-authoring/hoa-practice-retro/scripts"],
     "panel.md": ["skills/skill-authoring/hoa-practice-retro/references"],
     "usage-based-recommendations.md": [
@@ -58,7 +53,7 @@ CONSUMERS: dict[str, list[str]] = {
         "skills/productivity/spec-convergence/references",
         "skills/productivity/spin-breaker/references",
     ],
-    # Read on failure only; skills whose docs run their own scripts with `uv run`.
+    # Read on failure only; skills whose docs run commands with `uv run` or `uvx`.
     "troubleshooting.md": [
         "skills/productivity/agent-operating-contract-evolution/references",
         "skills/engineering/gdd/references",

@@ -5,8 +5,8 @@
 # ///
 """Run the multi-domain decision benchmark across claim-audit, ci-triage, tool-risk, and skill-review.
 
-Validates evals/decision-cases.json against evals/decision-rubrics.json offline when
-invoked with --validate-only, or executes the live suite against a configured
+Validates evals/decision-cases.json against the bundled hoa-cli presets offline
+when invoked with --validate-only, or executes the live suite against a configured
 endpoint (`--api decisions` or `--api chat-completions`).
 """
 from __future__ import annotations
@@ -19,17 +19,14 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 EVALS = Path(__file__).resolve().parent
-ROOT = EVALS.parent
-sys.path.insert(0, str(ROOT / "scripts"))
-
-import skill_config as sc  # noqa: E402
-
 try:
     import decision_judge as dj  # noqa: E402
 except ModuleNotFoundError as error:
     if error.name != "decision_judge":
         raise
     from evals import decision_judge as dj  # noqa: E402
+
+from hoa_cli import config as sc  # noqa: E402
 
 CASES_PATH = EVALS / "decision-cases.json"
 MAX_WORKERS = 5
