@@ -69,6 +69,7 @@ targets:  runtime-agnostic | repo-only |
 | report-claim-audit | skill | work-management,software-development | runtime-agnostic | `skills/research-writing/report-claim-audit/` | 审计报告声明和遗漏，或用任务清单、实际发布与部署锁定版本核查阶段收尾 |
 | research-stream-consolidation | skill | work-management | runtime-agnostic | `skills/research-writing/research-stream-consolidation/` | 把重复的研究流并成一个项目，并修好绑定旧路径的记录 |
 | review-revision-candidates | skill | work-management | runtime-agnostic | `skills/productivity/review-revision-candidates/` | 被驳回候选的返修轮：编号清单就是全部变更集，交的是字节不是辩解 |
+| rubric-hillclimb | skill | software-development,work-management | runtime-agnostic | `skills/productivity/rubric-hillclimb/` | 用有界训练试验、盲测晋升门槛和人工标注迭代分类准则 |
 | session-history-mining | skill | self-management,software-development | runtime-agnostic | `skills/productivity/session-history-mining/` | 挖掘 Claude Code、OMP 与 Codex 会话历史，使用两级剪枝、决策探针、残差主动学习和黄金锚点 |
 | spec-convergence | skill | software-development | runtime-agnostic | `skills/productivity/spec-convergence/` | 把模糊需求收敛为已确认 spec：每轮一个根问题、每轮问题数有上限、每问附事实、写前显式确认共同理解 |
 | spin-breaker | skill | self-management,software-development | runtime-agnostic | `skills/productivity/spin-breaker/` | 开工前或中途打转时刹车：3 要素执行锁、5 行现状清点、停放 side quest、重启面包屑与静态 HTML 决策板 |
@@ -116,7 +117,7 @@ targets:  runtime-agnostic | repo-only |
 安装其余全部 skill：
 
 ```bash
-npx skills add wxxb789/hoa -g -s agent-harness-settings-parity -s agent-operating-contract-evolution -s contract-bound-deliverables -s define-goal -s delegated-work-acceptance -s dotnet-repo-workflow -s evidence-backed-analytical-writing -s evidence-boundary-discipline -s gdd -s gdd-route-cc -s gdd-route-codex -s gdd-route-copilot -s gdd-route-dsh -s gdd-route-omo -s gdd-route-omp -s gdd-route-opencode -s gdd-route-pi -s ghc-decisions -s ghc-search -s git-auto-sync-pipelines -s harness-engineering -s hoa-practice-retro -s hoa-repo-reckoning -s hoa-skill-create -s hoa-skill-curate -s hoa-skill-port -s hoa-skill-review -s hoa-skill-set-audit -s measurement-campaign-evidence -s official-document-verification -s package-release-verification -s privileged-host-handoff -s report-claim-audit -s research-stream-consolidation -s review-revision-candidates -s session-history-mining -s spec-convergence -s spin-breaker -s tmux-agent-control -s writing -y
+npx skills add wxxb789/hoa -g -s agent-harness-settings-parity -s agent-operating-contract-evolution -s contract-bound-deliverables -s define-goal -s delegated-work-acceptance -s dotnet-repo-workflow -s evidence-backed-analytical-writing -s evidence-boundary-discipline -s gdd -s gdd-route-cc -s gdd-route-codex -s gdd-route-copilot -s gdd-route-dsh -s gdd-route-omo -s gdd-route-omp -s gdd-route-opencode -s gdd-route-pi -s ghc-decisions -s ghc-search -s git-auto-sync-pipelines -s harness-engineering -s hoa-practice-retro -s hoa-repo-reckoning -s hoa-skill-create -s hoa-skill-curate -s hoa-skill-port -s hoa-skill-review -s hoa-skill-set-audit -s measurement-campaign-evidence -s official-document-verification -s package-release-verification -s privileged-host-handoff -s report-claim-audit -s research-stream-consolidation -s review-revision-candidates -s rubric-hillclimb -s session-history-mining -s spec-convergence -s spin-breaker -s tmux-agent-control -s writing -y
 ```
 
 某次发布改名或退役了 skill 时：移除本仓库已不再提供的名称（由 `scripts/retired_skills.toml`
