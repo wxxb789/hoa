@@ -36,6 +36,7 @@ SOURCES: dict[str, Path] = {
 CONSUMERS: dict[str, list[str]] = {
     "skill_config.py": ["skills/engineering/gdd/scripts",
                         "skills/productivity/ghc-decisions/scripts",
+                        "skills/productivity/rubric-hillclimb/scripts",
                         "skills/productivity/session-history-mining/scripts",
                         "skills/productivity/spin-breaker/scripts"],
     "rubrics.json": ["skills/productivity/ghc-decisions/scripts"],
@@ -52,6 +53,7 @@ CONSUMERS: dict[str, list[str]] = {
         "skills/engineering/git-auto-sync-pipelines/references",
         "skills/skill-authoring/hoa-skill-curate/references",
         "skills/skill-authoring/hoa-skill-port/references",
+        "skills/productivity/rubric-hillclimb/references",
         "skills/productivity/session-history-mining/references",
         "skills/productivity/spec-convergence/references",
         "skills/productivity/spin-breaker/references",
@@ -66,6 +68,7 @@ CONSUMERS: dict[str, list[str]] = {
         "skills/skill-authoring/hoa-practice-retro/references",
         "skills/skill-authoring/hoa-skill-curate/references",
         "skills/skill-authoring/hoa-skill-set-audit/references",
+        "skills/productivity/rubric-hillclimb/references",
         "skills/productivity/session-history-mining/references",
         "skills/productivity/spin-breaker/references",
         "skills/research-writing/writing/references",
