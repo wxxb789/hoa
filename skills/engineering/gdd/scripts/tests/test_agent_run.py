@@ -23,7 +23,7 @@ import agent_run
 import gdd_process
 import stage_result
 from gdd_test_support import (check_processes, exited, finalized, own_identity, ready,
-                              route_fixture, wait_for_json)
+                              retry_windows, route_fixture, wait_for_json)
 
 
 SCHEMA = json.loads(read(os.path.join(HERE, "state.schema.json")))
@@ -120,6 +120,7 @@ class AutoGCTests(RunnerCase):
         root = Path(self.root)
         (root / ".gc.claim").write_text("claimed\n", encoding="utf-8", newline="\n")
         released = []
+        unlocking = []
         gc_lock = (root / ".gc.lock").open("a+b")
         slug_lock = (root / "claimed.start.lock").open("a+b")
         try:
@@ -128,8 +129,9 @@ class AutoGCTests(RunnerCase):
 
             def release_soon():
                 time.sleep(0.08)
-                (root / ".gc.claim").unlink(missing_ok=True)
+                unlocking.append(True)
                 slug_lock.close()
+                retry_windows(lambda: (root / ".gc.claim").unlink(missing_ok=True), time.monotonic() + 2)
                 gc_lock.close()
                 released.append(True)
 
@@ -138,9 +140,12 @@ class AutoGCTests(RunnerCase):
             worker.start()
             try:
                 with agent_run.slug_start_lock(root, "claimed"):
-                    self.assertEqual(released, [True])
+                    # gc_retire releases the slug locks before it unlinks the claim, so only the
+                    # worker's last step before its unlock is ordered before this start proceeds.
+                    self.assertEqual(unlocking, [True])
             finally:
                 worker.join(timeout=5)
+            self.assertEqual(released, [True])
         finally:
             if not slug_lock.closed:
                 slug_lock.close()

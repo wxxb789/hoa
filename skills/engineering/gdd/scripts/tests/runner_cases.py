@@ -61,7 +61,10 @@ class RunnerCase(unittest.TestCase):
         write(self.prompt, PROMPT)
         drop = ("GDD_", "STUB_", "DSH_", "OMP_")
         self.env = {k: v for k, v in os.environ.items() if not k.startswith(drop)}
-        self.env.update(GDD_RUN_ROOT=self.root, XDG_CONFIG_HOME=os.path.join(self.tmp, "config"),
+        # A detached auto-GC child cannot be joined, and it writes into the root while teardown
+        # deletes it; GC behaviour is covered by suites that run `_gc` in the foreground.
+        self.env.update(GDD_RUN_MAX_MB="off", GDD_RUN_ROOT=self.root,
+                        XDG_CONFIG_HOME=os.path.join(self.tmp, "config"),
                         GDD_RUN_DETACH="windows" if IS_WINDOWS else "setsid",
                         **{f"{agent.upper()}_BIN": STUB for agent in agent_run.discover_routes()}, STUB_RECORD=self.record,
                         PYTHONDONTWRITEBYTECODE="1")
