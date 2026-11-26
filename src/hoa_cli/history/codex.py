@@ -9,6 +9,7 @@ from operator import itemgetter
 from pathlib import Path
 
 from .codex_rollout import _codex_clean_thread, _codex_project, _codex_steps, _read_codex_rollout
+from .redact import redact_text
 from .sources import EmitSession, Scope
 
 
@@ -95,6 +96,55 @@ def extract_codex_root(root: Path, scope: Scope, emit: EmitSession, *, include_s
                 meta, steps = _read_codex_rollout(rollout, scope.redact, scope.extra_high_signal, scope=scope)
                 emit_thread(meta["tid"], meta["project"], str(rollout), "jsonl_backed", meta["include_clean"], meta, steps)
     return coverage
+
+
+def extract_codex_memories(root: Path, scope: Scope) -> tuple[dict, list[dict]]:
+    mem_path = root / "memories_1.sqlite"
+    state_path = root / "state_5.sqlite"
+    if not mem_path.is_file() or not state_path.is_file():
+        return {"root": str(root), "status": "not-found", "memory_count": 0}, []
+    memories: list[dict] = []
+    skipped = 0
+    with ExitStack() as stack:
+        mem_db = _open_codex_db(stack, mem_path)
+        state_db = _open_codex_db(stack, state_path)
+        cwds = dict(state_db.execute("SELECT id, cwd FROM threads").fetchall())
+        since_ts = scope.since.timestamp() if scope.since else None
+        try:
+            rows = mem_db.execute(
+                "SELECT thread_id, source_updated_at, rollout_summary, raw_memory FROM stage1_outputs ORDER BY thread_id"
+            ).fetchall()
+        except sqlite3.OperationalError:
+            return {"root": str(root), "status": "schema-unsupported", "memory_count": 0}, []
+        for tid, updated_at, summary, raw_mem in rows:
+            if since_ts is not None and updated_at is not None and float(updated_at) < since_ts:
+                skipped += 1
+                continue
+            cwd = cwds.get(tid)
+            if not cwd:
+                skipped += 1
+                continue
+            project = _codex_project(cwd, scope)
+            if project is None:
+                skipped += 1
+                continue
+            body = str(summary or raw_mem or "").strip()
+            if not body:
+                skipped += 1
+                continue
+            redacted = redact_text(body, scope.redact)
+            memories.append({
+                "id": f"codex-memory:{project}:{tid}",
+                "runtime": "codex-memory",
+                "project": project,
+                "path": f"{mem_path}#thread={tid}",
+                "chars": len(redacted),
+                "text": f"MEMORY codex-memory:{project}:{tid}\n{redacted}",
+            })
+    return {
+        "root": str(root), "status": "available",
+        "memory_count": len(memories), "skipped_memories": skipped,
+    }, memories
 
 
 def read_codex_evidence(path: Path, thread_id: str, start: int, end: int) -> Iterator[tuple[int, str, str]]:

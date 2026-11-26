@@ -41,10 +41,15 @@ A standing constraint for naming a new skill and for renaming one. Visibility an
    skill and also evolves or composes an existing one through the same method (say so in its
    description's first sentence); `port` moves a skill out of one runtime into a shared repository.
    A new verb gets one meaning, added here.
+   `judge` scores one item or batch against a structured rubric; `tune` refines a rubric with
+   bounded training trials and a blind holdout; `mine` extracts durable operational guardrails and
+   unknown unknowns from local session history and memory stores; `retro` reviews cross-repo
+   engineering practice over a period.
 5. **Prefixes.** `hoa-` is only for the skill-library family (skills that act on skills or on the
    agent's own usage history). A domain skill takes its tool or domain as prefix (`tmux-`, `ghc-`); a
    skill coupled to the Hermes runtime takes `hermes-` and may keep a `hermes-<topic>` noun form, as
-   `AGENTS.md` requires. The explicit-only `hoa-practice-retro` covers the owner's usage history.
+   `AGENTS.md` requires. The explicit-only `hoa-practice-mine` and `hoa-practice-retro` cover the
+   owner's usage history and engineering practice.
    `hoa-repo-reckoning` keeps its name as an explicit prompt shortcut for a repository review,
    an owner-approved exception to the prefix scope, not a precedent for unrelated repository
    skills. `hermes-ops-claim-verification` targets Hermes.

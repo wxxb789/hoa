@@ -12,8 +12,9 @@ from .hillclimb import evaluate_dataset, run_step, sample_unlabeled, stratified_
 
 def _endpoint(args: argparse.Namespace):
     return resolve_endpoint(
-        "rubric-hillclimb", flag_base_url=args.base_url, flag_model=args.model,
+        "rubric-tune", flag_base_url=args.base_url, flag_model=args.model,
         flag_api=args.api, flag_effort=args.effort, flag_workers=args.workers,
+        fallback_prefixes=("RUBRIC_HILLCLIMB", "RUBRIC_JUDGE", "GHC_DECISIONS", "EVALS"),
     )
 
 

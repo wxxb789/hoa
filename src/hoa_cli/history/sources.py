@@ -17,6 +17,7 @@ class Scope:
     since: datetime | None = None
     redact: RegexPatterns = ()
     extra_high_signal: RegexPatterns = ()
+    min_lines: int = 2
 
     def allows(self, *names: str) -> bool:
         return _dir_allowed(names, self.allow, self.deny)
@@ -63,5 +64,5 @@ def project_logs(project: Path, scope: Scope, parse: ParseSteps) -> Iterator[tup
     for path in sorted(project.glob("*.jsonl")):
         if path.is_file() and scope.modified_since(path):
             meta, steps = parse(path, scope.redact, scope.extra_high_signal)
-            if meta["raw_lines"] > 2 and steps:
+            if meta["raw_lines"] > scope.min_lines and steps:
                 yield path, meta, steps

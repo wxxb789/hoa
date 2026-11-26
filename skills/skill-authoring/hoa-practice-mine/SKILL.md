@@ -1,21 +1,22 @@
 ---
-name: session-history-mining
+name: hoa-practice-mine
 description: >-
-  Mine local Claude Code, OMP, and Codex session history for reusable operational
-  lessons using two-level pruning, multi-head `/v1/decisions` probes, residual
-  active learning, and gold-anchor calibration. Explicit invocation only;
-  not for single-repo or periodic self-retros.
+  Mine local Claude Code, OMP, and Codex session history and project memory stores
+  for reusable operational guardrails and unknown unknowns using two-level pruning,
+  multi-head `/v1/decisions` probes, residual active learning, and raw-line verification.
+  Explicit invocation only. Use hoa-practice-retro for periodic cross-repo retros
+  and rubric-tune for iterative rubric refinement.
 disable-model-invocation: true
 metadata:
-  revision: "3"
+  revision: "1"
   areas: "self-management,software-development"
   targets: "runtime-agnostic"
-  summary: "mine Claude Code, OMP, and Codex history with two-level pruning, decision probes, residual active learning, and gold anchors"
-  summary_zh: "挖掘 Claude Code、OMP 与 Codex 会话历史，使用两级剪枝、决策探针、残差主动学习和黄金锚点"
+  summary: "mine local session history and memory stores for reusable guardrails and unknown unknowns using a decision model"
+  summary_zh: "用 Decision Model 低成本挖掘本地会话与记忆中的可复用护栏和未知盲区"
   kind: "entry"
 ---
 
-# session-history-mining
+# hoa-practice-mine
 
 Extract reusable operational guardrails, hidden failure modes, and workflow rules
 from local Claude Code, OMP, and Codex session history without linear
@@ -64,6 +65,9 @@ hoa history extract \
   --claude-root ~/.claude/projects \
   --omp-root ~/.omp/agent/sessions \
   --codex-root ~/.codex \
+  --include-memories \
+  --cursor-file "$OUT/extract-cursor.txt" \
+  --min-lines 12 \
   --allow-regex '(?i)(repos-|dotfiles)' \
   --deny-regex '(?i)(work|corp|private)' \
   --out-dir "$OUT"
@@ -72,7 +76,11 @@ hoa history extract \
 Supply only the roots you intend to mine. For a follow-up run over a backlog
 already mined, add `--since <ISO date>` to keep only sessions active since then
 (file modification time for JSONL; `threads.updated_at` for Codex SQLite); the
-manifest records the cutoff. Codex prefers existing JSONL rollouts
+manifest records the cutoff. Alternatively pass `--cursor-file <path>` to read
+and update an incremental watermark automatically when `--since` is omitted, and
+`--min-lines 12` to skip one-turn probe sessions up front. `extract` streams
+`skeletons.jsonl` and `spans.jsonl` incrementally to disk as sessions are parsed.
+Codex prefers existing JSONL rollouts
 and reconstructs pruned rollouts from `state_5.sqlite` and
 `thread_history_1.sqlite`. With no database pair, it scans rollout files under
 the supplied root, including `sessions/` and `archived_sessions/`. SQLite reads
@@ -88,7 +96,11 @@ default unless their role is `worker` or `default`; use
   journals.
 - `spans.jsonl` — overlapping causal turn-windows (`--max-span-chars`, 2-step
   overlap so root-cause and resolution are not severed), tagged with `has_pivot`
-  and exact `file:Lstart-Lend` locators.
+  and exact `file:Lstart-Lend` locators. Identical spans across branched sessions
+  are deduplicated by content hash by default (`--no-dedup-spans` disables this).
+- `memories.jsonl` — when `--include-memories` is passed, redacted Claude project
+  `memory/*.md` files and scope-matched Codex `memories_1.sqlite` summaries ready
+  to score directly at `l3-novelty` against live rules.
 - `extract-manifest.json` — coverage by root, including Codex included/skipped
   threads and counts backed by JSONL or SQLite. For SQLite evidence,
   `thread_history_1.sqlite#thread=<id>` locators use `rollout_ordinal` values,
@@ -106,7 +118,10 @@ hoa mine judge \
 Retain sessions with `anomaly_probe >= 0.20`, `user_correction_probe >= 0.20`,
 raw `durability >= 0.45` (`>= 0.225` normalized for the bundled L0 scale),
 `p_clean < 0.80` (`routine_clean` and `one_off_code_bug` probability mass),
-or non-zero `hook_errors`. `filter-spans` fails open for model refusals and
+or non-zero `hook_errors`. On large backlogs where the loose OR retains too many
+sessions, pass `--strict` (requiring `(anomaly AND durability) OR correction OR
+hook_errors`) and tune `--min-anomaly` / `--min-durability` / `--min-correction`.
+`filter-spans` fails open for model refusals and
 request failures: it keeps those sessions eligible for pivot selection and
 counts only model refusals in `l0_refusal_sessions`. If `judge` writes a ledger
 but exits `1` for failed requests, investigate the failures and use the ledger
@@ -115,26 +130,29 @@ pruned sessions near the boundary before zooming into L1.
 
 ### 3. Level 1 orthogonal multi-head scan + residual reflection
 
-Filter `spans.jsonl` to pivot spans belonging to L0-surviving sessions, then run
-Round 1 with bundled orthogonal heads (`anomaly_probe`, `mechanism` with explicit
-`unclassified_novel_lesson` escape hatch, and `reusable_guardrail` score):
+Filter `spans.jsonl` to pivot spans belonging to L0-surviving sessions. For routine
+mining runs using the bundled rubrics (once `anchor-check` has passed for your
+endpoint), score directly with `--stage l1-v2` to halve model calls; run `l1-v1`
+first only when iterating on a custom taxonomy (hand off deeper rubric refinement
+to `rubric-tune`).
 
 ```bash
 hoa mine filter-spans \
+  --strict \
   --l0 "$OUT/l0-scored.jsonl" \
   --spans "$OUT/spans.jsonl" \
   --output "$OUT/l1-candidates.jsonl"
 
 hoa mine judge \
-  --stage l1-v1 \
+  --stage l1-v2 \
   --input "$OUT/l1-candidates.jsonl" \
-  --output "$OUT/l1-r1-scored.jsonl"
+  --output "$OUT/l1-r2-scored.jsonl"
 
 hoa mine residuals \
-  --stage l1-v1 \
-  --scored "$OUT/l1-r1-scored.jsonl" \
+  --stage l1-v2 \
+  --scored "$OUT/l1-r2-scored.jsonl" \
   --spans "$OUT/l1-candidates.jsonl" \
-  --output "$OUT/r1-residuals.json"
+  --output "$OUT/r2-residuals.json"
 ```
 
 Inspect the following residual pools in `r1-residuals.json` (pull adjacent
@@ -179,10 +197,12 @@ before advancing; do not refine a rubric at the expense of the anchors.
 ### 4. Baseline novelty reconciliation and line-verified report
 
 Join strong non-routine Round 2 judgments back to their source spans to
-restore the `text` stripped by `judge`. Prepare `current-rules-summary.md`
-from the target's live rules, then score the restored spans:
+restore the `text` stripped by `judge`. Assemble `current-rules-summary.md`
+from the target repositories (or curate one manually), then score the restored spans:
 
 ```bash
+hoa mine baseline --repo /path/to/repo-a --repo /path/to/repo-b \
+  --output "$OUT/current-rules-summary.md"
 hoa mine select-survivors --stage l1-v2 \
   --scored "$OUT/l1-r2-scored.jsonl" --spans "$OUT/l1-candidates.jsonl" \
   --output "$OUT/l3-candidates.jsonl"
@@ -199,28 +219,32 @@ Re-open the raw JSONL lines or the read-only SQLite items at the cited ordinals
 for every surviving gap:
 
 ```bash
-hoa history show --spans "$OUT/spans.jsonl" --context 3 <span-id> [<span-id> ...]
+hoa history show --spans "$OUT/spans.jsonl" --format readable --context 3 <span-id> [<span-id> ...]
 ```
 
-`show` prints unredacted evidence for the primary agent; never forward it to a
-decision endpoint. Verify current repository files before presenting
+`show` prints unredacted evidence for the primary agent (use `--format raw` for
+verbatim JSONL lines); never forward it to a decision endpoint. If `--include-memories`
+was used, also run `l3-novelty` on `$OUT/memories.jsonl` to surface high-signal
+single-machine memories ready to graduate into canonical repos. Verify current
+repository files before presenting
 `evidence locator -> concrete harm -> live coverage -> minimal fix -> canonical owner`.
 
 ## Configuration
 
 See [references/configuration.md](references/configuration.md). After the skill-specific
-lookup, unset keys fall back to `GHC_DECISIONS_*` then `EVALS_*` environment variables.
-The config file is `$XDG_CONFIG_HOME/session-history-mining/config.yaml` (fallback
-`~/.config/session-history-mining/config.yaml`); the fallback reads environment
+lookup, unset keys fall back to `SESSION_HISTORY_MINING_*` (legacy alias),
+`RUBRIC_JUDGE_*`, `GHC_DECISIONS_*`, then `EVALS_*` environment variables.
+The config file is `$XDG_CONFIG_HOME/hoa-practice-mine/config.yaml` (fallback
+`~/.config/hoa-practice-mine/config.yaml`); the fallback reads environment
 variables only, never another skill's config file.
 
 | Key | Flag | Environment variable | Default |
 |---|---|---|---|
-| `base_url` | `--base-url` | `SESSION_HISTORY_MINING_BASE_URL` (falls back to `GHC_DECISIONS_BASE_URL`) | none (required for `judge` / `anchor-check`) |
-| `model` | `--model` | `SESSION_HISTORY_MINING_MODEL` (falls back to `GHC_DECISIONS_MODEL`) | none (required for `judge` / `anchor-check`) |
-| `api` | `--api` | `SESSION_HISTORY_MINING_API` | `decisions` (`decisions` or `chat-completions`) |
-| `workers` | `--workers` | `SESSION_HISTORY_MINING_WORKERS` | `16` |
-| `api_key` | — | `SESSION_HISTORY_MINING_API_KEY` | `dummy` |
+| `base_url` | `--base-url` | `HOA_PRACTICE_MINE_BASE_URL` (falls back to `RUBRIC_JUDGE_BASE_URL`) | none (required for `judge` / `anchor-check`) |
+| `model` | `--model` | `HOA_PRACTICE_MINE_MODEL` (falls back to `RUBRIC_JUDGE_MODEL`) | none (required for `judge` / `anchor-check`) |
+| `api` | `--api` | `HOA_PRACTICE_MINE_API` | `decisions` (`decisions` or `chat-completions`) |
+| `workers` | `--workers` | `HOA_PRACTICE_MINE_WORKERS` | `16` |
+| `api_key` | — | `HOA_PRACTICE_MINE_API_KEY` | `dummy` |
 
 ## Additional resources
 

@@ -1,10 +1,10 @@
 ---
-name: rubric-hillclimb
+name: rubric-tune
 description: >-
-  Hillclimb a classification rubric or taxonomy when you have labeled examples and need bounded, semi-supervised refinement. Explicit invocation only. Use ghc-decisions for one-shot classification and session-history-mining for transcript extraction.
+  Tune a classification rubric or taxonomy when you have labeled examples and need bounded, semi-supervised refinement with a blind holdout gate. Explicit invocation only. Use rubric-judge for one-shot classification and hoa-practice-mine for session/memory mining.
 disable-model-invocation: true
 metadata:
-  revision: "2"
+  revision: "1"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "refine rubrics with bounded training trials, a blind promotion gate, and human labeling"
@@ -12,7 +12,7 @@ metadata:
   kind: "entry"
 ---
 
-# rubric-hillclimb
+# rubric-tune
 
 Produce a promotion diff backed by training comparisons, locked synthetic anchors,
 and a blind holdout. The human decides whether to promote and how to label new data.
@@ -115,7 +115,7 @@ hoa() { uvx --from git+https://github.com/wxxb789/hoa hoa "$@"; }
 ## Configuration
 
 Use [references/configuration.md](references/configuration.md) for lookup paths.
-After the skill-specific lookup, each unset key falls back to `GHC_DECISIONS_*`,
+After the skill-specific lookup, each unset key falls back to `RUBRIC_HILLCLIMB_*` (legacy alias), `RUBRIC_JUDGE_*`, `GHC_DECISIONS_*`,
 then `EVALS_*`, using the corresponding suffix; other skills' config files are
 not read. Use the same backend throughout the run. `--api chat-completions`
 selects the fallback explicitly if `/v1/decisions` is unavailable; the fallback
@@ -123,11 +123,11 @@ supplies hard answers, not calibrated choice distributions.
 
 | Key | CLI flag | Environment variable | Default |
 |---|---|---|---|
-| `base_url` | `--base-url` | `RUBRIC_HILLCLIMB_BASE_URL` | None (required for model calls) |
-| `model` | `--model` | `RUBRIC_HILLCLIMB_MODEL` | None (required for model calls) |
-| `api` | `--api` | `RUBRIC_HILLCLIMB_API` | `decisions` (`decisions` or `chat-completions`) |
-| `workers` | `--workers` | `RUBRIC_HILLCLIMB_WORKERS` | `16` |
-| `api_key` | — | `RUBRIC_HILLCLIMB_API_KEY` | `dummy` |
+| `base_url` | `--base-url` | `RUBRIC_TUNE_BASE_URL` | None (required for model calls) |
+| `model` | `--model` | `RUBRIC_TUNE_MODEL` | None (required for model calls) |
+| `api` | `--api` | `RUBRIC_TUNE_API` | `decisions` (`decisions` or `chat-completions`) |
+| `workers` | `--workers` | `RUBRIC_TUNE_WORKERS` | `16` |
+| `api_key` | — | `RUBRIC_TUNE_API_KEY` | `dummy` |
 
 ## Additional resources
 

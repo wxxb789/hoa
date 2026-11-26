@@ -6,11 +6,17 @@ from time import perf_counter
 from ..config import Endpoint, resolve_endpoint
 from ..decisions.rubric import DEFAULT_MINING_RUBRICS, load_stage, stage_from_document
 from ..io import iter_jsonl, read_json, read_jsonl, write_json, write_jsonl
-from .mining import MIN_STRONG_SCORE, anchor_check, compute_residuals, filter_spans, judge_records, select_survivors
+from .mining import (
+    DEFAULT_BASELINE_FILE_CHARS, DEFAULT_BASELINE_MAX_CHARS, MIN_STRONG_SCORE,
+    anchor_check, build_baseline, compute_residuals, filter_spans, judge_records, select_survivors,
+)
 
 
 def _endpoint(args: argparse.Namespace) -> Endpoint:
-    return resolve_endpoint("session-history-mining", args.base_url, args.model, args.api, args.effort, args.workers)
+    return resolve_endpoint(
+        "hoa-practice-mine", args.base_url, args.model, args.api, args.effort, args.workers,
+        fallback_prefixes=("SESSION_HISTORY_MINING", "RUBRIC_JUDGE", "GHC_DECISIONS", "EVALS"),
+    )
 
 
 def _report(value: dict) -> None:
@@ -33,8 +39,13 @@ def _judge(args: argparse.Namespace) -> int:
 
 def _filter(args: argparse.Namespace) -> int:
     stage = load_stage(args.rubrics, args.stage, require_axes=True)
-    rows, report = filter_spans(read_jsonl(args.l0), iter_jsonl(args.spans), stage,
-                                include_non_pivot=args.include_non_pivot)
+    rows, report = filter_spans(
+        read_jsonl(args.l0), iter_jsonl(args.spans), stage,
+        include_non_pivot=args.include_non_pivot,
+        min_anomaly=args.min_anomaly, min_correction=args.min_correction,
+        min_durability=args.min_durability, max_clean=args.max_clean,
+        strict=args.strict,
+    )
     write_jsonl(args.output, rows)
     _report(report)
     return 0
@@ -70,6 +81,14 @@ def _anchors(args: argparse.Namespace) -> int:
     return int(not report["passed"])
 
 
+def _baseline(args: argparse.Namespace) -> int:
+    text, report = build_baseline(args.repo, max_chars=args.max_chars, per_file_chars=args.per_file_chars)
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(text, encoding="utf-8", newline="\n")
+    _report({**report, "output": str(args.output)})
+    return 0
+
+
 def _rubric_flag(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--rubrics", type=Path, default=DEFAULT_MINING_RUBRICS, help="override the bundled mining rubrics")
 
@@ -100,6 +119,12 @@ def register(subparsers: argparse._SubParsersAction) -> None:
     filter_cmd.add_argument("--l0", type=Path, required=True, help="L0 scored JSONL")
     filter_cmd.add_argument("--spans", type=Path, required=True, help="extracted spans JSONL")
     filter_cmd.add_argument("--include-non-pivot", action="store_true", help="also keep spans without evidence pivots")
+    filter_cmd.add_argument("--min-anomaly", type=float, default=0.20, help="minimum anomaly_probe probability")
+    filter_cmd.add_argument("--min-correction", type=float, default=0.20, help="minimum user_correction_probe probability")
+    filter_cmd.add_argument("--min-durability", type=float, default=0.225, help="minimum normalized durability score")
+    filter_cmd.add_argument("--max-clean", type=float, default=0.80, help="retain when routine probability is below this")
+    filter_cmd.add_argument("--strict", action="store_true",
+                            help="require (anomaly AND durability) OR correction OR hook_errors for stronger L0 pruning")
     filter_cmd.add_argument("--output", type=Path, required=True, help="filtered spans JSONL output")
     filter_cmd.set_defaults(func=_filter)
 
@@ -124,3 +149,10 @@ def register(subparsers: argparse._SubParsersAction) -> None:
     anchors.add_argument("--baseline-stage", default="l1-v1")
     anchors.add_argument("--candidate-stage", default="l1-v2")
     anchors.set_defaults(func=_anchors)
+
+    baseline = commands.add_parser("baseline", help="assemble a redacted rules baseline from target repos for l3-novelty")
+    baseline.add_argument("--repo", type=Path, action="append", required=True, help="target repository root (repeatable)")
+    baseline.add_argument("--max-chars", type=int, default=DEFAULT_BASELINE_MAX_CHARS, help="total character budget")
+    baseline.add_argument("--per-file-chars", type=int, default=DEFAULT_BASELINE_FILE_CHARS, help="max chars per file")
+    baseline.add_argument("--output", type=Path, required=True, help="output baseline markdown path")
+    baseline.set_defaults(func=_baseline)

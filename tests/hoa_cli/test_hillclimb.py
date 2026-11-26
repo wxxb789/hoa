@@ -114,7 +114,7 @@ class HillclimbTests(unittest.TestCase):
         self.candidate = self.write_json("candidate.json", rubric("candidate"))
         self.url = f"http://127.0.0.1:{self.server.server_port}/v1"
         self.env = {key: value for key, value in os.environ.items()
-                    if not key.startswith(("RUBRIC_HILLCLIMB_", "GHC_DECISIONS_", "EVALS_"))}
+                    if not key.startswith(("RUBRIC_TUNE_", "RUBRIC_JUDGE_", "RUBRIC_HILLCLIMB_", "GHC_DECISIONS_", "EVALS_"))}
         self.env["XDG_CONFIG_HOME"] = str(self.root / "config")
 
     def write_json(self, name: str, obj: object) -> Path:
@@ -261,7 +261,7 @@ class HillclimbTests(unittest.TestCase):
                          {(variant, entry["text"]): 1 for variant in ("baseline", "candidate") for entry in items})
 
     def test_chat_fallback_and_environment_resolution(self) -> None:
-        self.env.update(GHC_DECISIONS_BASE_URL=self.url, EVALS_MODEL="fixture", RUBRIC_HILLCLIMB_API="chat-completions")
+        self.env.update(RUBRIC_JUDGE_BASE_URL=self.url, EVALS_MODEL="fixture", RUBRIC_TUNE_API="chat-completions")
         train = self.labeled("chat.jsonl", ("case-positive", True), ("ordinary", False), ("model-refusal", True))
         result = self.evaluate(train, rubric_path=self.candidate, api=None)
         self.assertEqual(result["refusal_count"], 1)

@@ -171,3 +171,15 @@ reason = "merged the read-only milestone closeout checklist (2026-11-21)"
 [retired.ai-coding-agent-delegation]
 replacement = "gdd"
 reason = "merged bounded CLI handoffs as lightweight delegation without shipping (2026-11-21)"
+
+[retired.ghc-decisions]
+replacement = "rubric-judge"
+reason = "renamed into the rubric-<verb> family; endpoint is provider-agnostic (2026-11-27)"
+
+[retired.rubric-hillclimb]
+replacement = "rubric-tune"
+reason = "renamed into the rubric-<verb> family; removed implementation detail word hillclimb (2026-11-27)"
+
+[retired.session-history-mining]
+replacement = "hoa-practice-mine"
+reason = "renamed into the hoa-practice-<verb> family and moved to skill-authoring alongside hoa-practice-retro (2026-11-27)"
