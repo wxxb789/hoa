@@ -12,6 +12,10 @@ Findings file: `${FINDINGS_FILE}`
    document or the test actually changes — not a comment acknowledging it. The findings file is the
    accepted disposition: do not replan a settled design or weaken a contract clause. A FIX finding
    the tree already satisfies needs no edit — record the evidence that shows it satisfied.
+   **Fix the class, not just the cited instance**: scan sibling paths in the same module for the
+   same defect class and never silently mark an unresolved sibling out of scope. For test-strength
+   findings, perform a vacuity sweep in the first pass: prefer whole-output equality over spot
+   checks, inject one mutation per assertion to prove it can fail, and remove assertions that cannot.
 2. **Prove it before you fix it.** For a behavioural finding, check whether the tree already
    satisfies it, find the existing test that should fail without the fix, and observe that failure
    (or capture a characterization baseline) before changing behaviour when practical. If neither is

@@ -63,6 +63,11 @@ rather than copied.
    changing behaviour — extend or add the clause test and watch it fail — or capture a
    characterization baseline of the current behaviour first. If neither is practical, say so and name
    the replacement proof.
+   When promoting a capability or modifying a contract invariant, scope edits by the live call chain
+   (not only the proposal's file list) and map every contract invariant to an executable test in the
+   delivery evidence; an untested invariant counts as unsatisfied. Before removing any "redundant"
+   check, verify an explicit input-class matrix (missing, regular file, dangling symlink, permission
+   error) shows identical old vs. new behavior on every row.
 3. **Then implement**: source, tests, docs, evidence record, examples, and any baseline/manifest
    updates the repo requires.
 4. **Close the increment** the way this repo closes one (archive/move the contract file unchanged,

@@ -6,7 +6,7 @@ description: >-
   command under the reporter's PATH and cwd, route it to the maintainer who owns the fix, and
   escalate one scoped landing decision. Not for dispatch.
 metadata:
-  revision: "17"
+  revision: "18"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
   summary: "verify delegated work against artifacts and write scope; route rejected or out-of-scope fixes to their owner"
@@ -45,6 +45,10 @@ sender works from a fixed scope and the acceptance criteria exist before the wor
 - Dispatch it headless and in the background — it runs for minutes; use the transport your harness
   provides (see `gdd-route-omp` for the OMP path) and keep the log plus the produced
   artifacts in the task dir.
+- Pass absolute target paths for isolated worktrees and nested subagents: a relative write path
+  resolves against the child's harness cwd and can land files in a scratch worktree. Verify the
+  intended repository's `git status` directly (including checking for forbidden `docs/plans/*` or
+  prematurely archived records) rather than trusting the subagent's report.
 - A line like `open terminal failed: not a terminal` is the CLI failing to open an interactive terminal
   under a headless flag — not a run failure. Judge by exit code and produced artifacts.
 - A clean process exit is itself only a claim: acceptance still re-runs the gates itself (§1.5).
@@ -78,6 +82,12 @@ changing the increment, and a one-line edit can change everything. Put the same 
 `scope_sha` in the acceptance verdict and the PR body. State resolution: `--state-file`, then
 `$HOA_SCOPE_STATE`, then `$XDG_STATE_HOME/hoa/scope`, then `~/.local/state/hoa/scope`; one JSON file
 per repo+label.
+
+Never bind a receipt to a tree digest that includes the receipt directory itself (for example
+`docs/**`): writing the receipt invalidates its own digest, and rebasing drifts embedded counts.
+Bind only the source subject (excluding the evidence directory explicitly) or record the final
+summary in the PR body, label every count with the revision it describes, and re-collect fresh
+evidence whenever the collection tool itself changes.
 
 ## 1. Verify from the diff, not from the receipt
 

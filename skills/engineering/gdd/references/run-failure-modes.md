@@ -123,3 +123,16 @@ launcher that merely returns may leave that child running, and a killed tmux ses
 
 Launchd was tested only with stubs. The double fork was tested against dispatch-group death on WSL2,
 not against a real macOS/BSD service restart.
+
+## 9. Shared build targets, shared `git stash`, and stall-blind waiters corrupt parallel lanes
+
+- **Shared build target directories serve stale test binaries.** In concurrent worktrees, a shared
+  `CARGO_TARGET_DIR` (or equivalent) can run an older revision's compiled binary under a newer
+  test list. Give each lane a private target directory for gates and run the CI build profile
+  rather than `--release` unless the stage specifically builds a release artifact.
+- **Never run `git stash` in linked worktrees.** The stash stack is shared across all worktrees of
+  the repository and cross-contaminates parallel lanes.
+- **Detect stalls by event growth, not process liveness or wrapper exit.** A background waiter
+  killed by a shell timeout does not mean the detached stage exited; conversely, a hung stream can
+  keep the process alive for hours without emitting events. Poll `events` byte growth with an idle
+  threshold larger than the slowest build/test gate (for example 1800 s when compiling).

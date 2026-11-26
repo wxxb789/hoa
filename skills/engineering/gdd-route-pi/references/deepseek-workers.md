@@ -48,3 +48,17 @@ review, against 4 for a spec that was not pre-reviewed. The one P1 was an invari
 ("never echo the matched value"). For each such invariant, the brief asks for a test that checks it on every output
 path. On Windows, also list `git ls-files --eol <new files>` among the gates: a new file can be committed with CRLF
 line endings and still pass the other checks.
+
+## Stream stalls, diff sizing, and review convergence
+
+- **Keep review diffs small.** Very large diffs (~300 KB+) can stall the model stream silently
+  without returning an error. After a merge whose pre-merge head was already reviewed, review only
+  `git show --cc <merge>`; otherwise split large reviews by module or commit.
+- **Size idle watchdogs to compilation.** Pi writes no session events while a long build or test
+  runs; short idle limits (such as 600 s) kill healthy compiling reviewers. Use a longer idle
+  threshold (such as 1800 s) and instruct reviewers to run filtered tests against a private build
+  target rather than a full workspace build.
+- **Bound the retry loop.** If a worker fails to clear the bar after 5 rounds on the same bounded
+  task, stop iterating and take over directly. On gateway budget errors (`422` quota/budget
+  exhausted), stop immediately, leave the half-edited tree uncommitted, and escalate rather than
+  silently switching providers.

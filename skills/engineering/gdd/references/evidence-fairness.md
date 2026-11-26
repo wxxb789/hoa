@@ -85,3 +85,17 @@ silently-narrowed guarantee.
   usually a measurement handoff (slot freed before the consumer increments its counter), not a
   breach — but prove the real bound with a quiescent deterministic read-count test and label the
   metric as a handoff, don't just assert "13 vs 12".
+
+## Guardrail validity (real proof vs. ritual)
+
+- **Hashes only prove integrity across a trust boundary** (stored receipt vs. recomputed source
+  tree, downloaded upstream binary vs. pinned digest, tool source bytes vs. recorded tool digest).
+  Comparing two hashes computed by the same code in the same run from the same input is
+  self-satisfying ritual, not protection.
+- **Regex over structured formats is a heuristic, not a guardrail.** Do not use regexes to enforce
+  routes, test summaries, URL credential redaction, or UUID validation: structured inputs and
+  decoy log lines bypass them. Use a real parser or structured event stream (JSON test formatter,
+  AST, `urlsplit`, `uuid.UUID`); where parsing is impossible, downgrade and label the check as a
+  policy heuristic rather than a proof.
+- **Derive audit file lists from the tree.** Build audit target sets from `git ls-files` minus
+  explicit exclusions instead of hand-enumerating files, which silently misses newly added paths.

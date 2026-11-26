@@ -4,6 +4,10 @@ Entries are dated and optional; no CI gate requires one. There is no project ver
 counts its own iterations in `metadata.revision`. Earlier entries retain the retired project
 `VERSION` numbers and historical per-skill versions.
 
+## 2026-11-26
+
+- gdd, gdd-route-pi, delegated-work-acceptance: add field-mined guardrails for evidence validity (trust-boundary hashes vs. self-satisfying ritual, parser over regex, tree-derived audit lists, excluding receipt dirs from subject digests), parallel worktree hygiene (private build targets, no `git stash`, event-growth stall checks, absolute paths for nested/isolated subagents), and review/fix convergence (call-chain scoping, error-path matrices, class-level fixes, vacuity sweeps, prior disposition tables, large-diff stream stall bounds).
+
 ## 2026-11-25
 
 - gdd (#173): add a scope-sealed `gdd.py commit` command with per-path purposes, gates and exact-OID push; guard stage dispatch against pending changes relative to the baseline and serialize ledger appends.

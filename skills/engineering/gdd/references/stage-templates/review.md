@@ -48,6 +48,9 @@ Three things decide whether the review is useful, and the orchestrator owes all 
   implemented contract. These are what a finding must be anchored to.
 - **Do-not-report list** — later goals' scope, formatting taste, prose length, "could be structured
   differently". Without it half the findings are unactionable taste.
+- **Prior disposition table (round 2+)** — `Fixed / Dismissed / Known` from earlier rounds with
+  the rule "re-raise only with new evidence". Before dispatching reviewers, run a fast diff grep
+  for any contract-forbidden literals so trivial omissions do not waste a full review round.
 
 Ask for the diff of the branch against its base, never a single commit, and for each finding:
 severity, `file:line`, and **the input that breaks** — not just the concern.
