@@ -127,7 +127,7 @@
     },
     "l3-novelty": {
       "routine_labels": ["false_alarm_or_local_detail", "already_covered"],
-      "novel_label": "cockpit_or_target_gap",
+      "novel_label": "target_gap",
       "mech_question": "novelty_status",
       "score_question": "actionability",
       "questions": [
@@ -137,7 +137,7 @@
           "instructions": "Compare the operational lesson in the SPAN against the CURRENT CODIFIED BASELINE prepended above. Classify whether it is already covered, an uncovered target gap, owned by a sibling repository, or local noise.",
           "choices": [
             {"value": "already_covered", "description": "The core rule or fix in this span is ALREADY explicitly covered by the baseline documents, scripts, or tests."},
-            {"value": "cockpit_or_target_gap", "description": "A concrete cross-repo playbook, onboarding diagnostic, or harness check gap that belongs in the target repository and is NOT yet covered in the baseline."},
+            {"value": "target_gap", "description": "A concrete cross-repo playbook, onboarding diagnostic, or harness check gap that belongs in the target repository and is NOT yet covered in the baseline."},
             {"value": "route_to_sibling_repo", "description": "Real reusable operational trap/lesson, but canonical ownership belongs to a sibling skill or dotfiles repository rather than the target repository."},
             {"value": "false_alarm_or_local_detail", "description": "Upon closer inspection against the baseline, this span is single-project implementation work, mid-flight status, or lacks a durable rule."}
           ]

@@ -57,9 +57,9 @@ jobs:
         run: python scripts/version.py check-revisions
 
       - name: Ruff
-        run: uvx ruff@0.17.5 check --config ruff.toml --force-exclude scripts evals skills
+        run: uvx ruff@0.17.5 check --config ruff.toml --force-exclude scripts evals skills src tests
 
-      # Python tests: every test_*.py under scripts/ evals/ skills/ (pytest.ini)
+      # Python tests: every test_*.py under scripts/ evals/ skills/ tests/ (pytest.ini)
       - name: pytest
         timeout-minutes: 12
         run: python -m pytest -n auto --dist load

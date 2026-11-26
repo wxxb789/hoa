@@ -4,7 +4,7 @@ description: >-
   Hillclimb a classification rubric or taxonomy when you have labeled examples and need bounded, semi-supervised refinement. Explicit invocation only. Use ghc-decisions for one-shot classification and session-history-mining for transcript extraction.
 disable-model-invocation: true
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "refine rubrics with bounded training trials, a blind promotion gate, and human labeling"
@@ -44,10 +44,14 @@ and a blind holdout. The human decides whether to promote and how to label new d
 
 ## Workflow
 
-Resolve `scripts/hillclimb.py` relative to this skill's installed directory. In
-these commands, replace `SCRATCH` with the approved `--out-dir` and other path
-arguments with the authorized inputs. Only if a script command fails (for
-example `uv` is not found), read [references/troubleshooting.md](references/troubleshooting.md).
+Use the Bash `hoa` function below to run the packaged CLI via `uvx`. In a local
+checkout use `uv run hoa ...` instead, or omit the function if `hoa` is installed.
+Replace the example paths with the authorized inputs and scratch directories.
+Only if a command fails, read [references/troubleshooting.md](references/troubleshooting.md).
+
+```bash
+hoa() { uvx --from git+https://github.com/wxxb789/hoa hoa "$@"; }
+```
 
 1. **Freeze the inputs.** Save a scratch copy of the original rubric for the
    eventual promotion diff. Lock a separate synthetic anchor file with positive
@@ -55,8 +59,8 @@ example `uv` is not found), read [references/troubleshooting.md](references/trou
    `expected`: all booleans or all string labels). Deduplicate semantically
    equivalent items before splitting. The custodian runs:
 
-   ```text
-   uv run scripts/hillclimb.py split --input corpus.jsonl --out-dir CUSTODIAN_SCRATCH --train-out train.jsonl --holdout-out holdout.jsonl
+   ```bash
+   hoa hillclimb split --input corpus.jsonl --out-dir CUSTODIAN_SCRATCH --train-out train.jsonl --holdout-out holdout.jsonl
    ```
 
    The custodian transfers only `train.jsonl` to the editor. If a separate locked
@@ -70,9 +74,9 @@ example `uv` is not found), read [references/troubleshooting.md](references/trou
    step. Use the resulting scratch best as the next baseline only if accepted;
    a reverted step preserves the previous best. Repeat until a bound is reached.
 
-   ```text
-   uv run scripts/hillclimb.py eval --rubric CURRENT --dataset SCRATCH/train.jsonl --mode train --anchors SCRATCH/anchors.jsonl
-   uv run scripts/hillclimb.py step --baseline CURRENT --candidate CANDIDATE --train SCRATCH/train.jsonl --anchors SCRATCH/anchors.jsonl --out-dir SCRATCH --best-out BEST_FOR_THIS_ITERATION --ledger rubric-ledger.jsonl --note HYPOTHESIS
+   ```bash
+   hoa hillclimb eval --rubric CURRENT --dataset SCRATCH/train.jsonl --mode train --anchors SCRATCH/anchors.jsonl
+   hoa hillclimb step --baseline CURRENT --candidate CANDIDATE --train SCRATCH/train.jsonl --anchors SCRATCH/anchors.jsonl --out-dir SCRATCH --best-out BEST_FOR_THIS_ITERATION --ledger rubric-ledger.jsonl --note HYPOTHESIS
    ```
 
    `step` compares only train `f_beta`, with the locked anchor gate. A reversion
@@ -85,9 +89,9 @@ example `uv` is not found), read [references/troubleshooting.md](references/trou
    endpoint. The original shows the reference `f_beta`; the finalist must also
    pass the locked anchor gate.
 
-   ```text
-   uv run scripts/hillclimb.py eval-holdout --rubric ORIGINAL --dataset HOLDOUT
-   uv run scripts/hillclimb.py eval-holdout --rubric FINALIST --dataset HOLDOUT --anchors LOCKED_ANCHORS
+   ```bash
+   hoa hillclimb eval-holdout --rubric ORIGINAL --dataset HOLDOUT
+   hoa hillclimb eval-holdout --rubric FINALIST --dataset HOLDOUT --anchors LOCKED_ANCHORS
    ```
 
    The custodian shares the metrics and gate exit status only (`0` passed,
@@ -104,8 +108,8 @@ example `uv` is not found), read [references/troubleshooting.md](references/trou
    overlapping labels, and escape-hatch cases; its scores are not labels. Let
    the operator label the items and decide which to add to a future train set.
 
-   ```text
-   uv run scripts/hillclimb.py sample --baseline ORIGINAL --candidate FINALIST --pool UNLABELED
+   ```bash
+   hoa hillclimb sample --baseline ORIGINAL --candidate FINALIST --pool UNLABELED > SCRATCH/label-queue.json
    ```
 
 ## Configuration
@@ -127,7 +131,7 @@ supplies hard answers, not calibrated choice distributions.
 
 ## Additional resources
 
-- [scripts/hillclimb.py](scripts/hillclimb.py) — CLI; use `--help` for inputs and exit codes.
-- [scripts/skill_config.py](scripts/skill_config.py) — vendored configuration resolver.
-- [scripts/tests/test_hillclimb.py](scripts/tests/test_hillclimb.py) — offline CLI contracts.
 - [agents/openai.yaml](agents/openai.yaml) — explicit-only invocation policy for Codex.
+- [references/methodology.md](references/methodology.md) — interpreting metrics and taxonomy overlap.
+- [references/configuration.md](references/configuration.md) — configuration lookup order and file path.
+- [references/troubleshooting.md](references/troubleshooting.md) — read only when a CLI command fails.

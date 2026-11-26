@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hoa-cli"
+version = "0.1.0"
+description = "Decision rubrics, session history mining, and rubric evaluation"
+requires-python = ">=3.13"
+dependencies = []
+
+[project.scripts]
+hoa = "hoa_cli.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+hoa_cli = ["data/*.json"]
