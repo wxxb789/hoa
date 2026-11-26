@@ -1,6 +1,7 @@
 import math
 from collections import Counter
 from collections.abc import Iterable
+from pathlib import Path
 
 from ..config import Endpoint
 from ..decisions.client import evaluate_batch
@@ -11,6 +12,62 @@ from ..decisions.rubric import (
 from ..history.redact import redact_text
 
 MIN_STRONG_SCORE = 0.675
+DEFAULT_BASELINE_MAX_CHARS = 24000
+DEFAULT_BASELINE_FILE_CHARS = 3000
+
+
+def build_baseline(
+    repos: Iterable[Path],
+    *,
+    max_chars: int = DEFAULT_BASELINE_MAX_CHARS,
+    per_file_chars: int = DEFAULT_BASELINE_FILE_CHARS,
+) -> tuple[str, dict]:
+    sections: list[str] = ["# Live Operational Rules Baseline"]
+    included: list[dict] = []
+    omitted: list[str] = []
+    total = len(sections[0])
+    for repo in repos:
+        root = repo.expanduser().resolve()
+        if not root.is_dir():
+            raise ValueError(f"baseline repo directory not found: {repo}")
+        candidates: list[Path] = []
+        for top in ("AGENTS.md", "CLAUDE.md", "repos/core.md"):
+            p = root / top
+            if p.is_file():
+                candidates.append(p)
+        docs_dir = root / "docs"
+        if docs_dir.is_dir():
+            candidates.extend(sorted(p for p in docs_dir.glob("*.md") if p.is_file()))
+        seen: set[Path] = set()
+        repo_parts: list[str] = []
+        for path in candidates:
+            if path in seen:
+                continue
+            seen.add(path)
+            rel = path.relative_to(root).as_posix()
+            raw = redact_text(path.read_text(encoding="utf-8", errors="replace").strip())
+            if not raw:
+                continue
+            clipped = raw[:per_file_chars]
+            if len(raw) > per_file_chars:
+                clipped = clipped.rstrip() + "\n...[truncated]..."
+            block = f"### {root.name}/{rel}\n{clipped}"
+            if total + len(block) + 2 > max_chars:
+                omitted.append(f"{root.name}/{rel}")
+                continue
+            repo_parts.append(block)
+            total += len(block) + 2
+            included.append({"repo": root.name, "file": rel, "chars": len(clipped)})
+        if repo_parts:
+            sections.append(f"## {root.name}\n\n" + "\n\n".join(repo_parts))
+    text = "\n\n".join(sections) + "\n"
+    return text, {
+        "file_count": len(included),
+        "omitted_count": len(omitted),
+        "total_chars": len(text),
+        "files": included,
+        "omitted": omitted,
+    }
 
 
 def _status(judgment: dict) -> str | None:
@@ -41,7 +98,9 @@ def judge_records(records: list[dict], stage_cfg: dict, endpoint: Endpoint, base
 
 
 def filter_spans(l0_rows: list[dict], spans: Iterable[dict], stage_cfg: dict, *, include_non_pivot: bool = False
-                 ) -> tuple[list[dict], dict]:
+                 , min_anomaly: float = 0.20, min_correction: float = 0.20,
+                 min_durability: float = 0.225, max_clean: float = 0.80,
+                 strict: bool = False) -> tuple[list[dict], dict]:
     score_name = stage_cfg["score_question"]
     question = next(q for q in stage_cfg["questions"] if q["name"] == score_name)
     surviving = set()
@@ -62,7 +121,21 @@ def filter_spans(l0_rows: list[dict], spans: Iterable[dict], stage_cfg: dict, *,
         durability = normalize_score(answer.get("value", answer.get("score", 0)), question)
         probs = answers.get(stage_cfg["mech_question"], {}).get("probabilities", {})
         clean = sum(probs.get(label, 0.0) for label in stage_cfg["routine_labels"])
-        if anomaly >= 0.20 or correction >= 0.20 or durability >= 0.225 or clean < 0.80 or row.get("hook_errors", 0) > 0:
+        if strict:
+            keep = (
+                (anomaly >= min_anomaly and durability >= min_durability)
+                or correction >= min_correction
+                or row.get("hook_errors", 0) > 0
+            )
+        else:
+            keep = (
+                anomaly >= min_anomaly
+                or correction >= min_correction
+                or durability >= min_durability
+                or clean < max_clean
+                or row.get("hook_errors", 0) > 0
+            )
+        if keep:
             surviving.add(sid)
         else:
             pruned.append((max(anomaly, durability), sid))
@@ -101,7 +174,7 @@ def select_survivors(scored: Iterable[dict], spans: Iterable[dict], stage_cfg: d
 
 def compute_residuals(scored: list[dict], spans: Iterable[dict], stage_cfg: dict, *, stage: str | None = None,
                       top_k: int = 12) -> dict:
-    texts = {span["id"]: span["text"] for span in spans}
+    source = {span["id"]: span for span in spans}
     question = next(q for q in stage_cfg["questions"] if q["name"] == stage_cfg["score_question"])
     routine, novel = set(stage_cfg["routine_labels"]), stage_cfg["novel_label"]
     refusals, ood, gray, strong = [], [], [], []
@@ -109,7 +182,10 @@ def compute_residuals(scored: list[dict], spans: Iterable[dict], stage_cfg: dict
     novel_count = 0
     for row in scored:
         sid, judgment = row["id"], row.get("judgment") or {}
-        text = texts.get(sid, "")
+        span = source.get(sid) or {}
+        text = span.get("text", "")
+        project = row.get("project") or span.get("project")
+        runtime = row.get("runtime") or span.get("runtime")
         if (status := _status(judgment)) is not None:
             refusals.append({"id": sid, "reason": status, "text": text[:800]})
             continue
@@ -125,9 +201,10 @@ def compute_residuals(scored: list[dict], spans: Iterable[dict], stage_cfg: dict
         pair = overlap(probs, routine, novel)
         if pair and pair[1] >= 0.18:
             overlaps[pair[0]] += 1
-        entry = {"id": sid, "choice": choice, "score": round(raw_score, 3), "p_anomaly": round(anomaly, 3),
-                 "p_novel": round(novel_prob, 3), "entropy": round(entropy, 3), "ood_residual": round(residual, 4),
-                 "excerpt": text[:900]}
+        entry = {"id": sid, "runtime": runtime, "project": project, "choice": choice,
+                 "score": round(raw_score, 3), "p_anomaly": round(anomaly, 3),
+                 "p_novel": round(novel_prob, 3), "entropy": round(entropy, 3),
+                 "ood_residual": round(residual, 4), "excerpt": text[:900]}
         if anomaly >= 0.45 and (residual >= 0.25 or choice == novel):
             ood.append(entry)
         if anomaly >= 0.80 and (0.25 <= score <= 0.70 or entropy >= 1.50):

@@ -27,11 +27,11 @@ def _decide(args: argparse.Namespace) -> int:
         raise ValueError("supply exactly one of --state or --state-file")
 
     try:
-        endpoint = resolve_endpoint("ghc-decisions", args.base_url, args.model, args.api, args.effort, args.workers,
-                                    fallback_prefixes=("EVALS",))
+        endpoint = resolve_endpoint("rubric-judge", args.base_url, args.model, args.api, args.effort, args.workers,
+                                    fallback_prefixes=("GHC_DECISIONS", "EVALS"))
     except EndpointNotConfigured:
         if args.if_configured:
-            return _skip("ghc-decisions is not configured (set GHC_DECISIONS_BASE_URL and GHC_DECISIONS_MODEL to opt in)")
+            return _skip("rubric-judge is not configured (set RUBRIC_JUDGE_BASE_URL and RUBRIC_JUDGE_MODEL to opt in)")
         raise
     if args.preset not in presets:
         raise ValueError(f"unknown preset {args.preset!r}; available: {sorted(presets)}")

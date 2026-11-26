@@ -7,7 +7,7 @@ description: >-
   repo's machinery (suggest the user run hoa-repo-reckoning).
 disable-model-invocation: true
 metadata:
-  revision: "4"
+  revision: "5"
   areas: "self-management,work-management"
   targets: "runtime-agnostic"
   summary: "periodic retro on the owner's own engineering practice across repos, sessions and memory: habits to stop, decisions never executed, unknown unknowns, each with two independent origins"
@@ -35,6 +35,10 @@ never evidence of absence.
    `prompts/cross-agent-history-retrieval.md` produces one), or bounded mode over only the paths the
    user supplied. Bounded mode lowers scope, not rigor; say what it excludes. If history is unavailable,
    use a manifest-only bundle that records the gap for the scripts; do not invent session records.
+   When a decision-model endpoint is configured, reduce transcript-reading cost for `treadmills`,
+   `delegation`, `boundary`, `recurrence`, and unknown unknowns by pre-filtering session history
+   and memory stores first: Read `../hoa-practice-mine/SKILL.md` (relative to this skill's
+   directory) and follow it. Do not call the Skill tool for it.
 2. **Memory store** with search, if present: the owner's dated decisions.
 3. **Cross-repo activity** in the window: PRs authored (for example
    `gh search prs --author @me --created ">=SINCE"`) and `git log` across the workspace roots listed

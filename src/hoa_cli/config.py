@@ -177,7 +177,7 @@ def resolve(skill: str, key: str, *, flag: object = None, env: Mapping[str, str]
 def resolve_endpoint(
     skill: str, flag_base_url: str | None = None, flag_model: str | None = None,
     flag_api: str | None = None, flag_effort: str | None = None, flag_workers: int | str | None = None,
-    fallback_prefixes: tuple[str, ...] = ("GHC_DECISIONS", "EVALS"), *, flag_api_key: str | None = None,
+    fallback_prefixes: tuple[str, ...] = ("RUBRIC_JUDGE", "GHC_DECISIONS", "EVALS"), *, flag_api_key: str | None = None,
     env: Mapping[str, str] | None = None, root: Path | None = None,
 ) -> Endpoint:
     environ = os.environ if env is None else env

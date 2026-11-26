@@ -94,7 +94,7 @@ class SessionHistoryMiningTests(unittest.TestCase):
 
     def _run(self, *args: str, expected: int = 0, external: bool = False) -> tuple[str, str]:
         env = {k: v for k, v in os.environ.items()
-               if not k.startswith(("SESSION_HISTORY_MINING_", "GHC_DECISIONS_", "EVALS_"))}
+               if not k.startswith(("HOA_PRACTICE_MINE_", "RUBRIC_JUDGE_", "SESSION_HISTORY_MINING_", "GHC_DECISIONS_", "EVALS_"))}
         env["XDG_CONFIG_HOME"] = self.xdg
         if external:
             env["PYTHONPATH"] = str(SRC)

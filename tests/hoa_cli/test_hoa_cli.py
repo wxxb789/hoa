@@ -76,7 +76,8 @@ class HoaCliTests(unittest.TestCase):
 
     def setUp(self):
         self.root = Path(self.enterContext(TemporaryDirectory()))
-        prefixes = ("GHC_DECISIONS_", "SESSION_HISTORY_MINING_", "RUBRIC_HILLCLIMB_", "EVALS_")
+        prefixes = ("RUBRIC_JUDGE_", "RUBRIC_TUNE_", "HOA_PRACTICE_MINE_",
+                    "GHC_DECISIONS_", "SESSION_HISTORY_MINING_", "RUBRIC_HILLCLIMB_", "EVALS_")
         env = {key: value for key, value in os.environ.items() if not key.startswith(prefixes)}
         self.enterContext(patch.dict(os.environ, {**env, "XDG_CONFIG_HOME": str(self.root / "config")}, clear=True))
         self.server.requests.clear()
@@ -106,7 +107,7 @@ class HoaCliTests(unittest.TestCase):
         state = self.write("state.json", {"note": "positive café"})
         args = ("decide", "--rubrics-file", rubrics, "--preset", "evidence")
         self.assertTrue(self.invoke(*args, "--state-file", state, "--if-configured")["skipped"])
-        with patch.dict(os.environ, {"GHC_DECISIONS_API_KEY": "fixture-token"}):
+        with patch.dict(os.environ, {"RUBRIC_JUDGE_API_KEY": "fixture-token"}):
             result = self.invoke(*args, "--state-file", state, *self.endpoint)
         route, posted, token = self.server.requests[-1]
         self.assertEqual((route, json.loads(posted["input"]), token), ("/v1/decisions", {"note": "positive café"}, "Bearer fixture-token"))
@@ -296,10 +297,122 @@ class HoaCliTests(unittest.TestCase):
 
     def test_subcommand_help(self):
         groups = {"decide": (), "history": ("extract", "show"),
-                  "mine": ("judge", "filter-spans", "select-survivors", "residuals", "anchor-check"),
+                  "mine": ("judge", "filter-spans", "select-survivors", "residuals", "anchor-check", "baseline"),
                   "hillclimb": ("split", "eval", "eval-holdout", "step", "sample")}
         for args in [(), *((group,) for group in groups), *((group, leaf) for group, leaves in groups.items() for leaf in leaves)]:
             with self.subTest(args=args), redirect_stdout(io.StringIO()) as out, self.assertRaises(SystemExit) as exit_code:
                 main([*args, "--help"])
             self.assertEqual(exit_code.exception.code, 0)
             self.assertIn("usage: hoa", out.getvalue())
+
+    def test_extract_memories_dedup_readable_show_and_strict_filter(self):
+        secret = "secret-token-xyz"
+        omp_lines = [
+            {"type": "session", "parentSession": "root"},
+            {"type": "message", "message": {"role": "user", "content": [{"type": "text", "text": "Fix the build"}]}},
+            {"type": "message", "message": {"role": "assistant", "content": [
+                {"type": "thinking", "thinking": "long internal reasoning"},
+                {"type": "text", "text": "Found root cause."},
+            ]}},
+            {"type": "message", "message": {"role": "toolResult", "toolName": "bash", "isError": True,
+                                            "content": [{"type": "text", "text": "exit 1"}]}},
+        ]
+        self.write("omp/proj/branch-a.jsonl", omp_lines, lines=True)
+        self.write("omp/proj/branch-b.jsonl", omp_lines, lines=True)
+        mem_dir = self.root / "claude" / "proj" / "memory"
+        mem_dir.mkdir(parents=True)
+        (mem_dir / "MEMORY.md").write_text("# Index\n", encoding="utf-8")
+        (mem_dir / "lesson.md").write_text(f"Rule with {secret}", encoding="utf-8")
+        out = self.root / "out"
+        manifest = self.invoke(
+            "history", "extract",
+            "--claude-root", self.root / "claude",
+            "--omp-root", self.root / "omp",
+            "--include-memories",
+            "--redact-regex", secret,
+            "--out-dir", out,
+        )
+        self.assertEqual(manifest["skeleton_count"], 2)
+        self.assertEqual(manifest["span_count"], 1)
+        self.assertEqual(manifest["deduped_span_count"], 1)
+        self.assertEqual(manifest["memory_count"], 1)
+        mems = self.rows(out / "memories.jsonl")
+        self.assertEqual(mems[0]["id"], "claude-memory:proj:lesson.md")
+        self.assertNotIn(secret, mems[0]["text"])
+        span_id = self.rows(out / "spans.jsonl")[0]["id"]
+        readable, _ = self.invoke("history", "show", "--spans", out / "spans.jsonl", "--format", "readable", span_id, raw=True)
+        self.assertIn("[USER] Fix the build", readable)
+        self.assertIn("[ASSISTANT] Found root cause.", readable)
+        self.assertIn("[TOOL_ERR bash] exit 1", readable)
+        self.assertNotIn("long internal reasoning", readable)
+        l0 = self.write("l0.jsonl", [{
+            "id": self.rows(out / "spans.jsonl")[0]["session_id"],
+            "hook_errors": 0,
+            "judgment": {"ok": True, "answers": {
+                "anomaly_probe": {"type": "predicate", "probability": 0.6},
+                "user_correction_probe": {"type": "predicate", "probability": 0.05},
+                "durability": {"type": "score", "score": 0.1},
+                "primary_axis": {"type": "choice", "choice": "routine_clean", "probabilities": {"routine_clean": 0.9}},
+            }},
+        }], lines=True)
+        loose = self.invoke("mine", "filter-spans", "--l0", l0, "--spans", out / "spans.jsonl", "--output", out / "loose.jsonl")
+        strict = self.invoke("mine", "filter-spans", "--strict", "--l0", l0, "--spans", out / "spans.jsonl", "--output", out / "strict.jsonl")
+        self.assertEqual(loose["l0_surviving_sessions"], 1)
+        self.assertEqual(strict["l0_surviving_sessions"], 0)
+
+    def test_cursor_min_lines_codex_memories_and_baseline(self):
+        import sqlite3
+        from contextlib import closing
+        codex_root = self.root / "codex"
+        codex_root.mkdir()
+        with closing(sqlite3.connect(codex_root / "state_5.sqlite")) as sdb:
+            sdb.execute("CREATE TABLE threads (id TEXT, cwd TEXT, rollout_path TEXT, thread_source TEXT, agent_role TEXT, updated_at REAL)")
+            sdb.execute("INSERT INTO threads VALUES ('t1', '/repos/demo', '', 'cli', 'default', 1700000000)")
+            sdb.execute("INSERT INTO threads VALUES ('t2', '/work/secret', '', 'cli', 'default', 1700000000)")
+            sdb.commit()
+        with closing(sqlite3.connect(codex_root / "thread_history_1.sqlite")) as hdb:
+            hdb.execute("CREATE TABLE thread_items (thread_id TEXT, rollout_ordinal INT, item_type TEXT, item_json TEXT)")
+            hdb.commit()
+        with closing(sqlite3.connect(codex_root / "memories_1.sqlite")) as mdb:
+            mdb.execute("CREATE TABLE stage1_outputs (thread_id TEXT, source_updated_at REAL, rollout_summary TEXT, raw_memory TEXT)")
+            mdb.execute("INSERT INTO stage1_outputs VALUES ('t1', 1700000000, 'Allowlisted codex lesson', '')")
+            mdb.execute("INSERT INTO stage1_outputs VALUES ('t2', 1700000000, 'Work secret must skip', '')")
+            mdb.commit()
+        cursor = self.root / "cursor.txt"
+        out1 = self.root / "out1"
+        m1 = self.invoke(
+            "history", "extract",
+            "--codex-root", codex_root,
+            "--include-memories",
+            "--cursor-file", cursor,
+            "--allow-regex", "repos",
+            "--deny-regex", "work",
+            "--out-dir", out1,
+        )
+        self.assertEqual(m1["memory_count"], 1)
+        self.assertTrue(cursor.is_file())
+        mems = self.rows(out1 / "memories.jsonl")
+        self.assertEqual(mems[0]["id"], "codex-memory:repos-demo:t1")
+        self.assertIn("Allowlisted codex lesson", mems[0]["text"])
+        # Second run with cursor skips older memories
+        out2 = self.root / "out2"
+        m2 = self.invoke(
+            "history", "extract",
+            "--codex-root", codex_root,
+            "--include-memories",
+            "--cursor-file", cursor,
+            "--allow-regex", "repos",
+            "--out-dir", out2,
+        )
+        self.assertEqual(m2["memory_count"], 0)
+        # Baseline builder
+        repo = self.root / "demo-repo"
+        (repo / "docs").mkdir(parents=True)
+        (repo / "AGENTS.md").write_text("# Demo Rules\nAlways test.\n", encoding="utf-8")
+        (repo / "docs" / "guide.md").write_text("# Guide\nUse LF.\n", encoding="utf-8")
+        base_out = self.root / "baseline.md"
+        rep = self.invoke("mine", "baseline", "--repo", repo, "--output", base_out)
+        self.assertEqual(rep["file_count"], 2)
+        text = base_out.read_text(encoding="utf-8")
+        self.assertIn("demo-repo/AGENTS.md", text)
+        self.assertIn("demo-repo/docs/guide.md", text)

@@ -1,5 +1,5 @@
 ---
-name: ghc-decisions
+name: rubric-judge
 description: >-
   Run opt-in structured rubric checks through an OpenAI-compatible `/v1/decisions`
   decision model or `/v1/chat/completions` fallback. Use when a parent workflow
@@ -7,9 +7,10 @@ description: >-
   bundled presets (claim-audit, ci-triage, tool-risk, skill-review, memory-curation,
   pr-feedback-triage, citation-entailment, model-escalation, spec-readiness). Not
   a substitute for deterministic gates, artifact inspection, or primary agent sign-off.
+  Use rubric-tune for iterative rubric optimization.
 disable-model-invocation: true
 metadata:
-  revision: "4"
+  revision: "1"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "opt-in `/v1/decisions` and `/v1/chat/completions` rubric classifier with 9 bundled presets"
@@ -17,7 +18,7 @@ metadata:
   kind: "mechanism"
 ---
 
-# ghc-decisions
+# rubric-judge
 
 Opt-in structured rubric classifier for fast `predicate`, `choice`, and `score`
 checks (`0 output tokens` on native `/v1/decisions` models, with
@@ -25,8 +26,8 @@ checks (`0 output tokens` on native `/v1/decisions` models, with
 
 ## Gates
 
-- **Opt-in only.** If neither `--base-url`/`--model`, `GHC_DECISIONS_BASE_URL`/`GHC_DECISIONS_MODEL`,
-  nor `$XDG_CONFIG_HOME/ghc-decisions/config.yaml` (`~/.config/ghc-decisions/config.yaml`)
+- **Opt-in only.** If neither `--base-url`/`--model`, `RUBRIC_JUDGE_BASE_URL`/`RUBRIC_JUDGE_MODEL`,
+  nor `$XDG_CONFIG_HOME/rubric-judge/config.yaml` (`~/.config/rubric-judge/config.yaml`)
   is configured, `hoa decide --if-configured` prints JSON with `"skipped": true`
   and a reason, then exits `0` (or exits `2` on direct required calls).
   Parent workflows must continue their deterministic verification without failing when
@@ -48,7 +49,7 @@ Only if a command fails, read [references/troubleshooting.md](references/trouble
 # List bundled presets
 uvx --from git+https://github.com/wxxb789/hoa hoa decide --list-presets
 
-# Run a preset only when the operator has configured ghc-decisions (exits 0 with {"skipped": true} otherwise)
+# Run a preset only when the operator has configured rubric-judge (exits 0 with {"skipped": true} otherwise)
 uvx --from git+https://github.com/wxxb789/hoa hoa decide --if-configured --preset claim-audit --state-file state.json
 
 # Explicit one-shot call; set the URL and model to those approved by the operator
@@ -76,15 +77,15 @@ uvx --from git+https://github.com/wxxb789/hoa hoa decide --preset pr-feedback-tr
 ## Configuration
 
 See [references/configuration.md](references/configuration.md). After the skill-specific
-lookup, unset keys fall back to their corresponding `EVALS_*` environment variables.
+lookup, unset keys fall back to `GHC_DECISIONS_*` (legacy alias) then `EVALS_*` environment variables.
 
 | Key | Flag | Environment variable | Default |
 |---|---|---|---|
-| `base_url` | `--base-url` | `GHC_DECISIONS_BASE_URL` | none (opt-in; skips under `--if-configured`) |
-| `model` | `--model` | `GHC_DECISIONS_MODEL` | none (opt-in; skips under `--if-configured`) |
-| `api` | `--api` | `GHC_DECISIONS_API` | `decisions` (`decisions` or `chat-completions`) |
-| `effort` | `--effort` | `GHC_DECISIONS_EFFORT` | `low` (used by `chat-completions`) |
-| `api_key` | — | `GHC_DECISIONS_API_KEY` | `dummy` |
+| `base_url` | `--base-url` | `RUBRIC_JUDGE_BASE_URL` | none (opt-in; skips under `--if-configured`) |
+| `model` | `--model` | `RUBRIC_JUDGE_MODEL` | none (opt-in; skips under `--if-configured`) |
+| `api` | `--api` | `RUBRIC_JUDGE_API` | `decisions` (`decisions` or `chat-completions`) |
+| `effort` | `--effort` | `RUBRIC_JUDGE_EFFORT` | `low` (used by `chat-completions`) |
+| `api_key` | — | `RUBRIC_JUDGE_API_KEY` | `dummy` |
 
 ## Additional resources
 

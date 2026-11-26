@@ -44,7 +44,6 @@ targets:  runtime-agnostic | repo-only |
 | gdd-route-omp | skill | software-development,work-management | pi | `skills/engineering/gdd-route-omp/` | 脱离会话的 runner 跑 `omp -p` 长任务；轮询完成、按 session id 恢复（需要 skill `gdd`） |
 | gdd-route-opencode | skill | software-development,work-management | runtime-agnostic | `skills/engineering/gdd-route-opencode/` | OpenCode 独立服务器路由，支持会话恢复和模型变体选择 |
 | gdd-route-pi | skill | software-development,work-management | runtime-agnostic | `skills/engineering/gdd-route-pi/` | Pi stdin 与 JSON 事件路由，支持会话恢复 |
-| ghc-decisions | skill | software-development,work-management | runtime-agnostic | `skills/productivity/ghc-decisions/` | 按需启用（opt-in）的 `/v1/decisions` 与 `/v1/chat/completions` 结构化 Rubric 分类器，内置 9 大日常预设 |
 | ghc-search | skill | software-development | runtime-agnostic | `skills/research-writing/ghc-search/` | 经本机 `ghc-proxy` Responses API 做 web 与 X/Twitter 搜索；返回答案加去重来源 |
 | git-auto-sync-pipelines | skill | software-development,work-management | runtime-agnostic | `skills/engineering/git-auto-sync-pipelines/` | 手改仓库的定时提交推送：固定门序、白名单与体积上限、暂存区密钥扫描、心跳与去重告警 |
 | harness-engineering | skill | software-development | runtime-agnostic | `skills/engineering/harness-engineering/` | 重构与设计 harness 脚本：自包含、检查绑定 owner 决策、纯函数检查加薄 runner、净减行数 |
@@ -55,6 +54,7 @@ targets:  runtime-agnostic | repo-only |
 | hermes-ops-claim-verification | skill | software-development,work-management | hermes | `skills/hermes/hermes-ops-claim-verification/` | 验证 Hermes 定时任务、修复或部署的说法：找准记录面、区分手动与调度运行、审查审计者 |
 | hermes-runtime-repairs | skill | software-development,work-management | hermes | `skills/hermes/hermes-runtime-repairs/` | 修模板/生成器、验证暂存产物，再部署并回读线上运行时 |
 | hermes-updates | skill | software-development | hermes | `skills/hermes/hermes-updates/` | 升级运行中的 Hermes 并诊断漂移：快照、官方更新器、更新后检查、故障索引 |
+| hoa-practice-mine | skill | self-management,software-development | runtime-agnostic | `skills/skill-authoring/hoa-practice-mine/` | 用 Decision Model 低成本挖掘本地会话与记忆中的可复用护栏和未知盲区 |
 | hoa-practice-retro | skill | self-management,work-management | runtime-agnostic | `skills/skill-authoring/hoa-practice-retro/` | 定期复盘负责人跨仓库、会话与记忆的工程实践：应停止的习惯、未执行的决定、未知的未知，每条都有两个独立来源 |
 | hoa-repo-reckoning | skill | software-development,work-management | runtime-agnostic | `skills/skill-authoring/hoa-repo-reckoning/` | 仅显式调用的只读仓库审查提示词：哪些事该停止，哪些未知会改变工作 |
 | hoa-skill-create | skill | software-development,work-management,self-management | runtime-agnostic | `skills/skill-authoring/hoa-skill-create/` | 直接创建、演进或组合已定义的 skill，并按风险聚焦验证 |
@@ -69,8 +69,8 @@ targets:  runtime-agnostic | repo-only |
 | report-claim-audit | skill | work-management,software-development | runtime-agnostic | `skills/research-writing/report-claim-audit/` | 审计报告声明和遗漏，或用任务清单、实际发布与部署锁定版本核查阶段收尾 |
 | research-stream-consolidation | skill | work-management | runtime-agnostic | `skills/research-writing/research-stream-consolidation/` | 把重复的研究流并成一个项目，并修好绑定旧路径的记录 |
 | review-revision-candidates | skill | work-management | runtime-agnostic | `skills/productivity/review-revision-candidates/` | 被驳回候选的返修轮：编号清单就是全部变更集，交的是字节不是辩解 |
-| rubric-hillclimb | skill | software-development,work-management | runtime-agnostic | `skills/productivity/rubric-hillclimb/` | 用有界训练试验、盲测晋升门槛和人工标注迭代分类准则 |
-| session-history-mining | skill | self-management,software-development | runtime-agnostic | `skills/productivity/session-history-mining/` | 挖掘 Claude Code、OMP 与 Codex 会话历史，使用两级剪枝、决策探针、残差主动学习和黄金锚点 |
+| rubric-judge | skill | software-development,work-management | runtime-agnostic | `skills/productivity/rubric-judge/` | 按需启用（opt-in）的 `/v1/decisions` 与 `/v1/chat/completions` 结构化 Rubric 分类器，内置 9 大日常预设 |
+| rubric-tune | skill | software-development,work-management | runtime-agnostic | `skills/productivity/rubric-tune/` | 用有界训练试验、盲测晋升门槛和人工标注迭代分类准则 |
 | spec-convergence | skill | software-development | runtime-agnostic | `skills/productivity/spec-convergence/` | 把模糊需求收敛为已确认 spec：每轮一个根问题、每轮问题数有上限、每问附事实、写前显式确认共同理解 |
 | spin-breaker | skill | self-management,software-development | runtime-agnostic | `skills/productivity/spin-breaker/` | 开工前或中途打转时刹车：3 要素执行锁、5 行现状清点、停放 side quest、重启面包屑与静态 HTML 决策板 |
 | tmux-agent-control | skill | software-development,work-management | runtime-agnostic | `skills/engineering/tmux-agent-control/` | 在 tmux 中驱动运行中的 TUI agent：定位 pane、证明空闲、一次发出完整指令 |
@@ -111,13 +111,14 @@ targets:  runtime-agnostic | repo-only |
 | gdd-route-opencode | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-opencode -s delegated-work-acceptance -s gdd -y` |
 | gdd-route-pi | delegated-work-acceptance, gdd | `npx skills add wxxb789/hoa -g -s gdd-route-pi -s delegated-work-acceptance -s gdd -y` |
 | hermes-models | hermes-models-cutover | `npx skills add wxxb789/hoa -g -s hermes-models -s hermes-models-cutover -y` |
+| hoa-practice-retro | hoa-practice-mine | `npx skills add wxxb789/hoa -g -s hoa-practice-retro -s hoa-practice-mine -y` |
 | hoa-skill-set-audit | hoa-skill-create | `npx skills add wxxb789/hoa -g -s hoa-skill-set-audit -s hoa-skill-create -y` |
 
 不使用 Hermes 时，不要安装 `hermes-*` skill：它们只用于操作 Hermes，其他 skill 也不链接它们。
 安装其余全部 skill：
 
 ```bash
-npx skills add wxxb789/hoa -g -s agent-harness-settings-parity -s agent-operating-contract-evolution -s contract-bound-deliverables -s define-goal -s delegated-work-acceptance -s dotnet-repo-workflow -s evidence-backed-analytical-writing -s evidence-boundary-discipline -s gdd -s gdd-route-cc -s gdd-route-codex -s gdd-route-copilot -s gdd-route-dsh -s gdd-route-omo -s gdd-route-omp -s gdd-route-opencode -s gdd-route-pi -s ghc-decisions -s ghc-search -s git-auto-sync-pipelines -s harness-engineering -s hoa-practice-retro -s hoa-repo-reckoning -s hoa-skill-create -s hoa-skill-curate -s hoa-skill-port -s hoa-skill-review -s hoa-skill-set-audit -s measurement-campaign-evidence -s official-document-verification -s package-release-verification -s privileged-host-handoff -s report-claim-audit -s research-stream-consolidation -s review-revision-candidates -s rubric-hillclimb -s session-history-mining -s spec-convergence -s spin-breaker -s tmux-agent-control -s writing -y
+npx skills add wxxb789/hoa -g -s agent-harness-settings-parity -s agent-operating-contract-evolution -s contract-bound-deliverables -s define-goal -s delegated-work-acceptance -s dotnet-repo-workflow -s evidence-backed-analytical-writing -s evidence-boundary-discipline -s gdd -s gdd-route-cc -s gdd-route-codex -s gdd-route-copilot -s gdd-route-dsh -s gdd-route-omo -s gdd-route-omp -s gdd-route-opencode -s gdd-route-pi -s ghc-search -s git-auto-sync-pipelines -s harness-engineering -s hoa-practice-mine -s hoa-practice-retro -s hoa-repo-reckoning -s hoa-skill-create -s hoa-skill-curate -s hoa-skill-port -s hoa-skill-review -s hoa-skill-set-audit -s measurement-campaign-evidence -s official-document-verification -s package-release-verification -s privileged-host-handoff -s report-claim-audit -s research-stream-consolidation -s review-revision-candidates -s rubric-judge -s rubric-tune -s spec-convergence -s spin-breaker -s tmux-agent-control -s writing -y
 ```
 
 某次发布改名或退役了 skill 时：移除本仓库已不再提供的名称（由 `scripts/retired_skills.toml`
@@ -127,7 +128,7 @@ npx skills add wxxb789/hoa -g -s agent-harness-settings-parity -s agent-operatin
 把你从其它来源安装的同名 skill 从命令中去掉：
 
 ```bash
-npx skills remove -g ai-coding-agent-delegation arch-improvement-plan cross-agent-repair-routing design-an-interface design-md discord-rich-message dsh-headless-gdd find-nearby generated-runtime-repairs git-worktree-workflow github-code-review github-repo-management grounded-citations hoa-agent-retrieve hoa-introspect hoa-introspect-distill hoa-skill-work html-artifact jupyter-live-kernel kanban-workflows m365-copilot-cdp microsoft-office my-ado-cppr notes-to-prd ocr-and-documents omp-headless-orchestration ops-claim-verification plan-to-issues project-phase-closeout rss-feeds skill-library-curation skill-porting-and-publishing structural-validity-gates subagent-driven-development systematic-debugging teams-cdp to-issues to-prd whisper writing-plans
+npx skills remove -g ai-coding-agent-delegation arch-improvement-plan cross-agent-repair-routing design-an-interface design-md discord-rich-message dsh-headless-gdd find-nearby generated-runtime-repairs ghc-decisions git-worktree-workflow github-code-review github-repo-management grounded-citations hoa-agent-retrieve hoa-introspect hoa-introspect-distill hoa-skill-work html-artifact jupyter-live-kernel kanban-workflows m365-copilot-cdp microsoft-office my-ado-cppr notes-to-prd ocr-and-documents omp-headless-orchestration ops-claim-verification plan-to-issues project-phase-closeout rss-feeds rubric-hillclimb session-history-mining skill-library-curation skill-porting-and-publishing structural-validity-gates subagent-driven-development systematic-debugging teams-cdp to-issues to-prd whisper writing-plans
 ```
 
 > reflections 与 eval 结果属于文章 / 知识类，不在此索引。

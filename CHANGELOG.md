@@ -4,6 +4,12 @@ Entries are dated and optional; no CI gate requires one. There is no project ver
 counts its own iterations in `metadata.revision`. Earlier entries retain the retired project
 `VERSION` numbers and historical per-skill versions.
 
+## 2026-11-27
+
+- Rename and align the rubric and practice-mining skill families: `ghc-decisions` -> `rubric-judge`, `rubric-hillclimb` -> `rubric-tune`, and `session-history-mining` -> `hoa-practice-mine` (moved to `skills/skill-authoring/` alongside `hoa-practice-retro`). Legacy env-var prefixes remain supported as fallbacks.
+- Upgrade `hoa history` and `hoa mine`: stream `skeletons.jsonl`/`spans.jsonl` during extraction, add `--include-memories` (redacted Claude project memories + scope-filtered Codex `memories_1.sqlite`), `--cursor-file` incremental watermarks, `--min-lines` probe pre-filtering, default content-hash deduplication of branched spans (`--no-dedup-spans`), `--format readable` on `hoa history show`, parameterized/strict L0 pruning (`--strict`, `--min-anomaly`, `--min-durability`, `--min-correction`, `--max-clean`), `project`/`runtime` metadata on residual pools, and `hoa mine baseline` for automatic `l3-novelty` rule baseline assembly.
+- `hoa-practice-retro` (rev 4 -> 5): chain optionally to sibling `../hoa-practice-mine/SKILL.md` when a decision-model endpoint is configured.
+
 ## 2026-11-26
 
 - gdd, gdd-route-pi, delegated-work-acceptance: add field-mined guardrails for evidence validity (trust-boundary hashes vs. self-satisfying ritual, parser over regex, tree-derived audit lists, excluding receipt dirs from subject digests), parallel worktree hygiene (private build targets, no `git stash`, event-growth stall checks, absolute paths for nested/isolated subagents), and review/fix convergence (call-chain scoping, error-path matrices, class-level fixes, vacuity sweeps, prior disposition tables, large-diff stream stall bounds).

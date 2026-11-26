@@ -94,3 +94,29 @@ def extract_claude_root(root: Path, scope: Scope, emit: EmitSession) -> dict:
             if steps:
                 emit(f"claude-sub:{project.name}:{path.stem}", "claude-subagent", project.name, str(path), meta, steps)
     return coverage
+
+
+def extract_claude_memories(root: Path, scope: Scope) -> tuple[dict, list[dict]]:
+    coverage, projects = project_dirs(root, scope)
+    memories: list[dict] = []
+    for project in projects:
+        mem_dir = project / "memory"
+        if not mem_dir.is_dir():
+            continue
+        for path in sorted(mem_dir.glob("*.md")):
+            if path.name.lower() == "memory.md" or not path.is_file() or not scope.modified_since(path):
+                continue
+            raw = path.read_text(encoding="utf-8", errors="replace").strip()
+            if not raw:
+                continue
+            redacted = redact_text(raw, scope.redact)
+            memories.append({
+                "id": f"claude-memory:{project.name}:{path.name}",
+                "runtime": "claude-memory",
+                "project": project.name,
+                "path": str(path),
+                "filename": path.name,
+                "chars": len(redacted),
+                "text": f"MEMORY claude-memory:{project.name}:{path.name}\n{redacted}",
+            })
+    return {**coverage, "memory_count": len(memories)}, memories
