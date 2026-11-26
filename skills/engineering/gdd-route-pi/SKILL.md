@@ -6,7 +6,7 @@ description: >-
   the overall delivery protocol.
 disable-model-invocation: true
 metadata:
-  revision: "5"
+  revision: "6"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "Pi stdin and JSON event route with session resume"

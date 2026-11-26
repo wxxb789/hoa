@@ -22,3 +22,8 @@ proof; a local pass proves nothing about the other platforms.
 - **One product decision hides per platform.** Printed shell commands are text for a specific shell:
   POSIX quoting is wrong in `cmd.exe`/PowerShell. Either render per detected shell or record the gap as
   open — never let it pass as cross-platform correctness.
+- **Cross-drive junctions and host-layout symlinks break path resolution.** On Windows, resolving a
+  module through a cross-drive junction (for example a repo on one drive and `TEMP` on another) can
+  emit relative segments that fold into an invalid drive-prefixed path. On Linux CI runners, host
+  paths like `/bin/true` can be symlinks that fail `ELOOP` checks even when local WSL passes. Copy
+  test fixtures into `t.TempDir()` and verify drive/symlink handling explicitly.
