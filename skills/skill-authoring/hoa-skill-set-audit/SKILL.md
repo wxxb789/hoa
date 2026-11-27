@@ -10,7 +10,7 @@ description: >-
   or editing skills.
 disable-model-invocation: true
 metadata:
-  revision: "5"
+  revision: "6"
   areas: "software-development,self-management"
   targets: "runtime-agnostic"
   summary: "audit the whole offered skill set: per-skill quality, overlap, shadowing, contradictions, same-name drift, visibility, ../ closure, listing budget; report-only"
@@ -33,20 +33,23 @@ bare name, a hidden child a parent can no longer reach.
   set from disk or memory, and never judge a skill's content from its listing line.
 - **Every finding cites evidence**: a listing line, an `inventory.json` field, or `file:line`.
   Zero usage is evidence, not proof of low value; an unclear owner scenario is `needs confirmation`.
+- **A/B probes require owner authorization for the cost.**
 - Re-read this file after compaction before continuing the passes.
 
-## Configuration
+## Configuration and references
 
-| Input | Resolves | Default |
-|---|---|---|
-| `--host NAME` | add a host's documented roots (`claude`, `codex`, `pi`, `omp`, `opencode`, `dsh`) | none |
-| `--root DIR` | any other root: custom dirs, a repo's `skills/`, roots the host config names | none |
-| `SKILL_SET_AUDIT_ROOTS` | roots (`os.pathsep`-separated) when neither flag is given | unset |
-| `--project DIR` | base for project-level host roots | cwd |
-| `CLAUDE_CONFIG_DIR`, `CODEX_HOME` | host homes used by the presets | `~/.claude`, `~/.codex` |
+Set roots with repeatable `--host NAME` (claude, codex, pi, omp, opencode, dsh)
+and/or `--root DIR` (any additional root, including those named in host config).
+If neither flag is given, `SKILL_SET_AUDIT_ROOTS` supplies roots separated by the
+OS path separator (unset by default). `--project DIR` defaults to the current
+working directory for project-level roots. `CLAUDE_CONFIG_DIR` and `CODEX_HOME`
+default to `.claude` and `.codex` under the OS home directory.
 
-`~` resolves per OS (`%USERPROFILE%` on Windows). Per-host roots, precedence, hide controls and
-budgets: [references/hosts.md](references/hosts.md).
+| When to read | Reference |
+|---|---|
+| When resolving host roots, precedence, visibility controls, shadowing, or listing budgets | [Host behavior](references/hosts.md) |
+| Only when assessing overlap, visibility, pruning, or necessity in the set pass | [Set judgment](references/set-judgment.md) |
+| Only if a script command fails (for example `uv` is not found) | [Troubleshooting](references/troubleshooting.md) |
 
 ## Procedure
 
@@ -70,14 +73,12 @@ For recommendations based on recent work, use `hoa-skill-curate`.
    Broken references (`broken-link`). Oversized bodies (`body-over-limit`). Bundled files the body
    never names (`unreferenced-file`) — a missing "Additional resources" list means the model does
    not know they exist.
-4. **Set pass.** Work through the checks below on visible skills first, then hidden ones.
-5. **Pruning and consolidation.** Assess each skill named in a set finding (or every skill when
-   the owner asked for a full prune) on five axes: usage (recent, historical, unobserved — from
-   the host's usage data, never from the name), overlap (unique, complementary, replacement
-   candidate), core value (owner's main workflows, on demand, non-core), quality (clear, bulky or
-   ambiguous, stale, risky, malformed), and necessity (non-inferable behavior or knowledge vs advice
-   a capable model already follows unaided). Protocol duplicated across a skill family: read
-   [skill family integrity](../hoa-skill-create/references/skill-family-integrity.md) and follow it.
+4. **Set pass.** Apply the set-level catalog to visible skills first, then hidden ones.
+5. **Pruning and consolidation.** Assess each skill named in a set finding (or
+   every skill for a full prune) on usage, overlap, core value, quality, and
+   necessity. Protocol duplicated across a skill family: read
+   [skill family integrity](../hoa-skill-create/references/skill-family-integrity.md)
+   and follow it. If missing, report that it belongs in the same host root.
 6. **Verify adversarially.** Give an independent reviewer the claims, their evidence anchors and
    scope, not the finder's reasoning. Re-read the evidence or rerun the probe, try to refute each
    claim, and record what was checked and a `confirmed`, `weakened` or `refuted` verdict. Drop
@@ -85,40 +86,6 @@ For recommendations based on recent work, use `hoa-skill-curate`.
    and proposed deletions. If fresh context is unavailable, perform a separate verification pass
    and label it `single-context`; do not present missing evidence as verified.
 7. **Report** and stop.
-
-## Necessity verdicts
-
-Give each assessed skill exactly one: `keep`, `keep explicit-only`, `merge into <name>`,
-`cut`, `needs A/B`, or `needs owner`. State the evidence that earns it. Do not equate no
-observed usage with no value. `keep explicit-only` is for valuable manual workflows; verify that
-required sibling Read links still resolve. A single skill needing deeper judgment goes to
-`hoa-skill-review`; provenance and upstream freshness stay with `hoa-skill-curate`.
-
-For a locally authored skill with no upstream, the owner's rule is **180 days unloaded, or
-never loaded** makes it a cut candidate, unless current projects suggest a plausible near-term
-use. Use usage records with known coverage and directory history, not `SKILL.md` mtimes. Missing
-usage data is `unobserved`, not evidence for a cut. Every cut stays a proposal pending explicit
-owner confirmation.
-
-Nominate at most five uncertain skills for A/B, and run probes only if the owner authorizes
-the cost. Write two or three representative prompts and a rubric first. Run with and without the
-skill in isolated environments, check the no-skill trace never loaded it, and grade responses
-blind against the rubric. A skill that adds no verified value is a cut or merge candidate.
-
-## Set-level checks
-
-| Check | Evidence | Typical fix |
-|---|---|---|
-| Overlapping activation | `overlap` pairs (lexical candidates only), then read both descriptions against 2–3 realistic requests: would the model pick reliably? | merge, or narrow one description with a mutual anti-trigger |
-| Contradictory instructions | the same situation governed by two bodies (commit rules, output format, authority) with different answers | one owner; the other points to it |
-| Shadowing | `totals.visible_names`, plus a generic skill whose trigger swallows a specialist's | hide or retire distractors; keep the visible set small (hosts.md § Shadowing) |
-| Near-duplicate names/descriptions | `overlap`, `duplicates.by_hash` | merge or retire the weaker |
-| Same name, different content | `duplicates.by_name` with `same_content: false`; `offered-twice`; hosts.md says which copy wins per host | remove or re-sync the losing copy; pin the source |
-| Visibility mistakes | `offered.hidden_but_offered`; `codex-policy-missing`; `hidden-codex-only`; a chained child absent from every root, or removed by a host deny/exclude setting | fix the frontmatter/openai.yaml pair; install the child; never deny a chained child |
-| Broken `../` closure | `closure-*` findings: lexical and physical sibling must both exist and match | install the parent's whole `../` closure into the same root |
-| Wrong discovery depth | `beyond-host-depth` | move the skill to the host's discovered level |
-| Budget and truncation | `offered.without_description`, `totals.visible_description_chars` vs the host budget | shorten descriptions, hide rarely chosen skills |
-| Horizontal knowledge in a skill | a skill every task needs, or one never selected while its content is always relevant | move it to an always-on index (AGENTS.md / rules) |
 
 ## Report
 
@@ -133,24 +100,15 @@ End with what was not verified and an explicit statement that nothing was change
 
 ## Pitfalls
 
-- **Do not use an old inventory as runtime truth.** Platform gates, disabled settings and
-  malformed metadata make listing and disk counts differ; reconcile both before declaring totals.
-- **`node_modules` phantom skills.** A vendored package can ship its own `SKILL.md`; loaders skip
-  `node_modules`, so it costs no prompt. The inventory skips it — do not report or disable it.
-- **Lexical similarity is a candidate list, not a verdict.** Low scores can still compete for
-  one request; high scores can be complementary stages of one chain.
-- **Do not patch a user-owned, bundled, hub-installed, external or pinned skill.** Report the
-  boundary and recommend adoption or owner action.
-- **Do not make a raw Markdown table the only deliverable on a channel that renders tables
-  poorly.** Attach the CSV/JSON and give readable rows.
+- **Reconcile current listing and disk before declaring totals.** Platform gates, disabled
+  settings, and malformed metadata make them differ. A stale inventory is not runtime truth.
+- **Ignore `node_modules` phantom skills.** The inventory and host loaders skip them.
+- **Lexical similarity only nominates pairs.** Low scores can compete; high scores can complement.
+- **Do not patch user-owned, bundled, hub-installed, external, or pinned skills.** Report the boundary and recommend adoption or owner action.
+- On channels that render tables poorly, attach CSV/JSON and give readable rows.
 
-## Additional resources
+## Tools
 
-- [scripts/inventory.py](scripts/inventory.py) — read-only root scanner; `--help` lists flags,
-  JSON fields and exit codes.
-- [scripts/test_inventory.py](scripts/test_inventory.py) — its tests on synthetic skill trees.
-- Only if a script command fails (for example `uv` is not found), read [references/troubleshooting.md](references/troubleshooting.md).
-- [references/hosts.md](references/hosts.md) — per-host roots, precedence, hiding, listing budgets,
-  shadowing evidence.
-- Sibling: `../hoa-skill-create/references/skill-family-integrity.md` — auditing a protocol duplicated
-  across one skill family; install `hoa-skill-create` into the same host root.
+- [scripts/inventory.py](scripts/inventory.py) — read-only root scanner; `--help`
+  lists flags, JSON fields, and exit codes.
+- [scripts/test_inventory.py](scripts/test_inventory.py) — tests on synthetic skill trees.

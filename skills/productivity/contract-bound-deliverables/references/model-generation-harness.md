@@ -1,14 +1,13 @@
 # Model-generation harness for contract-bound drafting
 
-Depth for step 3b. The project's own harness (`DELIVERABLE_HARNESS_DIR`, default `<project>/.harness`)
-ships a draft CLI and a providers module; read those for the current per-transport header quirks
-rather than re-deriving them. This file carries the parts that are easy to get wrong.
+Depth for step 3. The project's own harness (`DELIVERABLE_HARNESS_DIR`, default `<project>/.harness`)
+ships a draft CLI and a providers module; read those for the current transport-specific behavior.
 
 ## Provider registry entry
 
 ```json
 "<registry-key>": {
-  "base": "<full endpoint URL, e.g. <proxy-base>/v1/chat/completions>",
+  "base": "<full endpoint URL>",
   "model": "<provider model id>",
   "slug": "<filename-safe tag>",
   "cap": 20000,
@@ -26,24 +25,12 @@ rather than re-deriving them. This file carries the parts that are easy to get w
 
 ## Transports
 
-- `responses` (`/v1/responses`): reasoning via `reasoning.effort`, budget via `max_output_tokens`.
-- `chat` (`/v1/chat/completions`): reasoning via `reasoning_effort`, budget via `max_tokens` — the
-  reasoning budget is charged against it. Some gateways additionally require a session header and a
-  browser User-Agent; the harness module documents which.
-- Token-cap pitfall: a large `max_tokens` trips HTTP 504 on remote gateways; a cap around
-  `DELIVERABLE_DRAFT_TOKEN_CAP` (default `16000`) is a known-good starting point. Retry a failed call
-  with a lower cap before concluding the model failed.
-- **The long write must stream.** A non-streaming reasoning write can sit silent past the client read
-  timeout and die with a bare read timeout and no terminal text — the failure is an empty response,
-  not an HTTP error, so lowering `max_tokens` does not save it. Send `"stream": true`, read the SSE
-  `data:` lines, and accumulate `choices[0].delta.content` (count `delta.reasoning_content` for
-  progress). A stream keeps emitting chunks through the silent reasoning phase, so the per-read idle
-  timeout is never reached: use an *idle* timeout
-  (`DELIVERABLE_STREAM_IDLE_TIMEOUT_S`, default `300`), not a total-call timeout, and make streaming
-  the default for the long write call.
-- Read the final chunk's `finish_reason`: `stop` = complete, `length` = truncated (raise the cap or
-  split the write into two parts). When a non-streaming attempt times out, save a failed-attempt
-  receipt before retrying so the round keeps its audit trail.
+Before sending a request, read only the reference for the registry entry's `transport`:
+
+| `transport` | Read for |
+|---|---|
+| `responses` | [Responses API](transports/responses-api.md): reasoning field, cap and stream handling |
+| `chat` | [Chat Completions](transports/chat-completions.md): reasoning field, cap, headers and stream handling |
 
 ## Identity / effort preflight receipt
 
@@ -73,8 +60,10 @@ call 2: [ system , user(learn-instruction + FULL packet) ,
 ## Generator script rules
 
 - Standard library only; no shared mutable client.
-- Wrap the call in a retry that lowers the token cap on HTTP 504 (see transport pitfall), and stream
-  the long write so a long silent reasoning phase cannot trip the read timeout.
+- Stream the long write with a per-read idle timeout (`DELIVERABLE_STREAM_IDLE_TIMEOUT_S`, default
+  `300`), not a total-call timeout. A non-streaming reasoning write can go silent long enough to
+  time out without returning draft text; lowering the cap is not a fix for that type of failure.
+  Save a failed-attempt receipt before retrying a timed-out non-streaming call.
 - A reasoning-heavy write can run many minutes: launch it as a background job with completion
   notification and poll, rather than blocking the turn; save each phase's receipt as it completes so
   a later failure does not lose the learn output.

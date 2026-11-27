@@ -9,7 +9,7 @@ description: >-
   root-cause debugging.
 disable-model-invocation: true
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "self-management,software-development"
   targets: "runtime-agnostic"
   summary: "halt pre-execution or mid-session spinning: 3-element execution lock, 5-line reckoning, parked side quests, restart breadcrumbs, static HTML decision board"
@@ -45,127 +45,31 @@ Explicit-invocation circuit breaker for two failure modes:
 
 ## Mode selection
 
-Pick the mode from the user's argument or the conversation state:
+Use the explicit mode if supplied. Otherwise choose from the current state:
 
-- `lock` (or any invocation right before starting implementation or
-  delegation): the **pre-flight 15-second execution lock** below.
-- Default / `rescue` (invoked mid-session while spinning, after repeated
-  `continue`, or after scope creep): the **mid-spin rescue** below.
-- `map` (`spin-breaker map`, or when 3+ entangled hypotheses, surfaces, or
-  environments make linear chat illegible): the **decision board** below.
+| Mode | When to use | What it does / read |
+|---|---|---|
+| `lock` | Right before implementation or delegation | Read [Lock mode](references/lock-mode.md): confirm the exact target, observable check, and forbidden boundary before work starts. |
+| `rescue` (default) | Mid-session spin, repeated `continue`, or scope creep | Read [Rescue mode](references/rescue-mode.md): offer to park side quests and present a five-line reckoning with one discriminating read-only probe. |
+| `map` | Three or more entangled hypotheses, surfaces, or environments make linear chat hard to follow | Read [Decision board](references/decision-board.md): turn the evidence and decision into a static HTML board. |
 
-### Pre-flight 15-second execution lock
+Keep the freeze while you inspect read-only state and present choices. An
+operator's selection authorizes only the selected action, not the other
+options; a decision to retire an approach is not permission to roll back Git.
 
-Inspect the pending request and verify three elements before any edit:
+## Read when needed
 
-1. **Target surface** — the exact client/app/CLI/host/tenant where acceptance
-   will be observed, not a proxy cache, mock, or staging ticket.
-2. **Observable check** — input `X` produces expected output `Y`, plus what
-   visibly fails while the change is absent.
-3. **Forbidden boundary** — the files, branches, policies, or manual-vs-auto
-   triggers that must NOT change.
-
-If all three are unambiguous, display the 3-line lock card for one-click
-confirmation:
-
-```text
-Lock — Target: <surface> | Check: <X -> Y; absent-state failure> | Forbidden: <boundary>
-Proceed / Adjust
-```
-
-If any element is missing or ambiguous, ask only for the missing item(s), with
-concrete options and after read-only repo/state inspection, before any edit.
-
-### Mid-spin rescue
-
-Read the recent turns plus read-only `git status --short` and `git diff --stat`.
-
-1. Extract mixed-in **side quests and meta-ideas** that expanded the original
-   acceptance envelope; offer to park each via `spin_breaker.py park
-   --kind side-quest`.
-2. Output **at most 5 lines** of plain reckoning:
-
-| Line | Content |
+| When | Read |
 |---|---|
-| 1 `Outcome` | The single original user-visible result requested. |
-| 2 `Last verified fact` | The last directly observed fact, with exact `file:line`, command exit, or target surface. |
-| 3 `Eliminated vs. live guesses` | Which hypothesis line 2 ruled out (say `0 eliminated` when none), versus the live unfalsified guesses. |
-| 4 `Discriminating probe` | One minimal read-only command or observation that splits or falsifies the top live hypothesis, stating what pass vs. fail proves. |
-| 5 `Decision` | The 3-way choice: `A. Run probe` (execute only the line-4 read-only probe), `B. Freeze & Park` (write a 4-line restart breadcrumb via `park --kind breadcrumb` and stop cleanly), `C. Retire branch/approach` (record the falsified lesson via `park`, then await explicit rollback authorization before touching Git state). |
-
-### Decision board
-
-When 3+ entangled hypotheses, surfaces, or environments make linear chat
-illegible, gather structured JSON of the outcome, verified facts,
-live/eliminated hypotheses, next probe, and parked side quests, then run
-`uv run "$S" map --input -` (with `S` as defined under Commands):
-
-```json
-{
-  "outcome": "Single user-visible result requested",
-  "verified_facts": ["fact with file:line or command exit"],
-  "hypotheses": [
-    {"text": "live guess", "status": "live", "note": "optional note"},
-    {"text": "dead guess", "status": "eliminated"}
-  ],
-  "probe": {"command": "read-only command", "pass": "what a pass proves", "fail": "what a fail proves"},
-  "side_quests": [{"title": "parked side quest", "note": "optional note"}]
-}
-```
-
-The rendered board is a self-contained static HTML file (inline CSS, no
-scripts, no external assets, dark/light via `prefers-color-scheme`) with three
-columns: target outcome and verified facts; the active fork (live hypotheses,
-the single discriminating probe, and the 3-way action summary); eliminated
-hypotheses and parked side quests.
-
-## Commands
-
-Run these with the target repository as the current working directory (or pass
-`--repo-root <repo>` explicitly). Point `S` at this skill's script — in a
-checkout that is `skills/productivity/spin-breaker/scripts/spin_breaker.py`,
-installed it is `<skill-dir>/scripts/spin_breaker.py` — and invoke it with `uv`.
-Parked records default to
-`<repo-root>/.tmp-artifacts/spin-breaker/parked-items.md`. Bundle names are
-single safe directory names: no separators, `:`, `..`, trailing dots, or
-Windows reserved device names.
-
-```bash
-S=<skill-dir>/scripts/spin_breaker.py
-
-# Park a side quest (append-only; never touches Git state)
-uv run "$S" park --kind side-quest \
-  --title "Idea that widened the envelope" \
-  --why-deferred "Not needed for the current outcome" \
-  --origin-outcome "Original user-visible result" \
-  --locator "src/module.py:120"
-
-# Freeze with a 4-line restart breadcrumb
-uv run "$S" park --kind breadcrumb \
-  --outcome "Original user-visible result" \
-  --last-fact "scripts/check.py:42 exits 0 against the live surface" \
-  --eliminated "stale config cache" \
-  --next-command "rg -n 'live-surface' scripts/"
-
-# Render the decision board from a JSON document on stdin
-# (checkout form: uv run skills/productivity/spin-breaker/scripts/spin_breaker.py map ...)
-printf '%s' '{"outcome": "…", "verified_facts": [], "hypotheses": [], "side_quests": []}' \
-  | uv run "$S" map --repo-root . --input - --bundle board-1
-```
-
-Both commands print a compact JSON receipt on stdout. `map` never reuses an
-existing `--bundle` directory, and with the flag omitted it picks a fresh
-`spin-map-<UTC timestamp>` name (suffixed `-2`, `-3`, … if one already exists).
-`--confirm-external` is required before a configured external adapter command
-runs; without it the receipt reports `"external_status": "skipped_unconfirmed"`
-and no external mutation happens.
+| Before invoking `park` or `map`, interpreting a receipt, or configuring an external adapter | [Commands](references/commands.md) |
+| Resolving flags, environment, or config-file settings | [Configuration](references/configuration.md) |
+| Only if a script command fails (for example `uv` is not found) | [Troubleshooting](references/troubleshooting.md) |
 
 ## Configuration
 
 Resolution order for every key: CLI flag, then `SPIN_BREAKER_*` environment
 variable, then `$XDG_CONFIG_HOME/spin-breaker/config.yaml` (falling back to
-`~/.config/spin-breaker/config.yaml`), then the default. See
-[references/configuration.md](references/configuration.md).
+`~/.config/spin-breaker/config.yaml`), then the default.
 
 | Key | Flag | Environment variable | Default |
 |---|---|---|---|
@@ -173,22 +77,3 @@ variable, then `$XDG_CONFIG_HOME/spin-breaker/config.yaml` (falling back to
 | `parking_bundle` | `--parking-bundle` | `SPIN_BREAKER_PARKING_BUNDLE` | `spin-breaker` |
 | `external_cmd` | `--external-cmd` | `SPIN_BREAKER_EXTERNAL_CMD` | none (empty; local markdown only) |
 | `external_timeout` | `--external-timeout` | `SPIN_BREAKER_EXTERNAL_TIMEOUT` | `15` (seconds) |
-
-`external_cmd` is split by a deterministic quote-aware tokenizer and run with
-`shell=False`. One pair of outer quotes per token is removed, and inside double
-quotes only `\"` unescapes to `"`; every other backslash stays verbatim, so
-quoted Windows paths (`"C:\Tools\my-adapter.exe"`), UNC paths
-(`"\\server\share\my-adapter.exe"`), and `C:\Tools\my-adapter.exe` unquoted all
-survive unchanged. Quote paths that contain spaces. For direct executables
-(`uv`, Python, native binaries) there is no shell expansion and the item text
-cannot inject a command. The formatted item text replaces a `{text}`
-placeholder inside one argument when the placeholder is present; otherwise it
-is piped to the adapter's stdin. On Windows, `.cmd` and `.bat` adapters must
-receive the entry via stdin: a `{text}` argument is rejected for them (exit 2)
-because `cmd.exe` interprets the argument text. An empty `--external-cmd ""`
-or empty `SPIN_BREAKER_EXTERNAL_CMD` counts as *not supplied* and falls through
-to `config.yaml`; to disable a configured adapter permanently, remove (or
-comment out) `external_cmd` in `config.yaml`, and to skip it for a single run,
-omit `--confirm-external`.
-
-Only if a script command fails (for example `uv` is not found), read [references/troubleshooting.md](references/troubleshooting.md).

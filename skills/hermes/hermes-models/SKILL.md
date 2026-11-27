@@ -6,7 +6,7 @@ description: >-
   or image generation is wrong, verify the effective route with a real request and session record.
   Not for hermes-updates.
 metadata:
-  revision: "10"
+  revision: "11"
   areas: "software-development"
   targets: "hermes"
   summary: "configure Hermes providers, transports and routing; prove every route with live signals, not `config get`"
@@ -60,8 +60,10 @@ Substitute provider keys from your install's `providers:` block.
 | You hear / see | Load |
 |---|---|
 | fleet cutover (including planning, inventory, drift checks and dry runs), or same-provider ID swap at any scope | rule 20 below |
-| 换默认模型 / 加 provider / 换 endpoint | rules below + `references/model-switching.md` |
-| 某模型 404、`does not support the responses endpoint` | `references/custom-providers.md` |
+| 换默认模型 | rules below + [model switching](references/model-switching.md) |
+| 加 provider、某模型 404、`does not support the responses endpoint` | [custom providers](references/custom-providers.md) for provider shape, transport probes and reasoning budgets |
+| 加 alias / 换 endpoint 或 API key / 网关认证失败 | [provider rotation](references/provider-rotation.md) before changing an alias, URL or key; `.env` edits require owner confirmation |
+| Add or rotate a provider across root and profiles; verify per-home catalogs, aliases, fallbacks or account availability | [fleet provider rollout](references/fleet-provider-rollout.md); for cutovers or same-provider ID swaps, rule 20 still applies |
 | "让 subagent 用便宜点的模型" | `references/delegation-routing.md` |
 | "routing 机制怎么运作" / "能不能按任务自动选模型" | rules 6 + 16 + 18, `references/delegation-routing.md` |
 | profile 里模型/密钥不生效、只有 root 能用 | `references/delegation-routing.md` → per-profile provider |
@@ -128,8 +130,6 @@ real spawn and live transcript; verify vision with one real image call per profi
 
 ## References
 
-- `references/custom-providers.md` — provider shape, transport, sizing, aliases and install policy.
-  The provider list itself belongs to the install, not to this skill.
 - `references/model-switching.md` — switching order, three-signal proof, ghc-proxy deployment, Copilot
   fallback hygiene.
 - `references/delegation-routing.md` — layer lifetimes, overrides, pool tiers and profile routing.

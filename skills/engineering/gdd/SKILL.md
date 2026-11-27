@@ -5,7 +5,7 @@ description: >-
   resume from a saved stage ledger. Hand a bounded patch or review to a CLI agent with a written brief and isolated
   checkout; compare independent coding assistants in separate worktrees and check changes before integration.
 metadata:
-  revision: "33"
+  revision: "34"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "deliver a goal through staged authoring, gates and authorized merge, or verify one isolated CLI handoff without shipping"

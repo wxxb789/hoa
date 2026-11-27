@@ -6,11 +6,11 @@ description: >-
   packet, combine drafts and verify the final document with the brief's counting rule. Not for
   report-claim-audit.
 metadata:
-  revision: "6"
+  revision: "7"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
   summary: "meet a measurable brief: freeze the evidence packet, draft in parallel, assemble to the number, verify with the contract's own metric"
-  summary_zh: "满足可度量契约：冻结证据包、并行起草、按字数装配、用契约自身的度量脚本验收"
+  summary_zh: "满足可度量契约：冻结证据包、并行起草、按指定词数/字符数装配、用契约自身的度量脚本验收"
   kind: "entry"
 ---
 
@@ -74,8 +74,9 @@ verified numbers, specifics, citations, numbering and wording. Take the skeleton
 disciplined draft; good prose never outranks discipline. Add only packet-proven details. Measure
 adoption by citation marker and surrounding claim, not keyword. For a new model, use a versioned
 registry, check configured routes, capture identity/effort preflight and preserve generation
-attribution. Read the
-[generation harness](references/model-generation-harness.md) for registry, multi-turn and retry rules.
+attribution. When running model drafts, read the
+[generation harness](references/model-generation-harness.md) for registry, multi-turn and receipt
+rules; follow only the reference for the model's registered transport.
 
 ## 4. Assemble to the number
 
@@ -106,7 +107,8 @@ record retention and hashes. Follow [publishing](references/publish.md) for comm
 
 - [Evidence packet](references/evidence-packet.md): schema, provenance, draft comparison, assembly and QA.
 - [Search-route batching](references/search-route-batching.md): themed resumable retrieval and date windows.
-- [Model generation harness](references/model-generation-harness.md): registry, preflight and transports.
+- [Model generation harness](references/model-generation-harness.md): when running model drafts or
+  adding a model to the registry.
 - [Pre-flight and publishing](references/publish.md): writer detection, migration, LFS and read-back.
 - [Configuration keys](references/configuration-keys.md): keys and defaults; see
   [configuration](references/configuration.md) for resolution order. Project bindings belong in a profile.

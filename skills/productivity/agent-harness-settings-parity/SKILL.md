@@ -6,7 +6,7 @@ description: >-
   (tokens, percent, fractions) or profiles override them, verify effective values with config
   readback and session traces. Not for hermes-models.
 metadata:
-  revision: "3"
+  revision: "4"
   areas: "software-development"
   targets: "runtime-agnostic"
   summary: "hold one policy across every coding harness despite different config files, knob names and units"
@@ -44,6 +44,7 @@ An audit is read-only; apply only the changes the operator authorized.
 6. **Report** harness/version/profile, key and unit, before/after, and exact readback or runtime
    evidence. Mark inaccessible or unsupported verification as unverified, not equivalent.
 
-For compaction key candidates and preset layouts, see the
-[2026-11-21 key map](references/2026-11-21-context-compaction.md). Confirm every row against
-the installed version before use.
+- When normalizing auto-compaction thresholds, read the
+  [2026-11-21 key map](references/2026-11-21-context-compaction.md), then open only the harnesses in
+  scope. Confirm lookup candidates against the installed versions before use.
+- When verifying OMP model effort, read the [OMP runtime evidence note](references/harnesses/omp.md#runtime-evidence).
