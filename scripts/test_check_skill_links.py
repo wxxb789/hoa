@@ -203,6 +203,15 @@ class CheckSkillLinksTests(unittest.TestCase):
         ])
         self.assertIn("8 error(s)", err)
 
+    def test_script_broken_reference_link_fails(self):
+        self.skill("tool", "",
+                   files={"references/real.md": "ok\n",
+                          "scripts/probe.sh": "#!/bin/sh\n# See references/real.md and references/missing.md\n"})
+        code, out, err = self.run_main()
+        self.assertEqual(code, 1)
+        self.assertIn("scripts/probe.sh:2: script references missing references/missing.md", out)
+        self.assertNotIn("references/real.md", out)
+
 
 if __name__ == "__main__":
     unittest.main()

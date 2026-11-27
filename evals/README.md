@@ -263,7 +263,9 @@ explicit `--thresholds FILE`. Rules are evaluated in this order:
 
 Results: `evals/results/<local-date>-<task-id>-<runtime>-<mode>.{json,md}`.
 Use `--results DIR` to avoid overwriting a comparison. Review response and
-artifact excerpts for secrets before committing. Raw traces and stderr are
+artifact excerpts for secrets, local paths, and private model/provider IDs before
+committing (`scripts/check_public_privacy.py --base` scans newly added
+`evals/results/` blobs in CI). Raw traces and stderr are
 not persisted. Token counts are CLI-reported; Codex cached input and reasoning
 output are subsets, not added a second time. Pi sums uncached input, output,
 cache reads and cache writes from completed assistant messages and records

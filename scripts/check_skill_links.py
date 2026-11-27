@@ -84,6 +84,7 @@ LEADING_VARIABLE = re.compile(r"^(?:\$\{[^}]*\}|\$\w+|<[^>]*>|~)/")
 UV_SHEBANG = "#!/usr/bin/env -S uv run --script"
 SCRIPT_SUFFIXES = {".py", ".sh", ".bash", ".ps1"}
 SHELL_PYTHON = re.compile(r"(?<![\w./$<'\"-])python3?(?:\.exe)?(?=\s|$)")
+SCRIPT_REF_LINK = re.compile(r"(?<![\w./-])(references/[A-Za-z0-9][A-Za-z0-9._/-]+\.md)(?![\w./-])")
 PEP_723 = re.compile(r"^# /// script\s*$", re.M)
 
 
@@ -269,6 +270,31 @@ def shebang_errors(skill_dir: Path, skills_root: Path) -> list[str]:
     return errors
 
 
+def script_reference_errors(skill_dir: Path, skills_root: Path) -> list[str]:
+    """Errors for broken `references/*.md` paths cited inside non-test skill scripts."""
+    errors = []
+    for path in sorted(p for p in skill_dir.rglob("*") if p.suffix in SCRIPT_SUFFIXES):
+        relative = path.relative_to(skill_dir)
+        if "tests" in relative.parts or TEST_FILE.match(path.name):
+            continue
+        where = path.relative_to(skills_root.parent).as_posix()
+        lines = path.read_text(encoding="utf-8").splitlines()
+        for number, line in enumerate(lines, 1):
+            for match in SCRIPT_REF_LINK.finditer(line):
+                ref_rel = match.group(1)
+                if PLACEHOLDER.search(ref_rel):
+                    continue
+                # Skip single-letter illustrative filenames like `references/x.md`.
+                if len(Path(ref_rel).stem) <= 1:
+                    continue
+                if not (skill_dir / ref_rel).is_file():
+                    errors.append(
+                        f"{where}:{number}: script references missing {ref_rel} in "
+                        f"{skill_dir.relative_to(skills_root.parent).as_posix()}/"
+                    )
+    return errors
+
+
 def check(skills_root: Path) -> list[str]:
     """Return the errors for every skill under skills_root."""
     errors = []
@@ -277,6 +303,7 @@ def check(skills_root: Path) -> list[str]:
             continue
         errors.extend(script_errors(skill_dir, skills_root))
         errors.extend(shebang_errors(skill_dir, skills_root))
+        errors.extend(script_reference_errors(skill_dir, skills_root))
         category = skill_dir.parent
         for ref in references(skill_dir):
             where = f"{ref.source.relative_to(skills_root.parent).as_posix()}:{ref.line}"
