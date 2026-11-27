@@ -67,3 +67,11 @@ agreement, disagreement, and the escape-hatch signal are still usable, but
 soft overlap is not observable. The CLI orders and scores results deterministically
 for a given set of answers; the remote model itself may vary. Record the backend
 and model with the run and do not switch either mid-comparison.
+
+Native `/v1/decisions` backends also vary in output resolution: some emit smooth
+continuous probabilities while others quantize to `0.01` steps with polarized
+tails. On quantized backends, `F_beta` over small training sets moves in discrete
+steps; prioritize tightening `choice` category boundaries and explicit negative
+exclusions over minor wording tweaks, and group adjacent spans or same-incident
+memories before splitting so near-duplicate IDs cannot leak across train and
+holdout.

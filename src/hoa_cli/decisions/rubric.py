@@ -65,6 +65,23 @@ def _validate_axes(cfg: dict, by_name: dict[str, dict], source: str) -> None:
         raise ValueError(f"{source}: routine_labels must be an array of mechanism labels")
     if novel not in labels or novel in routine:
         raise ValueError(f"{source}: novel_label must name a non-routine mechanism label")
+    exclude = cfg.get("exclude_choices")
+    if exclude is not None:
+        if not isinstance(exclude, dict):
+            raise ValueError(f"{source}: exclude_choices must be an object mapping choice question names to label arrays")
+        for q_name, blocked in exclude.items():
+            q_def = by_name.get(q_name)
+            if q_def is None or q_def.get("type") != "choice":
+                raise ValueError(f"{source}: exclude_choices key {q_name!r} must name a choice question")
+            valid_labels = {opt["value"] for opt in q_def["choices"]}
+            if not isinstance(blocked, list) or not blocked or any(
+                not isinstance(label, str) or label not in valid_labels for label in blocked
+            ):
+                raise ValueError(f"{source}: exclude_choices[{q_name!r}] must be a non-empty array of valid choice labels")
+    min_anom = cfg.get("survivor_min_anomaly")
+    if min_anom is not None:
+        if isinstance(min_anom, bool) or not isinstance(min_anom, (int, float)) or not 0 <= min_anom <= 1:
+            raise ValueError(f"{source}: survivor_min_anomaly must be a number in [0, 1]")
 
 
 def stage_from_document(root: object, stage: str | None, source: str, *, require_axes: bool = False) -> dict:
@@ -137,3 +154,115 @@ def overlap(probabilities: Mapping[str, float], routine_labels: Collection[str],
 def confusion_pairs(counts: Mapping[tuple[str, str], int], limit: int = 10) -> list[dict]:
     ranked = sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:limit]
     return [{"labels": list(pair), "count": count} for pair, count in ranked]
+
+
+def summarize_distribution(
+    rows: Collection[Mapping[str, object]],
+    *,
+    predicate_question: str | None = None,
+    choice_question: str | None = None,
+    score_question: dict | None = None,
+    score_question_name: str | None = None,
+    score_max: float | None = None,
+    routine_labels: Collection[str] = (),
+    min_strong_score: float = 0.675,
+) -> dict:
+    """Compute observational output-distribution diagnostics across scored rows."""
+    routine = set(routine_labels)
+    all_probs: list[float] = []
+    pred_probs: list[float] = []
+    valid_rows = 0
+    choice_missing_probs = 0
+    choice_onehot = 0
+    choice_total = 0
+    pred_high_routine = 0
+    pred_low_strong = 0
+
+    for row in rows:
+        answers = row.get("answers")
+        if not isinstance(answers, Mapping):
+            judgment = row.get("judgment")
+            if isinstance(judgment, Mapping) and judgment.get("ok") and not is_refusal(judgment):
+                answers = judgment.get("answers")
+        if not isinstance(answers, Mapping) or has_refusal(answers):
+            continue
+        valid_rows += 1
+        for ans in answers.values():
+            if not isinstance(ans, Mapping):
+                continue
+            if "probability" in ans and isinstance(ans["probability"], (int, float)):
+                all_probs.append(float(ans["probability"]))
+            probs = ans.get("probabilities")
+            if isinstance(probs, Mapping):
+                for val in probs.values():
+                    if isinstance(val, (int, float)):
+                        all_probs.append(float(val))
+
+        p_val: float | None = None
+        if predicate_question and predicate_question in answers:
+            raw_p = answers[predicate_question].get("probability")
+            if isinstance(raw_p, (int, float)):
+                p_val = float(raw_p)
+                pred_probs.append(p_val)
+
+        choice_val: str | None = None
+        if choice_question and choice_question in answers:
+            choice_ans = answers[choice_question]
+            choice_total += 1
+            raw_probs = choice_ans.get("probabilities")
+            if not isinstance(raw_probs, Mapping) or not raw_probs:
+                choice_missing_probs += 1
+            else:
+                norm = choice_probabilities(choice_ans)
+                if any(v >= 1.0 - 1e-6 for v in norm.values()):
+                    choice_onehot += 1
+            val = _value(choice_ans, "choice")
+            if isinstance(val, str):
+                choice_val = val
+
+        norm_score: float | None = None
+        if score_question and score_question["name"] in answers:
+            score_ans = answers[score_question["name"]]
+            raw_s = _value(score_ans, "score")
+            if isinstance(raw_s, (int, float)):
+                norm_score = normalize_score(float(raw_s), score_question)
+        elif score_question_name and score_max and score_max > 0 and score_question_name in answers:
+            score_ans = answers[score_question_name]
+            raw_s = _value(score_ans, "score")
+            if isinstance(raw_s, (int, float)):
+                norm_score = min(1.0, max(0.0, float(raw_s) / score_max))
+
+        if p_val is not None and choice_val is not None and routine:
+            if p_val >= 0.80 and choice_val in routine:
+                pred_high_routine += 1
+            if p_val < 0.30 and choice_val not in routine and (norm_score is None or norm_score >= min_strong_score):
+                pred_low_strong += 1
+
+    grid_001_frac = (
+        sum(abs(round(p * 100) - p * 100) < 1e-6 for p in all_probs) / len(all_probs)
+        if all_probs else None
+    )
+    binary_hard = bool(all_probs) and all(p <= 1e-6 or p >= 1.0 - 1e-6 for p in all_probs)
+    quantized_001 = (
+        bool(grid_001_frac is not None and grid_001_frac >= 0.98 and valid_rows >= 20 and not binary_hard)
+    )
+    extreme_rate = (
+        round(sum(p <= 0.05 or p >= 0.95 for p in pred_probs) / len(pred_probs), 4)
+        if pred_probs else None
+    )
+    return {
+        "valid_rows": valid_rows,
+        "unique_predicate_probs": len({round(p, 6) for p in pred_probs}) if pred_probs else None,
+        "grid_001_fraction": round(grid_001_frac, 4) if grid_001_frac is not None else None,
+        "quantized_001": quantized_001,
+        "binary_hard": binary_hard,
+        "extreme_predicate_rate": extreme_rate,
+        "choice_missing_probs_rate": round(choice_missing_probs / choice_total, 4) if choice_total else None,
+        "choice_onehot_rate": round(choice_onehot / choice_total, 4) if choice_total else None,
+        "head_discordance_pred_high_routine_rate": (
+            round(pred_high_routine / valid_rows, 4) if (valid_rows and pred_probs and routine) else None
+        ),
+        "head_discordance_pred_low_strong_rate": (
+            round(pred_low_strong / valid_rows, 4) if (valid_rows and pred_probs and routine) else None
+        ),
+    }

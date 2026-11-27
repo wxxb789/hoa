@@ -10,7 +10,7 @@ description: >-
   Use rubric-tune for iterative rubric optimization.
 disable-model-invocation: true
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "opt-in `/v1/decisions` and `/v1/chat/completions` rubric classifier with 9 bundled presets"
@@ -38,6 +38,13 @@ checks (`0 output tokens` on native `/v1/decisions` models, with
 - **Atomic criteria.** Keep custom questions single-step (`predicate`, mutually
   exclusive `choice`, or `score` with 2–10 levels) and branch in code rather than
   asking for multi-hop reasoning.
+- **Multi-head gating over bare predicate cutoffs.** Native `/v1/decisions`
+  backends differ in probability resolution (smooth continuous floats vs. coarse
+  `0.01` quantized steps), and `/v1/chat/completions` emits hard `0`/`1`
+  indicators (`confidence: 1.0`). Never treat a bare `predicate` probability as a
+  calibrated threshold or sole admission gate: combine `choice` with `predicate`
+  and/or `score` whenever a preset exposes multiple heads, and treat low-confidence
+  or near-tied `choice` answers as verify/escalate gray zone.
 
 ## Usage
 

@@ -4,7 +4,7 @@ description: >-
   Tune a classification rubric or taxonomy when you have labeled examples and need bounded, semi-supervised refinement with a blind holdout gate. Explicit invocation only. Use rubric-judge for one-shot classification and hoa-practice-mine for session/memory mining.
 disable-model-invocation: true
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "refine rubrics with bounded training trials, a blind promotion gate, and human labeling"
@@ -41,6 +41,8 @@ and a blind holdout. The human decides whether to promote and how to label new d
   gitignored scratch `--out-dir`; never edit the production rubric. Unlabeled
   items may be sampled only after the loop. Never use model outputs as labels
   or include unlabeled items in training scores, loss, or candidate selection.
+  Cross-model disagreements belong only to the outer human-labeling queue; keep
+  the inner tuning loop locked to one endpoint, split, threshold, and metric.
 
 ## Workflow
 

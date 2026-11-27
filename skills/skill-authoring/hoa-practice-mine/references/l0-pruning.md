@@ -29,4 +29,14 @@ request failures: it keeps those sessions eligible for pivot selection and
 counts only model refusals in `l0_refusal_sessions`. If `judge` writes a ledger
 but exits `1` for failed requests, investigate the failures and use the ledger
 for fail-open filtering; do not treat failed rows as clean. Audit the top 5–8
-pruned sessions near the boundary before zooming into L1.
+pruned sessions near the boundary before zooming into L1, plus a small random
+sample of deep-negative pruned sessions on high-stakes runs (a second model at
+L1 only sees L0 survivors and cannot rescue L0 false negatives).
+
+## Handling quantized or polarized backends
+
+`filter-spans` reports `calibration_profile` (observational metrics only; no
+auto-tuning). When `quantized_001` is `true`, `extreme_predicate_rate > 0.30`,
+or the loose OR retains `> 75%` of sessions, switch to `--strict` so
+keyword-sensitive `anomaly_probe` spikes cannot push routine sessions through
+without corroborating `durability` or `user_correction_probe`.

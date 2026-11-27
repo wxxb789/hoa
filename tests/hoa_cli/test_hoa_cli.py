@@ -297,7 +297,7 @@ class HoaCliTests(unittest.TestCase):
 
     def test_subcommand_help(self):
         groups = {"decide": (), "history": ("extract", "show"),
-                  "mine": ("judge", "filter-spans", "select-survivors", "residuals", "anchor-check", "baseline"),
+                  "mine": ("judge", "filter-spans", "select-survivors", "residuals", "disagreements", "anchor-check", "baseline"),
                   "hillclimb": ("split", "eval", "eval-holdout", "step", "sample")}
         for args in [(), *((group,) for group in groups), *((group, leaf) for group, leaves in groups.items() for leaf in leaves)]:
             with self.subTest(args=args), redirect_stdout(io.StringIO()) as out, self.assertRaises(SystemExit) as exit_code:
@@ -416,3 +416,101 @@ class HoaCliTests(unittest.TestCase):
         text = base_out.read_text(encoding="utf-8")
         self.assertIn("demo-repo/AGENTS.md", text)
         self.assertIn("demo-repo/docs/guide.md", text)
+
+    def test_select_survivors_multihead_gating_and_residuals_quantized_profile(self):
+        spans = self.write("spans.jsonl", [
+            {"id": sid, "session_id": sid, "has_pivot": True, "text": f"text {sid}"}
+            for sid in ("keep", "low_anom", "no_evid", "dead_neg", "tie_b", "tie_a")
+        ], lines=True)
+        def row(sid, anom, evid, tax, tax_probs, score):
+            return {"id": sid, "judgment": {"ok": True, "answers": {
+                "anomaly_probe": {"type": "predicate", "probability": anom},
+                "evidence_backing": {"type": "choice", "choice": evid, "probabilities": {evid: 1.0}},
+                "taxonomy_v2": {"type": "choice", "choice": tax, "probabilities": tax_probs},
+                "systemic_score": {"type": "score", "score": score},
+            }}}
+        # Build 20 quantized rows so quantized_001 triggers cleanly.
+        scored_rows = [
+            row("keep", 0.90, "proven_operational_lesson", "os_shell_hook_subprocess", {"os_shell_hook_subprocess": 0.80, "routine_or_app_local": 0.20}, 1.80),
+            row("low_anom", 0.15, "proven_operational_lesson", "os_shell_hook_subprocess", {"os_shell_hook_subprocess": 0.80, "routine_or_app_local": 0.20}, 1.80),
+            row("no_evid", 0.95, "no_lesson_evidence", "os_shell_hook_subprocess", {"os_shell_hook_subprocess": 0.80, "routine_or_app_local": 0.20}, 1.80),
+            row("dead_neg", 0.88, "no_lesson_evidence", "routine_or_app_local", {"routine_or_app_local": 0.89, "os_shell_hook_subprocess": 0.11}, 0.10),
+            row("tie_b", 1.00, "proven_operational_lesson", "os_shell_hook_subprocess", {"os_shell_hook_subprocess": 1.00}, 2.00),
+            row("tie_a", 1.00, "proven_operational_lesson", "os_shell_hook_subprocess", {"os_shell_hook_subprocess": 1.00}, 2.00),
+        ]
+        extra_spans = []
+        for i in range(14):
+            sid = f"pad_{i:02d}"
+            extra_spans.append({"id": sid, "session_id": sid, "has_pivot": True, "text": f"pad {i}"})
+            scored_rows.append(row(sid, 0.05, "no_lesson_evidence", "routine_or_app_local", {"routine_or_app_local": 0.95, "os_shell_hook_subprocess": 0.05}, 0.00))
+        with spans.open("a", encoding="utf-8") as handle:
+            for item in extra_spans:
+                handle.write(json.dumps(item) + "\n")
+        scored = self.write("l1v2-scored.jsonl", scored_rows, lines=True)
+        selected, report = self.root / "sel.jsonl", self.root / "res.json"
+        self.invoke("mine", "select-survivors", "--stage", "l1-v2", "--scored", scored, "--spans", spans, "--output", selected)
+        self.assertEqual([r["id"] for r in self.rows(selected)], ["keep", "tie_b", "tie_a"])
+        self.invoke("mine", "residuals", "--stage", "l1-v2", "--scored", scored, "--spans", spans, "--output", report)
+        res = json.loads(report.read_text(encoding="utf-8"))
+        self.assertTrue(res["calibration_profile"]["quantized_001"])
+        self.assertFalse(res["calibration_profile"]["binary_hard"])
+        self.assertGreater(res["calibration_profile"]["head_discordance_pred_high_routine_rate"], 0.0)
+        self.assertEqual([item["id"] for item in res["strong_positives_top"][:2]], ["tie_a", "tie_b"])
+        self.assertEqual(res["strong_positive_count"], 3)
+
+    def test_mine_disagreements_offline_continuous_mass_and_head_conflict(self):
+        def flat_row(sid, p, cat, cat_probs, score):
+            return {"id": sid, "answers": {
+                "is_pitfall": {"type": "predicate", "probability": p},
+                "category": {"type": "choice", "value": cat, "probabilities": cat_probs},
+                "reusability": {"type": "score", "value": score},
+            }}
+        # Out-of-order inputs, plus refusal and missing id to verify id-join and coverage reporting.
+        left = self.write("left.jsonl", [
+            flat_row("busybox", 0.101, "none", {"none": 0.943, "wsl": 0.057}, 1.061),
+            flat_row("lockfile", 0.616, "toolchain", {"toolchain": 0.853, "none": 0.147}, 0.380),
+            flat_row("cargo_neg", 0.121, "none", {"none": 0.940, "toolchain": 0.060}, 0.050),
+            flat_row("left_only_hit", 0.920, "wsl", {"wsl": 0.900, "none": 0.100}, 1.700),
+            flat_row("tax_split", 0.900, "wsl", {"wsl": 0.800, "toolchain": 0.100, "none": 0.100}, 1.500),
+            {"id": "refused_item", "judgment": {"ok": True, "reason": "model_refusal", "answers": {"is_pitfall": {"type": "refusal"}}}},
+            flat_row("only_in_left", 0.500, "none", {"none": 1.0}, 0.0),
+        ], lines=True)
+        right = self.write("right.jsonl", [
+            flat_row("tax_split", 0.920, "toolchain", {"toolchain": 0.850, "wsl": 0.050, "none": 0.100}, 1.600),
+            flat_row("left_only_hit", 0.150, "none", {"none": 0.900, "wsl": 0.100}, 0.100),
+            flat_row("cargo_neg", 0.880, "none", {"none": 0.890, "toolchain": 0.110}, 0.100),
+            flat_row("lockfile", 0.990, "toolchain", {"toolchain": 0.670, "none": 0.330}, 1.640),
+            flat_row("busybox", 0.920, "wsl", {"wsl": 0.750, "none": 0.250}, 0.050),
+            flat_row("refused_item", 0.900, "wsl", {"wsl": 0.900, "none": 0.100}, 1.500),
+        ], lines=True)
+        out = self.root / "disagreements.json"
+        summary = self.invoke(
+            "mine", "disagreements",
+            "--left", left, "--right", right,
+            "--left-label", "primary", "--right-label", "challenger",
+            "--predicate", "is_pitfall", "--choice", "category",
+            "--routine-label", "none", "--score", "reusability", "--score-max", "2",
+            "--output", out,
+        )
+        self.assertEqual(summary["coverage"]["valid_pairs"], 5)
+        self.assertEqual(summary["coverage"]["left_only_missing_ids"], 1)
+        self.assertEqual(summary["coverage"]["left_refusals"], 1)
+        data = json.loads(out.read_text(encoding="utf-8"))
+        self.assertEqual([item["id"] for item in data["right_only_top"]], ["busybox", "lockfile"])
+        self.assertEqual([item["id"] for item in data["left_only_top"]], ["left_only_hit"])
+        self.assertEqual([item["id"] for item in data["taxonomy_split_top"]], ["tax_split"])
+        self.assertEqual([item["id"] for item in data["head_conflict_top"]], ["cargo_neg"])
+        self.assertEqual(data["head_conflict_top"][0]["conflict_sides"], ["challenger"])
+        # Missing declared predicate head on one side fails closed instead of fabricating a disagreement.
+        missing_pred = self.write("missing_pred.jsonl", [{"id": "busybox", "answers": {
+            "category": {"type": "choice", "value": "none", "probabilities": {"none": 0.943, "wsl": 0.057}},
+            "reusability": {"type": "score", "value": 1.061},
+        }}], lines=True)
+        _, err = self.invoke(
+            "mine", "disagreements",
+            "--left", left, "--right", missing_pred,
+            "--predicate", "is_pitfall", "--choice", "category",
+            "--routine-label", "none", "--score", "reusability", "--score-max", "2",
+            "--output", self.root / "fail.json", status=2, raw=True,
+        )
+        self.assertIn("missing predicate question", err)
