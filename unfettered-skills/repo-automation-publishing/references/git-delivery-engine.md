@@ -100,6 +100,15 @@ the module rather than a hand `git push` (a hand push lands the object but drops
 contract), and write the repair into the loop's own journal — the journal is what the next triage reads, and
 an unexplained `dirty-behind` followed by silence re-diagnoses from scratch.
 
+Prevent it at the source rather than triaging it: a repo that keeps a **materialised** ref worktree can
+reconcile before the align ever runs — bring every *initialised* submodule to the gitlink the branch records,
+and no further. Two constraints keep that safe: touch initialised submodules only (a bare
+`git submodule update --checkout <path>` skips the uninitialised rest, so a pointer-only corpus stays
+pointer-only) and let the update abort rather than discard local edits inside one. Never widen it into a
+refresh — an upstream fetch or `--remote` inside the refs advances the worktree past the recorded pointer and
+reproduces the dirty state this removes. The refs are read-only to the loop: the repo's own scheduled workflow
+owns which upstream commit each pointer names, and the loop only follows it.
+
 ## Deliver
 
 ```bash
