@@ -108,6 +108,10 @@ Chinese mirror in the same commit, in the same section order, with the same
 facts and equivalent links. Keep technical terms and commands consistent.
 The [indexes](../index.md) are generated in both languages from one source.
 
+On Windows, prefer `pytest -n 4` over `-n auto` when running the `gdd-runner`
+subprocess suites locally to avoid CPU-contention timeouts on 5-second process
+launch checks.
+
 ## Notes and project history
 
 hoa began as a personal, public, versioned home for portable agent components:

@@ -93,6 +93,9 @@ Claude Code 原生的 `plugin eval` 测试 plugin 形态的包；Anthropic 的 `
 
 ## 笔记与项目历史
 
+在 Windows 上本地运行 `gdd-runner` 子进程测试套件时，优先使用 `pytest -n 4` 而非
+`-n auto`，以避免 CPU 争抢触发 5 秒进程启动超时。
+
 hoa 最初是个人使用但公开的可移植 agent 组件库：集中版本管理，避免副本分散；部署 skill；
 并复盘哪些配置有效。名字取自 Tony Stark 的 *Hall of Armor*：为不同任务打造、比较和改进
 装备的工坊。可以 fork 或按需复用。只跟踪模板和脱敏产物，不将凭证和个人数据放入 Git

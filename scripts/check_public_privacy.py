@@ -40,12 +40,15 @@ _EXEMPT_PATH_RE = re.compile(
     r"ref/|"
     r"unfettered-skills/|"
     r"evals/tasks/|"
-    r"evals/results/|"
     r".*/tests?/|"
     r"(?:.*/)?test_[^/]+\.py$|"
     r".*\.test\.[tj]sx?$"
     r")"
 )
+
+# Legacy evals/results/ snapshots are exempted from the full worktree scan,
+# but newly introduced blobs under evals/results/ ARE scanned by --base.
+_WORKTREE_ONLY_EXEMPT_RE = re.compile(r"^evals/results/")
 
 # Clearly synthetic home-path placeholders (e.g. ExampleUser, ..., <trial>/home).
 _SYNTHETIC_HOME_RE = re.compile(
@@ -57,8 +60,12 @@ _SYNTHETIC_HOME_RE = re.compile(
 )
 
 
-def _is_exempt_path(rel: str) -> bool:
-    return _EXEMPT_PATH_RE.match(rel) is not None
+def _is_exempt_path(rel: str, *, include_results: bool = False) -> bool:
+    if _EXEMPT_PATH_RE.match(rel) is not None:
+        return True
+    if not include_results and _WORKTREE_ONLY_EXEMPT_RE.match(rel) is not None:
+        return True
+    return False
 
 
 def _scan_bytes(rel: str, data: bytes) -> list[str]:
@@ -99,7 +106,7 @@ def scan_introduced_blobs(root: Path, base: str, head: str = "HEAD") -> list[str
             continue
         oid = parts[0].decode("ascii", "replace")
         rel = parts[1].decode("utf-8", "surrogateescape")
-        if oid in seen or _is_exempt_path(rel):
+        if oid in seen or _is_exempt_path(rel, include_results=True):
             continue
         seen.add(oid)
         kind = git(root, "cat-file", "-t", oid, check=False).stdout.strip()
