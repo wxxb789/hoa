@@ -87,6 +87,7 @@ import agent_run
 import gdd_process
 import skill_config
 import stage_result
+from repo_identity import normalize_repo as repo_key
 
 STAGES = [
     "setup",
@@ -1578,31 +1579,6 @@ def cmd_close(args):
         f"closed: {os.path.basename(repo)} {args.goal} pr={pr} head={head[:7]}"
     )
     return 0
-
-
-def repo_key(value):
-    """The repo key delivery-state.py writes for --repo: git toplevel basename, else the value.
-
-    Kept identical to delivery-state.py's normalize_repo so the ledger reader and the plan
-    reader agree, including tilde expansion.
-    """
-    path = os.path.expanduser(value)
-    if os.path.isdir(path):
-        try:
-            proc = gdd_process.run(
-                ["git", "-C", path, "rev-parse", "--show-toplevel"],
-                capture_output=True, text=True,
-            )
-        except OSError:
-            proc = None
-        root = (proc.stdout or "").strip() if proc is not None and proc.returncode == 0 else ""
-        return os.path.basename(root) if root else os.path.basename(os.path.abspath(path))
-    default_root = os.environ.get("GDD_REPO_ROOT") or ""
-    if default_root:
-        candidate = os.path.join(os.path.expanduser(default_root), value)
-        if os.path.isdir(candidate):
-            return os.path.basename(os.path.abspath(candidate))
-    return value
 
 
 def reported_field(state, key, requested, *, observed=False):
