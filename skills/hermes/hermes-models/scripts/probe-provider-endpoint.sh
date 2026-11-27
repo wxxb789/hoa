@@ -18,7 +18,7 @@
 #   connection failure on a port            -> that scheme/port is not served
 #
 # Rule: once you see 401 Unauthorized, stop. No header variant can fix it - the owner must
-# confirm the key. See references/custom-providers.md -> "Rotating a provider endpoint".
+# confirm the key. See references/provider-rotation.md -> "Rotating a provider endpoint / API key".
 set -u
 
 ENVVAR="${1:?usage: $0 <KEY_ENV_VAR> <base-url> [...]}"; shift

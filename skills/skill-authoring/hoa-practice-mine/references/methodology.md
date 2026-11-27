@@ -36,49 +36,11 @@
    positives + 8 deceptive negatives). Accept a revision only when false negatives
    stay `0` and `worst_case_gap = min(score_pos) - max(score_neg)` is non-decreasing.
 
-## Store Schemas Covered
+## Source adapters
 
-### Claude Code (`~/.claude/projects/<project-slug>/`)
-
-- Main sessions: `<session-uuid>.jsonl`
-- Subagent workflows: `<session-uuid>/subagents/**/journal.jsonl` (filter rows
-  with `"failed"`, `"error"`, or `"aborted"` and load matching `agent-<id>.jsonl`).
-- Key records:
-  - `type == "user"`: human string/text blocks (`isMeta != true`) and `tool_result`
-    blocks (`is_error == true` or non-zero exit status).
-  - `type == "assistant"`: `text` blocks and `tool_use` blocks (`id`, `name`, `input`).
-  - `type == "system"`: `hookErrors[]`, `compact_boundary`, and `api_error` /
-    `turn_aborted` warnings.
-- Boilerplate stripping: delegated subagent tasks prepend `[Workflow harness — computed task] ... would be forged.`; replace that frame before classification so safety filters do not misfire.
-
-### Oh My Pi / OMP (`~/.omp/agent/sessions/<encoded-cwd>/`)
-
-- Main sessions: `<timestamp>_<session-uuid>.jsonl` (`type == "session"` line
-  carries `cwd` and optional `parentSession` for branched continuations).
-- Key records:
-  - `type == "message"` with `message.role == "user"`: `message.content[].text`
-    (strip injected `<system-reminder>` / `<system-notice>` wrappers when indexing
-    human intent).
-  - `type == "message"` with `message.role == "assistant"`: `message.content[]`
-    contains `text` and `toolCall` (`id`, `name`, `arguments`).
-  - `type == "message"` with `message.role == "toolResult"`: `toolCallId`,
-    `toolName`, `isError`, and `content[].text`.
-
-### Codex (`~/.codex/`)
-
-- Prefer existing rollout JSONL. Completed items take precedence over duplicate
-  raw response records; older rollouts can use `response_item` records directly.
-  Without both databases, scan `rollout-*.jsonl`, including under `sessions/` and
-  `archived_sessions/`.
-- If a rollout is missing, look up its thread in `state_5.sqlite` and reconstruct
-  its records from `thread_history_1.sqlite` in `rollout_ordinal` order. SQLite
-  locators use those ordinals; JSONL locators use physical file lines.
-- Open SQLite read-only. When WAL sidecars are missing or a lock blocks reads,
-  use an immutable view to avoid creating or touching sidecars. The warning
-  means recent WAL changes may be unavailable.
-- Within the selected directory scope, retain user threads, clean `worker` or
-  `default` subagents, and subagent threads with tool errors. Omit other clean
-  internal roles unless `--include-codex-subagents` is passed.
+For store schemas, discovery rules, and exact evidence locators, read only the
+adapters for the sources in scope: [Claude Code](sources/claude-code.md),
+[OMP](sources/omp.md), or [Codex](sources/codex.md).
 
 ## Stopping Criterion
 

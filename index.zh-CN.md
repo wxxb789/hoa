@@ -29,7 +29,7 @@ targets:  runtime-agnostic | repo-only |
 |---|---|---|---|---|---|
 | agent-harness-settings-parity | skill | software-development | runtime-agnostic | `skills/productivity/agent-harness-settings-parity/` | 让同一条策略在每个 coding harness 上生效，尽管配置文件、键名与单位各不相同 |
 | agent-operating-contract-evolution | skill | software-development,work-management,self-management | runtime-agnostic | `skills/productivity/agent-operating-contract-evolution/` | 按分层演进 agent 身份文件与操作协议：覆盖标记、行为评测、加载范围探测 |
-| contract-bound-deliverables | skill | work-management,software-development | runtime-agnostic | `skills/productivity/contract-bound-deliverables/` | 满足可度量契约：冻结证据包、并行起草、按字数装配、用契约自身的度量脚本验收 |
+| contract-bound-deliverables | skill | work-management,software-development | runtime-agnostic | `skills/productivity/contract-bound-deliverables/` | 满足可度量契约：冻结证据包、并行起草、按指定词数/字符数装配、用契约自身的度量脚本验收 |
 | define-goal | skill | self-management,software-development,work-management | runtime-agnostic | `skills/productivity/define-goal/` | 把雄心转化为编号 goal 文件，近期清晰、远期可细化，不制定实现步骤 |
 | delegated-work-acceptance | skill | work-management,software-development | runtime-agnostic | `skills/engineering/delegated-work-acceptance/` | 按 artifact 和写入边界验收委派成果，将退回或越界的修复交还给负责人 |
 | dotnet-repo-workflow | skill | software-development | runtime-agnostic | `skills/engineering/dotnet-repo-workflow/` | 运行仓库自带的 .NET 门禁，验证 NuGet 锁定还原，诊断 Roslyn 编译引用缺失 |
@@ -62,7 +62,7 @@ targets:  runtime-agnostic | repo-only |
 | hoa-skill-port | skill | software-development,work-management | runtime-agnostic | `skills/skill-authoring/hoa-skill-port/` | 将私有技能移入共享仓库作为权威副本：外置环境参数、通过目标仓库门禁，并区分运行时切换与发布 |
 | hoa-skill-review | skill | software-development,work-management,self-management | runtime-agnostic | `skills/skill-authoring/hoa-skill-review/` | 依据消费者证据审计 skill 行为与修改，不改动被审查对象 |
 | hoa-skill-set-audit | skill | software-development,self-management | runtime-agnostic | `skills/skill-authoring/hoa-skill-set-audit/` | 审计会话实际提供的整套技能：单项质量、重叠、遮蔽、指令冲突、同名漂移、可见性、../ 闭包、清单预算；只出报告 |
-| measurement-campaign-evidence | skill | software-development,work-management | runtime-agnostic | `skills/engineering/measurement-campaign-evidence/` | 测量运动：先钉候选身份、串行跑、一致报告集，不让基线伪造延迟对比 |
+| measurement-campaign-evidence | skill | software-development,work-management | runtime-agnostic | `skills/engineering/measurement-campaign-evidence/` | 测量活动：先钉候选身份、串行跑、一致报告集，不让基线伪造延迟对比 |
 | official-document-verification | skill | work-management | runtime-agnostic | `skills/research-writing/official-document-verification/` | 用文档的确切版本核验结论，含只能用真浏览器取到的被封来源 |
 | package-release-verification | skill | software-development | runtime-agnostic | `skills/engineering/package-release-verification/` | 发版：先补 changelog、同一 commit 的门禁、分派、按版本号核 registry、单独获批的清理 |
 | privileged-host-handoff | skill | software-development,work-management | runtime-agnostic | `skills/engineering/privileged-host-handoff/` | 人工代跑特权主机：先探测能力、钉住要跑的文件、交付自包含带闸门的命令块、先 dry run 再执行、把贴回的输出当证据核对 |

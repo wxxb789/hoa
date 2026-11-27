@@ -6,11 +6,11 @@ description: >-
   serially and reject mixed report sets or shortcuts in the comparator. Not for
   package-release-verification.
 metadata:
-  revision: "3"
+  revision: "4"
   areas: "software-development,work-management"
   targets: "runtime-agnostic"
   summary: "bind the candidate, measure serially, keep one report set, never let a comparator fake a latency"
-  summary_zh: "测量运动：先钉候选身份、串行跑、一致报告集，不让基线伪造延迟对比"
+  summary_zh: "测量活动：先钉候选身份、串行跑、一致报告集，不让基线伪造延迟对比"
   kind: "entry"
 ---
 
@@ -52,34 +52,12 @@ siblings). Successful runs clean up; kills do not.
 3. Keep long campaigns away from anything that restarts your supervisor — a gateway/service restart
    mid-build is what creates the poisoned state, and the campaign restarts from that workload.
 
-## 3. Comparators that cannot satisfy the oracle
+## 3. Require a comparable measurement
 
-A comparator tree usually predates the feature the instrument verifies (no database asset, different
-publication model). The instrument refuses it; that refusal IS the evidence: keep the refusal report,
-record the limitation in the goal record, and add separately labelled structural evidence (build output
-size, asset inventory, largest pages) describing what the old design shipped. Never synthesize a
-comparative latency from a structurally different path, and never simplify the corpus so the old tree
-passes.
-
-### Clock origin: the comparison that looks real and is not
-
-A comparator too old to run the instrument needs a purpose-built probe, and that is where a latency
-comparison silently becomes apples-to-oranges:
-
-- The candidate number usually starts in the driver — `Date.now()` around `locator.hover()` plus
-  `waitFor({state:'visible'})` — so it contains actionability checks, scroll-into-view, several CDP
-  round-trips and the polling interval that notices the panel. The probe number usually starts in the
-  page — `performance.now()` in a `pointerover` listener, or immediately before `mouse.move` — so it
-  contains none of that. Under CPU throttling the gap is ~100 ms per hover and lands entirely on the
-  candidate, which then reads as a product regression.
-- Align the origin before writing any delta. Usually free: if the candidate instrument already records
-  its own page-clock observation (pointerover → visible), compare that to the probe number and keep the
-  driver number as a separate "as-driven" column.
-- Bound the probe's overhead from its own numbers instead of asserting it from code review: with the
-  same constant intent delay on both trees, a probe warm total of ~delay + a few ms proves its driver
-  overhead is negligible.
-- Match sample shape as well: an n=1 candidate observation against a p50 of 30 is a point estimate, not
-  a distribution. Raise the candidate to the same n or say so in the same sentence as the delta.
+Never synthesize latency from a structurally different path or weaken the corpus so the comparator
+passes. Report no delta unless the numbers can be put on the same clock. If the comparator cannot
+run the standard instrument or timer origins differ, read
+[comparator measurement](references/comparator-measurement.md) before reporting the result.
 
 ## 4. Report the target metric alone, and the cost beside it
 
@@ -129,9 +107,4 @@ no suite in parallel, and record peak RSS per workload so the next campaign can 
 - Letting a failing large or hub-heavy case disappear into an average; the goal usually forbids it.
 - Reporting a south-of-target headline while the drawing cost tripled, so the maintainer accepts a UX
   trade-off they never saw.
-- Comparing one harness's driver-side timer against another's page-side timer and publishing the delta as
-  a trade-off. A footnote that says "clocks not decomposed" does not make the headline direction valid —
-  if the two numbers cannot be put on one clock, there is no delta to report, only two separate records.
-  When the committed goal record already carries such a delta, correct the record before asking the
-  maintainer to accept it.
 - Running the campaign beside a full test suite on a host sized for one.

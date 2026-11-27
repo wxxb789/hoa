@@ -6,7 +6,7 @@ description: >-
   date as supported, and return an answer with deduplicated source URLs. Not for
   official-document-verification.
 metadata:
-  revision: "6"
+  revision: "7"
   areas: "software-development"
   targets: "runtime-agnostic"
   summary: "web and X/Twitter search via a local ghc-proxy Responses API; answer plus deduped sources"
@@ -69,7 +69,7 @@ endpoint and per-engine model IDs via environment variables (or pass
 ## What you need to know
 
 - **Latency ~3-20s** measured; date-filtered X searches are the slow end.
-- **Model must support the responses endpoint.** Claude models return HTTP 400 here.
+- If a model returns HTTP 400 on `/v1/responses`, read [model/endpoint compatibility](references/models/responses-api-compatibility.md).
 - **`--handle` restricts results but does not steer the model**, so the script appends
   the handles to the prompt for you. That is why a terse `x --handle X "newest post"`
   works; without the appending it draws a clarifying question instead of a search.

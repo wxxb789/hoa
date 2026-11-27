@@ -6,7 +6,7 @@ description: >-
   At a phase wrap-up, reconcile the milestone index, release and production pins; list live runs,
   PRs and deferred loose ends. Read-only.
 metadata:
-  revision: "5"
+  revision: "6"
   areas: "work-management,software-development"
   targets: "runtime-agnostic"
   summary: "audit report claims and omissions or close out a milestone against its task inventory, release, and actual deployment pin"
@@ -25,6 +25,9 @@ re-reading the repo themselves.
 Open the role contract that governs the run: who may write which paths, what needs operator
 approval, what must never be written. Everything below is shaped by it — an audit run usually
 licenses *reading* and at most a `notes`/`STATUS` write, never a repair of what it found.
+
+At a phase or milestone wrap-up, even without a memo, read the [closeout checklist](references/milestone-closeout.md)
+before reading summary prose.
 
 ## 1. Recount every claim from the artifact that owns it
 
@@ -84,8 +87,8 @@ licenses *reading* and at most a `notes`/`STATUS` write, never a repair of what 
 - Route surface gaps to the role that owns that path. Hand over the **judgement**, not a prescription:
   the facts, the two possible rulings, the boundary (no commit, no claim change, no new file surface).
   A teammate told "fill the gap" fabricates entries to satisfy you.
-- Never commit or push from an audit run. Leaving the tree untouched is a reportable result — say it was
-  deliberate, and why (writes need approval).
+- Never repair records, change pins, deploy, clean up, commit or push from an audit run. Leaving the
+  tree untouched is a reportable result — say it was deliberate, and why (writes need approval).
 
 ## 5. Output shape
 
@@ -97,26 +100,6 @@ licenses *reading* and at most a `notes`/`STATUS` write, never a repair of what 
 
 Plain text in a terminal, one point per line, no markdown decoration: the operator may be reading this
 on a phone.
-
-## Milestone closeout checklist
-
-Use this read-only pass at a project phase boundary, even when there is no closeout memo.
-
-1. Inventory before reading summary prose: enumerate goal/task files and statuses, then reconcile
-   index and archive rows. Include open PRs/issues, live runs and inherited obligations. Separate
-   recorded completion, unrecorded completion, unfinished work, in-flight work and deliberate deferrals.
-2. Reconcile what was recorded with what was measured, the changelog with the published tag or
-   registry version, and that release with what users actually load. Resolve the deploy pipeline's
-   effective dependency, generator or tool pin to its version or commit, date and lag from release.
-   Inspect the materialized output when generation is involved.
-3. Look for post-deploy proof on the serving host: the shipped artifact is reachable, boots or
-   loads, and real usage exercises the changed capability. Check live host behavior (such as
-   response headers) when it matters. A green build, publish or deploy does not prove this;
-   mark unproven behavior and skipped checks explicitly.
-4. Rank remaining items by cost of leaving them, with evidence, execution order and blockers
-   such as active runs. Include cleanup candidates without acting on them. State the completion
-   verdict and recommend the one owner decision that clears the phase, if any. Do not repair
-   records, change pins, deploy or clean up during this audit.
 
 ## Pitfalls
 
