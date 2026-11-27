@@ -336,7 +336,9 @@ command = "do-not-run"
             raise runner.subprocess.TimeoutExpired(argv, kwargs["timeout"])
         if real_process:
             header = ", ".join(STUB_NAMES)
-            return process([sys.executable, "-c", f"{header} = {constants!r}\n" + STUB, *argv[1:]], **kwargs)
+            # Match the runtime's UTF-8 JSONL stream even on Windows legacy code pages.
+            return process([sys.executable, "-X", "utf8", "-c", f"{header} = {constants!r}\n" + STUB, *argv[1:]],
+                           **kwargs)
         return run_stub(argv, constants, cwd=cwd, env=kwargs["env"], input_text=kwargs.get("input", ""))
 
     monkeypatch.setattr(runner, "run_process", launch)
