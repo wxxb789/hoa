@@ -69,6 +69,37 @@ Give the rebase a timeout, and make the timeout path run the same verified rollb
 progress is refused by every later run, so a timeout that skips the abort converts one bad run into a
 permanent outage.
 
+## Wedge: a dirty submodule pointer behind the remote
+
+A repo that tracks its refs as submodules can wedge the engine with no defect on either side. The ref sync
+leaves the submodule's working tree on a commit the branch does not record — neither `HEAD`'s nor
+the remote's — so `git status --porcelain --untracked-files=no` is non-empty while the loop's own commit sits
+behind the remote. The engine refuses to reconcile a tracked-dirty tree (`deferred-dirty`), the branch is
+still behind, so it escalates to `dirty-behind` — and no later tick can clear it, because the one action that
+would remove the condition is the action the engine declines to take. The loop goes silently stale while every
+line it prints reads as an ordinary refusal; the tell is the *same* reason key on every tick.
+
+Repair in place — no force, no history rewrite, the rebase moves only the loop's own unpushed commit:
+
+```bash
+cd <repo>
+git status --porcelain                 # confirm the only entry is the submodule pointer
+git submodule update --checkout <sub>  # restore the commit the branch records ⇒ tree clean
+git rebase <remote>/<branch>           # now permitted; the rebase records the remote's newer pointer
+git submodule update --checkout <sub>  # match the pointer the rebase just recorded ⇒ clean again
+git status --porcelain                 # empty is the precondition deliver asserts
+deliver <repo>                         # through the engine: push-by-id + read-back
+```
+
+Restoring the pointer **twice** is the step that is missed: it must match `HEAD` before the rebase (or the
+rebase is refused) and again after it (or the tree is dirty against the newly recorded pointer). Note what
+makes the wedge permanent — a wrapper whose idle exit tests "nothing staged" instead of
+`git rev-list --count <remote>/<branch>..HEAD` strands the commit its own failed tick created: the next tick
+finds nothing to stage, exits 0, and the unpushed commit is never offered to the engine again. Publish through
+the module rather than a hand `git push` (a hand push lands the object but drops the read-back half of the
+contract), and write the repair into the loop's own journal — the journal is what the next triage reads, and
+an unexplained `dirty-behind` followed by silence re-diagnoses from scratch.
+
 ## Deliver
 
 ```bash

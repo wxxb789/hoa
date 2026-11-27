@@ -180,7 +180,10 @@ semantics that make the automation safe to leave unattended.
     list holds nothing outside `<scope>`, `git reset` + fail if it does. The engine's allowlist of roots is a
     first refusal only; the staged-set assertion is the binding check, because it also sees deletions and
     renames. A modified submodule pointer is *normal* in a repo that tracks its refs as submodules and must
-    never appear in a landing commit. Generalize: the loop owns a path, not the worktree — the repo's other
+    never appear in a landing commit — and it is never inert either: the same pointer is what
+    `status --porcelain` counts, so one left on a commit the branch does not record turns the align into
+    `deferred-dirty` and then `dirty-behind`, wedging the loop until a hand repair
+    (`references/git-delivery-engine.md` → *Wedge*). Generalize: the loop owns a path, not the worktree — the repo's other
     dirty paths are someone else's state. Append the repo to the member registry and leave every existing
     member's row untouched (one registry edit, no per-repo copy of the flow).
 16. **A gate that runs after the commit owns an uncommit, and resolves its own runner.** When the repo's
@@ -430,8 +433,9 @@ Order matters — each step either names the failing stage or rules it out:
   detection commands, the local-CI transcript/comment contract, the direct-push variant's commands and
   scenarios, fixture harness.
 - `references/git-delivery-engine.md` — the shared module contract (record format, reason keys), the full
-  align/deliver command set, push / read-back / retry / rollback rules, the race-and-tag fixture recipes,
-  and the review checklist a fixture-green first draft still fails.
+  align/deliver command set, push / read-back / retry / rollback rules, the `dirty-behind` wedge a stray
+  submodule pointer causes and its repair sequence, the race-and-tag fixture recipes, and the review checklist
+  a fixture-green first draft still fails.
 - `references/publisher-acceptance-probe.md` — the throwaway-clone harness and its five-case matrix
   (in-scope push, outside-path isolation, sensitive refusal, shape refusal, advanced remote), the
   real-repo-untouched assertions, and the pre-flight for a gate that will judge a new file inside a tree
