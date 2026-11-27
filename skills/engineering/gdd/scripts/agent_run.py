@@ -14,20 +14,14 @@ import argparse
 import glob
 import hashlib
 import json
-import math
 import os
-import plistlib
 import re
 import shlex
 import shutil
 import signal
-import stat
 import subprocess
 import threading
 import time
-import uuid
-import warnings
-from contextlib import ExitStack, contextmanager, suppress
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -43,29 +37,42 @@ sys.modules.setdefault("agent_run", sys.modules[__name__])
 import gdd_process
 import skill_config
 import stage_result
+from run_gc import RunGC, gc_claiming as gc_claiming
+from run_process import (
+    DATE_RE,
+    PID_KEYS,
+    STATES,
+    STOP_WAIT_SECONDS,
+    RunProcess,
+    group_alive as group_alive,
+    identity_matches,
+    is_starting,
+    knob,
+    make_run_directory,
+    read_json,
+    read_state,
+    sanitize,
+    state_age_seconds,
+    write_text,
+)
+from run_supervisors import (
+    SUPERVISOR_ENV as SUPERVISOR_ENV,
+    WINDOWS_DETACH as WINDOWS_DETACH,
+    RunSupervisors,
+    add_detach_arguments,
+    detach_config,
+    private_file,
+    restore_detached_env as restore_detached_env,
+    supervisor_call as supervisor_call,
+    tmux_missing as tmux_missing,
+    unit_name as unit_name,
+)
 
-IS_WINDOWS = os.name == "nt"
-if IS_WINDOWS:
-    import ctypes
-    import msvcrt
-    from ctypes import wintypes
-
+IS_WINDOWS = gdd_process.IS_WINDOWS
 KILLED_EXITS = (130, -2, 137, -9, 143, -15)
 KILL_EXIT, TIMEOUT_EXIT = 143, 124
-WINDOWS_DETACH = gdd_process.NO_WINDOW | gdd_process.NEW_GROUP
-# Ubuntu 22.04 leaves standard support in 2027-04; then move the floor to 24.04's 3.4.
-TMUX_MIN_VERSION = (3, 2, "a")
 POLL, PROGRESS_SECONDS = 0.25, 2.0
-STOP_WAIT_SECONDS = 20
-DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-SLUG_RE = re.compile(r"[^a-z0-9._-]+")
 CMD_UNSAFE = re.compile(r'[\r\n"&|<>^()%!]')
-STATES = ("running", "done", "failed", "killed")
-PID_KEYS = ("pid", "agent_pid")
-SUPERVISOR_ENV = {
-    "tmux": ("TMUX_TMPDIR", "TMPDIR"),
-    "herdr": ("HERDR_SESSION", "HERDR_SOCKET_PATH", "HERDR_CONFIG_PATH", "XDG_CONFIG_HOME"),
-}
 _RENAMED = ("EVENTS_MAX_BYTES", "START_GRACE_SECONDS", "STOP_WAIT_SECONDS", "DRAIN_TIMEOUT_SECONDS")
 RETIRED = {
     "OMP_RUN_ROOT": "GDD_RUN_ROOT", "DSH_RUN_ROOT": "GDD_RUN_ROOT",
@@ -73,6 +80,33 @@ RETIRED = {
     "OMP_RUN_BACKEND": "GDD_RUN_DETACH", "DSH_RUN_SETTLE_WAIT_SECONDS": "nothing",
     **{f"{p}_RUN_{k}": f"GDD_RUN_{k}" for p in ("OMP", "DSH") for k in _RENAMED},
 }
+
+# Keep the runner's import surface and use its live bindings for shared OS and I/O operations.
+_runtime = sys.modules[__name__]
+_process = RunProcess(_runtime)
+identity = _process.identity
+interpreter = _process.interpreter
+observed_state = _process.observed_state
+pid_alive = _process.pid_alive
+recorded_pid_alive = _process.recorded_pid_alive
+run_alive = _process.run_alive
+runner_interpreter = _process.runner_interpreter
+slug_start_lock = _process.slug_start_lock
+terminate = _process.terminate
+wait_until = _process.wait_until
+write_json = _process.write_json
+
+_supervisors = RunSupervisors(_runtime)
+check_tmux_version = _supervisors.check_tmux_version
+cleanup_supervisor = _supervisors.cleanup_supervisor
+enter_detached = _supervisors.enter_detached
+missing_tmux_session = _supervisors.missing_tmux_session
+select_detach = _supervisors.select_detach
+spawn_detached = _supervisors.spawn_detached
+
+_gc = RunGC(_runtime, os.path.abspath(__file__))
+gc_runs = _gc.gc_runs
+spawn_auto_gc = _gc.spawn_auto_gc
 
 
 def die(message):
@@ -84,14 +118,6 @@ def now_iso():
     return datetime.now(timezone.utc).isoformat()
 
 
-def knob(name, default):
-    try:
-        value = float(os.environ.get(name) or "")
-    except ValueError:
-        return default
-    return value if value > 0 else default
-
-
 def run_root():
     home = os.environ.get("XDG_STATE_HOME") or os.path.join(os.path.expanduser("~"), ".local", "state")
     try:
@@ -99,390 +125,6 @@ def run_root():
     except skill_config.ConfigError as exc:
         die(f"GDD_RUN_ROOT: {exc}")
     return os.path.abspath(os.path.expanduser(root))
-
-
-def detach_config():
-    try:
-        requested = skill_config.resolve("gdd", "GDD_RUN_DETACH", default="auto")
-    except skill_config.ConfigError as exc:
-        raise ValueError(f"GDD_RUN_DETACH: {exc}") from exc
-    if requested in SUPERVISOR_ENV and os.environ.get("GDD_RUN_DETACH") != requested:
-        raise ValueError(f"GDD_RUN_DETACH={requested} must be set in the environment")
-    return requested
-
-
-def select_detach(requested):
-    modes = ("auto", "systemd", "launchd", "setsid", "windows", "tmux", "herdr")
-    if requested not in modes:
-        raise ValueError(f"GDD_RUN_DETACH={requested!r}: expected {', '.join(modes)}")
-    if requested in SUPERVISOR_ENV:
-        if requested == "tmux" and IS_WINDOWS:
-            raise ValueError("GDD_RUN_DETACH=tmux is not supported on native Windows")
-        launcher = shutil.which(requested)
-        if not launcher:
-            raise ValueError(f"GDD_RUN_DETACH={requested}: {requested} executable not found on PATH")
-        if requested == "tmux":
-            check_tmux_version(launcher)
-        else:
-            herdr_executable(runner_interpreter())
-        return requested, launcher
-    if requested in ("auto", "systemd") and sys.platform == "linux":
-        if (launcher := shutil.which("systemd-run")) and (ctl := shutil.which("systemctl")):
-            try:
-                status = gdd_process.run([ctl, "--user", "is-system-running"], stdin=subprocess.DEVNULL,
-                                        capture_output=True, encoding="utf-8", errors="replace", timeout=1)
-                if status.stdout.strip() in ("running", "degraded"):
-                    return "systemd", launcher
-            except (OSError, subprocess.TimeoutExpired):
-                pass
-    if requested == "systemd":
-        raise ValueError("GDD_RUN_DETACH=systemd requires systemd-run and a reachable Linux user manager")
-    if requested == "launchd" and sys.platform != "darwin":
-        raise ValueError("GDD_RUN_DETACH=launchd requires macOS")
-    if requested in ("auto", "launchd") and sys.platform == "darwin":
-        return "launchd", shutil.which("launchctl")
-    native = "windows" if IS_WINDOWS else "setsid"
-    if requested not in ("auto", native):
-        raise ValueError(f"GDD_RUN_DETACH={requested} is not supported on {sys.platform}")
-    return native, None
-
-
-def check_tmux_version(launcher):
-    try:
-        found = require_success(supervisor_call([launcher, "-V"])).stdout.strip()
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        raise ValueError(f"tmux: cannot check version: {exc}") from exc
-    if found == "tmux master":
-        return
-    match = re.fullmatch(r"tmux (?:next-)?([0-9]+)\.([0-9]+)([a-z]*)", found)
-    if match and (int(match[1]), int(match[2]), match[3]) >= TMUX_MIN_VERSION:
-        return
-    minimum = "{}.{}{}".format(*TMUX_MIN_VERSION)
-    raise ValueError(f"tmux: found {found!r}; requires tmux {minimum} or newer")
-
-
-def dispatcher_umask():
-    # Called by the single-threaded dispatcher. Never make its mask more permissive.
-    mask = os.umask(0o777)
-    os.umask(mask)
-    return mask
-
-
-def systemd_argv(launcher, unit, cwd, log, runner):
-    # Transient unit properties carry literal paths; only ExecStart expands dollar variables.
-    return [launcher, "--user", "--collect", "--unit", unit, "--service-type=exec",
-            "--no-ask-password", f"--working-directory={cwd}", f"--property=UMask={dispatcher_umask():04o}",
-            f"--property=StandardOutput=append:{log}",
-            "--property=StandardError=inherit", "--", runner[0],
-            *(arg.replace("$", "$$") for arg in runner[1:]), "--restore-env"]
-
-
-def private_file(path):
-    if os.name != "nt":
-        return os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-    # Assign the protected DACL at creation, before writing any private data.
-    import csv
-
-    whoami = Path(os.environ["SystemRoot"], "System32", "whoami.exe")
-    account = require_success(gdd_process.run([str(whoami), "/user", "/fo", "csv", "/nh"],
-                                              capture_output=True, text=True, timeout=5))
-    sid = next(csv.reader(account.stdout.splitlines()), ["", ""])[-1]
-    if not re.fullmatch(r"S-1-(?:[0-9]+-)*[0-9]+", sid):
-        raise OSError("whoami.exe did not return a user SID")
-    advapi = ctypes.WinDLL("advapi32", use_last_error=True)
-    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
-
-    class SecurityAttributes(ctypes.Structure):
-        _fields_ = [("length", wintypes.DWORD), ("descriptor", ctypes.c_void_p),
-                    ("inherit", wintypes.BOOL)]
-
-    convert = advapi.ConvertStringSecurityDescriptorToSecurityDescriptorW
-    convert.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, ctypes.POINTER(ctypes.c_void_p), ctypes.c_void_p]
-    create = kernel.CreateFileW
-    create.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD,
-                       ctypes.POINTER(SecurityAttributes), wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
-    create.restype = wintypes.HANDLE
-    kernel.LocalFree.argtypes = [ctypes.c_void_p]
-    kernel.LocalFree.restype = ctypes.c_void_p
-    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
-    descriptor = ctypes.c_void_p()
-    if not convert(f"O:{sid}D:P(A;;FA;;;{sid})", 1, ctypes.byref(descriptor), None):
-        raise ctypes.WinError(ctypes.get_last_error())
-    try:
-        attrs = SecurityAttributes(ctypes.sizeof(SecurityAttributes), descriptor, False)
-        handle = create(str(path), 0x40000000, 0, ctypes.byref(attrs), 1, 0x80, None)
-        if handle == ctypes.c_void_p(-1).value:
-            raise ctypes.WinError(ctypes.get_last_error())
-        try:
-            return msvcrt.open_osfhandle(handle, os.O_WRONLY | os.O_BINARY)
-        except BaseException:
-            kernel.CloseHandle(handle)
-            raise
-    finally:
-        kernel.LocalFree(descriptor)
-
-
-def save_detached_env(run_dir, env):
-    # Supervisors have their own environment. Restore ours without exposing credentials in argv.
-    with os.fdopen(private_file(Path(run_dir) / ".runner-env"), "w", encoding="utf-8") as stream:
-        json.dump(env, stream)
-
-
-def supervisor_call(argv, *, env=None):
-    return gdd_process.run(argv, stdin=subprocess.DEVNULL, capture_output=True, text=True, env=env, timeout=10)
-
-
-def supervisor_error(result):
-    return result.stderr.strip() or f"exit {result.returncode}"
-
-
-def require_success(result):
-    if result.returncode:
-        raise OSError(supervisor_error(result))
-    return result
-
-
-def launchd_start(runner, run_dir, cwd, env, state):
-    target = state["supervisor"]
-    plist = run_dir / "runner.plist"
-    runner = [*runner, "--launchd-start"]
-    launcher, domain, label = target["argv"][0], target["domain"], target["label"]
-    umask = dispatcher_umask()
-    with os.fdopen(private_file(plist), "wb") as stream:
-        plistlib.dump({"Label": label, "ProgramArguments": runner, "WorkingDirectory": cwd,
-                       "EnvironmentVariables": env, "StandardOutPath": str(run_dir / "runner.log"),
-                       "StandardErrorPath": str(run_dir / "runner.log"), "AbandonProcessGroup": True,
-                       "RunAtLoad": True, "Umask": umask}, stream)
-    result = supervisor_call([launcher, "bootstrap", domain, str(plist)])
-    if result.returncode and (result.returncode == 64 or re.search(
-            r"(?:unknown|unrecognized|unsupported) (?:sub)?command", result.stderr, re.IGNORECASE)):
-        target["submit"] = True
-        write_json(run_dir / "state.json", state)
-        save_detached_env(run_dir, env)
-        result = supervisor_call([launcher, "submit", "-l", label, "-o", str(run_dir / "runner.log"),
-                                  "-e", str(run_dir / "runner.log"), "--", *runner, "--restore-env",
-                                  "--runner-cwd", cwd, "--runner-umask", str(umask)])
-    require_success(result)
-    (run_dir / ".launchd-ready").touch()
-
-
-def herdr_response(result):
-    require_success(result)
-    response = json.loads(result.stdout)
-    if not isinstance(response, dict) or not isinstance(response.get("result"), dict):
-        raise ValueError("expected a Herdr JSON result")
-    return response["result"]
-
-
-def herdr_executable(path):
-    executable = os.path.abspath(path)
-    if IS_WINDOWS:
-        executable = executable.replace("\\", "/")
-    if not re.fullmatch(r"[A-Za-z0-9_./:\-]+", executable):
-        raise OSError(f"GDD_RUN_DETACH=herdr cannot use Python at {path!r}; "
-                      "install Python at a path without spaces or special characters "
-                      "(use ASCII letters, digits, underscores, hyphens and dots in path components)")
-    return executable
-
-
-def spawn_detached(runner, run_dir, cwd, env, state, mode, launcher=None):
-    run_dir = Path(run_dir)
-    log_path = run_dir / "runner.log"
-    executable = herdr_executable(runner[0]) if mode == "herdr" else None
-    state["detach"] = mode
-    if state.get("backend") != "paseo":
-        state["backend"] = mode
-    suffix = uuid.uuid4().hex[:12]
-    target = {}
-    if mode == "launchd" and launcher:
-        target = {"mode": mode, "argv": [launcher], "domain": f"gui/{os.getuid()}",
-                  "label": f"gdd.{state['name']}.{suffix}"}
-    elif mode in SUPERVISOR_ENV:
-        target = {"mode": mode, "argv": [launcher],
-                  "env": {key: os.environ[key] for key in SUPERVISOR_ENV[mode] if key in os.environ}}
-        if mode == "tmux":
-            target["argv"] += flags(("-S", os.environ.get("TMUX", "").partition(",")[0]))
-            target["session"] = re.sub(r"[^a-zA-Z0-9_-]", "-", f"gdd-{state['name']}-{suffix}")
-        else:
-            target["entry"] = f".runner-herdr-{suffix}.py"
-    if target:
-        state["supervisor"] = target
-    else:
-        state.pop("supervisor", None)
-    if mode == "systemd":
-        state["unit"] = unit_name(state["name"])
-    write_json(run_dir / "state.json", state)
-    try:
-        if mode == "systemd" or mode in SUPERVISOR_ENV:
-            save_detached_env(run_dir, env)
-        if mode == "systemd":
-            require_success(supervisor_call(systemd_argv(launcher, state["unit"], cwd, log_path, runner)))
-            return None, 0
-        if mode == "launchd":
-            if not launcher:
-                raise OSError("launchctl executable not found on PATH")
-            launchd_start(runner, run_dir, cwd, env, state)
-            return None, 0
-        if mode in SUPERVISOR_ENV:
-            runner = [*runner, "--restore-env"]
-            setting = "-e" if mode == "tmux" else "--env"
-            options = [arg for key in ("PYTHONUNBUFFERED", "PYTHONPATH", "NOWINDOW_GUARD_LOG")
-                       if key in env or key == "PYTHONUNBUFFERED" for arg in (setting, f"{key}={env.get(key, '1')}")]
-            if mode == "tmux":
-                require_success(target_call(target, "new-session", "-d", "-s", target["session"],
-                                            "-c", cwd, *options, "--", *runner))
-                (run_dir / ".supervisor-started").touch()
-            else:
-                # Herdr sends shell input. Keep run arguments in the private entry, not the command.
-                with os.fdopen(private_file(run_dir / target["entry"]), "w", encoding="utf-8") as entry:
-                    entry.write("import os, runpy, sys\n"
-                                f"sys.argv = {ascii([*runner[2:], '--runner-cwd', cwd])}\n"
-                                "sys.path[0] = os.path.dirname(os.path.abspath(sys.argv[0]))\n"
-                                "os.unlink(__file__)\n"
-                                "runpy.run_path(sys.argv[0], run_name='__main__')\n")
-                result = herdr_response(target_call(target, "tab", "create", "--no-focus", "--cwd", str(run_dir),
-                                                    "--label", f"gdd-{state['name']}", *options))
-                for key, source in (("tab", "tab"), ("pane", "root_pane")):
-                    value = result[source][f"{key}_id"]
-                    if not isinstance(value, str) or not value or value.startswith("-"):
-                        raise ValueError(f"invalid Herdr {key} ID")
-                    target[key] = value
-                    write_json(run_dir / "state.json", state)
-                require_success(target_call(target, "pane", "run", target["pane"],
-                                            f"{executable} -B {target['entry']}"))
-            return None, 0
-    except (OSError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired) as exc:
-        (run_dir / ".runner-env").unlink(missing_ok=True)
-        if mode == "launchd" or mode in SUPERVISOR_ENV:
-            cleanup_supervisor(run_dir, state)
-        if mode == "launchd":
-            state["detach_fallback"] = f"launchd: {exc}"
-            return spawn_detached(runner, run_dir, cwd, env, state, "setsid")
-        raise OSError(f"{mode}: {exc}") from exc
-    if mode == "setsid":
-        return gdd_process.daemonize(runner, cwd, env, log_path), 0
-    with log_path.open("ab", buffering=0) as log:
-        for creationflags in (WINDOWS_DETACH | gdd_process.BREAKAWAY, WINDOWS_DETACH):
-            try:
-                process = gdd_process.popen([*runner, "--creationflags", str(creationflags)], cwd=cwd,
-                                            stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
-                                            env=env, creationflags=creationflags)
-                return process.pid, creationflags
-            except OSError as exc:
-                if creationflags == WINDOWS_DETACH or getattr(exc, "winerror", None) != 5:
-                    raise
-
-
-def restore_detached_env(run_dir):
-    path = Path(run_dir) / ".runner-env"
-    with path.open(encoding="utf-8") as handle:
-        env = json.load(handle)
-    path.unlink()
-    os.environ.clear()
-    os.environ.update(env)
-
-
-def enter_detached(args):
-    if args.runner_umask is not None:
-        os.umask(args.runner_umask)
-    # RunAtLoad can execute before bootstrap returns. Never run a second copy after fallback.
-    if args.launchd_start:
-        ready = Path(args.run_dir, ".launchd-ready")
-        cancelled = lambda: read_state(args.run_dir).get("detach") != "launchd"
-        if not wait_until(lambda: ready.exists() or cancelled(), 25) or not ready.exists():
-            return False
-    if args.restore_env:
-        restore_detached_env(args.run_dir)
-    if args.runner_cwd:
-        os.chdir(args.runner_cwd)
-    return True
-
-
-def add_detach_arguments(parser):
-    for flag in ("--restore-env", "--launchd-start"):
-        parser.add_argument(flag, action="store_true")
-    parser.add_argument("--runner-cwd")
-    parser.add_argument("--runner-umask", type=int, help=argparse.SUPPRESS)
-    parser.add_argument("--creationflags", type=int, default=0, help=argparse.SUPPRESS)
-
-
-def target_call(target, *args):
-    mode = target["mode"]
-    keys = (*SUPERVISOR_ENV[mode], "TMUX") if mode == "tmux" else SUPERVISOR_ENV["herdr"]
-    env = {key: value for key, value in os.environ.items() if key not in keys}
-    env.update(target.get("env", {}), LC_ALL="C")
-    return supervisor_call([*target["argv"], *args], env=env)
-
-
-def tmux_missing(result):
-    return result.returncode == 1 and any(phrase in result.stderr.lower() for phrase in (
-        "can't find session", "no server running", "no sessions", "no such file or directory"))
-
-
-def missing_tmux_session(state):
-    target = state.get("supervisor", {})
-    if target.get("mode") != "tmux":
-        return False
-    try:
-        return tmux_missing(target_call(target, "has-session", "-t", "=" + target["session"]))
-    except (OSError, subprocess.TimeoutExpired):
-        return False  # an unavailable probe is not evidence that the runner died
-
-
-def cleanup_supervisor(run_dir, state):
-    target = state.get("supervisor")
-    marker = Path(run_dir) / ".supervisor-cleaned"
-    if marker.exists():
-        return ""
-    mode = target["mode"] if target else state.get("detach")
-    try:
-        if target or mode == "systemd":
-            (Path(run_dir) / ".runner-env").unlink(missing_ok=True)
-        if not target:
-            return ""
-        if mode == "launchd":
-            service = f"{target['domain']}/{target['label']}"
-            (Path(run_dir) / "runner.plist").unlink(missing_ok=True)
-            result = supervisor_call([*target["argv"], "bootout", service])
-            if result.returncode and target.get("submit"):
-                result = supervisor_call([*target["argv"], "remove", target["label"]])
-            if result.returncode and result.returncode != 113 and not re.search(
-                    r"(?:could not find (?:specified )?service|no such process|not found)", result.stderr, re.IGNORECASE):
-                require_success(result)
-        elif mode == "tmux":
-            session = "=" + target["session"]
-            for command in ("has-session", "kill-session"):
-                result = target_call(target, command, "-t", session)
-                if tmux_missing(result):
-                    break
-                require_success(result)
-        elif mode == "herdr" and target.get("tab"):
-            result = target_call(target, "tab", "close", target["tab"])
-            response = read_json_text(result.stdout if not result.returncode else result.stderr)
-            if result.returncode or "result" not in response:
-                error = response.get("error") or {}
-                if not isinstance(error, dict) or error.get("code") != "tab_not_found":
-                    raise OSError(supervisor_error(result) if result.returncode else "invalid tab close result")
-        if mode == "herdr" and target.get("entry"):
-            (Path(run_dir) / target["entry"]).unlink(missing_ok=True)
-        marker.touch()
-        return ""
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        problem = f"{mode} cleanup: {exc}"
-        print(f"agent_run: warning: {problem}", file=sys.stderr)
-        return problem
-
-
-def read_json_text(value):
-    try:
-        result = json.loads(value)
-    except ValueError:
-        return {}
-    return result if isinstance(result, dict) else {}
-
-
-def unit_name(slug):
-    return f"gdd-{slug}-{uuid.uuid4().hex[:12]}"
 
 
 def warn_wsl(binary, run_dir):
@@ -496,532 +138,8 @@ def warn_wsl(binary, run_dir):
               file=sys.stderr)
 
 
-@contextmanager
-def slug_start_lock(root, slug):
-    root = Path(root)
-    root.mkdir(parents=True, exist_ok=True)
-    lock_slug = start_lock_slug(slug)
-    deadline = time.monotonic() + knob("GDD_RUN_STOP_WAIT_SECONDS", STOP_WAIT_SECONDS)
-    # Keep the lock file: unlinking would allow another process to lock a different inode.
-    with (root / f"{lock_slug}.start.lock").open("a+b") as handle:
-        while not gdd_process.try_file_lock(handle):
-            if time.monotonic() >= deadline or not gc_claiming(root, lock_slug):
-                if not gdd_process.try_file_lock(handle):
-                    die(f"start: run '{slug}' is already starting")
-                break
-            time.sleep(0.01)
-        yield  # closing the file releases the kernel lock on both platforms
-
-
-def start_lock_slug(slug):
-    return slug.rstrip(".") if IS_WINDOWS else slug
-
-
-def gc_claiming(root, slug):
-    try:
-        if slug not in gc_regular_path(root / ".gc.claim").read_text(encoding="utf-8").splitlines():
-            return False
-        with gc_regular_path(root / ".gc.lock").open("r+b") as handle:
-            return not gdd_process.try_file_lock(handle)
-    except (OSError, ValueError):
-        return False
-
-
-def make_run_directory(run_dir):
-    parent = os.path.dirname(run_dir)
-    while True:
-        os.makedirs(parent, exist_ok=True)
-        try:
-            os.mkdir(run_dir)
-            return
-        except FileNotFoundError:
-            # Collector rmdir won the gap between creating the date and claiming the slug.
-            if not Path(parent).parent.is_dir():
-                raise
-
-
-def read_json(path, default=None):
-    try:
-        with open(path, encoding="utf-8") as handle:
-            return json.load(handle)
-    except (OSError, ValueError):
-        return default
-
-
-def read_state(run_dir):
-    state = read_json(os.path.join(run_dir, "state.json"), {})
-    return state if isinstance(state, dict) else {}
-
-
-def write_json(path, payload, *, progress_tick=False):
-    """Retry WinError 5 from a poller before sacrificing atomicity, not the run."""
-    tmp = f"{path}.{os.getpid()}.tmp"
-    data = json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
-    write_text(tmp, data)
-    replace_attempts = 40
-    try:
-        for attempt in range(replace_attempts):
-            try:
-                return os.replace(tmp, path)
-            except PermissionError as exc:
-                if getattr(exc, "winerror", None) != 5:
-                    raise
-                if attempt + 1 < replace_attempts:
-                    # Keep all 40 chances, but cap the tick's backoff at 0.975 seconds.
-                    time.sleep(0.025 if progress_tick else 0.05 + 0.05 * (attempt % 5))
-        # A torn read is bad, a lost run is worse.
-        write_text(path, data)
-        if not progress_tick:
-            print(f"gdd: warning: could not replace {path} (WinError 5); writing in place", file=sys.stderr)
-    finally:
-        Path(tmp).unlink(missing_ok=True)
-
-
-def write_text(path, text):
-    with open(path, "w", encoding="utf-8") as handle:
-        handle.write(text)
-
-
-def sanitize(value):
-    slug = SLUG_RE.sub("-", str(value or "").lower()).strip("-")[:48]
-    return "" if slug in (".", "..") else slug
-
-
-def interpreter():
-    """python.exe, not pythonw.exe: a pythonw parent loses the std handles children need."""
-    console = os.path.join(os.path.dirname(sys.executable), "python.exe")
-    return console if IS_WINDOWS and os.path.exists(console) else sys.executable
-
-
-def runner_interpreter():
-    """interpreter() for gdd's own stdlib-only detached runners, whose Popen pid is recorded as theirs.
-
-    On Windows a venv's python.exe (`uv run`, `python -m venv`) is a launcher that re-spawns the base
-    interpreter, so its pid names the launcher. User-supplied `.py` agents keep interpreter() and the venv.
-    """
-    base = getattr(sys, "_base_executable", sys.executable)
-    console = os.path.join(os.path.dirname(base), "python.exe")
-    return console if IS_WINDOWS and os.path.exists(console) else interpreter()
-
-
-def state_age_seconds(state):
-    try:
-        return (datetime.now(timezone.utc) - datetime.fromisoformat(state["started"])).total_seconds()
-    except (KeyError, TypeError, ValueError):
-        return float("inf")
-
-
-def wait_until(predicate, seconds):
-    deadline = time.monotonic() + seconds
-    while not predicate():
-        if time.monotonic() >= deadline:
-            return False
-        time.sleep(POLL)
-    return True
-
-
-def _windows_query(pid, query):
-    """query(kernel32, handle) on an open process handle, or None when it cannot be opened."""
-    kernel32 = ctypes.windll.kernel32
-    kernel32.OpenProcess.restype = wintypes.HANDLE
-    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
-    kernel32.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
-    kernel32.GetProcessTimes.argtypes = [wintypes.HANDLE, *([ctypes.POINTER(wintypes.FILETIME)] * 4)]
-    handle = kernel32.OpenProcess(0x00100000 | 0x1000, False, pid)  # SYNCHRONIZE | QUERY_LIMITED
-    if not handle:
-        return None
-    try:
-        return query(kernel32, handle)
-    finally:
-        kernel32.CloseHandle(handle)
-
-
-def _probe(send, target):
-    """kill(target, 0) semantics: gone only on ProcessLookupError-like failures."""
-    try:
-        send(target, 0)
-    except PermissionError:
-        return True
-    except OSError:
-        return False
-    return True
-
-
-def proc_fields(pid):
-    with open(f"/proc/{pid}/stat", encoding="utf-8", errors="replace") as handle:
-        return handle.read().rsplit(")", 1)[1].split()
-
-
-def pid_alive(pid):
-    """Windows: OpenProcess + GetExitCodeProcess (os.kill reads AccessDenied as dead)."""
-    if isinstance(pid, str) and pid.isdigit():
-        pid = int(pid)
-    if not isinstance(pid, int) or isinstance(pid, bool) or pid <= 0:
-        return False
-    if IS_WINDOWS:
-        code = ctypes.c_ulong()
-        return bool(_windows_query(pid, lambda k, h: k.GetExitCodeProcess(h, ctypes.byref(code)) and code.value == 259))
-    if sys.platform == "linux":
-        try:
-            if proc_fields(pid)[0] in ("Z", "X"):
-                return False
-        except (OSError, IndexError):
-            pass
-    elif _probe(os.kill, pid):
-        try:
-            result = gdd_process.run(["ps", "-o", "stat=", "-p", str(pid)], capture_output=True, text=True)
-            if result.stdout.strip().startswith("Z"):
-                return False
-        except OSError:
-            pass
-        return True
-    return _probe(os.kill, pid)
-
-
-def identity(pid):
-    """Process start time (Linux stat field 22, macOS ps lstart, Windows creation time), or ""."""
-    if not pid_alive(pid):
-        return ""
-    if IS_WINDOWS:
-        times = [wintypes.FILETIME() for _ in range(4)]
-        ok = _windows_query(pid, lambda k, h: k.GetProcessTimes(h, *(ctypes.byref(t) for t in times)))
-        created = (times[0].dwHighDateTime << 32) | times[0].dwLowDateTime
-        return f"win:{created}" if ok and created else ""
-    if sys.platform.startswith("linux"):
-        try:
-            ticks = proc_fields(pid)[19]
-            return f"linux:{ticks}" if re.fullmatch(r"[0-9]+", ticks) else ""
-        except (OSError, IndexError):
-            return ""
-    try:
-        # BSD ps formats lstart in the child's local time; neither that zone nor the
-        # parent's locale should affect the stored epoch seconds.
-        result = gdd_process.run(["ps", "-o", "lstart=", "-p", str(pid)], capture_output=True, text=True,
-                                 env={**os.environ, "TZ": "UTC", "LC_ALL": "C"}, stdin=subprocess.DEVNULL)
-        if result.returncode:
-            return ""
-        _, month, day, clock, year = result.stdout.split()
-        month = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split().index(month) + 1
-        hour, minute, second = map(int, clock.split(":"))
-        started = datetime(int(year), month, int(day), hour, minute, second, tzinfo=timezone.utc)
-        return f"ps-utc:{int(started.timestamp())}"
-    except (OSError, ValueError):
-        return ""
-
-
-def identity_matches(recorded, current):
-    """True/False only for comparable identities; legacy local-time ps strings are unknown."""
-    pattern = r"(linux|win|ps-utc):(0|[1-9][0-9]*)"
-    before = re.fullmatch(pattern, recorded) if isinstance(recorded, str) else None
-    after = re.fullmatch(pattern, current)
-    if before and after and before[1] == after[1]:
-        return before[2] == after[2]
-    return None
-
-
-def group_alive(pid):
-    if not _probe(os.killpg, pid):
-        return False
-    # killpg(..., 0) also succeeds for zombie-only groups whose parent has not reaped.
-    try:
-        result = gdd_process.run(["ps", "-ax", "-o", "pgid=", "-o", "stat="], capture_output=True, text=True)
-    except OSError:
-        return True
-    rows = (line.split(None, 1) for line in result.stdout.splitlines())
-    return bool(result.returncode or any(
-        group == str(pid) and not status.startswith(("Z", "X"))
-        for group, status in (row for row in rows if len(row) == 2)))
-
-
-def terminate(pid, reap=lambda: None, *, single=False, recorded=None):
-    """End the tree pid leads; True once gone. `reap` lets the parent collect its own zombie."""
-    def reused():
-        return bool(recorded) and identity_matches(recorded, identity(pid)) is False
-
-    def gone():
-        reap()
-        return reused() or not (pid_alive(pid) or (not IS_WINDOWS and not single and group_alive(pid)))
-
-    if gone():
-        return True
-    if IS_WINDOWS:
-        gdd_process.run(["taskkill", "/T", "/F", "/PID", str(pid)], stdin=subprocess.DEVNULL,
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        return wait_until(gone, 5)
-    for signum in (signal.SIGTERM, signal.SIGKILL):
-        if reused():
-            return True
-        try:
-            (os.kill if single else os.killpg)(pid, signum)
-        except OSError:
-            pass
-        if wait_until(gone, 5):
-            return True
-    return False
-
-
-def recorded_pid_alive(state, key):
-    pid, recorded = state.get(key), state.get(f"{key}_identity")
-    if not pid_alive(pid):
-        return False
-    current = identity(pid) if recorded else ""
-    return identity_matches(recorded, current) is not False
-
-
-def run_alive(run_dir, state=None):
-    """The runner or the agent recorded in state.json is alive (public: gdd.py imports it)."""
-    state = read_state(run_dir) if state is None else state
-    return any(recorded_pid_alive(state, key) for key in PID_KEYS)
-
-
-def gc_setting(key, default):
-    value = skill_config.resolve("gdd", key, default=default)
-    if key == "GDD_RUN_MAX_MB" and str(value).strip().lower() == "off":
-        return 0
-    value = float(value)
-    if not math.isfinite(value) or (key != "GDD_RUN_MAX_MB" and value < 0):
-        raise ValueError(f"invalid {key}: {value}")
-    return value
-
-
-def gc_due(stamp, interval):
-    try:
-        return not interval or time.time() - stamp.lstat().st_mtime >= interval
-    except FileNotFoundError:
-        return True
-
-
-def spawn_auto_gc(root):
-    root = Path(root)
-    with suppress(OSError, ValueError):
-        if (gc_setting("GDD_RUN_MAX_MB", 512) <= 0 or
-                not gc_due(root / ".gc.stamp", gc_setting("GDD_RUN_GC_MIN_INTERVAL_SECONDS", 60))):
-            return
-        with gc_regular_path(root / ".gc.lock").open("a+b") as handle:
-            if not gdd_process.try_file_lock(handle):
-                return
-        argv = [runner_interpreter(), "-B", os.path.abspath(__file__), "_gc", "--run-root", str(root)]
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", ResourceWarning)
-            if IS_WINDOWS:
-                for flags in (WINDOWS_DETACH | gdd_process.BREAKAWAY, WINDOWS_DETACH):
-                    try:
-                        gdd_process.popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                                          stderr=subprocess.DEVNULL, creationflags=flags)
-                        break
-                    except OSError as exc:
-                        if flags == WINDOWS_DETACH or getattr(exc, "winerror", None) != 5:
-                            raise
-            else:
-                gdd_process.popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                                  stderr=subprocess.DEVNULL, start_new_session=True)
-
-
-def gc_stat(info, kind):
-    return kind(info.st_mode) and not getattr(info, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
-
-
-def gc_regular_path(path):
-    with suppress(FileNotFoundError):
-        if not gc_stat(path.lstat(), stat.S_ISREG):
-            raise OSError(f"not a regular file: {path}")
-    return path
-
-
-def gc_entries(folder):
-    try:
-        if not gc_stat(folder.lstat(), stat.S_ISDIR):
-            return
-        with os.scandir(folder) as entries:
-            for entry in entries:
-                with suppress(FileNotFoundError):
-                    yield Path(entry.path), entry.stat(follow_symlinks=False)
-    except FileNotFoundError:
-        pass
-
-
-def gc_size(run):
-    total, pending = 0, [run]
-    while pending:
-        for path, info in gc_entries(pending.pop()):
-            if gc_stat(info, stat.S_ISDIR):
-                pending.append(path)
-            elif gc_stat(info, stat.S_ISREG):
-                total += info.st_size
-    return total
-
-
-LEDGER_COLUMNS = (
-    "ts", "repo", "goal", "stage", "base_sha", "head_sha", "pr", "gates",
-    "rounds_simplify", "rounds_review", "findings", "next_action", "note",
-)
-
-
-def gc_ledger_names():
-    home = os.environ.get("XDG_STATE_HOME") or os.path.join(os.path.expanduser("~"), ".local", "state")
-    ledger = skill_config.resolve("gdd", "GDD_STATE_FILE", default=os.path.join(home, "gdd", "ledger.tsv"))
-    names = set()
-    try:
-        with Path(ledger).expanduser().open(encoding="utf-8-sig") as handle:
-            note = LEDGER_COLUMNS.index("note")
-            first = True
-            for raw in handle:
-                line = raw.rstrip("\r\n")
-                if not line:
-                    continue
-                cells = line.split("\t")
-                if first:
-                    first = False
-                    if "note" in cells:
-                        note = cells.index("note")
-                        continue
-                    if "stage" in cells and "goal" in cells:
-                        return None
-                if len(cells) > note and (value := cells[note].strip()).startswith("run="):
-                    names.add(start_lock_slug(value[4:]))
-    except FileNotFoundError:
-        pass
-    return names
-
-
-def gc_settled_at(run, cutoff):
-    marker = (run / "finalized").lstat()
-    if not gc_stat(marker, stat.S_ISREG) or marker.st_mtime >= cutoff:
-        return None
-    if not gc_stat((run / "state.json").lstat(), stat.S_ISREG):
-        return None
-    state = read_state(run)
-    if not state or state.get("state") in ("running", "unknown") or run_alive(run, state):
-        return None
-    settled = marker.st_mtime
-    recorded = False
-    for key in ("ended", "started"):
-        try:
-            timestamp = datetime.fromisoformat(state[key])
-            if timestamp.tzinfo is None:
-                timestamp = timestamp.replace(tzinfo=timezone.utc)
-            settled = max(settled, timestamp.timestamp())
-            recorded = True
-            break
-        except (KeyError, TypeError, ValueError, OverflowError, OSError):
-            continue
-    return settled if recorded and settled < cutoff else None
-
-
-def gc_retire(root, run, info, slugs, cutoff):
-    claim = gc_regular_path(root / ".gc.claim")
-    temp_claim = gc_regular_path(root / f".gc.claim.{os.getpid()}.tmp")
-    temp_claim.write_text("\n".join(slugs), encoding="utf-8", newline="\n")
-    os.replace(temp_claim, claim)
-    try:
-        with ExitStack() as locks:
-            for slug in slugs:
-                path = gc_regular_path(root / f"{slug}.start.lock")
-                handle = locks.enter_context(path.open("a+b"))
-                if not gdd_process.try_file_lock(handle):
-                    return None
-            current = run.lstat()
-            if (not gc_stat(run.parent.lstat(), stat.S_ISDIR) or not gc_stat(current, stat.S_ISDIR)
-                    or not os.path.samestat(info, current) or gc_settled_at(run, cutoff) is None):
-                return None
-            refresh = run / "refresh"
-            try:
-                existing = refresh.lstat()
-            except FileNotFoundError:
-                existing = None
-            if existing is not None and not gc_stat(existing, stat.S_ISREG):
-                return None
-            retired = run.with_name(f"~gc-{uuid.uuid4().hex}")
-            with refresh.open("a+b") as handle:
-                if not gdd_process.try_file_lock(handle) or gc_settled_at(run, cutoff) is None:
-                    return None
-                if not IS_WINDOWS:
-                    run.rename(retired)
-            if IS_WINDOWS:
-                # Windows rejects the rename while a CRT refresh handle is open, including a new claimant.
-                run.rename(retired)
-            return retired
-    finally:
-        with suppress(OSError):
-            temp_claim.unlink(missing_ok=True)
-            claim.unlink(missing_ok=True)
-
-
-def gc_prune(root, budget, cutoff):
-    total, runs = 0, []
-    for date, info in gc_entries(root):
-        if not DATE_RE.fullmatch(date.name) or not gc_stat(info, stat.S_ISDIR):
-            continue
-        for run, info in gc_entries(date):
-            if gc_stat(info, stat.S_ISDIR):
-                if run.name.startswith("~gc-"):
-                    with suppress(OSError):
-                        shutil.rmtree(run)
-                        if date.name != datetime.now().strftime("%Y-%m-%d"):
-                            date.rmdir()
-                    continue
-                with suppress(FileNotFoundError):
-                    info = run.lstat()
-                    if gc_stat(info, stat.S_ISDIR):
-                        size = gc_size(run)
-                        total += size
-                        runs.append((run, info, size))
-    if total <= budget:
-        return
-    protected = gc_ledger_names()
-    if protected is None:
-        return
-    candidates = []
-    for run, info, size in runs:
-        slugs = (run.name.rsplit(".prev-", 1)[0], run.name)
-        slugs = tuple(dict.fromkeys(start_lock_slug(slug) for slug in slugs if slug and slug == sanitize(slug)))
-        if not slugs or protected.intersection(slugs):
-            continue
-        with suppress(OSError):
-            if (settled := gc_settled_at(run, cutoff)) is not None:
-                candidates.append((settled, run, info, slugs, size))
-    for _, run, info, slugs, size in sorted(candidates):
-        with suppress(OSError):
-            if retired := gc_retire(root, run, info, slugs, cutoff):
-                shutil.rmtree(retired)
-                total -= size
-                if run.parent.name != datetime.now().strftime("%Y-%m-%d"):
-                    with suppress(OSError):
-                        run.parent.rmdir()
-                if total <= budget:
-                    break
-
-
 def cmd_gc(args):
-    with suppress(OSError, ValueError):
-        budget = gc_setting("GDD_RUN_MAX_MB", 512) * 1024**2
-        if budget > 0:
-            root = Path(args.run_root).resolve()
-            stamp = gc_regular_path(root / ".gc.stamp")
-            with gc_regular_path(root / ".gc.lock").open("a+b") as handle:
-                if gdd_process.try_file_lock(handle) and gc_due(
-                        stamp, gc_setting("GDD_RUN_GC_MIN_INTERVAL_SECONDS", 60)):
-                    now = time.time() if args.now is None else args.now
-                    if math.isfinite(now):
-                        gc_prune(root, budget, now - gc_setting("GDD_RUN_RETENTION_DAYS", 7) * 86400)
-                        stamp.touch()
-    return 0
-
-
-def is_starting(state):
-    return state.get("pid") is None and state_age_seconds(state) < knob("GDD_RUN_START_GRACE_SECONDS", 60)
-
-
-def observed_state(run_dir, state):
-    """Read-only view for gdd.py and delivery-state.py: the recorded state, or "stale" for a
-    `running` run with nothing alive, no `finalized` marker and no startup grace left. A custom
-    launcher that records no pid keys at all cannot be probed, so its recorded state stands."""
-    recorded = str(state.get("state") or "?")
-    if (recorded != "running" or state.keys().isdisjoint(PID_KEYS)
-            or os.path.exists(os.path.join(run_dir, "finalized"))
-            or run_alive(run_dir, state) or is_starting(state)):
-        return recorded
-    return "stale"
+    return gc_runs(args.run_root, args.now)
 
 
 def new_acc():

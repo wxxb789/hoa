@@ -44,11 +44,13 @@ import re
 import sys
 import time
 from datetime import datetime, timezone
+from functools import partial
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.dont_write_bytecode = True  # no __pycache__ inside an installed skill
 import agent_run
 import gdd_process
+from repo_identity import normalize_repo as _normalize_repo
 
 STAGES = [
     "setup",
@@ -105,6 +107,7 @@ DEFAULT_STATE = env_path("GDD_STATE_FILE", "gdd", "ledger.tsv")
 DEFAULT_TASK_ROOT = env_path("GDD_TASK_ROOT", "gdd", "tasks")
 DEFAULT_RUN_ROOT = env_path("GDD_RUN_ROOT", "gdd", "runs")
 DEFAULT_REPO_ROOT = os.environ.get("GDD_REPO_ROOT") or ""
+normalize_repo = partial(_normalize_repo, default_root=DEFAULT_REPO_ROOT)
 
 
 def clean(value):
@@ -120,28 +123,6 @@ def stage_type(value):
         raise argparse.ArgumentTypeError(
             f"invalid stage {value!r}; expected one of: {', '.join(STAGES)}"
         )
-    return value
-
-
-def normalize_repo(value):
-    """PATH_OR_NAME -> short repo name (git toplevel basename when possible)."""
-    path = os.path.expanduser(value)
-    if os.path.isdir(path):
-        try:
-            out = gdd_process.run(
-                ["git", "-C", path, "rev-parse", "--show-toplevel"],
-                capture_output=True,
-                text=True,
-            )
-            if out.returncode == 0 and out.stdout.strip():
-                return os.path.basename(out.stdout.strip())
-        except OSError:
-            pass
-        return os.path.basename(os.path.abspath(path))
-    if DEFAULT_REPO_ROOT:
-        candidate = os.path.join(os.path.expanduser(DEFAULT_REPO_ROOT), value)
-        if os.path.isdir(candidate):
-            return os.path.basename(os.path.abspath(candidate))
     return value
 
 
