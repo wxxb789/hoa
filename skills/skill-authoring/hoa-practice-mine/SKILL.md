@@ -8,7 +8,7 @@ description: >-
   and rubric-tune for iterative rubric refinement.
 disable-model-invocation: true
 metadata:
-  revision: "1"
+  revision: "2"
   areas: "self-management,software-development"
   targets: "runtime-agnostic"
   summary: "mine local session history and memory stores for reusable guardrails and unknown unknowns using a decision model"
@@ -58,8 +58,9 @@ information-theoretic contracts and residual formulas.
 ### 1. Extract redacted L0 skeletons and L1 causal spans
 
 ```bash
+# Bash example (adjust variable syntax for PowerShell or other shells)
 hoa() { uvx --from git+https://github.com/wxxb789/hoa hoa "$@"; }
-OUT=/tmp/session-mining-run   # or a gitignored scratch directory
+OUT="<scratch-dir>"   # e.g. a gitignored scratch directory
 
 hoa history extract \
   --claude-root ~/.claude/projects \
@@ -68,10 +69,11 @@ hoa history extract \
   --include-memories \
   --cursor-file "$OUT/extract-cursor.txt" \
   --min-lines 12 \
-  --allow-regex '(?i)(repos-|dotfiles)' \
-  --deny-regex '(?i)(work|corp|private)' \
   --out-dir "$OUT"
 ```
+
+Add `--allow-regex '<pattern>'` / `--deny-regex '<pattern>'` when filtering
+personal vs. work project directories.
 
 Supply only the roots you intend to mine. For a follow-up run over a backlog
 already mined, add `--since <ISO date>` to keep only sessions active since then

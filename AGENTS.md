@@ -38,8 +38,10 @@ identifiers. `unfettered-skills/` is unconstrained in shape, never in this.
   invented user names, documented-reserved paths. Finding those is not a leak: sharpen the scan,
   never rewrite the fixture.
 - **Know what CI covers.** `scripts/check_unfettered.py` enforces this mechanically for
-  `unfettered-skills/` only. For `skills/`, `prompts/`, `docs/` and `rules/` nothing fails on it, so
-  run the literal scan yourself and put the result in the report.
+  `unfettered-skills/`, and `scripts/check_public_privacy.py` scans tracked public files (plus
+  introduced blobs on PRs) for private keys, tokens, corporate feeds, home paths, emails, and
+  private IPs. Fixed-signature scans cannot catch private model IDs or repo names, so still review
+  those manually before opening a PR.
 
 ## Hermes-evolved skills
 

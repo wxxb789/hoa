@@ -6,7 +6,7 @@ description: >-
   or image generation is wrong, verify the effective route with a real request and session record.
   Not for hermes-updates.
 metadata:
-  revision: "9"
+  revision: "10"
   areas: "software-development"
   targets: "hermes"
   summary: "configure Hermes providers, transports and routing; prove every route with live signals, not `config get`"

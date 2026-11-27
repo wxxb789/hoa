@@ -31,14 +31,27 @@ class T(unittest.TestCase):
         self.assertEqual(len(requests), 1)
         return requests[0]
 
-    def test_cli_uses_per_engine_defaults(self):
-        gpt = self.capture_request(["gpt", "q"])
-        self.assertEqual(gpt["model"], "gpt-5.6-luna")
-        self.assertEqual(gpt["reasoning"], {"effort": "high"})
+    def test_cli_requires_model_when_env_unset(self):
+        with patch.dict("os.environ", {}, clear=True):
+            err = StringIO()
+            with patch("sys.stderr", err):
+                self.assertEqual(main(["gpt", "q", "--json"]), 2)
+            self.assertIn("GHC_SEARCH_MODEL_GPT", err.getvalue())
 
-        x = self.capture_request(["x", "q"])
-        self.assertEqual(x["model"], "grok-4.7")
-        self.assertEqual(x["reasoning"], {"effort": "medium"})
+            err = StringIO()
+            with patch("sys.stderr", err):
+                self.assertEqual(main(["x", "q", "--json"]), 2)
+            self.assertIn("GHC_SEARCH_MODEL_X", err.getvalue())
+
+    def test_cli_uses_per_engine_effort_defaults(self):
+        with patch.dict("os.environ", {"GHC_SEARCH_MODEL_GPT": "test-gpt", "GHC_SEARCH_MODEL_X": "test-x"}):
+            gpt = self.capture_request(["gpt", "q"])
+            self.assertEqual(gpt["model"], "test-gpt")
+            self.assertEqual(gpt["reasoning"], {"effort": "high"})
+
+            x = self.capture_request(["x", "q"])
+            self.assertEqual(x["model"], "test-x")
+            self.assertEqual(x["reasoning"], {"effort": "medium"})
 
     def test_cli_preserves_explicit_model_and_effort_overrides(self):
         gpt = self.capture_request(["gpt", "q", "--model", "custom-gpt", "--effort", "low"])
@@ -70,7 +83,10 @@ class T(unittest.TestCase):
         captured = {}
         with patch.dict(
             "os.environ",
-            {"GHC_SEARCH_ENDPOINT": "http://env-proxy:9999/v1/responses"},
+            {
+                "GHC_SEARCH_ENDPOINT": "http://env-proxy:9999/v1/responses",
+                "GHC_SEARCH_MODEL_GPT": "env-gpt",
+            },
         ), patch(
             "ghc_search.post",
             side_effect=lambda endpoint, body, timeout:

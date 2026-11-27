@@ -27,11 +27,11 @@ def default_endpoint() -> str:
     return os.environ.get("GHC_SEARCH_ENDPOINT", "http://127.0.0.1:4141/v1/responses")
 
 
-# Per-engine defaults. There is deliberately no default engine: gpt and x search
-# different corpora, and picking one for the caller guesses at intent.
+# Per-engine model env lookup. No private model ID is hard-coded; callers set
+# GHC_SEARCH_MODEL_GPT / GHC_SEARCH_MODEL_X or pass --model.
 def engine_model(engine: str) -> str:
     env_key = "GHC_SEARCH_MODEL_GPT" if engine == "gpt" else "GHC_SEARCH_MODEL_X"
-    return os.environ.get(env_key, {"gpt": "gpt-5.6-luna", "x": "grok-4.7"}[engine])
+    return os.environ.get(env_key, "").strip()
 
 
 ENGINE_EFFORT = {"gpt": "high", "x": "medium"}
@@ -222,7 +222,7 @@ def main(argv=None) -> int:
                     help="gpt = web search, x = X/Twitter search. No default: they search "
                          "different corpora, so the caller has to say which.")
     ap.add_argument("query")
-    ap.add_argument("--model", help=f"default per engine: {engine_model('gpt')} (gpt), {engine_model('x')} (x)")
+    ap.add_argument("--model", help="model id (overrides GHC_SEARCH_MODEL_GPT / GHC_SEARCH_MODEL_X)")
     ap.add_argument("--effort", choices=("low", "medium", "high"),
                     help=f"reasoning effort (default: gpt={ENGINE_EFFORT['gpt']}, x={ENGINE_EFFORT['x']})")
 
@@ -257,6 +257,10 @@ def main(argv=None) -> int:
         ap.error(f"{', '.join(wrong)} not valid for engine '{args.engine}'")
 
     model = args.model or engine_model(args.engine)
+    if not model:
+        env_key = "GHC_SEARCH_MODEL_GPT" if args.engine == "gpt" else "GHC_SEARCH_MODEL_X"
+        print(f"ghc-search: missing model for engine '{args.engine}'; pass --model or set {env_key}", file=sys.stderr)
+        return 2
     effort = args.effort or ENGINE_EFFORT[args.engine]
     mode = "x_search" if args.engine == "x" else "web_search"
 

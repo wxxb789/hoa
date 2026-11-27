@@ -18,12 +18,5 @@
   and [gdd-route-dsh](skills/engineering/gdd-route-dsh/SKILL.md#configuration). Update the default version
   in `SUPERVISOR` and the cases in `test_tmux_version_floor` in
   [test_detach_supervisors.py](skills/engineering/gdd/scripts/tests/test_detach_supervisors.py).
-- **Writing helper scripts contradict `ai-tells.md`:**
-  [flow_check.py](skills/research-writing/writing/scripts/flow_check.py) flags `scene_markers == 0`
-  as a defect (`读者没有代入位置`), and its `SCENE` regex counts `凌晨|夜里|那晚`, the invented-scene
-  tell [ai-tells.md](skills/research-writing/writing/references/ai-tells.md) forbids; scope it to
-  sourced actions in experience-led pieces. In
-  [zh_draft_check.py](skills/research-writing/writing/scripts/zh_draft_check.py), drop the quota
-  suffix `(contract wants >=3)` and relabel `BANNED` / `禁词` as stock-term counts.
 - **Managed resume deferred:** `gdd.py stage --resume-run` is not implemented; the design is in the
   2026-11-21 GDD resume-cap pre-review.

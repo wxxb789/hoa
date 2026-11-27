@@ -22,7 +22,7 @@ import re
 from pathlib import Path
 
 CJK_END = "\u3002\uff01\uff1f"  # 。！？
-BANNED = r"(赋能|抓手|闭环|范式|一文读懂|深度解析|浅谈|你必须知道|降维打击)"
+STOCK_TERMS = r"(赋能|抓手|闭环|范式|一文读懂|深度解析|浅谈|你必须知道|降维打击)"
 
 
 def strip_frontmatter(text):
@@ -73,7 +73,7 @@ def main():
     ap.add_argument("--limit", type=int, default=55)
     a = ap.parse_args()
 
-    text = strip_frontmatter(Path(a.draft).read_text())
+    text = strip_frontmatter(Path(a.draft).read_text(encoding="utf-8"))
     prose, blocks = split_code(text)
     sents = sentences(prose)
     lens = [n for _, n in sents]
@@ -90,7 +90,7 @@ def main():
         print(f"  [{tag}] {n}\u5b57 {s[:70]}")
 
     short = [s for s, n in sents if n <= 10]
-    print(f"short<=10={len(short)} (contract wants >=3)")
+    print(f"short<=10={len(short)}")
     for s in short[:6]:
         print(f"  - {s}")
 
@@ -101,7 +101,7 @@ def main():
         "自编靶子": len(re.findall(r"(有人可能会问|你可能会觉得|你或许会)", prose)),
         "命名仪式": len(re.findall(r"(我把它称为|我称之为|即所谓)", prose)),
         "推断标记": len(re.findall(r"推断：", prose)),
-        "禁词": len(re.findall(BANNED, prose)),
+        "套话计数": len(re.findall(STOCK_TERMS, prose)),
         "破折号": prose.count("——"),
     }
     for k, v in checks.items():
@@ -109,7 +109,7 @@ def main():
     print(f"code_blocks={len(blocks)}")
 
     if a.old:
-        old_text = strip_frontmatter(Path(a.old).read_text())
+        old_text = strip_frontmatter(Path(a.old).read_text(encoding="utf-8"))
         old_prose, _ = split_code(old_text)
         ratio = difflib.SequenceMatcher(None, re.sub(r"\s", "", old_prose), re.sub(r"\s", "", prose)).ratio()
         print(f"\nsimilarity_char={ratio*100:.1f}%")

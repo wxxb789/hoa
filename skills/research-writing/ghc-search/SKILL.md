@@ -6,7 +6,7 @@ description: >-
   date as supported, and return an answer with deduplicated source URLs. Not for
   official-document-verification.
 metadata:
-  revision: "5"
+  revision: "6"
   areas: "software-development"
   targets: "runtime-agnostic"
   summary: "web and X/Twitter search via a local ghc-proxy Responses API; answer plus deduped sources"
@@ -25,13 +25,11 @@ clean source list.
 The engine is a required first argument: `gpt` searches the web, `x` searches
 X/Twitter. They hit different corpora, so there is no default.
 
-The script is `scripts/ghc_search.py` in this skill's own directory — under
-`~/.claude/skills/ghc-search/` for a global Claude Code install, and the
-equivalent `skills/` dir for any other runtime `npx skills` installed it into.
+The script is `scripts/ghc_search.py` relative to this skill's directory.
 Only if a script command fails (for example `uv` is not found), read [references/troubleshooting.md](references/troubleshooting.md).
 
 ```bash
-S=~/.claude/skills/ghc-search/scripts/ghc_search.py   # adjust per runtime
+S="<skill-dir>/scripts/ghc_search.py"
 
 uv run "$S" gpt "what is the current stable .NET SDK version"
 uv run "$S" x --handle SpaceXAI "newest post"
@@ -56,14 +54,15 @@ A flag from the wrong engine is rejected before any network call.
 
 ## Configuration
 
-Defaults assume a ghc-proxy on `127.0.0.1:4141`. Override without flags via
-environment variables (a different proxy host, or different default models):
+Defaults assume a local `ghc-proxy` on `127.0.0.1:4141`. Set your proxy
+endpoint and per-engine model IDs via environment variables (or pass
+`--endpoint` / `--model`):
 
 | Env var | Overrides | Default |
 |---|---|---|
 | `GHC_SEARCH_ENDPOINT` | proxy endpoint | `http://127.0.0.1:4141/v1/responses` |
-| `GHC_SEARCH_MODEL_GPT` | gpt-engine default model | `gpt-5.6-luna` |
-| `GHC_SEARCH_MODEL_X` | x-engine default model | `grok-4.7` |
+| `GHC_SEARCH_MODEL_GPT` | gpt-engine model | required unless `--model` is passed |
+| `GHC_SEARCH_MODEL_X` | x-engine model | required unless `--model` is passed |
 
 `--model` and `--endpoint` flags win over env vars.
 

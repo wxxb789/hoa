@@ -6,7 +6,7 @@ description: >-
   point worth publishing, follow the channel's conventions and remove stock AI phrasing. Not for
   contract-bound-deliverables.
 metadata:
-  revision: "7"
+  revision: "8"
   areas: "work-management,self-management"
   targets: "runtime-agnostic"
   summary: "draft and verify publishable prose for its audience and channel; use style measurements as diagnostics, not quotas"
