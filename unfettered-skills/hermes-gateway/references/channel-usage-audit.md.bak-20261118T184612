@@ -1,0 +1,89 @@
+# Channel usage audit — measure before redesigning
+
+Trigger: "我需要哪些 channel"、"频道是不是冗余"、"为什么总觉得上下文断了"、任何要增删频道或拆 bot 的提案。
+**先量化，再提案。** 没有数字的结构建议是审美。
+
+## Where the data lives
+
+| 对象 | 路径 |
+|---|---|
+| default profile 会话库 | `~/.hermes/state.db` — 没有 `profiles/default/`，别去那里找 |
+| 其他 bot | `~/.hermes/profiles/<p>/state.db` |
+| slash 命令与 inbound | `~/.hermes/logs/gateway.log`（路由后的消息在目标 profile 的 `logs/gateway.log`） |
+| 频道名/父级/topic | Discord REST，见下 |
+
+`sqlite3` CLI 常缺；用 `python3 - <<'EOF'` + 标准库 `sqlite3`。
+
+`messages` 的时间列是 **`timestamp`**（不是 `created_at`）；`role` 为 user/assistant/tool；`compacted` 标记被压缩。
+`sessions` 关键列：`source`、`chat_id`、`chat_type`、`thread_id`、`title`、`started_at`、`last_activity_at`、`message_count`、`tool_call_count`、token 计数列、`archived`。
+
+## Steps
+
+1. **按 source × chat_id 聚合近 N 天**：`select source,chat_id,count(*),sum(message_count) from sessions where started_at>? group by 1,2 order by 3 desc`。
+2. **剔除 `oneshot` / `cron` / `subagent` / `kanban`**：它们动辄几百条，而人发起的会话只有几十条——不排除就会把"人实际怎么用"淹掉。只看 `discord` / `feishu` / `desktop` / `cli`。
+3. **owner 侧指标**（`messages where role='user'`）：条数、中位/ p90 字符长度（超长 = 在贴文件而不是下指令）、**小时直方图**（判断这是工作时段工具还是深夜工作台）。
+4. **空壳会话**：`message_count=0` 的占比。逐条和 `gateway.log` 的 `slash '/reset' invoked` 对齐——每次 `/reset` 都会留下一个 0 消息 shell。
+5. **压缩负荷**：`select count(*) from messages where compacted=1` 对比总会话消息数。
+6. **哪些 bot 真的在这平台上工作**：遍历 root + `profiles/*/state.db`，按 source/chat_id 分组。某 profile 在该平台 0 会话 = 它的"频道"是纸面上的。
+7. **解析频道名**：token 从 `~/.hermes/.env` 读（`DISCORD_BOT_TOKEN`），`GET /users/@me/guilds` → `GET /guilds/<id>/channels`，只打印 id/name/type/parent_id/topic，**绝不打印 token**。同时拿到未使用频道（没有会话却有 ID 在 allowlist 里）。
+
+## Reading the numbers (decision rules)
+
+- **一个频道长期只有 1 个 session、消息上千、压缩率高、`/reset` 频繁** → 这是 session 超载，不是"这个频道很忙"。修法是 thread-per-task，不是再开频道。
+- **两个频道内容同质，且其中一个名字撞了 bot / 人名** → 那个频道只是标签，不是路由。命名冲突会让 owner 和 agent 都记错谁该答。
+- **某专业 bot 在该平台 0 会话** → "一 bot 一频道"是虚构的设计。不要按这个假设继续扩张（每多一个频道就把上下文再切一份）；把它们收回前门路由。
+- **owner 在频道 A 问进度、活在频道 B 干** → 上下文分裂的结构性证据。跨 session 手动对账（"另一个 session 跟我说…"）也是同一件事。
+- **owner 消息里 `continue` / `怎么样了` / `How is it going` 占比高** → 缺推送式状态面，不是 owner 啰嗦。
+
+## 退役一个频道之前要证明什么
+
+改名隔离（`zz-*`）之后、真正动手删之前，跑 `scripts/channel-usage-audit.py <channel_id>...`（或手工照样四问）。
+**不可逆的只有 Discord 侧消息**——机器侧 transcript 在 `state.db`，删频道不影响本地检索，所以「历史会丢」不是不删的理由；
+要证明的是「没人还在用它，也没有机器在往它投递」。
+
+1. **最近还有人说话吗** — Discord REST `GET /channels/<id>/messages?limit=1`：最后一条的时间 + 作者。
+   改名隔离至今零人类消息才算过。
+2. **还有机器在往里面投递吗** — 跨 root + 所有 profile 扫 cron：`grep -rn '<channel_id>' ~/.hermes/cron/jobs.json
+   ~/.hermes/profiles/*/cron/jobs.json`。命中先 `remove` 那个 job（见 `hermes-cron` 规则 30），别把 thread/channel-scoped job 留在原地。
+3. **还有配置引用它吗** — `config.yaml` **和** `.env` 双写都要按 id grep：`DISCORD_ALLOWED_CHANNELS` /
+   `DISCORD_FREE_RESPONSE_CHANNELS` / `DISCORD_HOME_CHANNEL` / `channel_prompts` / `profile_routes`。命中即列出待清理项，否则删完留一堆死 id。
+4. **谁真的在那个频道工作过** — root `state.db` **和** `profiles/*/state.db` 都按 `chat_id` 聚合（`chat_id like '<id>%'`，thread 会话带后缀）。
+   某 profile 的 allowlist 里有它、但那里 0 会话 = 纸面路由：删它不影响那个 bot，但也别把「配置里有」讲成「在用」。
+
+两个数据源不一致时以 Discord 为准：`state.db` 只回答「机器侧有没有历史」，`last_activity_at` 不等于「频道最后一条消息时间」
+（正在跑的 session 未必已落盘成行，别拿它的最大值当「最近还有人用」的证据）。
+读 `state.db` 一律用 `file:<path>?mode=ro` URI 只读打开——gateway 可能正持有同一个库。
+
+回答形状沿用本文件末节（结论 + 每频道一行「最后一条消息时间/作者 + 本机会话数」+ 依赖清单（cron / 配置 / 别的 bot）
++ 风险（Discord 侧 N 条消息随删消失）+ 1/2/3 分级选项让 owner 按号回）；删除动作留 owner 或他明确一句授权后再动，不自行删。
+
+## 删除动作本身
+
+- 先探权限，再承诺：「这个 bot 能不能删」用一次**可见的 no-op** 探——`PATCH /channels/<id> {"name": <当前同名>}`
+  回 200 = 持有 `MANAGE_CHANNELS`；403 才把结论写成「需 owner 在 UI 删」。
+- **每个 Discord REST 调用都要带 `User-Agent`**：缺它 Cloudflare 直接回 `403 error code: 1010`，
+  读起来和权限不足一模一样（实测：同一 token 带 UA 全部 200，不带 UA 全部 403 1010）。
+- 动手前顺手给 owner 一份 `state.db → markdown` 的频道抄本：
+  `python3 scripts/archive-channel-transcripts.py --out <task>/transcripts <id>:<label> …`（只读 URI；thread 会话按
+  `chat_id like '<id>%'` 一并收进同一份）。机器侧检索靠 `state.db` 不会丢，但人翻不动 sqlite，而 Discord 侧那份是真的会消失。
+- 清配置引用：直接改文件（每个 profile 的 `config.yaml` **和** `.env` 各一处），改前逐文件 `cp -a` 备份到任务目录，
+  改后对这批 id 重新 grep 复验为 0——「config.yaml 清了、`.env` 漏了」是常态，而进程里 env 优先。
+  死引用还包括 `enabled: false` 的休眠 profile：它们不投递了，但 id 留着就会污染下一次审计。
+- 删后逐个 `GET /channels/<id>` 期望 **404**，再全库 grep 一遍这些 id（排除 `logs/` `backups/` `state-snapshots/`）；
+  cron 里只命中 `origin.*` 的是出处元数据（`deliver=origin` / mirror / 日志 provenance 才用它），
+  别为它改 live `jobs.json`，在报告里说一句即可。
+
+## Discord config levers that shape session topology
+
+- `auto_thread`（默认 **true**）只在 **@mention** 触发时生效；自由响应频道会被 `skip_thread` 跳过，除非同时开 `free_response_auto_thread: true`。
+  ⇒ `require_mention: false` + `free_response_channels` 全量 + `free_response_auto_thread: false` = **每条顶层消息都在频道主线程应答，一个频道永远只有一个 session**。这是"上下文裂开"最常见的根因。
+- `no_thread_channels`（逗号分隔 ID）：给只读播报频道（`#dashboard`）豁免开 thread。
+- `channel_prompts`（`{"<chat_id>": "prompt"}`）：频道级临时 system prompt——需要按频道改行为时用这个，别为此多开一个 bot。
+- `allowed_channels`（能否应答）/ `free_response_channels`（是否免 @）/ `gateway.profile_routes`（由哪个 bot 应答）是三件事，分别改。
+- 这些键在 `config.yaml` 和 `.env`（`DISCORD_*`）里都有副本，**进程里 env 优先**——两边都改，否则改完看不出效果。
+- 全部在 adapter 启动时读取：改完必须重启 gateway，再回频道实测。
+
+## Report shape the owner accepts
+
+数据 → 特点（每条带原文/数字）→ 冗余（可删的，带证据）→ 缺失 → 目标结构 → 配置 diff（可执行的那几行）→ 风险 → 需要确认的动作。
+频道删改属 Red（不可逆、动外部系统）：报告里给 1/2/3 分级方案（只改配置 / 配置+改名 / 含删除），让 owner 按号回，不要替他决定删频道。
