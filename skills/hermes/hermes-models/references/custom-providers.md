@@ -13,25 +13,25 @@ Key config shape:
 providers:
   local-openai:
     name: local-openai
-    api: http://localhost:4141
+    api: http://localhost:4141       # replace with your proxy URL
     api_key: local
     transport: codex_responses       # for OpenAI Responses API
     models:
-      gpt-6-luna: { context_length: 1000000 }
+      <responses-model-id>: { context_length: 1000000 }
   local-chat:
     name: local-chat
-    api: http://localhost:4141
+    api: http://localhost:4141       # replace with your proxy URL
     api_key: local
     transport: chat_completions      # for chat-completions-only models
     models:
-      gemini-3.8-flash: { context_length: 1048576 }
+      <chat-model-id>: { context_length: 1048576 }
 ```
 
 To set a default model from a `providers:` dictionary entry, use the exact bare dictionary key:
 
 ```yaml
 model:
-  default: gpt-6-luna
+  default: <responses-model-id>
   provider: local-openai
   base_url: http://localhost:4141
   api_key: local
@@ -39,8 +39,8 @@ model:
 ```
 
 Transport types:
-- `anthropic_messages` — Anthropic Messages protocol (protocol is supported by ghc-proxy; on this account
-  the Claude family is unavailable, so nothing is configured on this transport)
+- `anthropic_messages` — Anthropic Messages protocol (availability depends on your upstream account;
+  probe `/v1/models` and `/v1/messages` before configuring)
 - `codex_responses` — OpenAI Responses protocol (GPT models)
 - `chat_completions` — OpenAI Chat Completions protocol (Gemini models)
 - Declare per-model metadata with plain dotted keys (a dot-escaped key is silently ignored) — full

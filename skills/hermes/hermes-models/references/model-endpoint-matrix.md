@@ -43,12 +43,11 @@ Rules that survive catalog changes:
   install advertises one that does not.
 - **The Anthropic route is `/v1/messages`, not `/messages`.** A probe against `$RELAY/messages`
   returns `404 Unknown endpoint. Check the request path.` — a wrong-path artifact, not a dead proxy.
-- **A gateway is not one host.** The Tencent GLM service exists on two hosts with *different route maps and
-  different keys*: the new host (`1.14.219.252`) serves `/v1/chat/completions` only
-  (`/v1/messages` → `404 no Route matched with those values`), while the old host
-  (`svc-bytb2o81.gw.haihub.cn`) **does** serve `/v1/messages`, but only with
-  `Authorization: Bearer <old key>` (`x-api-key` → 401). Same env var name, incompatible values: the
-  `sk-…` (60-char) key is valid on the new host only, the `d4f0…` (64-char) key on the old host only.
+- **A gateway is not one host.** A vendor's relay can exist on multiple hosts with *different route maps
+  and different keys*: one host may serve `/v1/chat/completions` only
+  (`/v1/messages` → `404 no Route matched with those values`), while another serves `/v1/messages`
+  only with `Authorization: Bearer <key>` (`x-api-key` → 401). Never assume keys or path maps transfer
+  across hosts under the same env var name — probe each host directly.
 
 - On chat completions, reasoning tokens are charged against `max_tokens`. A 16k cap was consumed
   almost entirely by reasoning at `reasoning_effort: high` and the visible answer truncated
@@ -118,7 +117,8 @@ reasoning burn.
 
 ## External chat relays (not served by the localhost proxy)
 
-- `kimi-k3` — Tencent gateway `https://ms-5l65wdcd-100040620266-sw.gw.ap-shanghai.ti.tencentcs.com/ms-5l65wdcd/v1` (chat-completions), key env `TENCENT_KIMI_API_KEY`. It is **not** in the localhost proxy catalog (`/v1/models` does not list it), so the harness registry must point at the relay directly. Verified 2026-10-11: returns `model: kimi-k3`, accepts top-level `reasoning_effort: high` (reasoning_tokens > 0).
+- Models not listed in the localhost proxy `/v1/models` catalog must point directly at their external
+  chat-completions relay URL and key env var in the provider registry.
 - **Long reasoning calls must stream.** A non-streaming chat POST at `max_tokens: 20000` hit the client read timeout (~1800s) with no terminal event and no usable body; the identical request with `stream: true` completed (`finish_reason: stop`, ~4–5 min). Send `stream: true` and accumulate `choices[0].delta.content` (`delta.reasoning_content` carries the reasoning phase, which can run for minutes with zero visible content).
 - On this relay `max_tokens: 20000` was enough for a ~8000-character Chinese deliverable and did not `504` (the `504`-at-60k note above is the tencent-glm relay, a different host — re-probe per relay).
 

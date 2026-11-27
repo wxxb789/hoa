@@ -6,7 +6,7 @@
 #
 # Usage:
 #   probe-provider-endpoint.sh <KEY_ENV_VAR> <base-url> [<base-url> ...]
-#   probe-provider-endpoint.sh TENCENT_GLM_API_KEY http://10.0.0.1/v1 http://10.0.0.1:8000/v1
+#   probe-provider-endpoint.sh PROVIDER_API_KEY https://gateway.example.com/v1 https://gateway.example.com:8000/v1
 #
 # Env knobs: MODEL_ID (default MODEL - auth triage answers before model validation, so a
 # placeholder is fine), HERMES_ENV_FILE (default ~/.hermes/.env).
@@ -18,7 +18,7 @@
 #   connection failure on a port            -> that scheme/port is not served
 #
 # Rule: once you see 401 Unauthorized, stop. No header variant can fix it - the owner must
-# confirm the key. See references/providers-and-models.md -> "Rotating a provider endpoint".
+# confirm the key. See references/custom-providers.md -> "Rotating a provider endpoint".
 set -u
 
 ENVVAR="${1:?usage: $0 <KEY_ENV_VAR> <base-url> [...]}"; shift

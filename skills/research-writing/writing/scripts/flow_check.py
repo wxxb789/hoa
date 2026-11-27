@@ -14,7 +14,7 @@ Usage: uv run flow_check.py <draft.md>
   num_per_100 >= 1.5     每节都堆数字 -> 读者分不出哪条是承重墙
   tail_judge >= 段落数 60%  段段收束在判断句 -> 报告结论味，不是想明白了一个事
   sent_per_para >= 6     段落碎或长段堆句
-  scene_markers == 0     全篇没有具体时刻/动作 -> 读者没有代入位置
+  scene_markers == 0     叙事/经历稿缺少来源支撑的具体动作（技术说明/报告稿可为 0，勿编造场景）
   code_blocks >= 4       代码块过多，正文被示例切碎
 """
 import re
@@ -23,7 +23,7 @@ from pathlib import Path
 
 
 CONCL = r"(这说明|这意味着|也就是说|关键在于|道理很简单|换句话说)"
-SCENE = r"(凌晨|夜里|屏幕|翻到|读到|打开|关掉|坐在|那晚|当时我)"
+SCENE = r"(屏幕|翻到|读到|打开|关掉|运行|报错|提交|改完|跑通)"
 
 
 def stats(body):
@@ -49,7 +49,7 @@ def stats(body):
 
 
 def main():
-    text = Path(sys.argv[1]).read_text()
+    text = Path(sys.argv[1]).read_text(encoding="utf-8")
     text = re.sub(r"^---\n.*?\n---\n", "", text, flags=re.S)
     code = re.findall(r"```.*?```", text, flags=re.S)
     prose = re.sub(r"```.*?```", "", text, flags=re.S)

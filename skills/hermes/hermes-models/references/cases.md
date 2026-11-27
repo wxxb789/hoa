@@ -9,7 +9,7 @@ treat these commands as leads to re-verify against the current build.
 - **Places**: `config.yaml` (`model_aliases.*`, fallback chains) and `context_length_cache.yaml`; only for source maintenance, `hermes_cli/setup.py::_DEFAULT_PROVIDER_MODELS["copilot"]` + `hermes_cli/models.py::_PROVIDER_MODELS["copilot"]`.
 - **Workflow**: back up → patch the default profile only (other profiles are a separate scope) → re-point fallbacks at a kept id → refresh context lengths → `hermes config check` + the model-validation pytest.
 - **Pitfall**: live `/models` keeps serving retired ids for a while; follow the owner-confirmed set. An undeclared id resolves its context to 272k, not its real window.
-- **Rule**: Claude is unavailable on this account — no claude alias, provider entry or fallback.
+- **Rule**: Availability of any model family (including Claude) is per account — probe `/v1/models` on your install before adding or removing aliases, providers, or fallbacks.
 
 ## ghc-proxy systemd user service
 
