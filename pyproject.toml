@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=61"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "hoa-cli"
@@ -12,8 +12,5 @@ dependencies = []
 [project.scripts]
 hoa = "hoa_cli.cli:main"
 
-[tool.setuptools.packages.find]
-where = ["src"]
-
-[tool.setuptools.package-data]
-hoa_cli = ["data/*.json"]
+[tool.hatch.build.targets.wheel]
+packages = ["src/hoa_cli"]
