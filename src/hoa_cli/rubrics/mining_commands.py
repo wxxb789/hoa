@@ -10,6 +10,10 @@ from .mining import (
     DEFAULT_BASELINE_FILE_CHARS, DEFAULT_BASELINE_MAX_CHARS, MIN_STRONG_SCORE,
     anchor_check, build_baseline, compute_residuals, filter_spans, judge_records, select_survivors,
 )
+from .comparison import (
+    DEFAULT_HEAD_CONFLICT_PREDICATE, DEFAULT_MIN_PRIORITY, DEFAULT_TAXONOMY_MIN_INCIDENT,
+    compute_disagreements,
+)
 
 
 def _endpoint(args: argparse.Namespace) -> Endpoint:
@@ -31,10 +35,12 @@ def _judge(args: argparse.Namespace) -> int:
     start = perf_counter()
     rows = judge_records(records, stage, endpoint, baseline)
     write_jsonl(args.output, rows)
-    ok = sum(row["judgment"]["ok"] for row in rows)
-    _report({"stage": args.stage, "total": len(rows), "ok": ok, "failed": len(rows) - ok,
+    ok = sum(row["judgment"].get("ok") and row["judgment"].get("reason") != "model_refusal" for row in rows)
+    refused = sum(row["judgment"].get("reason") == "model_refusal" for row in rows)
+    failed = sum(not row["judgment"].get("ok") for row in rows)
+    _report({"stage": args.stage, "total": len(rows), "ok": ok, "refused": refused, "failed": failed,
              "elapsed_s": round(perf_counter() - start, 2), "output": str(args.output)})
-    return int(ok != len(rows))
+    return int(failed != 0)
 
 
 def _filter(args: argparse.Namespace) -> int:
@@ -54,8 +60,13 @@ def _filter(args: argparse.Namespace) -> int:
 def _select(args: argparse.Namespace) -> int:
     if not 0 <= args.min_score <= 1:
         raise ValueError("--min-score must be in [0, 1]")
+    if args.min_anomaly is not None and not 0 <= args.min_anomaly <= 1:
+        raise ValueError("--min-anomaly must be in [0, 1]")
     stage = load_stage(args.rubrics, args.stage, require_axes=True)
-    rows = select_survivors(iter_jsonl(args.scored), iter_jsonl(args.spans), stage, min_score=args.min_score)
+    rows = select_survivors(
+        iter_jsonl(args.scored), iter_jsonl(args.spans), stage,
+        min_score=args.min_score, min_anomaly=args.min_anomaly,
+    )
     write_jsonl(args.output, rows)
     _report({"stage": args.stage, "selected_spans": len(rows), "output": str(args.output)})
     return 0
@@ -86,6 +97,58 @@ def _baseline(args: argparse.Namespace) -> int:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(text, encoding="utf-8", newline="\n")
     _report({**report, "output": str(args.output)})
+    return 0
+
+
+def _disagreements(args: argparse.Namespace) -> int:
+    predicate_question = args.predicate
+    choice_question = args.choice
+    routine_labels = args.routine_label or []
+    score_question = args.score
+    score_max = args.score_max
+    if args.stage:
+        stage = load_stage(args.rubrics, args.stage, require_axes=True)
+        by_name = {q["name"]: q for q in stage["questions"]}
+        if predicate_question is None and "anomaly_probe" in by_name:
+            predicate_question = "anomaly_probe"
+        choice_question = choice_question or stage["mech_question"]
+        if not routine_labels:
+            routine_labels = list(stage["routine_labels"])
+        if score_question is None:
+            score_question = stage["score_question"]
+        if score_max is None and score_question in by_name:
+            score_max = float(max(1, len(by_name[score_question]["levels"]) - 1))
+    if not choice_question:
+        raise ValueError("supply --stage or --choice to identify the mechanism choice head")
+    if not routine_labels:
+        raise ValueError("supply --stage or at least one --routine-label")
+    if score_max is None:
+        score_max = 2.0
+    spans = iter_jsonl(args.spans) if args.spans else ()
+    report = compute_disagreements(
+        read_jsonl(args.left),
+        read_jsonl(args.right),
+        predicate_question=predicate_question,
+        choice_question=choice_question,
+        routine_labels=routine_labels,
+        score_question=score_question,
+        score_max=score_max,
+        spans=spans,
+        left_label=args.left_label or args.left.stem,
+        right_label=args.right_label or args.right.stem,
+        min_priority=args.min_priority,
+        head_conflict_predicate=args.head_conflict_predicate,
+        taxonomy_min_incident=args.taxonomy_min_incident,
+        top_k=args.top_k,
+    )
+    write_json(args.output, report)
+    _report({
+        "labels": report["labels"],
+        "coverage": report["coverage"],
+        "pool_counts": report["pool_counts"],
+        "profiles": report["profiles"],
+        "output": str(args.output),
+    })
     return 0
 
 
@@ -140,9 +203,37 @@ def register(subparsers: argparse._SubParsersAction) -> None:
         command.add_argument("--output", type=Path, required=True)
         if name == "select-survivors":
             command.add_argument("--min-score", type=float, default=MIN_STRONG_SCORE, help="minimum normalized score")
+            command.add_argument("--min-anomaly", type=float, default=None,
+                                 help="override minimum anomaly_probe probability (default: stage survivor_min_anomaly if declared)")
         else:
             command.add_argument("--top-k", type=int, default=12, help="maximum items per residual pool")
         command.set_defaults(func=handler)
+
+    disagree = commands.add_parser(
+        "disagreements",
+        help="offline cross-model or cross-rubric disagreement pool over two scored JSONL ledgers",
+    )
+    _rubric_flag(disagree)
+    disagree.add_argument("--stage", help="rubric stage to infer head names, routine labels, and score scale")
+    disagree.add_argument("--left", type=Path, required=True, help="left scored JSONL ledger")
+    disagree.add_argument("--right", type=Path, required=True, help="right scored JSONL ledger")
+    disagree.add_argument("--spans", type=Path, help="optional source spans JSONL to attach excerpts")
+    disagree.add_argument("--left-label", help="display label for left ledger (default: left filename stem)")
+    disagree.add_argument("--right-label", help="display label for right ledger (default: right filename stem)")
+    disagree.add_argument("--predicate", help="predicate question name (inferred from stage anomaly_probe if omitted)")
+    disagree.add_argument("--choice", help="choice question name (inferred from stage mech_question if omitted)")
+    disagree.add_argument("--routine-label", action="append", help="routine/negative choice label (repeatable; inferred from stage)")
+    disagree.add_argument("--score", help="optional score question name (inferred from stage score_question if omitted)")
+    disagree.add_argument("--score-max", type=float, help="maximum raw score value for normalization (inferred from stage or 2.0)")
+    disagree.add_argument("--min-priority", type=float, default=DEFAULT_MIN_PRIORITY,
+                          help="minimum max(|delta_incident|, |delta_survivor|) to enter directional pools")
+    disagree.add_argument("--head-conflict-predicate", type=float, default=DEFAULT_HEAD_CONFLICT_PREDICATE,
+                          help="predicate threshold for head-conflict diagnostic pool")
+    disagree.add_argument("--taxonomy-min-incident", type=float, default=DEFAULT_TAXONOMY_MIN_INCIDENT,
+                          help="minimum incident mass on both sides for taxonomy_split_top")
+    disagree.add_argument("--top-k", type=int, default=20, help="maximum items per disagreement pool")
+    disagree.add_argument("--output", type=Path, required=True, help="output disagreement report JSON")
+    disagree.set_defaults(func=_disagreements)
 
     anchors = commands.add_parser("anchor-check", help="check rubric monotonicity on locked anchors")
     _endpoint_flags(anchors)

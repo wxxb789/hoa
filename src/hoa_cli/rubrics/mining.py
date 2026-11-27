@@ -8,6 +8,7 @@ from ..decisions.client import evaluate_batch
 from ..decisions.responses import is_refusal
 from ..decisions.rubric import (
     choice_probabilities, composite_score, confusion_pairs, has_refusal, normalize_score, overlap,
+    summarize_distribution,
 )
 from ..history.redact import redact_text
 
@@ -90,7 +91,8 @@ def judge_records(records: list[dict], stage_cfg: dict, endpoint: Endpoint, base
                 kind = answer["type"]
                 if kind in ("score", "choice"):
                     answer[kind] = answer.pop("value")
-            result = {"ok": True, "answers": answers}
+            meta = {k: result[k] for k in ("api", "model") if k in result}
+            result = {"ok": True, **meta, "answers": answers}
             if has_refusal(answers):
                 result["reason"] = "model_refusal"
         rows.append({**{key: value for key, value in row.items() if key != "text"}, "judgment": result})
@@ -138,12 +140,21 @@ def filter_spans(l0_rows: list[dict], spans: Iterable[dict], stage_cfg: dict, *,
         if keep:
             surviving.add(sid)
         else:
-            pruned.append((max(anomaly, durability), sid))
+            pruned.append((round(max(anomaly, durability), 4), round(1.0 - clean, 4), sid))
     selected = [span for span in spans if span["session_id"] in surviving and (span.get("has_pivot") or include_non_pivot)]
+    profile = summarize_distribution(
+        l0_rows,
+        predicate_question="anomaly_probe",
+        choice_question=stage_cfg["mech_question"],
+        score_question=question,
+        routine_labels=stage_cfg["routine_labels"],
+    )
+    pruned.sort(key=lambda item: (-item[0], -item[1], item[2]))
     return selected, {"l0_total_sessions": len(l0_rows), "l0_surviving_sessions": len(surviving),
                       "l0_pruned_sessions": len(l0_rows) - len(surviving), "l0_refusal_sessions": len(refusals),
-                      "top_pruned_boundary_sessions": [sid for _, sid in sorted(pruned, reverse=True)[:8]],
-                      "l1_selected_spans": len(selected)}
+                      "top_pruned_boundary_sessions": [sid for _, _, sid in pruned[:8]],
+                      "l1_selected_spans": len(selected),
+                      "calibration_profile": profile}
 
 
 def _span_answers(answers: dict, stage: dict, score_question: dict) -> tuple[str, dict, float, float]:
@@ -154,21 +165,48 @@ def _span_answers(answers: dict, stage: dict, score_question: dict) -> tuple[str
     return choice, choice_probabilities(mechanism), raw_score, normalize_score(raw_score, score_question)
 
 
+def _is_strong_survivor(
+    answers: dict,
+    stage_cfg: dict,
+    choice: str,
+    score: float,
+    *,
+    min_score: float = MIN_STRONG_SCORE,
+    min_anomaly: float | None = None,
+) -> bool:
+    if choice in stage_cfg["routine_labels"] or score < min_score:
+        return False
+    effective_min_anomaly = stage_cfg.get("survivor_min_anomaly") if min_anomaly is None else min_anomaly
+    if effective_min_anomaly is not None and "anomaly_probe" in answers:
+        if answers["anomaly_probe"].get("probability", 0.0) < effective_min_anomaly:
+            return False
+    exclude_choices = stage_cfg.get("exclude_choices") or {}
+    if any(
+        q_name in answers and (
+            answers[q_name]["value"] if "value" in answers[q_name] else answers[q_name].get("choice")
+        ) in blocked
+        for q_name, blocked in exclude_choices.items()
+    ):
+        return False
+    return True
+
+
 def select_survivors(scored: Iterable[dict], spans: Iterable[dict], stage_cfg: dict, *, min_score: float = MIN_STRONG_SCORE
-                     ) -> list[dict]:
+                     , min_anomaly: float | None = None) -> list[dict]:
     source = {span["id"]: span for span in spans}
     score_question = next(q for q in stage_cfg["questions"] if q["name"] == stage_cfg["score_question"])
-    routine = set(stage_cfg["routine_labels"])
     rows = []
     for row in scored:
         judgment = row.get("judgment") or {}
         if _status(judgment) is not None:
             continue
-        choice, _, _, score = _span_answers(judgment["answers"], stage_cfg, score_question)
-        if choice not in routine and score >= min_score:
-            if row["id"] not in source:
-                raise ValueError(f"missing source span for survivor {row['id']!r}")
-            rows.append(source[row["id"]])
+        answers = judgment["answers"]
+        choice, _, _, score = _span_answers(answers, stage_cfg, score_question)
+        if not _is_strong_survivor(answers, stage_cfg, choice, score, min_score=min_score, min_anomaly=min_anomaly):
+            continue
+        if row["id"] not in source:
+            raise ValueError(f"missing source span for survivor {row['id']!r}")
+        rows.append(source[row["id"]])
     return rows
 
 
@@ -209,14 +247,23 @@ def compute_residuals(scored: list[dict], spans: Iterable[dict], stage_cfg: dict
             ood.append(entry)
         if anomaly >= 0.80 and (0.25 <= score <= 0.70 or entropy >= 1.50):
             gray.append(entry)
-        if score >= MIN_STRONG_SCORE and choice not in routine:
+        if _is_strong_survivor(answers, stage_cfg, choice, score, min_score=MIN_STRONG_SCORE):
             strong.append(entry)
-    ood.sort(key=lambda entry: (-entry["ood_residual"], -entry["entropy"]))
-    gray.sort(key=lambda entry: -entry["entropy"])
-    strong.sort(key=lambda entry: (-entry["score"], -entry["p_anomaly"]))
+    ood.sort(key=lambda entry: (-entry["ood_residual"], -entry["entropy"], entry["id"]))
+    gray.sort(key=lambda entry: (-entry["entropy"], -entry["p_anomaly"], -entry["score"], entry["id"]))
+    strong.sort(key=lambda entry: (-entry["score"], -entry["p_anomaly"], entry["id"]))
+    profile = summarize_distribution(
+        scored,
+        predicate_question="anomaly_probe",
+        choice_question=stage_cfg["mech_question"],
+        score_question=question,
+        routine_labels=routine,
+        min_strong_score=MIN_STRONG_SCORE,
+    )
     return {"stage": stage, "total_scored": len(scored), "refusal_count": len(refusals),
             "novel_escape_top_choice_count": novel_count, "novel_escape_rate": round(novel_count / max(1, len(scored)), 4),
-            "strong_positive_count": len(strong), "ood_pool_top": ood[:top_k], "gray_zone_pool_top": gray[:top_k],
+            "strong_positive_count": len(strong), "calibration_profile": profile,
+            "ood_pool_top": ood[:top_k], "gray_zone_pool_top": gray[:top_k],
             "refusals": refusals[:top_k], "strong_positives_top": strong[:top_k * 2],
             "confusion_pairs": confusion_pairs(overlaps, top_k)}
 
@@ -246,9 +293,10 @@ def _anchor_scores(stage: dict, anchors: list[dict], endpoint: Endpoint) -> dict
     summary = {"pos_min": pos_min, "pos_mean": pos_mean, "neg_max": neg_max, "neg_mean": neg_mean,
                "mean_margin": pos_mean - neg_mean if positives and negatives else None,
                "worst_case_gap": pos_min - neg_max if positives and negatives else None}
-    return {**{key: round(val, 4) if val is not None else None for key, val in summary.items()},
-            "false_negatives": false_negatives, "false_positives": false_positives,
-            "refusal_count": len(refusals), "refused_anchors": refusals, "failed_anchors": failed}
+    report = {**{key: round(val, 4) if val is not None else None for key, val in summary.items()},
+              "false_negatives": false_negatives, "false_positives": false_positives,
+              "refusal_count": len(refusals), "refused_anchors": refusals, "failed_anchors": failed}
+    return report, summary["worst_case_gap"]
 
 
 def anchor_check(baseline: dict, candidate: dict, anchors: list[dict], endpoint: Endpoint) -> dict:
@@ -257,8 +305,8 @@ def anchor_check(baseline: dict, candidate: dict, anchors: list[dict], endpoint:
         and type(row.get("expected")) is bool for row in anchors
     ) or {row["expected"] for row in anchors} != {False, True}:
         raise ValueError("anchors must include positive and negative labeled records with an id and text")
-    before, after = (_anchor_scores(stage, anchors, endpoint) for stage in (baseline, candidate))
+    (before, before_gap), (after, after_gap) = (_anchor_scores(stage, anchors, endpoint) for stage in (baseline, candidate))
     valid = not any(result[key] for result in (before, after) for key in ("refusal_count", "failed_anchors"))
     passed = (valid and not after["false_negatives"] and not after["false_positives"]
-              and after["worst_case_gap"] >= before["worst_case_gap"] - 1e-6)
+              and after_gap >= before_gap - 1e-6)
     return {"passed": passed, "baseline": before, "candidate": after}

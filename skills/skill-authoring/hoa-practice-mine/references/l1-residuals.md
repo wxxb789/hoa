@@ -28,6 +28,11 @@ spans when truncated.
    and failed requests (any other `reason`, such as HTTP errors or timeouts).
    Fix the endpoint for the latter; for the former, inspect the framing and strip
    any new fixed injection shell with `--redact-regex`.
+4. **Distribution profile (`calibration_profile`)**: check `quantized_001`,
+   `extreme_predicate_rate`, and `head_discordance_pred_high_routine_rate` to
+   spot quantized or keyword-overtriggered backends. Bundled `l1-v2` gates
+   `select-survivors` on `anomaly_probe` (`--min-anomaly`, default `0.50`) and
+   excludes `evidence_backing` in `{no_lesson_evidence, single_app_only}`.
 
 Use `confusion_pairs` to find recurring overlap between two known positive
 buckets. Inspect examples before merging labels that call for the same action.
@@ -56,3 +61,27 @@ hoa mine residuals --stage l1-v2 \
 
 Inspect Round 2, then apply the [stopping criterion](methodology.md#stopping-criterion)
 before advancing. Do not refine a rubric at the expense of the anchors.
+
+## Optional cross-model disagreement audit (offline)
+
+When an operator authorizes a second decision model (for example, pairing a
+calibrated continuous primary model with a high-recall quantized challenger),
+score the same candidate spans with both models via separate `hoa mine judge`
+calls, then join the two ledgers offline:
+
+```bash
+hoa mine disagreements \
+  --stage l1-v2 \
+  --left "$OUT/l1-primary.jsonl" \
+  --right "$OUT/l1-challenger.jsonl" \
+  --spans "$OUT/l1-candidates.jsonl" \
+  --top-k 20 \
+  --output "$OUT/disagreements.json"
+```
+
+For custom ledgers outside the bundled stage schema, omit `--stage` and pass
+`--predicate`, `--choice`, `--routine-label`, and optional `--score` / `--score-max`.
+Inspect `left_only_top`, `right_only_top`, and `taxonomy_split_top` (ranked by
+continuous incident/survivor mass deltas rather than brittle hard cutoffs) and
+treat `head_conflict_top` (high predicate with routine choice) as a diagnostic
+signal rather than positive admission.

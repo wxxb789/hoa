@@ -8,7 +8,7 @@ description: >-
   and rubric-tune for iterative rubric refinement.
 disable-model-invocation: true
 metadata:
-  revision: "3"
+  revision: "4"
   areas: "self-management,software-development"
   targets: "runtime-agnostic"
   summary: "mine local session history and memory stores for reusable guardrails and unknown unknowns using a decision model"
@@ -41,9 +41,10 @@ rereads, closed-set Softmax blind spots, or prompt calibration drift.
   candidate against raw session lines or read-only SQLite ordinals and live
   repository files before proposing changes.
 - **Gold-anchor monotonicity.** Never adopt a revised rubric (`v2+`) unless
-  `anchor-check` passes for the endpoint: zero false negatives and a worst-case
-  positive-vs-negative margin at least as wide as the baseline on the locked
-  anchor set (`>= 8` positives + `>= 8` negatives).
+  `anchor-check` passes for the endpoint: zero false negatives, zero false
+  positives, zero refusals/failures, and a worst-case positive-vs-negative
+  margin at least as wide as the baseline on the locked anchor set (`>= 8`
+  positives + `>= 8` negatives).
 
 ## Workflow
 
@@ -57,6 +58,10 @@ rereads, closed-set Softmax blind spots, or prompt calibration drift.
    Use bundled `l1-v2` directly once its anchor check has passed for the endpoint;
    use `l1-v1` first only when iterating on a custom taxonomy. Inspect residuals,
    preserve the anchors, and apply the [stopping criterion](references/methodology.md#stopping-criterion).
+   When a second authorized `/v1/decisions` backend is available for high-recall
+   auditing, keep the smoother calibrated model as the primary funnel and run
+   `hoa mine disagreements` offline over the two scored ledgers to surface top-K
+   semantic misses without flooding L3 with single-head false positives.
 4. **Reconcile at L3.** Compare strong non-routine survivors (and included memories)
    against live rules. Separate `target_gap`, `route_to_sibling_repo`, and
    `already_covered`, then verify every surviving gap in its source and live repo.

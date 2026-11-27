@@ -33,8 +33,11 @@
    sharpening" without a locked validation set can simply reflect pushing gray-zone
    positives into `noise`.
    **Fix:** Gate every rubric revision on a locked 16-item Gold Anchor Set (8 true
-   positives + 8 deceptive negatives). Accept a revision only when false negatives
-   stay `0` and `worst_case_gap = min(score_pos) - max(score_neg)` is non-decreasing.
+   positives + 8 deceptive negatives). Accept a revision only when false negatives,
+   false positives, and refusals all stay `0` and
+   `worst_case_gap = min(score_pos) - max(score_neg)` is non-decreasing on the
+   same endpoint. Do not compare `worst_case_gap` across different backends, and
+   do not treat a low `unclassified_novel_*` rate as proof of zero misses.
 
 ## Source adapters
 

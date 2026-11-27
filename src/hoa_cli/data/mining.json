@@ -83,6 +83,10 @@
       "novel_label": "novel_systemic_lesson",
       "mech_question": "taxonomy_v2",
       "score_question": "systemic_score",
+      "survivor_min_anomaly": 0.50,
+      "exclude_choices": {
+        "evidence_backing": ["no_lesson_evidence", "single_app_only"]
+      },
       "questions": [
         {
           "name": "anomaly_probe",
