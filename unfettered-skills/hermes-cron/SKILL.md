@@ -395,6 +395,15 @@ Create, audit, and repair scheduled jobs — including watchdogs that must stay 
     test is unreachable, and a fixture that "fails" there is testing the wrong thing (rule 16c).
     Report the two steps separately (`guard landed`, `job enabled`), never "resumed"
     alone, and treat a resume request as incomplete until both are true.
+    **Enabling is not a future event — the missed window collapses into one immediate catch-up run.**
+    Lifting a long pause does not wait for the next scheduled slot: the scheduler folds the whole missed
+    window into a single catch-up execution (measured: 13 missed fires → one run, seconds after the
+    enable), so a guard written *after* the enable lands on a lane that has already run once, and a
+    near-full resource it was meant to protect was already touched. That run is also the cheapest proof
+    of the resumed path — `hermes cron runs <id>` plus `cron/output/<id>/<timestamp>.md` (empty output
+    confirms the silence semantics still hold), where a manual `hermes cron run <id>` only proves the
+    payload (rule 7). Conclusion: silence/dedupe/guard semantics must be right *before* the enable,
+    never before the next slot.
 
 37. **A recurring digest needs window-level idempotency; a findings-hash dedupe (rule 2) does not cover it.**
     A brief whose content is "everything since the last window" has no finding to hash, so a retry, a
@@ -497,6 +506,15 @@ replace a bad design rather than preserving its rituals under one larger schedul
 
 For a broken-job repair, isolate the failing payload/gate/worker/delivery path first; expand into portfolio
 redesign only when requested or when evidence establishes a shared fault.
+
+**A capability paused by decision is not a capability that is missing.** "The subsystem is gone" and "we
+turned it off on purpose" read identically from the schedule, and the second one is invisible until you
+open the record: check the job's own `enabled` / `paused_at` / `paused_reason` in its store, and the ops
+ledger (`LOCAL_OVERRIDES.md`) whose dated entry says whether the pause was deliberate and why — a
+quiet job plus a ledger note is an intentional state, not a fault to report. Make your own earlier pause
+or resume the first hypothesis for a job that stopped delivering before alleging a broken chain. The
+mirror duty: every pause, resume and retirement you perform gets its dated ledger entry in the same pass,
+because the next audit reads the schedule, not your memory of the reason.
 
 `hermes cron status` → `cron list --all` → `cron doctor` → `cron incidents` (resolved ≠ ongoing) →
 `cron runs <id>` → inspect the matching output and payload implementation. Check payload side effects
