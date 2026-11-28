@@ -465,3 +465,7 @@ Order matters — each step either names the failing stage or rules it out:
   (in-scope push, outside-path isolation, sensitive refusal, shape refusal, advanced remote), the
   real-repo-untouched assertions, and the pre-flight for a gate that will judge a new file inside a tree
   the host *generates*.
+- `references/candidate-harvest.md` — the host-side feeder that fills the landing zone this skill publishes
+  from: its wiring and ordering, the naming/redaction rules for coupled and private-material skills, and the
+  pitfalls (gate output split across two streams, per-candidate worktree reset, verdict-keyed dedupe, backups
+  inside the scanned tree, a lock held by a long-lived process).
