@@ -157,7 +157,21 @@ Lane discipline — the point is that it runs unattended over dozens of units:
   previous run wrote: a frozen `classified.json` keeps re-selecting units that are already done and looks
   exactly like a queue that never drains.
 - **Ledger** each unit (attempts, rc, delivered) in a JSON state file with an attempts cap per unit — the
-  state file, not the log, is what makes a re-run idempotent.
+  state file, not the log, is what makes a re-run idempotent. **A resume's exit code is not the unit's
+  verdict.** The CLI prints `Gateway disconnected; turn outcome is unknown` and exits non-zero whenever the
+  adapter drops the socket mid-turn, while the gateway finishes that turn and posts the answer into the
+  thread anyway — its `Sending response (… chars) to <thread>` line is that delivery. A lane keyed on `rc`
+  re-queues units that already landed and re-runs each of them every pass; classify a unit done when the
+  thread holds its closeout report, and fall back to the CLI's rc only when it does not.
+- **One malformed unit must not be able to end the lane.** A unit with no session row (`sid = None`) taken
+  straight into argv kills the driver at command construction (`os.fork_exec` raising `TypeError`), and the
+  whole batch dies at entry — every later unit never runs, while the lane still *looks* busy because the
+  traceback sits at the end of the log, after the last unit that did run. Validate the unit's session id
+  before building the command (log it, mark the unit skipped, return a sentinel), wrap each unit in
+  `try/except`, and report lane health as the ledger's `done/total`, never from the tail of the lane log.
+- **A running lane owns its state file.** The driver rewrites the whole ledger from its in-memory copy
+  after each unit, so a hand-edit (marking a unit done, dropping a bad row) is silently reverted at the
+  next unit boundary. Stop the lane, edit, relaunch — or scope the change to the next launch and say so.
 - **One lane at a time**: `fcntl.flock` on a lock file inside the lane, plus a liveness guard in whatever
   launches it (a lane process started from an older revision holds no lock of its own).
 - `--limit` + `--concurrency`, and a `--dry-run` that prints both the unit list and the command it would
