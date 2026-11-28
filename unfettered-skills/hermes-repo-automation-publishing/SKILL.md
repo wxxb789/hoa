@@ -1,5 +1,5 @@
 ---
-name: repo-automation-publishing
+name: hermes-repo-automation-publishing
 description: Use when a scheduled job must publish into a shared repo.
 version: "0.1.0"
 license: MIT
@@ -179,11 +179,12 @@ semantics that make the automation safe to leave unattended.
     branch. Stage the published subtree explicitly (`git add -A -- <scope>`) and then assert the staged name
     list holds nothing outside `<scope>`, `git reset` + fail if it does. The engine's allowlist of roots is a
     first refusal only; the staged-set assertion is the binding check, because it also sees deletions and
-    renames. A modified submodule pointer is *normal* in a repo that tracks its refs as submodules and must
+    renames.    A modified submodule pointer is *normal* in a repo that tracks its refs as submodules and must
     never appear in a landing commit — and it is never inert either: the same pointer is what
     `status --porcelain` counts, so one left on a commit the branch does not record turns the align into
-    `deferred-dirty` and then `dirty-behind`, wedging the loop until a hand repair
-    (`references/git-delivery-engine.md` → *Wedge*). Generalize: the loop owns a path, not the worktree — the repo's other
+    `deferred-dirty` and then `dirty-behind`, wedging the loop until a hand repair. Prevent it instead:
+    reconcile the materialised submodules **in the repo's own wrapper, before the align** (rule 18) — repair
+    sequence and why the reconcile lives there: `references/git-delivery-engine.md` → *Wedge*. Generalize: the loop owns a path, not the worktree — the repo's other
     dirty paths are someone else's state. Append the repo to the member registry and leave every existing
     member's row untouched (one registry edit, no per-repo copy of the flow).
 16. **A gate that runs after the commit owns an uncommit, and resolves its own runner.** When the repo's
@@ -231,6 +232,30 @@ semantics that make the automation safe to leave unattended.
       `journalctl --user -u <unit> -n 30 --no-pager -o short-iso`, where `amended <sha>` followed by
       `held (min interval … left)` is the pair proving the amend ran and the push was deferred by the floor
       rather than failing.
+
+18. **A ref corpus in the repo is read-only; freshness is owned by the repo, not by your loop.** A repo that
+    vendors third-party content — a `ref/<name>` submodule corpus, an imported tree — has one writer for
+    those paths and it is not the automation: the repo's own scheduled workflow advances the pointers, and
+    the loop's only relationship to them is to *follow* what the branch records.
+    - **Reconcile before the align, and only towards the recorded pointer.** Bring every *initialised*
+      submodule to the gitlink the branch records and no further — `git submodule update --checkout -- <path>`
+      skips uninitialised entries, so a pointer-only corpus stays pointer-only, and it aborts rather than
+      discard local edits inside one. A worktree left on an older commit is tracked-dirty and wedges the
+      align (rule 15). Keep the step in the repo's wrapper, never in the shared engine: it is a repo-shape
+      fact, and the engine stays generic.
+    - **Never widen it into a refresh.** No `git fetch` and no `--remote` inside the corpus, and no write
+      inside one, ever: advancing the worktree past the recorded pointer reproduces the dirty state the
+      reconcile exists to remove, and authorship of that content is the repo's, not the agent's. Reading it
+      is expected — it is a source, so a copy may legitimately be materialised for reading; only its
+      freshness is not yours to drive.
+    - **Not a git hook.** Hooks are per-clone and unversioned, and their trigger set does not line up with how
+      the loop moves the branch (`post-merge` never fires for the rebase that actually advances it) — the
+      wrapper's pre-align step is the only place the reconcile is guaranteed to run. One no-op clean run plus
+      one real heal is the acceptance proof.
+    - **Prove it by re-injecting the failure**, not by reading the code: put the worktree back on an older
+      commit, run the loop's own entry point once, require the journal's realign line + exit 0 with no
+      refusal, then run it again and require silence (a clean tree must be a no-op, not a per-tick rewrite).
+      Recipe and the reconcile ordering: `references/git-delivery-engine.md` → *Wedge*.
 
 ## Decided-flow variant: direct push to the default branch
 

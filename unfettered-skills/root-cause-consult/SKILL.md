@@ -75,6 +75,12 @@ bytes are re-runnable and diffable.
 ## Procedure
 
 1. **Write the question as a file**, with the prohibitions above and an explicit "I will not act on that".
+   Consolidate the traces it must judge into a **dossier beside it** first: the contract paragraph, the
+   acceptance clauses, the apparatus size, the per-round series (reviewed-diff bytes, finding count, clean
+   rounds), the findings grouped into classes with **short IDs**, and your hypotheses with the evidence path
+   beside each. The series is what lets the lane answer the classification and bound questions instead of
+   restating your hypothesis, and the class IDs are what make its mapping checkable and the next round
+   diffable.
 2. **Give at least one lane read access to the tree** (`--tools read,grep,find,ls`) and point it at the
    readers, the helper and its tests, the contract paragraph, the plan and the evidence. A closed-book
    question about code returns a plausible design for code the model has not read — so when a closed-book
@@ -95,7 +101,11 @@ bytes are re-runnable and diffable.
    closed-book lane demanding a whole new layer because it cannot see the seam, against a tools lane citing
    the line that already carries it, is resolved by reading that line. The resolution usually **narrows** the
    root cause ("the mechanism is missing" → "its coverage is incomplete"), which changes the option set you
-   put to the owner, so do this before the round, never after.
+   put to the owner, so do this before the round, never after. Write the result as a **claim → verdict → evidence table**
+   beside the answer (`adjudication.md` in the run dir) with three verdicts — confirmed,
+   refuted-or-imprecise, unproven — and hand the owner the corrections together with the fork: a diagnosis
+   whose fork survives is still reported with what it got wrong, because that is what makes the fork
+   trustworthy instead of quoted. Claim-type checks: `references/adjudicating-an-answer.md`.
 6. **Do not dispatch the implementation round while the root answer is in flight.** A round dispatched on a
    recipe locks the framing in: it rewrites the function the way the last reviewer's counterexample wanted,
    the tree stays green, and the class survives. If a round is already running under the wrong framing, stop
@@ -112,6 +122,14 @@ fail to decrease strictly across a few rounds. Do **not** express the bound as a
 cap and a signal predicate are different things, and a hard round cap silently turns any larger `MAX_*`
 constant into dead code — keep exactly one of each (a *signal* and an *absolute cap*), and say in the code
 which one decides what.
+
+**A bound already written down decides the fork — evaluate the run against it and quote it verbatim.** When
+the repo's operating contract carries the trip conditions, check the current run against each before writing
+the consult (diff growth in the round, whether the finding count ever strictly decreased, ordinary rounds
+past the cap) and put the quoted clause in front of the owner. The ask then becomes "execute the rule you
+wrote", the option that continues patching is priced as a contract violation rather than a judgement call,
+and the ancestry — how many attempts already closed unmerged — is the number that makes re-decomposition
+cheaper than another round.
 
 When it trips, do not raise the cap. **Supersede the increment:** close the branch unmerged (tag its head
 first, so nothing becomes unreachable), keep its review log as an adversarial-shape corpus, and rewrite the
@@ -194,50 +212,9 @@ The same lane answers a second question — *is this design right?* — asked ab
 plan, an interface, a contract change) **before** the owner is asked to decide it, sometimes because the
 owner required exactly that order ("have the proposal read by <model>, integrate what it says, then bring it
 to me for approval"). Keep the shapes apart: a defect consult asks for a root cause, a design consult asks
-for a position — so it must also demand the argument *against* that position.
+for a position, so it must also demand the argument *against* that position. Prompt shape, the option-set
+brief, the stateless-lane rule and the GO / NO-GO gap check: `references/design-consult.md`.
 
-Prompt shape that produced a usable answer:
-
-- Attach the draft itself as a file (`@<draft>.md`) plus a **separate question file** naming exactly what to
-  judge: each decision point's option set, and the questions you cannot settle yourself. Option sets written
-  inline on the command line are not re-runnable and cannot be diffed against the next round.
-- Ask per question for **the position, the strongest argument against that position, and what evidence would
-  settle it.** An answer without its own counter-argument is a vote, and a vote cannot be adjudicated.
-- Ask it to name **which of your questions is the real one** and why the others are downstream. The order you
-  wrote them in is rarely the dependency order, and the real question usually collapses two of yours.
-- Have it **attack the draft against the repository's own binding rules** (point it at `AGENTS.md`, the
-  core-design notes, the conventions) instead of against general taste — a design review that cites no file
-  is an opinion.
-- **When the owner asks for options, demand exactly N *distinct* schemes** — a different philosophy each,
-  not three shades of one — and for every scheme: a one-line thesis, the structural change, a mapping of the
-  fix to each problem, cost/risk/what it gives up, when to prefer it, and a migration path. Give the problems
-  **short IDs** in the brief (A1, B2, …) so the mapping is checkable and the next round diffable, and close by
-  asking for a ranked verdict plus the single highest-leverage choice — an unranked scheme set is raw material
-  labelled as a menu.
-- Give it read-only tools (`--tools read,grep,find,ls`) and state in the prompt that you will re-derive every
-  claim before adopting it. Advice, not a spec: the decision stays with the owner.
-- **Smoke-test the channel with a one-line probe before dispatching the long consult.** A misrouted provider
-  or model id fails identically on the real prompt but costs the whole timeout; the probe costs seconds and
-  prints its own verdict, which is what you report as "the channel works".
-  Read the probe's failure for what it is, and do not re-derive the id: a "not found for provider" is a missing
-  **catalog row** (the harness's own catalog, not the proxy's — restart the proxy for a stale one, add the row
-  when it is absent), while an HTTP 400 naming an endpoint ("… does not support the responses endpoint") is a
-  **transport** mismatch — the model exists but not on the transport the harness picked, so switch model inside
-  the same provider. A catalog lists existence, never transport.
-
-**Across several rounds of the same design the lane is stateless — restate the settled design in every brief.**
-A consult lane has no memory of its earlier answers (number the rounds #1, #2 … so "no memory of #N" is
-unambiguous), so each brief must re-carry the decision reached so far; a brief that assumes continuity gets an
-answer to a design you are no longer building. Close the pre-build round with a **gap check**: hand the lane
-your own numbered candidate gaps and ask it to confirm / refute / refine each, name any you missed, give a
-**GO / NO-GO plus the one thing to settle first**, and the minimal ordered first steps each with a one-line
-"done means". Then **verify the lane's blocking claims on the host before you accept the verdict** — a NO-GO is
-usually one cheap probe (does the sandbox actually run here? can the tool actually be withheld here?), and the
-probe's result, not the opinion, is what flips it to GO.
-
-Then **integrate, and only then ask the owner**: the consult's option set is raw material for the round
-(options, costs, your recommendation), never the owner's menu and never his answer. The round's own shape
-lives in `owner-decision-requests`.
 
 ## Operating the consult lane
 
@@ -258,6 +235,13 @@ lives in `owner-decision-requests`.
   pass `--setenv=HOME=$HOME` and
   `--setenv=PATH=$HOME/.local/share/mise/shims:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin`, or a
   shim-provided `pi`/`omp` is `command not found` inside the unit while working fine in your shell.
+- **Invoke the unit's payload as `bash <script>`, never `exec <script>`, and never rely on the file tool
+  setting an executable bit.** A script the file tool just wrote lands `0644`, so `exec` fails with
+  `Permission denied` and the unit exits `126` within a second — the launch line still says `Running as
+  unit`, the answer file is absent and stderr is empty, which reads exactly like a very fast lane. Tell them
+  apart by `systemctl --user is-active <unit>` **after** a wait (≈20–30 s) plus the answer file's byte
+  count, and read `journalctl --user -u <unit>` when the unit is already gone. Give the unit
+  `--working-directory` on the run dir so relative paths inside the script resolve.
 - **Wake yourself with a monitor instead of blocking the turn.** One background job
   (`notify_on_complete=true`) polls both units until neither is `active`, then prints a **short** marker —
   completion time, byte counts, a tail of each answer — and you read the report files yourself. A

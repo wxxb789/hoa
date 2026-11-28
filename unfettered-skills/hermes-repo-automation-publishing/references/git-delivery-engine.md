@@ -100,19 +100,21 @@ the module rather than a hand `git push` (a hand push lands the object but drops
 contract), and write the repair into the loop's own journal — the journal is what the next triage reads, and
 an unexplained `dirty-behind` followed by silence re-diagnoses from scratch.
 
-Prevent it at the source rather than triaging it: a repo that keeps a **materialised** ref worktree should
-reconcile on every tick — before the align, so the dirty state never reaches the engine, and again on the way
-out, because a rebase that records the remote's newer pointer leaves the worktree behind and the next person
-to run `git status` sees a diff that is nobody's edit. Bring every *initialised* submodule to the gitlink the
-branch records, and no further. Three constraints keep that safe: touch initialised submodules only (a bare
+Prevent it at the source rather than triaging it: a repo that keeps a **materialised** ref worktree can
+reconcile before the align ever runs — bring every *initialised* submodule to the gitlink the branch records,
+and no further. Two constraints keep that safe: touch initialised submodules only (a bare
 `git submodule update --checkout <path>` skips the uninitialised rest, so a pointer-only corpus stays
-pointer-only), let the update abort rather than discard local edits inside one, and never turn a finished run
-into a failure from the exit path. Never widen it into a refresh — an upstream fetch or `--remote` inside the
-refs advances the worktree past the recorded pointer and reproduces the dirty state this removes. The refs are
-read-only: the repo's own scheduled workflow owns which upstream commit each pointer names, and the loop only
-follows it. A clone that keeps one materialised should wire the same reconcile to `post-merge`,
-`post-rewrite` and `post-checkout`, or a hand `git pull` leaves that stale-pointer diff behind until the next
-tick.
+pointer-only) and let the update abort rather than discard local edits inside one. Never widen it into a
+refresh — an upstream fetch or `--remote` inside the refs advances the worktree past the recorded pointer and
+reproduces the dirty state this removes. The refs are read-only to the loop: the repo's own scheduled workflow
+owns which upstream commit each pointer names, and the loop only follows it. Put the reconcile in the repo's
+own wrapper as a pre-align step — not the shared engine (a repo-shape fact, keep the engine generic) and not a
+git hook (per-clone, unversioned, and `post-merge` never fires for the rebase that actually moves the branch).
+
+Prove the reconcile instead of reading it: `git -C <sub> checkout <older-sha>` (the exact drift that wedged
+it), assert ` M <sub>` in `status --porcelain`, run the loop's own entry point once, and require the journal's
+realign line, exit 0 and no refusal — then run it again and require a silent no-op. A reconcile that fires on
+a clean tree (a rewrite every tick) is a different defect from one that never fires.
 
 ## Deliver
 

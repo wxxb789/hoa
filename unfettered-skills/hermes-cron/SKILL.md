@@ -121,6 +121,16 @@ Create, audit, and repair scheduled jobs — including watchdogs that must stay 
 12. **Frequency follows fault cost, not curiosity.** Ask "how long can this be broken before it hurts?" —
     resource spikes need minutes, invariants and staleness need a day, cleanup sweeps need a night.
     A check whose finding is harmless for 24h at a 15-minute interval is pure scheduler load.
+    **Retention and cadence are one decision, not two.** A retention window is only as short as the
+    interval that enforces it: a 3-day retention on a weekly sweep is a 3-to-10-day retention, so quote
+    the *effective* window and never the configured one. When the owner's complaint is a resource filling
+    faster than expected, tighten the interval instead of adding a second job — a sweep that stays silent
+    below its report threshold costs no attention, which is what makes the extra runs free. Then pay the
+    bookkeeping in the same pass, because a schedule change invalidates every copy of the job's identity:
+    rename the job when its interval changes (`weekly disk reclaim` firing daily is a name the next audit
+    reads as coverage that no longer exists), and re-derive the places that quote the name/schedule — the
+    ops skill's cron sheet via its generator (never by hand) and the generated live inventory — instead of
+    editing those tables (rules 2, 10).
 13. **A threshold below the healthy steady state is a permanent alarm; alert on transitions.**
     Measure the steady value (and its range) before setting a threshold — a limit under normal usage is
     true forever. A cooldown does not bound the rate (measured: 2519 MB against an 1800 MB limit with a

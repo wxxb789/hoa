@@ -390,6 +390,12 @@ and its FAIL sends the next session hunting a defect that does not exist.
   the pre-write tree reports a cosmetic difference as data loss. Pair the byte compare with a parsed-data
   comparison and keep byte equality only for the case that must not vary — two runs of the same input
   producing the same bytes.
+- **Where byte equality is the contract, pin the translation with the encoding.** `write_text(text,
+  encoding="utf-8")` still opens in text mode with `newline=None`, so the host's own line separator is
+  written — on Windows every `\n` becomes `\r\n` — and a comparison against the intended string, or a
+  pinned digest of the file, is green on one platform leg and red only on the translating one. State
+  `newline="\n"` beside the encoding, or compare parsed content; a byte contract that moves with the host
+  is not a contract (mechanism: skill `code-review-gates`, reference *platform-premises*).
 - **Take each check's baseline immediately before the step it measures.** A baseline captured before an
   intervening write turns a correct rollback or restore into a FAIL. Sharing one baseline across a
   sequence of mutating steps is what produces it; recompute per step.

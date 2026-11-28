@@ -13,7 +13,9 @@ metadata:
 
 # Code review gates
 
-Topic depth: `references/platform-premises.md` — a suite leg that fails on one OS only (undeclared host premises: path grammar vs kernel semantics, dual-dialect assertions, the import-time host probe, the idiom lint).
+Topic depth: `references/platform-premises.md` — a suite leg that fails on one OS only (undeclared host premises: path grammar vs kernel semantics, dual-dialect assertions, the import-time host probe, the idiom lint, byte contracts vs line-ending translation).
+
+Triage depth: `references/red-leg-triage.md` — reading a red required step: the raw job log, cause vs cascade, host block vs repo rule.
 
 ## The reviewed revision is pinned to the PUSHED head
 

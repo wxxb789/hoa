@@ -96,7 +96,28 @@ seeded bad idiom that must be reported — then restore the planted file byte-ex
 and after) and re-run green. A plant left in the tree is not proof, and neither is reading the lint's own
 source.
 
-## 6. Say what only the real platform leg can answer
+## 6. A byte contract pins the line-ending translation, not just the encoding
+
+- Pinning `encoding="utf-8"` on a text-mode write leaves `newline=None`, so the host's own line separator
+  goes out with the text: on Windows every `\n` becomes `\r\n`. A case — or a declared fixture digest, a
+  manifest hash, a receipt — that compares the written bytes against the intended string is then green on
+  the leg that writes LF and red only on the leg that translates, and the red survives the encoding pin
+  that looks like it already addressed it.
+- Where byte equality is the contract, pin the translation beside the encoding (`newline="\n"`, or write
+  bytes from explicitly encoded text). Where CRLF is legitimate, compare parsed content or normalize both
+  sides by a stated rule — never leave the comparison resting on `os.linesep`.
+- Same family for every text surface whose bytes are the claim: a `subprocess` stream captured with
+  `text=True`, a generated config/CSV/TSV hashed into a manifest, a transcript compared verbatim. Read it
+  back in binary and decode explicitly.
+- **A stub that forces one platform mechanism does not cover the others on the same path.** A case that
+  patches the interpreter's encoding resolver (`io.text_encoding`) proves the `encoding=` pin and leaves
+  the line-ending translation untouched, so its local green is evidence about one of the two host
+  behaviours the write consults — and the untested one is exactly what the foreign leg reports.
+  Enumerate every host-dependent behaviour on the path (default encoding, line-ending translation,
+  separator, `os.linesep`, mode bits, path anchor), give each a real-leg oracle or its own forced answer,
+  and say in the case's own docstring which of them the stub covers.
+
+## 7. Say what only the real platform leg can answer
 
 Write the boundary down where the suite's claims are stated: the target platform's real syscalls, the
 probe's own values on that platform, open-handle/locking semantics, and end-to-end foreign-absolute paths
