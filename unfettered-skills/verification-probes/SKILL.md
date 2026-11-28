@@ -65,6 +65,16 @@ the subject's own discovery rules, never from an assumed layout: an identifier t
 as "nothing to suppress" and the pair then passes for the wrong reason. Design rules for the switch itself
 (where it lives, what it may not hide): skill `mechanical-gate-design` §13.
 
+**A seam that switches a production guard OFF leaves that guard itself unverified.** An env override added so
+a fixture can flow through the subject (`<X>_SELF_ID=0` to stop a collector filtering its own author, a
+`--no-validate` flag) means the run proves the downstream path only: with the guard bypassed, nothing has
+exercised the exclusion the production run depends on, so a green fixture says nothing about it. Close it with
+two extra reads — one run at the **shipped default**, asserting the excluded input never reaches the artifact,
+and a sentence naming which seam the fixture disabled — and state the default in the seam's own docstring so
+the bypass is not mistaken for the behaviour. Then clean up the seam's fixtures (the test rows in the live
+store, the scratch copy of the artifact) and re-read the real artifact's digest: a seam that bypasses a write
+guard is exactly where a test row survives into production.
+
 ## 1.5 A gate is a probe with a validity window
 
 Two things void a gate result even when the gate itself is honest.
@@ -446,6 +456,15 @@ byte-identical output (`<tool> --list > /tmp/now.txt`, previous bytes back in th
 `diff -q`). The listing is the contract the change was not supposed to touch — a reader reconstructing the
 plan from a diff has to be right about every branch, while the tool prints the answer. Pair it with the pin
 (§4): the listing proves nothing was re-selected, the reverted implementation proves the new tests bite.
+
+**A machine-written section inside a file other writers also own is proven with three digests, not one.**
+When the writer replaces one managed block of a shared file (a daily note that other tools also rewrite, a
+config a formatter also touches), take `sha256` of (a) the whole file, (b) the bytes **outside** the managed
+markers, and (c) the section itself, then run the writer twice: all three must be stable, which is what tells
+idempotence apart from "the second run ate the other writer's edit". Follow with the *other* writer's run and
+require (b) unchanged while (c) survives — a single whole-file digest cannot distinguish those two outcomes,
+and it is the one digest a crash report will quote. Record the empty-string digest (`e3b0c442…`) as the
+"no section yet" signature before reporting a blank section hash as corruption.
 
 ## 5.5 Probe the contract the artifact now has, not the one the harness remembers
 

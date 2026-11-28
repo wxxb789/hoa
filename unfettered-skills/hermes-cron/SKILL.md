@@ -50,6 +50,12 @@ Create, audit, and repair scheduled jobs — including watchdogs that must stay 
    For a checker that can keep finding the **same** issue, persist a findings hash
    (`~/.hermes/cache/<name>-state.json`) and print only when the set changes; a permanent finding that
    re-alerts every run trains the owner to ignore the channel. `--verbose` should still dump everything.
+   **A silent-by-design job still needs an alarm, or its failures are journal-only.** With `deliver: local`
+   (or empty stdout) and no failure target set, a crash is written to `cron/output/<id>/` and reaches
+   nobody. Set the failure target (`failure_deliver`) and confirm it — together with `deliver`,
+   `no_agent`, `script` and `timezone` — by reading the job's own record back out of `jobs.json`:
+   `cron list` prints a subset of the definition, and the field your create/edit never mentioned is the
+   one that costs you (rules 4, 32).
 3. **Agent-run jobs must be self-contained**: fresh session; prior context exists only through explicitly
    configured attachment/continuity. Supply evidence paths and output rules even when continuity is on;
    scheduled runs cannot resolve missing requirements interactively. Verify the writer's persisted context
